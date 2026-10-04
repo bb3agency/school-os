@@ -823,6 +823,15 @@ class SchoolKnowledgeService:
                     withheld=not shown or c.title is None,
                 )
             )
+        if row.status not in repo.EARLIER_STATUSES:
+            # A cancelled or failed answer keeps the UNCHECKED preview and has no citations: it
+            # may quote any passage or record the model was given, so every one of them must
+            # still be visible (invariant 8).
+            withheld_any |= not all(
+                visibility.visible(str(item.get("source", "")))
+                for item in (row.retrieved or [])
+                if isinstance(item, dict)
+            )
         answer = None if withheld_any else conversations.answer_of(session, row)
         return MessageOut(
             query_id=row.id,
@@ -983,7 +992,10 @@ class SchoolKnowledgeService:
         return [self._memory_out(i) for i in memory.items(session, ctx.user_id, now)]
 
     def _screened(self, session: Session, ctx: UserContext, text: str) -> str:
-        """The item text after every screen, or the refusal (422 / 503)."""
+        """The item text after every screen, or the refusal (422 / 503). The screen is a model
+        call metered as Ask, so it counts against the per-user question rate first (429): one
+        person cannot drain the school's shared rate limit or budget (SEC-020)."""
+        self.admit(ctx)
         note = conversations.tidy(nfc(text))
         verdict = memory.screen(
             self.runtime.gateway, Metering(tenant_id=ctx.tenant_id, feature="ask"), note, set()

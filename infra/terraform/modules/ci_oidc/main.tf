@@ -180,9 +180,20 @@ data "aws_iam_policy_document" "plan" {
   dynamic "statement" {
     for_each = var.state_bucket_arn == null ? [] : [1]
     content {
-      sid       = "StateReadAndLock"
-      actions   = ["s3:GetObject", "s3:ListBucket", "s3:PutObject", "s3:DeleteObject"]
+      sid       = "StateRead"
+      actions   = ["s3:GetObject", "s3:ListBucket"]
       resources = [var.state_bucket_arn, "${var.state_bucket_arn}/*"]
+    }
+  }
+
+  # The plan role trusts every same-repo pull request, so it may write only the S3-native lock
+  # files (use_lockfile), never the state itself (SEC-009: a PR cannot rewrite the state that apply trusts).
+  dynamic "statement" {
+    for_each = var.state_bucket_arn == null ? [] : [1]
+    content {
+      sid       = "StateLockOnly"
+      actions   = ["s3:PutObject", "s3:DeleteObject"]
+      resources = ["${var.state_bucket_arn}/*.tflock"]
     }
   }
 

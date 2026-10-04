@@ -29575,7 +29575,7 @@
         ]
       },
       "post": {
-        "description": "Add a memory item: your own preference or work context (e.g. \"Keep answers short\").\nNever details about students, parents or other staff: refused with 422\n(``memory_personal_number``, ``memory_date``, ``memory_long_number``, ``memory_others``,\n``memory_unsure``, ``memory_too_long``); 503 ``memory_check_unavailable`` when the check\ncannot run; 409 ``memory_off`` or ``memory_full``.",
+        "description": "Add a memory item: your own preference or work context (e.g. \"Keep answers short\").\nNever details about students, parents or other staff: refused with 422\n(``memory_personal_number``, ``memory_date``, ``memory_long_number``, ``memory_others``,\n``memory_unsure``, ``memory_too_long``); 503 ``memory_check_unavailable`` when the check\ncannot run; 409 ``memory_off`` or ``memory_full``; 429 ``ai_rate_limited`` (the item check\ncounts against your per-minute question limit).",
         "operationId": "create_memory_api_v1_knowledge_memories_post",
         "requestBody": {
           "content": {
@@ -29652,7 +29652,7 @@
         ]
       },
       "patch": {
-        "description": "Edit one of your memory items (``If-Match``; checked again like a new item).",
+        "description": "Edit one of your memory items (``If-Match``; checked again like a new item, 429\n``ai_rate_limited`` included).",
         "operationId": "update_memory_api_v1_knowledge_memories__memory_id__patch",
         "parameters": [
           {

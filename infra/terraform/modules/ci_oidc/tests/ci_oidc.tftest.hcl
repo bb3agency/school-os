@@ -56,3 +56,30 @@ run "apply_role_optional" {
     error_message = "The administrative apply role is opt-in."
   }
 }
+
+# SEC-009: the plan role trusts every same-repo pull request, so it may write only the S3-native
+# lock files, never the state that the apply role later trusts.
+run "plan_role_cannot_write_state" {
+  command = plan
+
+  variables {
+    state_bucket_arn = "arn:aws:s3:::sos-test-tfstate"
+  }
+
+  assert {
+    condition = alltrue(flatten([
+      for s in data.aws_iam_policy_document.plan.statement : [
+        for r in s.resources : endswith(r, ".tflock")
+      ] if length(setintersection(toset(s.actions), toset(["s3:PutObject", "s3:DeleteObject", "s3:*"]))) > 0
+    ]))
+    error_message = "The plan role may put or delete only *.tflock objects in the state bucket."
+  }
+
+  assert {
+    condition = anytrue([
+      for s in data.aws_iam_policy_document.plan.statement :
+      contains(s.actions, "s3:PutObject") && contains(s.resources, "arn:aws:s3:::sos-test-tfstate/*.tflock")
+    ])
+    error_message = "The plan role can still take the S3-native state lock."
+  }
+}

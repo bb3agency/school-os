@@ -449,6 +449,10 @@ class Settings(BaseSettings):
                 value: SecretStr = getattr(self, name)
                 if "dev-only" in value.get_secret_value():
                     raise ValueError(f"{name} uses a dev-only default in {self.env}")
+            # The heartbeat answer (announcements shown to school users) is not signed: only TLS
+            # authenticates the control plane to a dedicated host (SEC-009).
+            if self.control_plane_url is not None and not _is_public_https(self.control_plane_url):
+                raise ValueError(f"SOS_CONTROL_PLANE_URL must be a public https URL in {self.env}")
             # Invoices are tax documents: never issue them with the placeholder supplier. Only the
             # shared tier runs the control plane (billing); dedicated hosts never invoice.
             invoicing = self.deployment_mode is DeploymentMode.SHARED

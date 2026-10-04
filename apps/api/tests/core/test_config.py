@@ -89,3 +89,36 @@ def test_every_setting_is_documented_in_docs_10_section_11() -> None:
         alias = field.validation_alias
         names.add(alias if isinstance(alias, str) else f"SOS_{field_name.upper()}")
     assert sorted(names - documented) == []
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://admin.schoolos.example",
+        "https://localhost:8000",
+        "https://127.0.0.1",
+        "ftp://admin.schoolos.example",
+    ],
+)
+def test_SEC_009_prod_rejects_a_control_plane_url_that_is_not_public_https(url: str) -> None:
+    """The heartbeat answer (announcements shown to school users) is not signed, so a
+    dedicated host talks to the control plane over public https only (SEC-009, FR-PLT-026)."""
+    from app.core.config import DeploymentMode
+
+    with pytest.raises(ValidationError, match="SOS_CONTROL_PLANE_URL"):
+        _prod(deployment_mode=DeploymentMode.DEDICATED, control_plane_url=url)
+
+
+def test_SEC_009_prod_accepts_a_public_https_control_plane_url() -> None:
+    from app.core.config import DeploymentMode
+
+    s = _prod(
+        deployment_mode=DeploymentMode.DEDICATED,
+        control_plane_url="https://admin.schoolos.example",
+    )
+    assert s.control_plane_url == "https://admin.schoolos.example"
+
+
+def test_SEC_009_local_allows_a_plain_http_control_plane_url() -> None:
+    s = Settings(env=Environment.LOCAL, control_plane_url="http://localhost:8000")
+    assert s.control_plane_url == "http://localhost:8000"

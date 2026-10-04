@@ -2644,7 +2644,8 @@ export interface paths {
          *     Never details about students, parents or other staff: refused with 422
          *     (``memory_personal_number``, ``memory_date``, ``memory_long_number``, ``memory_others``,
          *     ``memory_unsure``, ``memory_too_long``); 503 ``memory_check_unavailable`` when the check
-         *     cannot run; 409 ``memory_off`` or ``memory_full``.
+         *     cannot run; 409 ``memory_off`` or ``memory_full``; 429 ``ai_rate_limited`` (the item check
+         *     counts against your per-minute question limit).
          */
         post: operations["create_memory_api_v1_knowledge_memories_post"];
         /**
@@ -2676,7 +2677,8 @@ export interface paths {
         head?: never;
         /**
          * Update Memory
-         * @description Edit one of your memory items (``If-Match``; checked again like a new item).
+         * @description Edit one of your memory items (``If-Match``; checked again like a new item, 429
+         *     ``ai_rate_limited`` included).
          */
         patch: operations["update_memory_api_v1_knowledge_memories__memory_id__patch"];
         trace?: never;

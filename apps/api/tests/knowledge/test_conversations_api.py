@@ -720,18 +720,56 @@ def test_search_my_conversations_is_offered_and_cited_through_the_answer_loop(
     world: Any, api: Any, admin_engine: Engine, fake: Any
 ) -> None:
     who = _person(admin_engine, world)
-    _ask(api, who, "When does the Quokka camp start?")
+    meta = _ask(api, who, "When does the Quokka camp start?")[0][1]
     ctx = K.SW.ctx_for(world.a.tenant_id, who, "office_staff")
     tools = composition.runtime().tools
     with tenant_session(world.a.tenant_id, who.user_id) as s:
         names = [t.spec.name for t in offered(tools, ctx, s)]
         visibility = SourceVisibility(s, ctx)
         conv = repo.recent_conversations(s, who.user_id, 1)[0]
-        source = f"sos://conversation/{conv.id}#q{uuid.uuid4()}"
+        source = f"sos://conversation/{conv.id}#q{meta['query_id']}"
         assert visibility.visible(source)
+        # A question that is not in that conversation is not a source (fail closed).
+        assert not visibility.visible(f"sos://conversation/{conv.id}#q{uuid.uuid4()}")
         other = K.SW.ctx_for(world.a.tenant_id, _person(admin_engine, world), "office_staff")
         assert not SourceVisibility(s, other).visible(source)
     assert "search_my_conversations" in names
+
+
+def test_invariant_8_an_earlier_chat_is_a_source_only_while_what_it_cited_is_visible(
+    world: Any, api: Any, admin_engine: Engine, fake: Any
+) -> None:
+    """``search_my_conversations`` hands the model an earlier ANSWER as a passage, and a new
+    answer may cite it as ``sos://conversation/...#q...``. That earlier answer quoted other
+    sources; once the person can no longer see them, the chat that repeats them is withheld
+    too (history, context, summaries), as for a verified answer (invariant 8)."""
+    who = _person(admin_engine, world)
+    doc, _ = K.text_document(
+        admin_engine,
+        world.a,
+        PRIVATE,
+        title="Yak committee",
+        acl=[("membership", str(who.membership_id))],
+    )
+    first = _ask(api, who, "When does the Yak committee meet?")
+    assert any(str(doc) in d["source"] for e, d in first if e == "citation")
+    meta = first[0][1]
+    source = f"sos://conversation/{meta['conversation_id']}#q{meta['query_id']}"
+    ctx = K.SW.ctx_for(world.a.tenant_id, who, "office_staff")
+    with tenant_session(world.a.tenant_id, who.user_id) as s:
+        assert SourceVisibility(s, ctx).visible(source)
+    with admin_engine.begin() as c:  # access withdrawn
+        c.execute(text("DELETE FROM kb.document_acl WHERE document_id = :d"), {"d": doc})
+        c.execute(
+            text(
+                "INSERT INTO kb.document_acl (tenant_id, document_id, principal_type, "
+                "principal_ref) VALUES (:t, :d, 'role', 'owner')"
+            ),
+            {"t": world.a.tenant_id, "d": doc},
+        )
+    K.pipeline().refresh_acl(world.a.tenant_id, doc)
+    with tenant_session(world.a.tenant_id, who.user_id) as s:
+        assert not SourceVisibility(s, ctx).visible(source)
 
 
 # --- logs ---------------------------------------------------------------------------------------
