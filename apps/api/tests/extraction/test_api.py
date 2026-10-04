@@ -350,6 +350,38 @@ def test_confirm_input_rules(world: Any, api: Any, admin_engine: Engine) -> None
     assert X.row_of(admin_engine, "sis.extraction_items", item_id)["status"] == "pending_review"
 
 
+def test_SEC_013_confirm_refuses_a_full_aadhaar_roll_number(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """Audit 2026-10-04, DL-03: ``roll_no`` was the one confirm input never checked for a full
+    Aadhaar number (the route has no body guard and enrolment did not check it), so a
+    Verhoeff-valid 12-digit "roll number" was stored in sis.enrollments and shown on every
+    roster, timeline and export (invariant 4)."""
+    a = world.a
+    who = a.people["office_admin"]
+    item_id, _ = _item(admin_engine, a)
+    number = X.valid_aadhaar_like(78)
+    res = api.call(
+        who,
+        "POST",
+        f"/api/v1/extraction-items/{item_id}/confirm",
+        json={
+            "fields": {"full_name": "Synthetica Roll Check"},
+            "section_id": str(a.ids["section_9a"]),
+            "roll_no": number,
+        },
+    )
+    assert res.status_code == 422, res.text
+    assert res.json()["errors"][0]["code"] == "aadhaar_full_number_rejected"
+    assert number not in res.text
+    with admin_engine.connect() as c:
+        stored: int = c.execute(
+            text("SELECT count(*) FROM sis.enrollments WHERE roll_no = :n"), {"n": number}
+        ).scalar_one()
+    assert stored == 0
+    assert X.row_of(admin_engine, "sis.extraction_items", item_id)["status"] == "pending_review"
+
+
 def test_reject_records_nothing(world: Any, api: Any, admin_engine: Engine) -> None:
     a = world.a
     item_id, item = _item(admin_engine, a)

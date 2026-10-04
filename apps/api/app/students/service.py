@@ -1115,6 +1115,9 @@ def _enrol(
     roll_no: str | None,
     started_on: dt.date | None,
 ) -> EnrollmentOut:
+    # Every enrolment path (API, imports, register extraction) ends here: a roll number is never
+    # a full Aadhaar number (invariant 4; audit 2026-10-04, DL-03).
+    reject_full_aadhaar({"roll_no": roll_no or ""})
     existing = repo.active_enrollment(session, student.id, section.academic_year_id, lock=True)
     if existing is not None and existing.section_id == section.id:
         raise Conflict("The student is already in this section.", code="already_enrolled")
@@ -1226,6 +1229,7 @@ def update_enrollment(
     student, enrollment = _owned_enrollment(session, ctx, student_id, enrollment_id)
     values: dict[str, Any] = {}
     if "roll_no" in fields:
+        reject_full_aadhaar({"roll_no": data.roll_no or ""})
         values["roll_no"] = data.roll_no
     if "section_id" in fields:
         if data.section_id is None:

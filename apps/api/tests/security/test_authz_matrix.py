@@ -364,7 +364,8 @@ def _m5_marks(w: Any, suffix: str = "") -> str:
 
 
 def _m5_sheet(kind: str) -> Builder:
-    """A fresh scanned import file visible to 9A's staff (the preview deletes it)."""
+    """A fresh scanned import file visible to 9A's staff, uploaded by the caller (the preview
+    reads and deletes only the caller's own upload, audit DL-04)."""
 
     def build(w: Any, r: str, a: Engine) -> Request:
         if kind == "attendance":
@@ -376,7 +377,7 @@ def _m5_sheet(kind: str) -> Builder:
         doc = D.make_document(
             a,
             w.a.tenant_id,
-            w.a.people["owner"].user_id,
+            w.a.people[r].user_id,
             acl=[("section", str(w.a.ids["section_9a"]))],
             purpose="import_file",
             doc_type="import_file",

@@ -121,6 +121,57 @@ def test_PRV_015_valid_aadhaar_is_masked(text: str, expected: str) -> None:
     assert mask_aadhaar(text) == expected
 
 
+GAPS = [
+    "\t",  # copied from a spreadsheet
+    "\n",  # wrapped in a text area
+    "\r\n",
+    "   ",  # three spaces (PDF copy, OCR)
+    "\u2002",  # en space
+    "\u2003",  # em space
+    "\u2009",  # thin space
+    "\u202f",  # narrow no-break space
+    "\u3000",  # ideographic space
+    "\u200b",  # zero-width space
+    "\ufeff",  # zero-width no-break space
+    "\u2014",  # em dash
+    "\u2212",  # minus sign
+    "\uff0d",  # full-width hyphen-minus
+    "  -  ",
+    " \u2013 ",  # spaced en dash
+]
+
+
+@pytest.mark.parametrize("gap", ["    ", "\t\t\t\t", "\n\n\n\n\n", " -   ", "\u3000 \t \n "])
+def test_PRV_015_input_check_refuses_what_whitespace_collapsing_would_store(gap: str) -> None:
+    """DL-01: however wide the gap, the single-spaced text that would be stored is refused."""
+    raw = gap.join([VALID[:4], VALID[4:8], VALID[8:]])
+    assert contains_full_aadhaar(raw)
+    assert contains_full_aadhaar(re.sub(r"\s+", " ", raw))
+
+
+def test_PRV_015_structured_numbers_with_slashes_and_dots_are_not_joined() -> None:
+    """Dots, slashes and commas are not separators: invoice numbers (``SOS/2026-27/000123``),
+    dates and amounts must not read as Aadhaar numbers (audit DL-01 follow-up)."""
+    for serial in range(100, 1100):
+        text = f"SOS/2026-27/{serial:06d}"
+        assert not contains_full_aadhaar(text), text
+        assert redact(text) == text
+    assert not contains_full_aadhaar("1234.5678.9012 / 12/03/2026 / 1,234,567,890")
+
+
+@pytest.mark.parametrize("gap", GAPS)
+def test_PRV_015_any_gap_that_collapses_or_reads_as_a_separator_is_detected(gap: str) -> None:
+    """SEC-013 / invariant 4: input checks run on the raw text, and the stored value has its
+    whitespace collapsed to single spaces; a tab, line break, wide space or zero-width character
+    between the groups must not let a full Aadhaar number through (audit 2026-10-04, DL-01)."""
+    text = f"Ref {gap.join([VALID[:4], VALID[4:8], VALID[8:]])} end"
+    assert contains_full_aadhaar(text)
+    assert VALID[:4] not in mask_aadhaar(text)
+    assert masked(VALID) in mask_aadhaar(text)
+    assert masked(VALID) in redact(text)
+    assert [m.verhoeff for m in find_aadhaar(text)] == [True]
+
+
 def test_PRV_015_telugu_and_devanagari_digits_are_masked() -> None:
     for table in (TELUGU_DIGITS, DEVANAGARI_DIGITS):
         out = redact(f"సంఖ్య {spaced(VALID).translate(table)}")

@@ -279,6 +279,79 @@ def test_PRV_016_discard_tags_then_deletes_and_is_idempotent(s3_store: S3ObjectS
         s3_store.discard("elsewhere/original.png")
 
 
+VERSIONED_BUCKET = "sos-test-files-versioned"
+
+
+@pytest.fixture
+def versioned_store(s3_endpoint: str) -> tuple[S3ObjectStore, Any]:
+    """A versioned bucket, like the real files bucket (90-day noncurrent recovery window)."""
+    client = _client(s3_endpoint)
+    try:
+        client.create_bucket(Bucket=VERSIONED_BUCKET)
+    except client.exceptions.ClientError as exc:
+        if exc.response["Error"]["Code"] not in ("BucketAlreadyOwnedByYou", "BucketAlreadyExists"):
+            raise
+    client.put_bucket_versioning(
+        Bucket=VERSIONED_BUCKET, VersioningConfiguration={"Status": "Enabled"}
+    )
+    return S3ObjectStore(client, VERSIONED_BUCKET), client
+
+
+def _version_tags(client: Any, key: str) -> list[tuple[str, list[Any]]]:
+    out: list[tuple[str, list[Any]]] = []
+    for v in client.list_object_versions(Bucket=VERSIONED_BUCKET, Prefix=key).get("Versions", []):
+        if v["Key"] == key:
+            tags = client.get_object_tagging(
+                Bucket=VERSIONED_BUCKET, Key=key, VersionId=v["VersionId"]
+            )["TagSet"]
+            out.append((v["VersionId"], tags))
+    return out
+
+
+DISCARDED_TAGS = [{"Key": "sos-lifecycle", "Value": "discarded"}]
+
+
+def test_PRV_016_discard_tags_every_stored_version_of_the_key(
+    versioned_store: tuple[S3ObjectStore, Any],
+) -> None:
+    """Audit 2026-10-04, W3-07: the bucket is versioned, so a key written twice (an Aadhaar
+    image re-posted with the same presigned POST) keeps its first bytes as a noncurrent
+    version. ``discard`` tagged only the current version: the older one stayed for the 90-day
+    window instead of the 1-day ``discarded-1d`` rule. Every version must carry the tag."""
+    store, client = versioned_store
+    key = storage.document_key(uuid.uuid4(), uuid.uuid4(), 1, "png")
+    store.put(key, S.png(), "image/png")
+    store.put(key, S.png() + b"second", "image/png")
+    assert len(_version_tags(client, key)) == 2
+    store.discard(key)
+    assert store.head(key) is None
+    versions = _version_tags(client, key)
+    assert len(versions) == 2
+    assert all(tags == DISCARDED_TAGS for _, tags in versions), versions
+    store.discard(key)  # only noncurrent versions and a delete marker are left: still fine
+
+
+def test_PRV_016_purge_prefix_tags_noncurrent_versions_under_the_prefix(
+    versioned_store: tuple[S3ObjectStore, Any],
+) -> None:
+    """W3-07: a purge also reaches keys whose current version was deleted earlier (only
+    noncurrent versions are left, e.g. after a person's delete), and older versions of the
+    live keys."""
+    store, client = versioned_store
+    prefix = f"t/{uuid.uuid4()}/docs/{uuid.uuid4()}/"
+    live, gone = f"{prefix}v1/original.png", f"{prefix}v2/original.png"
+    store.put(live, S.png(), "image/png")
+    store.put(live, S.png() + b"again", "image/png")
+    store.put(gone, S.png(), "image/png")
+    store.delete(gone)  # a plain delete: noncurrent, 90-day window
+    assert store.purge_prefix(prefix) == 1
+    for key in (live, gone):
+        versions = _version_tags(client, key)
+        assert versions, key
+        assert all(tags == DISCARDED_TAGS for _, tags in versions), (key, versions)
+    assert store.purge_prefix(prefix) == 0
+
+
 def _stubbed_store() -> tuple[S3ObjectStore, Any]:
     client = boto3.client(
         "s3",
@@ -296,25 +369,51 @@ def test_PRV_016_discard_marks_the_object_for_the_short_lifecycle_rule() -> None
     ``discarded-1d`` (infra/terraform) expires that noncurrent version after one day."""
     store, client = _stubbed_store()
     key = "t/a/docs/b/v1/original.png"
+    tagging = {"TagSet": [{"Key": "sos-lifecycle", "Value": "discarded"}]}
+
+    def listed(*versions: tuple[str, str, bool]) -> dict[str, Any]:
+        return {
+            "Versions": [
+                {"Key": k, "VersionId": v, "IsLatest": latest} for k, v, latest in versions
+            ],
+            "IsTruncated": False,
+        }
+
     with Stubber(client) as stub:
         stub.add_response(
-            "put_object_tagging",
-            {},
-            {
-                "Bucket": BUCKET,
-                "Key": key,
-                "Tagging": {"TagSet": [{"Key": "sos-lifecycle", "Value": "discarded"}]},
-            },
+            "list_object_versions",
+            # An older version, the current one, and another key sharing the prefix.
+            listed((key, "v-new", True), (key, "v-old", False), (key + ".bak", "v-x", True)),
+            {"Bucket": BUCKET, "Prefix": key},
         )
+        for version in ("v-new", "v-old"):
+            stub.add_response(
+                "put_object_tagging",
+                {},
+                {"Bucket": BUCKET, "Key": key, "VersionId": version, "Tagging": tagging},
+            )
         stub.add_response("delete_object", {}, {"Bucket": BUCKET, "Key": key})
         store.discard(key)
         stub.assert_no_pending_responses()
-    for missing in ("NoSuchKey", "MethodNotAllowed"):  # gone, or only a delete marker is left
+    with Stubber(client) as stub:  # only a delete marker / noncurrent version left: no delete
+        stub.add_response(
+            "list_object_versions", listed((key, "v-old", False)), {"Bucket": BUCKET, "Prefix": key}
+        )
+        stub.add_response(
+            "put_object_tagging",
+            {},
+            {"Bucket": BUCKET, "Key": key, "VersionId": "v-old", "Tagging": tagging},
+        )
+        store.discard(key)
+        stub.assert_no_pending_responses()
+    for missing in ("NoSuchKey", "NoSuchVersion", "MethodNotAllowed"):  # removed meanwhile
         with Stubber(client) as stub:
+            stub.add_response("list_object_versions", listed((key, "v-old", False)))
             stub.add_client_error("put_object_tagging", service_error_code=missing)
             store.discard(key)
             stub.assert_no_pending_responses()
     with Stubber(client) as stub:
+        stub.add_response("list_object_versions", listed((key, "v-new", True)))
         stub.add_client_error("put_object_tagging", service_error_code="AccessDenied")
         with pytest.raises(storage.ObjectStoreError):
             store.discard(key)
@@ -330,18 +429,27 @@ def test_FR_DOC_007_purge_prefix_discards_every_page_of_a_large_prefix() -> None
     second = [f"{prefix}v1001/original.pdf", f"{prefix}v1001/derived/text.txt"]
     with Stubber(client) as stub:
         stub.add_response(
-            "list_objects_v2",
+            "list_object_versions",
             {
-                "Contents": [{"Key": k} for k in first],
+                "Versions": [{"Key": k, "VersionId": "v1", "IsLatest": True} for k in first],
                 "IsTruncated": True,
-                "NextContinuationToken": "page-2",
+                "NextKeyMarker": first[-1],
+                "NextVersionIdMarker": "v1",
             },
             {"Bucket": BUCKET, "Prefix": prefix},
         )
         stub.add_response(
-            "list_objects_v2",
-            {"Contents": [{"Key": k} for k in second], "IsTruncated": False},
-            {"Bucket": BUCKET, "Prefix": prefix, "ContinuationToken": "page-2"},
+            "list_object_versions",
+            {
+                "Versions": [{"Key": k, "VersionId": "v1", "IsLatest": True} for k in second],
+                "IsTruncated": False,
+            },
+            {
+                "Bucket": BUCKET,
+                "Prefix": prefix,
+                "KeyMarker": first[-1],
+                "VersionIdMarker": "v1",
+            },
         )
         for key in first + second:
             stub.add_response(
@@ -350,6 +458,7 @@ def test_FR_DOC_007_purge_prefix_discards_every_page_of_a_large_prefix() -> None
                 {
                     "Bucket": BUCKET,
                     "Key": key,
+                    "VersionId": "v1",
                     "Tagging": {"TagSet": [{"Key": "sos-lifecycle", "Value": "discarded"}]},
                 },
             )

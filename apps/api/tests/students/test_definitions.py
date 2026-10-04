@@ -84,6 +84,25 @@ def test_FR_STU_012_full_aadhaar_is_rejected_with_last4_message(text: str) -> No
     assert formatted not in str(exc.value.detail)
 
 
+@pytest.mark.parametrize(
+    "gap", ["\t", "\n", "   ", "      ", "\u2003", "\u202f", "\u200b", "\u2212"]
+)
+def test_FR_STU_012_full_aadhaar_with_any_gap_is_rejected_not_stored(gap: str) -> None:
+    """SEC-013 / invariant 4 (audit 2026-10-04, DL-01): the check ran on the raw text and the
+    value was then stored with its whitespace collapsed, so ``1234<TAB>5678<TAB>9012`` was
+    stored as ``1234 5678 9012``: a full Aadhaar number in sis.attribute_values."""
+    n = valid_aadhaar()
+    raw = gap.join([n[:4], n[4:8], n[8:]])
+    for target in (NAME, LAST4):
+        with pytest.raises(ValidationFailed) as exc:
+            validate_value(target, "aadhaar_as_printed", raw, today=TODAY)
+        assert _codes(exc) == [AADHAAR_CODE]
+    assert is_full_aadhaar(raw)
+    assert find_full_aadhaar({"notes": [raw]}) == ["notes.0"]
+    with pytest.raises(ValidationFailed):
+        normalize_phone(raw)
+
+
 def test_FR_STU_012_aadhaar_last4_accepts_exactly_four_digits() -> None:
     assert validate_value(LAST4, "aadhaar_as_printed", " 4821 ").plain == "4821"
     for bad in ("482", "48211", "48a1", "XXXX4821"):

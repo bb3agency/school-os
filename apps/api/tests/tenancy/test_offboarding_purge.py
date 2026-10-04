@@ -261,6 +261,41 @@ def test_ADR_0029_database_refuses_the_purge_role_without_offboarding_and_flag(
             s.execute(text(flagged + sql))
 
 
+def test_ADR_0029_the_purge_flag_lets_only_sos_purger_past_the_row_guards(
+    schools: tuple[School, School],
+) -> None:
+    """Audit 2026-10-04, DL-05: ``core.tenant_purge_allowed()`` checked only the flag and the
+    status, and the flag is a plain setting any role may set. sos_app holds DELETE on
+    sis.students (import revert), so with the flag set it removed students of an offboarding
+    school past the "only by reverting the import" guard without being sos_purger. Only the
+    purge role may use the flag."""
+    a, _ = schools
+
+    def delete_lone_student_as_app() -> None:
+        with tenant_session(a.tenant_id) as s:
+            flag = "SELECT set_config('app.purge_tenant', core.current_tenant()::text, true)"
+            s.execute(text(flag))
+            assert s.execute(text("SELECT current_user")).scalar_one() == "sos_app"
+            lone = uuid.uuid4()  # no enrolment or values: only the guard can stop the delete
+            s.execute(
+                text(
+                    "INSERT INTO sis.students (id, tenant_id, status) "
+                    "VALUES (:i, core.current_tenant(), 'active')"
+                ),
+                {"i": lone},
+            )
+            s.execute(text("DELETE FROM sis.students WHERE id = :i"), {"i": lone})
+
+    with pytest.raises(DBAPIError, match="students_delete_only_by_import_revert"):
+        delete_lone_student_as_app()
+    with tenant_session(a.tenant_id) as s:
+        s.execute(text("SELECT set_config('app.purge_tenant', core.current_tenant()::text, true)"))
+        assert s.execute(text("SELECT core.tenant_purge_allowed()")).scalar_one() is False
+        s.execute(text("SET LOCAL ROLE sos_purger"))
+        assert s.execute(text("SELECT core.tenant_purge_allowed()")).scalar_one() is True
+        s.execute(text("RESET ROLE"))
+
+
 def test_ADR_0029_purge_role_privileges_are_narrow(admin_engine: Engine) -> None:
     with admin_engine.connect() as c:
         role = c.execute(

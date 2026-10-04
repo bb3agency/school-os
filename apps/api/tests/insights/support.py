@@ -273,14 +273,21 @@ XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
 def sheet_document(
-    admin: Engine, school: Any, data: bytes, *, kind: str = "csv", section_key: str = "section_9a"
+    admin: Engine,
+    school: Any,
+    data: bytes,
+    *,
+    kind: str = "csv",
+    section_key: str = "section_9a",
+    uploader: str = "ct",
 ) -> uuid.UUID:
     """A virus-checked ``import_file`` upload of the school, visible to the section's staff
-    (ACL = the section, as the web registers it)."""
+    (ACL = the section, as the web registers it), uploaded by ``uploader`` (a person key: only
+    the person who uploaded a sheet may read it, audit DL-04)."""
     doc_id: uuid.UUID = D.make_document(
         admin,
         school.tenant_id,
-        school.people["owner"].user_id,
+        school.people[uploader].user_id,
         acl=[("section", str(school.ids[section_key]))],
         purpose="import_file",
         doc_type="import_file",
