@@ -7,6 +7,7 @@
  * (apps/web/README.md).
  */
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import type { components } from "@schoolos/api-client";
 import { createFakeIdp, type FakeIdp } from "../../src/test/fake-idp";
 import { askAnswer, askEvents, resetAsk } from "./ask-api";
 import { FILES_PREFIX, journeyAnswer, resetJourney } from "./journey-api";
@@ -138,7 +139,8 @@ const TENANT_SUMMARY = {
   created_at: "2026-06-01T04:30:00Z",
 };
 
-const PLAN = {
+/** Typed against the generated schemas so a new API field fails typecheck here. */
+const PLAN: components["schemas"]["PlanOut"] = {
   id: "0192f3a4-0000-7000-8000-00000000a001",
   code: "standard",
   name: "Standard",
@@ -157,9 +159,12 @@ const PLAN = {
   features: {},
   published_at: "2026-06-01T00:00:00Z",
   created_at: "2026-06-01T00:00:00Z",
+  one_time_fee_inr: "15000.00",
+  description: "Synthetic shared plan wording.",
+  row_version: 1,
 };
 
-const INVOICE = {
+const INVOICE: components["schemas"]["InvoiceOut"] = {
   id: "0192f3a4-0000-7000-8000-00000000c001",
   tenant_id: T1,
   subscription_id: SUB,
