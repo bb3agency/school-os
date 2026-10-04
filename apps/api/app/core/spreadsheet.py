@@ -48,6 +48,7 @@ CSV_BOM: Final = "﻿"  # Excel opens UTF-8 (Telugu) correctly only with a BOM
 FORMULA_TRIGGERS: Final = ("=", "+", "-", "@", "\t", "\r")
 NEUTRALISER: Final = "'"
 MAX_XLSX_CELL_CHARS: Final = 32_000  # XLSX allows 32,767 characters per cell
+MAX_ROW_CELLS: Final = 16_384  # XLSX's last column is XFD; no real row holds more cells
 
 _NUMERIC_RE: Final = re.compile(r"^[+-]?[\d\s().,-]*$")
 _CSV_DELIMITERS: Final = ",;\t|"
@@ -121,6 +122,49 @@ def check_zip(data: bytes, limits: ReadLimits) -> None:
         ratio = info.file_size / max(info.compress_size, 1)
         if info.file_size > 1_000_000 and ratio > limits.xlsx_max_compression_ratio:
             raise SpreadsheetError("file_too_complex")
+    _check_row_widths(data)
+
+
+_ROW_OR_CELL_RE: Final = re.compile(rb"<(?:[A-Za-z_][\w.-]*:)?(row|c)[\s/>]")
+_SCAN_CHUNK: Final = 1 << 20
+_SCAN_OVERLAP: Final = 64
+
+
+def _check_row_widths(data: bytes) -> None:
+    """Refuse a worksheet row holding more than :data:`MAX_ROW_CELLS` cell elements.
+
+    openpyxl builds a whole ``<row>`` (every ``<c>`` element) before yielding it, so one row of
+    millions of small cells inside the size and ratio limits costs gigabytes. This streams every
+    member (a worksheet part may have any name; the workbook relationships choose it) and counts
+    ``<c>`` start tags since the last ``<row>`` tag without parsing XML. Text never contains a
+    raw ``<``, so only markup is counted (SEC-017)."""
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        for info in archive.infolist():
+            if info.is_dir():
+                continue
+            cells = 0
+            pending = b""
+            try:
+                with archive.open(info) as member:
+                    while True:
+                        chunk = member.read(_SCAN_CHUNK)
+                        window = pending + chunk
+                        # A tag starting in the last bytes may be cut: look at it next round.
+                        end = len(window) - _SCAN_OVERLAP if chunk else len(window)
+                        for match in _ROW_OR_CELL_RE.finditer(window, 0, len(window)):
+                            if match.start() >= end:
+                                break
+                            if match.group(1) == b"row":
+                                cells = 0
+                            else:
+                                cells += 1
+                                if cells > MAX_ROW_CELLS:
+                                    raise SpreadsheetError("too_many_columns")
+                        if not chunk:
+                            break
+                        pending = window[max(end, 0) :]
+            except (zipfile.BadZipFile, NotImplementedError, RuntimeError, OSError) as exc:
+                raise SpreadsheetError("file_unreadable") from exc
 
 
 def xlsx_rows(data: bytes, limits: ReadLimits) -> Iterator[tuple[int, list[Cell]]]:
@@ -207,6 +251,8 @@ def csv_rows(data: bytes, limits: ReadLimits) -> Iterator[tuple[int, list[Cell]]
         for row_no, raw in enumerate(reader, start=1):
             if row_no > limits.max_scanned_rows:
                 raise SpreadsheetError("too_many_rows")
+            if len(raw) > MAX_ROW_CELLS:
+                raise SpreadsheetError("too_many_columns")
             cells = []
             for value in raw:
                 clean = _normalise_text(value)
