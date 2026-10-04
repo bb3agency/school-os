@@ -31,6 +31,11 @@ export interface ActionDialogProps<TSchema extends z.ZodType, TResult> {
   triggerVariant?: ButtonVariant;
   triggerSize?: ButtonSize;
   triggerDisabled?: boolean;
+  /**
+   * Hide the trigger but keep the dialog mounted, so a dialog that is open stays open (with its
+   * error) when the thing it acts on becomes read-only behind it.
+   */
+  triggerHidden?: boolean;
   /** Extra accessible description for the trigger (e.g. which row it acts on). */
   triggerDescription?: string;
   title: ReactNode;
@@ -72,6 +77,7 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
   triggerVariant = "secondary",
   triggerSize = "md",
   triggerDisabled = false,
+  triggerHidden = false,
   triggerDescription,
   title,
   description,
@@ -131,12 +137,13 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
         size={triggerSize}
         onClick={show}
         disabled={triggerDisabled}
+        hidden={triggerHidden}
         aria-haspopup="dialog"
-        aria-describedby={triggerDescription ? triggerHintId : undefined}
+        aria-describedby={triggerDescription && !triggerHidden ? triggerHintId : undefined}
       >
         {triggerLabel}
       </Button>
-      {triggerDescription ? (
+      {triggerDescription && !triggerHidden ? (
         <span id={triggerHintId} className="sr-only">
           {triggerDescription}
         </span>

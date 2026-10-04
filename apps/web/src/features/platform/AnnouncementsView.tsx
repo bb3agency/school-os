@@ -1,8 +1,9 @@
 "use client";
 
 import type { Announcement } from "@schoolos/api-client";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { z } from "zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
@@ -12,7 +13,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { announcementTone, known } from "@/features/status";
-import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
+import { ApiError, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { cn } from "@/lib/cn";
 import { AnnouncementEditDialog, AnnouncementEditor } from "./AnnouncementEditor";
 import { PK, useCan } from "./data";
@@ -26,6 +27,19 @@ const SEVERITY_TONE: Record<(typeof SEVERITIES)[number], BadgeTone> = {
   critical: "danger",
 };
 
+/**
+ * The status the list shows: the stored one, or "ended" once the end time has passed (the API's
+ * rule, docs/16 §5.13: schools see a banner while starts <= now < ends). Cancelled and ended
+ * announcements are read-only (owner decision 2026-10-04).
+ */
+export function announcementDisplayStatus(
+  row: Pick<Announcement, "status" | "ends_at">,
+  at: number = Date.now(),
+): string {
+  if (row.status === "cancelled") return row.status;
+  return Date.parse(row.ends_at) <= at ? "ended" : row.status;
+}
+
 /** FR-PLT-026: EN/TE banners to all schools, a tier or listed schools, scheduled. */
 export function AnnouncementsScreen() {
   const t = useTranslations("platform.announcements");
@@ -37,7 +51,15 @@ export function AnnouncementsScreen() {
   const api = useBffClient("operator");
   const can = useCan();
   const manage = can("platform.announcements.manage");
+  const queryClient = useQueryClient();
   const [updated, setUpdated] = useState(false);
+  // The clock "ended" is read against: every minute, and again when the API refuses an edit
+  // or a cancel, so a banner that ended while its dialog was open loses Edit and Cancel at once.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
   const announcements = useApiQuery(
     [...PK.announcements, "list"],
     async () => (await unwrap(api.GET("/api/v1/platform/announcements"))).data,
@@ -53,7 +75,9 @@ export function AnnouncementsScreen() {
 
   function item(row: Announcement) {
     const severity = SEVERITIES.find((candidate) => candidate === row.severity);
-    const status = known(announcementTone, row.status);
+    const shown = announcementDisplayStatus(row, now);
+    const status = known(announcementTone, shown);
+    const readOnly = shown === "cancelled" || shown === "ended";
     return (
       <li
         key={row.id}
@@ -68,7 +92,7 @@ export function AnnouncementsScreen() {
           {status ? (
             <Badge tone={announcementTone[status]}>{tstatus(status)}</Badge>
           ) : (
-            <Badge>{row.status}</Badge>
+            <Badge>{shown}</Badge>
           )}
           <Pill variant="tag">{audienceLabel(row)}</Pill>
         </div>
@@ -90,13 +114,27 @@ export function AnnouncementsScreen() {
             <MonoTime value={row.ends_at} />
           </dd>
         </dl>
-        {manage && row.status !== "cancelled" ? (
-          <div className="mt-auto flex flex-wrap justify-end gap-2 border-t border-border pt-3">
-            <AnnouncementEditDialog row={row} onSaved={() => setUpdated(true)} />
+        {manage ? (
+          <div
+            className={
+              readOnly
+                ? "contents"
+                : "mt-auto flex flex-wrap justify-end gap-2 border-t border-border pt-3"
+            }
+          >
+            {/* Read-only (ended or cancelled): no Edit and no Cancel, but a dialog opened
+                before that stays open with its explanation (the list refreshes behind it). */}
+            <AnnouncementEditDialog
+              row={row}
+              hidden={readOnly}
+              onSaved={() => setUpdated(true)}
+              onRefused={() => setNow(Date.now())}
+            />
             <ActionDialog
               triggerLabel={t("cancelAnnouncement")}
               triggerSize="sm"
               triggerVariant="ghost"
+              triggerHidden={readOnly}
               triggerDescription={row.title_en}
               title={t("cancelTitle")}
               description={t("cancelBody")}
@@ -104,14 +142,24 @@ export function AnnouncementsScreen() {
               confirmVariant="danger"
               schema={z.object({})}
               invalidate={[PK.announcements]}
+              errorNamespace="platform.announcements"
               onSuccess={() => setUpdated(false)}
-              submit={() =>
-                unwrap(
-                  api.POST("/api/v1/platform/announcements/{announcement_id}/cancel", {
-                    params: { path: { announcement_id: row.id } },
-                  }),
-                )
-              }
+              submit={async () => {
+                try {
+                  return await unwrap(
+                    api.POST("/api/v1/platform/announcements/{announcement_id}/cancel", {
+                      params: { path: { announcement_id: row.id } },
+                    }),
+                  );
+                } catch (failure) {
+                  // It ended while the dialog was open: say so and refresh the list.
+                  if (failure instanceof ApiError && failure.status === 409) {
+                    setNow(Date.now());
+                    void queryClient.invalidateQueries({ queryKey: PK.announcements });
+                  }
+                  throw failure;
+                }
+              }}
             />
           </div>
         ) : null}

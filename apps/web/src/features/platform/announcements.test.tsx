@@ -1,17 +1,21 @@
 import type { Announcement } from "@schoolos/api-client";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
 import { intlErrors, messages, renderWithIntl } from "@/test/render";
 import { utcToLocalDateTime } from "./AnnouncementEditor";
-import { AnnouncementsScreen } from "./AnnouncementsView";
+import { announcementDisplayStatus, AnnouncementsScreen } from "./AnnouncementsView";
 
 /**
  * Editing an announcement (FR-PLT-026, docs/16 §5.13): PATCH with If-Match, the same fields
- * and limits as a new one, hidden without `platform.announcements.manage` and on cancelled
- * announcements, plain-language errors. Synthetic data only.
+ * and limits as a new one, hidden without `platform.announcements.manage` and on cancelled or
+ * ended announcements (owner decision 2026-10-04), plain-language errors. The clock is pinned
+ * (only `Date`) so "ended" does not depend on the day the tests run. Synthetic data only.
  */
+
+/** Before every announcement below starts (they run 2026-10-11 00:30–01:30 UTC). */
+const NOW = new Date("2026-10-04T06:00:00Z");
 
 const OP = "0192f3a4-0000-7000-8000-0000000000f1";
 const T1 = "0192f3a4-0000-7000-8000-000000000001";
@@ -19,6 +23,7 @@ const T2 = "0192f3a4-0000-7000-8000-000000000002";
 const A1 = "0192f3a4-0000-7000-8000-00000000c101";
 const A2 = "0192f3a4-0000-7000-8000-00000000c102";
 const a = messages.en.platform.announcements;
+const s = messages.en.status.announcement;
 const api = messages.en.errors.api;
 const PATCH_A1 = `PATCH /bff/api/v1/platform/announcements/${A1}`;
 
@@ -69,6 +74,8 @@ function listing(rows: Announcement[]) {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
   stub = installBffStub("operator");
   signedIn(["platform.tenants.read", "platform.announcements.manage"]);
   stub.routes["GET /bff/api/v1/platform/tenants"] = () =>
@@ -78,6 +85,7 @@ beforeEach(() => {
     ]);
 });
 afterEach(() => {
+  vi.useRealTimers();
   uninstallBffStub();
   expect(intlErrors).toEqual([]);
 });
@@ -205,7 +213,8 @@ describe("edit an announcement (FR-PLT-026)", () => {
     renderWithIntl(<AnnouncementsScreen />);
     const { user, dialog } = await openEdit();
     await user.click(within(dialog).getByRole("button", { name: a.editSave }));
-    expect(await within(dialog).findByText(api.invalid_state.title)).toBeInTheDocument();
+    expect(await within(dialog).findByText(a.errors.invalid_state.title)).toBeInTheDocument();
+    expect(within(dialog).getByText(a.errors.invalid_state.body)).toBeInTheDocument();
     stub.routes[PATCH_A1] = () => problem(403, "forbidden");
     await user.click(within(dialog).getByRole("button", { name: a.editSave }));
     expect(await within(dialog).findByText(api.forbidden.title)).toBeInTheDocument();
@@ -244,6 +253,100 @@ describe("edit an announcement (FR-PLT-026)", () => {
     expect(await screen.findByText("Old notice")).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText(a.newTitle)).toBeNull());
     expect(screen.queryByRole("button", { name: a.edit })).toBeNull();
+  });
+
+  it("no Edit and no Cancel on an ended announcement: the list shows it as ended", async () => {
+    vi.setSystemTime(new Date("2026-10-11T01:30:00Z")); // exactly the end of the first one
+    listing([
+      announcement(),
+      announcement({
+        id: A2,
+        title_en: "Exam week",
+        starts_at: "2026-10-11T00:00:00Z",
+        ends_at: "2026-10-11T01:30:01Z",
+      }),
+    ]);
+    renderWithIntl(<AnnouncementsScreen />);
+    expect(
+      await screen.findByRole("button", { name: a.edit, description: "Exam week" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: a.edit })).toHaveLength(1);
+    const ended = screen.getByRole("heading", { name: announcement().title_en }).closest("li");
+    expect(ended).not.toBeNull();
+    expect(within(ended as HTMLElement).getByText(s.ended)).toBeInTheDocument();
+    expect(within(ended as HTMLElement).queryByText(s.scheduled)).toBeNull();
+    // Fully read-only (owner decision 2026-10-04): Cancel only on the one still showing.
+    expect(
+      screen.getByRole("button", { name: a.cancelAnnouncement, description: "Exam week" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: a.cancelAnnouncement })).toHaveLength(1);
+  });
+
+  it("ending while the cancel dialog is open (409): it explains it and the list refreshes", async () => {
+    const CANCEL_A1 = `POST /bff/api/v1/platform/announcements/${A1}/cancel`;
+    listing([announcement()]);
+    renderWithIntl(<AnnouncementsScreen />);
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole("button", {
+        name: a.cancelAnnouncement,
+        description: announcement().title_en,
+      }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: a.cancelTitle });
+    vi.setSystemTime(new Date("2026-10-11T02:00:00Z"));
+    stub.routes[CANCEL_A1] = () => problem(409, "invalid_state");
+    const before = stub.callsTo("GET /bff/api/v1/platform/announcements").length;
+    // The confirm button (the dialog's own close button is also labelled "Cancel").
+    const confirm = within(dialog)
+      .getAllByRole("button", { name: a.cancelAnnouncement })
+      .find((button) => button.getAttribute("type") === "submit");
+    expect(confirm).toBeDefined();
+    await user.click(confirm as HTMLElement);
+    expect(await within(dialog).findByText(a.errors.invalid_state.title)).toBeInTheDocument();
+    expect(within(dialog).getByText(a.errors.invalid_state.body)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(stub.callsTo("GET /bff/api/v1/platform/announcements").length).toBeGreaterThan(before),
+    );
+    expect(await screen.findByText(s.ended)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", {
+        name: a.cancelAnnouncement,
+        description: announcement().title_en,
+      }),
+    ).toBeNull();
+    expect(screen.queryByRole("button", { name: a.edit })).toBeNull();
+    expect(dialog).toBeVisible();
+    expect(stub.callsTo(CANCEL_A1)).toHaveLength(1);
+  });
+
+  it("ending while the dialog is open (409): the dialog explains it and the list refreshes", async () => {
+    listing([announcement()]);
+    renderWithIntl(<AnnouncementsScreen />);
+    const { user, dialog } = await openEdit();
+    // The end time passes while the operator types; the API refuses the edit.
+    vi.setSystemTime(new Date("2026-10-11T02:00:00Z"));
+    stub.routes[PATCH_A1] = () => problem(409, "invalid_state");
+    const before = stub.callsTo("GET /bff/api/v1/platform/announcements").length;
+    await user.click(within(dialog).getByRole("button", { name: a.editSave }));
+    expect(await within(dialog).findByText(a.errors.invalid_state.title)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(stub.callsTo("GET /bff/api/v1/platform/announcements").length).toBeGreaterThan(before),
+    );
+    // The refreshed list shows it as ended, without Edit, and the explanation stays open.
+    expect(await screen.findByText(s.ended)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: a.edit })).toBeNull();
+    expect(dialog).toBeVisible();
+    expect(within(dialog).getByText(a.errors.invalid_state.title)).toBeInTheDocument();
+  });
+
+  it("announcementDisplayStatus: ended from the end time on, cancelled stays cancelled", () => {
+    const end = Date.parse("2026-10-11T01:30:00Z");
+    const row = announcement();
+    expect(announcementDisplayStatus(row, end - 1)).toBe("scheduled");
+    expect(announcementDisplayStatus(row, end)).toBe("ended");
+    expect(announcementDisplayStatus({ ...row, status: "draft" }, end)).toBe("ended");
+    expect(announcementDisplayStatus({ ...row, status: "cancelled" }, end)).toBe("cancelled");
   });
 
   it("utcToLocalDateTime shows a UTC time in IST for datetime-local", () => {
