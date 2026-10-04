@@ -343,6 +343,13 @@ def _not_found() -> NotFound:
     return NotFound("Document not found")
 
 
+def _raw_restricted(doc: Document) -> bool:
+    """Whether the stored file itself is opened only by ``student.read_sensitive`` holders and
+    its uploader: restricted (C3) documents, and raw import spreadsheets, whose restricted (C3)
+    columns only the import's own sheet and export hide (FR-IMP-008/009; audit DL-02)."""
+    return doc.sensitivity == "C3" or doc.purpose == "import_file"
+
+
 def _visibility(session: Session, ctx: UserContext) -> repo.Visibility:
     everything = ctx.has(MANAGE) and ctx.scope_for(MANAGE).school_wide
     read = ctx.has(READ)
@@ -984,11 +991,13 @@ def get_download_url(
 ) -> DownloadUrlOut:
     """A presigned GET valid <= 5 minutes, forced to download as an attachment with the
     verified content type (FR-DOC-004). Only scanned (``ready``) versions are served; C3
-    documents also need ``student.read_sensitive`` unless the caller uploaded them."""
+    documents and raw import files (which may hold restricted columns that only the import's own
+    sheet hides, FR-IMP-008) also need ``student.read_sensitive`` unless the caller uploaded
+    them."""
     doc = repo.get_document(session, document_id, visibility=_visibility(session, ctx))
     if doc is None:
         raise _not_found()
-    if doc.sensitivity == "C3" and not (
+    if _raw_restricted(doc) and not (
         ctx.has("student.read_sensitive") or doc.created_by == ctx.user_id
     ):
         raise Forbidden(

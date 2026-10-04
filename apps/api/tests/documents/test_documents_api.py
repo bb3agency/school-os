@@ -862,6 +862,38 @@ def test_FR_DOC_004_restricted_c3_files_need_sensitive_read(world: Any, api: Any
     assert api.call(world.person("principal"), "GET", path).status_code == 200
 
 
+def test_SEC_015_raw_import_files_download_only_like_restricted_files(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """Audit 2026-10-04, DL-02: a raw import spreadsheet holds every column of the file,
+    including restricted (C3) ones (religion, caste, the Aadhaar-as-printed name) that the
+    import's own sheet and export hide from staff without ``student.read_sensitive``
+    (FR-IMP-008/009). Its ``download-url`` must not hand the raw file to a school-wide
+    document reader who lacks that permission (accountant, read-only auditor, other office
+    staff); the uploader and sensitive readers keep it."""
+    maker = world.person("office_staff")
+    up = upload(
+        api,
+        maker,
+        S.csv_text(),
+        purpose="import_file",
+        filename="students.csv",
+        content_type="text/csv",
+    )
+    doc = register(api, maker, up["upload_id"], title="Admissions list").json()
+    scan(world.a.tenant_id, doc)
+    path = f"/api/v1/documents/{doc['id']}/download-url"
+    assert api.call(maker, "GET", path).status_code == 200, "the uploader may open it"
+    for role in ("accountant", "auditor_readonly", "exam_coordinator"):
+        res = api.call(world.person(role), "GET", path)
+        assert res.status_code == 403, (role, res.text)
+        assert res.json()["code"] == "sensitive_document"
+    for role in ("principal", "office_admin"):
+        assert api.call(world.person(role), "GET", path).status_code == 200, role
+    issued = W.audit_events(admin_engine, world.a.tenant_id, "document.download_url_issued")
+    assert sum(str(e["resource_id"]) == doc["id"] for e in issued) == 3
+
+
 # --- ACL changes and delete -----------------------------------------------------------------
 
 
