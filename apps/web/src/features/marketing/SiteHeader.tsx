@@ -41,7 +41,10 @@ export function SiteHeader({
 }: {
   current: MarketingPage;
   contactEmail: string | null;
-  /** "Ask on WhatsApp": in the bar from xl (room beside the page links), in the menu below lg. */
+  /**
+   * "Ask on WhatsApp": in the bar from lg (an icon button with the full accessible name below
+   * xl, where the label would crowd the page links; labelled from xl), in the menu below lg.
+   */
   whatsappNumber?: string | null;
 }) {
   const t = useTranslations("marketing");
@@ -144,9 +147,14 @@ export function SiteHeader({
                 {t("cta.signIn")}
               </a>
               {whatsappNumber ? (
-                <span className="hidden xl:contents">
-                  <WhatsAppLink number={whatsappNumber} size="md" />
-                </span>
+                <>
+                  <span className="hidden xl:contents">
+                    <WhatsAppLink number={whatsappNumber} size="md" />
+                  </span>
+                  <span className="hidden lg:contents xl:hidden">
+                    <WhatsAppLink number={whatsappNumber} size="md" iconOnly />
+                  </span>
+                </>
               ) : null}
               {contactEmail ? (
                 <span className="hidden sm:contents">

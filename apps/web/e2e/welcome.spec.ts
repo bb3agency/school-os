@@ -402,6 +402,61 @@ test.describe("public site with every contact setting set @contact", () => {
     });
   }
 
+  test("header with Sign in, WhatsApp and Talk to us fits from 320 to 1920 px (one row, no clipping)", async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    // 1024–1279: the bar shows the page links, so "Ask on WhatsApp" is an icon button there.
+    const widths = [320, 375, 768, 1023, 1024, 1152, 1279, 1280, 1366, 1920];
+    for (const width of widths) {
+      const label = `header at ${width}px`;
+      await page.setViewportSize({ width, height: 800 });
+      await openPublicPage(page, HOME);
+      await expectNoHorizontalOverflow(page, label);
+      const banner = page.getByRole("banner");
+      const fit = await banner.evaluate((header) => {
+        const row = header.firstElementChild as HTMLElement;
+        const controls = [...row.querySelectorAll<HTMLElement>("a, button")].filter(
+          (el) => el.getBoundingClientRect().width > 0,
+        );
+        const tops = new Set(
+          controls.map((el) => {
+            const rect = el.getBoundingClientRect();
+            return Math.round(rect.top + rect.height / 2);
+          }),
+        );
+        return {
+          rowOverflow: row.scrollWidth - row.clientWidth,
+          headerHeight: Math.round(header.getBoundingClientRect().height),
+          centres: tops.size,
+          outside: controls
+            .filter((el) => {
+              const rect = el.getBoundingClientRect();
+              return rect.left < 0 || rect.right > document.documentElement.clientWidth;
+            })
+            .map((el) => el.textContent),
+          wrapped: controls
+            .filter((el) => el.scrollWidth > el.clientWidth || el.getBoundingClientRect().height > 48)
+            .map((el) => el.textContent),
+        };
+      });
+      expect(fit, label).toEqual({
+        rowOverflow: 0,
+        headerHeight: 64,
+        centres: 1,
+        outside: [],
+        wrapped: [],
+      });
+      const whatsapp = banner.getByRole("link", { name: new RegExp(`^${MK.cta.whatsapp}`) });
+      if (width >= 1024) {
+        await expect(whatsapp, label).toBeVisible();
+        await expect(whatsapp, label).toHaveAttribute("href", /^https:\/\/wa\.me\//);
+      } else {
+        await expect(whatsapp, label).toBeHidden(); // in the Menu panel below lg
+      }
+    }
+  });
+
   test("375 px: Talk to us is in the phone menu and the menu still passes axe", async ({
     page,
   }) => {

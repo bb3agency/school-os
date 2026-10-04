@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { expect, test, type Download, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Dialog, type Download, type Locator, type Page } from "@playwright/test";
 import {
   expectFocusRing,
   expectNoAxeViolations,
@@ -139,6 +139,20 @@ test.describe.serial("sheet editor: view, edit, export", () => {
     await expect(page.getByText("1 unsaved change")).toBeVisible();
     await expectNoAxeViolations(page, "document sheet with an unsaved change");
 
+    // The browser's Back button asks first (docs/17 §4.1); Cancel keeps the page and the change.
+    const questions: string[] = [];
+    const cancel = (dialog: Dialog) => {
+      questions.push(dialog.type());
+      void dialog.dismiss();
+    };
+    page.on("dialog", cancel);
+    await page.goBack();
+    await expect.poll(() => questions).toEqual(["confirm"]);
+    await expect(page).toHaveURL(new RegExp(`/documents/${SHEET_IDS.document}/sheet$`));
+    await expect(amount).toContainText("Not saved yet");
+    await expect(page.getByText("1 unsaved change")).toBeVisible();
+    page.off("dialog", cancel);
+
     const file = page.waitForEvent("download");
     await pressOn(page.getByRole("button", { name: "Download CSV" }), "Enter", "download csv");
     const text = await csvOf(await file);
@@ -152,5 +166,13 @@ test.describe.serial("sheet editor: view, edit, export", () => {
     );
     await expect(page.getByRole("status").filter({ hasText: "Saved as version 2" })).toBeVisible();
     await expectNoAxeViolations(page, "document sheet after saving");
+
+    // Nothing unsaved any more: one Back press returns to the document, with no question.
+    page.on("dialog", cancel);
+    await page.goBack();
+    await expect(page).toHaveURL(new RegExp(`/documents/${SHEET_IDS.document}$`));
+    await expect(page.getByRole("link", { name: "Open as a sheet" })).toBeVisible();
+    expect(questions).toEqual(["confirm"]);
+    page.off("dialog", cancel);
   });
 });
