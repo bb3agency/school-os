@@ -224,6 +224,14 @@ def _guard_invite_roles(session: Session, ctx: UserContext, roles: Iterable[Role
     _guard_grantable(session, ctx, sensitive)
 
 
+def _guard_status_reach(session: Session, ctx: UserContext, membership: Membership) -> None:
+    """Suspending, removing or reactivating a member takes away or gives back every role they
+    hold, so it follows the invite rule (SEC-003): a member with a privileged or custom role is
+    reached only with ``role.assign`` and roles whose permissions the caller holds (the owner
+    reaches everyone). 403 ``role_not_grantable``."""
+    _guard_invite_roles(session, ctx, repo.list_roles_for_membership(session, membership.id))
+
+
 def _guard_not_breakglass(session: Session, membership: Membership) -> None:
     """Temporary support memberships change only through the break-glass workflow."""
     roles = repo.list_roles_for_membership(session, membership.id)
@@ -579,6 +587,7 @@ def set_membership_status(
     if previous == "active":
         _guard_last_owner(session, membership)
     _guard_not_own(ctx, user_id)
+    _guard_status_reach(session, ctx, membership)
     updated = repo.set_membership_status(
         session, membership.id, status=status, expected_version=expected_version
     )
@@ -646,6 +655,7 @@ def update_user(
         if previous == "active":
             _guard_last_owner(session, membership)
         _guard_not_own(ctx, user_id)
+        _guard_status_reach(session, ctx, membership)
     if profile:
         _guard_profile_not_shared(session, user_id)
         with _db_errors():
