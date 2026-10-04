@@ -1,4 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
+import {
+  expectFocusInsideOpenDialog,
+  expectFocusRing,
+  expectNoAxeViolations,
+  pressOn,
+} from "./support/a11y-helpers";
 import { installFixtures } from "./support/layout-fixtures";
 import {
   LOCALES,
@@ -278,6 +284,68 @@ test.describe("dialogs on a phone (NFR-A11Y-001)", () => {
       expect(problems(await measure(page))).toEqual([]);
       await page.keyboard.press("Escape");
       await expect(dialog).toBeHidden();
+    });
+  }
+});
+
+/** A paid invoice with a recorded and a reversed payment (layout-fixtures `invoicePayments`). */
+const INVOICE_PAGE = "/platform/invoices/0192f3a4-0000-7000-8000-0000000c2002";
+
+test.describe("invoice payments: 'Reverse payment' dialog (FR-PLT-018, NFR-A11Y-001)", () => {
+  test.skip(!standIn, "set E2E_STAND_IN=1 (needs Valkey at REDIS_URL)");
+
+  for (const [width, height] of REQUIRED_VIEWPORTS) {
+    test(`at ${width}×${height}: the page and the dialog fit, keyboard only, no axe violations`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height });
+      await installFixtures(page);
+      await signInAs(page, "/platform", "operator-1");
+      await page.goto(INVOICE_PAGE);
+      await settle(page);
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      // Only the recorded payment can be reversed; the reversed one keeps its reason.
+      const trigger = page.getByRole("button", { name: "Reverse payment" });
+      await expect(trigger).toHaveCount(1);
+      await expect(page.getByText("Reversed", { exact: true })).toBeVisible();
+      expect(problems(await measure(page))).toEqual([]);
+      await expectNoAxeViolations(page, `invoice page ${width}`);
+
+      // Keyboard only: focus the trigger, Enter opens the dialog with focus inside it.
+      await pressOn(trigger, "Enter", "Reverse payment");
+      const dialog = page.getByRole("dialog", { name: "Reverse this payment?" });
+      await expect(dialog).toBeVisible();
+      await expectFocusInsideOpenDialog(page);
+      const box = await dialog.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.x).toBeGreaterThanOrEqual(width < 768 ? 15 : 0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(width - (width < 768 ? 15 : 0));
+      expect(box!.y).toBeGreaterThanOrEqual(0);
+      expect(box!.y + box!.height).toBeLessThanOrEqual(height);
+      expect(problems(await measure(page))).toEqual([]);
+      await expectNoAxeViolations(page, `reverse dialog ${width}`);
+
+      // Tab reaches the reason, then the confirm button, without leaving the dialog.
+      const reasonField = dialog.getByRole("textbox", { name: /Reason/ });
+      const confirm = dialog.getByRole("button", { name: "Reverse payment" });
+      for (
+        let i = 0;
+        i < 6 && !(await reasonField.evaluate((el) => el === document.activeElement));
+        i += 1
+      )
+        await page.keyboard.press("Tab");
+      await expect(reasonField).toBeFocused();
+      for (
+        let i = 0;
+        i < 6 && !(await confirm.evaluate((el) => el === document.activeElement));
+        i += 1
+      )
+        await page.keyboard.press("Tab");
+      await expectFocusRing(confirm, "confirm reversal");
+      // Escape closes it and returns focus to the row's trigger.
+      await page.keyboard.press("Escape");
+      await expect(dialog).toBeHidden();
+      await expect(trigger).toBeFocused();
     });
   }
 });
