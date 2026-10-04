@@ -4,7 +4,9 @@
   ``document.version.registered``; AV scan -> ``ready`` | ``quarantined``. Retries with backoff
   while the scanner is unavailable; after the last attempt the version is ``failed``.
 - ``documents.purge_objects`` (queue ``maintenance``): consumer of ``document.deleted``;
-  removes the stored objects of a deleted document.
+  removes the stored objects of a deleted document: discarded (1-day lifecycle rule) for an
+  automatic retention deletion, a plain delete (90-day recovery window) for a person's delete
+  (docs/08 §7). Idempotent; retries with backoff while the store fails.
 - ``documents.purge_expired_uploads`` (beat, daily): unregistered uploads past expiry.
 - ``documents.discard_object`` (queue ``maintenance``): consumer of
   ``document.version.discarded`` (PRV-016); deletes the object of a discarded version, tagged
@@ -35,6 +37,7 @@ log = get_logger(__name__)
 
 SCAN_MAX_RETRIES = 6
 DISCARD_MAX_RETRIES = 8
+PURGE_MAX_RETRIES = 8
 
 
 def _uuid(value: object) -> uuid.UUID:
@@ -63,12 +66,36 @@ def scan(self: Task[Any, Any], tenant_id: str, event_id: str, payload: dict[str,
         raise self.retry(exc=exc, countdown=min(30 * 2**self.request.retries, 900)) from exc
 
 
-@shared_task(name=service.PURGE_TASK, queue="maintenance", acks_late=True, ignore_result=True)
-def purge_objects(tenant_id: str, event_id: str, payload: dict[str, Any]) -> int:
+@shared_task(
+    name=service.PURGE_TASK,
+    bind=True,
+    queue="maintenance",
+    acks_late=True,
+    max_retries=PURGE_MAX_RETRIES,
+    ignore_result=True,
+)
+def purge_objects(
+    self: Task[Any, Any], tenant_id: str, event_id: str, payload: dict[str, Any]
+) -> int:
+    document_id = _uuid(payload["document_id"])
     batch_ids = [_uuid(b) for b in payload.get("batch_ids", [])]
-    return service.purge_document_objects(
-        _uuid(tenant_id), _uuid(payload["document_id"]), batch_ids
-    )
+    # ``discard`` only in events of automatic retention deletions (docs/08 §7); events queued
+    # before the flag existed are a person's delete (plain delete, 90-day recovery window).
+    discard = payload.get("discard") is True
+    try:
+        return service.purge_document_objects(
+            _uuid(tenant_id), document_id, batch_ids, discard=discard
+        )
+    except ObjectStoreError as exc:
+        if self.request.retries >= PURGE_MAX_RETRIES:
+            log.error(
+                "documents.purge.failed",
+                error_code="storage_unavailable",
+                resource_type="document",
+                resource_id=document_id,
+            )
+            return 0
+        raise self.retry(exc=exc, countdown=min(30 * 2**self.request.retries, 3600)) from exc
 
 
 @shared_task(

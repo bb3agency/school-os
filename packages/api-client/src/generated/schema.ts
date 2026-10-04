@@ -5072,8 +5072,11 @@ export interface paths {
          *     appears in a URL (SEC-008; permission ``student.read_basic``; class and subject teachers see
          *     only students in their sections/classes this year). Same results, page size and cursor as
          *     ``GET /students``; send ``next_cursor`` back as ``cursor`` with the same filters. Read-only:
-         *     nothing is written, so no ``Idempotency-Key``. A full Aadhaar number anywhere in the body is
-         *     refused (422 ``aadhaar_full_number_rejected``).
+         *     nothing is written, so no ``Idempotency-Key``. ``apaar_id`` finds a student by exact APAAR
+         *     ID (12 digits; current verified or recorded values of the typed ``apaar_id`` attribute only,
+         *     same scope; FR-STU-016, ADR-0037); it is the only field that accepts a 12-digit number. A
+         *     full Aadhaar number anywhere else in the body is refused (422
+         *     ``aadhaar_full_number_rejected``).
          */
         post: operations["search_students_by_body_api_v1_students_search_post"];
         delete?: never;
@@ -12366,6 +12369,11 @@ export interface components {
             academic_year_id?: string | null;
             /** Admission No */
             admission_no?: string | null;
+            /**
+             * Apaar Id
+             * @description Exact APAAR ID (FR-STU-016, ADR-0037): 12 digits, spaces or hyphens between the groups allowed. Matches only the student's current APAAR ID values (verified or recorded, not rejected), within the caller's scope; anything else answers 422 digits12_required. The only search field where a 12-digit number is accepted: query and admission_no still refuse one (aadhaar_full_number_rejected).
+             */
+            apaar_id?: string | null;
             /** Class Id */
             class_id?: string | null;
             /**

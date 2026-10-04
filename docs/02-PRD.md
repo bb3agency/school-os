@@ -105,10 +105,11 @@ Format: **US-ID · As a … I want … so that …** followed by acceptance crit
 **US-302** · As staff, I want to find a student by partial name, admission number, class or parent name in English or Telugu. [FR-STU-010]
 - AC1: "venkat sai 9b" finds "VENKATA SAI K." in 9B; Telugu script queries find transliterated matches.
 - AC2: Results respect my scope.
+- AC3: I can find a student by the exact APAAR ID (12 digits, with or without spaces) using a separate "APAAR ID" search option. It matches only the student's recorded or verified APAAR ID (not a rejected or replaced one, not other fields), within my scope; the number is never written to logs. [FR-STU-016, ADR-0037]
 
 **US-303** · As staff, I never want to enter an Aadhaar number by mistake. [FR-STU-012, BR-02]
 - AC1: Aadhaar input accepts only the last 4 digits and as-printed fields; pasting 12 digits is rejected with an explanation.
-- AC2: The APAAR ID field is the one place a 12-digit number is accepted: it is stored only as the APAAR ID and never as, or compared with, an Aadhaar number. Everywhere else (including search) 12 digits that look like an Aadhaar number are still refused. [FR-STU-015, ADR-0037]
+- AC2: The APAAR ID field is the one place a 12-digit number is accepted: it is stored only as the APAAR ID and never as, or compared with, an Aadhaar number. Everywhere else (including the free-text search box) 12 digits that look like an Aadhaar number are still refused; only the separate APAAR ID search option (US-302 AC3) takes 12 digits. [FR-STU-015, FR-STU-016, ADR-0037]
 
 ### C4 · Onboarding & import
 

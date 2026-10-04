@@ -634,8 +634,11 @@ class _Verified:
 
 
 def _discard(store: ObjectStore, key: str) -> None:
+    """Remove a staging or half-made object the system no longer needs (rejected, duplicate or
+    expired upload, undone write). An automatic deletion, so it is discarded: the bucket rule
+    ``discarded-1d`` expires the bytes after a day (docs/08 §7)."""
     try:
-        store.delete(key)
+        store.discard(key)
     except ObjectStoreError:
         log.warning("documents.upload.discard_failed", error_code="delete_failed")
 
@@ -1219,7 +1222,13 @@ def _delete(session: Session, doc: Document, *, reason: str | None) -> None:
             deleting(session, doc.id)
         repo.delete_document(session, doc.id)
         _audit(session, "document.deleted", doc.id, summary, system=reason is not None)
-        ops.enqueue_event(session, DELETED_EVENT, {"document_id": doc.id, "batch_ids": batch_ids})
+        # ``discard``: an automatic retention deletion tags the objects for the bucket's 1-day
+        # rule; a person's delete keeps the 90-day recovery window (docs/08 §7).
+        ops.enqueue_event(
+            session,
+            DELETED_EVENT,
+            {"document_id": doc.id, "batch_ids": batch_ids, "discard": reason is not None},
+        )
         for hook in DELETED_HOOKS:
             hook(session, doc.id)
 
@@ -1229,13 +1238,21 @@ def purge_document_objects(
     document_id: uuid.UUID,
     batch_ids: Sequence[uuid.UUID] = (),
     *,
+    discard: bool = False,
     store: ObjectStore | None = None,
 ) -> int:
-    """Worker: remove every stored object of a deleted document (FR-DOC-007 storage part)."""
+    """Worker: remove every stored object of a deleted document (FR-DOC-007 storage part).
+
+    ``discard`` (automatic retention deletions, :func:`delete_for_retention`): each object is
+    tagged ``sos-lifecycle=discarded`` before its delete, so the bucket rule ``discarded-1d``
+    expires the noncurrent bytes after one day. Otherwise (a person's delete) a plain delete
+    keeps them for the 90-day recovery window (docs/08 §7). Idempotent: a retry lists what is
+    left and removes only that."""
     store = store or get_object_store()
-    deleted = store.delete_prefix(document_prefix(tenant_id, document_id))
+    remove = store.purge_prefix if discard else store.delete_prefix
+    deleted = remove(document_prefix(tenant_id, document_id))
     for batch_id in batch_ids:
-        deleted += store.delete_prefix(f"{tenant_prefix(tenant_id)}imports/{batch_id}/")
+        deleted += remove(f"{tenant_prefix(tenant_id)}imports/{batch_id}/")
     return deleted
 
 
@@ -2227,9 +2244,10 @@ def export_download_url(
 def delete_export_files(
     session: Session, export_id: uuid.UUID, *, store: ObjectStore | None = None
 ) -> int:
-    """Delete every stored file of one export of the current school (retention, docs/05 §13)."""
+    """Delete every stored file of one export of the current school (retention, docs/05 §13).
+    An automatic deletion: the files are discarded (bucket rule ``discarded-1d``, docs/08 §7)."""
     prefix = export_prefix(repo.current_tenant_id(session), export_id)
-    return (store or get_object_store()).delete_prefix(prefix)
+    return (store or get_object_store()).purge_prefix(prefix)
 
 
 # --- the school's full data export (app.admin; FR-ADM-001, US-1201) -------------------------------
@@ -2325,9 +2343,10 @@ def delete_tenant_export(
     session: Session, export_id: uuid.UUID, object_key: str, *, store: ObjectStore | None = None
 ) -> None:
     """Delete the full export archive of the current school (retention: 24 hours after it was
-    ready; the bucket rule expires the noncurrent copy after a day)."""
+    ready, or an abandoned build). An automatic deletion: the archive is discarded, so the
+    bucket rule ``discarded-1d`` expires the noncurrent copy after a day (docs/08 §7)."""
     key = _tenant_export_key_checked(session, export_id, object_key)
-    (store or get_object_store()).delete(key)
+    (store or get_object_store()).discard(key)
 
 
 __all__ = [

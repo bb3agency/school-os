@@ -320,6 +320,58 @@ def test_PRV_016_discard_marks_the_object_for_the_short_lifecycle_rule() -> None
             store.discard(key)
 
 
+def test_FR_DOC_007_purge_prefix_discards_every_page_of_a_large_prefix() -> None:
+    """Automatic retention deletions (docs/08 §7) discard every object under a prefix, across
+    listing pages (1000 keys each), all collected before the first delete so the listing does
+    not shift. Each object is tagged before its delete (1-day rule, not the 90-day window)."""
+    store, client = _stubbed_store()
+    prefix = f"t/{uuid.uuid4()}/docs/{uuid.uuid4()}/"
+    first = [f"{prefix}v{i}/original.pdf" for i in range(1, 1001)]
+    second = [f"{prefix}v1001/original.pdf", f"{prefix}v1001/derived/text.txt"]
+    with Stubber(client) as stub:
+        stub.add_response(
+            "list_objects_v2",
+            {
+                "Contents": [{"Key": k} for k in first],
+                "IsTruncated": True,
+                "NextContinuationToken": "page-2",
+            },
+            {"Bucket": BUCKET, "Prefix": prefix},
+        )
+        stub.add_response(
+            "list_objects_v2",
+            {"Contents": [{"Key": k} for k in second], "IsTruncated": False},
+            {"Bucket": BUCKET, "Prefix": prefix, "ContinuationToken": "page-2"},
+        )
+        for key in first + second:
+            stub.add_response(
+                "put_object_tagging",
+                {},
+                {
+                    "Bucket": BUCKET,
+                    "Key": key,
+                    "Tagging": {"TagSet": [{"Key": "sos-lifecycle", "Value": "discarded"}]},
+                },
+            )
+            stub.add_response("delete_object", {}, {"Bucket": BUCKET, "Key": key})
+        assert store.purge_prefix(prefix) == 1002
+        stub.assert_no_pending_responses()
+    with pytest.raises(ValueError, match="tenant"):
+        store.purge_prefix("t/")
+
+
+def test_FR_DOC_007_purge_prefix_is_idempotent_against_s3(s3_store: S3ObjectStore) -> None:
+    """A retried purge (the task failed half-way) finishes what is left and fails nothing."""
+    prefix = f"t/{uuid.uuid4()}/imports/{uuid.uuid4()}/"
+    keys = [f"{prefix}raw-{i}.csv" for i in range(5)]
+    for key in keys:
+        s3_store.put(key, b"a,b\r\n", "text/csv")
+    s3_store.discard(keys[0])  # a first attempt that stopped after one object
+    assert s3_store.purge_prefix(prefix) == 4
+    assert all(s3_store.head(k) is None for k in keys)
+    assert s3_store.purge_prefix(prefix) == 0
+
+
 @pytest.mark.db
 def test_FR_DOC_001_browser_to_s3_to_api_round_trip(
     s3_store: S3ObjectStore, world: Any, api: Any

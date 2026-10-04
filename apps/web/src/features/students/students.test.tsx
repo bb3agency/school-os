@@ -29,7 +29,7 @@ import { CreateStudentForm, createBody, createStudentSchema } from "./CreateStud
 import { toIsoDate } from "./dates";
 import { permissionsFrom } from "./me";
 import { StudentDetailScreen, StudentDetailView } from "./StudentDetail";
-import { PAGE_SIZE, StudentsScreen } from "./StudentList";
+import { PAGE_SIZE, StudentsScreen, apaarDigits, cleanFilters } from "./StudentList";
 
 const push = vi.fn();
 vi.mock("next/navigation", async (importOriginal) => {
@@ -177,6 +177,66 @@ describe("US-302 / FR-STU-010: find students", () => {
     expect((await screen.findAllByText(sm.aadhaarNotAllowed)).length).toBeGreaterThan(0);
     expect(stub.callsTo("POST /bff/api/v1/students/search")).toHaveLength(calls);
     expect(screen.getByRole("link", { name: sm.list.add })).toBeInTheDocument();
+  });
+});
+
+describe("US-302 AC3 / FR-STU-016: find a student by exact APAAR ID", () => {
+  it("sends the 12 digits as apaar_id in the POST body, never in a URL", async () => {
+    stub.routes["GET /bff/api/v1/me"] = () => Response.json(me(["student.read_basic"]));
+    stub.routes["POST /bff/api/v1/students/search"] = async (request) => {
+      const body = (await request.json()) as { apaar_id?: string };
+      return body.apaar_id
+        ? page([summary({ match: { field: "apaar_id", score: null } })])
+        : page([]);
+    };
+    // A Verhoeff-valid number: the free-text Aadhaar guard must not block the APAAR ID field.
+    const number = fakeAadhaar("45678901234");
+    const spaced = `${number.slice(0, 4)} ${number.slice(4, 8)} ${number.slice(8)}`;
+    const user = userEvent.setup();
+    renderWithIntl(<StudentsScreen />);
+    await screen.findByText(sm.list.emptyTitle);
+
+    await user.type(screen.getByLabelText(sm.list.apaarLabel), spaced);
+    await user.click(screen.getByRole("button", { name: messages.en.common.search }));
+
+    expect(await screen.findByRole("link", { name: "Venkata Sai K." })).toBeInTheDocument();
+    expect(screen.queryByText(sm.aadhaarNotAllowed)).toBeNull();
+    const searches = stub.callsTo("POST /bff/api/v1/students/search");
+    expect(JSON.parse(searches.at(-1)?.body ?? "{}")).toEqual({
+      apaar_id: number,
+      limit: PAGE_SIZE,
+    });
+    for (const call of stub.calls) {
+      expect(decodeURIComponent(call.url.href)).not.toContain(number.slice(0, 8));
+    }
+    // Clearing empties the APAAR ID field too.
+    await user.click(screen.getByRole("button", { name: sm.list.clear }));
+    await waitFor(() => expect(screen.getByLabelText(sm.list.apaarLabel)).toHaveValue(""));
+  });
+
+  it("explains a value that is not 12 digits and sends nothing", async () => {
+    stub.routes["GET /bff/api/v1/me"] = () => Response.json(me(["student.read_basic"]));
+    stub.routes["POST /bff/api/v1/students/search"] = () => page([]);
+    const user = userEvent.setup();
+    renderWithIntl(<StudentsScreen />);
+    await screen.findByText(sm.list.emptyTitle);
+    const calls = stub.callsTo("POST /bff/api/v1/students/search").length;
+
+    await user.type(screen.getByLabelText(sm.list.apaarLabel), "1234 5678 901");
+    await user.click(screen.getByRole("button", { name: messages.en.common.search }));
+
+    expect(await screen.findByText(sm.list.apaarInvalid)).toBeInTheDocument();
+    expect(stub.callsTo("POST /bff/api/v1/students/search")).toHaveLength(calls);
+  });
+
+  it("normalises the APAAR ID and drops anything that is not 12 digits", () => {
+    expect(cleanFilters({ q: "venkat", apaar: "1234-5678-9012" })).toEqual({
+      query: "venkat",
+      apaar_id: "123456789012",
+    });
+    expect(cleanFilters({ apaar: "12345678901" })).toEqual({});
+    expect(apaarDigits(" 1234 5678 9012 ")).toBe("123456789012");
+    expect(apaarDigits("APAAR 123456789012")).toBeNull();
   });
 });
 
