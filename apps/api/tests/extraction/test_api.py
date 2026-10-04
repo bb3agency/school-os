@@ -375,7 +375,7 @@ def test_SEC_013_confirm_refuses_a_full_aadhaar_roll_number(
     assert res.json()["errors"][0]["code"] == "aadhaar_full_number_rejected"
     assert number not in res.text
     with admin_engine.connect() as c:
-        stored = c.execute(
+        stored: int = c.execute(
             text("SELECT count(*) FROM sis.enrollments WHERE roll_no = :n"), {"n": number}
         ).scalar_one()
     assert stored == 0
