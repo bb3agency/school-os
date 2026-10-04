@@ -114,7 +114,7 @@ function EditFields({ task, errors }: { task: Task; errors: FieldErrors }) {
 }
 
 /**
- * Edit an open or in-progress task (US-1604; PATCH /tasks/{id}, `task.manage`, If-Match):
+ * Edit an open or in-progress task (US-1603, FR-TASK-003; PATCH /tasks/{id}, `task.manage`, If-Match):
  * title, owner, due date and details. Only changed fields are sent; nothing changed sends
  * nothing. Someone else's change (412) or a task closed meanwhile (409) reloads the list.
  */

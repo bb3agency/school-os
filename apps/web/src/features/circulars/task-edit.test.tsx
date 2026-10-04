@@ -10,7 +10,7 @@ import type { Task } from "./data";
 import { TasksScreen } from "./TasksScreen";
 
 /**
- * Editing a task (US-1604, FR-TASK-*; PATCH /tasks/{id}): `task.manage` only, open and in
+ * Editing a task (US-1603, FR-TASK-003; PATCH /tasks/{id}): `task.manage` only, open and in
  * progress tasks only, only the changed fields with If-Match, the due date typed in the
  * school's date format, plain-language errors. Synthetic data only.
  */
@@ -94,7 +94,7 @@ function bodyOf(key: string, index = 0) {
   return JSON.parse(stub.callsTo(key)[index]?.body ?? "{}") as Record<string, unknown>;
 }
 
-describe("edit a task (US-1604)", () => {
+describe("edit a task (US-1603, FR-TASK-003)", () => {
   it("sends only the changed fields with If-Match; the due date is typed in the school's format", async () => {
     signedIn(MANAGER);
     stub.routes["GET /bff/api/v1/tasks"] = () => page([task()]);
