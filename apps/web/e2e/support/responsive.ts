@@ -17,6 +17,8 @@ export const LOCALES = ["en", "te"] as const;
 
 const T1 = "0192f3a4-0000-7000-8000-000000000001";
 const T3 = "0192f3a4-0000-7000-8000-000000000003";
+/** A paid invoice with two payments, one reversed (layout-fixtures `invoicePayments`). */
+const INVOICE = "0192f3a4-0000-7000-8000-0000000c2002";
 const STUDENT = "0192f3a4-0000-7000-8000-00000000e501";
 const FINDING = "0192f3a4-0000-7000-8000-0000000f1001";
 const YEAR = "0192f3a4-0000-7000-8000-0000000000a1";
@@ -128,6 +130,7 @@ export const SCREEN_GROUPS: Record<string, ScreenGroup> = {
       "/platform/plans",
       "/platform/subscriptions",
       "/platform/invoices",
+      `/platform/invoices/${INVOICE}`,
       "/platform/usage",
       "/platform/fleet",
       "/platform/flags",

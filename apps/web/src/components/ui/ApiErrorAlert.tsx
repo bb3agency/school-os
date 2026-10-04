@@ -30,7 +30,8 @@ export type ErrorNamespace =
   | "tasks"
   | "notices"
   | "tally"
-  | "platform.announcements";
+  | "platform.announcements"
+  | "platform.invoices.payments";
 
 type LooseTranslator = ((key: string) => string) & { has: (key: string) => boolean };
 

@@ -353,6 +353,104 @@ def test_FR_PLT_018_partial_payments_tds_and_reversal(
     assert void.status_code == 409  # partly paid invoices are not voided
 
 
+def test_FR_PLT_018_invoice_payments_list_newest_first_with_reversal_fields(
+    api: Api,
+    billing_admin: Operator,
+    owner: Operator,
+    make_operator: MakeOperator,
+    make_plan: Callable[..., uuid.UUID],
+) -> None:
+    sub = _school(api, owner, make_plan(base_price_inr="5000.00"))["subscription_id"]
+    inv_id = _drafts(sub)[0]["id"]
+    api.call("POST", f"/invoices/{inv_id}/issue", billing_admin)
+    empty = api.call("GET", f"/invoices/{inv_id}/payments", billing_admin)
+    assert (empty.status_code, empty.json()) == (200, [])
+
+    early = {
+        "method": "cheque",
+        "amount_inr": "1000.00",
+        "received_on": "2026-09-10",
+        "reference": f"CHQ-{letters(8)}",
+    }
+    late = {
+        "method": "upi",
+        "amount_inr": "2000.00",
+        "tds_inr": "100.00",
+        "received_on": "2026-09-20",
+        "reference": f"UPI-{letters(10)}",
+        "notes": "Second instalment",
+    }
+    first = api.call("POST", f"/invoices/{inv_id}/payments", billing_admin, json=early)
+    second = api.call("POST", f"/invoices/{inv_id}/payments", billing_admin, json=late)
+    assert (first.status_code, second.status_code) == (201, 201), first.text + second.text
+    rev = api.call(
+        "POST",
+        f"/payments/{first.json()['id']}/reverse",
+        billing_admin,
+        json={"reason": "Cheque bounced at the bank"},
+    )
+    assert rev.status_code == 200, rev.text
+    reversed_out = rev.json()
+    assert reversed_out["status"] == "reversed"
+    assert reversed_out["reversed_by"] == str(billing_admin.id)
+    assert reversed_out["reversed_by_name"] == "Synthetic Operator"
+    assert reversed_out["reversal_reason"] == "Cheque bounced at the bank"
+    assert reversed_out["reversed_at"] is not None
+    again = api.call(
+        "POST",
+        f"/payments/{first.json()['id']}/reverse",
+        billing_admin,
+        json={"reason": "Cheque bounced at the bank"},
+    )
+    assert (again.status_code, again.json()["code"]) == (409, "invalid_state")
+
+    viewer = make_operator("platform_viewer")
+    res = api.call("GET", f"/invoices/{inv_id}/payments", viewer)
+    assert res.status_code == 200, res.text
+    rows = res.json()
+    assert [r["id"] for r in rows] == [second.json()["id"], first.json()["id"]]
+    newest, oldest = rows
+    assert newest["status"] == "recorded"
+    assert (newest["amount_inr"], newest["tds_inr"], newest["method"]) == (
+        "2000.00",
+        "100.00",
+        "upi",
+    )
+    assert (newest["received_on"], newest["reference"]) == ("2026-09-20", late["reference"])
+    assert newest["notes"] == "Second instalment"
+    assert newest["recorded_by"] == str(billing_admin.id)
+    assert newest["recorded_by_name"] == "Synthetic Operator"
+    assert newest["recorded_at"] is not None
+    assert (newest["reversed_at"], newest["reversed_by"], newest["reversal_reason"]) == (
+        None,
+        None,
+        None,
+    )
+    assert newest["reversed_by_name"] is None
+    assert oldest["status"] == "reversed"
+    assert oldest["reversed_by"] == str(billing_admin.id)
+    assert oldest["reversed_by_name"] == "Synthetic Operator"
+    assert oldest["reversal_reason"] == "Cheque bounced at the bank"
+    assert oldest["reversed_at"] is not None
+
+    inv = api.call("GET", f"/invoices/{inv_id}", viewer).json()
+    assert (inv["status"], inv["amount_paid_inr"], inv["balance_due_inr"]) == (
+        "issued",
+        "2000.00",
+        "3800.00",
+    )
+
+
+def test_FR_PLT_018_invoice_payments_unknown_invoice_and_forbidden_role(
+    api: Api, billing_admin: Operator, make_operator: MakeOperator
+) -> None:
+    missing = api.call("GET", f"/invoices/{uuid.uuid4()}/payments", billing_admin)
+    assert (missing.status_code, missing.json()["code"]) == (404, "not_found")
+    support = make_operator("support_agent")  # no platform.invoices.read
+    denied = api.call("GET", f"/invoices/{uuid.uuid4()}/payments", support)
+    assert denied.status_code == 403
+
+
 def test_FR_PLT_019_void_keeps_number(
     api: Api, billing_admin: Operator, owner: Operator, make_plan: Callable[..., uuid.UUID]
 ) -> None:

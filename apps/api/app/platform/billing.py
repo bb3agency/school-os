@@ -1441,20 +1441,39 @@ def record_payment(
             },
             tenant_id=invoice["tenant_id"],
         )
-        return PaymentOut.model_validate(dict(payment))
+        return _payment_out(s, payment["id"])
+
+
+def _payment_out(s: Session, payment_id: uuid.UUID) -> PaymentOut:
+    rows = repo.payments_with_names(s, payment_id=payment_id)
+    if not rows:
+        raise NotFound("Payment not found")
+    return PaymentOut.model_validate(dict(rows[0]))
 
 
 def get_payment(payment_id: uuid.UUID) -> PaymentOut:
     with platform_session() as s:
-        row = repo.get(s, m.payments, payment_id)
-    if row is None:
-        raise NotFound("Payment not found")
-    return PaymentOut.model_validate(dict(row))
+        return _payment_out(s, payment_id)
+
+
+def list_payments(invoice_id: uuid.UUID) -> list[PaymentOut]:
+    """An invoice's payments, newest received first, incl. reversed ones (FR-PLT-018)."""
+    with platform_session() as s:
+        if repo.get(s, m.invoices, invoice_id) is None:
+            raise NotFound("Invoice not found")
+        return [
+            PaymentOut.model_validate(dict(row))
+            for row in repo.payments_with_names(s, invoice_id=invoice_id)
+        ]
 
 
 def reverse_payment(
     actor: Actor, payment_id: uuid.UUID, reason: str, *, today: dt.date | None = None
 ) -> PaymentOut:
+    """Reverse a recorded payment with a reason, never delete it (FR-PLT-018). The invoice is
+    re-settled: with less than its total covered it is ``issued`` again (balance due grows by
+    the payment's amount and TDS); the daily sweep later marks the subscription past due if the
+    due date has passed."""
     today = today or today_ist()
     with platform_session() as s, db_errors():
         payment = repo.get(s, m.payments, payment_id, for_update=True)
@@ -1464,7 +1483,7 @@ def reverse_payment(
             raise Conflict("The payment is already reversed.", code="invalid_state")
         invoice = repo.get(s, m.invoices, payment["invoice_id"], for_update=True)
         invoice = must(invoice)
-        payment = repo.update_row(
+        repo.update_row(
             s,
             m.payments,
             payment_id,
@@ -1486,7 +1505,7 @@ def reverse_payment(
             {"invoice_id": str(invoice["id"])},
             tenant_id=invoice["tenant_id"],
         )
-        return PaymentOut.model_validate(dict(payment))
+        return _payment_out(s, payment_id)
 
 
 def generate_invoices(month: str, actor: Actor = SYSTEM) -> JobOut:

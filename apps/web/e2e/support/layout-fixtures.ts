@@ -1208,6 +1208,49 @@ const PLATFORM_INVOICES: Schemas["InvoiceOut"][] = Array.from({ length: 8 }, (_,
   invoice(i, pick(SCHOOLS, i)[0]),
 );
 
+/** An invoice's payments (docs/16 §5.9): one recorded, one reversed with a long reason. */
+function invoicePayments(invoiceId: string): Schemas["PaymentOut"][] {
+  const base = {
+    invoice_id: invoiceId,
+    provider: "manual",
+    notes: null,
+    recorded_by: uid("00000000f0", 1),
+    recorded_by_name: "Synthetic Billing Admin",
+  };
+  return [
+    {
+      ...base,
+      id: uid("0000000d2", 2),
+      method: "bank_transfer",
+      amount_inr: "5798.84",
+      tds_inr: "99.98",
+      received_on: date(9, 20),
+      reference: LONG_TOKEN,
+      status: "recorded",
+      recorded_at: at(20),
+      reversed_by: null,
+      reversed_by_name: null,
+      reversed_at: null,
+      reversal_reason: null,
+    },
+    {
+      ...base,
+      id: uid("0000000d2", 1),
+      method: "cheque",
+      amount_inr: "5898.82",
+      tds_inr: "0.00",
+      received_on: date(9, 10),
+      reference: "CHQ-000123",
+      status: "reversed",
+      recorded_at: at(10),
+      reversed_by: uid("00000000f0", 2),
+      reversed_by_name: `Synthetic Owner ${LONG_TOKEN}`,
+      reversed_at: at(12),
+      reversal_reason: LONG_TEXT.slice(0, 500),
+    },
+  ];
+}
+
 function tenantDetail(tenant_id: string): Schemas["TenantDetailOut"] {
   const index = Math.max(
     0,
@@ -2152,6 +2195,11 @@ const ROUTES: Array<[RegExp, Handler]> = [
         ),
       ),
   ],
+  [
+    re("/platform/invoices/{id}"),
+    ([, id = ""]) => PLATFORM_INVOICES.find((row) => row.id === id) ?? PLATFORM_INVOICES[1],
+  ],
+  [re("/platform/invoices/{id}/payments"), ([, id = ""]) => invoicePayments(id)],
 ];
 
 /** Searches sent as POST that only read (answered like the GET lists above). */
