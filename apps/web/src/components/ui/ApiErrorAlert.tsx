@@ -29,7 +29,8 @@ export type ErrorNamespace =
   | "circulars"
   | "tasks"
   | "notices"
-  | "tally";
+  | "tally"
+  | "platform.announcements";
 
 type LooseTranslator = ((key: string) => string) & { has: (key: string) => boolean };
 

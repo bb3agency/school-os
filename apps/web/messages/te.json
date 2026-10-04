@@ -117,7 +117,8 @@
     "announcement": {
       "draft": "డ్రాఫ్ట్",
       "scheduled": "షెడ్యూల్ చేయబడింది",
-      "cancelled": "రద్దు చేయబడింది"
+      "cancelled": "రద్దు చేయబడింది",
+      "ended": "Ended"
     },
     "breakGlass": {
       "requested": "ఆమోదం కోసం వేచి ఉంది",
@@ -1309,6 +1310,12 @@
       "editBody": "Schools see the change within a minute on the shared platform, and at the next heartbeat on dedicated hosts.",
       "editSave": "Save changes",
       "updated": "Announcement updated.",
+      "errors": {
+        "invalid_state": {
+          "title": "This announcement can't be changed any more",
+          "body": "It has ended or was cancelled, so it is read-only. The list now shows its current status. To show the message again, create a new announcement."
+        }
+      },
       "emptyTitle": "ఇంకా ప్రకటనలు లేవు",
       "emptyBody": "మీరు షెడ్యూల్ చేసే ప్రకటనలు ఇక్కడ కనిపిస్తాయి."
     },

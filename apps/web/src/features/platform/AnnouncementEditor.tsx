@@ -311,16 +311,24 @@ function EditFields({ row, errors }: { row: Announcement; errors: FieldErrors })
 }
 
 /**
- * Edit an announcement that is not cancelled (PATCH, `platform.announcements.manage`,
- * FR-PLT-026). The whole banner is sent again with `If-Match`: the API replaces it. Someone
- * else's change first (412) or a cancellation meanwhile (409) refreshes the list.
+ * Edit an announcement that has not ended and is not cancelled (PATCH,
+ * `platform.announcements.manage`, FR-PLT-026; owner decision 2026-10-04). The whole banner is
+ * sent again with `If-Match`: the API replaces it. Someone else's change first (412), or the
+ * announcement ending or being cancelled meanwhile (409 `invalid_state`), refreshes the list
+ * and says so in plain language.
  */
 export function AnnouncementEditDialog({
   row,
+  hidden = false,
   onSaved,
+  onRefused,
 }: {
   row: Announcement;
+  /** Read-only (ended or cancelled): no Edit button; an open dialog stays open. */
+  hidden?: boolean;
   onSaved?: () => void;
+  /** The API refused the edit because the announcement changed meanwhile (409 or 412). */
+  onRefused?: () => void;
 }) {
   const t = useTranslations("platform.announcements");
   const api = useBffClient("operator");
@@ -332,11 +340,13 @@ export function AnnouncementEditDialog({
       triggerLabel={t("edit")}
       triggerSize="sm"
       triggerVariant="secondary"
+      triggerHidden={hidden}
       triggerDescription={row.title_en}
       title={t("editTitle")}
       description={t("editBody")}
       confirmLabel={t("editSave")}
       schema={announcementEditSchemaFor(telugu)}
+      errorNamespace="platform.announcements"
       extra={tenantIds}
       invalidate={[PK.announcements]}
       onSuccess={() => onSaved?.()}
@@ -353,6 +363,7 @@ export function AnnouncementEditDialog({
           );
         } catch (failure) {
           if (failure instanceof ApiError && (failure.status === 409 || failure.status === 412)) {
+            onRefused?.();
             void queryClient.invalidateQueries({ queryKey: PK.announcements });
           }
           throw failure;
