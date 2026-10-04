@@ -33,7 +33,7 @@ All are ex-GST starting prices; GST (18%, CGST + SGST or IGST) goes on the invoi
 - Bad: overage lags a month (billed on the next invoice) and depends on the day's usage row being collected (the collector runs at 01:30 IST; the monthly draft run at 02:00 IST on the 1st). A dedicated host that cannot send heartbeats undercounts until it reconnects (in the school's favour).
 - Bad: annual plans cannot take a bundle until a rule for them is decided.
 - Control plane first: a dedicated host upgraded before the control plane sends `ai_answers`, which an older control plane rejects (strict heartbeat schema). The control plane is upgraded first, as for every release.
-- Follow-ups: the 80%/100% alert on a bundle's quota (usage thresholds cover plan limits only); the school-side "Plan & billing" page does not show the bundle yet; the public pricing page (`/pricing`) still says prices are agreed per school and calls Dedicated "your own server" (marketing copy, not changed here).
+- Follow-ups: the 80%/100% alert on a bundle's quota (usage thresholds cover plan limits only); the school-side "Plan & billing" page shows the bundle (built: `ai_bundle` on `GET /api/v1/tenant/billing`; docs/16 §5.18); the public pricing page (`/pricing`) still says prices are agreed per school and calls Dedicated "your own server" (marketing copy, not changed here).
 
 ## Alternatives considered
 
