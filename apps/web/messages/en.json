@@ -461,7 +461,6 @@
         "staff_users": "Staff users",
         "documents": "Documents",
         "storage_gb": "Storage",
-        "ai_tokens_month": "Ask the school (AI tokens)",
         "ai_budget_inr": "Ask the school (AI cost)"
       },
       "pastDueTitle": "Payment overdue",

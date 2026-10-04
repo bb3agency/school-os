@@ -171,6 +171,36 @@ describe("Plan and billing (FR-PLT-030)", () => {
     expect(await screen.findByText("SOS/2026-27/000123")).toBeInTheDocument();
   });
 
+  it("never shows AI tokens to the school; the AI answers card replaces them (ADR-0038)", async () => {
+    stub.routes["GET /bff/api/v1/tenant/billing"] = () =>
+      Response.json({
+        available: true,
+        plan_code: "standard",
+        plan_name: "Standard",
+        tier: "shared",
+        billing_period: "monthly",
+        status: "active",
+        current_period_start: "2026-09-01",
+        current_period_end: "2026-09-30",
+        trial_ends_at: null,
+        past_due_since: null,
+        grace_ends_on: null,
+        cancel_at_period_end: false,
+        usage_date: "2026-09-25",
+        usage: [
+          { metric: "students", used: "1210", limit: "1500", percent: 80 },
+          { metric: "ai_tokens_month", used: "420000", limit: "1000000", percent: 42 },
+        ],
+        amount_due_inr: "0.00",
+      });
+    stub.routes["GET /bff/api/v1/tenant/billing/invoices"] = () => page([]);
+    renderWithIntl(<BillingScreen />);
+    expect(await screen.findByText("1,210 of 1,500", { selector: "span" })).toBeInTheDocument();
+    expect(screen.queryByText(/AI tokens/)).toBeNull();
+    expect(screen.queryByText(/420,000/)).toBeNull();
+    expect(screen.getAllByRole("meter")).toHaveLength(1);
+  });
+
   describe("AI answers card (ADR-0038)", () => {
     const base = {
       available: true,

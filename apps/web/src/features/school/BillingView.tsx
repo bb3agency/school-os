@@ -30,7 +30,8 @@ const METRICS = [
   "staff_users",
   "documents",
   "storage_gb",
-  "ai_tokens_month",
+  // No "ai_tokens_month": schools never see tokens; the AI answers card shows their AI use
+  // (ADR-0038; owner decision 2026-10-04).
   "ai_budget_inr",
 ] as const;
 type Metric = (typeof METRICS)[number];
