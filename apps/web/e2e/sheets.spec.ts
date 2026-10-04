@@ -1,5 +1,12 @@
 import { readFile } from "node:fs/promises";
-import { expect, test, type Dialog, type Download, type Locator, type Page } from "@playwright/test";
+import {
+  expect,
+  test,
+  type Dialog,
+  type Download,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 import {
   expectFocusRing,
   expectNoAxeViolations,

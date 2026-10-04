@@ -436,7 +436,9 @@ test.describe("public site with every contact setting set @contact", () => {
             })
             .map((el) => el.textContent),
           wrapped: controls
-            .filter((el) => el.scrollWidth > el.clientWidth || el.getBoundingClientRect().height > 48)
+            .filter(
+              (el) => el.scrollWidth > el.clientWidth || el.getBoundingClientRect().height > 48,
+            )
             .map((el) => el.textContent),
         };
       });
