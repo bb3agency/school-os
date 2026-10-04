@@ -1,0 +1,77 @@
+# Security audit 2026-10-04: API authentication, authorization and surface (api-auth)
+
+Auditor 2 of 3 (wave 4). Branch `wip/sec-api-auth` from `claude/friendly-ptolemy-0tl3br` (3d408fc).
+The audit covered every route in `apps/api/openapi.json` (318 routes) and the guard on each one:
+`require`, `require_any`, `require_platform`, `require_principal`, the fleet signature and the
+Tally edge guards. For each permission it asked what the lowest role holding it can reach.
+
+Testing used synthetic data only. Each fixed finding has a test that failed before the fix and
+passes after it. Paths are relative to `apps/api/`.
+
+## Findings
+
+| ID | Severity (why) | Area | File:line | Exploit path | Status | Proving test |
+|---|---|---|---|---|---|---|
+| AA-01 | Medium: one request from any `document.upload` + `document.read` holder (a class teacher) costs the API ~0.7–0.8 GB and up to a minute of CPU; a few in parallel can kill the API container | Uploads, DoS | `app/core/spreadsheet.py:105-160, 254` | Upload a 10 MB CSV that is one row of commas, or an 8 MB XLSX whose single row holds 1.5 M `<c>` cells (stays under the size and ratio limits). Then open `GET /documents/{id}/sheet`. The same path is hit by an import and by the attendance or marks sheet preview. Every cell is materialised before the column limit runs: measured peaks were 708 MB (CSV) and 777 MB (XLSX). | Fixed in f381b47. A row with more than 16,384 cells (XFD) is refused with `too_many_columns`. CSV is refused before cells are built; XLSX members are scanned as a stream before openpyxl parses them. The 10 MB CSV case now peaks at ~150 MB (the `csv` module's own row list) and takes 0.3 s. | `tests/core/test_spreadsheet_limits.py` |
+| AA-02 | Medium: privilege escalation inside a school; needs office_admin plus step-up | Authz (identity) | `app/identity/service.py:566-600, 610-660` | An office admin holds `user.manage` but not `role.assign`. Through `PATCH /users/{id} {"status": ...}` they could suspend or remove the principal and other owners, and reactivate a principal the owner had suspended. Taking away or giving back every role bypassed the rule that nobody may grant or revoke a role with more access than their own. | Fixed in c3bfb2f. A status change on a member with a privileged (MFA) or custom role now follows the invite rule: it needs `role.assign` and grantable roles, otherwise 403 `role_not_grantable`. The owner still reaches everyone, and office admins still manage non-privileged staff. | `tests/api/test_users_privileged_status.py` |
+| AA-03 | Medium: C3 data of the whole school leaks to a member whose sensitive grant covers one section | Authz scope (exports) | `app/exports/service.py:321-340, 445-447, 506` | Take one membership with `exam_coordinator` (`student.read_basic` school-wide, `student.export`, `export.board`) and `class_teacher` (`student.read_sensitive` scoped to 9A). `POST /exports/student-list` with a C3 column, or `POST /exports` with `include_sensitive`, froze every student, because only the `read_basic` scope applied. The holder could then download C3 values for all sections. A pre-check's findings also ignored the scope of `dq.findings.read`. | Fixed in 43d4fa8. The frozen student set now intersects the scope of `student.read_sensitive` (when C3 is included) and of `dq.findings.read` (pre-check). | `tests/exports/test_service.py::test_SEC_015_sensitive_and_findings_reach_only_their_own_scope` |
+| AA-04 | Medium: DQ findings (names, admission numbers, source values) of the whole school leak to a section-scoped reader | Authz scope (dq) | `app/dq/service.py:145-158`, `app/dq/engine.py:136-152` | A membership with `accountant` (`read_basic` school-wide) and `class_teacher` (`dq.findings.read` scoped). `GET /dq/findings`, `/dq/findings/{id}` and `/dq/summary` reached every student, and `POST /dq/runs` checked every student. Exports and the knowledge `list_findings` tool use the same reach. | Fixed in 24cd4df. Reach now intersects both grants. | `tests/dq/test_engine.py::test_SEC_015_school_wide_read_basic_does_not_widen_scoped_findings` |
+| AA-05 | Medium: a scoped editor writes another section's roster (attendance, marks, insights inputs) | Authz scope (students) | `app/students/service.py:1164-1185` | A custom role is always scoped. A holder of `student.update_nonidentity` on 9A could call `POST /students/{9A student}/enrollments {"section_id": <9C>}`. Only the student was checked, not the target section; `PATCH .../enrollments/{id}` already refused the same move. | Fixed in 2b2756a: 422 `section_id not_found`. | `tests/students/test_enrollments_api.py::test_SEC_015_scoped_editor_cannot_enrol_into_a_section_outside_scope` |
+| AA-06 | Low–medium: reveals another section's guardian C3 phone and address; needs a custom scoped role and the guardian's UUID | Authz scope (students) | `app/students/service.py:2078-2091` | `POST /students/{9A student}/guardians {"guardian_id": <guardian of a 9C student>}` linked the guardian. `sensitive-reveal` then decrypted its phone and address, and `PATCH` edited the guardian. The 422 vs 201 answer also confirmed that a guardian UUID exists. | Fixed in 06d640a. The guardian must belong to a student in the caller's update scope; otherwise 422 `not_found`, the same answer as for an unknown id. | `tests/students/test_enrollments_api.py::test_SEC_015_scoped_editor_cannot_link_a_guardian_of_a_student_outside_scope` |
+| AA-07 | Low: a stolen Tally device key stays valid for ever; only matters after theft, and revoking the device still ends it | Machine auth (Tally) | `app/tally/service.py:904-930` | Whoever holds the current key calls `POST /edge/tally/key-rotation` again within 7 days and never signs with the new key. Each call restarted `rotation_started_at`, so the old key never expired. | Fixed in 1376305. A pending rotation keeps its original start. | `tests/tally/test_api.py::test_FR_TALLY_002_repeated_rotation_does_not_extend_the_old_keys_life` |
+| AA-08 | Low: unauthenticated memory pressure | API surface | `app/core/middleware.py:50, 226-236` | Any client could send `Content-Type: multipart/form-data` to raise the body limit from 1 MiB to 10 MB. The fleet heartbeat and Tally guards (and FastAPI's body reading) then buffered 10 MB before authentication. No route takes multipart. | Fixed in 6029caf: both limits are 1 MiB. Also corrected the stale docs/09 `POST /imports` row (the route takes JSON). | `tests/core/test_middleware.py::test_SEC_010_a_multipart_content_type_does_not_raise_the_limit_on_the_real_app` |
+| AA-09 | Low–medium: affects the integrity of billable usage, but only for the host's own tenant | Fleet heartbeat | `app/platform/schemas.py` (`HbUsage.date`), `app/platform/usage.py:143-164`, `repository.py:492` | Anyone holding a dedicated host's heartbeat key can send a validly signed heartbeat whose `usage.date` is any past or future day. That rewrites `usage_daily` (AI answers and cost) for months already invoiced or still to come. `sent_at` is not checked either. | Reported, needs decision. Recommendation: accept only today and yesterday (IST), or require an operator-approved backfill. Product should decide how a host catches up after an outage. | none |
+| AA-10 | Low: integrity, inside the school | Authz (documents) | `app/documents/service.py:554-566, 879-890, 1075-1095` | A version upload, `add_version` and `PATCH /documents/{id}` need only `document.upload` plus being able to see the document. A 9A class teacher can therefore replace the file or metadata of a document the principal shared with role `class_teacher`, or with sections 9A and 10B, and the change reaches the other sections. The docstrings say this is intended. | Reported, needs decision. Option 1: writes require the uploader or `document.manage_acl`. Option 2: a scoped uploader writes only documents whose ACL is entirely inside their scope. | none |
+| AA-11 | Low: data loss of a sheet someone else uploaded | Authz (academics) | `app/academics/service.py:365-392` | `POST /sections/{id}/attendance/sheet` (or marks) with the `document_id` of any visible `import_file` that no live import uses deletes that file after reading it. A co-teacher can destroy a sheet another teacher uploaded for the same section. | Reported. Recommendation: consume only files whose `created_by` is the caller. This changes test fixtures in tests/academics and tests/insights that preview the owner's upload as the class teacher. | none |
+| AA-12 | Low | Authz (exports) | `app/exports/service.py:522-529` | `_own_problem` checks only that the caller still holds the export-kind permission (and `read_sensitive` for C3). A requester whose student scope or `read_basic` was reduced can still download their frozen export until it expires. | Reported. Recommendation: on download, re-check `read_basic` (and the scope of the frozen students). | none |
+| AA-13 | Low | Platform API | `app/platform/api.py:114` and the services that call `_version(None)` | `If-Match` is optional on plan, billing-account, invoice, deployment, announcement and ticket updates. Two operators editing at once silently overwrite each other (lost update, e.g. GSTIN on the billing account). docs/16 documents it as optional. | Reported, needs decision. Recommendation: require it, as tenant routes do (docs/09 §2). This is a breaking contract change for the operator UI. | none |
+| AA-14 | Low | Platform idempotency | `app/ops/idempotency.py:94-99` | The in-progress marker lives 24 h. If `store.complete` fails after the commit, or the process dies, retries get 409 `idempotency_in_progress` for a day. | Hardening note: use a short pending TTL as the tenant implementation does (60 s). | none |
+| AA-15 | Low | Tally edge | `app/tally/agent_auth.py:254-268` | (a) Enrolment does not check that the school is active, so a code made just before suspension still enrols, although the device is then refused everywhere. (b) Anyone who knows a school's tenant UUID can use up the 10 enrolment attempts per hour, because the attempt is counted before the code is checked. | Hardening notes. | none |
+| AA-16 | Info: needs decision | Platform | `app/platform/tenants.py:296` | A non-billing (security) suspension by `platform.tenants.suspend` ignores protected exam windows. docs/16 principle 5 says suspension never happens in a window without owner approval; §9.3 covers billing only. | Reported, needs decision. A security suspension probably must stay immediate; if so, state that in docs/16. | none |
+| AA-17 | Info | Insights | `app/insights/service.py:1170-1221` | `GET /students/{id}/timeline` returns attendance and exam results to any `insights.read` holder in scope, without `attendance.read` or `marks.read`. No system role is affected; a custom role would be. | Hardening note. | none |
+| AA-18 | Info | DQ | `app/dq/service.py:381-408` | `POST /dq/runs` answers 422 for an unknown section or class id and 201/202 for an existing one outside the caller's scope, which shows whether an id exists. | Hardening note: run the structure check after scoping, or return the same answer. | none |
+
+### Hardening notes (no exploit path found)
+
+- Access tokens are not revoked at logout. The API is stateless and tokens live ≤ 10 min (FR-IAM-004). The BFF session is auditor 3's area.
+- `POST /users/{id}/invitation-email` has a per-membership cool-down (10 min) that fails open without Valkey. There is no per-school cap: an insider holding `user.manage` and step-up could invite many addresses.
+- The price-override reason is kept only on the subscription row, so the audit event loses earlier reasons when the override changes.
+- A 10 MB CSV still peaks at ~150 MB, because the `csv` module builds a 10 M-field row before the 16,384 check.
+- The Chromium PDF renderer aborts every request but not `dns-prefetch`. All templates escape values, so no injection path exists today.
+
+## Verified (no finding)
+
+- **Route guards:** every route has exactly one guard; step-up flags match the catalog (pinned by `tests/security/test_route_enumeration.py`). The `require_any` routes (change requests, exports, certificates, tally status, exams, staff, task assignees) re-check the specific permission and scope in the service.
+- **Step-up and two-person:**
+  - Every ᴿ platform permission uses `require_platform`, which calls `require_recent_auth` (MFA and `auth_time` ≤ 300 s). Operators without MFA are refused outright.
+  - Offboarding approval and emergency break-glass need a second, different operator: checked in the service and by a DB CHECK.
+  - The exam-window override is enforced on the server (`"platform_owner" in ctx.roles` together with `exam_window_override`); the checkbox alone does nothing.
+  - Price override (₹0 allowed, by owner decision), AI bundle, suspend and reactivate need `platform.subscriptions.manage` with step-up. Invoices and payments (including reverse) use `platform.invoices.manage`, which has no step-up, as docs/16 §6 says.
+- **Recently added routes:**
+  - `PATCH /platform/plans` locks the row and checks `row_version` and draft status.
+  - Payment reverse locks the payment and the invoice.
+  - Announcement edit and cancel need `announcements.manage`.
+  - `PATCH /tasks` (`task.manage` school-wide plus If-Match).
+  - `POST /students/search` with `apaar_id` (C2, same scope).
+  - Import sheet `PATCH`/export: C3 columns are hidden without `read_sensitive`; export needs step-up.
+  - Document sheet export needs step-up for C2/C3.
+  - Tenant billing `ai_bundle` returns only the caller's own subscription.
+- **Identity:**
+  - Tokens are checked for RS256/ES256 only, an `alg`/JWK match, issuer, audience or Cognito `client_id` + `token_use`, and lifetime ≤ 15 min. The other app clients' ids are refused.
+  - Support tokens are accepted only for the support client and only with MFA.
+  - Identities are issuer-qualified (ADR-0023) in `resolve_login` and `create_user_for_invite`.
+  - Break-glass sessions are read-only (GET/HEAD) and every call is audited. The grant is checked live on each request, and revoke closes the membership in the same transaction.
+- **Uploads:**
+  - Presigned POST with `content-length-range`, magic-byte and tail checks, CSV UTF-8 and NUL checks, and a SHA-256 check on every read. Storage keys come from the server (the file name never reaches storage).
+  - Only `ready` (scanned clean) versions are served, opened as sheets, imported, extracted or ingested. Quarantined versions are withheld everywhere.
+  - Zip bombs are refused by member count, total and ratio before parsing.
+- **Errors:** responses are problem+json. Validation errors never echo values, and a 500 never carries a stack trace.
+- **Machine routes:** the fleet heartbeat (HMAC over timestamp and body, ±300 s, nonce, registry match, 16 KB, strict schema) and the Tally edge signature (canonical request, nonce, per-tenant RLS lookup, rate limits) checked out. No SSRF sink takes a URL from user input, DB data or an operator-editable setting.
+
+## Checks run
+
+- `uv run lint-imports`: 38 contracts kept.
+- `uv run mypy apps/api apps/worker evals`: no issues.
+- `ruff check` and `ruff format --check` in apps/api: clean.
+- `pytest` on tests/security, tests/migrations, tests/core and the touched modules (api, identity, tally, students, exports, dq, imports, academics, documents, platform, breakglass, insights, changes, certificates). The result is in the final report.
+- OpenAPI unchanged: no route, schema or route docstring changed.
