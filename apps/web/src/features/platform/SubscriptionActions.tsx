@@ -7,9 +7,17 @@ import { ActionDialog } from "@/components/ui/ActionDialog";
 import { TextAreaField, TextField } from "@/components/ui/Input";
 import { SelectField } from "@/components/ui/Select";
 import { unwrap, useBffClient } from "@/lib/bff/query";
-import { formatCount, formatInr } from "@/lib/format";
-import { localDateTime, money, reason, uuid } from "@/lib/validation";
-import { PK, planLabel, readyOr, useAiBundles, useCan, usePlanDirectory } from "./data";
+import { formatCount, formatDate, formatInr } from "@/lib/format";
+import { checkbox, localDateTime, money, reason, uuid } from "@/lib/validation";
+import {
+  PK,
+  planLabel,
+  readyOr,
+  useAiBundles,
+  useCan,
+  useOperatorMe,
+  usePlanDirectory,
+} from "./data";
 
 const reasonSchema = z.object({ reason });
 const changePlanSchema = z.object({ plan_id: uuid });
@@ -26,6 +34,11 @@ const overrideSchema = z.object({
   }),
   reason,
 });
+/**
+ * Billing suspension (FR-PLT-014, docs/16 §9): past-due only, after the grace period, with a
+ * reason; inside a protected board-exam window only a platform owner may approve it.
+ */
+const suspendSchema = z.object({ reason, exam_window_override: checkbox });
 const INVALIDATE = [PK.subscriptions, PK.tenants, PK.dashboard] as const;
 
 /**
@@ -48,6 +61,8 @@ export function SubscriptionActions({
   const { plans } = usePlanDirectory();
   const bundles = readyOr(useAiBundles(), []);
   const locale = useLocale();
+  // Only a platform owner can approve a suspension inside a board-exam window (§9.3).
+  const owner = useOperatorMe()?.roles.includes("platform_owner") ?? false;
   if (!can("platform.subscriptions.manage")) return null;
 
   const path = { sub_id: subscription.id };
@@ -272,12 +287,61 @@ export function SubscriptionActions({
           }
         />
       ) : null}
+      {status === "past_due" ? (
+        <ActionDialog
+          triggerLabel={t("suspend")}
+          triggerVariant="danger"
+          triggerSize="sm"
+          triggerDescription={label}
+          title={t("suspendTitle")}
+          description={t("suspendBody", {
+            date: formatDate(subscription.grace_ends_on) ?? "",
+          })}
+          confirmLabel={t("suspend")}
+          confirmVariant="danger"
+          consequence={
+            current?.tier === "dedicated"
+              ? t("suspendDedicatedConsequence")
+              : current?.tier === "shared"
+                ? t("suspendSharedConsequence")
+                : t("suspendUnknownConsequence")
+          }
+          stepUp
+          schema={suspendSchema}
+          invalidate={INVALIDATE}
+          submit={(data) =>
+            unwrap(
+              api.POST("/api/v1/platform/subscriptions/{sub_id}/suspend", {
+                params: { path },
+                body: data,
+              }),
+            )
+          }
+        >
+          {(errors) => (
+            <>
+              <ReasonField error={errors.reason} />
+              {owner ? (
+                <label className="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    name="exam_window_override"
+                    className="mt-1 size-4 accent-primary"
+                  />
+                  {t("examWindowOverride")}
+                </label>
+              ) : null}
+            </>
+          )}
+        </ActionDialog>
+      ) : null}
       {status === "suspended" ? (
         <ActionDialog
           triggerLabel={t("reactivate")}
           triggerSize="sm"
           triggerDescription={label}
           title={t("reactivateTitle")}
+          description={t("reactivateBody")}
           confirmLabel={t("reactivate")}
           stepUp
           schema={z.object({})}

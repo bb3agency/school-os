@@ -753,7 +753,7 @@
       "resendInviteBody": "A new invitation email goes to the owner.",
       "suspend": "Suspend school",
       "suspendDialogTitle": "Suspend this school?",
-      "suspendDialogBody": "Staff will not be able to sign in until the school is reactivated. The owner can still download the school's data. Records are kept.",
+      "suspendDialogBody": "Staff will not be able to sign in until the school is reactivated. The owner can still download the school's data. Records are kept. For non-payment, suspend the subscription on the Subscription tab instead.",
       "suspendConfirm": "Suspend school",
       "reactivate": "Reactivate school",
       "reactivateTitle": "Reactivate this school?",
@@ -1108,7 +1108,16 @@
       "removeOverride": "Remove negotiated price",
       "removeOverrideTitle": "Remove the negotiated price?",
       "removeOverrideBody": "Invoices made from now on use the plan's base price again. Invoices already made don't change.",
-      "overrideValue": "Negotiated price: {amount}"
+      "overrideValue": "Negotiated price: {amount}",
+      "suspend": "Suspend subscription",
+      "suspendTitle": "Suspend this subscription for non-payment?",
+      "suspendBody": "This is a billing suspension: only for a past-due subscription whose 15-day grace period has ended (grace ended {date}). It is not the school suspension on the Overview tab, which is for security or abuse.",
+      "suspendSharedConsequence": "The school is suspended too: staff can't sign in until you reactivate the subscription after the overdue invoices are paid. Records are kept.",
+      "suspendDedicatedConsequence": "Only the subscription changes. The school's dedicated environment keeps running; it is not switched off from here.",
+      "suspendUnknownConsequence": "A school on the shared platform is suspended too, so staff can't sign in until you reactivate the subscription. For a dedicated school only the subscription changes.",
+      "examWindowOverride": "Today is inside a protected board-exam window and I approve this suspension as platform owner",
+      "reactivateBody": "Overdue invoices must be paid first. A school suspended for non-payment can sign in again straight away.",
+      "overrideReason": "Reason for the negotiated price"
     },
     "invoices": {
       "title": "Invoices",
