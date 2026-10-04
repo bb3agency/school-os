@@ -7,7 +7,30 @@ import { expect, type Locator, type Page } from "@playwright/test";
 
 export const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
+/**
+ * Let the finite enter animations end (skeleton-to-content `.content-in` fades over 200ms,
+ * `.alert-in`, dialog motion; docs/17 §5.5). Measured mid-fade, text at partial opacity
+ * reports false colour-contrast failures. Endless ones (skeleton shimmer, spinners) are
+ * left running: they never finish.
+ */
+export async function settleAnimations(page: Page) {
+  // Data still loading: its content fades in once it arrives, so wait for the skeletons
+  // (LoadingState) to go first. A screen that keeps one is measured as it is.
+  await page
+    .waitForFunction(() => !document.querySelector(".skeleton"), undefined, { timeout: 10_000 })
+    .catch(() => undefined);
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((animation) => Number.isFinite(animation.effect?.getComputedTiming().endTime))
+        .map((animation) => animation.finished.catch(() => null)),
+    ).then(() => undefined),
+  );
+}
+
 export async function expectNoAxeViolations(page: Page, label: string) {
+  await settleAnimations(page);
   const results = await new AxeBuilder({ page }).withTags(WCAG).analyze();
   const summary = results.violations.map(
     (violation) =>
