@@ -239,7 +239,7 @@ first 10 rows on the document page (FR-IMP-008, FR-DOC-009..011).
 | Checks before sending      | NFC, trimmed, blank clears; one line, at most 1,000 characters; a full Aadhaar number is refused with how to fix it ("enter only the last 4 digits"). The API applies the same rules                                                                                                          |
 | Announcements              | One polite `role="status"` line per screen for outcomes ("Row 3 saved. It has no problems now.", "Downloaded …"); "Saving…" is shown, not announced. Failures use `ProblemAlert` with the API's code, never cell values                                                                       |
 | Find on this page          | `SearchInput` + "In column" `SelectField` above the grid filter the rows of the current page (restricted columns are never searched); a polite count says how many match. Paging (100 rows) stays server-side                                                                              |
-| Unsaved work               | `useUnsavedChangesWarning`: an open editor with a changed value, or document changes not yet saved, make links inside SchoolOS ask first and the browser ask before the tab closes                                                                                                         |
+| Unsaved work               | `useUnsavedChangesWarning`: an open editor with a changed value, or document changes not yet saved, make links inside SchoolOS ask first, the browser's Back and Forward buttons inside SchoolOS ask first, and the browser ask before the tab closes. Back/Forward (Baseline only, no Navigation API): the first warning pushes one guard history entry (same URL, the router's state kept); a capture-phase `popstate` listener holds the Next.js router back and asks; Cancel pushes the guard again (page and changes stay), OK goes on without a second "Leave site?". Once nothing is unsaved the entry stays but goes quiet, and the next Back skips it, so one press still leaves. Several warnings on a page share one entry; the hook removes its listeners on unmount |
 | Conflicts (412)            | Imports: the sheet reloads and the person makes the change again. Documents: the changes stay on the page with "Download my changes (CSV)" and "Reload the sheet"; saving waits for the reload                                                                                               |
 | Downloads                  | CSV (UTF-8 with BOM) and Excel buttons in the page header, through the BFF with the step-up prompt; the note under the grid says changes are included, Aadhaar-like numbers masked and formulas turned into text                                                                           |
 | Motion                     | None (§2 rule 6: never on tables or keyboard navigation)                                                                                                                                                                                                                                   |
@@ -695,9 +695,12 @@ for eyebrows. Dark bands (`.mk-night`, #0b1220) use white (18.9:1) and `--mk-nig
 `/bff/auth/login`. Without an address "Sign in" becomes the primary button and the home hero
 offers "See how it works". **"Ask on WhatsApp"** (`WhatsAppLink`) is a secondary button beside
 "Talk to us" (after "Sign in" when there is no address), shown only when
-`SOS_PUBLIC_WHATSAPP_NUMBER` is set: in the header bar from xl (1280px), in the phone menu
-below lg (1024px; between 1024 and 1279px the header has no WhatsApp link, only the page body
-does), the hero, both plan cards on /pricing and the closing bands. It is a plain link
+`SOS_PUBLIC_WHATSAPP_NUMBER` is set: in the header bar from lg (labelled from xl, 1280px;
+between 1024 and 1279px a 40px square icon button, `iconOnly`, whose accessible name is still
+"Ask on WhatsApp (opens WhatsApp)" and whose tooltip is the label, so the bar never wraps or
+crowds the page links), in the phone menu below lg (1024px), the hero, both plan cards on
+/pricing and the closing bands. `welcome.spec.ts` (@contact) checks the header stays one 64px
+row with every control inside the screen and no sideways scroll from 320 to 1920px. It is a plain link
 to `https://wa.me/<digits>?text=<encoded>` with the fixed greeting "Hello, I'd like to see
 SchoolOS for our school." (`marketing.cta.whatsappMessage`; never student or other personal
 data), `rel="noopener noreferrer"`, same tab, and an accessible name that starts with the
@@ -901,9 +904,10 @@ and the switch have no text inside when empty, so they use `border-control` (3:1
   when you leave Ask. The conversation and memory endpoints use the generated client; the SSE
   event payloads, which OpenAPI does not describe, are typed in `features/ask/sse.ts` from
   `knowledge/domain.py` and must be changed together with it.
-- Calmer app (0.8), for the product owner: between 1024 and 1279px the header bar has no room
-  for "Ask on WhatsApp" beside the page links, so there it is only in the hero, plan cards and
-  closing bands (the phone menu covers smaller screens); the neutral canvas covers the screens
+- Calmer app (0.8), for the product owner: between 1024 and 1279px "Ask on WhatsApp" in the
+  header bar is an icon button (§5.6; the full label did not fit beside the page links without
+  crowding them), which a visitor may not recognise as quickly as the labelled button; the
+  neutral canvas covers the screens
   named in §3.2 only (Ask, notices, attendance and the other school pages keep the gradient
   until someone adds them to `NEUTRAL_CANVAS_PATHS`); the consequence line is used on the
   change-request and finding decisions so far; other dialogs adopt it in their own changes.
