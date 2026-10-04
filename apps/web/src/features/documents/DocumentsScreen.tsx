@@ -93,7 +93,7 @@ export function DocumentsScreen({
             <span className="min-w-0 space-y-1">
               <Link
                 href={`/documents/${row.id}`}
-                className="block font-medium text-primary underline underline-offset-4"
+                className="block font-semibold text-primary underline underline-offset-4"
               >
                 {row.title}
               </Link>

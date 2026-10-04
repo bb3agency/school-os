@@ -56,7 +56,7 @@ export function Stepper({
             <span
               aria-hidden="true"
               className={cn(
-                "flex size-8 shrink-0 items-center justify-center rounded-full border-2 text-sm font-medium",
+                "flex size-8 shrink-0 items-center justify-center rounded-full border-2 text-sm font-semibold",
                 state === "done" && "border-success bg-success text-white",
                 state === "current" && !stopped && "border-primary bg-primary-soft text-primary",
                 stopped && "border-danger bg-danger-soft text-danger",
@@ -78,7 +78,7 @@ export function Stepper({
               <span
                 className={cn(
                   "block text-sm",
-                  state === "pending" ? "text-ink-muted" : "font-medium text-ink",
+                  state === "pending" ? "text-ink-muted" : "font-semibold text-ink",
                 )}
               >
                 {state === "done" ? <span className="sr-only">{doneLabel} </span> : null}
@@ -99,7 +99,7 @@ export function Stepper({
 export const fileInputClasses =
   "mx-auto block w-full max-w-md cursor-pointer rounded-md text-sm text-ink-muted " +
   "file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-action file:px-4 " +
-  "file:py-2 file:font-medium file:text-on-action hover:file:bg-action-hover " +
+  "file:py-2 file:font-semibold file:text-on-action hover:file:bg-action-hover " +
   "disabled:cursor-not-allowed disabled:opacity-70";
 
 /**
@@ -170,7 +170,7 @@ export function FileDropZone({
       >
         <Icon name={icon} className="size-6" />
       </span>
-      <p className="font-medium text-ink">{title}</p>
+      <p className="font-semibold text-ink">{title}</p>
       {children}
       {note ? <p className="text-xs text-ink-muted">{note}</p> : null}
     </div>

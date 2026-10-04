@@ -129,7 +129,7 @@ export function PageHero({
 
 export function PlannedBadge({ label }: { label: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-info-border bg-info-soft px-2.5 py-0.5 text-xs font-medium text-info-ink">
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-info-border bg-info-soft px-2.5 py-0.5 text-xs font-semibold text-info-ink">
       <Icon name="clock" className="size-3.5" />
       {label}
     </span>
@@ -141,7 +141,7 @@ export function SampleTag({ label, className }: { label: string; className?: str
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border border-warning-border/40 bg-warning-soft px-2 py-0.5 font-mono text-[0.6875rem] font-medium tracking-wide text-warning-ink uppercase",
+        "inline-flex items-center gap-1 rounded-full border border-warning-border/40 bg-warning-soft px-2 py-0.5 font-mono text-[0.6875rem] tracking-wide text-warning-ink uppercase",
         className,
       )}
     >
@@ -184,7 +184,7 @@ export function ArrowLink({
     <Link
       href={href}
       className={cn(
-        "inline-flex min-h-11 items-center gap-1.5 font-medium underline-offset-4 hover:underline",
+        "inline-flex min-h-11 items-center gap-1.5 font-semibold underline-offset-4 hover:underline",
         night ? "text-white" : "text-primary",
       )}
     >

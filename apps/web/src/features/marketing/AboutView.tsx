@@ -78,7 +78,7 @@ export function AboutView({ settings }: { settings: MarketingSettings }) {
               {companyName ? (
                 <div>
                   <dt className="eyebrow text-ink-subtle">{t("about.contact.company")}</dt>
-                  <dd className="mt-1 text-lg font-medium text-ink">{companyName}</dd>
+                  <dd className="mt-1 text-lg font-semibold text-ink">{companyName}</dd>
                 </div>
               ) : null}
               {companyAddress ? (
@@ -101,7 +101,7 @@ export function AboutView({ settings }: { settings: MarketingSettings }) {
                   <dd className="mt-1">
                     <a
                       href={mailtoHref(contactEmail)}
-                      className="break-anywhere inline-flex min-h-11 items-center text-lg font-medium text-primary underline underline-offset-4"
+                      className="break-anywhere inline-flex min-h-11 items-center text-lg font-semibold text-primary underline underline-offset-4"
                     >
                       {contactEmail}
                     </a>

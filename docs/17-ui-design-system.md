@@ -113,7 +113,8 @@ shaping. Only the serif display figures get optical tracking (`-0.01em`, reset b
 Weights: PP Mori has 200/400/600 only, so there are **two weights, default (400) and
 `font-semibold` (600)**. `font-medium` renders as 400 and `font-bold`/`font-extrabold` snap to a
 600 or a synthetic bold, so none of the three is used anywhere (`components/ui/font-weights.test.ts`
-fails on them; its allowlist names the feature folders not yet swept and must only shrink). Pick
+fails on them in every source file; it has no allowlist and must never get one). The public
+pages may also use `font-extralight` (200, served by PP Mori) for the large `h1` (§5.6). Pick
 on purpose:
 
 - **Semibold:** headings, card/section/dialog titles, legends and field labels (including a label
@@ -874,9 +875,11 @@ and the switch have no text inside when empty, so they use `border-control` (3:1
   an animated accordion and toasts; they were left out on purpose (keyboard-driven, no Baseline
   height animation, Sonner blocked by the CSP). The e2e axe checks run without waiting for
   animations; a fade is at most 200ms, but a slow CI machine could catch one mid-fade.
-- Weights (§3.1): the imports, documents, sheets and marketing screens still use `font-medium`
-  (and marketing `font-extralight`, which PP Mori serves as 200); they are listed in
-  `font-weights.test.ts` and come off that list when they are swept.
+- Weights (§3.1): swept everywhere (2026-10-04); `font-weights.test.ts` has no allowlist left.
+  On the public pages the former `font-medium` text (nav links, chips, the FAQ questions, the
+  four sources, the dark-band points) is now semibold, which reads a little heavier than before
+  (the old 500 rendered as 400); the product owner may ask for any of them to go back to the
+  default weight.
 
 - English first (§5.4, ADR-0036), for the product owner: while Telugu is off, a new class and a
   platform banner store their English text in the Telugu fields because the API still requires

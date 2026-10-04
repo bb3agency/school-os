@@ -95,7 +95,7 @@ export function PlanCards({
                   dark ? "border-white/10" : "border-border",
                 )}
               >
-                <p className={cn("font-medium", dark ? "text-white" : "text-ink")}>
+                <p className={cn("font-semibold", dark ? "text-white" : "text-ink")}>
                   {t("pricing.priceNote")}
                 </p>
                 {contactEmail || whatsappNumber ? (

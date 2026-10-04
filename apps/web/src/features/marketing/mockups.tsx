@@ -70,7 +70,7 @@ function Chip({
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap",
+        "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap",
         tones[tone],
       )}
     >
@@ -175,7 +175,7 @@ export function ImportCard({ className }: { className?: string | undefined }) {
         ))}
       </ol>
       <p className="mt-3 text-xs text-ink-muted">{t("rows")}</p>
-      <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-ink">
+      <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-surface-muted px-2 py-0.5 text-xs font-semibold text-ink">
         <Icon name="refresh" className="size-3" />
         {t("undo")}
       </p>
@@ -215,7 +215,7 @@ export function AskCard({
         {[t("sourceRegister"), t("sourceRecord")].map((source, index) => (
           <li
             key={source}
-            className="inline-flex items-center gap-1 rounded-full bg-surface px-2.5 py-0.5 text-xs font-medium text-ink"
+            className="inline-flex items-center gap-1 rounded-full bg-surface px-2.5 py-0.5 text-xs font-semibold text-ink"
           >
             <span className="font-mono text-primary">[{index + 1}]</span>
             {source}
@@ -270,7 +270,7 @@ export function ChangeRequestCard({ className }: { className?: string | undefine
           {t("approve")}
         </li>
       </ol>
-      <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-violet-soft px-2.5 py-0.5 text-xs font-medium text-violet-ink">
+      <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-violet-soft px-2.5 py-0.5 text-xs font-semibold text-violet-ink">
         <Icon name="users" className="size-3" />
         {t("rule")}
       </p>
@@ -304,7 +304,7 @@ export function AuditCard({ className }: { className?: string | undefined }) {
           </li>
         ))}
       </ol>
-      <p className="mt-4 flex items-center gap-2 rounded-lg bg-success-soft px-3 py-2 text-sm font-medium text-success-ink">
+      <p className="mt-4 flex items-center gap-2 rounded-lg bg-success-soft px-3 py-2 text-sm font-semibold text-success-ink">
         <Icon name="shieldCheck" className="size-4" />
         {t("check")}
       </p>
@@ -362,10 +362,10 @@ export function AccessRequestCard({ className }: { className?: string | undefine
         </li>
       </ul>
       <div className="mt-4 flex gap-2">
-        <span className="inline-flex min-h-9 flex-1 items-center justify-center rounded-md bg-action px-3 text-sm font-medium text-on-action">
+        <span className="inline-flex min-h-9 flex-1 items-center justify-center rounded-md bg-action px-3 text-sm font-semibold text-on-action">
           {t("approve")}
         </span>
-        <span className="inline-flex min-h-9 flex-1 items-center justify-center rounded-md border border-border-soft px-3 text-sm font-medium text-ink">
+        <span className="inline-flex min-h-9 flex-1 items-center justify-center rounded-md border border-border-soft px-3 text-sm font-semibold text-ink">
           {t("decline")}
         </span>
       </div>
