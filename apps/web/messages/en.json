@@ -1304,6 +1304,11 @@
       "cancelAnnouncement": "Cancel",
       "cancelTitle": "Cancel this announcement?",
       "cancelBody": "Schools stop seeing it straight away.",
+      "edit": "Edit",
+      "editTitle": "Edit announcement",
+      "editBody": "Schools see the change within a minute on the shared platform, and at the next heartbeat on dedicated hosts.",
+      "editSave": "Save changes",
+      "updated": "Announcement updated.",
       "emptyTitle": "No announcements yet",
       "emptyBody": "Announcements you schedule appear here."
     },

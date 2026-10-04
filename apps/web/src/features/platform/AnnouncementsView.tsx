@@ -2,6 +2,7 @@
 
 import type { Announcement } from "@schoolos/api-client";
 import { useLocale, useTranslations } from "next-intl";
+import { useState } from "react";
 import { z } from "zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
@@ -13,7 +14,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { announcementTone, known } from "@/features/status";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { cn } from "@/lib/cn";
-import { AnnouncementEditor } from "./AnnouncementEditor";
+import { AnnouncementEditDialog, AnnouncementEditor } from "./AnnouncementEditor";
 import { PK, useCan } from "./data";
 import { MonoTime } from "./pills";
 
@@ -36,6 +37,7 @@ export function AnnouncementsScreen() {
   const api = useBffClient("operator");
   const can = useCan();
   const manage = can("platform.announcements.manage");
+  const [updated, setUpdated] = useState(false);
   const announcements = useApiQuery(
     [...PK.announcements, "list"],
     async () => (await unwrap(api.GET("/api/v1/platform/announcements"))).data,
@@ -89,7 +91,8 @@ export function AnnouncementsScreen() {
           </dd>
         </dl>
         {manage && row.status !== "cancelled" ? (
-          <div className="mt-auto flex justify-end border-t border-border pt-3">
+          <div className="mt-auto flex flex-wrap justify-end gap-2 border-t border-border pt-3">
+            <AnnouncementEditDialog row={row} onSaved={() => setUpdated(true)} />
             <ActionDialog
               triggerLabel={t("cancelAnnouncement")}
               triggerSize="sm"
@@ -101,6 +104,7 @@ export function AnnouncementsScreen() {
               confirmVariant="danger"
               schema={z.object({})}
               invalidate={[PK.announcements]}
+              onSuccess={() => setUpdated(false)}
               submit={() =>
                 unwrap(
                   api.POST("/api/v1/platform/announcements/{announcement_id}/cancel", {
@@ -149,7 +153,14 @@ export function AnnouncementsScreen() {
           <AnnouncementEditor />
         </Card>
       ) : null}
-      <Card title={t("listTitle")}>{list()}</Card>
+      <Card title={t("listTitle")}>
+        {updated ? (
+          <Alert tone="success" live className="mb-4">
+            {t("updated")}
+          </Alert>
+        ) : null}
+        {list()}
+      </Card>
     </div>
   );
 }
