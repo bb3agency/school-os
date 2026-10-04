@@ -134,12 +134,18 @@ class Scope:
 
 
 def resolve_students(session: Session, ctx: UserContext, scope: Scope) -> list[uuid.UUID]:
-    """Student ids of ``scope`` limited to what ``ctx`` may read (``student.read_basic``)."""
+    """Student ids of ``scope`` limited to what ``ctx`` may read (``student.read_basic``) and,
+    when it holds ``dq.findings.read``, to that grant's scope too (SEC-015)."""
+    reach = (DQ_READ,) if ctx.has(DQ_READ) else ()
     if scope.section_ids is not None:
-        return students.list_students_in_scope(session, ctx, section_ids=scope.section_ids)
+        return students.list_students_in_scope(
+            session, ctx, section_ids=scope.section_ids, permissions=reach
+        )
     if scope.class_ids is not None:
-        return students.list_students_in_scope(session, ctx, class_ids=scope.class_ids)
-    reachable = students.list_students_in_scope(session, ctx)
+        return students.list_students_in_scope(
+            session, ctx, class_ids=scope.class_ids, permissions=reach
+        )
+    reachable = students.list_students_in_scope(session, ctx, permissions=reach)
     if scope.student_ids is not None:
         wanted = set(scope.student_ids)
         return [s for s in reachable if s in wanted]

@@ -393,6 +393,32 @@ def test_SEC_015_class_teacher_runs_and_reads_only_own_sections(
     assert DS.call(world.a, dq.get_run, run.id, as_ctx=teacher).id == run.id
 
 
+def test_SEC_015_school_wide_read_basic_does_not_widen_scoped_findings(
+    world: Any, admin_engine: Engine
+) -> None:
+    """One membership, two roles: student.read_basic school-wide (e.g. accountant) and
+    dq.findings.read scoped to 9A (class teacher). Findings and runs follow the dq.findings.read
+    scope; before, the read_basic scope alone decided and every finding was visible."""
+    import dataclasses
+
+    a9 = DS.conflict_student(world.a)
+    c9 = DS.conflict_student(world.a, section_key="section_9c")
+    DS.run(world.a, a9, c9)
+    teacher = DS.ctx(world.a, "class_teacher")
+    mixed = dataclasses.replace(
+        teacher, scoped_permissions=teacher.scoped_permissions - {"student.read_basic"}
+    )
+    assert mixed.scope_for("student.read_basic").school_wide
+    assert not mixed.scope_for("dq.findings.read").school_wide
+    listed = DS.call(world.a, dq.list_findings, FindingFilters(), as_ctx=mixed, limit=200)
+    assert c9 not in {f.student.id for f in listed.data}
+    (hidden,) = DS.findings(admin_engine, c9, "DQ-003")
+    with pytest.raises(NotFound):
+        DS.call(world.a, dq.get_finding, hidden["id"], as_ctx=mixed)
+    run = DS.call(world.a, dq.run_checks, student_ids=[a9, c9], as_ctx=mixed)
+    assert run.stats["students"] == 1
+
+
 def test_SEC_001_other_school_findings_are_invisible(world: Any, admin_engine: Engine) -> None:
     b_student = DS.conflict_student(world.b)
     DS.run(world.b, b_student)
