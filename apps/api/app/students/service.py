@@ -1174,6 +1174,10 @@ def enrol(
         session, ctx, student_id, permission=UPDATE, structure=structure, lock=True
     )
     section = _enrolment_target(session, data.section_id)
+    # The target section must be in reach too, as for PATCH (SEC-015).
+    allowed = _allowed_sections(ctx, UPDATE, structure)
+    if allowed is not None and section.id not in allowed:
+        raise ValidationFailed([error("section_id", "not_found")])
     out = _enrol(session, ctx, student, section, roll_no=data.roll_no, started_on=data.started_on)
     _touch(session, student, _definitions(session))
     _values_changed(session, student_id, [ENROLLMENT_KEY])
