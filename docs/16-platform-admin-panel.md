@@ -262,7 +262,11 @@ Invite (email, name, roles), resend invite, assign or remove roles, deactivate. 
 Filter by operator, action, school, date; export CSV; **Verify chain** runs the verification job and shows the result (first bad sequence number if any).
 
 ### 5.18 School-side "Plan & billing" page (FR-PLT-030)
-In the **school** app, for holders of `tenant.billing.read` (owner, principal, accountant): current plan, status, period, trial end; usage vs limits (latest daily aggregates); invoices list (number, period, total, status, amount due). Data comes from `core.current_subscription()`, which returns only the current tenant's own records. On a dedicated host the page shows the summary delivered in the heartbeat response (§12.4); until that lands (M1), it shows plan name and a note that invoices are sent by email.
+In the **school** app, for holders of `tenant.billing.read` (owner, principal, accountant): current plan, status, period, trial end; usage vs limits (latest daily aggregates); invoices list (number, period, total, status, amount due). Data comes from `core.current_subscription()`, which returns only the current tenant's own records.
+
+**AI answers card** (ADR-0038; built 2026-10-04). `GET /api/v1/tenant/billing` also returns `ai_bundle`: the bundle of that subscription (`code`, `name`, `included_answers` a month, `price_inr` a month and `overage_rate_inr` per extra answer, both ex-GST from the catalogue row), `counts_from` (`ai_bundle_from`), `month_start` (the current calendar month, IST), `answers_used` (billable answers of that month so far, summed from `platform.usage_daily.ai_answers`) and `answers_counted_to` (the last day collected; the collector adds each day the next morning), or `null` without a bundle. `answers_used` is `null` while the month is before `counts_from` (a newly chosen bundle counts from the next month). These are platform rows read by `platform.service.school_ai_bundle(tenant_id, subscription_id)` for the caller's own tenant and the subscription the definer returned (`platform_session`, the same path as announcements and tickets): no tenant-table read, no definer function, no migration. Same permission (`tenant.billing.read`) and suspended-school rules as the rest of the page. The card shows the bundle name, included answers, a usage meter (answers this month of the included number), the bundle price and the price per extra answer (both "plus GST"), and, without a bundle, "No AI answer bundle. Ask SchoolOS support to add one." It shows facts only: no estimate of the overage charge (open question §19 Q21), never tokens. Pinned by `apps/api/tests/platform/test_school_ai_bundle.py` and `apps/web/src/features/school/school.test.tsx`.
+
+On a dedicated host the page shows the summary delivered in the heartbeat response (§12.4); until that lands (M1), it shows plan name and a note that invoices are sent by email.
 
 ## 6. Permissions
 
@@ -889,7 +893,7 @@ Served by `app/platform/tenant_api.py` in the caller's `tenant_session`.
 
 | Method | Path | Permission | Status | Notes |
 |---|---|---|---|---|
-| GET | `/tenant/billing` | `tenant.billing.read` | 200 | Plan, status, period, trial end, usage vs limits (via `core.current_subscription()`) |
+| GET | `/tenant/billing` | `tenant.billing.read` | 200 | Plan, status, period, trial end, usage vs limits (via `core.current_subscription()`); `ai_bundle` (bundle, included answers, ex-GST prices, this month's answers) or `null` (§5.18) |
 | GET | `/tenant/billing/invoices` | `tenant.billing.read` | 200 | Own issued invoices, newest first (last 24): number, period, total, amount due, status |
 | GET | `/announcements` | any active member (`session.authenticated`) | 200 | Active announcements for this school, EN and TE (§14) |
 | POST | `/support/tickets` | `support.ticket.create` | 201 | Opens a ticket via `platform.service.open_ticket_from_tenant`; text redacted before storage |
@@ -1220,6 +1224,7 @@ In addition to the general suites (12 §4):
 | Q18 | ADR-0020 amendment B2: may the usage collector count answered `kb.queries` rows inside the school's `tenant_session` (counts only)? | **Closed: approved by the product owner 2026-10-03** (recorded in ADR-0020); no code change | Product owner |
 | Q19 | Dedicated hosts: the school's AI answer allowance (the budget follows the bundle, §5.7) cannot be written from the shared control plane. | Until then a dedicated school keeps its own `ai_monthly_budget_inr`; deliver the allowance in the heartbeat response with the billing summary (Q7) | Engineering |
 | Q20 | Cost per AI answer: the budget estimate is $0.06 (≈ ₹5.76) per answered question, above the ₹1.50 overage price and the bundles' price per included answer (₹2.33 / ₹1.50 / ₹1.17). | Measure the real cost per answered question from `kb.llm_calls` after the live evaluation; then re-check `budget.bundle.cost_per_answer_usd` and the bundle and overage prices | Product owner |
+| Q21 | School-side AI answers card (§5.18): should a school see an estimate of this month's overage charge (extra answers × rate), and an alert near the quota? | Not shown: the card shows only the bundle, included answers, this month's answers, the price and the price per extra answer. The month's count is incomplete until the 1st of the next month, and overage is billed in arrears (ADR-0038 §3); decide with Q16's quota alerts | Product owner |
 
 ## 20. Requirement map
 

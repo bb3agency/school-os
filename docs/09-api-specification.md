@@ -105,7 +105,7 @@ The active school is sent by the BFF as `X-Active-Tenant`. A user with several m
 ### Plan & billing, announcements, support (school side)
 | Method | Path | Permission | Notes |
 |---|---|---|---|
-| GET | `/tenant/billing` | `tenant.billing.read` | Current plan, status, period, trial end, usage vs limits (via `core.current_subscription()`) (**built**) |
+| GET | `/tenant/billing` | `tenant.billing.read` | Current plan, status, period, trial end, usage vs limits (via `core.current_subscription()`); `ai_bundle`: the AI answer bundle (name, included answers, ex-GST price and price per extra answer, this IST month's answers so far) or `null` (docs/16 §5.18) (**built**) |
 | GET | `/tenant/billing/invoices` | `tenant.billing.read` | Own issued invoices, newest first (last 24): number, period, total, amount due, status (**built**) |
 | GET | `/announcements` | any active member | Active platform announcements for this school, English and Telugu text (Telugu empty while hidden, ADR-0036) (**built**) |
 | POST · GET | `/support/tickets` | `support.ticket.create` | Open (201) or list the school's own tickets; text is redacted before storage (**built**) |

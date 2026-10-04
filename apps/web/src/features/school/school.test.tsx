@@ -171,6 +171,93 @@ describe("Plan and billing (FR-PLT-030)", () => {
     expect(await screen.findByText("SOS/2026-27/000123")).toBeInTheDocument();
   });
 
+  describe("AI answers card (ADR-0038)", () => {
+    const base = {
+      available: true,
+      plan_code: "shared",
+      plan_name: "Shared",
+      tier: "shared",
+      billing_period: "monthly",
+      status: "active",
+      current_period_start: "2026-10-01",
+      current_period_end: "2026-10-31",
+      trial_ends_at: null,
+      past_due_since: null,
+      grace_ends_on: null,
+      cancel_at_period_end: false,
+      usage_date: null,
+      usage: [],
+      amount_due_inr: "0.00",
+    };
+    const bundle = {
+      code: "ai-standard",
+      name: "Standard",
+      included_answers: 1000,
+      price_inr: "1499.00",
+      overage_rate_inr: "1.50",
+      counts_from: "2026-10-01",
+      month_start: "2026-10-01",
+      answers_used: 412,
+      answers_counted_to: "2026-10-03",
+    };
+    const ai = sm.billing.ai;
+
+    function serve(body: unknown) {
+      stub.routes["GET /bff/api/v1/tenant/billing"] = () => Response.json(body);
+      stub.routes["GET /bff/api/v1/tenant/billing/invoices"] = () => page([]);
+    }
+
+    it("shows the bundle, included answers, this month's meter and the prices", async () => {
+      serve({ ...base, ai_bundle: bundle });
+      renderWithIntl(<BillingScreen />);
+      const card = (await screen.findByRole("heading", { name: ai.title })).closest("section");
+      expect(card).not.toBeNull();
+      const scope = within(card as HTMLElement);
+      expect(scope.getByText("Standard bundle")).toBeInTheDocument();
+      expect(scope.getByText("1,000 a month")).toBeInTheDocument();
+      expect(scope.getByText("₹1,499.00 a month plus GST")).toBeInTheDocument();
+      expect(scope.getByText("₹1.50 plus GST")).toBeInTheDocument();
+      const meter = scope.getByRole("meter", { name: ai.thisMonth });
+      expect(meter).toHaveAttribute("value", "412");
+      expect(meter).toHaveAttribute("max", "1000");
+      expect(scope.getByText("412 of 1,000", { selector: "span" })).toBeInTheDocument();
+      expect(scope.getByText(/^Counted up to/)).toBeInTheDocument();
+      expect(scope.queryByText(ai.none)).toBeNull();
+    });
+
+    it("before the bundle counts: no meter, says when counting starts", async () => {
+      serve({
+        ...base,
+        ai_bundle: {
+          ...bundle,
+          counts_from: "2026-11-01",
+          answers_used: null,
+          answers_counted_to: null,
+        },
+      });
+      renderWithIntl(<BillingScreen />);
+      const card = (await screen.findByRole("heading", { name: ai.title })).closest("section");
+      const scope = within(card as HTMLElement);
+      expect(scope.queryByRole("meter")).toBeNull();
+      expect(scope.getByText(/^Answers count against this bundle from/)).toBeInTheDocument();
+    });
+
+    it("no bundle: plain text telling the school how to get one", async () => {
+      serve({ ...base, ai_bundle: null });
+      renderWithIntl(<BillingScreen />);
+      expect(await screen.findByText(ai.none)).toBeInTheDocument();
+      expect(ai.none).toBe("No AI answer bundle. Ask SchoolOS support to add one.");
+      expect(screen.queryByRole("meter")).toBeNull();
+    });
+
+    it("dedicated hosts (no billing data): no AI answers card", async () => {
+      serve({ available: false });
+      renderWithIntl(<BillingScreen />);
+      expect(await screen.findByText(sm.billing.planUnavailable)).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: ai.title })).toBeNull();
+    });
+  });
+
   it("dedicated hosts: says invoices come by email", async () => {
     stub.routes["GET /bff/api/v1/tenant/billing"] = () => Response.json({ available: false });
     stub.routes["GET /bff/api/v1/tenant/billing/invoices"] = () => page([]);

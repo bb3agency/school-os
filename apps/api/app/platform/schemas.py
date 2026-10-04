@@ -232,6 +232,25 @@ class AiBundleOut(Out):
     published_at: dt.datetime | None
 
 
+class SchoolAiBundle(Out):
+    """The school's own AI answer bundle on its "Plan and billing" page (FR-PLT-030, ADR-0038).
+
+    Prices are ex-GST INR from the catalogue row. ``month_start`` is the current calendar month
+    (IST). ``answers_used`` is the month's billable answers counted so far (whole IST days up to
+    ``answers_counted_to``, collected the next morning), or ``null`` while the month does not
+    count against the bundle (``counts_from`` is later). No tokens, no cost estimate."""
+
+    code: str
+    name: str
+    included_answers: int
+    price_inr: Decimal
+    overage_rate_inr: Decimal
+    counts_from: dt.date
+    month_start: dt.date
+    answers_used: int | None
+    answers_counted_to: dt.date | None
+
+
 # --- billing accounts -------------------------------------------------------------------------
 
 
