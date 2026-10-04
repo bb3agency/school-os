@@ -16,7 +16,7 @@ const changePlanSchema = z.object({ plan_id: uuid });
 const bundleSchema = z.object({ ai_bundle_id: uuid });
 const extendSchema = z.object({ trial_ends_at: localDateTime });
 /**
- * Negotiated price (FR-PLT-012, docs/16 §5.7): rupees before GST for each billing period, two
+ * Negotiated price (FR-PLT-013, docs/16 §5.7): rupees before GST for each billing period, two
  * decimals at most, above zero. It replaces the plan's base price on invoices made from now
  * on; the reason (10–500 characters) is required with it, as on the API.
  */

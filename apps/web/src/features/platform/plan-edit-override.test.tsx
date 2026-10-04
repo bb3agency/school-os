@@ -16,7 +16,7 @@ import { SchoolDetailScreen } from "./SchoolDetailView";
 /**
  * Operator screens for two built API actions (owner decision 2026-10-04; docs/16 §5.6, §5.7):
  * edit a draft plan (PATCH /platform/plans/{id}, FR-PLT-010) and set or clear a school's
- * negotiated price (PUT/DELETE /platform/subscriptions/{id}/price-override, FR-PLT-012).
+ * negotiated price (PUT/DELETE /platform/subscriptions/{id}/price-override, FR-PLT-013).
  * Both need a permission with step-up MFA (`platform.plans.manage`,
  * `platform.subscriptions.manage`); neither is a two-person action, and neither route takes
  * If-Match or Idempotency-Key. Synthetic data only.
@@ -323,7 +323,7 @@ describe("edit a draft plan (FR-PLT-010, docs/16 §5.6)", () => {
 
 /* ------------------------------------------------------------ negotiated price */
 
-describe("negotiated price per school (FR-PLT-012, docs/16 §5.7)", () => {
+describe("negotiated price per school (FR-PLT-013, docs/16 §5.7)", () => {
   let current: typeof SUB;
   beforeEach(() => {
     current = { ...SUB };
