@@ -768,6 +768,34 @@ def test_FR_DOC_002_infected_file_is_quarantined_audited_and_never_served(
         assert service.evidence_exists(s, uuid.UUID(doc["id"])) is False
 
 
+def test_FR_DOC_002_FR_NOT_001_the_uploader_is_told_their_file_was_blocked(
+    world: Any, api: Any
+) -> None:
+    """The ``document.quarantined`` template had no producer: the uploader gets one in-app
+    notification linked to the document (ids only), once, however often the scan runs."""
+    who = world.person("office_admin")
+    other = world.person("owner")
+    doc = new_document(api, who, S.pdf(S.EICAR.decode()))
+    assert scan(world.a.tenant_id, doc) == "quarantined"
+    assert scan(world.a.tenant_id, doc) == "quarantined", "idempotent"
+
+    def blocked(person: Any) -> list[dict[str, Any]]:
+        items = api.call(person, "GET", "/api/v1/notifications", params={"limit": 200}).json()[
+            "data"
+        ]
+        return [n for n in items if n["template_key"] == "document.quarantined"]
+
+    (note,) = [n for n in blocked(who) if n["resource_id"] == doc["id"]]
+    assert note["resource_type"] == "document"
+    assert note["params"] == {"document_id": doc["id"]}
+    assert [n for n in blocked(other) if n["resource_id"] == doc["id"]] == []
+    # A clean file tells nobody anything.
+    before = len(blocked(who))
+    clean = new_document(api, who)
+    assert scan(world.a.tenant_id, clean) == "ready"
+    assert len(blocked(who)) == before
+
+
 def test_FR_DOC_008_scanner_outage_retries_then_fails(world: Any, api: Any) -> None:
     who = world.person("office_admin")
     doc = new_document(api, who)

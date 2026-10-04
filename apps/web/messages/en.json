@@ -24,7 +24,6 @@
     "search": "Search",
     "applyFilters": "Apply filters",
     "dateHint": "Use DD/MM/YYYY, for example 01/06/2026.",
-    "notConnected": "This screen is not connected to the server yet. Nothing was saved.",
     "scrollableTable": "{caption}. Scroll sideways to see all columns.",
     "notAvailableYetTitle": "Not available yet",
     "notAvailableYetBody": "This part of SchoolOS is still being set up. Check again later.",
@@ -375,7 +374,15 @@
           "languageHint": "The language SchoolOS uses for this person.",
           "submit": "Save details"
         },
-        "profileShared": "This person also works at another school on SchoolOS, so their name, email and language are shared and can't be changed here. Ask them to update their profile, or contact SchoolOS support."
+        "profileShared": "This person also works at another school on SchoolOS, so their name, email and language are shared and can't be changed here. Ask them to update their profile, or contact SchoolOS support.",
+        "resend": {
+          "button": "Send the invitation again",
+          "title": "Send the invitation email again?",
+          "body": "We'll email the invitation to {email} again. It can be sent once every 10 minutes.",
+          "sentTitle": "Invitation email on its way",
+          "sentBody": "It should arrive in a few minutes. The invitation works until {date}.",
+          "noEmail": "There is no email address for this person, so the invitation can't be emailed. Add one with Edit details, or give them their sign-in ID yourself."
+        }
       },
       "errors": {
         "role_not_grantable": {
@@ -413,6 +420,26 @@
         "roles_required": {
           "title": "Choose at least one role",
           "body": "A staff member keeps at least one role. To stop their access, use Suspend or Remove instead."
+        },
+        "email_disabled": {
+          "title": "Email isn't switched on for this school",
+          "body": "Give the person their sign-in ID yourself, or contact SchoolOS support to switch email on."
+        },
+        "not_invited": {
+          "title": "This person is no longer waiting for an invitation",
+          "body": "They have already signed in, or they were removed. Reload the page to see their status."
+        },
+        "invitation_expired": {
+          "title": "This invitation has expired",
+          "body": "Remove this person and invite them again to send a new invitation."
+        },
+        "email_missing": {
+          "title": "There is no email address for this person",
+          "body": "Add their email address with Edit details, then send the invitation again."
+        },
+        "rate_limited": {
+          "title": "The invitation was sent a few minutes ago",
+          "body": "Wait 10 minutes before sending it again, and ask them to check their spam folder."
         }
       },
       "inviteForm": {
@@ -694,7 +721,6 @@
     },
     "schoolDetail": {
       "title": "School details",
-      "codeLine": "Code: {code}",
       "tabsLabel": "School details sections",
       "tabs": {
         "overview": "Overview",
@@ -1272,7 +1298,6 @@
       "bothLanguagesHint": "Write the title and message in both English and Telugu before saving.",
       "listTitle": "Scheduled and past announcements",
       "colTitle": "Title",
-      "colAudience": "Shown to",
       "colStarts": "Starts",
       "colEnds": "Ends",
       "colStatus": "Status",
@@ -1318,8 +1343,6 @@
       "assignedMe": "You",
       "assignKeep": "Keep ({name})",
       "assignMe": "Me",
-      "firstResponseDue": "First reply due",
-      "resolutionDue": "Resolution due",
       "flagPersonalData": "This ticket contains personal data (it will be redacted)",
       "flaggedTitle": "Flagged: personal data",
       "flaggedBody": "Do not copy this ticket's text anywhere. Ask the school to use record IDs.",
@@ -2653,14 +2676,11 @@
     "queue": {
       "title": "Rows to check",
       "description": "Each row found on the photos. Open a row to compare it with the page, correct it, and save or discard it.",
-      "colWhere": "Where",
       "where": "Page {page}, row {row}",
       "colAdmissionNo": "Admission number (as read)",
       "colName": "Name (as read)",
-      "colCheck": "Check carefully",
       "lowConfidence": "{count, plural, one {# unclear value} other {# unclear values}}",
       "colStatus": "Status",
-      "colOpen": "Open",
       "review": "Check this row",
       "view": "View",
       "filter": "Show",

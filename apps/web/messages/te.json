@@ -24,7 +24,6 @@
     "search": "వెతకండి",
     "applyFilters": "ఫిల్టర్లు వర్తింపజేయండి",
     "dateHint": "DD/MM/YYYY రూపంలో ఇవ్వండి, ఉదాహరణకు 01/06/2026.",
-    "notConnected": "ఈ స్క్రీన్ ఇంకా సర్వర్‌కు అనుసంధానం కాలేదు. ఏదీ సేవ్ కాలేదు.",
     "scrollableTable": "{caption}. అన్ని కాలమ్‌లు చూడటానికి పక్కకు స్క్రోల్ చేయండి.",
     "notAvailableYetTitle": "ఇంకా అందుబాటులో లేదు",
     "notAvailableYetBody": "SchoolOS లో ఈ భాగం ఇంకా సిద్ధమవుతోంది. తర్వాత మళ్లీ చూడండి.",
@@ -375,7 +374,15 @@
           "languageHint": "ఈ వ్యక్తి కోసం SchoolOS ఉపయోగించే భాష.",
           "submit": "వివరాలు సేవ్ చేయండి"
         },
-        "profileShared": "వీరు SchoolOSలో మరో పాఠశాలలో కూడా పని చేస్తున్నారు, కాబట్టి వారి పేరు, ఈమెయిల్, భాష పంచుకోబడ్డాయి, వాటిని ఇక్కడ మార్చలేరు. వారినే తమ ప్రొఫైల్ మార్చుకోమని అడగండి, లేదా SchoolOS సపోర్ట్‌ను సంప్రదించండి."
+        "profileShared": "వీరు SchoolOSలో మరో పాఠశాలలో కూడా పని చేస్తున్నారు, కాబట్టి వారి పేరు, ఈమెయిల్, భాష పంచుకోబడ్డాయి, వాటిని ఇక్కడ మార్చలేరు. వారినే తమ ప్రొఫైల్ మార్చుకోమని అడగండి, లేదా SchoolOS సపోర్ట్‌ను సంప్రదించండి.",
+        "resend": {
+          "button": "Send the invitation again",
+          "title": "Send the invitation email again?",
+          "body": "We'll email the invitation to {email} again. It can be sent once every 10 minutes.",
+          "sentTitle": "Invitation email on its way",
+          "sentBody": "It should arrive in a few minutes. The invitation works until {date}.",
+          "noEmail": "There is no email address for this person, so the invitation can't be emailed. Add one with Edit details, or give them their sign-in ID yourself."
+        }
       },
       "errors": {
         "role_not_grantable": {
@@ -413,6 +420,26 @@
         "roles_required": {
           "title": "కనీసం ఒక పాత్ర ఎంచుకోండి",
           "body": "సిబ్బంది సభ్యులకు కనీసం ఒక పాత్ర ఉండాలి. వారి యాక్సెస్ ఆపాలంటే, బదులుగా నిలిపివేయండి లేదా తీసివేయండి ఉపయోగించండి."
+        },
+        "email_disabled": {
+          "title": "Email isn't switched on for this school",
+          "body": "Give the person their sign-in ID yourself, or contact SchoolOS support to switch email on."
+        },
+        "not_invited": {
+          "title": "This person is no longer waiting for an invitation",
+          "body": "They have already signed in, or they were removed. Reload the page to see their status."
+        },
+        "invitation_expired": {
+          "title": "This invitation has expired",
+          "body": "Remove this person and invite them again to send a new invitation."
+        },
+        "email_missing": {
+          "title": "There is no email address for this person",
+          "body": "Add their email address with Edit details, then send the invitation again."
+        },
+        "rate_limited": {
+          "title": "The invitation was sent a few minutes ago",
+          "body": "Wait 10 minutes before sending it again, and ask them to check their spam folder."
         }
       },
       "inviteForm": {
@@ -694,7 +721,6 @@
     },
     "schoolDetail": {
       "title": "పాఠశాల వివరాలు",
-      "codeLine": "కోడ్: {code}",
       "tabsLabel": "పాఠశాల వివరాల విభాగాలు",
       "tabs": {
         "overview": "సారాంశం",
@@ -1272,7 +1298,6 @@
       "bothLanguagesHint": "సేవ్ చేసే ముందు శీర్షిక, సందేశాన్ని ఇంగ్లీష్ మరియు తెలుగు రెండింటిలో రాయండి.",
       "listTitle": "షెడ్యూల్ చేసిన మరియు గత ప్రకటనలు",
       "colTitle": "శీర్షిక",
-      "colAudience": "ఎవరికి",
       "colStarts": "ప్రారంభం",
       "colEnds": "ముగింపు",
       "colStatus": "స్థితి",
@@ -1318,8 +1343,6 @@
       "assignedMe": "మీకు",
       "assignKeep": "అలాగే ఉంచండి ({name})",
       "assignMe": "నాకు",
-      "firstResponseDue": "మొదటి జవాబు గడువు",
-      "resolutionDue": "పరిష్కార గడువు",
       "flagPersonalData": "ఈ టికెట్‌లో వ్యక్తిగత డేటా ఉంది (దాచబడుతుంది)",
       "flaggedTitle": "గుర్తించబడింది: వ్యక్తిగత డేటా",
       "flaggedBody": "ఈ టికెట్ పాఠ్యాన్ని ఎక్కడా కాపీ చేయవద్దు. రికార్డు IDలు వాడమని పాఠశాలను అడగండి.",
@@ -2653,14 +2676,11 @@
     "queue": {
       "title": "తనిఖీ చేయాల్సిన వరుసలు",
       "description": "ఫోటోల్లో దొరికిన ప్రతి వరుస. వరుసను తెరిచి పేజీతో పోల్చండి, సరిచేయండి, తర్వాత సేవ్ చేయండి లేదా వదిలేయండి.",
-      "colWhere": "ఎక్కడ",
       "where": "పేజీ {page}, వరుస {row}",
       "colAdmissionNo": "ప్రవేశ సంఖ్య (చదివినట్లు)",
       "colName": "పేరు (చదివినట్లు)",
-      "colCheck": "జాగ్రత్తగా చూడండి",
       "lowConfidence": "{count, plural, one {# అస్పష్ట విలువ} other {# అస్పష్ట విలువలు}}",
       "colStatus": "స్థితి",
-      "colOpen": "తెరవండి",
       "review": "ఈ వరుసను తనిఖీ చేయండి",
       "view": "చూడండి",
       "filter": "చూపించు",

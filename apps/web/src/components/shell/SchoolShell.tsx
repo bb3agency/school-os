@@ -200,7 +200,13 @@ export function SchoolShell({
       id: "admin",
       items: [
         { href: "/settings/school", label: t("schoolSettings.nav"), icon: "building" },
-        { href: "/settings/structure", label: t("school.nav.structure"), icon: "layers" },
+        {
+          // GET /academic-years, /classes and /sections need student.read_basic.
+          href: "/settings/structure",
+          label: t("school.nav.structure"),
+          permission: "student.read_basic",
+          icon: "layers",
+        },
         {
           // FR-TEN-011, US-202 AC2: year-end promotion, under the structure it changes.
           href: "/settings/structure/promotions",

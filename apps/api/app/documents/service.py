@@ -124,6 +124,7 @@ from app.documents.storage import (
 )
 from app.identity import service as identity
 from app.identity.principal import STEP_UP_MAX_AGE
+from app.notifications import service as notifications
 from app.ops import service as ops
 from app.tenancy import service as tenancy
 
@@ -1259,6 +1260,36 @@ def purge_document_objects(
 # --- scanning (worker) ----------------------------------------------------------------------
 
 
+QUARANTINED_TEMPLATE: Final = "document.quarantined"
+
+
+def _notify_quarantined(
+    session: Session,
+    tenant_id: uuid.UUID,
+    document_id: uuid.UUID,
+    version_id: uuid.UUID,
+    uploader: uuid.UUID,
+) -> None:
+    """Tell the person who uploaded the version that the virus check blocked it (FR-DOC-002,
+    FR-NOT-001), in the scan's transaction: ids only, once per version (dedupe key). Nobody is
+    told when the uploader is no longer an active member of this school."""
+    try:
+        person = identity.get_user(session, uploader)
+    except NotFound:
+        return
+    if person.status != "active":
+        return
+    notifications.notify(
+        session,
+        tenant_id=tenant_id,
+        recipients=[person.membership_id],
+        template_key=QUARANTINED_TEMPLATE,
+        params={"document_id": str(document_id)},
+        resource_id=document_id,
+        dedupe_key=f"{QUARANTINED_TEMPLATE}:{version_id}",
+    )
+
+
 def scan_version(
     tenant_id: uuid.UUID,
     document_id: uuid.UUID,
@@ -1303,6 +1334,7 @@ def scan_version(
             )
             for hook in QUARANTINE_HOOKS:
                 hook(s, document_id, version_id)
+            _notify_quarantined(s, tenant_id, document_id, version_id, updated.created_by)
             log.warning(
                 "documents.scan.quarantined", resource_type="document", resource_id=document_id
             )
