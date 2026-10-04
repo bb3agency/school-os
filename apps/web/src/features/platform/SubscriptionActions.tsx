@@ -25,15 +25,11 @@ const bundleSchema = z.object({ ai_bundle_id: uuid });
 const extendSchema = z.object({ trial_ends_at: localDateTime });
 /**
  * Negotiated price (FR-PLT-013, docs/16 §5.7): rupees before GST for each billing period, two
- * decimals at most, above zero. It replaces the plan's base price on invoices made from now
- * on; the reason (10–500 characters) is required with it, as on the API.
+ * decimals at most, zero or more (₹0 is allowed, e.g. a free pilot: owner decision
+ * 2026-10-04; `money` refuses a minus sign). It replaces the plan's base price on invoices
+ * made from now on; the reason (10–500 characters) is required with it, as on the API.
  */
-const overrideSchema = z.object({
-  price_override_inr: money.refine((value) => Number(value) > 0, {
-    error: "invalidPositiveAmount",
-  }),
-  reason,
-});
+const overrideSchema = z.object({ price_override_inr: money, reason });
 /**
  * Billing suspension (FR-PLT-014, docs/16 §9): past-due only, after the grace period, with a
  * reason; inside a protected board-exam window only a platform owner may approve it.

@@ -375,19 +375,19 @@ describe("negotiated price per school (FR-PLT-013, docs/16 §5.7)", () => {
     expect(screen.getByRole("button", { name: pm.subscriptions.removeOverride })).toBeVisible();
   });
 
-  it("refuses zero, more than two decimals and a short reason before sending", async () => {
+  it("refuses a negative amount, more than two decimals and a short reason before sending", async () => {
     const user = userEvent.setup();
     renderTab();
     await user.click(await screen.findByRole("button", { name: pm.subscriptions.setOverride }));
     const dialog = screen.getByRole("dialog", { name: pm.subscriptions.setOverrideTitle });
     const amount = within(dialog).getByLabelText(pm.subscriptions.overrideAmount);
     const confirm = within(dialog).getByRole("button", { name: pm.subscriptions.setOverride });
-    await user.type(amount, "0");
+    await user.type(amount, "-100");
     await user.type(within(dialog).getByLabelText(cm.reason), "short");
     await user.click(confirm);
     expect(amount).toHaveAttribute("aria-invalid", "true");
     expect(amount).toHaveAccessibleDescription(
-      `${pm.subscriptions.overrideAmountHint} ${messages.en.validation.invalidPositiveAmount}`,
+      `${pm.subscriptions.overrideAmountHint} ${messages.en.validation.invalidAmount}`,
     );
     expect(within(dialog).getByLabelText(cm.reason)).toHaveAttribute("aria-invalid", "true");
     await user.clear(amount);
@@ -395,6 +395,23 @@ describe("negotiated price per school (FR-PLT-013, docs/16 §5.7)", () => {
     await user.click(confirm);
     expect(amount).toHaveAttribute("aria-invalid", "true");
     expect(stub.callsTo(`PUT ${OVERRIDE}`)).toHaveLength(0);
+  });
+
+  it("accepts ₹0, for example a free pilot (owner decision 2026-10-04)", async () => {
+    const user = userEvent.setup();
+    renderTab();
+    await user.click(await screen.findByRole("button", { name: pm.subscriptions.setOverride }));
+    const dialog = screen.getByRole("dialog", { name: pm.subscriptions.setOverrideTitle });
+    await user.type(within(dialog).getByLabelText(pm.subscriptions.overrideAmount), "0.00");
+    await user.type(within(dialog).getByLabelText(cm.reason), "Free pilot for the 2026-27 year");
+    await user.click(within(dialog).getByRole("button", { name: pm.subscriptions.setOverride }));
+    await waitFor(() => expect(dialog).not.toHaveAttribute("open"));
+    // Money (numeric(14,2), >= 0) takes the decimal string as typed.
+    expect(bodyOf(`PUT ${OVERRIDE}`)).toEqual({
+      price_override_inr: "0.00",
+      reason: "Free pilot for the 2026-27 year",
+    });
+    expect(await screen.findByText("₹0.00")).toBeVisible();
   });
 
   it("removes the price after confirmation; focus returns when cancelled", async () => {

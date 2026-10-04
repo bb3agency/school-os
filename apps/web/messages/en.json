@@ -1872,8 +1872,7 @@
     "chooseWhoCanSee": "Choose at least one role, class, section or staff member, or choose \"Whole school\".",
     "tooManyAclEntries": "Choose at most 50, or choose \"Whole school\".",
     "invalidIssueDate": "Choose a date, or leave it empty.",
-    "noAadhaar": "This looks like a full Aadhaar number. SchoolOS never stores one: remove it.",
-    "invalidPositiveAmount": "Enter an amount above zero in rupees, like 3999 or 3999.50."
+    "noAadhaar": "This looks like a full Aadhaar number. SchoolOS never stores one: remove it."
   },
   "support": {
     "piiWarningTitle": "Do not include student personal data",
