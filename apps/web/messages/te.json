@@ -1184,7 +1184,51 @@
       "gstNoteTitle": "నంబర్లు మరియు GST",
       "gstNote": "పాఠశాల మా బిల్లింగ్ సంస్థ ఉన్న రాష్ట్రంలోనే ఉంటే CGST మరియు SGST, లేకపోతే IGST వర్తిస్తుంది. GST నిలువు వరుస ఈ విభజనను చూపిస్తుంది.",
       "gstSplitIntra": "CGST {cgst} + SGST {sgst}",
-      "gstSplitInter": "IGST {igst}"
+      "gstSplitInter": "IGST {igst}",
+      "openInvoice": "Open invoice {number}",
+      "detailTitle": "Invoice",
+      "detailEyebrow": "Invoice",
+      "summary": "Summary",
+      "amountPaid": "Amount received",
+      "tdsReceived": "TDS deducted by the school",
+      "payments": {
+        "title": "Payments",
+        "colReceived": "Received on",
+        "colAmount": "Amount",
+        "colMethod": "Paid by",
+        "colReference": "Reference",
+        "colRecordedBy": "Recorded by",
+        "colStatus": "Status",
+        "colActions": "Actions",
+        "status": {
+          "recorded": "Recorded",
+          "reversed": "Reversed"
+        },
+        "tdsValue": "+ TDS {tds}",
+        "reversedBy": "Reversed by {name} on {date}",
+        "reversalReason": "Reason: {reason}",
+        "unknownOperator": "an operator",
+        "emptyTitle": "No payments yet",
+        "emptyBody": "Payments recorded against this invoice appear here, newest first.",
+        "onlyIssued": "Payments are recorded against issued invoices only.",
+        "reverse": "Reverse payment",
+        "reverseTitle": "Reverse this payment?",
+        "rowLabel": "{amount} received on {date}, reference {reference}",
+        "reverseBody": "{payment}. Use this when a payment was recorded in error or a cheque bounced. The payment stays on record, marked reversed; it is never deleted.",
+        "reverseNote": "The school is not told automatically: tell its billing contact yourself. Its Plan & billing page shows the amount as due again. If the due date has passed, the daily billing check marks the subscription past due and its grace period starts; nothing is suspended automatically.",
+        "reverseConsequence": "The invoice goes back to Issued (unpaid) and its balance due rises by {amount}.",
+        "reason": "Why are you reversing it?",
+        "errors": {
+          "invalid_state": {
+            "title": "Already reversed",
+            "body": "This payment was reversed already, perhaps by someone else. The list now shows its current status."
+          },
+          "not_found": {
+            "title": "Payment not found",
+            "body": "It may have been changed by someone else. The list has been reloaded; check it and try again."
+          }
+        }
+      }
     },
     "usage": {
       "title": "వినియోగం మరియు కోటాలు",

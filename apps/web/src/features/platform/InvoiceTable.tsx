@@ -20,6 +20,7 @@ import {
   optionalText,
   reason,
 } from "@/lib/validation";
+import { Link } from "@/i18n/navigation";
 import { PK, useCan } from "./data";
 import { InvoiceDownload } from "./InvoiceDownload";
 import { Mono } from "./pills";
@@ -236,7 +237,22 @@ export function InvoiceTable({
   }
 
   const columns: Column<Invoice>[] = [
-    { key: "number", header: t("colNumber"), cell: (row) => <InvoiceNumber invoice={row} /> },
+    {
+      key: "number",
+      header: t("colNumber"),
+      cell: (row) => (
+        <Link
+          href={`/platform/invoices/${row.id}`}
+          className="text-primary underline-offset-4 hover:underline"
+          aria-label={t("openInvoice", {
+            number:
+              row.invoice_number ?? `${t("draftNumber")} ${formatDate(row.period_start) ?? ""}`,
+          })}
+        >
+          <InvoiceNumber invoice={row} />
+        </Link>
+      ),
+    },
     ...(schoolName
       ? [
           {
