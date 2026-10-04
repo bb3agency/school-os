@@ -46,6 +46,7 @@ export type SchoolChoices = Schemas["SchoolChoicesOut"];
 export type AcceptedInvitations = Schemas["AcceptedInvitationsOut"];
 /** GET /tenant/billing via core.current_subscription() (FR-PLT-030). */
 export type TenantBilling = Schemas["TenantBillingOut"];
+export type SchoolAiBundle = Schemas["SchoolAiBundle"];
 export type UsageAgainstLimit = Schemas["UsageAgainstLimit"];
 export type TenantInvoice = Schemas["TenantInvoice"];
 export type AnnouncementBrief = Schemas["AnnouncementBrief"];

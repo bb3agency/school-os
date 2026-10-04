@@ -5534,7 +5534,8 @@ export interface paths {
         };
         /**
          * Get Billing
-         * @description Current plan, status, period and usage vs limits (permission ``tenant.billing.read``).
+         * @description Current plan, status, period, usage vs limits and the AI answer bundle (permission
+         *     ``tenant.billing.read``). ``ai_bundle`` is ``null`` when the school has no bundle.
          */
         get: operations["get_billing_api_v1_tenant_billing_get"];
         put?: never;
@@ -11802,6 +11803,41 @@ export interface components {
             student_ids?: string[] | null;
         };
         /**
+         * SchoolAiBundle
+         * @description The school's own AI answer bundle on its "Plan and billing" page (FR-PLT-030, ADR-0038).
+         *
+         *     Prices are ex-GST INR from the catalogue row. ``month_start`` is the current calendar month
+         *     (IST). ``answers_used`` is the month's billable answers counted so far (whole IST days up to
+         *     ``answers_counted_to``, collected the next morning), or ``null`` while the month does not
+         *     count against the bundle (``counts_from`` is later). No tokens, no cost estimate.
+         */
+        SchoolAiBundle: {
+            /** Answers Counted To */
+            answers_counted_to: string | null;
+            /** Answers Used */
+            answers_used: number | null;
+            /** Code */
+            code: string;
+            /**
+             * Counts From
+             * Format: date
+             */
+            counts_from: string;
+            /** Included Answers */
+            included_answers: number;
+            /**
+             * Month Start
+             * Format: date
+             */
+            month_start: string;
+            /** Name */
+            name: string;
+            /** Overage Rate Inr */
+            overage_rate_inr: string;
+            /** Price Inr */
+            price_inr: string;
+        };
+        /**
          * SchoolChoiceOut
          * @description A school the signed-in user may work in (school picker; no personal data).
          */
@@ -12790,6 +12826,7 @@ export interface components {
          *     heartbeat carries a billing summary (M1); invoices are then sent by email.
          */
         TenantBillingOut: {
+            ai_bundle?: components["schemas"]["SchoolAiBundle"] | null;
             /**
              * Amount Due Inr
              * @default 0.00
