@@ -414,6 +414,23 @@ def ai_answers_between(session: Session, tenant_id: uuid.UUID, start: dt.date, e
     return int(total)
 
 
+def ai_answers_to_date(
+    session: Session, tenant_id: uuid.UUID, start: dt.date, end: dt.date
+) -> tuple[int, dt.date | None]:
+    """Sum of the daily billable AI answer counts in [start, end) and the last day counted."""
+    row = session.execute(
+        select(
+            func.coalesce(func.sum(m.usage_daily.c.ai_answers), 0),
+            func.max(m.usage_daily.c.usage_date),
+        ).where(
+            m.usage_daily.c.tenant_id == tenant_id,
+            m.usage_daily.c.usage_date >= start,
+            m.usage_daily.c.usage_date < end,
+        )
+    ).one()
+    return int(row[0]), row[1]
+
+
 def subscription_has_line(
     session: Session,
     subscription_id: uuid.UUID,

@@ -65,6 +65,7 @@ from app.platform.schemas import (
     PlanIn,
     PlanOut,
     PlanPatch,
+    SchoolAiBundle,
     SubscriptionOut,
 )
 from app.tenancy import service as tenancy
@@ -1012,6 +1013,60 @@ def ai_answers_in_month(tenant_id: uuid.UUID, month: dt.date) -> int:
     start = month.replace(day=1)
     with platform_session() as s:
         return repo.ai_answers_between(s, tenant_id, start, next_month(start))
+
+
+def school_ai_bundle(
+    tenant_id: uuid.UUID, subscription_id: uuid.UUID, *, today: dt.date | None = None
+) -> SchoolAiBundle | None:
+    """The calling school's AI answer bundle for its "Plan and billing" page (FR-PLT-030).
+
+    Platform data only (``platform.subscriptions``, ``ai_bundles``, ``usage_daily``), read for
+    the subscription that ``core.current_subscription()`` returned to the school's own session
+    and pinned to the caller's ``tenant_id``; ``None`` without a bundle. This month's answer
+    count is shown only once the month counts against the bundle (``ai_bundle_from``).
+    """
+    month = (today or today_ist()).replace(day=1)
+    with platform_session() as s:
+        row = (
+            s.execute(
+                select(
+                    m.ai_bundles.c.code,
+                    m.ai_bundles.c.name,
+                    m.ai_bundles.c.included_answers,
+                    m.ai_bundles.c.price_inr,
+                    m.ai_bundles.c.overage_rate_inr,
+                    m.subscriptions.c.ai_bundle_from,
+                )
+                .select_from(
+                    m.subscriptions.join(
+                        m.ai_bundles, m.ai_bundles.c.id == m.subscriptions.c.ai_bundle_id
+                    )
+                )
+                .where(
+                    m.subscriptions.c.id == subscription_id,
+                    m.subscriptions.c.tenant_id == tenant_id,
+                )
+            )
+            .mappings()
+            .first()
+        )
+        if row is None:
+            return None
+        used: int | None = None
+        counted_to: dt.date | None = None
+        if row["ai_bundle_from"] <= month:
+            used, counted_to = repo.ai_answers_to_date(s, tenant_id, month, next_month(month))
+    return SchoolAiBundle(
+        code=row["code"],
+        name=row["name"],
+        included_answers=row["included_answers"],
+        price_inr=row["price_inr"],
+        overage_rate_inr=row["overage_rate_inr"],
+        counts_from=row["ai_bundle_from"],
+        month_start=month,
+        answers_used=used,
+        answers_counted_to=counted_to,
+    )
 
 
 def _totals(s: Session, invoice: Mapping[Any, Any]) -> dict[str, Any]:

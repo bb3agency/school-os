@@ -5,7 +5,10 @@ Mounted in BOTH deployment modes (they are tenant routes guarded by ``require``)
 - ``GET /api/v1/tenant/billing`` and ``/tenant/billing/invoices`` (``tenant.billing.read``): the
   school's own plan, status, period, usage vs limits and invoices, read through the allowlisted
   definer ``core.current_subscription()`` in the caller's ``tenant_session`` (never another
-  school's rows). On a dedicated host there is no local billing data yet (M1: heartbeat).
+  school's rows). The AI answer bundle of that subscription, its ex-GST prices and this month's
+  answer count are platform rows read for the caller's own tenant and subscription
+  (``service.school_ai_bundle``; no tenant table, no definer). On a dedicated host there is no
+  local billing data yet (M1: heartbeat).
 - ``GET /api/v1/announcements`` (any member): active banners for this school and tier.
 - ``POST/GET /api/v1/support/tickets``, ``GET /support/tickets/{id}``,
   ``POST /support/tickets/{id}/messages`` (``support.ticket.create``): the school's own tickets;
@@ -31,6 +34,7 @@ from app.core.config import get_settings
 from app.platform import service
 from app.platform.schemas import (
     AnnouncementBrief,
+    SchoolAiBundle,
     SchoolTicketMessageIn,
     TicketCreateSchool,
     TicketOut,
@@ -94,6 +98,7 @@ class TenantBillingOut(BaseModel):
     usage_date: dt.date | None = None
     usage: list[UsageAgainstLimit] = []
     amount_due_inr: Decimal = Decimal("0.00")
+    ai_bundle: SchoolAiBundle | None = None
 
 
 def _usage(limits: dict[str, Any], usage: dict[str, Any] | None) -> list[UsageAgainstLimit]:
@@ -116,7 +121,8 @@ def _invoices(data: dict[str, Any] | None) -> list[TenantInvoice]:
 
 @router.get("/tenant/billing", response_model=TenantBillingOut)
 def get_billing(ctx: BillingReader, db: TenantDB) -> TenantBillingOut:
-    """Current plan, status, period and usage vs limits (permission ``tenant.billing.read``)."""
+    """Current plan, status, period, usage vs limits and the AI answer bundle (permission
+    ``tenant.billing.read``). ``ai_bundle`` is ``null`` when the school has no bundle."""
     data = service.current_subscription(db)
     if data is None:
         return TenantBillingOut(available=False)
@@ -137,6 +143,7 @@ def get_billing(ctx: BillingReader, db: TenantDB) -> TenantBillingOut:
         usage_date=(data.get("usage") or {}).get("usage_date"),
         usage=_usage(dict(data.get("limits") or {}), data.get("usage")),
         amount_due_inr=sum((i.amount_due_inr for i in invoices), Decimal("0.00")),
+        ai_bundle=service.school_ai_bundle(ctx.tenant_id, uuid.UUID(str(data["subscription_id"]))),
     )
 
 
