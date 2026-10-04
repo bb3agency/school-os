@@ -476,7 +476,26 @@
       "colStatus": "Status",
       "emptyTitle": "No invoices yet",
       "emptyBody": "Invoices appear here each month once your subscription is active.",
-      "home": "Home"
+      "home": "Home",
+      "ai": {
+        "title": "AI answers",
+        "description": "Answers from Ask the school with sources, counted each calendar month.",
+        "none": "No AI answer bundle. Ask SchoolOS support to add one.",
+        "bundle": "Bundle",
+        "bundleName": "{name} bundle",
+        "included": "Included answers",
+        "perMonth": "{value} a month",
+        "price": "Bundle price",
+        "pricePerMonth": "{amount} a month plus GST",
+        "overage": "Each extra answer",
+        "overageRate": "{amount} plus GST",
+        "thisMonth": "Answers this month",
+        "usedOf": "{used} of {included}",
+        "countedTo": "Counted up to {date}. Each day is added the next morning.",
+        "notCountedYet": "No answers counted yet this month. Each day is added the next morning.",
+        "countsFrom": "Answers count against this bundle from {date}.",
+        "overageNote": "Answers above the included number are billed on the next month's invoice. To change the bundle, contact SchoolOS support."
+      }
     },
     "audit": {
       "title": "Audit log",
