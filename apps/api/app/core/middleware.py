@@ -9,7 +9,9 @@
 - ``SecurityHeadersMiddleware`` (SEC-010, docs/07 §11): API response headers; ``no-store`` on
   ``/api/v1/*`` unless a route sets its own ``Cache-Control``.
 - ``BodySizeLimitMiddleware`` (docs/07 §11 API4): 1 MiB by default, a separate limit for
-  ``multipart/form-data`` (imports, FR-IMP-001: 10 MB). Oversized requests get a 413 problem+json.
+  ``multipart/form-data``, also 1 MiB: no route takes multipart (files go straight to presigned
+  S3 URLs), so the header must not let an unauthenticated client make the API buffer more
+  (SEC-010). Oversized requests get a 413 problem+json.
 
 Pure ASGI (not ``BaseHTTPMiddleware``) so streaming, background tasks and context variables
 behave normally.
@@ -47,7 +49,7 @@ __all__ = [
 
 REQUEST_ID_HEADER = "X-Request-Id"
 DEFAULT_MAX_BODY_BYTES = 1024 * 1024
-DEFAULT_MAX_MULTIPART_BYTES = 10 * 1024 * 1024
+DEFAULT_MAX_MULTIPART_BYTES = DEFAULT_MAX_BODY_BYTES
 API_PREFIX = "/api/v1"
 API_CSP = "default-src 'none'; frame-ancestors 'none'"
 SECURITY_HEADERS: tuple[tuple[str, str], ...] = (
