@@ -551,6 +551,7 @@ def test_FR_IAM_014_staff_cannot_assign_or_edit_support_access_by_hand(
 # --- emergency access: two operators, no school approval, school told at once ---------------
 
 
+@pytest.mark.usefixtures("telugu_on")  # Telugu output: switched on (ADR-0036)
 def test_SEC_029_emergency_access_needs_two_operators_and_notifies_the_school(
     campus: Campus, api: Any, admin_engine: Engine, make_operator: MakeOperator
 ) -> None:
