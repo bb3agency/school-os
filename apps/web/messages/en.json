@@ -1043,7 +1043,12 @@
       "colBundlePrice": "Price a month (before GST)",
       "colExtra": "Each extra answer",
       "bundlesEmptyTitle": "No AI answer bundles",
-      "bundlesEmptyBody": "AI answer bundles come from the billing catalogue."
+      "bundlesEmptyBody": "AI answer bundles come from the billing catalogue.",
+      "edit": "Edit",
+      "editTitle": "Edit {name} version {version} (draft)",
+      "editBody": "Only drafts can change. Once published, a plan's prices and limits are fixed.",
+      "fixedFieldsNote": "The plan code, deployment, billing period, pricing, GST rate and SAC code stay as they are. To change them, save a new version instead.",
+      "saveChanges": "Save changes"
     },
     "subscriptions": {
       "title": "Subscriptions",
@@ -1092,7 +1097,18 @@
       "aiBundleOption": "{name}: {answers} answers, {price} a month, {rate} each extra answer",
       "removeAiBundle": "Remove AI bundle",
       "removeAiBundleTitle": "Remove the AI answer bundle?",
-      "removeAiBundleBody": "From the next invoice there is no bundle charge and no charge for extra answers."
+      "removeAiBundleBody": "From the next invoice there is no bundle charge and no charge for extra answers.",
+      "setOverride": "Set negotiated price",
+      "changeOverride": "Change negotiated price",
+      "setOverrideTitle": "Negotiated price for this school",
+      "overrideBody": "Replaces the plan's base price on this school's subscription invoices.",
+      "overrideAmount": "Negotiated price (₹, before GST)",
+      "overrideAmountHint": "For each billing period, for example 3999.00. GST is added on the invoice.",
+      "overrideConsequence": "Invoices made from now on use this price instead of the plan's base price. Invoices already made don't change.",
+      "removeOverride": "Remove negotiated price",
+      "removeOverrideTitle": "Remove the negotiated price?",
+      "removeOverrideBody": "Invoices made from now on use the plan's base price again. Invoices already made don't change.",
+      "overrideValue": "Negotiated price: {amount}"
     },
     "invoices": {
       "title": "Invoices",
@@ -1847,7 +1863,8 @@
     "chooseWhoCanSee": "Choose at least one role, class, section or staff member, or choose \"Whole school\".",
     "tooManyAclEntries": "Choose at most 50, or choose \"Whole school\".",
     "invalidIssueDate": "Choose a date, or leave it empty.",
-    "noAadhaar": "This looks like a full Aadhaar number. SchoolOS never stores one: remove it."
+    "noAadhaar": "This looks like a full Aadhaar number. SchoolOS never stores one: remove it.",
+    "invalidPositiveAmount": "Enter an amount above zero in rupees, like 3999 or 3999.50."
   },
   "support": {
     "piiWarningTitle": "Do not include student personal data",

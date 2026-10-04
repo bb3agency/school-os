@@ -8,13 +8,24 @@ import { TextAreaField, TextField } from "@/components/ui/Input";
 import { SelectField } from "@/components/ui/Select";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { formatCount, formatInr } from "@/lib/format";
-import { localDateTime, reason, uuid } from "@/lib/validation";
+import { localDateTime, money, reason, uuid } from "@/lib/validation";
 import { PK, planLabel, readyOr, useAiBundles, useCan, usePlanDirectory } from "./data";
 
 const reasonSchema = z.object({ reason });
 const changePlanSchema = z.object({ plan_id: uuid });
 const bundleSchema = z.object({ ai_bundle_id: uuid });
 const extendSchema = z.object({ trial_ends_at: localDateTime });
+/**
+ * Negotiated price (FR-PLT-012, docs/16 §5.7): rupees before GST for each billing period, two
+ * decimals at most, above zero. It replaces the plan's base price on invoices made from now
+ * on; the reason (10–500 characters) is required with it, as on the API.
+ */
+const overrideSchema = z.object({
+  price_override_inr: money.refine((value) => Number(value) > 0, {
+    error: "invalidPositiveAmount",
+  }),
+  reason,
+});
 const INVALIDATE = [PK.subscriptions, PK.tenants, PK.dashboard] as const;
 
 /**
@@ -194,6 +205,67 @@ export function SubscriptionActions({
           submit={() =>
             unwrap(
               api.DELETE("/api/v1/platform/subscriptions/{sub_id}/ai-bundle", {
+                params: { path },
+              }),
+            )
+          }
+        />
+      ) : null}
+      {status !== "cancelled" ? (
+        <ActionDialog
+          triggerLabel={
+            subscription.price_override_inr === null ? t("setOverride") : t("changeOverride")
+          }
+          triggerSize="sm"
+          triggerDescription={label}
+          title={t("setOverrideTitle")}
+          description={t("overrideBody")}
+          confirmLabel={t("setOverride")}
+          consequence={t("overrideConsequence")}
+          stepUp
+          schema={overrideSchema}
+          invalidate={INVALIDATE}
+          submit={(data) =>
+            unwrap(
+              api.PUT("/api/v1/platform/subscriptions/{sub_id}/price-override", {
+                params: { path },
+                body: data,
+              }),
+            )
+          }
+        >
+          {(errors) => (
+            <>
+              <TextField
+                name="price_override_inr"
+                label={t("overrideAmount")}
+                hint={t("overrideAmountHint")}
+                inputMode="decimal"
+                error={errors.price_override_inr}
+                defaultValue={subscription.price_override_inr ?? ""}
+                required
+              />
+              <ReasonField error={errors.reason} />
+            </>
+          )}
+        </ActionDialog>
+      ) : null}
+      {status !== "cancelled" && subscription.price_override_inr !== null ? (
+        <ActionDialog
+          triggerLabel={t("removeOverride")}
+          triggerVariant="ghost"
+          triggerSize="sm"
+          triggerDescription={label}
+          title={t("removeOverrideTitle")}
+          description={t("removeOverrideBody")}
+          confirmLabel={t("removeOverride")}
+          confirmVariant="danger"
+          stepUp
+          schema={z.object({})}
+          invalidate={INVALIDATE}
+          submit={() =>
+            unwrap(
+              api.DELETE("/api/v1/platform/subscriptions/{sub_id}/price-override", {
                 params: { path },
               }),
             )
