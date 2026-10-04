@@ -191,7 +191,7 @@ export function NewDocumentScreen() {
                   className="mt-0.5 size-4"
                 />
                 <span>
-                  <span className="font-medium text-ink">{tsens(`${value}.short`)}</span>
+                  <span className="font-semibold text-ink">{tsens(`${value}.short`)}</span>
                   {" · "}
                   {tsens(`${value}.hint`)}
                 </span>

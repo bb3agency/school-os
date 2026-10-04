@@ -8,13 +8,17 @@ import { whatsappHref } from "./links";
  * "Ask on WhatsApp" (docs/17 §5.6): a secondary call to action beside "Talk to us", shown
  * only when `SOS_PUBLIC_WHATSAPP_NUMBER` is set. A plain link to wa.me with a fixed greeting;
  * nothing is stored and no personal data is sent. The accessible name starts with the visible
- * label and says that it opens WhatsApp (WCAG 2.5.3). Works in server and client components.
+ * label and says that it opens WhatsApp (WCAG 2.5.3). `iconOnly` (the header bar between lg
+ * and xl, where the label does not fit) shows the icon in a 40px square button (the `md`
+ * height) with the same accessible name and a matching tooltip. Works in server and client
+ * components.
  */
 export function WhatsAppLink({
   number,
   variant = "secondary",
   size = "lg",
   context,
+  iconOnly = false,
   className,
 }: {
   /** Validated digits from the settings. */
@@ -23,6 +27,8 @@ export function WhatsAppLink({
   size?: ButtonSize;
   /** Extra words for screen readers when several links share a page (e.g. the plan name). */
   context?: string;
+  /** Icon only; the label stays in the accessible name and the tooltip. */
+  iconOnly?: boolean;
   className?: string;
 }) {
   const t = useTranslations("marketing.cta");
@@ -30,10 +36,16 @@ export function WhatsAppLink({
     <a
       href={whatsappHref(number, t("whatsappMessage"))}
       rel="noopener noreferrer"
-      className={cn(buttonClasses(variant, size), "mk-press", className)}
+      title={iconOnly ? t("whatsapp") : undefined}
+      className={cn(
+        buttonClasses(variant, size),
+        "mk-press",
+        iconOnly && "size-10 shrink-0 p-0",
+        className,
+      )}
     >
       <Icon name="message" className="size-4.5" />
-      {t("whatsapp")}
+      {iconOnly ? <span className="sr-only">{t("whatsapp")}</span> : t("whatsapp")}
       <span className="sr-only">
         {context ? `: ${context}` : null} {t("whatsappOpens")}
       </span>

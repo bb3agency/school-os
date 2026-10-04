@@ -200,7 +200,7 @@ export function AclSummary({ acl }: { acl: readonly AclEntry[] }) {
           <li key={aclValue(entry)}>
             <Pill variant="tag" size="md">
               <span className="text-ink-subtle">{t(`kind.${entry.principal_type}`)}:</span>
-              <span className="font-medium text-ink">{label(entry)}</span>
+              <span className="font-semibold text-ink">{label(entry)}</span>
             </Pill>
           </li>
         ))}

@@ -228,7 +228,7 @@ export function UploadSpreadsheet({ onStarted }: { onStarted: (batch: ImportBatc
       <div id={statusId} role="status" aria-live="polite" className="min-h-6 space-y-2">
         {progress ? (
           <>
-            <p className="text-sm font-medium">{stageText(progress)}</p>
+            <p className="text-sm">{stageText(progress)}</p>
             {progress.stage === "uploading" ? (
               <progress
                 max={100}
@@ -282,7 +282,7 @@ export function ImportsView({
       cell: (row) => (
         <Link
           href={`/imports/${row.id}`}
-          className="font-medium text-primary underline underline-offset-4"
+          className="font-semibold text-primary underline underline-offset-4"
         >
           {formatDateTime(row.created_at) ?? t("open")}
           <span className="sr-only">{t("openHint")}</span>

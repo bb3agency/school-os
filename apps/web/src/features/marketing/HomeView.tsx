@@ -115,7 +115,7 @@ export function HomeView({ settings }: { settings: MarketingSettings }) {
           </h2>
           <ul className="grid flex-1 grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-4">
             {SOURCES.map((source) => (
-              <li key={source} className="flex items-center gap-2.5 font-medium text-ink">
+              <li key={source} className="flex items-center gap-2.5 font-semibold text-ink">
                 <Icon name={SOURCE_ICONS[source]} className="size-5 text-ink-subtle" />
                 {t(`home.sources.${source}`)}
               </li>
@@ -192,7 +192,7 @@ export function HomeView({ settings }: { settings: MarketingSettings }) {
                     <p className="mt-2 flex-1 text-ink-muted">
                       {t(`home.highlights.${feature}.body`)}
                     </p>
-                    <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-primary">
+                    <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
                       {t("cta.learnMore")}
                       <span className="sr-only">: {t(`home.highlights.${feature}.title`)}</span>
                       <Icon name="arrowRight" className="mk-arrow size-4" />
@@ -227,7 +227,7 @@ export function HomeView({ settings }: { settings: MarketingSettings }) {
                   <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white">
                     <Icon name={SECURITY_ICONS[point]} className="size-5" />
                   </span>
-                  <p className="self-center font-medium text-white">
+                  <p className="self-center font-semibold text-white">
                     {t(`home.security.${point}`)}
                   </p>
                 </li>
@@ -309,7 +309,7 @@ export function Faq({ items }: { items: { q: string; a: string }[] }) {
         <details key={item.q} className="mk-faq group">
           <summary
             className={cn(
-              "flex min-h-14 cursor-pointer list-none items-center justify-between gap-6 py-5 text-lg font-medium text-ink",
+              "flex min-h-14 cursor-pointer list-none items-center justify-between gap-6 py-5 text-lg font-semibold text-ink",
               "rounded-md hover:text-primary",
             )}
           >

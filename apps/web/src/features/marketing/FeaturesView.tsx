@@ -61,7 +61,7 @@ export function FeaturesView({ settings }: { settings: MarketingSettings }) {
               <li key={feature}>
                 <a
                   href={`#${feature}`}
-                  className="mk-press inline-flex min-h-11 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm font-medium text-ink hover:border-border-soft hover:bg-surface-muted"
+                  className="mk-press inline-flex min-h-11 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-ink hover:border-border-soft hover:bg-surface-muted"
                 >
                   {t(`features.${feature}.nav`)}
                 </a>
