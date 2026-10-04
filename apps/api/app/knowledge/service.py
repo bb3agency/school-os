@@ -823,6 +823,15 @@ class SchoolKnowledgeService:
                     withheld=not shown or c.title is None,
                 )
             )
+        if row.status not in repo.EARLIER_STATUSES:
+            # A cancelled or failed answer keeps the UNCHECKED preview and has no citations: it
+            # may quote any passage or record the model was given, so every one of them must
+            # still be visible (invariant 8).
+            withheld_any |= not all(
+                visibility.visible(str(item.get("source", "")))
+                for item in (row.retrieved or [])
+                if isinstance(item, dict)
+            )
         answer = None if withheld_any else conversations.answer_of(session, row)
         return MessageOut(
             query_id=row.id,

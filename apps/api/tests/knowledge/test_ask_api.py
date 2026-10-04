@@ -1054,3 +1054,59 @@ def test_FR_KB_030_active_verified_answers_are_searched_first_and_only_where_vis
     fake.sent.clear()
     K.ask(api, world.b.people["owner"], question)
     assert source not in str(fake.sent)
+
+
+YAK = "The Yak committee meets on 05/12/2026 in room Y7 to plan the annual day."
+
+
+def test_invariant_8_an_unfinished_answer_is_withheld_once_its_sources_are_not_visible(
+    world: Any, api: Any, admin_engine: Engine, docs: dict[str, uuid.UUID]
+) -> None:
+    """A stream that ends early (the person left: ``cancelled``) keeps the unchecked preview
+    and no citations. History must still re-check what that preview was written from, so it
+    never shows a document the person can no longer see (invariant 8)."""
+    who = W.add_member(admin_engine, world.a.tenant_id, ["office_staff"])
+    doc, _ = K.text_document(
+        admin_engine,
+        world.a,
+        YAK,
+        title="Yak committee",
+        acl=[("membership", str(who.membership_id))],
+    )
+    _install(transport=LongAnswerTransport())
+    try:
+        stream = _start(
+            K.SW.ctx_for(world.a.tenant_id, who, "office_staff"),
+            "When does the Yak committee meet?",
+        )
+        event = next(stream)
+        while event.event != "delta":
+            event = next(stream)
+        for _ in range(3):  # a little more of the preview reaches the screen
+            next(stream)
+        stream.close()
+    finally:
+        composition.set_runtime(None)
+    row = _query_row(admin_engine, str(stream.query_id))
+    assert row["status"] == "cancelled"
+    assert any(str(doc) in r["source"] for r in row["retrieved"])
+    cid = str(row["conversation_id"])
+    before = api.call(who, "GET", f"/api/v1/knowledge/conversations/{cid}").json()
+    assert before["messages"][0]["answer_withheld"] is False  # still visible: kept as shown
+
+    with admin_engine.begin() as c:  # access withdrawn
+        c.execute(text("DELETE FROM kb.document_acl WHERE document_id = :d"), {"d": doc})
+        c.execute(
+            text(
+                "INSERT INTO kb.document_acl (tenant_id, document_id, principal_type, "
+                "principal_ref) VALUES (:t, :d, 'role', 'owner')"
+            ),
+            {"t": world.a.tenant_id, "d": doc},
+        )
+    K.pipeline().refresh_acl(world.a.tenant_id, doc)
+    message = api.call(who, "GET", f"/api/v1/knowledge/conversations/{cid}").json()["messages"][0]
+    assert message["answer"] is None
+    assert message["answer_withheld"] is True
+    assert message["followups"] == []
+    assert "Y7" not in str(message)
+    assert "05/12/2026" not in str(message)
