@@ -789,6 +789,15 @@ def void_invoice(
     return billing.void_invoice(_actor(ctx), invoice_id, data.reason)
 
 
+@router.get("/invoices/{invoice_id}/payments", response_model=list[PaymentOut])
+def list_invoice_payments(
+    *, invoice_id: uuid.UUID, ctx: Annotated[Ctx, InvRead]
+) -> list[PaymentOut]:
+    """The invoice's payments, newest received first, reversed ones included with who reversed
+    them, when and why (docs/16 §5.9). 404 for an unknown invoice."""
+    return billing.list_payments(invoice_id)
+
+
 @router.post("/invoices/{invoice_id}/payments", response_model=PaymentOut, status_code=201)
 def record_payment(
     *,
@@ -825,6 +834,9 @@ def record_payment(
 def reverse_payment(
     *, payment_id: uuid.UUID, data: Reasoned, ctx: Annotated[Ctx, InvManage]
 ) -> PaymentOut:
+    """Reverse a ``recorded`` payment with a reason (10-500 characters); it is kept, never
+    deleted. ``409 invalid_state`` if it is already reversed. The invoice is re-settled, so a
+    ``paid`` invoice goes back to ``issued``; read the invoice again for its new status."""
     return billing.reverse_payment(_actor(ctx), payment_id, data.reason)
 
 

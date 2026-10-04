@@ -316,6 +316,39 @@ def payments_total(session: Session, invoice_id: uuid.UUID) -> tuple[Decimal, De
     return Decimal(row[0]), Decimal(row[1])
 
 
+def payments_with_names(
+    session: Session,
+    *,
+    invoice_id: uuid.UUID | None = None,
+    payment_id: uuid.UUID | None = None,
+) -> list[RowMapping]:
+    """Payments of one invoice (newest received first) or one payment, with the recording and
+    reversing operators' display names (``platform.operators``; no tenant data)."""
+    if invoice_id is None and payment_id is None:
+        raise ValueError("payments_with_names needs an invoice_id or a payment_id")
+    recorder = m.operators.alias("recorder")
+    reverser = m.operators.alias("reverser")
+    stmt = (
+        select(
+            m.payments,
+            recorder.c.display_name.label("recorded_by_name"),
+            reverser.c.display_name.label("reversed_by_name"),
+        )
+        .outerjoin(recorder, recorder.c.id == m.payments.c.recorded_by)
+        .outerjoin(reverser, reverser.c.id == m.payments.c.reversed_by)
+        .order_by(
+            m.payments.c.received_on.desc(),
+            m.payments.c.recorded_at.desc().nulls_last(),
+            m.payments.c.id.desc(),
+        )
+    )
+    if invoice_id is not None:
+        stmt = stmt.where(m.payments.c.invoice_id == invoice_id)
+    if payment_id is not None:
+        stmt = stmt.where(m.payments.c.id == payment_id)
+    return list(session.execute(stmt).mappings())
+
+
 def overdue_invoices(session: Session, subscription_id: uuid.UUID, today: dt.date) -> int:
     return int(
         session.execute(

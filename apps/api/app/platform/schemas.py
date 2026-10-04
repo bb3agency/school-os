@@ -458,6 +458,9 @@ class PaymentIn(In):
 
 
 class PaymentOut(Out):
+    """One manual payment (docs/16 §5.9). ``reference`` and ``notes`` are operator-entered;
+    ``*_by_name`` is the operator's display name (control-plane staff, never school data)."""
+
     id: uuid.UUID
     invoice_id: uuid.UUID
     provider: str
@@ -466,8 +469,15 @@ class PaymentOut(Out):
     tds_inr: Decimal
     received_on: dt.date
     reference: str
+    notes: str | None = None
     status: Literal["recorded", "reversed"]
+    recorded_by: uuid.UUID
+    recorded_by_name: str | None = None
     recorded_at: dt.datetime | None
+    reversed_by: uuid.UUID | None = None
+    reversed_by_name: str | None = None
+    reversed_at: dt.datetime | None = None
+    reversal_reason: str | None = None
 
 
 class InvoiceRunIn(In):
