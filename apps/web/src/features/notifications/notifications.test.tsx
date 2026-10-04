@@ -147,10 +147,20 @@ describe("notification bell (FR-NOT-001)", () => {
       "origin-top-right",
     );
     const panelId = bell.getAttribute("aria-controls") ?? "";
+    const panel = document.getElementById(panelId);
+    expect(panel).not.toBeNull();
+    // While it fades out it takes no focus and no clicks (inert), then it is gone. Record the
+    // moment it turns inert: under a loaded run the 150 ms exit can finish (and the panel
+    // unmount) before the click resolves, so reading the attribute afterwards would race.
+    let inertDuringExit = false;
+    const observer = new MutationObserver(() => {
+      if (panel?.hasAttribute("inert")) inertDuringExit = true;
+    });
+    if (panel) observer.observe(panel, { attributes: true, attributeFilter: ["inert"] });
     await userEvent.click(screen.getByRole("button", { name: "Elsewhere" }));
     expect(bell).toHaveAttribute("aria-expanded", "false");
-    // While it fades out it takes no focus and no clicks (inert), then it is gone.
-    expect(document.getElementById(panelId)).toHaveAttribute("inert");
+    await waitFor(() => expect(inertDuringExit || panel?.hasAttribute("inert")).toBe(true));
+    observer.disconnect();
     // The 150 ms exit runs on Motion's frame loop; under a loaded full-suite run jsdom frames
     // can stall past waitFor's 1 s default, so allow more time (the assertion is unchanged).
     await waitFor(
