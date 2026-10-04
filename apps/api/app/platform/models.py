@@ -77,6 +77,8 @@ plans = Table(
     Column("updated_at", DateTime(timezone=True)),
     Column("one_time_fee_inr", Numeric(14, 2), nullable=False),
     Column("description", Text),
+    # Edit counter for If-Match on draft edits (0043); not the catalogue ``version``.
+    Column("row_version", Integer, nullable=False, server_default="1"),
 )
 
 # AI answer bundles (0041_billing_catalogue): published or retired, prices never change.

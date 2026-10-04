@@ -216,6 +216,9 @@ class PlanOut(Out):
     created_at: dt.datetime | None
     one_time_fee_inr: Decimal
     description: str | None
+    # Edit counter of the draft, sent as the ETag; PATCH takes it back in If-Match (412 when
+    # stale). Not the catalogue ``version`` above.
+    row_version: int
 
 
 class AiBundleOut(Out):
