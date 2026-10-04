@@ -992,7 +992,10 @@ class SchoolKnowledgeService:
         return [self._memory_out(i) for i in memory.items(session, ctx.user_id, now)]
 
     def _screened(self, session: Session, ctx: UserContext, text: str) -> str:
-        """The item text after every screen, or the refusal (422 / 503)."""
+        """The item text after every screen, or the refusal (422 / 503). The screen is a model
+        call metered as Ask, so it counts against the per-user question rate first (429): one
+        person cannot drain the school's shared rate limit or budget (SEC-020)."""
+        self.admit(ctx)
         note = conversations.tidy(nfc(text))
         verdict = memory.screen(
             self.runtime.gateway, Metering(tenant_id=ctx.tenant_id, feature="ask"), note, set()

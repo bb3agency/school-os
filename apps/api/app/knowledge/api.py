@@ -378,7 +378,8 @@ def create_memory(ctx: Asker, db: TenantDB, body: MemoryIn) -> MemoryOut:
     Never details about students, parents or other staff: refused with 422
     (``memory_personal_number``, ``memory_date``, ``memory_long_number``, ``memory_others``,
     ``memory_unsure``, ``memory_too_long``); 503 ``memory_check_unavailable`` when the check
-    cannot run; 409 ``memory_off`` or ``memory_full``."""
+    cannot run; 409 ``memory_off`` or ``memory_full``; 429 ``ai_rate_limited`` (the item check
+    counts against your per-minute question limit)."""
     return service.get_service().create_memory(db, ctx, body)
 
 
@@ -399,7 +400,8 @@ def update_memory(
     version: IfMatch,
     response: Response,
 ) -> MemoryOut:
-    """Edit one of your memory items (``If-Match``; checked again like a new item)."""
+    """Edit one of your memory items (``If-Match``; checked again like a new item, 429
+    ``ai_rate_limited`` included)."""
     out = service.get_service().update_memory(db, ctx, memory_id, body, expected_version=version)
     response.headers["ETag"] = etag(out.version)
     return out
