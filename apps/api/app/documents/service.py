@@ -1419,6 +1419,13 @@ def is_visible(session: Session, ctx: UserContext, document_id: uuid.UUID) -> bo
     return repo.get_document(session, document_id, visibility=_visibility(session, ctx)) is not None
 
 
+def is_own_upload(session: Session, ctx: UserContext, document_id: uuid.UUID) -> bool:
+    """Whether the caller can see the document AND uploaded it themselves (for flows that read
+    an upload and then delete it, such as attendance and marks sheets: audit DL-04)."""
+    doc = repo.get_document(session, document_id, visibility=_visibility(session, ctx))
+    return doc is not None and doc.created_by == ctx.user_id
+
+
 @dataclass(frozen=True, slots=True)
 class StoredObject:
     """Location and facts of one stored version, for workers (imports, extraction)."""

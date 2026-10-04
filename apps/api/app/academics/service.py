@@ -365,12 +365,14 @@ def record_attendance(
 def _consume_sheet(
     ctx: UserContext, document_id: uuid.UUID, action: str, section_id: uuid.UUID
 ) -> tuple[bytes, FileKind]:
-    """Read an uploaded ``import_file`` the caller can see, then delete it, committed in its own
-    transaction (whatever the parse finds, the file does not linger). 404 when not visible;
-    409 ``document_not_ready`` while the virus check runs; 415/413 for other types or sizes."""
+    """Read an ``import_file`` the caller uploaded and can see, then delete it, committed in its
+    own transaction (whatever the parse finds, the file does not linger). 404 when not visible
+    or uploaded by someone else (a preview never reads or deletes another person's upload, audit
+    DL-04); 409 ``document_not_ready`` while the virus check runs; 415/413 for other types or
+    sizes."""
     limits = load_config().sheets
     with tenant_session(ctx.tenant_id, ctx.user_id) as session:
-        if not documents.is_visible(session, ctx, document_id):
+        if not documents.is_own_upload(session, ctx, document_id):
             raise NotFound("Document not found")
         obj = documents.document_object(session, document_id)
         if obj.purpose != "import_file":

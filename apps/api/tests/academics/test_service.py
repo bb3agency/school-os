@@ -267,7 +267,9 @@ def test_invariant_4_a_sheet_with_an_aadhaar_number_is_refused_and_still_deleted
 ) -> None:
     number = "23456789012" + verhoeff_check_digit("23456789012")
     day = S.school_days(1)[0].strftime("%d/%m/%Y")
-    doc = S.sheet_document(admin_engine, school, f"Adm No,{day}\n{number},P\n".encode())
+    doc = S.sheet_document(
+        admin_engine, school, f"Adm No,{day}\n{number},P\n".encode(), uploader="principal"
+    )
     with pytest.raises(ValidationFailed) as err:
         academics.preview_attendance_sheet(
             S.principal_ctx(school), school.ids["section_9a"], SheetIn(document_id=doc)
@@ -277,10 +279,35 @@ def test_invariant_4_a_sheet_with_an_aadhaar_number_is_refused_and_still_deleted
     assert not S.document_exists(admin_engine, doc)
 
 
+def test_SEC_015_only_the_uploader_may_read_and_delete_a_sheet(
+    school: Any, admin_engine: Engine
+) -> None:
+    """Audit 2026-10-04, DL-04: a sheet preview reads the upload and deletes it at once. Any
+    ``import_file`` the caller could see was accepted, so a class teacher (or a school-wide
+    reader) could read and destroy another person's upload, e.g. a file waiting to be
+    imported, without delete rights. Someone else's upload is 404 and is left alone."""
+    day = S.school_days(1)[0].strftime("%d/%m/%Y")
+    doc = S.sheet_document(
+        admin_engine, school, f"Adm No,{day}\nSYN-A1,P\n".encode(), uploader="owner"
+    )
+    for actor in (S.ct_ctx(school), S.principal_ctx(school)):
+        with pytest.raises(NotFound):
+            academics.preview_attendance_sheet(
+                actor, school.ids["section_9a"], SheetIn(document_id=doc)
+            )
+    assert S.document_exists(admin_engine, doc)
+    assert not any(
+        e["summary"].get("document_id") == str(doc)
+        for e in _events(admin_engine, school.tenant_id, "attendance.sheet_read")
+    )
+
+
 def test_FR_ATT_004_the_upload_must_be_visible_and_scanned(
     school: Any, admin_engine: Engine
 ) -> None:
-    doc = S.sheet_document(admin_engine, school, b"Adm No\n", section_key="section_9c")
+    doc = S.sheet_document(
+        admin_engine, school, b"Adm No\n", section_key="section_9c", uploader="principal"
+    )
     with pytest.raises(NotFound):
         academics.preview_attendance_sheet(
             S.ct_ctx(school), school.ids["section_9a"], SheetIn(document_id=doc)
