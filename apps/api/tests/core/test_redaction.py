@@ -133,24 +133,30 @@ GAPS = [
     "\u3000",  # ideographic space
     "\u200b",  # zero-width space
     "\ufeff",  # zero-width no-break space
-    ".",
-    "/",
     "\u2014",  # em dash
     "\u2212",  # minus sign
     "\uff0d",  # full-width hyphen-minus
     "  -  ",
     " \u2013 ",  # spaced en dash
-    ",",
-    "_",
 ]
 
 
-@pytest.mark.parametrize("gap", ["    ", "\t\t\t\t", "\n\n\n\n\n", " .   ", "\u3000 \t \n "])
+@pytest.mark.parametrize("gap", ["    ", "\t\t\t\t", "\n\n\n\n\n", " -   ", "\u3000 \t \n "])
 def test_PRV_015_input_check_refuses_what_whitespace_collapsing_would_store(gap: str) -> None:
     """DL-01: however wide the gap, the single-spaced text that would be stored is refused."""
     raw = gap.join([VALID[:4], VALID[4:8], VALID[8:]])
     assert contains_full_aadhaar(raw)
     assert contains_full_aadhaar(re.sub(r"\s+", " ", raw))
+
+
+def test_PRV_015_structured_numbers_with_slashes_and_dots_are_not_joined() -> None:
+    """Dots, slashes and commas are not separators: invoice numbers (``SOS/2026-27/000123``),
+    dates and amounts must not read as Aadhaar numbers (audit DL-01 follow-up)."""
+    for serial in range(100, 1100):
+        text = f"SOS/2026-27/{serial:06d}"
+        assert not contains_full_aadhaar(text), text
+        assert redact(text) == text
+    assert not contains_full_aadhaar("1234.5678.9012 / 12/03/2026 / 1,234,567,890")
 
 
 @pytest.mark.parametrize("gap", GAPS)

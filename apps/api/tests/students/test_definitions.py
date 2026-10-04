@@ -85,7 +85,7 @@ def test_FR_STU_012_full_aadhaar_is_rejected_with_last4_message(text: str) -> No
 
 
 @pytest.mark.parametrize(
-    "gap", ["\t", "\n", "   ", "      ", "\u2003", "\u202f", "\u200b", ".", "\u2212", ","]
+    "gap", ["\t", "\n", "   ", "      ", "\u2003", "\u202f", "\u200b", "\u2212"]
 )
 def test_FR_STU_012_full_aadhaar_with_any_gap_is_rejected_not_stored(gap: str) -> None:
     """SEC-013 / invariant 4 (audit 2026-10-04, DL-01): the check ran on the raw text and the

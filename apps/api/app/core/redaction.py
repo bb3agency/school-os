@@ -18,8 +18,9 @@ Public API
 Detection rules (defined and tested in ``tests/core/test_redaction.py``)
 -----------------------------------------------------------------------
 Text is NFC-normalised. A *run* is a sequence of digit *groups* joined by a short separator
-(1-3 whitespace or zero-width characters of any kind, or a hyphen/dash/minus, dot or slash with
-up to 2 of them on each side; also a comma or underscore). Input checks also collapse every
+(1-3 whitespace or zero-width characters of any kind, or a hyphen/dash/minus with up to 2 of
+them on each side; dots, slashes and commas are not separators, so structured numbers such
+as invoice numbers ``SOS/2026-27/000123`` and dates stay intact). Input checks also collapse every
 whitespace run first, as stored text is (``contains_full_aadhaar``). Digits in any script
 (ASCII, Telugu, Devanagari, ...) count via ``unicodedata.digit``. Candidates are windows of
 consecutive whole groups inside a run, so:
@@ -117,13 +118,13 @@ def verhoeff_check_digit(digits: str) -> str:
 # --- Candidate runs -----------------------------------------------------------------------
 
 # A gap is any Unicode whitespace (tab, line break, NBSP, thin/em/narrow spaces...) or an
-# invisible zero-width character; up to 3 of them, or a dash/dot/slash with up to 2 on each side.
+# invisible zero-width character; up to 3 of them, or a dash with up to 2 on each side.
 # Input checks run on raw text that is later stored with its whitespace collapsed (NFC, single
 # spaces), so every gap that collapses into a space must already join the groups here, or a
 # number typed as "1234<TAB>5678<TAB>9012" would pass the check and be stored as a full Aadhaar
 # number (invariant 4).
 _GAP = r"[\s\u200b-\u200d\u2060\ufeff]"
-_DASH = r"[-\u2010-\u2015\u2212\ufe58\ufe63\uff0d./,_]"
+_DASH = r"[-\u2010-\u2015\u2212\ufe58\ufe63\uff0d]"
 _SEP = rf"(?:{_GAP}{{1,3}}|{_GAP}{{0,2}}{_DASH}{_GAP}{{0,2}})"
 _RUN_RE = re.compile(rf"\+?\d+(?:{_SEP}\d+)*")
 _GROUP_RE = re.compile(r"\+?\d+")
