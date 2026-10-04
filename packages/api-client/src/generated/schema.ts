@@ -3615,7 +3615,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List Invoice Payments
+         * @description The invoice's payments, newest received first, reversed ones included with who reversed
+         *     them, when and why (docs/16 §5.9). 404 for an unknown invoice.
+         */
+        get: operations["list_invoice_payments_api_v1_platform_invoices__invoice_id__payments_get"];
         put?: never;
         /** Record Payment */
         post: operations["record_payment_api_v1_platform_invoices__invoice_id__payments_post"];
@@ -3737,7 +3742,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Reverse Payment */
+        /**
+         * Reverse Payment
+         * @description Reverse a ``recorded`` payment with a reason (10-500 characters); it is kept, never
+         *     deleted. ``409 invalid_state`` if it is already reversed. The invoice is re-settled, so a
+         *     ``paid`` invoice goes back to ``issued``; read the invoice again for its new status.
+         */
         post: operations["reverse_payment_api_v1_platform_payments__payment_id__reverse_post"];
         delete?: never;
         options?: never;
@@ -10785,7 +10795,11 @@ export interface components {
              */
             tds_inr: number | string;
         };
-        /** PaymentOut */
+        /**
+         * PaymentOut
+         * @description One manual payment (docs/16 §5.9). ``reference`` and ``notes`` are operator-entered;
+         *     ``*_by_name`` is the operator's display name (control-plane staff, never school data).
+         */
         PaymentOut: {
             /** Amount Inr */
             amount_inr: string;
@@ -10801,6 +10815,8 @@ export interface components {
             invoice_id: string;
             /** Method */
             method: string;
+            /** Notes */
+            notes?: string | null;
             /** Provider */
             provider: string;
             /**
@@ -10810,8 +10826,23 @@ export interface components {
             received_on: string;
             /** Recorded At */
             recorded_at: string | null;
+            /**
+             * Recorded By
+             * Format: uuid
+             */
+            recorded_by: string;
+            /** Recorded By Name */
+            recorded_by_name?: string | null;
             /** Reference */
             reference: string;
+            /** Reversal Reason */
+            reversal_reason?: string | null;
+            /** Reversed At */
+            reversed_at?: string | null;
+            /** Reversed By */
+            reversed_by?: string | null;
+            /** Reversed By Name */
+            reversed_by_name?: string | null;
             /**
              * Status
              * @enum {string}
@@ -19912,6 +19943,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InvoiceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_invoice_payments_api_v1_platform_invoices__invoice_id__payments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoice_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentOut"][];
                 };
             };
             /** @description Validation Error */

@@ -13668,6 +13668,7 @@
         "type": "object"
       },
       "PaymentOut": {
+        "description": "One manual payment (docs/16 \u00a75.9). ``reference`` and ``notes`` are operator-entered;\n``*_by_name`` is the operator's display name (control-plane staff, never school data).",
         "properties": {
           "amount_inr": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
@@ -13687,6 +13688,17 @@
           "method": {
             "title": "Method",
             "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
           },
           "provider": {
             "title": "Provider",
@@ -13709,9 +13721,71 @@
             ],
             "title": "Recorded At"
           },
+          "recorded_by": {
+            "format": "uuid",
+            "title": "Recorded By",
+            "type": "string"
+          },
+          "recorded_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recorded By Name"
+          },
           "reference": {
             "title": "Reference",
             "type": "string"
+          },
+          "reversal_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reversal Reason"
+          },
+          "reversed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reversed At"
+          },
+          "reversed_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reversed By"
+          },
+          "reversed_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reversed By Name"
           },
           "status": {
             "enum": [
@@ -13737,6 +13811,7 @@
           "received_on",
           "reference",
           "status",
+          "recorded_by",
           "recorded_at"
         ],
         "title": "PaymentOut",
@@ -32364,6 +32439,52 @@
       }
     },
     "/api/v1/platform/invoices/{invoice_id}/payments": {
+      "get": {
+        "description": "The invoice's payments, newest received first, reversed ones included with who reversed\nthem, when and why (docs/16 \u00a75.9). 404 for an unknown invoice.",
+        "operationId": "list_invoice_payments_api_v1_platform_invoices__invoice_id__payments_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invoice_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Invoice Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PaymentOut"
+                  },
+                  "title": "Response List Invoice Payments Api V1 Platform Invoices  Invoice Id  Payments Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Invoice Payments",
+        "tags": [
+          "platform"
+        ]
+      },
       "post": {
         "operationId": "record_payment_api_v1_platform_invoices__invoice_id__payments_post",
         "parameters": [
@@ -32765,6 +32886,7 @@
     },
     "/api/v1/platform/payments/{payment_id}/reverse": {
       "post": {
+        "description": "Reverse a ``recorded`` payment with a reason (10-500 characters); it is kept, never\ndeleted. ``409 invalid_state`` if it is already reversed. The invoice is re-settled, so a\n``paid`` invoice goes back to ``issued``; read the invoice again for its new status.",
         "operationId": "reverse_payment_api_v1_platform_payments__payment_id__reverse_post",
         "parameters": [
           {
