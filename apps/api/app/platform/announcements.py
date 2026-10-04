@@ -120,6 +120,13 @@ def _values(data: AnnouncementIn, row: Any = None) -> dict[str, Any]:
     return values
 
 
+def has_ended(ends_at: dt.datetime, at: dt.datetime) -> bool:
+    """Ended: the banner feed shows an announcement while ``starts_at <= at < ends_at``
+    (:func:`_active_rows`, :func:`active_announcements`), so it has ended from ``ends_at`` on.
+    Server time, UTC."""
+    return ends_at <= at
+
+
 def list_announcements() -> list[AnnouncementOut]:
     with platform_session() as s:
         rows = s.execute(
@@ -163,6 +170,9 @@ def update(
             raise NotFound("Announcement not found")
         if row["status"] == "cancelled":
             raise Conflict("A cancelled announcement cannot change.", code="invalid_state")
+        if has_ended(row["ends_at"], now()):
+            # Owner decision 2026-10-04: an ended announcement is read-only (docs/16 §5.13).
+            raise Conflict("An announcement that has ended cannot change.", code="invalid_state")
         if expected_version is not None and row["version"] != expected_version:
             raise PreconditionFailed()
         values = _values(data, row)
