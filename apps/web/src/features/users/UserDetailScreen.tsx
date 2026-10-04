@@ -143,7 +143,9 @@ function ResendInvitation({ user }: { user: StaffUser & { email: string } }) {
       renderResult={(result, close) => (
         <>
           <Alert tone="success" live title={t("sentTitle")}>
-            {t("sentBody", { date: formatDateTime(result.expires_at) })}
+            {t("sentBody", {
+              date: formatDateTime(result.expires_at) ?? result.expires_at,
+            })}
           </Alert>
           <div className="flex justify-end">
             <Button onClick={close}>{tc("done")}</Button>

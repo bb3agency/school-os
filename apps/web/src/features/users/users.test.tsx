@@ -483,11 +483,11 @@ describe("user detail (US-102 AC2, FR-IAM-012..014)", () => {
         { status: 202 },
       );
     renderWithIntl(<UserDetailScreen userId={USER} />);
-    await userEvent.click(
-      await screen.findByRole("button", { name: detailCopy.resend.button }),
-    );
+    await userEvent.click(await screen.findByRole("button", { name: detailCopy.resend.button }));
     const dialog = screen.getByRole("dialog", { name: detailCopy.resend.title });
-    expect(within(dialog).getByText("lakshmi@school.example", { exact: false })).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("lakshmi@school.example", { exact: false }),
+    ).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole("button", { name: detailCopy.resend.button }));
     expect(await within(dialog).findByText(detailCopy.resend.sentTitle)).toBeInTheDocument();
     expect(stub.callsTo(RESEND)).toHaveLength(1);
@@ -504,9 +504,7 @@ describe("user detail (US-102 AC2, FR-IAM-012..014)", () => {
       return attempts === 1 ? problem(409, "email_disabled") : problem(429, "rate_limited");
     };
     renderWithIntl(<UserDetailScreen userId={USER} />);
-    await userEvent.click(
-      await screen.findByRole("button", { name: detailCopy.resend.button }),
-    );
+    await userEvent.click(await screen.findByRole("button", { name: detailCopy.resend.button }));
     const dialog = screen.getByRole("dialog", { name: detailCopy.resend.title });
     const send = within(dialog).getByRole("button", { name: detailCopy.resend.button });
     await userEvent.click(send);
