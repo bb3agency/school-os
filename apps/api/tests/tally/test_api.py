@@ -302,6 +302,34 @@ def test_FR_TALLY_002_key_rotation_retires_the_old_key_on_first_use(
     assert "tally.device.key_promoted" in actions
 
 
+def test_FR_TALLY_002_repeated_rotation_does_not_extend_the_old_keys_life(
+    api: Any, admin_engine: Engine
+) -> None:
+    """SEC-030: rotating again (with the old key, never using the new one) used to restart the
+    overlap, so a stolen key could be kept alive indefinitely. The overlap counts from the first
+    rotation that is still pending."""
+    school = T.fresh_school(admin_engine)
+    agent = T.enrol(api, school)
+
+    def shift(interval: str) -> None:
+        with admin_engine.begin() as c:
+            c.execute(
+                text(
+                    "UPDATE ops.tally_devices SET rotation_started_at = rotation_started_at "
+                    f"- interval '{interval}' WHERE tenant_id = :t"
+                ),
+                {"t": school.tenant_id},
+            )
+
+    assert agent.call(api, "POST", "/api/v1/edge/tally/key-rotation").status_code == 200
+    shift("6 days")
+    _new_window()
+    assert agent.call(api, "POST", "/api/v1/edge/tally/key-rotation").status_code == 200
+    shift("36 hours")  # 7.5 days after the first rotation
+    _new_window()
+    assert agent.call(api, "GET", "/api/v1/edge/tally/config").status_code == 401
+
+
 # --- catalog, selection and snapshots (FR-TALLY-004, FR-TALLY-005) ------------------------------
 
 

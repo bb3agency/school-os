@@ -908,13 +908,16 @@ def rotate_key(caller: AgentCaller, *, wrapper: KeyWrapper) -> KeyRotationOut:
     with tenant_session(caller.tenant_id) as session:
         device = _touch(session, _active_device(session, caller), caller, now)
         key_id, wrapped, secret = _new_key(caller.tenant_id, wrapper)
+        # A rotation already pending keeps its start: rotating again with the old key must not
+        # extend the old key's life past the overlap (SEC-030).
+        pending = device.next_key_id is not None and device.rotation_started_at is not None
         repo.update_device(
             session,
             device.id,
             {
                 "next_key_id": key_id,
                 "next_key_ciphertext": wrapped,
-                "rotation_started_at": now,
+                "rotation_started_at": device.rotation_started_at if pending else now,
             },
         )
         audit.record(
