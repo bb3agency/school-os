@@ -182,7 +182,8 @@ resource "aws_iam_role_policy_attachment" "ssm" {
 data "aws_iam_policy_document" "host" {
   statement {
     sid       = "FilesBucketList"
-    actions   = ["s3:ListBucket"]
+    # ListBucketVersions: discard and purge tag every stored version (PRV-016, audit W3-07).
+    actions   = ["s3:ListBucket", "s3:ListBucketVersions"]
     resources = [module.files.arn]
   }
 
@@ -190,7 +191,8 @@ data "aws_iam_policy_document" "host" {
     sid = "FilesBucketObjects"
     actions = [
       "s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:GetObjectVersion",
-      "s3:GetObjectTagging", "s3:PutObjectTagging", "s3:AbortMultipartUpload",
+      "s3:GetObjectTagging", "s3:PutObjectTagging", "s3:PutObjectVersionTagging",
+      "s3:AbortMultipartUpload",
     ]
     resources = ["${module.files.arn}/*"]
   }

@@ -342,7 +342,8 @@ check "pdf_worker_has_egress" {
 data "aws_iam_policy_document" "api" {
   statement {
     sid       = "FilesList"
-    actions   = ["s3:ListBucket"]
+    # ListBucketVersions: discard and purge tag every stored version (PRV-016, audit W3-07).
+    actions   = ["s3:ListBucket", "s3:ListBucketVersions"]
     resources = [module.s3.files_bucket_arn]
     condition {
       test     = "StringLike"
@@ -353,7 +354,7 @@ data "aws_iam_policy_document" "api" {
 
   statement {
     sid       = "FilesObjects"
-    actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:GetObjectTagging", "s3:PutObjectTagging", "s3:AbortMultipartUpload"]
+    actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:GetObjectTagging", "s3:PutObjectTagging", "s3:PutObjectVersionTagging", "s3:AbortMultipartUpload"]
     resources = ["${module.s3.files_bucket_arn}/t/*"]
   }
 
