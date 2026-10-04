@@ -238,7 +238,11 @@ def get_plan(plan_id: uuid.UUID) -> PlanOut:
     return PlanOut.model_validate(dict(row))
 
 
-def update_plan(actor: Actor, plan_id: uuid.UUID, data: PlanPatch) -> PlanOut:
+def update_plan(
+    actor: Actor, plan_id: uuid.UUID, data: PlanPatch, *, expected_version: int | None = None
+) -> PlanOut:
+    """Edit a draft. ``expected_version`` is the If-Match ``row_version`` (412 when stale); a
+    published plan answers 409 ``plan_published`` whatever the ETag."""
     with platform_session() as s, db_errors():
         row = repo.get(s, m.plans, plan_id, for_update=True)
         if row is None:
@@ -247,6 +251,8 @@ def update_plan(actor: Actor, plan_id: uuid.UUID, data: PlanPatch) -> PlanOut:
             raise Conflict(
                 "Published plans cannot change; create a new version.", code="plan_published"
             )
+        if expected_version is not None and row["row_version"] != expected_version:
+            raise PreconditionFailed()
         values = _plan_values(data)
         merged = {**dict(row), **values}
         if (merged["pricing_model"] == "per_student") != (
@@ -261,7 +267,14 @@ def update_plan(actor: Actor, plan_id: uuid.UUID, data: PlanPatch) -> PlanOut:
                     }
                 ]
             )
-        row = repo.update_row(s, m.plans, plan_id, values, bump_version=False)
+        # ``version`` is the catalogue version and never moves; the edit counter does.
+        row = repo.update_row(
+            s,
+            m.plans,
+            plan_id,
+            {**values, "row_version": m.plans.c.row_version + 1},
+            bump_version=False,
+        )
         audit_platform(s, actor, "plan.updated", "plan", plan_id, {"fields": sorted(values)})
         return PlanOut.model_validate(dict(row))
 

@@ -503,8 +503,10 @@ def list_plans(*, ctx: Annotated[Ctx, PlanRead], status: str | None = None) -> P
 
 
 @router.get("/plans/{plan_id}", response_model=PlanOut)
-def get_plan(*, plan_id: uuid.UUID, ctx: Annotated[Ctx, PlanRead]) -> PlanOut:
-    return billing.get_plan(plan_id)
+def get_plan(*, plan_id: uuid.UUID, response: Response, ctx: Annotated[Ctx, PlanRead]) -> PlanOut:
+    out = billing.get_plan(plan_id)
+    _etag(response, out.row_version)
+    return out
 
 
 @router.post("/plans", response_model=PlanOut, status_code=201)
@@ -540,9 +542,15 @@ def update_plan(
     *,
     plan_id: uuid.UUID,
     data: PlanPatch,
+    response: Response,
     ctx: Annotated[Ctx, Depends(require_platform("platform.plans.manage"))],
+    if_match: IfMatch = None,
 ) -> PlanOut:
-    return billing.update_plan(_actor(ctx), plan_id, data)
+    """Edit a draft plan. Optional If-Match with the ETag (``row_version``): 412
+    ``precondition_failed`` when stale; 409 ``plan_published`` once published."""
+    out = billing.update_plan(_actor(ctx), plan_id, data, expected_version=_version(if_match))
+    _etag(response, out.row_version)
+    return out
 
 
 @router.post("/plans/{plan_id}/publish", response_model=PlanOut)

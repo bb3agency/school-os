@@ -216,6 +216,9 @@ class PlanOut(Out):
     created_at: dt.datetime | None
     one_time_fee_inr: Decimal
     description: str | None
+    # Edit counter of the draft, sent as the ETag; PATCH takes it back in If-Match (412 when
+    # stale). Not the catalogue ``version`` above.
+    row_version: int
 
 
 class AiBundleOut(Out):
@@ -313,6 +316,10 @@ class SubscriptionOut(Out):
     current_period_start: dt.date
     current_period_end: dt.date
     price_override_inr: Decimal | None
+    # Operator-written reason for the negotiated price (docs/16 §5.3); never student data. Set
+    # exactly when ``price_override_inr`` is (DB check). Operators only: the school's own
+    # billing page uses its own schema.
+    override_reason: str | None
     past_due_since: dt.date | None
     grace_ends_on: dt.date | None
     cancel_at_period_end: bool

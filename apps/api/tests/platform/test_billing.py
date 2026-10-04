@@ -162,6 +162,48 @@ def test_FR_PLT_010_plans_are_versioned_and_frozen(api: Api, billing_admin: Oper
     )
 
 
+def test_FR_PLT_010_draft_edit_checks_the_row_version(api: Api, billing_admin: Operator) -> None:
+    """Owner decision 2026-10-04: PATCH a draft plan takes If-Match (optional, like every
+    platform edit); a stale ETag gets 412 and changes nothing. ``row_version`` is the edit
+    counter, separate from the catalogue ``version`` (code + version)."""
+    body = {"code": f"etag-{uuid.uuid4().hex[:8]}", "name": "Synthetic", "base_price_inr": "10.00"}
+    created = api.call("POST", "/plans", billing_admin, json=body)
+    plan = created.json()
+    assert (plan["version"], plan["row_version"]) == (1, 1)
+    path = f"/plans/{plan['id']}"
+    read = api.call("GET", path, billing_admin)
+    assert read.headers["ETag"] == '"1"'
+
+    first = api.call(
+        "PATCH", path, billing_admin, json={"name": "First"}, headers={"If-Match": '"1"'}
+    )
+    assert first.status_code == 200, first.text
+    assert (first.json()["row_version"], first.json()["version"]) == (2, 1)
+    assert first.headers["ETag"] == '"2"'
+
+    stale = api.call(
+        "PATCH", path, billing_admin, json={"name": "Stale"}, headers={"If-Match": '"1"'}
+    )
+    assert (stale.status_code, stale.json()["code"]) == (412, "precondition_failed")
+    assert api.call("GET", path, billing_admin).json()["name"] == "First"
+
+    weak = api.call(
+        "PATCH", path, billing_admin, json={"name": "Second"}, headers={"If-Match": 'W/"2"'}
+    )
+    assert weak.json()["row_version"] == 3
+    # Without If-Match the edit still applies (the house pattern) and the version still moves.
+    blind = api.call("PATCH", path, billing_admin, json={"name": "Third"})
+    assert (blind.status_code, blind.json()["row_version"]) == (200, 4)
+    bad = api.call("PATCH", path, billing_admin, json={"name": "X"}, headers={"If-Match": "abc"})
+    assert (bad.status_code, bad.json()["code"]) == (400, "bad_if_match")
+    # Publishing freezes the plan; a stale or current ETag cannot reopen it.
+    assert api.call("POST", f"{path}/publish", billing_admin).status_code == 200
+    frozen = api.call(
+        "PATCH", path, billing_admin, json={"name": "Late"}, headers={"If-Match": '"4"'}
+    )
+    assert (frozen.status_code, frozen.json()["code"]) == (409, "plan_published")
+
+
 # --- invoices ---------------------------------------------------------------------------------
 
 
@@ -532,6 +574,34 @@ def test_FR_PLT_011_trial_activate_and_extend(
     assert act.json()["status"] == "active"
     assert len(_drafts(sub)) == 1
     assert api.call("POST", f"/subscriptions/{sub}/activate", billing_admin).status_code == 409
+
+
+def test_FR_PLT_013_negotiated_price_returns_its_reason(
+    api: Api,
+    owner: Operator,
+    billing_admin: Operator,
+    make_operator: MakeOperator,
+    make_plan: Callable[..., uuid.UUID],
+) -> None:
+    """docs/16 §5.3: the subscription shows the negotiated price and its reason (operators)."""
+    sub = _school(api, owner, make_plan())["subscription_id"]
+    assert api.call("GET", f"/subscriptions/{sub}", billing_admin).json()["override_reason"] is None
+    reason = "Pilot school, price agreed in writing (ref SS/2026/3)"
+    res = api.call(
+        "PUT",
+        f"/subscriptions/{sub}/price-override",
+        billing_admin,
+        json={"price_override_inr": "3999.00", "reason": reason},
+    )
+    assert res.status_code == 200, res.text
+    assert (res.json()["price_override_inr"], res.json()["override_reason"]) == ("3999.00", reason)
+    viewer = make_operator("platform_viewer")
+    read = api.call("GET", f"/subscriptions/{sub}", viewer).json()
+    assert (read["price_override_inr"], read["override_reason"]) == ("3999.00", reason)
+    listed = api.call("GET", "/subscriptions", viewer).json()["data"]
+    assert next(row for row in listed if row["id"] == sub)["override_reason"] == reason
+    cleared = api.call("DELETE", f"/subscriptions/{sub}/price-override", billing_admin).json()
+    assert (cleared["price_override_inr"], cleared["override_reason"]) == (None, None)
 
 
 def test_FR_PLT_013_billing_account_gstin_validation_and_etag(

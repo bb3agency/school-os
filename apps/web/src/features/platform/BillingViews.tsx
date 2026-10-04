@@ -6,8 +6,10 @@ import {
   type AiBundle,
   type Plan,
   type PlanInput,
+  type PlanPatch,
   type Subscription,
 } from "@schoolos/api-client";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { z } from "zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
@@ -20,7 +22,7 @@ import { SelectField } from "@/components/ui/Select";
 import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { planTone, subscriptionTone } from "@/features/status";
-import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
+import { ApiError, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import type { FieldErrors } from "@/lib/forms";
 import { formatCount, formatDate, formatInr } from "@/lib/format";
 import {
@@ -29,10 +31,19 @@ import {
   optionalInt,
   optionalMoney,
   optionalText,
+  requiredInt,
   text,
 } from "@/lib/validation";
 import { Link } from "@/i18n/navigation";
-import { PK, readyOr, useAiBundles, useCan, usePlanDirectory, useSchoolDirectory } from "./data";
+import {
+  PK,
+  ifMatch,
+  readyOr,
+  useAiBundles,
+  useCan,
+  usePlanDirectory,
+  useSchoolDirectory,
+} from "./data";
 import { InvoiceTable } from "./InvoiceTable";
 import { FilterCard } from "./FilterCard";
 import { Mono, TierTag } from "./pills";
@@ -245,6 +256,163 @@ function PlanFields({ errors, base }: { errors: FieldErrors; base?: Plan | undef
   );
 }
 
+/**
+ * PATCH body for a draft plan (FR-PLT-010; `PlanPatch`). Only these fields can change on a
+ * draft; code, tier, billing period, pricing model, GST rate and SAC code are fixed once
+ * created (a new version changes them). Every editable field is sent: emptied optional
+ * fields go as null (no limit, no description), so what the form shows is what is saved.
+ * `row_version` comes from a hidden field filled when the dialog opened and goes in If-Match,
+ * so a change saved by someone else meanwhile answers 412 instead of being overwritten.
+ */
+function planPatchSchema(plan: Plan) {
+  const perStudent = plan.pricing_model === "per_student";
+  return z
+    .object({
+      row_version: requiredInt(1, 2_147_483_647),
+      name: text(100),
+      base_price_inr: money,
+      per_student_price_inr: perStudent ? money : z.undefined().optional(),
+      included_students: optionalInt(10_000_000),
+      trial_days: requiredInt(0, 365),
+      one_time_fee_inr: optionalMoney,
+      description: optionalText(300),
+      "limits.students": optionalInt(10_000_000),
+      "limits.staff_users": optionalInt(1_000_000),
+      "limits.storage_gb": optionalInt(1_000_000),
+      "limits.documents": optionalInt(100_000_000),
+      "limits.ai_tokens_month": optionalInt(1_000_000_000_000),
+      "limits.ai_budget_inr": optionalMoney,
+    })
+    .transform((value): { rowVersion: number; patch: PlanPatch } => ({
+      rowVersion: value.row_version,
+      patch: {
+        name: value.name,
+        base_price_inr: value.base_price_inr,
+        ...(perStudent ? { per_student_price_inr: value.per_student_price_inr ?? null } : {}),
+        included_students: value.included_students,
+        trial_days: value.trial_days,
+        // Null means "keep" on the API, so an emptied fee is sent as 0 (no fee).
+        one_time_fee_inr: value.one_time_fee_inr ?? "0",
+        description: value.description,
+        limits: {
+          students: value["limits.students"],
+          staff_users: value["limits.staff_users"],
+          storage_gb: value["limits.storage_gb"],
+          documents: value["limits.documents"],
+          ai_tokens_month: value["limits.ai_tokens_month"],
+          ai_budget_inr: value["limits.ai_budget_inr"],
+        },
+      },
+    }));
+}
+
+/** The editable fields of a draft, prefilled, with the fixed ones listed read-only. */
+function PlanEditFields({ errors, plan }: { errors: FieldErrors; plan: Plan }) {
+  const t = useTranslations("platform.plans");
+  const tmode = useTranslations("deploymentMode");
+  const fixed: Array<[string, string]> = [
+    [t("code"), plan.code],
+    [t("colTier"), tmode(plan.tier)],
+    [t("billingPeriod"), plan.billing_period === "annual" ? t("annual") : t("monthly")],
+    [t("pricingModel"), plan.pricing_model === "per_student" ? t("perStudent") : t("flat")],
+    [t("gstRate"), `${Number(plan.gst_rate)}%`],
+    [t("sacCode"), plan.sac_code],
+  ];
+  return (
+    <>
+      {/* Read once, when the dialog opens: a background reload must not move it (If-Match). */}
+      <input type="hidden" name="row_version" defaultValue={plan.row_version} />
+      <div className="space-y-2 rounded-lg border border-border bg-surface-muted p-3">
+        <p className="text-sm text-ink-muted">{t("fixedFieldsNote")}</p>
+        <dl className="grid grid-cols-label-value gap-x-6 gap-y-1 text-sm">
+          {fixed.map(([label, value]) => (
+            <div key={label} className="contents">
+              <dt className="text-ink-muted">{label}</dt>
+              <dd className="font-mono">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <TextField
+          name="name"
+          label={t("colName")}
+          error={errors.name}
+          defaultValue={plan.name}
+          required
+        />
+        <TextField
+          name="base_price_inr"
+          label={t("basePrice")}
+          hint={t("priceHint")}
+          inputMode="decimal"
+          error={errors.base_price_inr}
+          defaultValue={plan.base_price_inr}
+          required
+        />
+        {plan.pricing_model === "per_student" ? (
+          <TextField
+            name="per_student_price_inr"
+            label={t("perStudentPrice")}
+            inputMode="decimal"
+            error={errors.per_student_price_inr}
+            defaultValue={plan.per_student_price_inr ?? ""}
+            required
+          />
+        ) : null}
+        <TextField
+          name="included_students"
+          label={t("includedStudents")}
+          inputMode="numeric"
+          error={errors.included_students}
+          defaultValue={plan.included_students?.toString() ?? ""}
+        />
+        <TextField
+          name="trial_days"
+          label={t("trialDays")}
+          inputMode="numeric"
+          error={errors.trial_days}
+          defaultValue={plan.trial_days.toString()}
+          required
+        />
+        <TextField
+          name="one_time_fee_inr"
+          label={t("oneTimeFee")}
+          hint={t("oneTimeFeeHint")}
+          inputMode="decimal"
+          error={errors.one_time_fee_inr}
+          defaultValue={plan.one_time_fee_inr}
+        />
+      </div>
+      <TextAreaField
+        name="description"
+        label={t("planDescription")}
+        hint={t("planDescriptionHint")}
+        error={errors.description}
+        maxLength={300}
+        rows={2}
+        defaultValue={plan.description ?? ""}
+      />
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-semibold">{t("limitsTitle")}</legend>
+        <p className="text-sm text-ink-muted">{t("limitsHint")}</p>
+        <div className="grid gap-4 md:grid-cols-3">
+          {LIMIT_KEYS.map((key) => (
+            <TextField
+              key={key}
+              name={`limits.${key}`}
+              label={t(`limits.${key}`)}
+              inputMode={key === "ai_budget_inr" ? "decimal" : "numeric"}
+              error={errors[`limits.${key}`]}
+              defaultValue={limitOf(plan, key)}
+            />
+          ))}
+        </div>
+      </fieldset>
+    </>
+  );
+}
+
 /** FR-PLT-010..011 (docs/16 §5.6): versioned plans; a published plan never changes. */
 export function PlansScreen({ status = "" }: { status?: string }) {
   const t = useTranslations("platform.plans");
@@ -254,6 +422,7 @@ export function PlansScreen({ status = "" }: { status?: string }) {
   const locale = useLocale();
   const api = useBffClient("operator");
   const can = useCan();
+  const queryClient = useQueryClient();
   const manage = can("platform.plans.manage");
   const query = status ? { status } : {};
   const plans = useApiQuery(
@@ -376,6 +545,41 @@ export function PlansScreen({ status = "" }: { status?: string }) {
             header: tc("actions"),
             cell: (row: Plan) => (
               <div className="relative flex flex-wrap gap-2">
+                {row.status === "draft" ? (
+                  <ActionDialog
+                    triggerLabel={t("edit")}
+                    triggerSize="sm"
+                    triggerDescription={row.name}
+                    title={t("editTitle", { name: row.name, version: row.version })}
+                    description={t("editBody")}
+                    confirmLabel={t("saveChanges")}
+                    stepUp
+                    schema={planPatchSchema(row)}
+                    fieldMap={(field) => field}
+                    invalidate={[PK.plans]}
+                    submit={async ({ rowVersion, patch }) => {
+                      try {
+                        return await unwrap(
+                          api.PATCH("/api/v1/platform/plans/{plan_id}", {
+                            params: {
+                              path: { plan_id: row.id },
+                              header: { "If-Match": ifMatch(rowVersion) },
+                            },
+                            body: patch,
+                          }),
+                        );
+                      } catch (error) {
+                        // Stale (412): reload so the next Edit starts from the saved draft.
+                        if (error instanceof ApiError && error.status === 412) {
+                          await queryClient.invalidateQueries({ queryKey: PK.plans });
+                        }
+                        throw error;
+                      }
+                    }}
+                  >
+                    {(errors) => <PlanEditFields errors={errors} plan={row} />}
+                  </ActionDialog>
+                ) : null}
                 {row.status === "draft" ? (
                   <ActionDialog
                     triggerLabel={t("publish")}
@@ -559,6 +763,11 @@ export function SubscriptionsScreen({ status = "" }: { status?: string }) {
           {row.pending_plan_id ? (
             <span className="block text-xs text-ink-muted">
               {t("pendingPlanValue", { plan: planName(row.pending_plan_id) })}
+            </span>
+          ) : null}
+          {row.price_override_inr !== null ? (
+            <span className="block text-xs text-ink-muted">
+              {t("overrideValue", { amount: formatInr(row.price_override_inr, locale) ?? "" })}
             </span>
           ) : null}
           {feeOf(row.plan_id) ? (

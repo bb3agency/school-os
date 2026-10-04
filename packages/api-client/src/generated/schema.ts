@@ -3777,7 +3777,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Update Plan */
+        /**
+         * Update Plan
+         * @description Edit a draft plan. Optional If-Match with the ETag (``row_version``): 412
+         *     ``precondition_failed`` when stale; 409 ``plan_published`` once published.
+         */
         patch: operations["update_plan_api_v1_platform_plans__plan_id__patch"];
         trace?: never;
     };
@@ -10934,6 +10938,8 @@ export interface components {
             pricing_model: string;
             /** Published At */
             published_at: string | null;
+            /** Row Version */
+            row_version: number;
             /** Sac Code */
             sac_code: string;
             /**
@@ -12484,6 +12490,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Override Reason */
+            override_reason: string | null;
             /** Past Due Since */
             past_due_since: string | null;
             /** Pending Plan Id */
@@ -20308,7 +20316,9 @@ export interface operations {
     update_plan_api_v1_platform_plans__plan_id__patch: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "If-Match"?: string | null;
+            };
             path: {
                 plan_id: string;
             };

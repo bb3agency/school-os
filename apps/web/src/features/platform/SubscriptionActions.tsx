@@ -7,14 +7,34 @@ import { ActionDialog } from "@/components/ui/ActionDialog";
 import { TextAreaField, TextField } from "@/components/ui/Input";
 import { SelectField } from "@/components/ui/Select";
 import { unwrap, useBffClient } from "@/lib/bff/query";
-import { formatCount, formatInr } from "@/lib/format";
-import { localDateTime, reason, uuid } from "@/lib/validation";
-import { PK, planLabel, readyOr, useAiBundles, useCan, usePlanDirectory } from "./data";
+import { formatCount, formatDate, formatInr } from "@/lib/format";
+import { checkbox, localDateTime, money, reason, uuid } from "@/lib/validation";
+import {
+  PK,
+  planLabel,
+  readyOr,
+  useAiBundles,
+  useCan,
+  useOperatorMe,
+  usePlanDirectory,
+} from "./data";
 
 const reasonSchema = z.object({ reason });
 const changePlanSchema = z.object({ plan_id: uuid });
 const bundleSchema = z.object({ ai_bundle_id: uuid });
 const extendSchema = z.object({ trial_ends_at: localDateTime });
+/**
+ * Negotiated price (FR-PLT-013, docs/16 §5.7): rupees before GST for each billing period, two
+ * decimals at most, zero or more (₹0 is allowed, e.g. a free pilot: owner decision
+ * 2026-10-04; `money` refuses a minus sign). It replaces the plan's base price on invoices
+ * made from now on; the reason (10–500 characters) is required with it, as on the API.
+ */
+const overrideSchema = z.object({ price_override_inr: money, reason });
+/**
+ * Billing suspension (FR-PLT-014, docs/16 §9): past-due only, after the grace period, with a
+ * reason; inside a protected board-exam window only a platform owner may approve it.
+ */
+const suspendSchema = z.object({ reason, exam_window_override: checkbox });
 const INVALIDATE = [PK.subscriptions, PK.tenants, PK.dashboard] as const;
 
 /**
@@ -37,6 +57,8 @@ export function SubscriptionActions({
   const { plans } = usePlanDirectory();
   const bundles = readyOr(useAiBundles(), []);
   const locale = useLocale();
+  // Only a platform owner can approve a suspension inside a board-exam window (§9.3).
+  const owner = useOperatorMe()?.roles.includes("platform_owner") ?? false;
   if (!can("platform.subscriptions.manage")) return null;
 
   const path = { sub_id: subscription.id };
@@ -200,12 +222,122 @@ export function SubscriptionActions({
           }
         />
       ) : null}
+      {status !== "cancelled" ? (
+        <ActionDialog
+          triggerLabel={
+            subscription.price_override_inr === null ? t("setOverride") : t("changeOverride")
+          }
+          triggerSize="sm"
+          triggerDescription={label}
+          title={t("setOverrideTitle")}
+          description={t("overrideBody")}
+          confirmLabel={t("setOverride")}
+          consequence={t("overrideConsequence")}
+          stepUp
+          schema={overrideSchema}
+          invalidate={INVALIDATE}
+          submit={(data) =>
+            unwrap(
+              api.PUT("/api/v1/platform/subscriptions/{sub_id}/price-override", {
+                params: { path },
+                body: data,
+              }),
+            )
+          }
+        >
+          {(errors) => (
+            <>
+              <TextField
+                name="price_override_inr"
+                label={t("overrideAmount")}
+                hint={t("overrideAmountHint")}
+                inputMode="decimal"
+                error={errors.price_override_inr}
+                defaultValue={subscription.price_override_inr ?? ""}
+                required
+              />
+              <ReasonField error={errors.reason} />
+            </>
+          )}
+        </ActionDialog>
+      ) : null}
+      {status !== "cancelled" && subscription.price_override_inr !== null ? (
+        <ActionDialog
+          triggerLabel={t("removeOverride")}
+          triggerVariant="ghost"
+          triggerSize="sm"
+          triggerDescription={label}
+          title={t("removeOverrideTitle")}
+          description={t("removeOverrideBody")}
+          confirmLabel={t("removeOverride")}
+          confirmVariant="danger"
+          stepUp
+          schema={z.object({})}
+          invalidate={INVALIDATE}
+          submit={() =>
+            unwrap(
+              api.DELETE("/api/v1/platform/subscriptions/{sub_id}/price-override", {
+                params: { path },
+              }),
+            )
+          }
+        />
+      ) : null}
+      {status === "past_due" ? (
+        <ActionDialog
+          triggerLabel={t("suspend")}
+          triggerVariant="danger"
+          triggerSize="sm"
+          triggerDescription={label}
+          title={t("suspendTitle")}
+          description={t("suspendBody", {
+            date: formatDate(subscription.grace_ends_on) ?? "",
+          })}
+          confirmLabel={t("suspend")}
+          confirmVariant="danger"
+          consequence={
+            current?.tier === "dedicated"
+              ? t("suspendDedicatedConsequence")
+              : current?.tier === "shared"
+                ? t("suspendSharedConsequence")
+                : t("suspendUnknownConsequence")
+          }
+          stepUp
+          schema={suspendSchema}
+          invalidate={INVALIDATE}
+          submit={(data) =>
+            unwrap(
+              api.POST("/api/v1/platform/subscriptions/{sub_id}/suspend", {
+                params: { path },
+                body: data,
+              }),
+            )
+          }
+        >
+          {(errors) => (
+            <>
+              <ReasonField error={errors.reason} />
+              {owner ? (
+                <label className="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    name="exam_window_override"
+                    className="mt-1 size-4 accent-primary"
+                  />
+                  {t("examWindowOverride")}
+                </label>
+              ) : null}
+            </>
+          )}
+        </ActionDialog>
+      ) : null}
       {status === "suspended" ? (
         <ActionDialog
           triggerLabel={t("reactivate")}
           triggerSize="sm"
           triggerDescription={label}
           title={t("reactivateTitle")}
+          description={t("reactivateBody")}
           confirmLabel={t("reactivate")}
           stepUp
           schema={z.object({})}

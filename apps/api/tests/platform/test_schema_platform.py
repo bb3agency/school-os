@@ -262,6 +262,26 @@ def test_FR_PLT_010_published_plan_prices_cannot_change(engines: None) -> None:
         s.execute(text("DELETE FROM platform.plans WHERE id = :p"), {"p": pid})
 
 
+def test_FR_PLT_010_plan_row_version_defaults_to_1_and_freezes_with_the_plan(
+    engines: None,
+) -> None:
+    """0043_plan_row_version: the edit counter starts at 1, stays >= 1, and the freeze trigger
+    keeps it fixed once the plan is published."""
+    operator = _operator()
+    draft = _plan(operator, status="draft")
+    with platform_session() as s:
+        row_version: int = s.execute(
+            text("SELECT row_version FROM platform.plans WHERE id = :p"), {"p": draft}
+        ).scalar_one()
+        assert row_version == 1
+        s.execute(text("UPDATE platform.plans SET row_version = 2 WHERE id = :p"), {"p": draft})
+    with pytest.raises(IntegrityError, match="plans_row_version"), platform_session() as s:
+        s.execute(text("UPDATE platform.plans SET row_version = 0 WHERE id = :p"), {"p": draft})
+    published = _plan(operator)
+    with pytest.raises(DBAPIError, match="immutable"), platform_session() as s:
+        s.execute(text("UPDATE platform.plans SET row_version = 2 WHERE id = :p"), {"p": published})
+
+
 def _issue_raw(invoice: uuid.UUID, number: str, fy: str = "2090-91", seq: int = 1) -> None:
     with platform_session() as s:
         s.execute(

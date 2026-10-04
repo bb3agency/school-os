@@ -534,6 +534,12 @@ function SubscriptionTab({ school }: { school: TenantDetail }) {
         <dd>
           <Value>{formatInr(sub.price_override_inr, locale)}</Value>
         </dd>
+        {sub.override_reason ? (
+          <>
+            <dt className="text-ink-muted">{t("overrideReason")}</dt>
+            <dd className="max-w-prose break-words">{sub.override_reason}</dd>
+          </>
+        ) : null}
       </dl>
       <SubscriptionActions subscription={sub} label={school.school_name} />
     </div>

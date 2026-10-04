@@ -241,6 +241,7 @@ def test_PRV_016_downgrade_refuses_while_redacted_pages_exist_and_round_trips_ot
         "0040_contextual_retrieval",
         "0041_billing_catalogue",
         "0042_apaar_id",
+        "0043_plan_row_version",
     }
     with pytest.raises(DBAPIError, match="irreversible: redacted register pages exist"):
         command.downgrade(cfg, "0017_exports")
