@@ -2534,8 +2534,6 @@
         "skipped": "Skipped",
         "reverted": "Undone"
       },
-      "errorPrefix": "Error:",
-      "warningPrefix": "Warning:",
       "sensitive": "{count, plural, one {Has # restricted value (hidden)} other {Has # restricted values (hidden)}}",
       "filter": "Show",
       "filters": {
@@ -4142,10 +4140,8 @@
     },
     "list": {
       "colTitle": "Title",
-      "colType": "Type",
       "colStatus": "Status",
       "colVersion": "Version",
-      "colSensitivity": "Kind of content",
       "colVisibility": "Who can see it",
       "colUpdated": "Last changed",
       "noVersion": "No file yet",
@@ -4195,11 +4191,7 @@
       "colVersion": "Version",
       "latest": "(newest)",
       "colStatus": "Status",
-      "colKind": "File type",
       "otherKind": "Other",
-      "colSize": "Size",
-      "colUploaded": "Uploaded on",
-      "colOpen": "Open",
       "downloadShort": "Download",
       "downloadVersion": "Download version {version}",
       "cannotOpen": "Cannot be opened",
@@ -5072,7 +5064,6 @@
     "cta": {
       "signIn": "Sign in",
       "talk": "Talk to us",
-      "talkEmail": "Talk to us by email",
       "learnMore": "Learn more",
       "existing": "Already using SchoolOS? Sign in with your school account.",
       "whatsapp": "Ask on WhatsApp",
@@ -6167,6 +6158,8 @@
       "chooseOwner": "Choose a person",
       "taskTitle": "Task",
       "dueOn": "Due date",
+      "dueHint": "Use {format}, for example {example}.",
+      "dueInvalid": "Enter a real date as {format}, for example {example}.",
       "confirm": "Confirm as task",
       "dismiss": "Dismiss",
       "openTasks": "See it in Tasks",
@@ -6282,6 +6275,8 @@
       "owner": "Owner",
       "chooseOwner": "Choose a person",
       "dueOn": "Due date",
+      "dueHint": "Use {format}, for example {example}.",
+      "dueInvalid": "Enter a real date as {format}, for example {example}.",
       "details": "Details (optional)",
       "submit": "Add task",
       "saved": "Task added."
