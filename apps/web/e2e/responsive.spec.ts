@@ -326,7 +326,7 @@ test.describe("invoice payments: 'Reverse payment' dialog (FR-PLT-018, NFR-A11Y-
       await expectNoAxeViolations(page, `reverse dialog ${width}`);
 
       // Tab reaches the reason, then the confirm button, without leaving the dialog.
-      const reasonField = dialog.getByRole("textbox", { name: /Reason/ });
+      const reasonField = dialog.getByRole("textbox", { name: "Why are you reversing it?" });
       const confirm = dialog.getByRole("button", { name: "Reverse payment" });
       for (
         let i = 0;

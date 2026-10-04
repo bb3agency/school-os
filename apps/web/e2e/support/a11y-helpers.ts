@@ -14,6 +14,11 @@ export const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
  * left running: they never finish.
  */
 export async function settleAnimations(page: Page) {
+  // Data still loading: its content fades in once it arrives, so wait for the skeletons
+  // (LoadingState) to go first. A screen that keeps one is measured as it is.
+  await page
+    .waitForFunction(() => !document.querySelector(".skeleton"), undefined, { timeout: 10_000 })
+    .catch(() => undefined);
   await page.evaluate(() =>
     Promise.all(
       document

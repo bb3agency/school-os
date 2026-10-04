@@ -61,6 +61,7 @@ beforeEach(() => {
   );
 });
 afterEach(() => {
+  cleanup();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
@@ -109,16 +110,26 @@ function localePrefixed(root: HTMLElement): string[] {
   return found;
 }
 
+/**
+ * One test per page: importing and rendering ~90 pages took one long test (about 10 s alone,
+ * minutes on a loaded machine where the 120 s budget ran out). Each page now has its own
+ * budget and names itself when it fails; the last test checks the scan's coverage. Tests in
+ * a file run in order, so run the whole file (a `-t` filter leaves the coverage test short).
+ */
+const PATHS = Object.keys(modules).sort();
+const scanned: string[] = [];
+let links = 0;
+
 describe("English only while Telugu is switched off (ADR-0036)", () => {
-  it("no page under app/[locale] shows Telugu, a Telugu field or a language switch", async () => {
-    const paths = Object.keys(modules).sort();
-    expect(paths.length).toBeGreaterThan(60);
-    const scanned: string[] = [];
-    const failures: Record<string, string[]> = {};
-    let links = 0;
-    for (const path of paths) {
+  it("finds the pages under app/[locale]", () => {
+    expect(PATHS.length).toBeGreaterThan(60);
+  });
+
+  it.each(PATHS)(
+    "%s shows no Telugu, Telugu field, language switch or locale in a URL",
+    async (path) => {
       const page = await element(path);
-      if (!page) continue;
+      if (!page) return;
       const shell = path.includes("/platform/") ? (
         <PlatformShell permissions={null}>{page}</PlatformShell>
       ) : (
@@ -131,14 +142,15 @@ describe("English only while Telugu is switched off (ADR-0036)", () => {
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
-      const found = [...offenders(container), ...localePrefixed(container)];
-      if (found.length > 0) failures[path] = found;
+      expect([...offenders(container), ...localePrefixed(container)]).toEqual([]);
       links += container.querySelectorAll("a[href^='/']").length;
       expect(container.querySelector("nav[aria-label='Language']"), path).toBeNull();
       scanned.push(path);
-      cleanup();
-    }
-    expect(failures).toEqual({});
+    },
+    60_000,
+  );
+
+  it("the scan covered the pages and their links", () => {
     // The scan really looked at in-app links (none may name a locale).
     expect(links).toBeGreaterThan(50);
     // Most pages render without a session; pinned so a broken import cannot empty the scan.
@@ -151,7 +163,7 @@ describe("English only while Telugu is switched off (ADR-0036)", () => {
         ),
       ),
     );
-  }, 120_000);
+  });
 
   it("the scan finds Telugu when it is switched on (the check itself works)", async () => {
     const page = await element("./[locale]/welcome/page.tsx");
