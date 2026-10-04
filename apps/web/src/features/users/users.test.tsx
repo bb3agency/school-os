@@ -468,6 +468,77 @@ describe("user detail (US-102 AC2, FR-IAM-012..014)", () => {
     expect(await screen.findByRole("button", { name: "Give access back" })).toBeInTheDocument();
   });
 
+  it("sends the invitation email again for an invited person (POST /users/{id}/invitation-email)", async () => {
+    setMe([MANAGE, READ_BASIC]);
+    serveUser(user({ status: "invited" }));
+    const RESEND = `POST /bff/api/v1/users/${USER}/invitation-email`;
+    stub.routes[RESEND] = () =>
+      Response.json(
+        {
+          user_id: USER,
+          membership_id: "0192f3a4-0000-7000-8000-0000000000e1",
+          status: "queued",
+          expires_at: "2026-10-11T04:30:00Z",
+        },
+        { status: 202 },
+      );
+    renderWithIntl(<UserDetailScreen userId={USER} />);
+    await userEvent.click(
+      await screen.findByRole("button", { name: detailCopy.resend.button }),
+    );
+    const dialog = screen.getByRole("dialog", { name: detailCopy.resend.title });
+    expect(within(dialog).getByText("lakshmi@school.example", { exact: false })).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: detailCopy.resend.button }));
+    expect(await within(dialog).findByText(detailCopy.resend.sentTitle)).toBeInTheDocument();
+    expect(stub.callsTo(RESEND)).toHaveLength(1);
+    expect(stub.callsTo(RESEND)[0]?.body ?? "").toBe("");
+  });
+
+  it("explains why the invitation email can't be sent (409 email_disabled, 429)", async () => {
+    setMe([MANAGE, READ_BASIC]);
+    serveUser(user({ status: "invited" }));
+    const RESEND = `POST /bff/api/v1/users/${USER}/invitation-email`;
+    let attempts = 0;
+    stub.routes[RESEND] = () => {
+      attempts += 1;
+      return attempts === 1 ? problem(409, "email_disabled") : problem(429, "rate_limited");
+    };
+    renderWithIntl(<UserDetailScreen userId={USER} />);
+    await userEvent.click(
+      await screen.findByRole("button", { name: detailCopy.resend.button }),
+    );
+    const dialog = screen.getByRole("dialog", { name: detailCopy.resend.title });
+    const send = within(dialog).getByRole("button", { name: detailCopy.resend.button });
+    await userEvent.click(send);
+    expect(
+      await within(dialog).findByText(messages.en.school.users.errors.email_disabled.title),
+    ).toBeInTheDocument();
+    await userEvent.click(send);
+    expect(
+      await within(dialog).findByText(messages.en.school.users.errors.rate_limited.title),
+    ).toBeInTheDocument();
+  });
+
+  it("offers no resend without an email address, for an active person or without user.manage", async () => {
+    setMe([MANAGE, READ_BASIC]);
+    serveUser(user({ status: "invited", email: null }));
+    const first = renderWithIntl(<UserDetailScreen userId={USER} />);
+    expect(await screen.findByText("Waiting for them to sign in")).toBeInTheDocument();
+    expect(screen.getByText(detailCopy.resend.noEmail)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: detailCopy.resend.button })).toBeNull();
+    first.unmount();
+    serveUser(user({ status: "active" }));
+    const second = renderWithIntl(<UserDetailScreen userId={USER} />);
+    expect(await screen.findByRole("button", { name: "Suspend" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: detailCopy.resend.button })).toBeNull();
+    second.unmount();
+    setMe([READ_BASIC]);
+    serveUser(user({ status: "invited" }));
+    renderWithIntl(<UserDetailScreen userId={USER} />);
+    expect(await screen.findByText("Waiting for them to sign in")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: detailCopy.resend.button })).toBeNull();
+  });
+
   it("a removed person has no actions and no role or class controls", async () => {
     setMe([MANAGE, ASSIGN, READ_BASIC], ["owner"]);
     serveUser(user({ status: "removed" }));

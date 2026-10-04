@@ -114,6 +114,46 @@ function StatusActions({ user }: { user: StaffUser }) {
   );
 }
 
+/**
+ * Send the invitation email again to someone who has not signed in yet
+ * (POST /users/{id}/invitation-email; `user.manage`, step-up, 202). The API refuses with 409
+ * when email is off, the invitation expired or ended, or there is no address, and with 429
+ * within 10 minutes of the last one; each is explained in plain words.
+ */
+function ResendInvitation({ user }: { user: StaffUser & { email: string } }) {
+  const t = useTranslations("school.users.detail.resend");
+  const tc = useTranslations("common");
+  const api = useBffClient("staff");
+  return (
+    <ActionDialog
+      triggerLabel={t("button")}
+      title={t("title")}
+      description={t("body", { email: user.email })}
+      confirmLabel={t("button")}
+      stepUp
+      schema={z.object({})}
+      errorNamespace="school.users"
+      submit={() =>
+        unwrap(
+          api.POST("/api/v1/users/{user_id}/invitation-email", {
+            params: { path: { user_id: user.id } },
+          }),
+        )
+      }
+      renderResult={(result, close) => (
+        <>
+          <Alert tone="success" live title={t("sentTitle")}>
+            {t("sentBody", { date: formatDateTime(result.expires_at) })}
+          </Alert>
+          <div className="flex justify-end">
+            <Button onClick={close}>{tc("done")}</Button>
+          </div>
+        </>
+      )}
+    />
+  );
+}
+
 /* ------------------------------------------------------------------ profile */
 
 /** Client checks mirroring `UserUpdateIn` (display name 1–200, email ≤ 254 or empty). */
@@ -419,7 +459,13 @@ export function UserDetailScreen({ userId }: { userId: string }) {
       ) : null}
       {user.status === "invited" ? (
         <Alert tone="info" title={td("invitedTitle")}>
-          {td("invitedBody")}
+          <p>{td("invitedBody")}</p>
+          {canManage && user.email ? (
+            <div className="mt-3">
+              <ResendInvitation user={{ ...user, email: user.email }} />
+            </div>
+          ) : null}
+          {canManage && !user.email ? <p className="mt-2">{td("resend.noEmail")}</p> : null}
         </Alert>
       ) : null}
       {removed ? (
