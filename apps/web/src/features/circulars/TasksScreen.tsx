@@ -17,6 +17,7 @@ import { Value } from "@/components/ui/Value";
 import { Link } from "@/i18n/navigation";
 import { newIdempotencyKey, unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
+import { useDateInput } from "@/lib/date-format";
 import { formatDate } from "@/lib/format";
 import { zodErrorKeys } from "@/lib/forms";
 import { translateOr } from "@/lib/i18n-dynamic";
@@ -112,13 +113,17 @@ function RowActions({
   );
 }
 
-/** Add a task by hand (task.manage): title, owner, due date, details. */
+/**
+ * Add a task by hand (task.manage): title, owner, due date, details. The due date is typed in
+ * the school's format, as in the edit dialog, and sent as `YYYY-MM-DD`.
+ */
 function NewTaskCard() {
   const t = useTranslations("tasks.new");
   const tv = useTranslations("validation");
   const api = useBffClient("staff");
   const queryClient = useQueryClient();
   const assignees = useAssignees(true);
+  const dates = useDateInput();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<unknown>(undefined);
   const [saved, setSaved] = useState(false);
@@ -158,6 +163,7 @@ function NewTaskCard() {
   const fieldError = (name: string) =>
     errors[name] ? translateOr(tv, errors[name] ?? "invalid", "invalid") : undefined;
   const options = assignees.status === "ready" ? assignees.data : [];
+  const hint = dates.hint(todayIst());
 
   return (
     <Card title={t("title")} description={t("description")}>
@@ -177,7 +183,15 @@ function NewTaskCard() {
             error={fieldError("owner_membership_id")}
             options={options.map((a) => ({ value: a.membership_id, label: a.display_name }))}
           />
-          <TextField name="due_on" type="date" label={t("dueOn")} error={fieldError("due_on")} />
+          <TextField
+            name="due_on"
+            label={t("dueOn")}
+            hint={t("dueHint", hint)}
+            inputMode="numeric"
+            autoComplete="off"
+            placeholder={dates.placeholder}
+            error={errors.due_on ? t("dueInvalid", hint) : undefined}
+          />
         </div>
         <TextAreaField
           name="details"
