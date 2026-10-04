@@ -9,6 +9,7 @@ import {
   type PlanPatch,
   type Subscription,
 } from "@schoolos/api-client";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { z } from "zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
@@ -21,7 +22,7 @@ import { SelectField } from "@/components/ui/Select";
 import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { planTone, subscriptionTone } from "@/features/status";
-import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
+import { ApiError, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import type { FieldErrors } from "@/lib/forms";
 import { formatCount, formatDate, formatInr } from "@/lib/format";
 import {
@@ -34,7 +35,15 @@ import {
   text,
 } from "@/lib/validation";
 import { Link } from "@/i18n/navigation";
-import { PK, readyOr, useAiBundles, useCan, usePlanDirectory, useSchoolDirectory } from "./data";
+import {
+  PK,
+  ifMatch,
+  readyOr,
+  useAiBundles,
+  useCan,
+  usePlanDirectory,
+  useSchoolDirectory,
+} from "./data";
 import { InvoiceTable } from "./InvoiceTable";
 import { FilterCard } from "./FilterCard";
 import { Mono, TierTag } from "./pills";
@@ -252,11 +261,14 @@ function PlanFields({ errors, base }: { errors: FieldErrors; base?: Plan | undef
  * draft; code, tier, billing period, pricing model, GST rate and SAC code are fixed once
  * created (a new version changes them). Every editable field is sent: emptied optional
  * fields go as null (no limit, no description), so what the form shows is what is saved.
+ * `row_version` comes from a hidden field filled when the dialog opened and goes in If-Match,
+ * so a change saved by someone else meanwhile answers 412 instead of being overwritten.
  */
 function planPatchSchema(plan: Plan) {
   const perStudent = plan.pricing_model === "per_student";
   return z
     .object({
+      row_version: requiredInt(1, 2_147_483_647),
       name: text(100),
       base_price_inr: money,
       per_student_price_inr: perStudent ? money : z.undefined().optional(),
@@ -271,22 +283,25 @@ function planPatchSchema(plan: Plan) {
       "limits.ai_tokens_month": optionalInt(1_000_000_000_000),
       "limits.ai_budget_inr": optionalMoney,
     })
-    .transform((value): PlanPatch => ({
-      name: value.name,
-      base_price_inr: value.base_price_inr,
-      ...(perStudent ? { per_student_price_inr: value.per_student_price_inr ?? null } : {}),
-      included_students: value.included_students,
-      trial_days: value.trial_days,
-      // Null means "keep" on the API, so an emptied fee is sent as 0 (no fee).
-      one_time_fee_inr: value.one_time_fee_inr ?? "0",
-      description: value.description,
-      limits: {
-        students: value["limits.students"],
-        staff_users: value["limits.staff_users"],
-        storage_gb: value["limits.storage_gb"],
-        documents: value["limits.documents"],
-        ai_tokens_month: value["limits.ai_tokens_month"],
-        ai_budget_inr: value["limits.ai_budget_inr"],
+    .transform((value): { rowVersion: number; patch: PlanPatch } => ({
+      rowVersion: value.row_version,
+      patch: {
+        name: value.name,
+        base_price_inr: value.base_price_inr,
+        ...(perStudent ? { per_student_price_inr: value.per_student_price_inr ?? null } : {}),
+        included_students: value.included_students,
+        trial_days: value.trial_days,
+        // Null means "keep" on the API, so an emptied fee is sent as 0 (no fee).
+        one_time_fee_inr: value.one_time_fee_inr ?? "0",
+        description: value.description,
+        limits: {
+          students: value["limits.students"],
+          staff_users: value["limits.staff_users"],
+          storage_gb: value["limits.storage_gb"],
+          documents: value["limits.documents"],
+          ai_tokens_month: value["limits.ai_tokens_month"],
+          ai_budget_inr: value["limits.ai_budget_inr"],
+        },
       },
     }));
 }
@@ -305,6 +320,8 @@ function PlanEditFields({ errors, plan }: { errors: FieldErrors; plan: Plan }) {
   ];
   return (
     <>
+      {/* Read once, when the dialog opens: a background reload must not move it (If-Match). */}
+      <input type="hidden" name="row_version" defaultValue={plan.row_version} />
       <div className="space-y-2 rounded-lg border border-border bg-surface-muted p-3">
         <p className="text-sm text-ink-muted">{t("fixedFieldsNote")}</p>
         <dl className="grid grid-cols-label-value gap-x-6 gap-y-1 text-sm">
@@ -405,6 +422,7 @@ export function PlansScreen({ status = "" }: { status?: string }) {
   const locale = useLocale();
   const api = useBffClient("operator");
   const can = useCan();
+  const queryClient = useQueryClient();
   const manage = can("platform.plans.manage");
   const query = status ? { status } : {};
   const plans = useApiQuery(
@@ -539,14 +557,25 @@ export function PlansScreen({ status = "" }: { status?: string }) {
                     schema={planPatchSchema(row)}
                     fieldMap={(field) => field}
                     invalidate={[PK.plans]}
-                    submit={(data) =>
-                      unwrap(
-                        api.PATCH("/api/v1/platform/plans/{plan_id}", {
-                          params: { path: { plan_id: row.id } },
-                          body: data,
-                        }),
-                      )
-                    }
+                    submit={async ({ rowVersion, patch }) => {
+                      try {
+                        return await unwrap(
+                          api.PATCH("/api/v1/platform/plans/{plan_id}", {
+                            params: {
+                              path: { plan_id: row.id },
+                              header: { "If-Match": ifMatch(rowVersion) },
+                            },
+                            body: patch,
+                          }),
+                        );
+                      } catch (error) {
+                        // Stale (412): reload so the next Edit starts from the saved draft.
+                        if (error instanceof ApiError && error.status === 412) {
+                          await queryClient.invalidateQueries({ queryKey: PK.plans });
+                        }
+                        throw error;
+                      }
+                    }}
                   >
                     {(errors) => <PlanEditFields errors={errors} plan={row} />}
                   </ActionDialog>

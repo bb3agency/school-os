@@ -65,6 +65,7 @@ const PLAN = (id: string, code: string, status: string, version = 1, extra = {})
   created_at: "2026-06-01T00:00:00Z",
   one_time_fee_inr: "15000.00",
   description: "Synthetic plan wording.",
+  row_version: 3,
   ...extra,
 });
 
@@ -206,8 +207,9 @@ describe("edit a draft plan (FR-PLT-010, docs/16 §5.6)", () => {
     await waitFor(() => expect(dialog).not.toHaveAttribute("open"));
     const [call] = stub.callsTo(PATCH_DRAFT);
     expect(call?.headers.get("x-csrf-token")).toBe(CSRF);
-    // The route takes neither If-Match nor Idempotency-Key.
-    expect(call?.headers.get("if-match")).toBeNull();
+    // If-Match carries the draft's edit counter (row_version), not the catalogue version;
+    // the route takes no Idempotency-Key.
+    expect(call?.headers.get("if-match")).toBe('"3"');
     expect(call?.headers.get("idempotency-key")).toBeNull();
     expect(bodyOf(PATCH_DRAFT)).toEqual({
       name: "Premium 2027",
@@ -289,6 +291,39 @@ describe("edit a draft plan (FR-PLT-010, docs/16 §5.6)", () => {
     const price = within(dialog).getByLabelText(pm.plans.basePrice);
     await waitFor(() => expect(price).toHaveAttribute("aria-invalid", "true"));
     expect(price).toHaveAccessibleDescription(`${pm.plans.priceHint} ${em.field.invalid}`);
+  });
+
+  it("412 stale: says someone changed it first, reloads the plan, and a reopened form is current", async () => {
+    let name = "Premium";
+    let rowVersion = 3;
+    stub.routes["GET /bff/api/v1/platform/plans"] = () =>
+      page([PLAN(DRAFT_ID, "premium", "draft", 2, { name, row_version: rowVersion })]);
+    stub.routes[PATCH_DRAFT] = () => problem(412, "precondition_failed");
+    const { user, dialog } = await openEdit();
+    // Meanwhile another operator renamed the draft.
+    name = "Premium (renamed)";
+    rowVersion = 4;
+    const before = stub.callsTo("GET /bff/api/v1/platform/plans").length;
+    await user.click(within(dialog).getByRole("button", { name: pm.plans.saveChanges }));
+    expect(await within(dialog).findByText(em.api.precondition_failed.title)).toBeVisible();
+    expect(within(dialog).getByText(em.api.precondition_failed.body)).toBeVisible();
+    await waitFor(() =>
+      expect(stub.callsTo("GET /bff/api/v1/platform/plans").length).toBeGreaterThan(before),
+    );
+    // Close and edit again: the form shows the other operator's change and its version.
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(dialog).not.toHaveAttribute("open"));
+    const row = await screen.findByRole("row", { name: /Premium \(renamed\)/ });
+    stub.routes[PATCH_DRAFT] = () =>
+      Response.json(PLAN(DRAFT_ID, "premium", "draft", 2, { name, row_version: 5 }));
+    await user.click(within(row).getByRole("button", { name: pm.plans.edit }));
+    const again = screen.getByRole("dialog", {
+      name: pm.plans.editTitle.replace("{name}", name).replace("{version}", "2"),
+    });
+    expect(within(again).getByLabelText(pm.plans.colName)).toHaveValue(name);
+    await user.click(within(again).getByRole("button", { name: pm.plans.saveChanges }));
+    await waitFor(() => expect(stub.callsTo(PATCH_DRAFT)).toHaveLength(2));
+    expect(stub.callsTo(PATCH_DRAFT)[1]?.headers.get("if-match")).toBe('"4"');
   });
 
   it("403 says the role is missing", async () => {
