@@ -66,8 +66,11 @@ describe("bell polling (FR-NOT-001)", () => {
     expect(notificationHref({ resource_type: "tally_device", resource_id: id })).toBe(
       "/settings/tally",
     );
-    // announcement.new stays unlinked (owner decision: the banner shows it).
+    // A resource type with no school screen stays unlinked. Announcements are banner-only and
+    // send no notification (owner decision 2026-10-04), so "announcement" is unknown too.
     expect(notificationHref({ resource_type: "announcement", resource_id: id })).toBeNull();
+    expect(notificationHref({ resource_type: "not_a_screen", resource_id: id })).toBeNull();
+    expect(notificationHref({ resource_type: null, resource_id: id })).toBeNull();
     expect(notificationHref({ resource_type: "change_request", resource_id: "../x" })).toBeNull();
     expect(notificationHref({ resource_type: "export", resource_id: "../x" })).toBeNull();
   });
@@ -203,10 +206,11 @@ describe("notifications page (FR-NOT-001)", () => {
         }),
         notification({
           id: "0192f3a4-0000-7000-8000-00000000c0e3",
-          template_key: "announcement.new",
-          resource_type: "announcement",
+          // A resource type this web build has no screen for (e.g. sent by a newer API).
+          template_key: "future.thing",
+          resource_type: "future_thing",
           resource_id: "0192f3a4-0000-7000-8000-00000000a001",
-          title: "New message from SchoolOS",
+          title: "Something new",
         }),
       ]);
     renderWithIntl(<NotificationsScreen />);
@@ -220,10 +224,9 @@ describe("notifications page (FR-NOT-001)", () => {
       "href",
       expect.stringContaining("/documents/0192f3a4-0000-7000-8000-00000000d001"),
     );
-    // Announcements have no school screen: no link, a plain "mark as read" button instead.
-    expect(
-      screen.getByRole("button", { name: "Mark as read: New message from SchoolOS" }),
-    ).toBeInTheDocument();
+    // A resource type with no screen: no link, a plain "mark as read" button instead.
+    expect(screen.getByRole("button", { name: "Mark as read: Something new" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Something new/ })).toBeNull();
     await userEvent.click(screen.getByRole("radio", { name: "Unread" }));
     await waitFor(() =>
       expect(

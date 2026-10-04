@@ -1098,6 +1098,7 @@ After offboarding approval (§5.5): final export delivered → data deleted → 
 - **Delivery to shared-tier schools:** the `sos_app` role cannot read `platform.announcements`. A platform job (`announcements.publish`, every minute and on every change) writes the currently active announcements (no personal data) to a Valkey key; `GET /api/v1/announcements` in the school app reads that key and filters by the school's tier and ID.
 - **Delivery to dedicated hosts:** included in the heartbeat response (§12.4) and cached on the host.
 - The school app shows them as a dismissible banner (critical: not dismissible until it ends) in the user's language.
+- **Banner only** (owner decision 2026-10-04): an announcement creates no school notification (no bell item, no email). The control plane never writes school notifications (ADR-0020), so the `announcement.new` notification template, which nothing sent, was removed.
 - Cancelling removes it from the next publish (within one minute on shared; next heartbeat on dedicated).
 
 ## 15. Support tickets
