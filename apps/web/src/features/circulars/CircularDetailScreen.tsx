@@ -17,6 +17,7 @@ import { useTeluguEnabled } from "@/i18n/LanguagesProvider";
 import { Link, useRouter } from "@/i18n/navigation";
 import { newIdempotencyKey, unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan } from "@/lib/bff/staff-me";
+import { useDateInput } from "@/lib/date-format";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { zodErrorKeys } from "@/lib/forms";
 import { translateOr } from "@/lib/i18n-dynamic";
@@ -63,7 +64,10 @@ function Chips({ citations, title }: { citations: readonly Citation[]; title: st
   );
 }
 
-/** Confirm one suggestion as a task: owner (required), title and due date (editable). */
+/**
+ * Confirm one suggestion as a task: owner (required), title and due date (editable). The due
+ * date is shown and typed in the school's format and sent as `YYYY-MM-DD`.
+ */
 function ConfirmForm({
   suggestion,
   assignees,
@@ -76,6 +80,7 @@ function ConfirmForm({
   const t = useTranslations("circulars.suggestion");
   const tv = useTranslations("validation");
   const api = useBffClient("staff");
+  const dates = useDateInput();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<unknown>(undefined);
   const [pending, setPending] = useState(false);
@@ -128,6 +133,7 @@ function ConfirmForm({
 
   const fieldError = (name: string) =>
     errors[name] ? translateOr(tv, errors[name] ?? "invalid", "invalid") : undefined;
+  const hint = dates.hint(suggestion.due_on);
 
   return (
     <form onSubmit={(event) => void confirm(event)} noValidate className="space-y-3">
@@ -148,11 +154,16 @@ function ConfirmForm({
           error={fieldError("title")}
         />
         <TextField
+          // Remounts with the suggested date in the school's format once GET /me brings it.
+          key={dates.format}
           name="due_on"
-          type="date"
           label={t("dueOn")}
-          defaultValue={suggestion.due_on}
-          error={fieldError("due_on")}
+          hint={t("dueHint", hint)}
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder={dates.placeholder}
+          defaultValue={dates.fromIso(suggestion.due_on)}
+          error={errors.due_on ? t("dueInvalid", hint) : undefined}
         />
       </div>
       <div className="flex flex-wrap gap-3">

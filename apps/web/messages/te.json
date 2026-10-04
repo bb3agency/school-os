@@ -6167,6 +6167,8 @@
       "chooseOwner": "ఒకరిని ఎంచుకోండి",
       "taskTitle": "పని",
       "dueOn": "గడువు తేదీ",
+      "dueHint": "Use {format}, for example {example}.",
+      "dueInvalid": "Enter a real date as {format}, for example {example}.",
       "confirm": "పనిగా నిర్ధారించండి",
       "dismiss": "తీసివేయండి",
       "openTasks": "పనుల్లో చూడండి",
@@ -6282,6 +6284,8 @@
       "owner": "బాధ్యులు",
       "chooseOwner": "ఒకరిని ఎంచుకోండి",
       "dueOn": "గడువు తేదీ",
+      "dueHint": "Use {format}, for example {example}.",
+      "dueInvalid": "Enter a real date as {format}, for example {example}.",
       "details": "వివరాలు (ఐచ్ఛికం)",
       "submit": "పని జోడించండి",
       "saved": "పని జోడించబడింది."

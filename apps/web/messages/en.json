@@ -6167,6 +6167,8 @@
       "chooseOwner": "Choose a person",
       "taskTitle": "Task",
       "dueOn": "Due date",
+      "dueHint": "Use {format}, for example {example}.",
+      "dueInvalid": "Enter a real date as {format}, for example {example}.",
       "confirm": "Confirm as task",
       "dismiss": "Dismiss",
       "openTasks": "See it in Tasks",
@@ -6282,6 +6284,8 @@
       "owner": "Owner",
       "chooseOwner": "Choose a person",
       "dueOn": "Due date",
+      "dueHint": "Use {format}, for example {example}.",
+      "dueInvalid": "Enter a real date as {format}, for example {example}.",
       "details": "Details (optional)",
       "submit": "Add task",
       "saved": "Task added."
