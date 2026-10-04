@@ -41,6 +41,23 @@ describe("school navigation (UX only; the API checks every call)", () => {
     expect(links).not.toContain("Support access");
   });
 
+  it("School structure needs student.read_basic, which GET /academic-years requires (FR-TEN-010)", () => {
+    const { unmount } = renderWithIntl(
+      <SchoolShell permissions={["support.ticket.create"]}>
+        <p>x</p>
+      </SchoolShell>,
+    );
+    expect(navLinks()).toContain("School settings");
+    expect(navLinks()).not.toContain("School structure");
+    unmount();
+    renderWithIntl(
+      <SchoolShell permissions={["student.read_basic"]}>
+        <p>x</p>
+      </SchoolShell>,
+    );
+    expect(navLinks()).toContain("School structure");
+  });
+
   it("shows the Tally items only while the school's connector is on (M6, ADR-0032)", () => {
     const { unmount } = renderWithIntl(
       <SchoolShell permissions={["finance.read", "tally.configure"]}>
