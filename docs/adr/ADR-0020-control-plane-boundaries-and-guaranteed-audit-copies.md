@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted · implementation amendments 2026-09-29 (ADR-0029), 2026-10-01 (ADR-0038) |
+| Status | Accepted · implementation amendments 2026-09-29 (ADR-0029), 2026-10-01 (ADR-0038; B2 approved by the product owner 2026-10-03), 2026-10-03 (B3, AI budget from the bundle) |
 | Date | 2026-09-27 |
 | Deciders | Founder (product owner decisions of 2026-09-27 on the M0 "decisions needed" list, [14 · M0 status](../14-roadmap.md#m0-status-2026-09-26)) |
 | Amends / supersedes | Amends [ADR-0013](ADR-0013-cross-tenant-access-and-platform-privilege-separation.md) (settles Amendments A6 and A10) and [ADR-0017](ADR-0017-platform-admin-panel-architecture.md) (what `platform` may call on the tenant side) |
@@ -36,7 +36,8 @@ The M0 build left two deviations open (ADR-0013 Amendments A6 and A10, recorded 
 - register (`register_tenant`);
 - initialise keys (`initialise_tenant`);
 - activate, suspend, reactivate, offboard (`activate_tenant`, `suspend_tenant`, `reactivate_tenant`, `begin_offboarding`, `set_tenant_status`);
-- usage counts (`tenant_usage`, and `list_tenant_ids` for the daily fan-out).
+- usage counts (`tenant_usage`, and `list_tenant_ids` for the daily fan-out);
+- the AI answer allowance of the school's subscription (`set_ai_answer_allowance`, amendment B3).
 
 It MUST NOT read tenant data. Pinned tenant-side imports, with the names they may bring in:
 - `app.tenancy.schemas.TenantProvisionIn`;
@@ -105,3 +106,31 @@ definer function, `definer_access` policy or grant was added, and `platform` imp
 tenant-side module. `SQL_ALLOWED` in `apps/api/tests/platform/test_boundaries.py` gains
 (`usage.py`, `kb.queries`); `TENANT_SESSION_FILES` is unchanged. A dedicated host runs the same
 function locally and sends the count in its heartbeat.
+
+*Approved by the product owner on 2026-10-03* (counts only, in the school's own
+`tenant_session`); docs/16 §19 Q18 is closed. No code change.
+
+## Amendments (2026-10-03)
+
+**B3 · AI answer allowance from the bundle (ADR-0038 amendment 2026-10-03; owner decision
+2026-10-03).** A school's monthly AI budget is derived from its AI answer bundle. The bundle lives
+in `platform.ai_bundles`; the tenant side may not read it. The control plane hands over **one
+number**, the bundle's included answers a month, through a new lifecycle-style call
+`app.tenancy.service.set_ai_answer_allowance(tenant_id, answers | None)`. Like the B1 calls it
+opens the school's own `tenant_session` inside `tenancy` (sos_app, RLS `own_tenant`), stores
+the number under its own key `ai_answers_per_month` in `core.tenants.settings` (not a school
+setting: the settings form can neither show nor change it, and a settings edit keeps it), bumps
+`version`, audits `tenant.ai_allowance_set` (`included_answers`, system actor) in the same
+transaction and returns only whether it changed. It is idempotent.
+`platform/billing.py` calls it after a bundle is chosen, changed or removed (after the platform
+transaction commits; a failure is logged `platform.ai_allowance.sync_failed`, ids only, and the
+operator's action stands), and `platform/usage.py` calls it for every live school in the daily
+collector, which repairs a missed write. Only shared-tier schools are reached; a dedicated host's
+school keeps its own budget setting until the heartbeat response can carry the allowance
+(docs/16 §19 Q19). No migration, definer function, `definer_access` policy or grant was added;
+`platform` imports no new tenant-side module, opens no new `tenant_session` and names no new
+tenant relation in SQL. `TENANCY_ALLOWED` in `apps/api/tests/platform/test_boundaries.py` gains
+`set_ai_answer_allowance`. Rejected alternatives: a value in `platform.feature_flags` (the table
+has no value column, so it would need a migration, and dedicated hosts' flags are written by the
+deploy pipeline, docs/16 §19 Q5); extending the definer `core.current_subscription()` to the
+bundle (a wider definer read, ADR-0013).

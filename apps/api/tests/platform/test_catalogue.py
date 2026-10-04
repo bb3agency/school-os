@@ -508,3 +508,96 @@ def test_FR_PLT_020_heartbeat_carries_ai_answers() -> None:
     }
     assert HbUsage.model_validate(base).ai_answers == 0  # hosts older than 0041
     assert HbUsage.model_validate({**base, "ai_answers": 2}).ai_answers == 2
+
+
+# --- the school's AI budget follows its bundle (owner decision 2026-10-03; ADR-0020 B3) -------
+
+
+def _allowance(admin: Engine, tenant_id: uuid.UUID) -> Any:
+    with admin.connect() as c:
+        settings: Any = c.execute(
+            text("SELECT settings FROM core.tenants WHERE id = :t"), {"t": tenant_id}
+        ).scalar_one()
+    return dict(settings or {}).get("ai_answers_per_month")
+
+
+def test_FR_KB_011_bundle_sets_the_schools_ai_answer_allowance(
+    api: Api,
+    billing_admin: Operator,
+    owner: Operator,
+    make_plan: Callable[..., uuid.UUID],
+    admin_engine: Engine,
+) -> None:
+    school = _school(api, owner, make_plan())
+    sub, tid = school["subscription_id"], uuid.UUID(school["tenant_id"])
+    path = f"/subscriptions/{sub}/ai-bundle"
+    assert _allowance(admin_engine, tid) is None
+    for code, answers in (("ai-standard", 1000), ("ai-high", 3000)):
+        res = api.call("PUT", path, billing_admin, json={"ai_bundle_id": str(_bundle_id(code))})
+        assert res.status_code == 200, res.text
+        assert _allowance(admin_engine, tid) == answers
+    assert api.call("DELETE", path, billing_admin).status_code == 200
+    assert _allowance(admin_engine, tid) is None
+    # The school's own audit chain records each change (system actor, the count only).
+    with admin_engine.connect() as c:
+        rows: Any = c.execute(
+            text(
+                "SELECT summary FROM audit.events WHERE tenant_id = :t "
+                "AND action = 'tenant.ai_allowance_set' ORDER BY occurred_at, id"
+            ),
+            {"t": tid},
+        ).scalars()
+        summaries = [dict(r) for r in rows]
+    assert [s_["included_answers"] for s_ in summaries] == [1000, 3000, 0]
+
+
+def test_FR_KB_011_a_failed_allowance_write_does_not_fail_the_operator_and_is_reconciled(  # noqa: PLR0917 - pytest fixtures
+    api: Api,
+    billing_admin: Operator,
+    owner: Operator,
+    make_plan: Callable[..., uuid.UUID],
+    admin_engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from structlog.testing import capture_logs
+
+    from app.core.logging import ALLOWED_FIELDS
+    from app.tenancy import service as tenancy_service
+
+    school = _school(api, owner, make_plan())
+    sub, tid = school["subscription_id"], uuid.UUID(school["tenant_id"])
+    real = tenancy_service.set_ai_answer_allowance
+
+    def down(*_a: Any, **_k: Any) -> bool:
+        raise RuntimeError("synthetic outage")
+
+    monkeypatch.setattr(tenancy_service, "set_ai_answer_allowance", down)
+    with capture_logs() as logs:
+        res = api.call(
+            "PUT",
+            f"/subscriptions/{sub}/ai-bundle",
+            billing_admin,
+            json={"ai_bundle_id": str(_bundle_id("ai-lite"))},
+        )
+    assert res.status_code == 200, res.text  # the bundle is set; the school catches up later
+    assert _allowance(admin_engine, tid) is None
+    (failed,) = [e for e in logs if e["event"] == "platform.ai_allowance.sync_failed"]
+    assert set(failed) - {"event", "log_level", "exc_info"} <= set(ALLOWED_FIELDS)
+    monkeypatch.setattr(tenancy_service, "set_ai_answer_allowance", real)
+    # The daily collector reconciles every live shared school from its subscription (the school
+    # goes live after provisioning; set here directly).
+    with admin_engine.begin() as c:
+        c.execute(text("UPDATE core.tenants SET status = 'active' WHERE id = :t"), {"t": tid})
+    usage.collect_daily(dt.date(2075, 2, 1))
+    assert _allowance(admin_engine, tid) == 300
+    # And it repairs drift (e.g. a restored settings backup).
+    with admin_engine.begin() as c:
+        c.execute(
+            text(
+                "UPDATE core.tenants SET settings = settings - 'ai_answers_per_month' WHERE id = :t"
+            ),
+            {"t": tid},
+        )
+    assert billing.sync_ai_allowance(tid) is True
+    assert _allowance(admin_engine, tid) == 300
+    assert billing.sync_ai_allowance(tid) is False  # nothing to change

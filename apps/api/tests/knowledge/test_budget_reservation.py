@@ -13,7 +13,7 @@ import json
 import threading
 import time
 import uuid
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -53,6 +53,8 @@ SEPT, OCT = "2026-09", "2026-10"
 QUESTION = "Synthetic question about the class 7 picnic circular for Synthetic Vidyalaya?"
 ANSWER_TEXT = "The synthetic picnic circular says buses leave at 08:00."
 VALKEY_IMAGE = "valkey/valkey:8.1.10-alpine"  # the deploy/dedicated/compose.yaml image
+ONE_USD_INR = load_llm_config().budget.usd_inr_rate
+"""A budget of exactly $1.00 at the configured rate (``models.yaml`` ``budget.usd_inr_rate``)."""
 
 
 def config(*, rate_limit: int = 10_000) -> LlmConfig:
@@ -100,14 +102,16 @@ class Now:
 def guard(
     ledger: SpendLedger,
     *,
-    budget_inr: int = 84,  # 84 INR at 84.00 = $1.00
+    budget_inr: Decimal | int | None = None,  # default: $1.00 at the configured rate
     now: Now | None = None,
     cfg: LlmConfig | None = None,
     counters: InMemoryKV | None = None,
 ) -> BudgetGuard:
     return BudgetGuard(
         cfg or config(),
-        StaticAiPolicy(TenantAiSettings(True, Decimal(budget_inr))),
+        StaticAiPolicy(
+            TenantAiSettings(True, ONE_USD_INR if budget_inr is None else Decimal(budget_inr))
+        ),
         ledger,
         counters or InMemoryKV(),
         now=now or Now(),
@@ -451,6 +455,115 @@ def test_FR_KB_011_zero_budget_reserves_nothing(ledger: SpendLedger) -> None:
     assert ledger.reserved_usd(TENANT, SEPT, int(NOW.timestamp() * 1000)) == 0
 
 
+# --- the 100 % alert: the first refusal for budget in a school's month (NFR-CST-001) ----------
+#
+# Owner decision 2026-10-03: with atomic reservations recorded spend stops about one estimate
+# below the limit, so "100 % of the budget" is never reached by spend. The 100 % alert is the
+# FIRST reservation refused for budget in the school's IST month, reported once (an atomic
+# set-if-absent key in the spend store), through the same log event as the 80 % alert.
+
+
+def _exhausted_alerts(logs: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    return [
+        e
+        for e in logs
+        if e["event"] == "kb.budget.alert_crossed" and e.get("action") == "exhausted"
+    ]
+
+
+def test_NFR_CST_001_first_refusal_for_budget_alerts_once_per_month(ledger: SpendLedger) -> None:
+    est = estimate()
+    now = Now()
+    g = guard(ledger, now=now)
+    ledger.add_usd(TENANT, SEPT, Decimal(1) - est * Decimal("0.5"))  # less than one call left
+    with capture_logs() as logs:
+        for _ in range(3):
+            with pytest.raises(BudgetExhausted):
+                admit(g)
+    (alert,) = _exhausted_alerts(logs)
+    assert alert["tenant_id"] == TENANT
+    assert alert["log_level"] == "warning"
+    # Another school's first refusal is its own alert.
+    ledger.add_usd(OTHER_TENANT, SEPT, Decimal(1))
+    with capture_logs() as logs, pytest.raises(BudgetExhausted):
+        admit(g, OTHER_TENANT)
+    assert [e["tenant_id"] for e in _exhausted_alerts(logs)] == [OTHER_TENANT]
+    # A new IST month starts afresh: its first refusal alerts again.
+    now.at = datetime(2026, 10, 2, 6, 0, tzinfo=UTC)
+    ledger.add_usd(TENANT, OCT, Decimal(1))
+    with capture_logs() as logs:
+        for _ in range(2):
+            with pytest.raises(BudgetExhausted):
+                admit(g)
+    assert len(_exhausted_alerts(logs)) == 1
+
+
+def test_NFR_CST_001_no_exhausted_alert_while_calls_still_fit(ledger: SpendLedger) -> None:
+    g = guard(ledger)
+    with capture_logs() as logs:
+        g.settle(admit(g), Decimal("0.004"))
+    assert _exhausted_alerts(logs) == []
+
+
+def test_NFR_CST_001_exhausted_alert_fires_exactly_once_under_concurrency(
+    ledger: SpendLedger,
+) -> None:
+    ledger.add_usd(TENANT, SEPT, Decimal(1))
+    g = guard(ledger)
+    start = threading.Barrier(24)
+
+    def one(_: int) -> bool:
+        start.wait(timeout=10)
+        try:
+            admit(g)
+        except BudgetExhausted:
+            return True
+        return False
+
+    with capture_logs() as logs, ThreadPoolExecutor(max_workers=24) as pool:
+        refused = list(pool.map(one, range(24)))
+    assert all(refused)
+    assert len(_exhausted_alerts(logs)) == 1
+
+
+def test_NFR_CST_001_ledger_marks_a_month_exhausted_once(ledger: SpendLedger) -> None:
+    start = threading.Barrier(16)
+
+    def one(_: int) -> bool:
+        start.wait(timeout=10)
+        return ledger.mark_exhausted(TENANT, SEPT)
+
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        results = list(pool.map(one, range(16)))
+    assert sum(results) == 1
+    assert ledger.mark_exhausted(TENANT, OCT) is True
+    assert ledger.mark_exhausted(OTHER_TENANT, SEPT) is True
+    assert ledger.mark_exhausted(TENANT, SEPT) is False
+
+
+def test_NFR_CST_001_zero_budget_is_not_an_exhausted_alert(ledger: SpendLedger) -> None:
+    """A budget of 0 means the school has no AI spend at all (a setting, not a spent budget)."""
+    with capture_logs() as logs, pytest.raises(BudgetExhausted):
+        admit(guard(ledger, budget_inr=0))
+    assert _exhausted_alerts(logs) == []
+
+
+def test_NFR_CST_001_alert_store_down_still_refuses_and_logs_ids_only() -> None:
+    class Down(InMemorySpendLedger):
+        def mark_exhausted(self, tenant_id: uuid.UUID, month: str) -> bool:
+            raise KVUnavailable("synthetic outage at 10.0.0.9")
+
+    ledger = Down()
+    ledger.add_usd(TENANT, SEPT, Decimal(1))
+    with capture_logs() as logs, pytest.raises(BudgetExhausted):
+        admit(guard(ledger))
+    assert _exhausted_alerts(logs) == []
+    (failed,) = [e for e in logs if e["event"] == "kb.budget.alert_unrecorded"]
+    assert failed["tenant_id"] == TENANT
+    assert set(failed) - {"event", "log_level"} <= set(ALLOWED_FIELDS)
+    assert "10.0.0.9" not in json.dumps(logs, default=str)
+
+
 # --- invariant 5: new log lines carry ids and numbers only --------------------------------------
 
 
@@ -487,11 +600,16 @@ def test_invariant_5_budget_log_lines_carry_ids_only() -> None:
         g.settle(late, Decimal("0.001"))  # settled after expiry
         flaky = guard(Flaky())
         flaky.release(admit(flaky))  # the store fails on release
+        spent = InMemorySpendLedger()
+        spent.add_usd(TENANT, SEPT, Decimal(1))
+        with pytest.raises(BudgetExhausted):
+            admit(guard(spent))  # the 100 % alert
     events = {e["event"] for e in logs}
     assert {
         "kb.budget.over_estimate",
         "kb.budget.settled_late",
         "kb.budget.release_failed",
+        "kb.budget.alert_crossed",
     } <= events
     budget_lines = [e for e in logs if e["event"].startswith("kb.budget")]
     for line in budget_lines:

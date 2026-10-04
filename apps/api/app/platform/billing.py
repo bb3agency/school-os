@@ -586,7 +586,59 @@ def set_ai_bundle(
         audit_platform(
             s, actor, action, "subscription", sub_id, summary, tenant_id=sub["tenant_id"]
         )
-        return SubscriptionOut.model_validate(dict(sub))
+        out = SubscriptionOut.model_validate(dict(sub))
+    _sync_ai_allowance_now(out.tenant_id)
+    return out
+
+
+# --- the school's AI budget follows its bundle (owner decision 2026-10-03; ADR-0020 B3) -------
+
+
+def ai_allowance_for(s: Session, tenant_id: uuid.UUID) -> int | None:
+    """Included answers a month of the school's live subscription's bundle (platform data
+    only), or ``None`` without a bundle or a live subscription."""
+    stmt = (
+        select(m.ai_bundles.c.included_answers)
+        .select_from(
+            m.subscriptions.join(m.ai_bundles, m.ai_bundles.c.id == m.subscriptions.c.ai_bundle_id)
+        )
+        .where(m.subscriptions.c.tenant_id == tenant_id, m.subscriptions.c.status != "cancelled")
+        .order_by(m.subscriptions.c.created_at.desc())
+        .limit(1)
+    )
+    value = s.execute(stmt).scalar_one_or_none()
+    return None if value is None else int(value)
+
+
+def sync_ai_allowance(tenant_id: uuid.UUID) -> bool:
+    """Hand the bundle's included answers to a shared-tier school (``True`` if it changed).
+
+    The school derives its monthly AI budget from this number (``knowledge.policy``). The only
+    tenant-side step is the lifecycle-style ``tenancy.set_ai_answer_allowance`` (ADR-0020
+    amendment B3): one count in, a flag out, in the school's own session. Idempotent; called
+    after a bundle change and by the daily collector, which repairs a missed or failed write.
+    Dedicated-tier schools live on their own host and are not reached from here (docs/16 §19
+    Q18).
+    """
+    with platform_session() as s:
+        dep = repo.get_by(s, m.deployments, m.deployments.c.tenant_id == tenant_id)
+        if dep is None or dep["mode"] != "shared":
+            return False
+        answers = ai_allowance_for(s, tenant_id)
+    return tenancy.set_ai_answer_allowance(tenant_id, answers)
+
+
+def _sync_ai_allowance_now(tenant_id: uuid.UUID) -> None:
+    """Best effort after the platform change has committed: a failure is logged (ids only) and
+    the daily collector catches up; the operator's action stands."""
+    try:
+        sync_ai_allowance(tenant_id)
+    except Exception as exc:
+        log.warning(
+            "platform.ai_allowance.sync_failed",
+            tenant_id=str(tenant_id),
+            error_type=type(exc).__name__,
+        )
 
 
 def cancel_subscription(actor: Actor, sub_id: uuid.UUID, reason: str) -> SubscriptionOut:

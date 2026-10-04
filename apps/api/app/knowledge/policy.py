@@ -2,7 +2,9 @@
 
 - :class:`SchoolAiPolicy` implements the gateway's :class:`TenantAiPolicy` (FR-KB-011, owner
   decision 2026-09-27): ``ai_enabled`` = the school's ``ai_features_enabled`` setting AND the
-  per-school feature flag ``kb.ask.enabled``; the budget is ``ai_monthly_budget_inr``. Settings
+  per-school feature flag ``kb.ask.enabled``; the budget is derived from the school's AI answer
+  bundle when it has one (owner decision 2026-10-03, ``models.yaml`` ``budget.bundle``), else
+  its ``ai_monthly_budget_inr`` setting. Settings
   are read through ``tenancy.service`` in a short ``tenant_session`` of that school; the flag
   through :mod:`app.core.feature_flags` (``sos_app`` may read ``platform.feature_flags``;
   knowledge never imports the control plane). Answers are cached per school for a few seconds
@@ -31,7 +33,8 @@ from app.core import feature_flags
 from app.core.db import tenant_session
 from app.core.logging import get_logger
 from app.knowledge import repository as repo
-from app.knowledge.gateway.budget import TenantAiSettings
+from app.knowledge.config.llm import LlmConfig, load_llm_config
+from app.knowledge.gateway.budget import TenantAiSettings, bundle_budget_inr
 from app.knowledge.gateway.metering import MeteringEvent
 from app.tenancy import service as tenancy
 
@@ -50,13 +53,26 @@ def _session(tenant_id: uuid.UUID) -> AbstractContextManager[Session]:
     return tenant_session(tenant_id)
 
 
-def read_ai_settings(session: Session, tenant_id: uuid.UUID) -> TenantAiSettings:
-    """The school's switch and budget, read in ``session`` (a tenant_session of the school)."""
+def read_ai_settings(
+    session: Session, tenant_id: uuid.UUID, *, config: LlmConfig | None = None
+) -> TenantAiSettings:
+    """The school's switch and budget, read in ``session`` (a tenant_session of the school).
+
+    Budget (owner decision 2026-10-03): with an AI answer bundle (its included answers, handed
+    to the school by the control plane through ``tenancy.set_ai_answer_allowance``), the budget
+    is derived from it (:func:`bundle_budget_inr`); without one, the school's own
+    ``ai_monthly_budget_inr`` setting applies."""
     school = tenancy.get_tenant(session).settings
     flag = feature_flags.is_enabled(ASK_FLAG, tenant_id, session=session)
+    answers = tenancy.ai_answer_allowance(session)
+    budget = (
+        Decimal(school.ai_monthly_budget_inr)
+        if answers is None
+        else bundle_budget_inr(config or load_llm_config(), answers)
+    )
     return TenantAiSettings(
         ai_enabled=bool(school.ai_features_enabled) and flag,
-        monthly_budget_inr=Decimal(school.ai_monthly_budget_inr),
+        monthly_budget_inr=budget,
     )
 
 
