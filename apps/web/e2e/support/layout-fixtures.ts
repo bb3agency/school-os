@@ -723,9 +723,11 @@ const NOTIFICATIONS: Schemas["NotificationOut"][] = [
     uid("00000000d0", 70),
   ],
   [
-    "announcement.new",
-    "announcement",
-    "కొత్త సందేశం: ఆదివారం నిర్వహణ",
+    // Telugu-rendered row (language "te"). Announcements send no notification (banner only,
+    // owner decision 2026-10-04), so this stress row uses a circular.
+    "circular.read_ready",
+    "circular",
+    "సర్క్యులర్ సారాంశం సిద్ధంగా ఉంది: ఆదివారం నిర్వహణ",
     TE_TEXT,
     uid("00000000a5", 1),
   ],

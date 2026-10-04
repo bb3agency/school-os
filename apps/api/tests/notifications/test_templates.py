@@ -23,7 +23,6 @@ REQUIRED = {
     "breakglass.requested",
     "breakglass.approved",
     "breakglass.expired",
-    "announcement.new",
     "export.ready",
     "export.failed",
     "admin.tenant_export.ready",
@@ -191,55 +190,100 @@ def _module_constants(tree: ast.Module) -> dict[str, str]:
     return constants
 
 
+def _local_constants(func: ast.FunctionDef | ast.AsyncFunctionDef) -> dict[str, set[str]]:
+    """String literals a function assigns to its local names, including tuple unpacking
+    (``key, template = f"...", "task.overdue"`` in ``circulars.send_reminders``)."""
+    found: dict[str, set[str]] = {}
+    for node in ast.walk(func):
+        if not isinstance(node, ast.Assign | ast.AnnAssign) or node.value is None:
+            continue
+        value = node.value
+        targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+        for target in targets:
+            pairs: list[tuple[ast.expr, ast.expr]] = (
+                list(zip(target.elts, value.elts, strict=False))
+                if isinstance(target, ast.Tuple) and isinstance(value, ast.Tuple)
+                else [(target, value)]
+            )
+            for name, item in pairs:
+                if (
+                    isinstance(name, ast.Name)
+                    and isinstance(item, ast.Constant)
+                    and isinstance(item.value, str)
+                ):
+                    found.setdefault(name.id, set()).add(item.value)
+    return found
+
+
 def _sent_template_keys() -> dict[str, tuple[str, set[str] | None]]:
     """``template_key`` values passed to ``notifications.notify`` by app code, with the literal
-    param names when the call spells them out. Covers literals, module constants and module
-    helpers that forward a key (``changes._notify(session, row, "<key>", ...)``,
-    ``extraction._notify(session, batch, <CONSTANT>, {...})``)."""
+    param names when the call spells them out. Covers literals, module constants, string
+    literals the calling function assigns to a local name (``template = "task.overdue"``) and
+    module helpers that forward a key (``changes._notify(session, row, "<key>", ...)``,
+    ``extraction._notify(session, batch, <CONSTANT>, {...})``). Keyed ``path:line:key``."""
     found: dict[str, tuple[str, set[str] | None]] = {}
     for path in sorted(APP_DIR.rglob("*.py")):
         if path.parent.name == "notifications":
             continue
         tree = ast.parse(path.read_text("utf-8"))
         constants = _module_constants(tree)
+        scopes: list[tuple[ast.AST, dict[str, set[str]]]] = [(tree, {})]
+        scopes += [
+            (node, _local_constants(node))
+            for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+        ]
+        for scope, local in scopes:
 
-        def resolve(expr: ast.expr, constants: dict[str, str] = constants) -> str | None:
-            if isinstance(expr, ast.Constant) and isinstance(expr.value, str):
-                return expr.value
-            if isinstance(expr, ast.Name):
-                return constants.get(expr.id)
-            return None
+            def resolve(
+                expr: ast.expr,
+                constants: dict[str, str] = constants,
+                local: dict[str, set[str]] = local,
+            ) -> set[str]:
+                if isinstance(expr, ast.Constant) and isinstance(expr.value, str):
+                    return {expr.value}
+                if isinstance(expr, ast.Name):
+                    if expr.id in local:
+                        return local[expr.id]
+                    if expr.id in constants:
+                        return {constants[expr.id]}
+                return set()
 
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            kwargs = {k.arg: k.value for k in node.keywords}
-            key_expr = kwargs.get("template_key")
-            params_expr = kwargs.get("params")
-            func = node.func
-            name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", None)
-            if key_expr is None and name == "_notify" and len(node.args) >= 3:
-                key_expr = node.args[2]
-                params_expr = node.args[3] if len(node.args) >= 4 else None
-            if key_expr is None:
-                continue
-            key = resolve(key_expr)
-            if key is None:
-                continue  # a forwarded parameter: checked where the helper is called
-            params = (
-                {str(k.value) for k in params_expr.keys if isinstance(k, ast.Constant)}
-                if isinstance(params_expr, ast.Dict)
-                else None
-            )
-            found[f"{path.relative_to(APP_DIR)}:{node.lineno}"] = (key, params)
+            for node in ast.walk(scope):
+                if not isinstance(node, ast.Call):
+                    continue
+                kwargs = {k.arg: k.value for k in node.keywords}
+                key_expr = kwargs.get("template_key")
+                params_expr = kwargs.get("params")
+                func = node.func
+                name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", None)
+                if key_expr is None and name == "_notify" and len(node.args) >= 3:
+                    key_expr = node.args[2]
+                    params_expr = node.args[3] if len(node.args) >= 4 else None
+                if key_expr is None:
+                    continue
+                params = (
+                    {str(k.value) for k in params_expr.keys if isinstance(k, ast.Constant)}
+                    if isinstance(params_expr, ast.Dict)
+                    else None
+                )
+                # Nothing resolved: a forwarded parameter, checked where the helper is called.
+                for key in resolve(key_expr):
+                    found[f"{path.relative_to(APP_DIR)}:{node.lineno}:{key}"] = (key, params)
     return found
 
 
 def test_FR_NOT_001_every_notification_sent_by_the_code_has_a_bilingual_template() -> None:
     sent = _sent_template_keys()
     keys = {key for key, _ in sent.values()}
-    # The scan sees literals, module constants and forwarding helpers.
-    assert {"export.ready", "extraction.batch.ready", "change_request.expired"} <= keys
+    # The scan sees literals, module constants, function-local literals and forwarding helpers.
+    assert {
+        "export.ready",
+        "extraction.batch.ready",
+        "change_request.expired",
+        "task.due_soon",
+        "task.overdue",
+    } <= keys
     catalog = t.catalog()
     problems = []
     for where, (key, params) in sorted(sent.items()):
@@ -249,3 +293,22 @@ def test_FR_NOT_001_every_notification_sent_by_the_code_has_a_bilingual_template
         elif params is not None and params != set(template.params):
             problems.append(f"{where}: {key} params {sorted(params)} != {sorted(template.params)}")
     assert problems == []
+
+
+def test_FR_NOT_001_every_template_has_a_producer() -> None:
+    """A template nothing sends is dead copy that reviewers keep checking and docs keep
+    listing. Remove it (as ``announcement.new`` was, 2026-10-04) instead of keeping it."""
+    sent = {key for key, _ in _sent_template_keys().values()}
+    assert sorted(set(t.catalog()) - sent) == []
+
+
+def test_FR_NOT_001_announcements_are_banner_only() -> None:
+    """Owner decision 2026-10-04: platform announcements reach schools only as the banner
+    (``GET /announcements``); the control plane never writes school notifications (ADR-0020),
+    so there is no ``announcement.new`` template and nothing links to an ``announcement``."""
+    catalog = t.catalog()
+    assert "announcement.new" not in catalog
+    assert not [key for key in catalog if key.startswith("announcement.")]
+    assert all(template.resource_type != "announcement" for template in catalog.values())
+    with pytest.raises(t.TemplateError):
+        t.get("announcement.new")
