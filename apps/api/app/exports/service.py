@@ -318,12 +318,24 @@ def _check_structure(session: Session, scope: ExportScopeIn) -> None:
             raise _invalid(f"scope.class_ids.{i}", "not_found", "errors.not_found") from None
 
 
-def _students_for(session: Session, ctx: UserContext, scope: ExportScopeIn) -> list[uuid.UUID]:
+def _students_for(
+    session: Session,
+    ctx: UserContext,
+    scope: ExportScopeIn,
+    *,
+    permissions: Sequence[str] = (),
+) -> list[uuid.UUID]:
     """The students of ``scope`` the caller may read (current academic year), frozen for the
-    export. 422 when there are none or too many."""
+    export. ``permissions``: further grants whose scope must also reach each student (findings,
+    restricted values; SEC-015: one role's school-wide read must not widen another role's
+    scoped grant). 422 when there are none or too many."""
     _check_structure(session, scope)
     ids = students.list_students_in_scope(
-        session, ctx, section_ids=scope.section_ids, class_ids=scope.class_ids
+        session,
+        ctx,
+        section_ids=scope.section_ids,
+        class_ids=scope.class_ids,
+        permissions=permissions,
     )
     if not ids:
         raise _invalid("scope", "no_students")
@@ -431,7 +443,8 @@ def request_precheck(session: Session, ctx: UserContext, data: PrecheckCreate) -
             detail="Restricted details can be included only by staff allowed to see them.",
         )
     _require_step_up(ctx)
-    ids = _students_for(session, ctx, data.scope)
+    reach = (DQ_READ, SENSITIVE) if data.include_sensitive else (DQ_READ,)
+    ids = _students_for(session, ctx, data.scope, permissions=reach)
     sensitive: list[str] = []
     if data.include_sensitive:
         classes = _exportable_columns(session, load_config())
@@ -490,7 +503,7 @@ def request_student_list(session: Session, ctx: UserContext, data: StudentListCr
             code="sensitive_not_allowed",
             detail="Restricted details can be exported only by staff allowed to see them.",
         )
-    ids = _students_for(session, ctx, data.scope)
+    ids = _students_for(session, ctx, data.scope, permissions=(SENSITIVE,) if sensitive else ())
     return _create(
         session,
         ctx,
