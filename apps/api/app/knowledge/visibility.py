@@ -17,7 +17,8 @@ modules' services (the same rules as the UI and the record tools):
   document the caller can read, at a version that still exists and is ``ready``.
 - ``count`` / ``fee``: aggregates of a tool; visible while the caller may still use that tool
   (fail closed when the caller's tools are not known).
-- ``conversation``: one of the caller's own conversations that is not deleted.
+- ``conversation``: one of the caller's own conversations that is not deleted, the cited question
+  in it, and every source that question's answer cited (the passage repeats that answer).
 
 Anything that does not parse is not visible (fail closed). Results are cached per instance
 (one request or job). Nothing here logs source text.
@@ -35,6 +36,7 @@ from app.documents import service as documents
 from app.dq import service as dq
 from app.knowledge import repository as repo
 from app.knowledge import sources
+from app.knowledge.sealed import cited_sources_of
 from app.knowledge.tools.students import ROW_FIELDS
 from app.students import service as students
 
@@ -123,10 +125,7 @@ class SourceVisibility:
                 case "fee":
                     return FEE_TOOL in self._tool_names()
                 case "conversation":
-                    return (
-                        repo.get_conversation(self._session, ref.object_id, self._ctx.user_id)
-                        is not None
-                    )
+                    return self._chat_visible(ref.object_id, ref.query_id)
         except DomainError:
             return False
         return False  # pragma: no cover - every SourceKind is matched above
@@ -180,6 +179,20 @@ class SourceVisibility:
             if not self._version_kept(ref.object_id, ref.version_no):
                 return False
         return True
+
+    def _chat_visible(self, conversation_id: uuid.UUID, query_id: uuid.UUID | None) -> bool:
+        """The caller's own live conversation, the cited question in it, and every source that
+        question's answer cited (the passage repeats that answer; as for ``verified``)."""
+        if repo.get_conversation(self._session, conversation_id, self._ctx.user_id) is None:
+            return False
+        if query_id is None:
+            return False
+        row = repo.get_query_of_user(self._session, query_id, self._ctx.user_id)
+        if row is None or row.conversation_id != conversation_id:
+            return False
+        own = sources.conversation_question(conversation_id, query_id)
+        self._cache[own] = False  # an answer citing itself (or a cycle) is never visible
+        return self.all_visible(cited_sources_of(self._session, row))
 
     def _tool_names(self) -> frozenset[str]:
         if self._tools is None:
