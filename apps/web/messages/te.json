@@ -1304,6 +1304,11 @@
       "cancelAnnouncement": "రద్దు చేయండి",
       "cancelTitle": "ఈ ప్రకటన రద్దు చేయాలా?",
       "cancelBody": "పాఠశాలలకు వెంటనే కనిపించడం ఆగిపోతుంది.",
+      "edit": "Edit",
+      "editTitle": "Edit announcement",
+      "editBody": "Schools see the change within a minute on the shared platform, and at the next heartbeat on dedicated hosts.",
+      "editSave": "Save changes",
+      "updated": "Announcement updated.",
       "emptyTitle": "ఇంకా ప్రకటనలు లేవు",
       "emptyBody": "మీరు షెడ్యూల్ చేసే ప్రకటనలు ఇక్కడ కనిపిస్తాయి."
     },
@@ -1554,7 +1559,9 @@
       "citation_source_unsupported": "ఇక్కడ పత్రం పేజీ మాత్రమే ఆధారం కాగలదు, ఉదా. sos://doc/…/v2#p1.",
       "citation_not_found": "మీరు చదవగల ఏ పత్రమూ ఈ ఆధారంతో సరిపోలడం లేదు. తనిఖీ చేయండి లేదా మళ్ళీ కాపీ చేయండి.",
       "citation_not_current": "ఇది పత్రం యొక్క ప్రస్తుత వెర్షన్ కాదు. కొత్త వెర్షన్ పేజీని వాడండి.",
-      "citation_text_not_found": "ఈ వాక్యం ఆ పేజీలో లేదు. పత్రంలోని ఖచ్చితమైన పదాలను కాపీ చేయండి."
+      "citation_text_not_found": "ఈ వాక్యం ఆ పేజీలో లేదు. పత్రంలోని ఖచ్చితమైన పదాలను కాపీ చేయండి.",
+      "owner_not_active": "This person can no longer be given tasks. Choose someone else.",
+      "aadhaar_last4_only": "Don't enter Aadhaar numbers. Use only the last 4 digits."
     },
     "api": {
       "generic": {
@@ -6202,6 +6209,20 @@
       "details": "వివరాలు (ఐచ్ఛికం)",
       "submit": "పని జోడించండి",
       "saved": "పని జోడించబడింది."
+    },
+    "edit": {
+      "action": "Edit",
+      "title": "Edit task",
+      "description": "Change the task, its owner, due date or details. A new owner is told in the app.",
+      "taskTitle": "Task",
+      "owner": "Owner",
+      "formerOwner": "{name} (no longer active)",
+      "dueOn": "Due date",
+      "dueHint": "Use {format}, for example {example}.",
+      "dueInvalid": "Enter a real date as {format}, for example {example}.",
+      "details": "Details (optional)",
+      "save": "Save changes",
+      "updated": "Task updated."
     },
     "errors": {
       "task_closed": {

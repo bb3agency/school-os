@@ -1304,6 +1304,11 @@
       "cancelAnnouncement": "Cancel",
       "cancelTitle": "Cancel this announcement?",
       "cancelBody": "Schools stop seeing it straight away.",
+      "edit": "Edit",
+      "editTitle": "Edit announcement",
+      "editBody": "Schools see the change within a minute on the shared platform, and at the next heartbeat on dedicated hosts.",
+      "editSave": "Save changes",
+      "updated": "Announcement updated.",
       "emptyTitle": "No announcements yet",
       "emptyBody": "Announcements you schedule appear here."
     },
@@ -1554,7 +1559,9 @@
       "citation_source_unsupported": "Only a document page can be a source here, like sos://doc/…/v2#p1.",
       "citation_not_found": "No document you can read matches this source. Check it, or copy it again.",
       "citation_not_current": "This is not the current version of the document. Use the newest version's page.",
-      "citation_text_not_found": "This text is not on that page. Copy the exact words from the document."
+      "citation_text_not_found": "This text is not on that page. Copy the exact words from the document.",
+      "owner_not_active": "This person can no longer be given tasks. Choose someone else.",
+      "aadhaar_last4_only": "Don't enter Aadhaar numbers. Use only the last 4 digits."
     },
     "api": {
       "generic": {
@@ -6202,6 +6209,20 @@
       "details": "Details (optional)",
       "submit": "Add task",
       "saved": "Task added."
+    },
+    "edit": {
+      "action": "Edit",
+      "title": "Edit task",
+      "description": "Change the task, its owner, due date or details. A new owner is told in the app.",
+      "taskTitle": "Task",
+      "owner": "Owner",
+      "formerOwner": "{name} (no longer active)",
+      "dueOn": "Due date",
+      "dueHint": "Use {format}, for example {example}.",
+      "dueInvalid": "Enter a real date as {format}, for example {example}.",
+      "details": "Details (optional)",
+      "save": "Save changes",
+      "updated": "Task updated."
     },
     "errors": {
       "task_closed": {
