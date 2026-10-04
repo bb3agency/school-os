@@ -2534,8 +2534,6 @@
         "skipped": "వదిలేయబడింది",
         "reverted": "రద్దు చేయబడింది"
       },
-      "errorPrefix": "తప్పు:",
-      "warningPrefix": "హెచ్చరిక:",
       "sensitive": "{count, plural, one {# పరిమిత విలువ ఉంది (దాచబడింది)} other {# పరిమిత విలువలు ఉన్నాయి (దాచబడ్డాయి)}}",
       "filter": "చూపించు",
       "filters": {
@@ -4142,10 +4140,8 @@
     },
     "list": {
       "colTitle": "శీర్షిక",
-      "colType": "రకం",
       "colStatus": "స్థితి",
       "colVersion": "వెర్షన్",
-      "colSensitivity": "విషయం రకం",
       "colVisibility": "ఎవరు చూడగలరు",
       "colUpdated": "చివరి మార్పు",
       "noVersion": "ఇంకా ఫైల్ లేదు",
@@ -4195,11 +4191,7 @@
       "colVersion": "వెర్షన్",
       "latest": "(కొత్తది)",
       "colStatus": "స్థితి",
-      "colKind": "ఫైల్ రకం",
       "otherKind": "ఇతర",
-      "colSize": "పరిమాణం",
-      "colUploaded": "అప్‌లోడ్ చేసిన తేదీ",
-      "colOpen": "తెరవండి",
       "downloadShort": "డౌన్‌లోడ్",
       "downloadVersion": "వెర్షన్ {version} డౌన్‌లోడ్ చేయండి",
       "cannotOpen": "తెరవలేరు",
@@ -5072,7 +5064,6 @@
     "cta": {
       "signIn": "Sign in",
       "talk": "Talk to us",
-      "talkEmail": "Talk to us by email",
       "learnMore": "Learn more",
       "existing": "Already using SchoolOS? Sign in with your school account.",
       "whatsapp": "Ask on WhatsApp",
