@@ -270,7 +270,7 @@ def test_FR_PLT_010_plan_row_version_defaults_to_1_and_freezes_with_the_plan(
     operator = _operator()
     draft = _plan(operator, status="draft")
     with platform_session() as s:
-        row_version = s.execute(
+        row_version: int = s.execute(
             text("SELECT row_version FROM platform.plans WHERE id = :p"), {"p": draft}
         ).scalar_one()
         assert row_version == 1
@@ -279,9 +279,7 @@ def test_FR_PLT_010_plan_row_version_defaults_to_1_and_freezes_with_the_plan(
         s.execute(text("UPDATE platform.plans SET row_version = 0 WHERE id = :p"), {"p": draft})
     published = _plan(operator)
     with pytest.raises(DBAPIError, match="immutable"), platform_session() as s:
-        s.execute(
-            text("UPDATE platform.plans SET row_version = 2 WHERE id = :p"), {"p": published}
-        )
+        s.execute(text("UPDATE platform.plans SET row_version = 2 WHERE id = :p"), {"p": published})
 
 
 def _issue_raw(invoice: uuid.UUID, number: str, fy: str = "2090-91", seq: int = 1) -> None:

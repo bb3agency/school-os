@@ -503,9 +503,7 @@ def list_plans(*, ctx: Annotated[Ctx, PlanRead], status: str | None = None) -> P
 
 
 @router.get("/plans/{plan_id}", response_model=PlanOut)
-def get_plan(
-    *, plan_id: uuid.UUID, response: Response, ctx: Annotated[Ctx, PlanRead]
-) -> PlanOut:
+def get_plan(*, plan_id: uuid.UUID, response: Response, ctx: Annotated[Ctx, PlanRead]) -> PlanOut:
     out = billing.get_plan(plan_id)
     _etag(response, out.row_version)
     return out
