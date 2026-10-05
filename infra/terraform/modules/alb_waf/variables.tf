@@ -80,6 +80,11 @@ variable "ssl_policy" {
   description = "TLS policy (TLS 1.2+ with 1.3)."
   type        = string
   default     = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+
+  validation {
+    condition     = can(regex("^ELBSecurityPolicy-TLS13-", var.ssl_policy))
+    error_message = "ssl_policy must be an ELBSecurityPolicy-TLS13-* policy (TLS 1.2 minimum, 1.3 enabled)."
+  }
 }
 
 variable "waf_rate_limit_per_5min" {

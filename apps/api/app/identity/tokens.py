@@ -506,6 +506,8 @@ def unverified_issuer(token: str) -> str | None:
     if not isinstance(token, str) or not token or len(token) > MAX_TOKEN_BYTES:
         return None
     try:
+        # Only picks the verifier, which re-checks signature and issuer (see docstring).
+        # nosemgrep: python.jwt.security.unverified-jwt-decode.unverified-jwt-decode
         claims = jwt.decode(token, options={"verify_signature": False})
     except (PyJWTError, ValueError, TypeError):
         return None

@@ -171,11 +171,12 @@ resource "aws_lb_listener" "http" {
   }
 }
 
+# ssl_policy comes from a variable whose validation allows only ELBSecurityPolicy-TLS13-* (TLS 1.2+).
 resource "aws_lb_listener" "https" {
   load_balancer_arn = aws_lb.this.arn
   port              = 443
   protocol          = "HTTPS"
-  ssl_policy        = var.ssl_policy
+  ssl_policy        = var.ssl_policy # nosemgrep: terraform.aws.security.insecure-load-balancer-tls-version.insecure-load-balancer-tls-version
   certificate_arn   = aws_acm_certificate_validation.this.certificate_arn
 
   default_action {

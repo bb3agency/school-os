@@ -9,6 +9,15 @@ HAS_WEB   := $(wildcard package.json)
 GITLEAKS_IMAGE  ?= zricethezav/gitleaks:v8.30.1
 TRIVY_IMAGE     ?= aquasec/trivy:0.74.0
 SEMGREP_VERSION ?= 1.178.0
+# make security: `.semgrep/` is excluded as a target because its files are deliberate bad-code
+# fixtures for the custom rules (tested by `semgrep --test` in the ci-config job). Registry rules
+# turned off, one reason each (docs/13, dependencies; SEC-009):
+#  - uv-missing-dependency-cooldown: `exclude-newer = "7 days"` makes uv.lock unsatisfiable
+#    (the locked google-auth is newer than 7 days), so `uv sync --locked` breaks.
+#  - npm-missing-minimum-release-age: `min-release-age` needs npm 11.10+, newer than the npm
+#    bundled with our Node (.nvmrc); package-lock.json and `ignore-scripts=true` cover installs.
+SEMGREP_EXCLUDE_RULES := --exclude-rule package_managers.uv.uv-missing-dependency-cooldown.uv-missing-dependency-cooldown
+SEMGREP_EXCLUDE_RULES += --exclude-rule package_managers.npm.npm-missing-minimum-release-age.npm-missing-minimum-release-age
 # Same Terraform version as CI (.github/actions/install-tools); multi-arch index digest.
 TERRAFORM_IMAGE ?= hashicorp/terraform:1.16.4@sha256:985cdc6c1d9b0a65b83377f666efd2f740b47f02ac55be1ced3d18f7d3b0e829
 
@@ -152,11 +161,13 @@ security: ## gitleaks, semgrep, pip-audit, npm audit, trivy (fs + config)
 	$(GITLEAKS) git --no-banner --redact --config .gitleaks.toml .
 	$(UV) run --with semgrep==$(SEMGREP_VERSION) --no-project semgrep scan --error --metrics=off \
 	  --config .semgrep --config p/python --config p/typescript --config p/owasp-top-ten \
-	  --exclude .venv --exclude node_modules --exclude docs --exclude .claude .
+	  --exclude .venv --exclude node_modules --exclude docs --exclude .claude \
+	  --exclude .semgrep $(SEMGREP_EXCLUDE_RULES) .
 	$(UV) export --locked --all-packages --no-dev --no-emit-workspace --format requirements-txt > /tmp/sos-requirements.txt
 	$(UV) run pip-audit --strict --disable-pip -r /tmp/sos-requirements.txt
 ifneq ($(HAS_WEB),)
-	npm audit --audit-level=high
+	npm audit --omit=dev --audit-level=high
+	node scripts/npm-audit-check.mjs
 endif
 	$(TRIVY) fs --scanners vuln,secret --severity HIGH,CRITICAL --exit-code 1 --skip-dirs node_modules --skip-dirs .venv --skip-dirs .claude .
 	$(TRIVY) config --severity HIGH,CRITICAL --exit-code 1 --skip-dirs node_modules --skip-dirs .claude .
