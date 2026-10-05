@@ -248,6 +248,50 @@ def test_BR_01_identity_change_required_over_http(
     assert res.json()["code"] == "identity_change_required"
 
 
+def test_BR_01_a_verified_identity_value_is_not_replaced_without_a_change_request(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """Audit 2026-10-05 A-05 (invariant 6): a value verified through an approved change request
+    (any source, e.g. ``birth_certificate``) is replaced only by another change request; a
+    direct unverified write used to supersede it and drop it from the canonical view."""
+    admin, staff = world.person("office_admin"), world.person("office_staff")
+    sid = api.call(admin, "POST", BASE, json=new_body("Synthetica Verified Dob")).json()["id"]
+    first = api.call(
+        staff,
+        "POST",
+        f"{BASE}/{sid}/values",
+        json={"attribute_key": "dob", "source": "birth_certificate", "value": "2012-03-14"},
+    )
+    assert first.status_code == 201, first.text
+    value_id = first.json()["id"]
+    with admin_engine.begin() as c:  # as record_verified_identity_value leaves it
+        c.execute(
+            text(
+                "UPDATE sis.attribute_values SET verification_status = 'verified', "
+                "verified_at = now() WHERE id = :v"
+            ),
+            {"v": value_id},
+        )
+    res = api.call(
+        staff,
+        "POST",
+        f"{BASE}/{sid}/values",
+        json={"attribute_key": "dob", "source": "birth_certificate", "value": "2011-01-01"},
+    )
+    assert res.status_code == 403, res.text
+    assert res.json()["code"] == "identity_change_required"
+    with admin_engine.connect() as c:
+        current = c.execute(
+            text(
+                "SELECT id FROM sis.attribute_values WHERE student_id = :s "
+                "AND attribute_key = 'dob' AND source = 'birth_certificate' "
+                "AND superseded_by IS NULL"
+            ),
+            {"s": sid},
+        ).scalar_one()
+    assert str(current) == value_id
+
+
 def test_values_etag_verify_and_status_patch(world: Any, api: Any, admin_engine: Engine) -> None:
     admin = world.person("office_admin")
     sid = api.call(admin, "POST", BASE, json=new_body("Synthetica Etag Case")).json()["id"]

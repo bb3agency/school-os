@@ -655,11 +655,16 @@ def _identity_guard(
     verification: Verification,
     existing: AttributeValue | None,
 ) -> None:
+    """Identity values change only through a change request (invariant 6, BR-01): no write may
+    set a decision, replace the admission-register value, or supersede a value that was verified
+    (e.g. by an approved change request at ``birth_certificate``; audit 2026-10-05 A-05)."""
     if not definition.is_identity:
         return
     if verification != "unverified":
         raise IdentityChangeRequired()
     if source == definition.policy.anchor and existing is not None:
+        raise IdentityChangeRequired()
+    if existing is not None and existing.verification_status == "verified":
         raise IdentityChangeRequired()
 
 
