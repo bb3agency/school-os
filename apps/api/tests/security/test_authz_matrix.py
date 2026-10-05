@@ -2020,7 +2020,18 @@ def test_SEC_003_role_route_matrix(
     granted = AUTHENTICATED in permissions or any(p in held for p in permissions)
     res = _call(api, world, admin_engine, role, key)
     expected = _success(*key) if granted and key not in SUPPORT_ONLY else 403
+    # Guard passed; the service refuses: confirming a register row as a *new* student also needs
+    # student.create (audit A-06). The exact code proves the route guard itself let the role in.
+    needs_create = (
+        key == ("POST", "/api/v1/extraction-items/{item_id}/confirm")
+        and granted
+        and "student.create" not in held
+    )
+    if needs_create:
+        expected = 403
     assert res.status_code == expected, f"{role} {key}: {res.status_code} {res.text}"
+    if needs_create:
+        assert res.json()["code"] == "student_create_required"
     if key in SUPPORT_ONLY:
         assert res.json()["code"] == "breakglass_only"
 
