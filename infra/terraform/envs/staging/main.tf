@@ -61,11 +61,13 @@ module "platform" {
   alarm_emails       = var.alarm_emails
   monthly_budget_usd = var.monthly_budget_usd
 
+  # Audit W3-04: the plan role trusts every same-repo pull request, so it never reads secrets (a
+  # refresh shows no secret versions; their values are write-only anyway).
   github_deploy_environment   = "staging"
   github_allow_main_branch    = false
   create_github_oidc_provider = var.create_github_oidc_provider
   create_plan_role            = true
-  plan_can_read_secrets       = true
+  plan_can_read_secrets       = false
   create_apply_role           = true
   github_apply_environment    = "staging-infra"
   state_bucket_arn            = var.state_bucket_arn

@@ -78,9 +78,25 @@ variable "create_plan_role" {
 }
 
 variable "plan_can_read_secrets" {
-  description = "Let the PR plan role refresh secret versions (GetSecretValue). Only for accounts with synthetic data (staging)."
+  description = "Let the plan role refresh secret versions (GetSecretValue). Only for accounts with synthetic data (staging), and only when plan_environment gates the role (audit W3-04: a same-repo pull request must never read secrets)."
   type        = bool
   default     = false
+
+  validation {
+    condition     = !var.plan_can_read_secrets || var.plan_environment != null
+    error_message = "plan_can_read_secrets needs plan_environment: a role every pull request can assume must not read secrets (audit W3-04)."
+  }
+}
+
+variable "plan_environment" {
+  description = "GitHub Environment (with required reviewers) the plan role trusts instead of every pull request and main. Null = pull requests and main, read-only and without secrets."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.plan_environment == null || can(regex("^[A-Za-z0-9._-]{1,64}$", coalesce(var.plan_environment, "x")))
+    error_message = "plan_environment: a GitHub Environment name."
+  }
 }
 
 variable "secrets_kms_key_arn" {

@@ -828,6 +828,7 @@ module "ci" {
   artifacts_kms_key_arn    = local.kms_data
   create_plan_role         = var.create_plan_role
   plan_can_read_secrets    = var.plan_can_read_secrets
+  plan_environment         = var.github_plan_environment
   secrets_kms_key_arn      = local.kms_data
   create_apply_role        = var.create_apply_role
   apply_environment        = var.github_apply_environment

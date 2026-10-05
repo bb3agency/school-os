@@ -137,3 +137,13 @@ run "files_locked_copy_with_the_dr_path" {
     error_message = "Staging replicates the files bucket to a locked bucket in ap-south-2."
   }
 }
+
+# Audit W3-04: staging's pull-request plan role reads no secrets.
+run "pr_plan_role_reads_no_secrets" {
+  command = plan
+
+  assert {
+    condition     = !module.platform.github_actions.plan_reads_secrets && contains(module.platform.github_actions.plan_subjects, "repo:bb3agency/school-os:pull_request")
+    error_message = "Staging's plan role trusts every same-repo pull request, so it must not read secrets."
+  }
+}

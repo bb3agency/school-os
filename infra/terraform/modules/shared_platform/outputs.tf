@@ -121,6 +121,9 @@ output "github_actions" {
     plan_role_arn   = module.ci.plan_role_arn
     apply_role_arn  = module.ci.apply_role_arn
     deploy_subjects = module.ci.deploy_subjects
+    # Audit W3-04: who may assume the plan role, and whether it may read secrets.
+    plan_subjects      = module.ci.plan_subjects
+    plan_reads_secrets = module.ci.plan_reads_secrets
   }
 }
 

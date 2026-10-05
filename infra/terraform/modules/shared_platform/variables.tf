@@ -541,9 +541,15 @@ variable "create_plan_role" {
 }
 
 variable "plan_can_read_secrets" {
-  description = "PR plan role may refresh secret versions (staging only)."
+  description = "Plan role may refresh secret versions (staging only, and only with github_plan_environment; audit W3-04)."
   type        = bool
   default     = false
+}
+
+variable "github_plan_environment" {
+  description = "GitHub Environment (required reviewers) that gates the plan role. Null = every same-repo pull request and main, without secrets."
+  type        = string
+  default     = null
 }
 
 variable "create_apply_role" {
