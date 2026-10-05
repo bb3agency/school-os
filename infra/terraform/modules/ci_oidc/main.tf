@@ -75,9 +75,23 @@ data "aws_iam_policy_document" "deploy" {
   }
 
   statement {
-    sid       = "EcsDeployAndOneOffTasks"
-    actions   = ["ecs:UpdateService", "ecs:DescribeServices", "ecs:RunTask", "ecs:DescribeTasks", "ecs:ListTasks", "ecs:StopTask"]
+    sid       = "EcsDeploy"
+    actions   = ["ecs:UpdateService", "ecs:DescribeServices", "ecs:DescribeTasks", "ecs:ListTasks", "ecs:StopTask"]
     resources = ["*"]
+    condition {
+      test     = "ArnEquals"
+      variable = "ecs:cluster"
+      values   = [var.ecs_cluster_arn]
+    }
+  }
+
+  # Only the listed one-off tasks (the migrate task). RunTask on any family would let a deploy start
+  # db-bootstrap, whose execution role injects the RDS master password, with a command override and
+  # read the output from the task logs (audit 2026-10-05 P2-04).
+  statement {
+    sid       = "EcsOneOffTasks"
+    actions   = ["ecs:RunTask"]
+    resources = [for f in var.one_off_task_families : "arn:${data.aws_partition.current.partition}:ecs:*:${data.aws_caller_identity.current.account_id}:task-definition/${f}:*"]
     condition {
       test     = "ArnEquals"
       variable = "ecs:cluster"

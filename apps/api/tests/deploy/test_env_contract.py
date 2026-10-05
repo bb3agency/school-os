@@ -247,7 +247,8 @@ def synthetic_value(name: str) -> str:
     if name.endswith("DATABASE_URL"):
         return f"postgresql+psycopg://sos_role:synthetic-{name.lower()}@db.example.test:5432/sos"
     values = {
-        "SOS_REDIS_URL": "rediss://:synthetic@valkey.example.test:6379/0",
+        # The shape modules/redis writes (url_template): TLS with certificate checks.
+        "SOS_REDIS_URL": "rediss://:synthetic@valkey.example.test:6379/0?ssl_cert_reqs=required",
         "SOS_BILLING_SUPPLIER_GSTIN": "37ABCDE1234F1Z5",
         "SOS_BILLING_SUPPLIER_STATE_CODE": "37",
         "SOS_BILLING_SUPPLIER_LEGAL_NAME": "Synthetic Staging Supplier Private Limited",

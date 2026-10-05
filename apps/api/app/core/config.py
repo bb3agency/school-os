@@ -10,7 +10,7 @@ import json
 from enum import StrEnum
 from functools import lru_cache
 from typing import Literal
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlsplit
 
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -147,6 +147,25 @@ def _is_public_https(url: str) -> bool:
         and not host.endswith(".localhost")
         and not host.startswith("127.")
     )
+
+
+def _tls_without_certificate_check(url: str) -> bool:
+    """A ``rediss://`` URL whose TLS would not verify the server certificate.
+
+    The Celery broker (kombu) reads ``ssl_cert_reqs`` from the URL and uses CERT_NONE when it
+    is missing; the result backend refuses such a URL. Only an explicit, single
+    ``ssl_cert_reqs=required`` (or ``CERT_REQUIRED``) counts as verified. Plain ``redis://``
+    (dedicated hosts, internal compose network) is not TLS and is not judged here.
+    """
+    parts = urlsplit(url)
+    if parts.scheme.lower() != "rediss":
+        return False
+    values = [
+        value.strip().lower()
+        for key, value in parse_qsl(parts.query, keep_blank_values=True)
+        if key == "ssl_cert_reqs"
+    ]
+    return values not in (["required"], ["cert_required"])
 
 
 # Placeholder supplier identity for local/CI invoices; refused in staging/prod (FR-PLT-016).
@@ -449,6 +468,12 @@ class Settings(BaseSettings):
                 value: SecretStr = getattr(self, name)
                 if "dev-only" in value.get_secret_value():
                     raise ValueError(f"{name} uses a dev-only default in {self.env}")
+            # TLS to Valkey must check the certificate: the Celery broker would otherwise
+            # accept anyone's (SEC-011, ASVS 9.2.1).
+            if _tls_without_certificate_check(self.redis_url.get_secret_value()):
+                raise ValueError(
+                    f"SOS_REDIS_URL must set ssl_cert_reqs=required for rediss:// in {self.env}"
+                )
             # The heartbeat answer (announcements shown to school users) is not signed: only TLS
             # authenticates the control plane to a dedicated host (SEC-009).
             if self.control_plane_url is not None and not _is_public_https(self.control_plane_url):

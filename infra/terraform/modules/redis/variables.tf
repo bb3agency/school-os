@@ -43,8 +43,14 @@ variable "num_cache_clusters" {
 }
 
 variable "kms_key_arn" {
-  description = "CMK for at-rest encryption, the auth-token secret and the slow-log group."
+  description = "CMK for at-rest encryption and the auth-token secret."
   type        = string
+}
+
+variable "log_kms_key_arn" {
+  description = "CMK for the slow-log group. Its key policy must allow CloudWatch Logs (the kms module's allow_cloudwatch_logs); null uses kms_key_arn."
+  type        = string
+  default     = null
 }
 
 variable "auth_token_version" {

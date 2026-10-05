@@ -32,6 +32,15 @@ run "encrypted_and_tls_required" {
   }
 }
 
+run "celery_verifies_the_valkey_certificate" {
+  command = plan
+
+  assert {
+    condition     = startswith(local.url_template, "rediss://") && endswith(local.url_template, "?ssl_cert_reqs=required")
+    error_message = "The connection URL must be rediss:// with ssl_cert_reqs=required (kombu defaults to CERT_NONE)."
+  }
+}
+
 run "auth_token_never_in_state" {
   command = plan
 

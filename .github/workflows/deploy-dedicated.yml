@@ -1,7 +1,7 @@
 # Dedicated-tier deploy (one isolated host per school) — docs/10 §8 step 2, CONTRACT §1.
 #
 # Manually dispatched with a CalVer release tag. After approval on the `production`
-# environment, AWS SSM Run Command executes `deploy/dedicated/upgrade.sh <version>` on the
+# environment, AWS SSM Run Command executes `deploy/dedicated/scripts/upgrade.sh <version>` on the
 # selected host(s), one host at a time, stopping at the first failure. No inbound SSH.
 #
 # Hosts are selected by EC2 tags that the Terraform `dedicated_host` module must set:
@@ -144,7 +144,7 @@ jobs:
           # never by string eval. AWS-RunShellScript runs /bin/sh (dash on Debian/Ubuntu), so
           # only POSIX `set -eu` here; upgrade.sh carries its own bash shebang.
           params=$(jq -n --arg dir "$INSTALL_DIR" --arg v "$VERSION" '{
-            commands: ["set -eu", ("cd " + ($dir | @sh)), ("./deploy/dedicated/upgrade.sh " + ($v | @sh))],
+            commands: ["set -eu", ("cd " + ($dir | @sh)), ("./deploy/dedicated/scripts/upgrade.sh " + ($v | @sh))],
             executionTimeout: ["3600"]
           }')
           cmd=$(aws ssm send-command \

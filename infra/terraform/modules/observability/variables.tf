@@ -103,6 +103,44 @@ variable "custom_metric_namespace" {
   default     = "SchoolOS"
 }
 
+variable "security_metric_namespace" {
+  description = "Namespace of the metrics derived from security log events. It must differ from custom_metric_namespace: the api and worker roles may PutMetricData there, and must not be able to silence a security alarm."
+  type        = string
+  default     = "SchoolOS/Security"
+
+  validation {
+    condition     = var.security_metric_namespace != var.custom_metric_namespace
+    error_message = "security_metric_namespace must differ from custom_metric_namespace."
+  }
+}
+
+variable "api_log_group_name" {
+  description = "CloudWatch log group of the api service (structured JSON lines, app/core/logging.py)."
+  type        = string
+}
+
+variable "worker_log_group_name" {
+  description = "CloudWatch log group of the Celery worker that runs audit.verify_all_chains."
+  type        = string
+}
+
+variable "web_log_group_name" {
+  description = "CloudWatch log group of the web/BFF service (src/server/log.ts JSON lines)."
+  type        = string
+}
+
+variable "api_auth_failures_per_5min" {
+  description = "401 answers from the API in 5 minutes that alarm (token replay, stolen service token, credential stuffing behind the BFF)."
+  type        = number
+  default     = 50
+}
+
+variable "heartbeat_rejections_per_15min" {
+  description = "Rejected fleet heartbeats (bad signature, replay, schema) in 15 minutes that alarm."
+  type        = number
+  default     = 5
+}
+
 variable "monthly_budget_usd" {
   description = "AWS Budgets monthly limit for this account (null disables). Alerts at 50/80/100 %."
   type        = number

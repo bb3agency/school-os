@@ -2,6 +2,14 @@
 # TLS in transit (required), KMS at rest (SEC-011), AUTH token generated ephemerally and written only
 # to write-only attributes (ElastiCache + Secrets Manager), so it never appears in plan or state (SEC-009).
 
+locals {
+  # The Celery broker (kombu) treats a rediss:// URL without ssl_cert_reqs as CERT_NONE: TLS
+  # without any certificate check, so anyone on the path could read or inject tasks. The Celery
+  # result backend refuses such a URL outright. redis-py (API) and node-redis (web) verify by
+  # default and ignore or accept the parameter (SEC-011, ASVS 9.2.1).
+  url_template = "rediss://:%s@%s:6379/0?ssl_cert_reqs=required"
+}
+
 ephemeral "random_password" "auth" {
   length  = 64
   special = false # ElastiCache AUTH tokens forbid several symbols; 64 alphanumerics ~ 380 bits.
@@ -48,7 +56,7 @@ resource "aws_elasticache_parameter_group" "this" {
 resource "aws_cloudwatch_log_group" "slow" {
   name              = "/schoolos/${var.name}/valkey-slow-log"
   retention_in_days = var.log_retention_days
-  kms_key_id        = var.kms_key_arn
+  kms_key_id        = coalesce(var.log_kms_key_arn, var.kms_key_arn)
   tags              = var.tags
 }
 
@@ -104,7 +112,7 @@ resource "aws_secretsmanager_secret_version" "this" {
     host       = aws_elasticache_replication_group.this.primary_endpoint_address
     port       = 6379
     auth_token = ephemeral.random_password.auth.result
-    url        = "rediss://:${ephemeral.random_password.auth.result}@${aws_elasticache_replication_group.this.primary_endpoint_address}:6379/0"
+    url        = format(local.url_template, ephemeral.random_password.auth.result, aws_elasticache_replication_group.this.primary_endpoint_address)
   })
   secret_string_wo_version = var.auth_token_version
 }

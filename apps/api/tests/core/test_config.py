@@ -119,6 +119,41 @@ def test_SEC_009_prod_accepts_a_public_https_control_plane_url() -> None:
     assert s.control_plane_url == "https://admin.schoolos.example"
 
 
+@pytest.mark.parametrize(
+    "url",
+    [
+        "rediss://:token@valkey.example.internal:6379/0",
+        "rediss://:token@valkey.example.internal:6379/0?ssl_cert_reqs=none",
+        "rediss://:token@valkey.example.internal:6379/0?ssl_cert_reqs=CERT_NONE",
+        "rediss://:token@valkey.example.internal:6379/0?ssl_cert_reqs=optional",
+        "rediss://:token@valkey.example.internal:6379/0?ssl_cert_reqs=required&ssl_cert_reqs=none",
+    ],
+)
+def test_SEC_011_prod_rejects_a_valkey_tls_url_without_certificate_checks(url: str) -> None:
+    """The Celery broker (kombu) treats a rediss:// URL without ssl_cert_reqs as CERT_NONE, so
+    the worker's TLS to Valkey would accept any certificate (audit 2026-10-05 P2-01)."""
+    with pytest.raises(ValidationError, match="SOS_REDIS_URL"):
+        _prod(redis_url=SecretStr(url))
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "rediss://:token@valkey.example.internal:6379/0?ssl_cert_reqs=required",
+        "rediss://:token@valkey.example.internal:6379/0?ssl_cert_reqs=CERT_REQUIRED",
+        # Dedicated hosts: plaintext on the internal, isolated compose network (docs/10 §15).
+        "redis://:token@valkey:6379/0",
+    ],
+)
+def test_SEC_011_prod_accepts_a_verified_or_internal_valkey_url(url: str) -> None:
+    assert _prod(redis_url=SecretStr(url)).redis_url.get_secret_value() == url
+
+
+def test_SEC_011_local_allows_rediss_without_certificate_checks() -> None:
+    url = "rediss://localhost:6380/0"
+    assert Settings(env=Environment.LOCAL, redis_url=SecretStr(url)).redis_url is not None
+
+
 def test_SEC_009_local_allows_a_plain_http_control_plane_url() -> None:
     s = Settings(env=Environment.LOCAL, control_plane_url="http://localhost:8000")
     assert s.control_plane_url == "http://localhost:8000"
