@@ -233,6 +233,7 @@ def _set_status(
     extra: dict[str, Any] | None = None,
     require_provisioned: bool = False,
     after: Callable[[Session, RowMapping], None] | None = None,
+    check: Callable[[Session, RowMapping], None] | None = None,
 ) -> TenantDetailOut:
     dep0 = _deployment(tenant_id)
     shared = dep0["mode"] == "shared"
@@ -244,6 +245,8 @@ def _set_status(
                 f"A school that is {dep['tenant_status']} cannot become {target}.",
                 code="invalid_state",
             )
+        if check is not None:  # under the deployment lock
+            check(s, dep)
         if require_provisioned:
             run = repo.get_by(s, m.provisioning_runs, m.provisioning_runs.c.tenant_id == tenant_id)
             if run is not None and run["state"] != "completed":
@@ -305,12 +308,21 @@ def suspend(actor: Actor, tenant_id: uuid.UUID, reason: str) -> TenantDetailOut:
     )
 
 
-def reactivate(actor: Actor, tenant_id: uuid.UUID, reason: str) -> TenantDetailOut:
-    dep = _deployment(tenant_id)
-    if dep["tenant_status_reason"] == "billing":
+def _not_billing_suspended(s: Session, dep: RowMapping) -> None:
+    """A billing suspension is lifted only from the subscription (docs/16 §9). That covers a
+    school suspended for billing, and a school already held for another reason whose
+    subscription was suspended meanwhile (audit 2026-10-05 A-08: reactivating it made the
+    school live while its subscription stayed suspended and was no longer invoiced)."""
+    sub = repo.live_subscription(s, dep["tenant_id"])
+    if dep["tenant_status_reason"] == "billing" or (
+        sub is not None and sub["status"] == "suspended"
+    ):
         raise Conflict(
             "Billing suspensions are lifted from the subscription.", code="billing_suspension"
         )
+
+
+def reactivate(actor: Actor, tenant_id: uuid.UUID, reason: str) -> TenantDetailOut:
     del reason  # recorded in the platform audit event action only (free text is not audited)
     return _set_status(
         actor,
@@ -319,6 +331,7 @@ def reactivate(actor: Actor, tenant_id: uuid.UUID, reason: str) -> TenantDetailO
         allowed_from=("suspended",),
         action="tenant.reactivated",
         reason=None,
+        check=_not_billing_suspended,
     )
 
 

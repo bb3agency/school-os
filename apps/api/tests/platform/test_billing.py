@@ -495,6 +495,42 @@ def _issue_overdue(owner: Operator, sub: str, issue_day: dt.date) -> str:
     return str(inv_id)
 
 
+def test_FR_PLT_004_lifting_a_security_hold_does_not_lift_a_billing_suspension(
+    api: Api,
+    owner: Operator,
+    make_operator: MakeOperator,
+    make_plan: Callable[..., uuid.UUID],
+    admin_engine: Engine,
+) -> None:
+    """Audit 2026-10-05 A-08: a school already suspended for security keeps its reason when its
+    subscription is suspended for non-payment later; an engineer's reactivate then made it live
+    while the subscription stayed suspended (no new invoices, nothing past due)."""
+    engineer, billing_admin = make_operator("platform_engineer"), make_operator("billing_admin")
+    school = _school(api, owner, make_plan())
+    sub, tid = school["subscription_id"], school["tenant_id"]
+    api.call("POST", f"/tenants/{tid}/activate", owner)
+    _issue_overdue(owner, sub, dt.date(2026, 1, 5))
+    billing.mark_past_due(today=dt.date(2026, 2, 1))
+    hold = {"reason": "Security incident reported by the school"}
+    assert api.call("POST", f"/tenants/{tid}/suspend", engineer, json=hold).status_code == 200
+    billing.suspend_subscription(
+        billing_admin.actor,
+        uuid.UUID(sub),
+        "Unpaid for two months",
+        actor_is_owner=False,
+        exam_window_override=False,
+        today=dt.date(2026, 2, 16),
+    )
+    res = api.call("POST", f"/tenants/{tid}/reactivate", engineer, json=hold)
+    assert res.status_code == 409, res.text
+    assert res.json()["code"] == "billing_suspension"
+    with admin_engine.connect() as c:
+        assert (
+            c.execute(text("SELECT status FROM core.tenants WHERE id = :t"), {"t": tid}).scalar()
+            == "suspended"
+        )
+
+
 def test_FR_PLT_014_overdue_sweep_marks_past_due_and_never_suspends(
     api: Api,
     owner: Operator,
