@@ -113,7 +113,9 @@ def confirm_item(
     """Save the row as you read it on the page (permission ``import.commit``).
 
     Creates a student (or adds to ``student_id``) with source ``admission_register`` and the
-    page as evidence. A row already checked answers 409 ``item_already_reviewed``; changing an
+    page as evidence; creating a student also needs ``student.create`` (403
+    ``student_create_required``). A row already checked answers 409 ``item_already_reviewed``;
+    changing an
     existing register identity value answers 403 ``identity_change_required`` (use a change
     request). Accepts ``Idempotency-Key``.
     """

@@ -94,6 +94,7 @@ log = get_logger(__name__)
 RUN: Final = "import.run"
 COMMIT: Final = "import.commit"
 SOURCE: Final = "admission_register"
+CREATE_STUDENT: Final = "student.create"
 
 BATCH_EVENT: Final = "extraction.batch.created"
 CONFIRMED_EVENT: Final = "extraction.confirmed"
@@ -868,7 +869,8 @@ def confirm_item(
 ) -> ItemOut:
     """Record the reviewer's values (permission ``import.commit``; US-402 AC2, FR-IMP-023).
 
-    Creates the student (``student_id`` omitted) or adds the values to an existing one, with
+    Creates the student (``student_id`` omitted; needs ``student.create`` school-wide, else 403
+    ``student_create_required``) or adds the values to an existing one, with
     source ``admission_register`` and the page as evidence. Identity values are recorded
     unverified (students module rule: verifying them needs a change request); other values
     are recorded verified by you. An existing different register identity value answers 403
@@ -888,6 +890,14 @@ def confirm_item(
     value_ids: list[uuid.UUID] = []
     later = values
     if data.student_id is None:
+        # Creating a student needs ``student.create`` school-wide, as on POST /students and in
+        # an import (audit 2026-10-05 A-06): ``import.commit`` alone does not create students.
+        if not (ctx.has(CREATE_STUDENT) and ctx.scope_for(CREATE_STUDENT).school_wide):
+            raise Forbidden(
+                "You cannot add new students. Link the row to an existing student, or ask "
+                "someone who can add students to confirm it.",
+                code="student_create_required",
+            )
         # Identity values create the student (students records them unverified: provisional
         # until a change request verifies them, BR-01); the rest follow as verified values.
         student_id, value_ids = _create_student(
