@@ -62,6 +62,27 @@ def upsert_attendance(session: Session, rows: Sequence[Mapping[str, Any]]) -> tu
     return _written(session, stmt)
 
 
+def marks_in_other_sections(
+    session: Session,
+    section_id: uuid.UUID,
+    student_ids: Collection[uuid.UUID],
+    first: dt.date,
+    last: dt.date,
+) -> set[tuple[uuid.UUID, dt.date]]:
+    """(student, date) pairs between ``first`` and ``last`` already recorded under a section
+    other than ``section_id`` (the section the student was in that day)."""
+    if not student_ids:
+        return set()
+    rows = session.execute(
+        select(AttendanceMark.student_id, AttendanceMark.on_date).where(
+            AttendanceMark.student_id.in_(list(student_ids)),
+            AttendanceMark.on_date.between(first, last),
+            AttendanceMark.section_id != section_id,
+        )
+    ).all()
+    return {(r.student_id, r.on_date) for r in rows}
+
+
 def section_marks(
     session: Session, section_id: uuid.UUID, first: dt.date, last: dt.date
 ) -> list[AttendanceMark]:

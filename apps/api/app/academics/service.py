@@ -97,6 +97,9 @@ EVENT_CHUNK: Final = 100
 IST: Final = ZoneInfo("Asia/Kolkata")
 SHEET_REASON: Final = "records_sheet_read"
 AADHAAR_CODE: Final = "aadhaar_full_number_rejected"
+OTHER_SECTION_CODE: Final = "recorded_in_another_section"
+"""A scoped recorder may not overwrite a record made under another section (the section the
+student was in that day or for that exam); school-wide recorders may (audit 2026-10-05 A-04)."""
 _MIME_KINDS: Final[dict[str, FileKind]] = {
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
     "text/csv": "csv",
@@ -303,7 +306,9 @@ def record_attendance(
 ) -> WriteResultOut:
     """Store a section's statuses for one or more dates, all or nothing (``attendance.record``;
     FR-ATT-002). 422 when a student is not in the section's roster, a date is in the future or
-    outside the section's academic year, or an entry repeats. Audit ``attendance.recorded``."""
+    outside the section's academic year, or an entry repeats; and, for a scoped recorder, when
+    the day is already recorded under another section (``recorded_in_another_section``).
+    Audit ``attendance.recorded``."""
     cfg = load_config().attendance
     sec = _section(session, ctx, section_id, ATTENDANCE_RECORD)
     if len(data.entries) > cfg.max_entries:
@@ -321,6 +326,15 @@ def record_attendance(
             errors.append(_error(f"entries.{i}", "duplicate_entry"))
         seen.add(key)
     _refuse(errors)
+    if not ctx.scope_for(ATTENDANCE_RECORD).school_wide:
+        dates = [e.on_date for e in data.entries]
+        elsewhere = repo.marks_in_other_sections(
+            session, sec.section.id, roster, min(dates), max(dates)
+        )
+        for i, entry in enumerate(data.entries):
+            if (entry.student_id, entry.on_date) in elsewhere:
+                errors.append(_error(f"entries.{i}.on_date", OTHER_SECTION_CODE))
+        _refuse(errors)
     inserted, updated = repo.upsert_attendance(
         session,
         [
@@ -571,6 +585,23 @@ def section_marks(
     )
 
 
+def _marks_in_other_sections(
+    ctx: UserContext, section_id: uuid.UUID, existing: Iterable[Any], entries: Sequence[MarkIn]
+) -> list[dict[str, str]]:
+    """Errors for papers a scoped recorder finds already recorded under another section
+    (:data:`OTHER_SECTION_CODE`); none for a school-wide recorder."""
+    if ctx.scope_for(MARKS_RECORD).school_wide:
+        return []
+    elsewhere = {
+        (m.student_id, m.subject.casefold()) for m in existing if m.section_id != section_id
+    }
+    return [
+        _error(f"entries.{i}.subject", OTHER_SECTION_CODE)
+        for i, entry in enumerate(entries)
+        if (entry.student_id, entry.subject.casefold()) in elsewhere
+    ]
+
+
 def record_marks(
     session: Session,
     ctx: UserContext,
@@ -580,7 +611,9 @@ def record_marks(
 ) -> WriteResultOut:
     """Store a section's marks for one exam, all or nothing (``marks.record``; FR-MRK-002). 422
     when a student is not in the roster, marks exceed the maximum, absent papers carry marks,
-    a subject is too long or holds an Aadhaar-like number, or an entry repeats. Subjects match
+    a subject is too long or holds an Aadhaar-like number, or an entry repeats; and, for a scoped
+    recorder, when the paper is already recorded under another section
+    (``recorded_in_another_section``). Subjects match
     whatever their case: a paper already stored corrects in place under its first spelling.
     Audit ``marks.recorded``."""
     cfg = load_config().marks
@@ -621,10 +654,9 @@ def record_marks(
     spelling: dict[str, str] = {}
     for subject in repo.exam_subjects(session, exam.id):
         spelling.setdefault(subject.casefold(), subject)
-    stored = {
-        (m.student_id, m.subject.casefold()): m.subject
-        for m in repo.exam_marks(session, exam.id, {e.student_id for e in data.entries})
-    }
+    existing = repo.exam_marks(session, exam.id, {e.student_id for e in data.entries})
+    stored = {(m.student_id, m.subject.casefold()): m.subject for m in existing}
+    _refuse(_marks_in_other_sections(ctx, sec.section.id, existing, data.entries))
 
     def _subject(entry: MarkIn) -> str:
         folded = entry.subject.casefold()

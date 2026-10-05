@@ -152,9 +152,10 @@ def _scope_out(scopes: Iterable[Any]) -> list[ScopeOut]:
 
 
 def _contact_hidden(membership: Membership, shared: bool) -> bool:
-    """Audit DL-09: a school sees the email of a person who also belongs to another school only
-    while they are its member (active or suspended), i.e. after they accepted. An open or
-    declined invitation, or a removed membership, shows no contact details."""
+    """Audit DL-09: a school sees the email and the last sign-in time (audit 2026-10-05 A-03) of
+    a person who also belongs to another school only while they are its member (active or
+    suspended), i.e. after they accepted. An open or declined invitation, or a removed
+    membership, shows neither."""
     return shared and membership.status not in ("active", "suspended")
 
 
@@ -192,7 +193,7 @@ def _user_out(session: Session, membership: Membership) -> UserOut:
         expires_at=membership.expires_at,
         roles=[r.key for r in repo.list_roles_for_membership(session, membership.id)],
         scopes=_scope_out(repo.list_membership_scopes(session, membership.id)),
-        last_login_at=user.last_login_at,
+        last_login_at=None if hidden else user.last_login_at,
         created_at=membership.created_at,
         version=membership.version,
         profile_shared=shared,
@@ -848,9 +849,39 @@ def set_roles(
             resource_id=membership.id,
             summary={"user_id": user_id, "role_key": role.key, "role_id": role.id},
         )
+    membership = _start_time_bound_window(session, ctx, membership, added)
     if added or revoked:
         cache.invalidate_on_commit(session, ctx.tenant_id, membership.id)
     return _user_out(session, membership)
+
+
+def _start_time_bound_window(
+    session: Session, ctx: UserContext, membership: Membership, added: Sequence[Role]
+) -> Membership:
+    """A role with a membership TTL (``auditor_readonly``, docs/07 §6.2) is time-bound however it
+    is given: adding it caps the membership's expiry at now + TTL, as an invitation does. An
+    earlier expiry is kept; nothing is ever extended (audit 2026-10-05 A-02)."""
+    templates = system_roles()
+    ttls = [
+        d.membership_ttl
+        for r in added
+        if r.is_system and (d := templates.get(r.key)) is not None and d.membership_ttl
+    ]
+    if not ttls:
+        return membership
+    ends = dt.datetime.now(dt.UTC) + min(ttls)
+    if membership.expires_at is not None and membership.expires_at <= ends:
+        return membership
+    updated = repo.set_membership_expiry(session, membership.id, expires_at=ends)
+    _record(
+        session,
+        ctx,
+        action="membership.expiry_set",
+        resource_type="membership",
+        resource_id=membership.id,
+        summary={"user_id": membership.user_id, "expires_at": ends.isoformat()},
+    )
+    return updated
 
 
 def _add_scopes(

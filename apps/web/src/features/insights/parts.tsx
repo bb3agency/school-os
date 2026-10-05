@@ -80,6 +80,7 @@ const PROBLEM_CODES = new Set([
   "marks_over_max",
   "absent_has_no_marks",
   "exam_other_year",
+  "recorded_in_another_section",
   "exam_name_taken",
   "too_old",
   "not_enrolled",

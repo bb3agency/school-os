@@ -282,7 +282,8 @@ def certificate_download_url(
 ) -> DownloadUrlOut:
     """A link to download the certificate PDF, valid for at most 5 minutes (permission
     ``certificate.read``). Error ``pdf_not_ready`` / ``document_not_ready`` (409) while it is
-    being made or checked. Audited."""
+    being made or checked; ``certificate_cancelled`` (409) once it, or the original it copies,
+    was cancelled (print it from the print view, marked CANCELLED). Audited."""
     return service.download_url(db, ctx, certificate_id)
 
 

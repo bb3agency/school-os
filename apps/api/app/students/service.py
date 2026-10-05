@@ -69,6 +69,7 @@ from app.core.languages import telugu_text
 from app.core.logging import get_context, get_logger
 from app.core.records import RecordTable
 from app.core.textnorm import comparison_key
+from app.documents import service as documents
 from app.identity import service as identity
 from app.ops import service as ops
 from app.students import crypto
@@ -644,9 +645,21 @@ def value_history(
 # --- create and record -----------------------------------------------------------------------
 
 
-def _check_evidence(evidence_document_id: uuid.UUID | None) -> None:
-    """Evidence documents live in ``kb.documents`` (M1 documents module); until that module's
-    ``evidence_exists`` is available the id is stored as given (composite FK added in 0009)."""
+def _check_evidence(
+    session: Session, ctx: UserContext, evidence_document_id: uuid.UUID | None
+) -> None:
+    """Evidence named on a value must be a document the caller can see, with a usable version
+    (audit 2026-10-05 A-09: any id of the school was stored as given, so a value could claim
+    evidence the caller never saw, pin an unrelated document against deletion, and the 422/201
+    answer showed whether an id existed). 422 ``evidence_document_id not_found`` otherwise,
+    the same answer for an unknown id."""
+    if evidence_document_id is None:
+        return
+    if not (
+        documents.is_visible(session, ctx, evidence_document_id)
+        and documents.evidence_exists(session, evidence_document_id)
+    ):
+        raise ValidationFailed([error("evidence_document_id", "not_found")])
 
 
 def _identity_guard(
@@ -655,11 +668,16 @@ def _identity_guard(
     verification: Verification,
     existing: AttributeValue | None,
 ) -> None:
+    """Identity values change only through a change request (invariant 6, BR-01): no write may
+    set a decision, replace the admission-register value, or supersede a value that was verified
+    (e.g. by an approved change request at ``birth_certificate``; audit 2026-10-05 A-05)."""
     if not definition.is_identity:
         return
     if verification != "unverified":
         raise IdentityChangeRequired()
     if source == definition.policy.anchor and existing is not None:
+        raise IdentityChangeRequired()
+    if existing is not None and existing.verification_status == "verified":
         raise IdentityChangeRequired()
 
 
@@ -760,7 +778,7 @@ def create_student(
         if (item.attribute_key, item.source) in seen:
             raise ValidationFailed([error(f"values.{i}", "duplicate_value")])
         seen.add((item.attribute_key, item.source))
-        _check_evidence(item.evidence_document_id)
+        _check_evidence(session, ctx, item.evidence_document_id)
         cleaned.append((definition, item.source, clean, item.evidence_document_id))
     if not any(d.key == "full_name" for d, *_ in cleaned):
         raise ValidationFailed([error("values", "full_name_required")])
@@ -847,7 +865,7 @@ def record_value(  # noqa: PLR0917 - signature fixed by the M1 build contract
     defs = _definitions(session)
     definition = _definition_for(defs, attribute_key, "attribute_key")
     clean = validate_value(definition, source, value)
-    _check_evidence(evidence_document_id)
+    _check_evidence(session, ctx, evidence_document_id)
     previous = repo.current_value(session, student_id, attribute_key, source)
     if (
         previous is not None

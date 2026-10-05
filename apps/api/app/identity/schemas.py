@@ -178,8 +178,9 @@ class UserOut(_Out):
     contact_hidden: bool = Field(
         default=False,
         description="The person also belongs to another school and has not accepted this "
-        "school's invitation (or declined it, or was removed), so their email is not shown "
-        "(``email`` is null; audit DL-09). It appears once they accept.",
+        "school's invitation (or declined it, or was removed), so their email and last sign-in "
+        "time are not shown (``email`` and ``last_login_at`` are null; audit DL-09). They "
+        "appear once they accept.",
     )
 
 

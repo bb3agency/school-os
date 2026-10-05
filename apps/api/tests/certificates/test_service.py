@@ -732,6 +732,57 @@ def test_FR_CERT_008_cancel_archives_the_document(school: Any, admin_engine: Eng
     assert status == "archived"
 
 
+def test_SEC_015_a_cancelled_certificates_clean_pdf_is_not_handed_out(
+    school: Any, admin_engine: Engine
+) -> None:
+    """Audit 2026-10-05 A-07: the PDF stored at issue carries no CANCELLED mark, so after a
+    cancellation its download would look like a valid certificate."""
+    cert = C.issue(school, C.student(school), "conduct")
+    C.render(school, cert)
+    C.mark_document_ready(admin_engine, C.row(admin_engine, cert.id)["document_id"])
+    reader = school.people["office_staff"]
+    assert C.call(school, reader, "office_staff", certificates.download_url, cert.id).url
+    C.cancel(
+        school,
+        C.call(
+            school, school.people["principal"], "principal", certificates.get_certificate, cert.id
+        ),
+    )
+    with pytest.raises(Conflict) as exc:
+        C.call(school, reader, "office_staff", certificates.download_url, cert.id)
+    assert exc.value.code == "certificate_cancelled"
+
+
+def test_SEC_015_a_duplicate_of_a_cancelled_original_is_marked_and_not_handed_out(
+    school: Any, admin_engine: Engine
+) -> None:
+    """Audit 2026-10-05 A-07: cancelling the original left its issued duplicates printable and
+    downloadable with no mark (only the register said "Original cancelled")."""
+    original = C.issue(school, C.student(school), "bonafide")
+    copy = C.duplicate(school, original.id)
+    assert copy.status == "issued"
+    C.render(school, copy)
+    C.mark_document_ready(admin_engine, C.row(admin_engine, copy.id)["document_id"])
+    reader = school.people["office_staff"]
+    assert "CANCELLED" not in C.call(
+        school, reader, "office_staff", certificates.print_page, copy.id
+    )
+    C.cancel(
+        school,
+        C.call(
+            school,
+            school.people["principal"],
+            "principal",
+            certificates.get_certificate,
+            original.id,
+        ),
+    )
+    assert "CANCELLED" in C.call(school, reader, "office_staff", certificates.print_page, copy.id)
+    with pytest.raises(Conflict) as exc:
+        C.call(school, reader, "office_staff", certificates.download_url, copy.id)
+    assert exc.value.code == "certificate_cancelled"
+
+
 def test_FR_CERT_010_failed_render_is_marked_and_can_be_retried(
     school: Any, admin_engine: Engine
 ) -> None:

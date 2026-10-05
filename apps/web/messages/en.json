@@ -2900,6 +2900,10 @@
         "title": "Someone already checked this row",
         "body": "Go back to the list of rows and open the next one."
       },
+      "student_create_required": {
+        "title": "You cannot add new students",
+        "body": "Choose the existing student this row belongs to, or ask someone who can add students to save it."
+      },
       "evidence_unavailable": {
         "title": "The photo of this page is no longer available",
         "body": "The row can't be saved without it. Discard it, then photograph the page again and upload it."
@@ -5923,6 +5927,10 @@
         "title": "The PDF is still being made",
         "body": "Try again in a moment. You can print from the print view meanwhile."
       },
+      "certificate_cancelled": {
+        "title": "This certificate was cancelled",
+        "body": "Its PDF is not handed out. Print it from the print view, where it is marked CANCELLED."
+      },
       "document_not_ready": {
         "title": "The PDF is still being checked",
         "body": "Every file is checked for viruses first. Try again in a moment."
@@ -6888,6 +6896,7 @@
       "marks_over_max": "Some marks are more than the maximum.",
       "absent_has_no_marks": "A student marked absent cannot also have marks.",
       "exam_other_year": "This exam belongs to another academic year.",
+      "recorded_in_another_section": "Some days or papers were recorded in the section the student was in before. Ask the principal to correct them.",
       "exam_name_taken": "An exam with this name already exists this year. Choose another name.",
       "too_old": "The date is too far back. Notes can go back 60 days.",
       "not_enrolled": "The student is not in a section this year.",

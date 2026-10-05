@@ -672,7 +672,8 @@ export interface paths {
          * Certificate Download Url
          * @description A link to download the certificate PDF, valid for at most 5 minutes (permission
          *     ``certificate.read``). Error ``pdf_not_ready`` / ``document_not_ready`` (409) while it is
-         *     being made or checked. Audited.
+         *     being made or checked; ``certificate_cancelled`` (409) once it, or the original it copies,
+         *     was cancelled (print it from the print view, marked CANCELLED). Audited.
          */
         get: operations["certificate_download_url_api_v1_certificates__certificate_id__download_url_get"];
         put?: never;
@@ -2027,7 +2028,9 @@ export interface paths {
          * @description Save the row as you read it on the page (permission ``import.commit``).
          *
          *     Creates a student (or adds to ``student_id``) with source ``admission_register`` and the
-         *     page as evidence. A row already checked answers 409 ``item_already_reviewed``; changing an
+         *     page as evidence; creating a student also needs ``student.create`` (403
+         *     ``student_create_required``). A row already checked answers 409 ``item_already_reviewed``;
+         *     changing an
          *     existing register identity value answers 403 ``identity_change_required`` (use a change
          *     request). Accepts ``Idempotency-Key``.
          */
@@ -13649,7 +13652,7 @@ export interface components {
         UserOut: {
             /**
              * Contact Hidden
-             * @description The person also belongs to another school and has not accepted this school's invitation (or declined it, or was removed), so their email is not shown (``email`` is null; audit DL-09). It appears once they accept.
+             * @description The person also belongs to another school and has not accepted this school's invitation (or declined it, or was removed), so their email and last sign-in time are not shown (``email`` and ``last_login_at`` are null; audit DL-09). They appear once they accept.
              * @default false
              */
             contact_hidden: boolean;

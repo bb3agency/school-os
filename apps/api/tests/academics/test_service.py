@@ -453,3 +453,99 @@ def test_FR_MRK_005_results_per_exam_for_the_rules(school: Any) -> None:
     mine = [r for r in results[school.ids["a2"]] if r.exam_id == exam_id]
     assert mine[0].percent == 30.0
     assert mine[0].papers == 1
+
+
+# --- records made in another section (audit 2026-10-05 A-04) --------------------------------------
+
+
+def _student_in_9c(school: Any) -> uuid.UUID:
+    """A new student enrolled in 9C (the fixture's students stay where they are)."""
+    sid: uuid.UUID = S.SW.create(
+        school,
+        name="Synthetica Moved Kumar",
+        section_key=None,
+        admission_no=f"SYN-MV-{uuid.uuid4().hex[:6]}",
+    )
+    with tenant_session(school.tenant_id, school.people["owner"].user_id) as db:
+        S.students.enrol(
+            db,
+            S.SW.admin_ctx(school),
+            sid,
+            S.EnrollmentIn(section_id=school.ids["section_9c"], roll_no="7"),
+        )
+    return sid
+
+
+def _move_to_9a(school: Any, admin_engine: Engine, sid: uuid.UUID) -> None:
+    with admin_engine.begin() as c:
+        c.execute(
+            text(
+                "UPDATE sis.enrollments SET section_id = :s WHERE tenant_id = :t "
+                "AND student_id = :st AND status = 'active'"
+            ),
+            {"s": school.ids["section_9a"], "t": school.tenant_id, "st": sid},
+        )
+
+
+def test_SEC_015_a_scoped_teacher_cannot_rewrite_another_sections_attendance(
+    school: Any, admin_engine: Engine
+) -> None:
+    sid = _student_in_9c(school)
+    day = S.school_days(1, end=S.school_days(30)[0])[0]
+    ct9c = S.ct_ctx(school, "ct9c", "section_9c")
+    S.record(school, "section_9c", {sid: ["present"]}, [day], who=ct9c)
+    _move_to_9a(school, admin_engine, sid)
+
+    ct = S.ct_ctx(school)
+    entry = AttendanceEntryIn(student_id=sid, on_date=day, status="absent")
+    with (
+        pytest.raises(ValidationFailed) as err,
+        tenant_session(school.tenant_id, ct.user_id) as db,
+    ):
+        academics.record_attendance(
+            db, ct, school.ids["section_9a"], AttendanceWrite(entries=[entry])
+        )
+    assert "recorded_in_another_section" in _codes(err)
+    with admin_engine.connect() as c:
+        row = c.execute(
+            text(
+                "SELECT section_id, status FROM sis.attendance_marks "
+                "WHERE tenant_id = :t AND student_id = :s AND on_date = :d"
+            ),
+            {"t": school.tenant_id, "s": sid, "d": day},
+        ).one()
+    assert (row.section_id, row.status) == (school.ids["section_9c"], "present")
+
+    # A day with no record yet, and a school-wide recorder's correction, still work.
+    later = S.school_days(1, end=S.school_days(29)[0])[0]
+    assert S.record(school, "section_9a", {sid: ["late"]}, [later], who=ct).written == 1
+    assert S.record(school, "section_9a", {sid: ["absent"]}, [day]).written == 1
+
+
+def test_SEC_015_a_scoped_teacher_cannot_rewrite_another_sections_marks(
+    school: Any, admin_engine: Engine
+) -> None:
+    sid = _student_in_9c(school)
+    exam_id = S.exam(school, f"Synthetic moved {uuid.uuid4().hex[:5]}", S.school_days(1)[0])
+    S.marks(school, "section_9c", exam_id, {sid: [("Maths", 20, 50)]})
+    _move_to_9a(school, admin_engine, sid)
+
+    ct = S.ct_ctx(school)
+    entry = MarkIn(student_id=sid, subject="Maths", marks=45, max_marks=50, absent=False)
+    with (
+        pytest.raises(ValidationFailed) as err,
+        tenant_session(school.tenant_id, ct.user_id) as db,
+    ):
+        academics.record_marks(
+            db, ct, school.ids["section_9a"], exam_id, MarksWrite(entries=[entry])
+        )
+    assert "recorded_in_another_section" in _codes(err)
+    with admin_engine.connect() as c:
+        row = c.execute(
+            text(
+                "SELECT section_id, marks FROM sis.exam_marks "
+                "WHERE tenant_id = :t AND student_id = :s AND exam_id = :e"
+            ),
+            {"t": school.tenant_id, "s": sid, "e": exam_id},
+        ).one()
+    assert (row.section_id, row.marks) == (school.ids["section_9c"], Decimal("20.00"))
