@@ -89,9 +89,7 @@ def _forge(
     )
     if advance_head:
         s.execute(
-            text(
-                "UPDATE audit.chain_heads SET last_seq = :s, last_hash = :h WHERE tenant_id = :t"
-            ),
+            text("UPDATE audit.chain_heads SET last_seq = :s, last_hash = :h WHERE tenant_id = :t"),
             {"s": row["seq"], "h": row["hash"], "t": tenant},
         )
 
@@ -142,41 +140,46 @@ def test_SEC_007_record_still_appends_after_the_guard(chain: uuid.UUID) -> None:
     assert _verify(chain) == VerifyResult(True, N + 1)
 
 
+def _forge_platform(s: Session) -> None:
+    """Append a backdated control-plane event as sos_platform could, bypassing record_platform()."""
+    head = s.execute(text("SELECT last_seq, last_hash FROM platform.audit_chain_head")).one()
+    row: dict[str, Any] = {
+        "id": uuid.uuid4(),
+        "seq": int(head.last_seq) + 1,
+        "occurred_at": datetime.now(UTC) - timedelta(days=3),
+        "actor_type": "operator",
+        "actor_id": uuid.uuid4(),
+        "action": "platform.tenant.suspended",
+        "resource_type": "tenant",
+        "resource_id": uuid.uuid4(),
+        "subject_tenant_id": uuid.uuid4(),
+        "summary": {"reason_code": "non_payment"},
+        "request_id": None,
+        "ip_hash": None,
+        "prev_hash": bytes(head.last_hash),
+    }
+    row["hash"] = chain_hash(row["prev_hash"], platform_event_dict(row))
+    s.execute(
+        text(
+            "INSERT INTO platform.audit_events (id, seq, occurred_at, actor_type, actor_id, "
+            "action, resource_type, resource_id, subject_tenant_id, summary, request_id, "
+            "ip_hash, prev_hash, hash) VALUES (:id, :seq, :occurred_at, :actor_type, "
+            ":actor_id, :action, :resource_type, :resource_id, :subject_tenant_id, :summary, "
+            ":request_id, :ip_hash, :prev_hash, :hash)"
+        ),
+        {**row, "summary": json.dumps(row["summary"])},
+    )
+    s.execute(
+        text("UPDATE platform.audit_chain_head SET last_seq = :s, last_hash = :h"),
+        {"s": row["seq"], "h": row["hash"]},
+    )
+
+
 def test_SEC_007_platform_role_cannot_append_a_backdated_platform_event(
     platform_engine: Any,
 ) -> None:
     with pytest.raises(DBAPIError, match="audit event"), platform_session() as s:
-        head = s.execute(text("SELECT last_seq, last_hash FROM platform.audit_chain_head")).one()
-        row: dict[str, Any] = {
-            "id": uuid.uuid4(),
-            "seq": int(head.last_seq) + 1,
-            "occurred_at": datetime.now(UTC) - timedelta(days=3),
-            "actor_type": "operator",
-            "actor_id": uuid.uuid4(),
-            "action": "platform.tenant.suspended",
-            "resource_type": "tenant",
-            "resource_id": uuid.uuid4(),
-            "subject_tenant_id": uuid.uuid4(),
-            "summary": {"reason_code": "non_payment"},
-            "request_id": None,
-            "ip_hash": None,
-            "prev_hash": bytes(head.last_hash),
-        }
-        row["hash"] = chain_hash(row["prev_hash"], platform_event_dict(row))
-        s.execute(
-            text(
-                "INSERT INTO platform.audit_events (id, seq, occurred_at, actor_type, actor_id, "
-                "action, resource_type, resource_id, subject_tenant_id, summary, request_id, "
-                "ip_hash, prev_hash, hash) VALUES (:id, :seq, :occurred_at, :actor_type, "
-                ":actor_id, :action, :resource_type, :resource_id, :subject_tenant_id, :summary, "
-                ":request_id, :ip_hash, :prev_hash, :hash)"
-            ),
-            {**row, "summary": json.dumps(row["summary"])},
-        )
-        s.execute(
-            text("UPDATE platform.audit_chain_head SET last_seq = :s, last_hash = :h"),
-            {"s": row["seq"], "h": row["hash"]},
-        )
+        _forge_platform(s)
     with platform_session() as s:
         assert verify_platform_chain(s).ok
 
