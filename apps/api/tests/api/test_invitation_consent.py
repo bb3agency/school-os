@@ -125,6 +125,28 @@ def test_DL_09_the_person_declines_the_invitation(api: Any, admin_engine: Engine
     assert (one["status"], one["email"], one["contact_hidden"]) == ("removed", None, True)
 
 
+def test_DL_09_inviting_school_does_not_see_when_the_existing_account_signs_in(
+    api: Any, admin_engine: Engine
+) -> None:
+    """Audit 2026-10-05 A-03: ``last_login_at`` is activity in the person's other school. Until
+    they accept (and after a decline) the inviting school does not see it, as with the email."""
+    person, owner_b, _b, invited = _invite_existing(api, admin_engine)
+    with admin_engine.begin() as c:
+        c.execute(
+            text("UPDATE core.users SET last_login_at = now() WHERE id = :u"),
+            {"u": person.user_id},
+        )
+    one = api.call(owner_b, "GET", f"{USERS}/{person.user_id}").json()
+    assert (one["contact_hidden"], one["last_login_at"]) == (True, None)
+    listed = api.call(owner_b, "GET", USERS, params={"limit": 100}).json()["data"]
+    row = next(u for u in listed if u["id"] == str(person.user_id))
+    assert row["last_login_at"] is None
+    mid = uuid.UUID(invited["membership_id"])
+    assert api.call(person, "POST", f"/api/v1/me/invitations/{mid}/decline").status_code == 200
+    one = api.call(owner_b, "GET", f"{USERS}/{person.user_id}").json()
+    assert (one["status"], one["last_login_at"]) == ("removed", None)
+
+
 def test_DL_09_inviting_school_cannot_activate_the_invitation_itself(
     api: Any, admin_engine: Engine
 ) -> None:

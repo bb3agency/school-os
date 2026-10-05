@@ -152,9 +152,10 @@ def _scope_out(scopes: Iterable[Any]) -> list[ScopeOut]:
 
 
 def _contact_hidden(membership: Membership, shared: bool) -> bool:
-    """Audit DL-09: a school sees the email of a person who also belongs to another school only
-    while they are its member (active or suspended), i.e. after they accepted. An open or
-    declined invitation, or a removed membership, shows no contact details."""
+    """Audit DL-09: a school sees the email and the last sign-in time (audit 2026-10-05 A-03) of
+    a person who also belongs to another school only while they are its member (active or
+    suspended), i.e. after they accepted. An open or declined invitation, or a removed
+    membership, shows neither."""
     return shared and membership.status not in ("active", "suspended")
 
 
@@ -192,7 +193,7 @@ def _user_out(session: Session, membership: Membership) -> UserOut:
         expires_at=membership.expires_at,
         roles=[r.key for r in repo.list_roles_for_membership(session, membership.id)],
         scopes=_scope_out(repo.list_membership_scopes(session, membership.id)),
-        last_login_at=user.last_login_at,
+        last_login_at=None if hidden else user.last_login_at,
         created_at=membership.created_at,
         version=membership.version,
         profile_shared=shared,
