@@ -281,7 +281,7 @@ def test_BR_01_a_verified_identity_value_is_not_replaced_without_a_change_reques
     assert res.status_code == 403, res.text
     assert res.json()["code"] == "identity_change_required"
     with admin_engine.connect() as c:
-        current = c.execute(
+        current: uuid.UUID = c.execute(
             text(
                 "SELECT id FROM sis.attribute_values WHERE student_id = :s "
                 "AND attribute_key = 'dob' AND source = 'birth_certificate' "

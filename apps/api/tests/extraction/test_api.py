@@ -333,7 +333,7 @@ def test_SEC_003_confirm_creates_a_student_only_with_student_create(
     assert res.status_code == 403, res.text
     assert X.row_of(admin_engine, "sis.extraction_items", item_id)["status"] == "pending_review"
     with admin_engine.connect() as c:
-        made = c.execute(
+        made: int = c.execute(
             text(
                 "SELECT count(*) FROM sis.attribute_values WHERE tenant_id = :t "
                 "AND attribute_key = 'admission_no' AND value_text = 'RG-NC-1'"
