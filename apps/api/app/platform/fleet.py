@@ -48,7 +48,16 @@ from app.identity.service_token import InMemoryReplayStore, RedisReplayStore, Re
 from app.platform import announcements, usage
 from app.platform import models as m
 from app.platform import repository as repo
-from app.platform.common import SYSTEM, Actor, audit_platform, db_errors, fleet_cfg, must, now
+from app.platform.common import (
+    SYSTEM,
+    Actor,
+    audit_platform,
+    db_errors,
+    fleet_cfg,
+    must,
+    now,
+    today_ist,
+)
 from app.platform.schemas import (
     DeploymentOut,
     DeploymentPatch,
@@ -374,9 +383,39 @@ def _status_for(payload: HeartbeatIn, at: dt.datetime) -> str:  # noqa: PLR0911
     return "healthy"
 
 
+class UsageDateInFuture(ValidationFailed):
+    """A heartbeat's usage day is after today in IST (AA-09)."""
+
+    code = "usage_date_in_future"
+
+
+def _usage_to_record(verified: VerifiedHeartbeat, current: dt.datetime) -> bool:
+    """Audit AA-09 (owner decision 2026-10-04): a host reports usage only for today and yesterday
+    (IST). An older day is ignored and logged with IDs only (it cannot rewrite days already
+    counted or invoiced); a future day is refused (422 ``usage_date_in_future``)."""
+    usage_in = verified.payload.usage
+    if usage_in is None:
+        return False
+    today = today_ist(current)
+    if usage_in.date > today:
+        raise UsageDateInFuture(
+            [{"field": "usage.date", "code": "in_future", "message_key": "errors.invalid"}]
+        )
+    if usage_in.date < today - dt.timedelta(days=1):
+        log.warning(
+            "fleet.heartbeat.usage_too_old",
+            deployment_id=str(verified.deployment["id"]),
+            tenant_id=str(verified.deployment["tenant_id"]),
+            outcome="ignored",
+        )
+        return False
+    return True
+
+
 def accept_heartbeat(verified: VerifiedHeartbeat, *, at: dt.datetime | None = None) -> HeartbeatOut:
     current = at or now()
     payload = verified.payload
+    record_usage = _usage_to_record(verified, current)
     status = _status_for(payload, current)
     with platform_session() as s, db_errors():
         dep = repo.get(s, m.deployments, verified.deployment["id"], for_update=True)
@@ -408,7 +447,7 @@ def accept_heartbeat(verified: VerifiedHeartbeat, *, at: dt.datetime | None = No
                 {"from": dep["status"], "to": status},
                 tenant_id=dep["tenant_id"],
             )
-        if payload.usage is not None:
+        if record_usage and payload.usage is not None:
             usage.ingest_heartbeat(s, dep["tenant_id"], payload.usage)
         target = dep["target_version"]
     return HeartbeatOut(

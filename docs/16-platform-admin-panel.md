@@ -1004,6 +1004,8 @@ Suspension must not cut off a school during board exams or registration deadline
 - Every dedicated host's `beat` sends `POST https://<control-plane-host>/api/v1/fleet/heartbeat` every **5 minutes** (±30 s jitter), outbound only.
 - Shared-tier deployments do not send heartbeats; the shared stack is monitored directly (11).
 
+
+**Usage window (audit AA-09, owner decision 2026-10-04).** `usage.date` counts only for today or yesterday (IST): an older day is ignored (the heartbeat still counts; logged `fleet.heartbeat.usage_too_old` with IDs only) and a future day is refused (`422 usage_date_in_future`). Tests: `tests/platform/test_heartbeat.py` `test_AA_09_*`.
 ### 12.2 Authentication (SEC-028)
 
 | Header | Value |

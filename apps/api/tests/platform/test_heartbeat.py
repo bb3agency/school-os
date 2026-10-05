@@ -20,6 +20,7 @@ from app.core.db import platform_session
 from app.core.errors import Unauthenticated
 from app.identity.service_token import InMemoryReplayStore
 from app.platform import fleet, heartbeat_client
+from app.platform.common import today_ist
 from app.platform.schemas import HeartbeatIn
 
 from .conftest import Api, Operator, provision_payload
@@ -57,7 +58,7 @@ def _payload(dep: dict[str, Any], **extra: Any) -> dict[str, Any]:
         },
         "queues": {"ingest": {"depth": 0, "oldest_s": 0}},
         "usage": {
-            "date": "2026-09-25",
+            "date": str(today_ist()),
             "active_users": 3,
             "staff_users": 7,
             "students_active": 120,
@@ -339,3 +340,55 @@ def test_SEC_028_fuzzed_unknown_fields_are_rejected(extra: dict[str, Any]) -> No
     HeartbeatIn.model_validate(base)
     with pytest.raises(ValidationError):
         HeartbeatIn.model_validate({**base, **extra})
+
+
+def _usage_dates(tenant_id: str) -> list[dt.date]:
+    with platform_session() as s:
+        return list(
+            s.execute(
+                text("SELECT usage_date FROM platform.usage_daily WHERE tenant_id = :t"),
+                {"t": tenant_id},
+            ).scalars()
+        )
+
+
+def _with_usage_date(dep: dict[str, Any], day: dt.date) -> dict[str, Any]:
+    body = _payload(dep)
+    body["usage"]["date"] = day.isoformat()
+    return body
+
+
+def test_AA_09_usage_for_today_and_yesterday_ist_is_recorded(
+    api: Api, dep: dict[str, Any], fleet_stores: fleet.FleetStores
+) -> None:
+    today = today_ist()
+    for day in (today - dt.timedelta(days=1), today):
+        _next_minute(fleet_stores)
+        raw, headers = _signed(dep, _with_usage_date(dep, day))
+        assert api.client.post(URL, content=raw, headers=headers).status_code == 200
+    assert sorted(_usage_dates(dep["tenant_id"])) == [today - dt.timedelta(days=1), today]
+
+
+def test_AA_09_older_usage_is_ignored_but_the_heartbeat_counts(
+    api: Api, dep: dict[str, Any]
+) -> None:
+    """A signed heartbeat cannot rewrite usage of days already counted or invoiced."""
+    old = today_ist() - dt.timedelta(days=2)
+    raw, headers = _signed(dep, _with_usage_date(dep, old))
+    res = api.client.post(URL, content=raw, headers=headers)
+    assert res.status_code == 200, res.text
+    assert _usage_dates(dep["tenant_id"]) == []
+    with platform_session() as s:
+        seen = s.execute(
+            text("SELECT last_heartbeat_at FROM platform.deployments WHERE id = :d"),
+            {"d": dep["deployment_id"]},
+        ).scalar_one()
+    assert seen is not None
+
+
+def test_AA_09_future_usage_is_refused(api: Api, dep: dict[str, Any]) -> None:
+    future = today_ist() + dt.timedelta(days=1)
+    raw, headers = _signed(dep, _with_usage_date(dep, future))
+    res = api.client.post(URL, content=raw, headers=headers)
+    assert (res.status_code, res.json()["code"]) == (422, "usage_date_in_future")
+    assert _usage_dates(dep["tenant_id"]) == []
