@@ -3004,6 +3004,10 @@
       "aadhaar_full_number_rejected": {
         "title": "Remove the Aadhaar number",
         "body": "Never type a full Aadhaar number. If you need to refer to it, use only the last 4 digits."
+      },
+      "blocker_needs_waive": {
+        "title": "Only the office admin or principal can resolve this",
+        "body": "This problem stops certificates and submissions. Ask someone who may accept problems, or request a correction of the record."
       }
     },
     "detail": {
@@ -3050,7 +3054,9 @@
       "problem": "Problem",
       "relatedLabel": "Related pages",
       "resolveConsequence": "Nothing on the student's record changes. The next check looks at it again.",
-      "waiveConsequence": "Nothing on the student's record changes."
+      "waiveConsequence": "Nothing on the student's record changes.",
+      "blockerResolveBody": "This problem stops certificates and submissions. Say what was done, or link the correction request that fixes it. You will be asked to confirm it's you. If the problem is still there at the next check, it opens again.",
+      "blockerNeedsWaive": "This problem stops certificates and submissions. It closes when the correction request that fixes the record is approved, or the office admin or principal can resolve or accept it."
     },
     "rules": {
       "title": "What SchoolOS checks",

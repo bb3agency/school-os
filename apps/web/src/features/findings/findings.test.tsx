@@ -204,7 +204,8 @@ describe("finding detail (US-502, FR-DQ-020)", () => {
   }
 
   it("resolving needs a note or a request, and sends If-Match with the finding's version", async () => {
-    detail([...READ, "dq.findings.resolve"]);
+    // A high (not blocker) finding: resolving it needs only dq.findings.resolve (DL-06).
+    detail([...READ, "dq.findings.resolve"], { severity: "high", blocker: false });
     stub.routes["POST /bff/api/v1/dq/findings/0192f3a4-0000-7000-8000-00000000f001/resolve"] = () =>
       Response.json(finding({ status: "resolved" }));
     renderWithIntl(<FindingDetailScreen findingId="0192f3a4-0000-7000-8000-00000000f001" />);
@@ -271,6 +272,28 @@ describe("finding detail (US-502, FR-DQ-020)", () => {
     expect(link.getAttribute("href")).toBe(
       `/change-requests/new?student_id=${STUDENT}&finding_id=0192f3a4-0000-7000-8000-00000000f001&attribute_key=date_of_birth`,
     );
+  });
+
+  it("hides resolve on a blocker from a clerk who may not waive, and says who can (DL-06)", async () => {
+    detail([...READ, "dq.findings.resolve"], { severity: "blocker", rule_id: "DQ-002" });
+    renderWithIntl(<FindingDetailScreen findingId="0192f3a4-0000-7000-8000-00000000f001" />);
+    expect(await screen.findByTestId("blocker-resolve-hint")).toHaveTextContent(
+      /office admin or principal can resolve or accept it/,
+    );
+    expect(screen.queryByRole("button", { name: "Resolve" })).not.toBeInTheDocument();
+  });
+
+  it("resolving a blocker asks a waive holder to confirm it's them (DL-06)", async () => {
+    detail([...READ, "dq.findings.resolve", "dq.findings.waive"], {
+      severity: "blocker",
+      rule_id: "DQ-002",
+    });
+    renderWithIntl(<FindingDetailScreen findingId="0192f3a4-0000-7000-8000-00000000f001" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Resolve" }));
+    const dialog = screen.getByRole("dialog", { name: "Resolve this problem" });
+    expect(within(dialog).getByText(/stops certificates and submissions/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/you may be asked to sign in again/)).toBeInTheDocument();
+    expect(screen.queryByTestId("blocker-resolve-hint")).not.toBeInTheDocument();
   });
 
   it("accepting (waive) warns about step-up and explains finding_not_open", async () => {

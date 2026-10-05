@@ -1519,7 +1519,9 @@ export interface paths {
         /**
          * Resolve Finding
          * @description Resolve with a note or a linked change request (permission ``dq.findings.resolve``).
-         *     If the conflict is still there, the next check reopens it. Optional ``If-Match``.
+         *     A blocker also needs ``dq.findings.waive`` (else 403 ``blocker_needs_waive``) and a fresh
+         *     MFA sign-in (else 428 ``step_up_required``), like waiving it. If the conflict is still
+         *     there, the next check reopens it. Optional ``If-Match``.
          */
         post: operations["resolve_finding_api_v1_dq_findings__finding_id__resolve_post"];
         delete?: never;

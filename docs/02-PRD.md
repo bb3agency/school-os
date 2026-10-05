@@ -137,6 +137,7 @@ Format: **US-ID · As a … I want … so that …** followed by acceptance crit
 
 **US-502** · As an office admin, I want to resolve or waive findings with a reason so that the list stays actionable. [FR-DQ-020..024]
 - AC1: Resolving requires linking a change request or a note; waiving requires `dq.findings.waive` and a reason; both are audited.
+- AC1a: A blocker (it stops certificates and submissions) closes when the change request that corrects the record is approved. Resolving or accepting it by hand needs `dq.findings.waive` and a fresh MFA sign-in (403 `blocker_needs_waive`, 428 otherwise); the app hides "Resolve" on a blocker from anyone else and says who can. So a clerk cannot resolve a blocker with a note and then print a certificate from the mismatched record (FR-CERT-002; owner decision 2026-10-04, audit DL-06).
 - AC2: Re-running the check reopens a finding if the underlying conflict returns.
 
 ### C6 · Change requests (maker-checker)

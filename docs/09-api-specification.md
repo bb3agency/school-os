@@ -259,7 +259,7 @@ Imports notes (M1, as built; US-401, FR-IMP-001..007):
 | POST | `/dq/runs` (`scope`: `section_ids` \| `class_ids` \| `student_ids` \| `batch_id`, `profile_key`) → 202 (**built**) | `dq.findings.read` |
 | GET | `/dq/runs/{id}` (**built**) | `dq.findings.read` (scoped holders: own runs) |
 | GET | `/dq/findings` (`severity`, `rule_id`, `section_id`, `status`, `student_id`, `profile_key`, `attribute_key`, cursor) · `/dq/findings/{id}` (`ETag`) (**built**) | `dq.findings.read` |
-| POST | `/dq/findings/{id}/resolve` (`note` and/or `change_request_id`; optional `If-Match`) (**built**) | `dq.findings.resolve` |
+| POST | `/dq/findings/{id}/resolve` (`note` and/or `change_request_id`; optional `If-Match`) (**built**). A blocker also needs `dq.findings.waive` (else `403 blocker_needs_waive`) and step-up MFA (`428 step_up_required`), like waiving (FR-DQ-020, DL-06) | `dq.findings.resolve` |
 | POST | `/dq/findings/{id}/waive` (`reason`; optional `If-Match`) (**built**) | `dq.findings.waive` (step-up) |
 | GET | `/dq/rules` · `/dq/profiles` · `/dq/summary` (`profile_key`, `section_ids`) (**built**) | `dq.findings.read` |
 

@@ -26627,7 +26627,7 @@
     },
     "/api/v1/dq/findings/{finding_id}/resolve": {
       "post": {
-        "description": "Resolve with a note or a linked change request (permission ``dq.findings.resolve``).\nIf the conflict is still there, the next check reopens it. Optional ``If-Match``.",
+        "description": "Resolve with a note or a linked change request (permission ``dq.findings.resolve``).\nA blocker also needs ``dq.findings.waive`` (else 403 ``blocker_needs_waive``) and a fresh\nMFA sign-in (else 428 ``step_up_required``), like waiving it. If the conflict is still\nthere, the next check reopens it. Optional ``If-Match``.",
         "operationId": "resolve_finding_api_v1_dq_findings__finding_id__resolve_post",
         "parameters": [
           {
