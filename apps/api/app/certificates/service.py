@@ -1255,13 +1255,24 @@ def _duplicate_mark(row: Certificate) -> templates.DuplicateMark | None:
     )
 
 
+def _void(session: Session, row: Certificate) -> bool:
+    """Cancelled, or a duplicate whose original was cancelled (its copies are void with it;
+    audit 2026-10-05 A-07)."""
+    if row.status == "cancelled":
+        return True
+    if row.original_certificate_id is None:
+        return False
+    original = repo.get_certificate(session, row.original_certificate_id)
+    return original is not None and original.status == "cancelled"
+
+
 def _page(session: Session, ctx: UserContext, row: Certificate, *, for_pdf: bool) -> str:
     """The certificate page: frozen content once issued; a DRAFT built from the record now
     while the request waits for approval."""
     if row.status in ("rejected", "withdrawn"):
         raise Conflict("This request was closed and has nothing to print.", code="not_printable")
     mark: templates.Mark = None
-    if row.status == "cancelled":
+    if _void(session, row):
         mark = "cancelled"
     elif row.status == "pending":
         mark = "draft"
@@ -1308,8 +1319,15 @@ def print_page(session: Session, ctx: UserContext, certificate_id: uuid.UUID) ->
 def download_url(session: Session, ctx: UserContext, certificate_id: uuid.UUID) -> DownloadUrlOut:
     """A presigned PDF download (≤ 5 minutes, attachment) once the PDF is stored and scanned
     (FR-CERT-011; permission ``certificate.read``). 409 ``pdf_not_ready`` before; audit
-    ``certificate.downloaded``."""
+    ``certificate.downloaded``. A cancelled certificate (or a duplicate of a cancelled original)
+    answers 409 ``certificate_cancelled``: its stored PDF was made before the cancellation and
+    carries no mark; the print view shows it marked CANCELLED (audit 2026-10-05 A-07)."""
     row = _load(session, ctx, certificate_id, permissions=[READ])
+    if _void(session, row):
+        raise Conflict(
+            "This certificate was cancelled. Open it to print it marked CANCELLED.",
+            code="certificate_cancelled",
+        )
     if row.document_id is None:
         raise Conflict("The PDF is still being made. Try again in a moment.", code="pdf_not_ready")
     name = _FILENAME_RE.sub("-", f"{row.certificate_type}-{row.serial or row.id.hex[:8]}")
