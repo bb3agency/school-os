@@ -26,7 +26,11 @@ from app.core.db import context_free_session, platform_session, tenant_session
 
 logger = logging.getLogger("app.audit.verify")
 
-TENANT_STATUSES = ("active", "suspended")
+TENANT_STATUSES = ("provisioning", "active", "suspended", "offboarding", "deleted")
+"""Every status whose school can hold an audit chain (audit 2026-10-05 DP-03). Offboarding and
+deleted schools keep their chain, including the evidence of the deletion, until the audit
+retention ends (ADR-0029), so the daily verification and the signed archive cover them too. A
+school whose chain was purged verifies as empty and archives nothing."""
 
 
 class TenantListingUnavailable(RuntimeError):
@@ -34,7 +38,8 @@ class TenantListingUnavailable(RuntimeError):
 
 
 def list_tenant_ids(*, engine: Engine | None = None) -> list[uuid.UUID]:
-    """Active and suspended tenant IDs via the allowlisted definer function."""
+    """IDs of every school that can hold a chain (:data:`TENANT_STATUSES`), via the
+    allowlisted definer function."""
     try:
         with context_free_session(engine=engine) as session:
             rows: Iterable[object] = session.execute(
