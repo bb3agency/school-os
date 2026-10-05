@@ -64,6 +64,16 @@ set_version() {
 render_compose_env() {
   local release_dir="${1:-$(active_release_dir)}"
   [[ -r $SOS_SECRETS_ENV ]] || die "missing $SOS_SECRETS_ENV; run scripts/fetch-secrets.sh"
+  # Images only by digest from the release's release.env (written by package.sh). A bare tag
+  # would let Docker resolve the image elsewhere (Docker Hub for schoolos/...) or a moved tag.
+  [[ -r $release_dir/release.env ]] || die "missing $release_dir/release.env (images pinned by digest)"
+  local pins name line
+  pins="$(grep -E '^SOS_(API|WEB|WORKER)_IMAGE=' "$release_dir/release.env" || true)"
+  for name in SOS_API_IMAGE SOS_WEB_IMAGE SOS_WORKER_IMAGE; do
+    line="$(grep -E "^${name}=" <<<"$pins" || true)"
+    [[ $(grep -c . <<<"$line") -eq 1 ]] || die "release.env must set $name exactly once"
+    [[ $line =~ ^${name}=[^[:space:]@]+@sha256:[0-9a-f]{64}$ ]] || die "$name must be pinned by digest (@sha256:...)"
+  done
   local tmp
   tmp="$(mktemp "$SOS_ETC/.compose.env.XXXXXX")"
   chmod 0600 "$tmp"
@@ -71,14 +81,8 @@ render_compose_env() {
     echo "# Rendered by scripts/lib.sh render_compose_env; do not edit (contains secrets)."
     grep -Ev '^\s*(#|$)' "$SOS_HOST_ENV"
     echo "SOS_VERSION=$SOS_VERSION"
-    if [[ -r $release_dir/release.env ]]; then
-      # CI pins images by digest: SOS_API_IMAGE=schoolos/api:<version>@sha256:...
-      grep -E '^SOS_(API|WEB|WORKER)_IMAGE=' "$release_dir/release.env"
-    else
-      echo "SOS_API_IMAGE=schoolos/api:$SOS_VERSION"
-      echo "SOS_WEB_IMAGE=schoolos/web:$SOS_VERSION"
-      echo "SOS_WORKER_IMAGE=schoolos/api:$SOS_VERSION"
-    fi
+    # CI pins images by digest: SOS_API_IMAGE=<registry>/schoolos/api:<version>@sha256:...
+    echo "$pins"
     if [[ ${SOS_WALG_ENABLED:-false} == "true" ]]; then
       echo "SOS_PG_ARCHIVE_MODE=on"
     fi
