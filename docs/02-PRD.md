@@ -77,6 +77,7 @@ Format: **US-ID · As a … I want … so that …** followed by acceptance crit
 - AC1: Given I hold `user.manage`, when I invite a user with role `class_teacher` scoped to sections 9A and 9B, then they can see only students enrolled in 9A/9B.
 - AC2: Given I lack `role.assign`, then role controls are hidden and the API returns 403.
 - AC3: Every invite, role change and deactivation creates an audit event showing who did what, when.
+- AC-DL09: An invitation to someone who already has a SchoolOS account is never accepted at sign-in: they accept or decline it themselves (both audited), and the inviting school sees no email until they accept and cannot activate it by hand (owner decision 2026-10-04, ADR-0023 amendment).
 
 **US-103** · As a principal, I want to approve temporary support access so that the vendor can help without standing access. [FR-OPS-004]
 - AC1: A support request shows reason, scope and duration (max 8 hours).

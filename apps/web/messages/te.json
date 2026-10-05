@@ -326,6 +326,7 @@
         "breakGlassLink": "సపోర్ట్ యాక్సెస్‌కు వెళ్లండి",
         "invitedTitle": "వారు సైన్ ఇన్ అయ్యే వరకు వేచి ఉంది",
         "invitedBody": "ఈ వ్యక్తి తమ సైన్-ఇన్ IDతో మొదటిసారి సైన్ ఇన్ అయినప్పుడు ఆహ్వానం సక్రియమవుతుంది.",
+        "contactHidden": "This person already has a SchoolOS account, so they accept or decline the invitation themselves when they sign in. Their email appears here only after they accept.",
         "removedTitle": "ఈ వ్యక్తిని తొలగించారు",
         "removedBody": "వారు ఇకపై ఈ పాఠశాలలో సైన్ ఇన్ కాలేరు. మళ్లీ యాక్సెస్ ఇవ్వాలంటే కొత్త ఆహ్వానం పంపండి.",
         "aboutTitle": "వివరాలు",
@@ -1968,6 +1969,15 @@
     "errorGeneric": "ఏదో పొరపాటు జరిగింది. పేజీని మళ్లీ లోడ్ చేసి ప్రయత్నించండి.",
     "loadErrorTitle": "మీ పాఠశాలలను లోడ్ చేయలేకపోయాము",
     "loadErrorBody": "ఇంటర్నెట్ కనెక్షన్ చూసి పేజీని మళ్లీ లోడ్ చేయండి. ఇలాగే జరుగుతుంటే, సహాయాన్ని సంప్రదించండి."
+  },
+  "invitations": {
+    "title": "Invitations waiting for you",
+    "body": "A school invited you. It sees your contact details only after you accept.",
+    "accept": "Accept",
+    "decline": "Decline",
+    "acceptLabel": "Accept the invitation from {school}",
+    "declineLabel": "Decline the invitation from {school}",
+    "failed": "We couldn't answer this invitation. Reload the page and try again."
   },
   "noAccess": {
     "title": "మీకు ఇంకా ఏ పాఠశాలకూ యాక్సెస్ లేదు",

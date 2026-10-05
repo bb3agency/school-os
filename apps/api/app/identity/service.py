@@ -49,6 +49,9 @@ from app.core.logging import get_context
 from app.identity import repository as repo
 from app.identity.models import Membership, Role
 from app.identity.schemas import (
+    InvitationAnswerOut,
+    InvitationOut,
+    InvitationsOut,
     InviteIn,
     LoginChoice,
     MembershipAccess,
@@ -148,15 +151,42 @@ def _scope_out(scopes: Iterable[Any]) -> list[ScopeOut]:
     return [ScopeOut(type=s.scope_type, ref=s.scope_ref) for s in scopes]
 
 
+def _contact_hidden(membership: Membership, shared: bool) -> bool:
+    """Audit DL-09: a school sees the email of a person who also belongs to another school only
+    while they are its member (active or suspended), i.e. after they accepted. An open or
+    declined invitation, or a removed membership, shows no contact details."""
+    return shared and membership.status not in ("active", "suspended")
+
+
+def _guard_consent(session: Session, membership: Membership, previous: str, status: str) -> None:
+    """Audit DL-09: an invitation to a person who already has a SchoolOS account (they belong to
+    another school) is accepted only by that person (``/me/invitations``), never activated by the
+    inviting school (409 ``invitation_needs_consent``). A brand-new account's invitation may still
+    be activated by hand (ADR-0019)."""
+    if (
+        previous == "invited"
+        and status == "active"
+        and (repo.user_membership_count(session, membership.user_id) or 0) > 1
+    ):
+        raise Conflict(
+            "This person already has a SchoolOS account, so only they can accept the "
+            "invitation. They will see it when they sign in.",
+            code="invitation_needs_consent",
+        )
+
+
 def _user_out(session: Session, membership: Membership) -> UserOut:
     user = repo.get_user(session, membership.user_id)
     if user is None:  # pragma: no cover - RLS shows users with a membership here
         raise NotFound("User not found")
+    shared = (repo.user_membership_count(session, user.id) or 0) > 1
+    hidden = _contact_hidden(membership, shared)
     return UserOut(
         id=user.id,
         membership_id=membership.id,
         display_name=user.display_name,
-        email=user.email,
+        email=None if hidden else user.email,
+        contact_hidden=hidden,
         preferred_language=output_language(user.preferred_language),  # ADR-0036
         status=membership.status,
         expires_at=membership.expires_at,
@@ -165,7 +195,7 @@ def _user_out(session: Session, membership: Membership) -> UserOut:
         last_login_at=user.last_login_at,
         created_at=membership.created_at,
         version=membership.version,
-        profile_shared=(repo.user_membership_count(session, user.id) or 0) > 1,
+        profile_shared=shared,
     )
 
 
@@ -369,41 +399,127 @@ def record_login_event(
             repo.record_login(session, user_id)
 
 
-def accept_invitations(subject: str, *, request_id: str | None = None) -> list[uuid.UUID]:
-    """Accept the signed-in user's pending invitations on first sign-in (ADR-0019).
+def _audit_in_school(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    membership_id: uuid.UUID,
+    user_id: uuid.UUID,
+    action: str,
+    request_id: str | None,
+) -> None:
+    """Audit an invitee's own answer in the inviting school's chain: the tenant context is
+    switched with transaction-local ``set_config`` (invariant 7)."""
+    session.execute(
+        text("SELECT set_config('app.tenant_id', :t, true), set_config('app.user_id', :u, true)"),
+        {"t": str(tenant_id), "u": str(user_id)},
+    )
+    audit.record(
+        session,
+        action=action,
+        resource_type="membership",
+        resource_id=membership_id,
+        summary={"membership_id": membership_id},
+        actor_type="user",
+        actor_id=user_id,
+        request_id=request_id or _request_id(),
+    )
 
-    ``subject`` MUST come from a verified access token. Activation and the
-    ``membership.invitation_accepted`` audit events share one transaction: the tenant context is
-    switched per accepted school (transaction-local ``set_config``) so each event lands in that
-    school's own chain. Only the caller's own memberships are involved. Returns the school IDs.
+
+def _clear_school_context(session: Session) -> None:
+    session.execute(
+        text("SELECT set_config('app.tenant_id', '', true), set_config('app.user_id', '', true)")
+    )
+
+
+def accept_invitations(
+    subject: str, *, issuer: str, request_id: str | None = None
+) -> list[uuid.UUID]:
+    """Sign-in acceptance (ADR-0019), narrowed by audit DL-09 (owner decision 2026-10-04).
+
+    Only a **brand-new account's only invitation** is accepted here (the account was made by that
+    invitation, e.g. a new school's owner); an invitation to an existing account waits for the
+    person's explicit answer (:func:`respond_to_invitation`). ``subject`` and ``issuer`` MUST come
+    from a verified access token; only the identity ``(issuer, subject)`` is involved (ADR-0023).
+    Activation and the ``membership.invitation_accepted`` events share one transaction, each event
+    in that school's own chain. Returns the school IDs.
     """
     accepted: list[uuid.UUID] = []
     with context_free_session() as session:
-        for tenant_id, membership_id, user_id in repo.accept_invitations(session, subject):
-            session.execute(
-                text(
-                    "SELECT set_config('app.tenant_id', :t, true), "
-                    "set_config('app.user_id', :u, true)"
-                ),
-                {"t": str(tenant_id), "u": str(user_id)},
-            )
-            audit.record(
+        for tenant_id, membership_id, user_id in repo.accept_invitations(
+            session, subject, issuer=issuer
+        ):
+            _audit_in_school(
                 session,
+                tenant_id=tenant_id,
+                membership_id=membership_id,
+                user_id=user_id,
                 action="membership.invitation_accepted",
-                resource_type="membership",
-                resource_id=membership_id,
-                summary={"membership_id": membership_id},
-                actor_type="user",
-                actor_id=user_id,
-                request_id=request_id or _request_id(),
+                request_id=request_id,
             )
             accepted.append(tenant_id)
-        session.execute(
-            text(
-                "SELECT set_config('app.tenant_id', '', true), set_config('app.user_id', '', true)"
-            )
-        )
+        _clear_school_context(session)
     return accepted
+
+
+def list_invitations(subject: str, *, issuer: str) -> InvitationsOut:
+    """The signed-in person's own open invitations, to accept or decline (DL-09). Only the
+    school's name and the invited roles are shown; no audit event (a read of their own data)."""
+    with context_free_session() as session:
+        rows = repo.pending_invitations(session, subject, issuer=issuer)
+    return InvitationsOut(
+        data=[
+            InvitationOut(
+                membership_id=r.membership_id,
+                tenant_id=r.tenant_id,
+                school_name=r.school_name,
+                roles=list(r.role_keys),
+                invited_at=r.invited_at,
+                expires_at=r.expires_at,
+            )
+            for r in rows
+        ]
+    )
+
+
+def respond_to_invitation(
+    subject: str,
+    *,
+    issuer: str,
+    membership_id: uuid.UUID,
+    accept: bool,
+    request_id: str | None = None,
+) -> InvitationAnswerOut:
+    """Accept or decline one of the signed-in person's own open invitations (DL-09, ADR-0023
+    amendment). Anything else (someone else's, already answered, expired, school not active) is
+    404 ``invitation_not_found``. Audit, in the inviting school's chain and the same transaction:
+    ``membership.invitation_accepted`` or ``membership.invitation_declined``."""
+    with context_free_session() as session:
+        row = repo.respond_to_invitation(
+            session, subject, issuer=issuer, membership_id=membership_id, accept=accept
+        )
+        if row is None:
+            raise NotFound(
+                "This invitation is no longer open. Ask the school to invite you again.",
+                code="invitation_not_found",
+            )
+        tenant_id, answered, user_id = row
+        _audit_in_school(
+            session,
+            tenant_id=tenant_id,
+            membership_id=answered,
+            user_id=user_id,
+            action=(
+                "membership.invitation_accepted" if accept else "membership.invitation_declined"
+            ),
+            request_id=request_id,
+        )
+        _clear_school_context(session)
+    return InvitationAnswerOut(
+        tenant_id=tenant_id,
+        membership_id=answered,
+        status="active" if accept else "removed",
+    )
 
 
 # --- me ---------------------------------------------------------------------------------------
@@ -584,6 +700,7 @@ def set_membership_status(
         return _user_out(session, membership)
     if status not in _TRANSITIONS[previous]:
         raise Conflict(f"A {previous} user cannot be made {status}.", code="invalid_state")
+    _guard_consent(session, membership, previous, status)
     if previous == "active":
         _guard_last_owner(session, membership)
     _guard_not_own(ctx, user_id)
@@ -652,6 +769,7 @@ def update_user(
     if status != previous:
         if status not in _TRANSITIONS[previous]:
             raise Conflict(f"A {previous} user cannot be made {status}.", code="invalid_state")
+        _guard_consent(session, membership, previous, status)
         if previous == "active":
             _guard_last_owner(session, membership)
         _guard_not_own(ctx, user_id)

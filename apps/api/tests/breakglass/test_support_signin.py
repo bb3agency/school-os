@@ -244,6 +244,14 @@ def test_ADR_0023_support_never_accepts_invitations(
     res = api.call(Support(op.subject), "POST", "/api/v1/me/accept-invitations")
     assert res.status_code == 403
     assert res.json()["code"] == "breakglass_only"
+    # DL-09: nor lists or answers them.
+    for method, path in (
+        ("GET", "/api/v1/me/invitations"),
+        ("POST", f"/api/v1/me/invitations/{uuid.uuid4()}/accept"),
+        ("POST", f"/api/v1/me/invitations/{uuid.uuid4()}/decline"),
+    ):
+        res = api.call(Support(op.subject), method, path)
+        assert (res.status_code, res.json()["code"]) == (403, "breakglass_only"), path
 
 
 def test_ADR_0023_support_writes_stay_refused(

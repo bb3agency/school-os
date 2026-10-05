@@ -326,6 +326,7 @@
         "breakGlassLink": "Go to Support access",
         "invitedTitle": "Waiting for them to sign in",
         "invitedBody": "The invitation becomes active the first time this person signs in with their sign-in ID.",
+        "contactHidden": "This person already has a SchoolOS account, so they accept or decline the invitation themselves when they sign in. Their email appears here only after they accept.",
         "removedTitle": "This person has been removed",
         "removedBody": "They can no longer sign in to this school. To give them access again, send a new invitation.",
         "aboutTitle": "About",
@@ -1968,6 +1969,15 @@
     "errorGeneric": "Something went wrong. Reload the page and try again.",
     "loadErrorTitle": "We couldn't load your schools",
     "loadErrorBody": "Check your internet connection and reload the page. If it keeps happening, contact support."
+  },
+  "invitations": {
+    "title": "Invitations waiting for you",
+    "body": "A school invited you. It sees your contact details only after you accept.",
+    "accept": "Accept",
+    "decline": "Decline",
+    "acceptLabel": "Accept the invitation from {school}",
+    "declineLabel": "Decline the invitation from {school}",
+    "failed": "We couldn't answer this invitation. Reload the page and try again."
   },
   "noAccess": {
     "title": "You don't have access to a school yet",

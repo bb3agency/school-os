@@ -27,6 +27,9 @@ from app.main import create_app
 TENANTLESS = {
     ("GET", "/api/v1/me/schools"),
     ("POST", "/api/v1/me/accept-invitations"),
+    ("GET", "/api/v1/me/invitations"),
+    ("POST", "/api/v1/me/invitations/{membership_id}/accept"),
+    ("POST", "/api/v1/me/invitations/{membership_id}/decline"),
     ("POST", "/api/v1/me/active-tenant"),
     ("POST", "/api/v1/me/login-event"),
 }

@@ -5,6 +5,7 @@ import { SessionControls } from "@/components/session/SessionControls";
 import { MinimalShell } from "@/components/shell/MinimalShell";
 import { Alert } from "@/components/ui/Alert";
 import { ChooseSchoolView } from "@/features/auth/ChooseSchoolView";
+import { PendingInvitations } from "@/features/auth/PendingInvitations";
 import { pageMetadata } from "@/lib/metadata";
 import { safeNext } from "@/server/auth/redirect";
 import { apiGetAsSession, requireStaff } from "@/server/session/rsc";
@@ -44,6 +45,7 @@ export default async function ChooseSchoolPage({ searchParams }: Props) {
     <MinimalShell
       headerActions={<SessionControls kind="staff" displayName={session.displayName} />}
     >
+      <PendingInvitations />
       {schools ? (
         <ChooseSchoolView schools={schools} next={next} currentTenantId={session.activeTenantId} />
       ) : (

@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChooseSchoolView } from "@/features/auth/ChooseSchoolView";
 import { CheckInvitationsButton } from "@/features/auth/CheckInvitationsButton";
+import { PendingInvitations } from "@/features/auth/PendingInvitations";
 import {
   CSRF,
   installBffStub,
@@ -483,6 +484,60 @@ describe("school picker (FR-IAM-013)", () => {
     expect(
       stub.callsTo("POST /bff/api/v1/me/accept-invitations")[0]?.headers.get("x-csrf-token"),
     ).toBe(CSRF);
+  });
+
+  it("invitations to an existing account: accept goes to the picker, decline removes it (DL-09)", async () => {
+    const A = "0192f3a4-0000-7000-8000-00000000c001";
+    const B = "0192f3a4-0000-7000-8000-00000000c002";
+    stub.routes["GET /bff/api/v1/me/invitations"] = () =>
+      Response.json({
+        data: [
+          {
+            membership_id: A,
+            tenant_id: T,
+            school_name: "Synthetic Hill School",
+            roles: ["teacher"],
+            invited_at: "2026-10-01T04:30:00Z",
+            expires_at: "2026-10-31T04:30:00Z",
+          },
+          {
+            membership_id: B,
+            tenant_id: T,
+            school_name: "Synthetic Lake School",
+            roles: ["teacher"],
+            invited_at: "2026-10-01T04:30:00Z",
+            expires_at: "2026-10-31T04:30:00Z",
+          },
+        ],
+      });
+    stub.routes[`POST /bff/api/v1/me/invitations/${B}/decline`] = () =>
+      Response.json({ tenant_id: T, membership_id: B, status: "removed" });
+    stub.routes[`POST /bff/api/v1/me/invitations/${A}/accept`] = () =>
+      Response.json({ tenant_id: T, membership_id: A, status: "active" });
+    const navigate = vi.fn();
+    const user = userEvent.setup();
+    renderWithIntl(<PendingInvitations navigate={navigate} />);
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Decline the invitation from Synthetic Lake School",
+      }),
+    );
+    await waitFor(() => expect(screen.queryByText("Synthetic Lake School")).toBeNull());
+    expect(navigate).not.toHaveBeenCalled();
+    await user.click(
+      screen.getByRole("button", { name: "Accept the invitation from Synthetic Hill School" }),
+    );
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/choose-school"));
+    expect(
+      stub.callsTo(`POST /bff/api/v1/me/invitations/${A}/accept`)[0]?.headers.get("x-csrf-token"),
+    ).toBe(CSRF);
+  });
+
+  it("no open invitations: nothing is shown (DL-09)", async () => {
+    stub.routes["GET /bff/api/v1/me/invitations"] = () => Response.json({ data: [] });
+    const { container } = renderWithIntl(<PendingInvitations navigate={vi.fn()} />);
+    await waitFor(() => expect(stub.callsTo("GET /bff/api/v1/me/invitations")).toHaveLength(1));
+    expect(container).toBeEmptyDOMElement();
   });
 
   it("'no access yet': still nothing", async () => {
