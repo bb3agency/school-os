@@ -39,3 +39,17 @@ def test_W3_04_every_external_action_is_pinned_by_sha() -> None:
         if not ref.startswith("./") and not ref.startswith("docker://") and not PINNED.match(ref)
     ]
     assert unpinned == []
+
+
+SCRIPT_REF = re.compile(r"(?<![\w/.-])\./((?:deploy|scripts)/[\w./-]+\.sh)")
+
+
+def test_SEC_030_every_repository_script_a_workflow_runs_exists() -> None:
+    """A fleet rollout that calls a missing script fails on every host, so security fixes never
+    reach dedicated hosts (audit 2026-10-05 P2-03: ./deploy/dedicated/upgrade.sh, which lives in
+    deploy/dedicated/scripts/). Paths are relative to the repository root, as in the release
+    bundle installed under the host's INSTALL_DIR."""
+    refs = [(p, ref) for p in _yaml_files() for ref in SCRIPT_REF.findall(p.read_text("utf-8"))]
+    assert refs, "no script reference found"
+    missing = [f"{p.relative_to(ROOT)}: {ref}" for p, ref in refs if not (ROOT / ref).is_file()]
+    assert missing == []
