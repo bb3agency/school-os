@@ -46,6 +46,8 @@ NOT_SETTINGS: dict[str, str] = {
     "AWS_DEFAULT_REGION": "AWS SDK default region on dedicated hosts",
     # Mount point of /var/lib/schoolos/state (backup.json from scripts/backup.sh) for the heartbeat.
     "SOS_HOST_STATE_DIR": "dedicated host state mount",
+    # botocore reads it: the per-container credential_process config (audit W3-06, dedicated).
+    "AWS_CONFIG_FILE": "dedicated per-container AWS credentials",
 }
 
 SYNTHETIC_TENANT = "0192a0de-0000-7000-8000-00000000a001"

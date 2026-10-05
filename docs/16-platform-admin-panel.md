@@ -887,7 +887,7 @@ Conventions from 09 §2 apply (problem+json, `Idempotency-Key` on creating POSTs
 | POST | `/platform/support/tickets/{ticket_id}/messages` | `platform.support.manage` | 201 | Reply or internal note |
 | PATCH | `/platform/support/tickets/{ticket_id}` | `platform.support.manage` | 200 | Status, priority, assignee, personal-data flag |
 | GET | `/platform/break-glass-requests` | any operator | 200 | Status list, optional `tenant_id` |
-| POST | `/platform/break-glass-requests` | `platform.breakglass.request` | 201 | Records the request (school approval workflow: M1) |
+| POST | `/platform/break-glass-requests` | `platform.breakglass.request` | 201 | Records the request (school approval workflow: M1). `scope` is `{}` (the whole school) or `section_id` and/or `class_id` (UUIDs); any other key is `422` (audit DL-10) |
 | POST | `/platform/break-glass-requests/{request_id}/emergency-confirm` | `platform.breakglass.emergency` ᴿ | 200 | Two different operators (SEC-029) |
 | GET | `/platform/operators` | `platform.operators.manage` (no step-up) | 200 | |
 | POST | `/platform/operators` | `platform.operators.manage` ᴿ | 201 | Invite |
@@ -1004,6 +1004,8 @@ Suspension must not cut off a school during board exams or registration deadline
 - Every dedicated host's `beat` sends `POST https://<control-plane-host>/api/v1/fleet/heartbeat` every **5 minutes** (±30 s jitter), outbound only.
 - Shared-tier deployments do not send heartbeats; the shared stack is monitored directly (11).
 
+
+**Usage window (audit AA-09, owner decision 2026-10-04).** `usage.date` counts only for today or yesterday (IST): an older day is ignored (the heartbeat still counts; logged `fleet.heartbeat.usage_too_old` with IDs only) and a future day is refused (`422 usage_date_in_future`). Tests: `tests/platform/test_heartbeat.py` `test_AA_09_*`.
 ### 12.2 Authentication (SEC-028)
 
 | Header | Value |

@@ -316,3 +316,9 @@ variable "public_whatsapp_number" {
   type        = string
   default     = ""
 }
+
+variable "files_replica_retention_days" {
+  description = "Object Lock (GOVERNANCE) retention of the files bucket's locked copy in ap-south-2, in days (audit W3-06; >= the 90-day recovery window)."
+  type        = number
+  default     = 90
+}

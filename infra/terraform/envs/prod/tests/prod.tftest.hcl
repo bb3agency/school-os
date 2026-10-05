@@ -237,3 +237,20 @@ run "security_baseline_sec_023" {
     error_message = "Account-level S3 Block Public Access is on in prod."
   }
 }
+
+# Audit W3-06 (b): every school file has an independent, locked copy in Hyderabad.
+run "files_locked_copy_in_hyderabad" {
+  command = plan
+
+  assert {
+    condition = (
+      module.files_replica.posture.object_lock_mode == "GOVERNANCE"
+      && module.files_replica.posture.object_lock_days >= 90
+      && module.files_replica.posture.replica_region == "ap-south-2"
+      && module.files_replica.posture.versioning == "Enabled"
+      && module.files_replica.posture.replicated_prefix == "t/"
+      && module.files_replica.posture.delete_markers == "Enabled"
+    )
+    error_message = "The files bucket is replicated to a locked (GOVERNANCE >= 90 days), versioned bucket in ap-south-2 (SSE-KMS: modules/s3_replica tests)."
+  }
+}

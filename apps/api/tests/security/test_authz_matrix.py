@@ -1059,6 +1059,18 @@ SPECS: dict[tuple[str, str], Builder] = {
         None,
         {},
     ),
+    ("GET", "/api/v1/me/invitations"): lambda w, r, a: ("/api/v1/me/invitations", None, {}),
+    # DL-09: an invitation that is not the caller's own is 404 for every role (guard passed).
+    ("POST", "/api/v1/me/invitations/{membership_id}/accept"): lambda w, r, a: (
+        f"/api/v1/me/invitations/{uuid.uuid4()}/accept",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/me/invitations/{membership_id}/decline"): lambda w, r, a: (
+        f"/api/v1/me/invitations/{uuid.uuid4()}/decline",
+        None,
+        {},
+    ),
     ("POST", "/api/v1/me/active-tenant"): lambda w, r, a: (
         "/api/v1/me/active-tenant",
         {"tenant_id": str(w.a.tenant_id)},
@@ -1969,6 +1981,8 @@ def _success(method: str, path: str) -> int:
         return 202
     if (method, path) == ("POST", "/api/v1/users/{user_id}/invitation-email"):
         return 409  # guard passed; the service refuses (email off in tests)
+    if method == "POST" and path.startswith("/api/v1/me/invitations/"):
+        return 404  # guard passed; not the caller's own open invitation (DL-09)
     if method == "DELETE" and path in (
         "/api/v1/knowledge/conversations/{conversation_id}",
         "/api/v1/knowledge/memories",

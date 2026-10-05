@@ -186,3 +186,19 @@ run "operator_pool_id_is_validated" {
 
   expect_failures = [var.operator_user_pool_id]
 }
+
+# Audit W3-06 (b): the school's files have an independent, locked copy in Hyderabad.
+run "files_locked_copy_in_hyderabad" {
+  command = plan
+
+  assert {
+    condition = (
+      module.files_replica.posture.object_lock_mode == "GOVERNANCE"
+      && module.files_replica.posture.object_lock_days >= 90
+      && module.files_replica.posture.replica_region == "ap-south-2"
+      && module.files_replica.posture.sse_algorithm == "aws:kms"
+      && module.files_replica.posture.delete_markers == "Enabled"
+    )
+    error_message = "The school's files bucket is replicated to a locked, encrypted bucket in ap-south-2."
+  }
+}

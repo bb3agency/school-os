@@ -2104,19 +2104,16 @@
             "type": "string"
           },
           "scope": {
-            "maxProperties": 10,
-            "patternProperties": {
-              "^[a-z_]{1,40}$": {
-                "anyOf": [
-                  {
-                    "format": "uuid",
-                    "type": "string"
-                  },
-                  {
-                    "type": "string"
-                  }
-                ]
-              }
+            "additionalProperties": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxProperties": 2,
+            "propertyNames": {
+              "enum": [
+                "section_id",
+                "class_id"
+              ]
             },
             "title": "Scope",
             "type": "object"
@@ -2131,7 +2128,6 @@
           "tenant_id",
           "reason_code",
           "reason",
-          "scope",
           "duration_minutes"
         ],
         "title": "BreakGlassIn",
@@ -9148,6 +9144,36 @@
         "title": "InsightSummaryOut",
         "type": "object"
       },
+      "InvitationAnswerOut": {
+        "description": "The answer to an invitation: ``active`` (accepted) or ``removed`` (declined).",
+        "properties": {
+          "membership_id": {
+            "format": "uuid",
+            "title": "Membership Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "removed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tenant_id": {
+            "format": "uuid",
+            "title": "Tenant Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "membership_id",
+          "status"
+        ],
+        "title": "InvitationAnswerOut",
+        "type": "object"
+      },
       "InvitationEmailOut": {
         "description": "An invitation email was queued (``POST /users/{user_id}/invitation-email``).",
         "properties": {
@@ -9179,6 +9205,69 @@
           "expires_at"
         ],
         "title": "InvitationEmailOut",
+        "type": "object"
+      },
+      "InvitationOut": {
+        "description": "One of the signed-in person's own open invitations (audit DL-09).",
+        "properties": {
+          "expires_at": {
+            "description": "The invitation can be answered until then.",
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "invited_at": {
+            "format": "date-time",
+            "title": "Invited At",
+            "type": "string"
+          },
+          "membership_id": {
+            "format": "uuid",
+            "title": "Membership Id",
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
+          "school_name": {
+            "title": "School Name",
+            "type": "string"
+          },
+          "tenant_id": {
+            "format": "uuid",
+            "title": "Tenant Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "membership_id",
+          "tenant_id",
+          "school_name",
+          "roles",
+          "invited_at",
+          "expires_at"
+        ],
+        "title": "InvitationOut",
+        "type": "object"
+      },
+      "InvitationsOut": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/InvitationOut"
+            },
+            "title": "Data",
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "InvitationsOut",
         "type": "object"
       },
       "InviteIn": {
@@ -21075,6 +21164,12 @@
       },
       "UserOut": {
         "properties": {
+          "contact_hidden": {
+            "default": false,
+            "description": "The person also belongs to another school and has not accepted this school's invitation (or declined it, or was removed), so their email is not shown (``email`` is null; audit DL-09). It appears once they accept.",
+            "title": "Contact Hidden",
+            "type": "boolean"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -26627,7 +26722,7 @@
     },
     "/api/v1/dq/findings/{finding_id}/resolve": {
       "post": {
-        "description": "Resolve with a note or a linked change request (permission ``dq.findings.resolve``).\nIf the conflict is still there, the next check reopens it. Optional ``If-Match``.",
+        "description": "Resolve with a note or a linked change request (permission ``dq.findings.resolve``).\nA blocker also needs ``dq.findings.waive`` (else 403 ``blocker_needs_waive``) and a fresh\nMFA sign-in (else 428 ``step_up_required``), like waiving it. If the conflict is still\nthere, the next check reopens it. Optional ``If-Match``.",
         "operationId": "resolve_finding_api_v1_dq_findings__finding_id__resolve_post",
         "parameters": [
           {
@@ -30156,7 +30251,7 @@
     },
     "/api/v1/me/accept-invitations": {
       "post": {
-        "description": "Accept the signed-in user's pending invitations (ADR-0019). The BFF calls this after the\nOIDC callback, before ``/me/login-event``. Works without ``X-Active-Tenant``; a privileged\nactive membership without MFA gets 403 ``mfa_required`` (FR-IAM-002). SchoolOS support\nsign-ins never accept invitations (403 ``breakglass_only``, ADR-0023).",
+        "description": "Sign-in acceptance (ADR-0019): accepts a **brand-new account's only invitation**; an\ninvitation to a person who already has a SchoolOS account waits for their explicit answer\non ``/me/invitations`` (audit DL-09). The BFF calls this after the OIDC callback, before\n``/me/login-event``. Works without ``X-Active-Tenant``; a privileged active membership\nwithout MFA gets 403 ``mfa_required`` (FR-IAM-002). SchoolOS support sign-ins never accept\ninvitations (403 ``breakglass_only``, ADR-0023).",
         "operationId": "accept_my_invitations_api_v1_me_accept_invitations_post",
         "responses": {
           "200": {
@@ -30213,6 +30308,116 @@
           }
         },
         "summary": "Set Active Tenant",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
+    "/api/v1/me/invitations": {
+      "get": {
+        "description": "The signed-in person's own open invitations (school name, roles, until when), to accept\nor decline (audit DL-09, ADR-0023 amendment; permission: authenticated, no school needed).\nSupport sign-ins get 403 ``breakglass_only``.",
+        "operationId": "list_my_invitations_api_v1_me_invitations_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List My Invitations",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
+    "/api/v1/me/invitations/{membership_id}/accept": {
+      "post": {
+        "description": "Accept one of your own open invitations: you become a member of that school (audit\n``membership.invitation_accepted`` in its chain; DL-09). Not yours, already answered or\nexpired: 404 ``invitation_not_found``. Support sign-ins: 403 ``breakglass_only``.",
+        "operationId": "accept_my_invitation_api_v1_me_invitations__membership_id__accept_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "membership_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Membership Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationAnswerOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Accept My Invitation",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
+    "/api/v1/me/invitations/{membership_id}/decline": {
+      "post": {
+        "description": "Decline one of your own open invitations: the school's membership is removed and it never\nsees your contact details (audit ``membership.invitation_declined`` in its chain; DL-09).\nNot yours, already answered or expired: 404 ``invitation_not_found``.",
+        "operationId": "decline_my_invitation_api_v1_me_invitations__membership_id__decline_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "membership_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Membership Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationAnswerOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Decline My Invitation",
         "tags": [
           "identity"
         ]

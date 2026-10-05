@@ -99,6 +99,7 @@ function user(overrides: Partial<Schemas["UserOut"]> = {}): Schemas["UserOut"] {
     created_at: "2026-06-01T04:30:00Z",
     version: 3,
     profile_shared: false,
+    contact_hidden: false,
     ...overrides,
   };
 }
@@ -569,6 +570,14 @@ describe("user detail (US-102 AC2, FR-IAM-012..014)", () => {
     expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
     // Your own name, email and language can still be corrected.
     expect(screen.getByRole("button", { name: detailCopy.edit.trigger })).toBeInTheDocument();
+  });
+
+  it("an invitation to an existing account hides their email and says who accepts (DL-09)", async () => {
+    serveUser(user({ status: "invited", email: null, contact_hidden: true, profile_shared: true }));
+    renderWithIntl(<UserDetailScreen userId={USER} />);
+    expect(await screen.findByTestId("contact-hidden")).toHaveTextContent(
+      /they accept or decline the invitation themselves/,
+    );
   });
 
   it("a profile shared with another school offers no edit and says why (ADR-0028)", async () => {

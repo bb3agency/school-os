@@ -540,6 +540,10 @@ def test_FR_DOC_001_browser_to_s3_to_api_round_trip(
         who, "POST", "/api/v1/documents", json={"upload_id": up["upload_id"], "title": "Fake"}
     )
     assert bad.status_code == 415
+    # W3-06: the api only queues the discard; the worker removes the object.
+    assert s3_store.head(up["fields"]["key"]) is not None
+    payload = {"upload_id": up["upload_id"]}
+    assert service.discard_unused_object(world.a.tenant_id, payload, store=s3_store) is True
     assert s3_store.head(up["fields"]["key"]) is None
 
 

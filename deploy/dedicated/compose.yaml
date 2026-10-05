@@ -163,8 +163,12 @@ services:
     environment:
       <<: *app-env
       SOS_SERVICE_NAME: api
+      # Audit W3-06: the api role's own short-lived credentials (scripts/app-credentials.sh); it can
+      # read and write school files but never tag or delete them. IMDS (hop limit 1) is unreachable.
+      AWS_CONFIG_FILE: /run/aws/config
     volumes:
       - /var/lib/schoolos/state:/run/schoolos-state:ro
+      - /var/lib/schoolos/aws/api:/run/aws:ro
     tmpfs:
       - /tmp:size=128m,uid=10001,gid=10001
     networks: [app, data]
@@ -202,6 +206,10 @@ services:
     environment:
       <<: *app-env
       SOS_SERVICE_NAME: worker
+      # Audit W3-06: the worker role (files incl. discard, audit archive, signing key).
+      AWS_CONFIG_FILE: /run/aws/config
+    volumes:
+      - /var/lib/schoolos/aws/worker:/run/aws:ro
     tmpfs:
       - /tmp:size=512m,uid=10001,gid=10001
     shm_size: 256m # headless Chromium (PDF rendering)

@@ -48,6 +48,11 @@ output "instance_role_arn" {
   value       = aws_iam_role.host.arn
 }
 
+output "app_role_arns" {
+  description = "Per-container roles (audit W3-06): api (no tag/delete on files) and worker. scripts/app-credentials.sh assumes them as sos-ded-<school_code>-<api|worker>."
+  value       = { for k, r in aws_iam_role.app : k => r.arn }
+}
+
 output "log_group_name" {
   description = "Host CloudWatch log group (containers + backup/upgrade scripts)."
   value       = aws_cloudwatch_log_group.host.name
@@ -67,6 +72,7 @@ output "posture" {
   description = "Security posture summary (asserted by tests)."
   value = {
     imdsv2_required      = one(aws_instance.host.metadata_options).http_tokens == "required"
+    imds_hop_limit       = one(aws_instance.host.metadata_options).http_put_response_hop_limit
     root_encrypted       = one(aws_instance.host.root_block_device).encrypted
     data_encrypted       = aws_ebs_volume.data.encrypted
     public_ip_on_launch  = aws_instance.host.associate_public_ip_address

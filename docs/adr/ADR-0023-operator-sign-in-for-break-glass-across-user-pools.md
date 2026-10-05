@@ -252,3 +252,24 @@ Implementation facts (the decision is unchanged).
   operator never approved anywhere still gets no emergency access (fail closed). Creating it
   would need a change to the definer guard, which needs a product decision (listed in the
   report of 2026-09-27).
+
+## Amendment 2026-10-04: invitation consent (audit DL-09, owner decision)
+
+A school that knew another school's user's subject could invite them, read their email while the
+invitation was pending and have them attached at their next sign-in. Migration
+`0045_invitation_consent` (expand only; allowlist changes decided here, no new grant or policy):
+
+- `core.accept_invitations(p_subject, p_issuer)` activates at sign-in only a **brand-new account's
+  only invitation** (no other membership anywhere), for that issuer's identity. The one-argument
+  signature stays as a wrapper with the staff issuer, so an older API image cannot auto-accept
+  either; a later release drops it.
+- New `core.pending_invitations(p_subject, p_issuer)` (STABLE) and
+  `core.respond_to_invitation(p_subject, p_issuer, p_membership_id, p_accept)`: the person lists
+  their own open invitations (school name, roles) and accepts (`active`) or declines (`removed`)
+  one. Routes `GET /me/invitations`, `POST /me/invitations/{membership_id}/accept|decline`
+  (staff sign-ins only; others' or answered invitations `404 invitation_not_found`). Audited
+  `membership.invitation_accepted` / `membership.invitation_declined` in the inviting school's
+  chain, same transaction.
+- The inviting school sees no email of a person who also belongs to another school unless their
+  membership is active or suspended (`UserOut.contact_hidden`), and cannot activate such an
+  invitation by hand (`409 invitation_needs_consent`).

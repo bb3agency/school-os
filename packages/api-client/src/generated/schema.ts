@@ -1519,7 +1519,9 @@ export interface paths {
         /**
          * Resolve Finding
          * @description Resolve with a note or a linked change request (permission ``dq.findings.resolve``).
-         *     If the conflict is still there, the next check reopens it. Optional ``If-Match``.
+         *     A blocker also needs ``dq.findings.waive`` (else 403 ``blocker_needs_waive``) and a fresh
+         *     MFA sign-in (else 428 ``step_up_required``), like waiving it. If the conflict is still
+         *     there, the next check reopens it. Optional ``If-Match``.
          */
         post: operations["resolve_finding_api_v1_dq_findings__finding_id__resolve_post"];
         delete?: never;
@@ -2880,10 +2882,12 @@ export interface paths {
         put?: never;
         /**
          * Accept My Invitations
-         * @description Accept the signed-in user's pending invitations (ADR-0019). The BFF calls this after the
-         *     OIDC callback, before ``/me/login-event``. Works without ``X-Active-Tenant``; a privileged
-         *     active membership without MFA gets 403 ``mfa_required`` (FR-IAM-002). SchoolOS support
-         *     sign-ins never accept invitations (403 ``breakglass_only``, ADR-0023).
+         * @description Sign-in acceptance (ADR-0019): accepts a **brand-new account's only invitation**; an
+         *     invitation to a person who already has a SchoolOS account waits for their explicit answer
+         *     on ``/me/invitations`` (audit DL-09). The BFF calls this after the OIDC callback, before
+         *     ``/me/login-event``. Works without ``X-Active-Tenant``; a privileged active membership
+         *     without MFA gets 403 ``mfa_required`` (FR-IAM-002). SchoolOS support sign-ins never accept
+         *     invitations (403 ``breakglass_only``, ADR-0023).
          */
         post: operations["accept_my_invitations_api_v1_me_accept_invitations_post"];
         delete?: never;
@@ -2907,6 +2911,72 @@ export interface paths {
          *     (FR-IAM-013; permission: authenticated). The BFF then sends ``X-Active-Tenant``.
          */
         post: operations["set_active_tenant_api_v1_me_active_tenant_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List My Invitations
+         * @description The signed-in person's own open invitations (school name, roles, until when), to accept
+         *     or decline (audit DL-09, ADR-0023 amendment; permission: authenticated, no school needed).
+         *     Support sign-ins get 403 ``breakglass_only``.
+         */
+        get: operations["list_my_invitations_api_v1_me_invitations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/invitations/{membership_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept My Invitation
+         * @description Accept one of your own open invitations: you become a member of that school (audit
+         *     ``membership.invitation_accepted`` in its chain; DL-09). Not yours, already answered or
+         *     expired: 404 ``invitation_not_found``. Support sign-ins: 403 ``breakglass_only``.
+         */
+        post: operations["accept_my_invitation_api_v1_me_invitations__membership_id__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/invitations/{membership_id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decline My Invitation
+         * @description Decline one of your own open invitations: the school's membership is removed and it never
+         *     sees your contact details (audit ``membership.invitation_declined`` in its chain; DL-09).
+         *     Not yours, already answered or expired: 404 ``invitation_not_found``.
+         */
+        post: operations["decline_my_invitation_api_v1_me_invitations__membership_id__decline_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6758,7 +6828,7 @@ export interface components {
              */
             reason_code: "support_request" | "security_incident" | "legal_obligation";
             /** Scope */
-            scope: {
+            scope?: {
                 [key: string]: string;
             };
             /**
@@ -9255,6 +9325,27 @@ export interface components {
             since: string;
         };
         /**
+         * InvitationAnswerOut
+         * @description The answer to an invitation: ``active`` (accepted) or ``removed`` (declined).
+         */
+        InvitationAnswerOut: {
+            /**
+             * Membership Id
+             * Format: uuid
+             */
+            membership_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "removed";
+            /**
+             * Tenant Id
+             * Format: uuid
+             */
+            tenant_id: string;
+        };
+        /**
          * InvitationEmailOut
          * @description An invitation email was queued (``POST /users/{user_id}/invitation-email``).
          */
@@ -9279,6 +9370,42 @@ export interface components {
              * Format: uuid
              */
             user_id: string;
+        };
+        /**
+         * InvitationOut
+         * @description One of the signed-in person's own open invitations (audit DL-09).
+         */
+        InvitationOut: {
+            /**
+             * Expires At
+             * Format: date-time
+             * @description The invitation can be answered until then.
+             */
+            expires_at: string;
+            /**
+             * Invited At
+             * Format: date-time
+             */
+            invited_at: string;
+            /**
+             * Membership Id
+             * Format: uuid
+             */
+            membership_id: string;
+            /** Roles */
+            roles: string[];
+            /** School Name */
+            school_name: string;
+            /**
+             * Tenant Id
+             * Format: uuid
+             */
+            tenant_id: string;
+        };
+        /** InvitationsOut */
+        InvitationsOut: {
+            /** Data */
+            data: components["schemas"]["InvitationOut"][];
         };
         /**
          * InviteIn
@@ -13520,6 +13647,12 @@ export interface components {
         };
         /** UserOut */
         UserOut: {
+            /**
+             * Contact Hidden
+             * @description The person also belongs to another school and has not accepted this school's invitation (or declined it, or was removed), so their email is not shown (``email`` is null; audit DL-09). It appears once they accept.
+             * @default false
+             */
+            contact_hidden: boolean;
             /**
              * Created At
              * Format: date-time
@@ -18597,6 +18730,88 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["app__identity__schemas__MeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_my_invitations_api_v1_me_invitations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationsOut"];
+                };
+            };
+        };
+    };
+    accept_my_invitation_api_v1_me_invitations__membership_id__accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                membership_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationAnswerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decline_my_invitation_api_v1_me_invitations__membership_id__decline_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                membership_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationAnswerOut"];
                 };
             };
             /** @description Validation Error */

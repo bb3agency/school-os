@@ -326,6 +326,7 @@
         "breakGlassLink": "Go to Support access",
         "invitedTitle": "Waiting for them to sign in",
         "invitedBody": "The invitation becomes active the first time this person signs in with their sign-in ID.",
+        "contactHidden": "This person already has a SchoolOS account, so they accept or decline the invitation themselves when they sign in. Their email appears here only after they accept.",
         "removedTitle": "This person has been removed",
         "removedBody": "They can no longer sign in to this school. To give them access again, send a new invitation.",
         "aboutTitle": "About",
@@ -1447,7 +1448,7 @@
       "openSchool": "Open the school",
       "openSchoolHint": "Support sign-in: you sign in again with MFA. Only the operator who asked can use it. Read only; every page is recorded in the school's audit log.",
       "requestTitle": "Request temporary access",
-      "requestBody": "Read-only access for the time you choose. Every action is audited in the school's log.",
+      "requestBody": "Read-only access to the whole school for the time you choose. The school approves it unless two operators confirm an emergency. Every action is audited in the school's log.",
       "colSchool": "School",
       "colReason": "Reason",
       "colDuration": "Duration",
@@ -1968,6 +1969,15 @@
     "errorGeneric": "Something went wrong. Reload the page and try again.",
     "loadErrorTitle": "We couldn't load your schools",
     "loadErrorBody": "Check your internet connection and reload the page. If it keeps happening, contact support."
+  },
+  "invitations": {
+    "title": "Invitations waiting for you",
+    "body": "A school invited you. It sees your contact details only after you accept.",
+    "accept": "Accept",
+    "decline": "Decline",
+    "acceptLabel": "Accept the invitation from {school}",
+    "declineLabel": "Decline the invitation from {school}",
+    "failed": "We couldn't answer this invitation. Reload the page and try again."
   },
   "noAccess": {
     "title": "You don't have access to a school yet",
@@ -3004,6 +3014,10 @@
       "aadhaar_full_number_rejected": {
         "title": "Remove the Aadhaar number",
         "body": "Never type a full Aadhaar number. If you need to refer to it, use only the last 4 digits."
+      },
+      "blocker_needs_waive": {
+        "title": "Only the office admin or principal can resolve this",
+        "body": "This problem stops certificates and submissions. Ask someone who may accept problems, or request a correction of the record."
       }
     },
     "detail": {
@@ -3050,7 +3064,9 @@
       "problem": "Problem",
       "relatedLabel": "Related pages",
       "resolveConsequence": "Nothing on the student's record changes. The next check looks at it again.",
-      "waiveConsequence": "Nothing on the student's record changes."
+      "waiveConsequence": "Nothing on the student's record changes.",
+      "blockerResolveBody": "This problem stops certificates and submissions. Say what was done, or link the correction request that fixes it. You will be asked to confirm it's you. If the problem is still there at the next check, it opens again.",
+      "blockerNeedsWaive": "This problem stops certificates and submissions. It closes when the correction request that fixes the record is approved, or the office admin or principal can resolve or accept it."
     },
     "rules": {
       "title": "What SchoolOS checks",
@@ -3395,6 +3411,7 @@
     "durationHours": "{hours, plural, one {# hour} other {# hours}}",
     "durationMinutes": "{minutes} minutes",
     "scopeWholeSchool": "The whole school",
+    "scopeIgnored": "Also sent by SchoolOS, but these do not limit what they can see: {items}.",
     "status": {
       "requested": "Waiting for you",
       "approved": "Confirmed by SchoolOS",

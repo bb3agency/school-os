@@ -127,3 +127,23 @@ run "security_baseline_can_be_disabled" {
     error_message = "enable_security_baseline = false creates nothing."
   }
 }
+
+# Audit W3-06 (b): staging exercises the locked files copy with the DR path.
+run "files_locked_copy_with_the_dr_path" {
+  command = plan
+
+  assert {
+    condition     = length(module.files_replica) == 1 && module.files_replica[0].posture.object_lock_mode == "GOVERNANCE" && module.files_replica[0].posture.object_lock_days >= 90
+    error_message = "Staging replicates the files bucket to a locked bucket in ap-south-2."
+  }
+}
+
+# Audit W3-04: staging's pull-request plan role reads no secrets.
+run "pr_plan_role_reads_no_secrets" {
+  command = plan
+
+  assert {
+    condition     = !module.platform.github_actions.plan_reads_secrets && contains(module.platform.github_actions.plan_subjects, "repo:bb3agency/school-os:pull_request")
+    error_message = "Staging's plan role trusts every same-repo pull request, so it must not read secrets."
+  }
+}

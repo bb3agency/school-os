@@ -4,7 +4,7 @@ Documentation=file://@INSTALL_DIR@/README.md
 Requires=docker.service
 # apparmor.service loads /etc/apparmor.d/schoolos-worker (the worker's profile, ADR-0025).
 After=docker.service network-online.target apparmor.service
-Wants=network-online.target
+Wants=network-online.target schoolos-app-credentials.timer
 RequiresMountsFor=/var/lib/schoolos
 
 [Service]
@@ -12,6 +12,9 @@ Type=oneshot
 RemainAfterExit=yes
 # Secrets are re-read from Secrets Manager on every start (rotation = update secret + restart).
 ExecStartPre=@INSTALL_DIR@/scripts/fetch-secrets.sh
+# Each app container's own AWS credentials (audit W3-06), before any container starts; the timer
+# keeps them fresh.
+ExecStartPre=@INSTALL_DIR@/scripts/app-credentials.sh
 ExecStart=@INSTALL_DIR@/scripts/compose.sh up -d --remove-orphans --wait
 ExecStop=@INSTALL_DIR@/scripts/compose.sh stop
 TimeoutStartSec=900

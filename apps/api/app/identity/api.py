@@ -41,6 +41,8 @@ from app.identity.principal import Principal, get_principal
 from app.identity.schemas import (
     AcceptedInvitationsOut,
     ActiveTenantIn,
+    InvitationAnswerOut,
+    InvitationsOut,
     InviteIn,
     LoginEventOut,
     MeOut,
@@ -90,10 +92,22 @@ def get_me(
 def accept_my_invitations(
     principal: Caller, resolver: Resolver, request: Request
 ) -> AcceptedInvitationsOut:
-    """Accept the signed-in user's pending invitations (ADR-0019). The BFF calls this after the
-    OIDC callback, before ``/me/login-event``. Works without ``X-Active-Tenant``; a privileged
-    active membership without MFA gets 403 ``mfa_required`` (FR-IAM-002). SchoolOS support
-    sign-ins never accept invitations (403 ``breakglass_only``, ADR-0023)."""
+    """Sign-in acceptance (ADR-0019): accepts a **brand-new account's only invitation**; an
+    invitation to a person who already has a SchoolOS account waits for their explicit answer
+    on ``/me/invitations`` (audit DL-09). The BFF calls this after the OIDC callback, before
+    ``/me/login-event``. Works without ``X-Active-Tenant``; a privileged active membership
+    without MFA gets 403 ``mfa_required`` (FR-IAM-002). SchoolOS support sign-ins never accept
+    invitations (403 ``breakglass_only``, ADR-0023)."""
+    _staff_sign_in_with_mfa_if_needed(principal, resolver)
+    accepted = identity.accept_invitations(
+        principal.subject, issuer=identity.staff_issuer(), request_id=request_id_of(request)
+    )
+    return AcceptedInvitationsOut(accepted=accepted)
+
+
+def _staff_sign_in_with_mfa_if_needed(principal: Principal, resolver: AuthzResolver) -> None:
+    """Staff sign-ins only (their tokens carry the staff issuer, which the invitation functions
+    match: ADR-0023); support sign-ins are 403 ``breakglass_only``."""
     if principal.kind == "support":
         raise Forbidden(
             "SchoolOS support sign-in works only with the school's approved support access.",
@@ -105,8 +119,49 @@ def accept_my_invitations(
             "Your role needs two-step verification (MFA). Set it up, then sign in again.",
             code="mfa_required",
         )
-    accepted = identity.accept_invitations(principal.subject, request_id=request_id_of(request))
-    return AcceptedInvitationsOut(accepted=accepted)
+
+
+@router.get("/me/invitations", response_model=InvitationsOut)
+def list_my_invitations(principal: Caller, resolver: Resolver) -> InvitationsOut:
+    """The signed-in person's own open invitations (school name, roles, until when), to accept
+    or decline (audit DL-09, ADR-0023 amendment; permission: authenticated, no school needed).
+    Support sign-ins get 403 ``breakglass_only``."""
+    _staff_sign_in_with_mfa_if_needed(principal, resolver)
+    return identity.list_invitations(principal.subject, issuer=identity.staff_issuer())
+
+
+@router.post("/me/invitations/{membership_id}/accept", response_model=InvitationAnswerOut)
+def accept_my_invitation(
+    membership_id: uuid.UUID, principal: Caller, resolver: Resolver, request: Request
+) -> InvitationAnswerOut:
+    """Accept one of your own open invitations: you become a member of that school (audit
+    ``membership.invitation_accepted`` in its chain; DL-09). Not yours, already answered or
+    expired: 404 ``invitation_not_found``. Support sign-ins: 403 ``breakglass_only``."""
+    _staff_sign_in_with_mfa_if_needed(principal, resolver)
+    return identity.respond_to_invitation(
+        principal.subject,
+        issuer=identity.staff_issuer(),
+        membership_id=membership_id,
+        accept=True,
+        request_id=request_id_of(request),
+    )
+
+
+@router.post("/me/invitations/{membership_id}/decline", response_model=InvitationAnswerOut)
+def decline_my_invitation(
+    membership_id: uuid.UUID, principal: Caller, resolver: Resolver, request: Request
+) -> InvitationAnswerOut:
+    """Decline one of your own open invitations: the school's membership is removed and it never
+    sees your contact details (audit ``membership.invitation_declined`` in its chain; DL-09).
+    Not yours, already answered or expired: 404 ``invitation_not_found``."""
+    _staff_sign_in_with_mfa_if_needed(principal, resolver)
+    return identity.respond_to_invitation(
+        principal.subject,
+        issuer=identity.staff_issuer(),
+        membership_id=membership_id,
+        accept=False,
+        request_id=request_id_of(request),
+    )
 
 
 @router.get("/me/schools", response_model=SchoolChoicesOut)

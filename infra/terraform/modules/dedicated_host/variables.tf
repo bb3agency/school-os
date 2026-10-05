@@ -243,6 +243,17 @@ variable "generated_secret_version" {
   default     = 1
 }
 
+variable "imds_hop_limit" {
+  description = "IMDSv2 PUT response hop limit. 1 (default) keeps every container away from the instance role (audit W3-06); set 2 only for the one apply that precedes upgrading a host from a release older than the per-container credentials (README: Upgrading), then back to 1."
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = contains([1, 2], var.imds_hop_limit)
+    error_message = "imds_hop_limit must be 1 (default) or 2 (transition only)."
+  }
+}
+
 variable "walg_enabled" {
   description = "Enable WAL-G continuous archiving to the backup bucket (RPO <= 15 min instead of 24 h)."
   type        = bool

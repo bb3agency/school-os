@@ -157,6 +157,11 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
   const data = finding.data;
   const field = attributeLabel(attributes.data, data.attribute_key, locale);
   const open = isUnresolved(data.status);
+  // DL-06 (FR-CERT-002): a blocker is resolved by hand only by someone who may waive findings,
+  // after confirming it's them (the API answers 403 blocker_needs_waive / 428 otherwise). The
+  // change request that corrects the record closes it without that.
+  const blocker = data.severity === "blocker";
+  const canResolve = can("dq.findings.resolve") && (!blocker || can("dq.findings.waive"));
   const invalidate = [DQ_KEYS.findings, DQ_KEYS.summary] as const;
   const suggestsRequest = data.routes.some((route) => route.code === SCHOOL_RECORD_ROUTE);
   const pending = (requests.data ?? []).filter(
@@ -183,14 +188,20 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
                   {td("requestCorrection")}
                 </ButtonLink>
               ) : null}
-              {can("dq.findings.resolve") ? (
+              {blocker && can("dq.findings.resolve") && !can("dq.findings.waive") ? (
+                <p className="max-w-prose text-sm text-ink-muted" data-testid="blocker-resolve-hint">
+                  {td("blockerNeedsWaive")}
+                </p>
+              ) : null}
+              {canResolve ? (
                 <ActionDialog
                   triggerLabel={td("resolve")}
                   triggerVariant="primary"
                   title={td("resolveTitle")}
-                  description={td("resolveBody")}
+                  description={blocker ? td("blockerResolveBody") : td("resolveBody")}
                   confirmLabel={td("resolve")}
                   consequence={td("resolveConsequence")}
+                  stepUp={blocker}
                   schema={resolveSchema}
                   invalidate={invalidate}
                   errorNamespace="findings"

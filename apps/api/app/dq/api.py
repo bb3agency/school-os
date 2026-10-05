@@ -122,7 +122,9 @@ def resolve_finding(
     response: Response,
 ) -> FindingOut:
     """Resolve with a note or a linked change request (permission ``dq.findings.resolve``).
-    If the conflict is still there, the next check reopens it. Optional ``If-Match``."""
+    A blocker also needs ``dq.findings.waive`` (else 403 ``blocker_needs_waive``) and a fresh
+    MFA sign-in (else 428 ``step_up_required``), like waiving it. If the conflict is still
+    there, the next check reopens it. Optional ``If-Match``."""
     out = dq.resolve_finding(db, ctx, finding_id, body, expected_version=version)
     response.headers["ETag"] = etag(out.version)
     return out

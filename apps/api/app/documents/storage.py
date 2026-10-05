@@ -108,6 +108,7 @@ class ObjectHead:
     content_type: str | None
     sse: str | None = None
     kms_key_id: str | None = None
+    last_modified: dt.datetime | None = None
 
 
 def tenant_prefix(tenant_id: uuid.UUID) -> str:
@@ -338,6 +339,7 @@ class S3ObjectStore:
             content_type=res.get("ContentType"),
             sse=res.get("ServerSideEncryption"),
             kms_key_id=res.get("SSEKMSKeyId"),
+            last_modified=res.get("LastModified"),
         )
 
     def read_range(self, key: str, start: int, length: int) -> bytes:

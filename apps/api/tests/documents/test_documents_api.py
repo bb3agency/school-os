@@ -158,7 +158,9 @@ def test_FR_DOC_001_uploads_outside_the_allowlist_are_refused(
     assert res.headers["content-type"].startswith("application/problem+json")
 
 
-def test_FR_IMP_import_files_use_the_imports_layout(world: Any, api: Any) -> None:
+def test_FR_IMP_import_files_use_the_imports_layout(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
     who = world.person("office_staff")
     data = S.csv_text()
     out = upload(
@@ -169,6 +171,7 @@ def test_FR_IMP_import_files_use_the_imports_layout(world: Any, api: Any) -> Non
     assert res.status_code == 202, res.text
     objects = S.memory_store().objects
     assert f"t/{world.a.tenant_id}/imports/{out['batch_id']}/raw.csv" in objects
+    S.run_object_discards(admin_engine, world.a.tenant_id)  # W3-06: the worker discards
     assert out["fields"]["key"] not in objects, "staging copy removed"
     body = res.json()
     assert (body["purpose"], body["doc_type"], body["sensitivity"]) == (
@@ -258,6 +261,7 @@ def test_FR_DOC_001_png_renamed_to_pdf_is_415_and_object_deleted(
     res = register(api, who, up["upload_id"])
     assert res.status_code == 415
     assert res.json()["code"] == "unsupported_file_type"
+    S.run_object_discards(admin_engine, world.a.tenant_id)  # W3-06: the worker discards
     assert up["fields"]["key"] not in S.memory_store().objects
     assert W.audit_events(admin_engine, world.a.tenant_id, "document.registered") == before
 
@@ -277,7 +281,7 @@ def test_FR_DOC_001_png_renamed_to_pdf_is_415_and_object_deleted(
     ids=["html-as-jpeg", "jpeg-html-polyglot"],
 )
 def test_SEC_016_html_and_polyglots_declared_as_images_are_rejected(
-    world: Any, api: Any, data: bytes, code: str
+    world: Any, api: Any, admin_engine: Engine, data: bytes, code: str
 ) -> None:
     who = world.person("office_admin")
     up = upload(
@@ -286,6 +290,7 @@ def test_SEC_016_html_and_polyglots_declared_as_images_are_rejected(
     res = register(api, who, up["upload_id"], title="Register page 4")
     assert res.status_code == 415, res.text
     assert res.json()["code"] == code
+    S.run_object_discards(admin_engine, world.a.tenant_id)  # W3-06: the worker discards
     assert up["fields"]["key"] not in S.memory_store().objects
 
 
@@ -303,6 +308,7 @@ def test_SEC_016_stored_object_bigger_than_declared_is_rejected(
     res = register(api, who, str(intent))
     assert res.status_code == 422
     assert res.json()["errors"][0]["code"] == "size_mismatch"
+    S.run_object_discards(admin_engine, world.a.tenant_id)  # W3-06: the worker discards
     assert key not in S.memory_store().objects
 
     intent = S.make_intent(admin_engine, world.a.tenant_id, who.user_id, data)
@@ -358,7 +364,9 @@ def test_SEC_016_intent_of_another_user_or_school_is_404(
     }
 
 
-def test_FR_DOC_001_duplicate_file_is_reported_only_when_visible(world: Any, api: Any) -> None:
+def test_FR_DOC_001_duplicate_file_is_reported_only_when_visible(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
     admin = world.person("office_admin")
     data = S.pdf()
     first = new_document(api, admin, data)
@@ -367,6 +375,7 @@ def test_FR_DOC_001_duplicate_file_is_reported_only_when_visible(world: Any, api
     assert res.status_code == 409
     assert res.json()["code"] == "duplicate_document"
     assert first["id"] in res.json()["detail"]
+    S.run_object_discards(admin_engine, world.a.tenant_id)  # W3-06: the worker discards
     assert up["fields"]["key"] not in S.memory_store().objects
 
     # A duplicate the caller cannot see is not revealed: the upload proceeds.
@@ -707,7 +716,9 @@ def test_SEC_016_reposting_after_registration_cannot_replace_the_checked_file(
     assert up["fields"]["key"] not in store.objects
 
 
-def test_SEC_016_file_swapped_during_checks_is_refused(world: Any, api: Any) -> None:
+def test_SEC_016_file_swapped_during_checks_is_refused(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
     who = world.person("office_admin")
     store = S.memory_store()
     data = S.pdf()
@@ -723,6 +734,7 @@ def test_SEC_016_file_swapped_during_checks_is_refused(world: Any, api: Any) -> 
         store.before_copy = None
     assert res.status_code == 409
     assert res.json()["code"] == "upload_changed"
+    S.run_object_discards(admin_engine, world.a.tenant_id)  # W3-06: the worker discards
     assert up["fields"]["key"] not in store.objects
 
 

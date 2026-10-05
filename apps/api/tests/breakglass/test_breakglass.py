@@ -71,16 +71,14 @@ def test_US_103_AC1_pending_request_shows_reason_scope_and_duration(
 ) -> None:
     op = make_operator("support_agent")
     section = campus.id("section_9a")
-    request_id = raise_request(
-        campus.tenant_id, op, minutes=90, scope={"section_id": section, "area": "imports"}
-    )
+    request_id = raise_request(campus.tenant_id, op, minutes=90, scope={"section_id": section})
     # The list pulls new requests from the control plane first.
     res = api.call(campus.person("owner"), "GET", f"{BASE}/requests")
     assert res.status_code == 200, res.text
     item = next(i for i in res.json()["data"] if i["platform_request_id"] == str(request_id))
     assert item["status"] == "requested"
     assert item["duration_minutes"] == 90
-    assert item["scope"] == {"section_id": str(section), "area": "imports"}
+    assert item["scope"] == {"section_id": str(section)}
     assert item["reason"].startswith("Import batch shows duplicate rows")
     assert item["operator_display_name"] == OPERATOR_NAME
     assert item["membership_id"] is None

@@ -61,11 +61,13 @@ module "platform" {
   alarm_emails       = var.alarm_emails
   monthly_budget_usd = var.monthly_budget_usd
 
+  # Audit W3-04: the plan role trusts every same-repo pull request, so it never reads secrets (a
+  # refresh shows no secret versions; their values are write-only anyway).
   github_deploy_environment   = "staging"
   github_allow_main_branch    = false
   create_github_oidc_provider = var.create_github_oidc_provider
   create_plan_role            = true
-  plan_can_read_secrets       = true
+  plan_can_read_secrets       = false
   create_apply_role           = true
   github_apply_environment    = "staging-infra"
   state_bucket_arn            = var.state_bucket_arn
@@ -82,6 +84,7 @@ module "kms_dr" {
   deletion_window_in_days = 7
   keys = {
     backup = { description = "SchoolOS staging: replicated RDS backups in ap-south-2" }
+    files  = { description = "SchoolOS staging: locked copy of the files bucket in ap-south-2" }
   }
 }
 
@@ -93,6 +96,22 @@ module "rds_dr" {
   source_db_instance_arn = module.platform.rds_arn
   kms_key_arn            = module.kms_dr.key_arns["backup"]
   retention_days         = var.dr_backup_retention_days
+}
+
+# Audit W3-06 (b): the locked copy of the files bucket, as in prod (on with the DR path). Its versions
+# stay locked for retention_days, so tearing staging down waits for the lock (synthetic data only).
+module "files_replica" {
+  source    = "../../modules/s3_replica"
+  count     = var.dr_backup_replication_enabled ? 1 : 0
+  providers = { aws = aws.dr }
+
+  name                = "sos-staging-files-replica-${var.aws_account_id}"
+  source_region       = var.aws_region
+  source_bucket_id    = module.platform.buckets.files
+  source_kms_key_arn  = module.platform.kms_key_arns["data"]
+  replica_kms_key_arn = module.kms_dr.key_arns["files"]
+  retention_days      = var.files_replica_retention_days
+  force_destroy       = true
 }
 
 # --- Account security baseline (SEC-023) ---------------------------------------------------------

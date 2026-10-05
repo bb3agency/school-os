@@ -140,9 +140,15 @@ DISCARDED_EVENT: Final = "document.version.discarded"
 SCAN_TASK: Final = "documents.scan"
 PURGE_TASK: Final = "documents.purge_objects"
 DISCARD_TASK: Final = "documents.discard_object"
+# W3-06: objects the upload path no longer needs (rejected, duplicate or half-made uploads, the
+# staging copy after promotion). The api only queues them; its role cannot tag or delete under
+# ``t/*`` (infra/terraform), so only the worker discards (``documents.discard_unused_object``).
+OBJECT_DISCARD_EVENT: Final = "document.object.discard_requested"
+OBJECT_DISCARD_TASK: Final = "documents.discard_unused_object"
 ops.register_outbox_route(SCAN_EVENT, SCAN_TASK)
 ops.register_outbox_route(DELETED_EVENT, PURGE_TASK)
 ops.register_outbox_route(DISCARDED_EVENT, DISCARD_TASK)
+ops.register_outbox_route(OBJECT_DISCARD_EVENT, OBJECT_DISCARD_TASK)
 
 # An intent can be registered for a while after its presigned POST expired (slow uploads).
 INTENT_GRACE: Final = dt.timedelta(minutes=30)
@@ -641,18 +647,64 @@ class _Verified:
     etag: str
 
 
-def _discard(store: ObjectStore, key: str) -> None:
-    """Remove a staging or half-made object the system no longer needs (rejected, duplicate or
-    expired upload, undone write). An automatic deletion, so it is discarded: the bucket rule
-    ``discarded-1d`` expires the bytes after a day (docs/08 §7)."""
+def _discard_now(store: ObjectStore, key: str) -> None:
+    """Worker only: remove an object the system no longer needs. An automatic deletion, so it
+    is discarded: the bucket rule ``discarded-1d`` expires the bytes after a day (docs/08 §7)."""
     try:
         store.discard(key)
     except ObjectStoreError:
         log.warning("documents.upload.discard_failed", error_code="delete_failed")
 
 
-def _reject(store: ObjectStore, intent: UploadIntent, code: str) -> UnsupportedFileType:
-    _discard(store, intent.object_key)
+_UUID_RE: Final = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+_TENANT_RE: Final = rf"^t/(?P<t>{_UUID_RE})/"
+_UPLOAD_KEY: Final = re.compile(rf"{_TENANT_RE}uploads/(?P<u>{_UUID_RE})/original\.[a-z]+$")
+_DOC_KEY: Final = re.compile(
+    rf"{_TENANT_RE}docs/(?P<d>{_UUID_RE})/v(?P<n>[1-9][0-9]{{0,5}})/original\.(?P<e>[a-z]+)$"
+)
+_IMPORT_KEY: Final = re.compile(rf"{_TENANT_RE}imports/(?P<b>{_UUID_RE})/raw\.(?P<e>[a-z]+)$")
+
+
+def _discard_payload(key: str) -> dict[str, Any] | None:
+    """The IDs-only payload of :data:`OBJECT_DISCARD_EVENT` for an upload-path key (object keys
+    never go into the outbox; the worker rebuilds the key from the IDs and checks it)."""
+    if m := _UPLOAD_KEY.match(key):
+        return {"upload_id": m["u"]}
+    requested_at = _now().isoformat()
+    if m := _DOC_KEY.match(key):
+        return {
+            "document_id": m["d"],
+            "version_no": int(m["n"]),
+            "ext": m["e"],
+            "requested_at": requested_at,
+        }
+    if m := _IMPORT_KEY.match(key):
+        return {"batch_id": m["b"], "ext": m["e"], "requested_at": requested_at}
+    return None
+
+
+def _request_discard(session: Session, key: str) -> None:
+    """Queue the discard of ``key`` in the caller's transaction (W3-06: the worker deletes)."""
+    payload = _discard_payload(key)
+    if payload is None:  # pragma: no cover - every upload-path key matches a layout
+        log.error("documents.discard.unknown_key", error_code="unknown_key_layout")
+        return
+    ops.enqueue_event(session, OBJECT_DISCARD_EVENT, payload)
+
+
+def _request_discard_committed(tenant_id: uuid.UUID, key: str) -> None:
+    """Queue the discard of ``key`` in its own short transaction: for refusals and errors, whose
+    request transaction rolls back (W3-06). A failure is logged, never raised: the daily
+    :func:`purge_expired_uploads` removes a forgotten staging object anyway."""
+    try:
+        with tenant_session(tenant_id) as s:
+            _request_discard(s, key)
+    except Exception:
+        log.warning("documents.discard.queue_failed", error_code="outbox_unavailable")
+
+
+def _reject(intent: UploadIntent, code: str) -> UnsupportedFileType:
+    _request_discard_committed(intent.tenant_id, intent.object_key)
     log.warning(
         "documents.upload.rejected",
         resource_type="upload_intent",
@@ -677,14 +729,14 @@ def _check_stored_head(store: ObjectStore, intent: UploadIntent) -> int:
     if head is None:
         raise Conflict("Upload the file before registering it.", code="upload_missing")
     if head.size > intent.max_bytes:
-        _discard(store, intent.object_key)
+        _request_discard_committed(intent.tenant_id, intent.object_key)
         raise FileTooLarge("The uploaded file is larger than allowed.")
     if head.size != intent.declared_size:
-        _discard(store, intent.object_key)
+        _request_discard_committed(intent.tenant_id, intent.object_key)
         raise _invalid("upload_id", "size_mismatch")
     kms = getattr(store, "kms_key_id", None)
     if kms and head.sse != "aws:kms":
-        _discard(store, intent.object_key)
+        _request_discard_committed(intent.tenant_id, intent.object_key)
         raise Conflict("The file was not stored encrypted. Upload it again.", code="not_encrypted")
     return head.size
 
@@ -706,7 +758,7 @@ def _verify_object(store: ObjectStore, intent: UploadIntent) -> _Verified:
         for chunk in opened.chunks:
             total += len(chunk)
             if total > intent.max_bytes:
-                _discard(store, intent.object_key)
+                _request_discard_committed(intent.tenant_id, intent.object_key)
                 raise FileTooLarge("The uploaded file is larger than allowed.")
             digest.update(chunk)
             if len(first) < filetypes.HEAD_BYTES:
@@ -717,7 +769,7 @@ def _verify_object(store: ObjectStore, intent: UploadIntent) -> _Verified:
     finally:
         opened.close()
     if total != size:
-        _discard(store, intent.object_key)
+        _request_discard_committed(intent.tenant_id, intent.object_key)
         raise _invalid("upload_id", "size_mismatch")
     code = filetypes.check_head(kind, bytes(first))
     if code is None and csv is None:
@@ -725,7 +777,7 @@ def _verify_object(store: ObjectStore, intent: UploadIntent) -> _Verified:
     if code is None and csv is not None:
         code = csv.finish()
     if code is not None:
-        raise _reject(store, intent, code)
+        raise _reject(intent, code)
     return _Verified(digest.digest(), total, kind, opened.etag)
 
 
@@ -735,15 +787,18 @@ def _final_key(intent: UploadIntent, kind: FileKind) -> str:
     return document_key(intent.tenant_id, intent.document_id, intent.version_no, kind.ext)
 
 
-def _promote(store: ObjectStore, intent: UploadIntent, verified: _Verified) -> str:
-    """Copy the verified bytes to the final key (only if unchanged) and drop the staging copy."""
+def _promote(
+    session: Session, store: ObjectStore, intent: UploadIntent, verified: _Verified
+) -> str:
+    """Copy the verified bytes to the final key (only if unchanged) and queue the staging copy's
+    discard in the caller's transaction (W3-06)."""
     final = _final_key(intent, verified.kind)
     try:
         store.copy(
             intent.object_key, final, if_match=verified.etag, content_type=verified.kind.mime
         )
     except ObjectChanged as exc:
-        _discard(store, intent.object_key)
+        _request_discard_committed(intent.tenant_id, intent.object_key)
         raise Conflict(
             "The file changed while it was being checked. Upload it again.", code="upload_changed"
         ) from exc
@@ -751,16 +806,19 @@ def _promote(store: ObjectStore, intent: UploadIntent, verified: _Verified) -> s
         raise Conflict(
             "The file could not be stored. Try again.", code="storage_unavailable"
         ) from exc
-    _discard(store, intent.object_key)
+    _request_discard(session, intent.object_key)
     return final
 
 
 @contextmanager
-def _undo_object_on_error(store: ObjectStore, key: str) -> Iterator[None]:
+def _undo_object_on_error(tenant_id: uuid.UUID, key: str) -> Iterator[None]:
+    """On any error, queue the discard of the object just written (its transaction rolls back,
+    so in a transaction of its own; W3-06: the worker deletes, after checking that no version
+    uses the key)."""
     try:
         yield
     except BaseException:
-        _discard(store, key)
+        _request_discard_committed(tenant_id, key)
         raise
 
 
@@ -775,7 +833,7 @@ def _check_duplicate(
     visibility = _visibility(session, ctx)
     for match in matches:
         if repo.get_document(session, match.document_id, visibility=visibility) is not None:
-            _discard(store, intent.object_key)
+            _request_discard_committed(intent.tenant_id, intent.object_key)
             raise Conflict(
                 f"This file is already in SchoolOS as document {match.document_id}.",
                 code="duplicate_document",
@@ -809,11 +867,11 @@ def register_document(session: Session, ctx: UserContext, data: DocumentCreate) 
     store = get_object_store()
     verified = _verify_object(store, intent)
     _check_duplicate(session, ctx, store, intent, verified.sha256)
-    final_key = _promote(store, intent, verified)
+    final_key = _promote(session, store, intent, verified)
 
     tenant_id = repo.current_tenant_id(session)
     version_id = new_id()
-    with _undo_object_on_error(store, final_key), _db_errors():
+    with _undo_object_on_error(intent.tenant_id, final_key), _db_errors():
         doc = repo.insert_document(
             session,
             id=intent.document_id,
@@ -905,11 +963,11 @@ def add_version(
     verified = _verify_object(store, intent)
     latest = repo.get_version(session, doc.id)
     if latest is not None and latest.sha256 == verified.sha256:
-        _discard(store, intent.object_key)
+        _request_discard_committed(intent.tenant_id, intent.object_key)
         raise Conflict("This file is the same as the current version.", code="version_unchanged")
-    final_key = _promote(store, intent, verified)
+    final_key = _promote(session, store, intent, verified)
     version_id = new_id()
-    with _undo_object_on_error(store, final_key), _db_errors():
+    with _undo_object_on_error(intent.tenant_id, final_key), _db_errors():
         version = _insert_version(
             session,
             ctx=ctx,
@@ -1386,13 +1444,13 @@ def purge_expired_uploads(tenant_id: uuid.UUID, *, store: ObjectStore | None = N
         stale = repo.expired_intents(s, now, limit=500)
         for intent in stale:
             if key_in_tenant(intent.object_key, tenant_id):
-                _discard(store, intent.object_key)
+                _discard_now(store, intent.object_key)
         # A presigned POST stays usable for a few minutes after registration: drop any staging
         # object re-created meanwhile, then the used intent rows.
         used = repo.consumed_intents_before(s, now - dt.timedelta(days=1), limit=500)
         for intent in used:
             if key_in_tenant(intent.object_key, tenant_id):
-                _discard(store, intent.object_key)
+                _discard_now(store, intent.object_key)
         repo.delete_intents(s, [i.id for i in (*stale, *used)])
         purged = len(stale)
     return purged
@@ -1587,7 +1645,7 @@ def replace_with_redacted(
         raise Conflict(
             "The redacted copy could not be stored. Try again.", code="storage_unavailable"
         ) from exc
-    with _undo_object_on_error(store, key), _db_errors():
+    with _undo_object_on_error(tenant_id, key), _db_errors():
         version = repo.insert_version(
             session,
             id=new_id(),
@@ -1623,6 +1681,85 @@ def replace_with_redacted(
         ops.enqueue_event(session, SCAN_EVENT, {"document_id": doc.id, "version_id": version.id})
     log.info("documents.version.redacted", resource_type="document", resource_id=doc.id)
     return new_no
+
+
+def _payload_uuid(payload: Mapping[str, Any], name: str) -> uuid.UUID | None:
+    try:
+        return uuid.UUID(str(payload[name]))
+    except (KeyError, ValueError):
+        return None
+
+
+def _payload_time(payload: Mapping[str, Any]) -> dt.datetime | None:
+    try:
+        at = dt.datetime.fromisoformat(str(payload["requested_at"]))
+    except (KeyError, ValueError):
+        return None
+    return at if at.tzinfo is not None else None
+
+
+def _requested_final_key(tenant_id: uuid.UUID, payload: Mapping[str, Any]) -> str | None:
+    """The document or import key an :data:`OBJECT_DISCARD_EVENT` names, rebuilt from IDs."""
+    ext = payload.get("ext")
+    if not isinstance(ext, str) or ext not in {k.ext for k in filetypes.KINDS.values()}:
+        return None
+    if (document_id := _payload_uuid(payload, "document_id")) is not None:
+        version_no = payload.get("version_no")
+        if isinstance(version_no, bool) or not isinstance(version_no, int) or version_no < 1:
+            return None
+        return document_key(tenant_id, document_id, version_no, ext)
+    if (batch_id := _payload_uuid(payload, "batch_id")) is not None:
+        return import_key(tenant_id, batch_id, ext)
+    return None
+
+
+def discard_unused_object(
+    tenant_id: uuid.UUID, payload: Mapping[str, Any], *, store: ObjectStore | None = None
+) -> bool:
+    """Worker (outbox :data:`OBJECT_DISCARD_EVENT`, W3-06): discard an object the upload path
+    no longer needs. Only the worker role may tag or delete under ``t/*``.
+
+    The event carries IDs only, and the api's database role can write the outbox, so nothing in
+    it is trusted: the key is rebuilt under this school's prefix from the IDs.
+
+    - ``upload_id``: the staging object of that upload intent of this school (never the final
+      copy; a staging object is never the file of record).
+    - ``document_id`` + ``version_no`` + ``ext``, or ``batch_id`` + ``ext``: a document or
+      import key written by a request that then failed. Discarded only if no version of this
+      school points at it and the object is not newer than ``requested_at`` (a retry may have
+      copied it again meanwhile).
+
+    Idempotent (a key that is already gone is fine). Returns True when a key was discarded.
+    """
+    store = store or get_object_store()
+    with tenant_session(tenant_id) as s:
+        if (upload_id := _payload_uuid(payload, "upload_id")) is not None:
+            intent = repo.get_intent(s, upload_id)
+            key = intent.object_key if intent is not None else None
+            if key is not None and not _UPLOAD_KEY.match(key):
+                key = None
+        else:
+            key = _requested_final_key(tenant_id, payload)
+            if key is not None and repo.object_key_in_use(s, key):
+                log.warning(
+                    "documents.discard.refused", tenant_id=str(tenant_id), error_code="key_in_use"
+                )
+                return False
+    if key is None or not key_in_tenant(key, tenant_id):
+        log.warning("documents.discard.refused", tenant_id=str(tenant_id), error_code="bad_event")
+        return False
+    if upload_id is None:
+        requested_at = _payload_time(payload)
+        head = store.head(key)
+        if head is None:
+            return False  # gone already: nothing to do
+        modified = head.last_modified
+        if requested_at is None or (modified is not None and modified > requested_at):
+            log.info("documents.discard.skipped", tenant_id=str(tenant_id), error_code="newer")
+            return False
+    store.discard(key)
+    log.info("documents.object.discarded", tenant_id=str(tenant_id))
+    return True
 
 
 def discard_object(
@@ -2008,7 +2145,7 @@ def save_sheet_version(
         raise Conflict(
             "The new version could not be stored. Try again.", code="storage_unavailable"
         ) from exc
-    with _undo_object_on_error(store, key), _db_errors():
+    with _undo_object_on_error(tenant_id, key), _db_errors():
         version = repo.insert_version(
             session,
             id=new_id(),
@@ -2146,7 +2283,7 @@ def store_generated_document(
     key = document_key(tenant_id, document_id, 1, filetypes.PDF.ext)
     store = store or get_object_store()
     store.put(key, content, filetypes.PDF.mime)
-    with _undo_object_on_error(store, key), _db_errors():
+    with _undo_object_on_error(tenant_id, key), _db_errors():
         repo.insert_document(
             session,
             id=document_id,
@@ -2406,6 +2543,8 @@ __all__ = [
     "DISCARD_REASONS",
     "DISCARD_TASK",
     "GENERATED_PURPOSES",
+    "OBJECT_DISCARD_EVENT",
+    "OBJECT_DISCARD_TASK",
     "QUARANTINE_HOOKS",
     "READY_HOOKS",
     "RETENTION_REASONS",
@@ -2427,6 +2566,7 @@ __all__ = [
     "delete_for_retention",
     "delete_tenant_export",
     "discard_object",
+    "discard_unused_object",
     "discard_version",
     "document_object",
     "evidence_exists",

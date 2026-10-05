@@ -5,7 +5,8 @@
 #
 # Steps: fetch + verify the release bundle (compose, Caddyfile, scripts, image digests) from the artifacts
 # bucket -> pre-upgrade backup -> pull new images -> switch release -> worker sandbox profiles
-# (seccomp + AppArmor, ADR-0025) -> db-bootstrap + migrations
+# (seccomp + AppArmor, ADR-0025) -> systemd units + per-container AWS credentials (audit W3-06) ->
+# db-bootstrap + migrations
 # (backward-compatible expand-only migrations, so the previous code keeps working) -> system-role sync
 # (sync-system-roles.sh --apply, ADR-0022; never --prune) -> rolling restart ->
 # health check through Caddy -> on any failure re-link the previous release and restart it.
@@ -75,6 +76,10 @@ trap rollback ERR
 activate_release "$version"
 # The worker's Chromium sandbox profiles (ADR-0025) must match the release before it restarts.
 install_host_profiles "$(active_release_dir)"
+# The release's systemd units (the credential refresh timer among them) and each app container's own
+# AWS credentials (audit W3-06) before any container restarts.
+install_units "$(active_release_dir)"
+refresh_app_credentials
 render_compose_env
 
 sos_compose run --rm db-bootstrap

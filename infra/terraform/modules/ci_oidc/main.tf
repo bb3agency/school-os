@@ -139,6 +139,12 @@ resource "aws_iam_role_policy" "deploy" {
 
 # --- Plan role (pull requests) ------------------------------------------------------------
 
+locals {
+  plan_subjects = var.plan_environment == null ? [
+    "repo:${local.repo}:pull_request", "repo:${local.repo}:ref:refs/heads/main",
+  ] : ["repo:${local.repo}:environment:${var.plan_environment}"]
+}
+
 data "aws_iam_policy_document" "plan_trust" {
   statement {
     actions = ["sts:AssumeRoleWithWebIdentity"]
@@ -151,10 +157,12 @@ data "aws_iam_policy_document" "plan_trust" {
       variable = "token.actions.githubusercontent.com:aud"
       values   = ["sts.amazonaws.com"]
     }
+    # Audit W3-04: every same-repo pull request and main, unless a GitHub Environment with required
+    # reviewers gates the role (plan_environment); only a gated role may read secrets.
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${local.repo}:pull_request", "repo:${local.repo}:ref:refs/heads/main"]
+      values   = local.plan_subjects
     }
   }
 }
@@ -308,6 +316,16 @@ output "oidc_provider_arn" {
 output "deploy_role_arn" {
   description = "Role for the deploy workflow (aws-actions/configure-aws-credentials role-to-assume)."
   value       = aws_iam_role.deploy.arn
+}
+
+output "plan_subjects" {
+  description = "OIDC subjects allowed to assume the plan role."
+  value       = local.plan_subjects
+}
+
+output "plan_reads_secrets" {
+  description = "Whether the plan role may read secret values (only when environment-gated)."
+  value       = var.create_plan_role && var.plan_can_read_secrets
 }
 
 output "plan_role_arn" {

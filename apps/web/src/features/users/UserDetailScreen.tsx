@@ -467,7 +467,13 @@ export function UserDetailScreen({ userId }: { userId: string }) {
               <ResendInvitation user={{ ...user, email: user.email }} />
             </div>
           ) : null}
-          {canManage && !user.email ? <p className="mt-2">{td("resend.noEmail")}</p> : null}
+          {user.contact_hidden ? (
+            <p className="mt-2" data-testid="contact-hidden">
+              {td("contactHidden")}
+            </p>
+          ) : canManage && !user.email ? (
+            <p className="mt-2">{td("resend.noEmail")}</p>
+          ) : null}
         </Alert>
       ) : null}
       {removed ? (

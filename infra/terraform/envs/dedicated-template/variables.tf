@@ -143,6 +143,12 @@ variable "route53_zone_id" {
   default     = null
 }
 
+variable "imds_hop_limit" {
+  description = "IMDSv2 hop limit of the host: 1 (default, audit W3-06). 2 only for the apply before upgrading a host from a release older than the per-container credentials (deploy/dedicated/README.md: Upgrading)."
+  type        = number
+  default     = 1
+}
+
 variable "walg_enabled" {
   description = "Continuous WAL archiving (RPO <= 15 min)."
   type        = bool
@@ -171,4 +177,10 @@ variable "termination_protection" {
   description = "EC2 termination protection (disable only for decommissioning)."
   type        = bool
   default     = true
+}
+
+variable "files_replica_retention_days" {
+  description = "Object Lock (GOVERNANCE) retention of the files bucket's locked copy in ap-south-2, in days (audit W3-06; >= the 90-day recovery window)."
+  type        = number
+  default     = 90
 }

@@ -17,6 +17,10 @@ Other modules call only these functions.
   in their sections this year; anything else, including other schools' ids, is 404.
 - **Workflow (FR-DQ-020).** Resolve needs a note or a change request; waive needs
   ``dq.findings.waive`` (route) and a reason, and step-up MFA for blockers (428). Both audited.
+  A **blocker** is resolved by hand only by a ``dq.findings.waive`` holder with step-up, the same
+  as waiving it (403 ``blocker_needs_waive``, 428; audit DL-06, FR-CERT-002): otherwise a clerk
+  could note it away and print the mismatched record. The change request that corrects it closes
+  it on approval (below) without that.
 - **Change requests** are linked through outbox events (payload
   ``{change_request_id, student_id, attribute_key}``): ``submitted`` links the student's
   unresolved findings of that attribute, ``approved`` re-checks the student and resolves the
@@ -43,6 +47,7 @@ from app.core.config import get_settings
 from app.core.db import tenant_session
 from app.core.errors import (
     Conflict,
+    Forbidden,
     NotFound,
     PreconditionFailed,
     StepUpRequired,
@@ -895,11 +900,15 @@ def resolve_finding(
     expected_version: int | None = None,
 ) -> FindingOut:
     """Resolve with a note and/or a change request (US-502 AC1, FR-DQ-020). Permission
-    ``dq.findings.resolve``. A re-run reopens it if the conflict is still there (AC2).
-    Audit: ``dq.finding.resolved``."""
+    ``dq.findings.resolve``; a **blocker** also needs ``dq.findings.waive`` (403
+    ``blocker_needs_waive``) and step-up MFA (428), like waiving it (DL-06, FR-CERT-002). A
+    re-run reopens it if the conflict is still there (AC2). Audit: ``dq.finding.resolved``."""
     _reject_aadhaar("note", data.note)
     row, reach = _visible_finding(session, ctx, finding_id, lock=True)
     _open_for_change(row, expected_version)
+    blocker = row["severity"] == Severity.BLOCKER.value
+    if blocker:
+        _require_blocker_clearance(ctx)
     if data.change_request_id is not None:
         _check_change_request(
             session, data.change_request_id, (row["student_id"], row["related_student_id"])
@@ -932,9 +941,22 @@ def resolve_finding(
             "resolution": updated["resolution"],
             "change_request_id": data.change_request_id,
             "has_note": note is not None,
+            "step_up": blocker,
         },
     )
     return _render(session, [updated], reach)[0]
+
+
+def _require_blocker_clearance(ctx: UserContext) -> None:
+    """DL-06: only a ``dq.findings.waive`` holder with a fresh MFA sign-in clears a blocker by
+    hand. The waive grant must reach the school (it is ``school_step_up`` in roles.yaml)."""
+    if not ctx.has(WAIVE) or not ctx.scope_for(WAIVE).school_wide:
+        raise Forbidden(
+            "Only someone who may waive findings can resolve a blocker, after signing in again. "
+            "Ask the office admin or the principal, or correct the record with a change request.",
+            code="blocker_needs_waive",
+        )
+    _require_step_up(ctx)
 
 
 def resolve_with_change_request(

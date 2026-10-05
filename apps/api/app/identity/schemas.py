@@ -175,6 +175,12 @@ class UserOut(_Out):
         "email and language are shared and cannot be edited here (PATCH answers 409 "
         "``profile_shared``, ADR-0028). The other schools are never named.",
     )
+    contact_hidden: bool = Field(
+        default=False,
+        description="The person also belongs to another school and has not accepted this "
+        "school's invitation (or declined it, or was removed), so their email is not shown "
+        "(``email`` is null; audit DL-09). It appears once they accept.",
+    )
 
 
 # --- roles and permissions ------------------------------------------------------------------
@@ -233,6 +239,29 @@ class AcceptedInvitationsOut(_Out):
     """Schools whose invitation was accepted by this sign-in (ADR-0019)."""
 
     accepted: list[uuid.UUID]
+
+
+class InvitationOut(_Out):
+    """One of the signed-in person's own open invitations (audit DL-09)."""
+
+    membership_id: uuid.UUID
+    tenant_id: uuid.UUID
+    school_name: str
+    roles: list[str]
+    invited_at: dt.datetime
+    expires_at: dt.datetime = Field(description="The invitation can be answered until then.")
+
+
+class InvitationsOut(_Out):
+    data: list[InvitationOut]
+
+
+class InvitationAnswerOut(_Out):
+    """The answer to an invitation: ``active`` (accepted) or ``removed`` (declined)."""
+
+    tenant_id: uuid.UUID
+    membership_id: uuid.UUID
+    status: Literal["active", "removed"]
 
 
 class SchoolChoiceOut(_Out):

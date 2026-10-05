@@ -78,6 +78,7 @@ module "kms_dr" {
   name_prefix = "sos-prod-dr"
   keys = {
     backup = { description = "SchoolOS prod: replicated RDS backups in ap-south-2" }
+    files  = { description = "SchoolOS prod: locked copy of the files bucket in ap-south-2" }
   }
 }
 
@@ -88,6 +89,21 @@ module "rds_dr" {
   source_db_instance_arn = module.platform.rds_arn
   kms_key_arn            = module.kms_dr.key_arns["backup"]
   retention_days         = var.dr_backup_retention_days
+}
+
+# Audit W3-06 (b): an independent, locked copy of every school file (Object Lock GOVERNANCE for the
+# 90-day recovery window, SSE-KMS under the DR key). The replication role trusts only S3, so no app
+# role can reach it; a compromised api or worker cannot remove the copy (docs/10 §9, docs/08 §7).
+module "files_replica" {
+  source    = "../../modules/s3_replica"
+  providers = { aws = aws.dr }
+
+  name                = "sos-prod-files-replica-${var.aws_account_id}"
+  source_region       = var.aws_region
+  source_bucket_id    = module.platform.buckets.files
+  source_kms_key_arn  = module.platform.kms_key_arns["data"]
+  replica_kms_key_arn = module.kms_dr.key_arns["files"]
+  retention_days      = var.files_replica_retention_days
 }
 
 # --- Account security baseline (SEC-023, pilot-ready gate) ---------------------------------------
@@ -106,6 +122,7 @@ module "security" {
   data_event_bucket_arns = [
     "arn:aws:s3:::${module.platform.buckets.files}",
     "arn:aws:s3:::${module.platform.buckets.audit}",
+    module.files_replica.replica_bucket_arn,
   ]
   data_event_bucket_name_prefixes = ["sos-ded-"]
   access_log_bucket               = module.platform.buckets.logs

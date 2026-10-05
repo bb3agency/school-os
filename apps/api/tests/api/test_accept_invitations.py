@@ -120,8 +120,8 @@ def test_ADR_0019_function_is_pinned_and_not_callable_by_other_roles(
                 "SELECT r.rolname AS owner, p.prosecdef, "
                 "coalesce(array_to_string(p.proconfig, ','), '') AS config "
                 "FROM pg_proc p JOIN pg_roles r ON r.oid = p.proowner "
-                "JOIN pg_namespace n ON n.oid = p.pronamespace "
-                "WHERE n.nspname = 'core' AND p.proname = 'accept_invitations'"
+                # 0045 adds core.accept_invitations(text, text) (DL-09): pin this signature.
+                "WHERE p.oid = 'core.accept_invitations(text)'::regprocedure"
             )
         ).one()
         assert row.owner == "sos_definer"
