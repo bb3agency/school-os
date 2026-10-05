@@ -2,12 +2,131 @@
 #
 # Custom metrics the application must publish (CloudWatch EMF, namespace var.custom_metric_namespace,
 # dimension Environment=<env>), consumed here:
-#   AuditChainVerificationRuns      count, +1 per completed daily verification run (all tenants)
-#   AuditChainVerificationFailures  count, +1 per tenant whose chain fails verification (P1 security)
 #   CeleryQueueOldestTaskAgeSeconds gauge, max over queues (placeholder until the worker exports it)
+#
+# Security metrics are NOT published by the app: CloudWatch Logs metric filters derive them from the
+# services' structured JSON log lines (app/core/logging.py, apps/web/src/server/log.ts), in
+# "<security_metric_namespace>/<env>", a namespace no task role may write (docs/07 §15, SEC-007).
 
 locals {
-  dims_env = { Environment = var.environment }
+  dims_env    = { Environment = var.environment }
+  security_ns = "${var.security_metric_namespace}/${var.environment}"
+
+  # key => log group, filter pattern, metric name. Event names are pinned by
+  # apps/api/tests/deploy/test_security_log_events.py, so renaming an event breaks a test, not an alarm.
+  security_filters = {
+    # One line per tenant chain whose hash chain fails (also after a verify error), P1.
+    audit_chain_broken = {
+      log_group = var.worker_log_group_name
+      pattern   = "{ $.event = \"audit.chain.broken\" }"
+      metric    = "AuditChainVerificationFailures"
+    }
+    # One line per chain checked (verified or broken): zero in a day means the job did not run.
+    audit_chain_checked = {
+      log_group = var.worker_log_group_name
+      pattern   = "{ ($.event = \"audit.chain.verified\") || ($.event = \"audit.chain.broken\") }"
+      metric    = "AuditChainsChecked"
+    }
+    # The API refused a token or service token (expired tokens are refreshed by the BFF first).
+    api_auth_failures = {
+      log_group = var.api_log_group_name
+      pattern   = "{ ($.event = \"http.request\") && ($.status = 401) }"
+      metric    = "ApiAuthFailures"
+    }
+    # SchoolOS support started a break-glass session in a school (ADR-0023).
+    breakglass_session = {
+      log_group = var.api_log_group_name
+      pattern   = "{ ($.event = \"http.request\") && ($.route = \"POST /api/v1/breakglass/support-session\") && ($.status = 200) }"
+      metric    = "BreakGlassSessionsStarted"
+    }
+    # A spent refresh token came back: a stolen or replayed session (FR-IAM-004).
+    refresh_token_reuse = {
+      log_group = var.web_log_group_name
+      pattern   = "{ $.event = \"refresh_token_reuse_detected\" }"
+      metric    = "RefreshTokenReuse"
+    }
+    # Fleet heartbeat with a bad signature, a replayed nonce or a bad body (SEC-028).
+    heartbeat_rejected = {
+      log_group = var.api_log_group_name
+      pattern   = "{ $.event = \"fleet.heartbeat.rejected\" }"
+      metric    = "HeartbeatRejected"
+    }
+    # A valid operator-pool token whose subject is not an active operator (FR-PLT-028).
+    operator_denied = {
+      log_group = var.api_log_group_name
+      pattern   = "{ $.event = \"platform.operator.denied\" }"
+      metric    = "OperatorDenied"
+    }
+  }
+
+  # key => alarm name suffix, description, period, threshold.
+  security_alarms = {
+    api_auth_failures = {
+      name        = "api-auth-failures"
+      description = "SECURITY: many 401 answers from the API (token replay or a stolen service token). docs/07 §15."
+      period      = 300
+      threshold   = var.api_auth_failures_per_5min
+    }
+    breakglass_session = {
+      name        = "breakglass-session-started"
+      description = "SECURITY (notice): a SchoolOS support break-glass session started in a school (ADR-0023). Check it matches an approved request."
+      period      = 300
+      threshold   = 1
+    }
+    refresh_token_reuse = {
+      name        = "refresh-token-reuse"
+      description = "SECURITY: a spent refresh token was presented again; the session family was revoked (FR-IAM-004). Possible session theft."
+      period      = 300
+      threshold   = 1
+    }
+    heartbeat_rejected = {
+      name        = "heartbeat-rejected"
+      description = "SECURITY: fleet heartbeats rejected (signature, replay or schema; SEC-028)."
+      period      = 900
+      threshold   = var.heartbeat_rejections_per_15min
+    }
+    operator_denied = {
+      name        = "operator-denied"
+      description = "SECURITY: an operator-pool sign-in that is not an active operator reached the control plane (FR-PLT-028)."
+      period      = 300
+      threshold   = 1
+    }
+  }
+}
+
+resource "aws_cloudwatch_log_metric_filter" "security" {
+  for_each = local.security_filters
+
+  name           = "${var.name_prefix}-${replace(each.key, "_", "-")}"
+  log_group_name = each.value.log_group
+  pattern        = each.value.pattern
+
+  metric_transformation {
+    name          = each.value.metric
+    namespace     = local.security_ns
+    value         = "1"
+    default_value = "0"
+    unit          = "Count"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "security" {
+  for_each = local.security_alarms
+
+  alarm_name          = "${var.name_prefix}-${each.value.name}"
+  alarm_description   = each.value.description
+  namespace           = local.security_ns
+  metric_name         = local.security_filters[each.key].metric
+  statistic           = "Sum"
+  period              = each.value.period
+  evaluation_periods  = 1
+  threshold           = each.value.threshold
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [aws_sns_topic.alarms.arn]
+  tags                = var.tags
+
+  depends_on = [aws_cloudwatch_log_metric_filter.security]
 }
 
 resource "aws_sns_topic" "alarms" {
@@ -228,9 +347,8 @@ resource "aws_cloudwatch_metric_alarm" "queue_age" {
 resource "aws_cloudwatch_metric_alarm" "audit_chain_failure" {
   alarm_name          = "${var.name_prefix}-audit-chain-verification-failed"
   alarm_description   = "P1 SECURITY: audit hash-chain verification failed for at least one tenant (SEC-007). Runbook R5."
-  namespace           = var.custom_metric_namespace
-  metric_name         = "AuditChainVerificationFailures"
-  dimensions          = local.dims_env
+  namespace           = local.security_ns
+  metric_name         = local.security_filters.audit_chain_broken.metric
   statistic           = "Sum"
   period              = 3600
   evaluation_periods  = 1
@@ -245,10 +363,9 @@ resource "aws_cloudwatch_metric_alarm" "audit_chain_failure" {
 # The daily verification must actually run: no run recorded in 26 hours alarms (missing = breaching).
 resource "aws_cloudwatch_metric_alarm" "audit_chain_not_run" {
   alarm_name          = "${var.name_prefix}-audit-chain-verification-missing"
-  alarm_description   = "Daily audit chain verification has not reported a run in the last day (SLO: 100% daily)."
-  namespace           = var.custom_metric_namespace
-  metric_name         = "AuditChainVerificationRuns"
-  dimensions          = local.dims_env
+  alarm_description   = "Daily audit chain verification has not checked any chain in the last day (SLO: 100% daily)."
+  namespace           = local.security_ns
+  metric_name         = local.security_filters.audit_chain_checked.metric
   statistic           = "Sum"
   period              = 86400
   evaluation_periods  = 1

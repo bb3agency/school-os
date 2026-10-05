@@ -27,5 +27,6 @@ output "alarm_names" {
       aws_cloudwatch_metric_alarm.audit_chain_failure.alarm_name,
       aws_cloudwatch_metric_alarm.audit_chain_not_run.alarm_name,
     ],
+    [for a in aws_cloudwatch_metric_alarm.security : a.alarm_name],
   )
 }

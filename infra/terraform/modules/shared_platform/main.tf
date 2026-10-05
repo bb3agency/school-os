@@ -210,6 +210,7 @@ module "redis" {
   node_type          = var.redis_node_type
   num_cache_clusters = var.redis_num_nodes
   kms_key_arn        = local.kms_data
+  log_kms_key_arn    = local.kms_logs # the data key does not grant CloudWatch Logs
   secret_name        = "${local.secret_ns}/valkey"
   allowed_security_groups = {
     web        = module.web.security_group_id
@@ -804,7 +805,11 @@ module "observability" {
   rds_allocated_storage_gb   = var.rds_allocated_storage_gb
   redis_replication_group_id = module.redis.replication_group_id
   monthly_budget_usd         = var.monthly_budget_usd
-  tags                       = var.tags
+  # Security alarms read these services' structured logs (docs/07 §15).
+  api_log_group_name    = module.api.log_group_name
+  worker_log_group_name = module.worker.log_group_name
+  web_log_group_name    = module.web.log_group_name
+  tags                  = var.tags
 }
 
 module "ci" {
