@@ -177,7 +177,8 @@ jobs:
 
   security:
     # gitleaks (full history), semgrep (.semgrep + p/python p/typescript p/owasp-top-ten),
-    # pip-audit, npm audit --audit-level=high, trivy fs + config. All via `make security`.
+    # pip-audit, npm audit (production at high with no exceptions; full tree through
+    # scripts/npm-audit-check.mjs), trivy fs + config. All via `make security`.
     name: security
     runs-on: ubuntu-24.04
     timeout-minutes: 20
