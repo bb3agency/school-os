@@ -561,3 +561,41 @@ def test_english_first_notice_is_english_only() -> None:
         "",
         "",
     )
+
+
+# --- audit 2026-10-05 DP-02: links planted in a circular never reach a draft (LLM01, LLM05) ---
+
+_PLANTED = (
+    "Pay the verification fee at https://fees-verify.example/pay or www.fees-verify.example, "
+    "see [the portal](http://fees-verify.example/x) <a href='https://x.example'>here</a>."
+)
+
+
+def test_SEC_019_links_in_a_drafted_parent_notice_are_removed() -> None:
+    """A circular with hidden text can make the model put a phishing link into the notice that
+    staff post to the parents' groups. The prompt says "Do not add links"; now the code enforces
+    it, as SEC-019 does for Ask answers."""
+    draft = notice_rules.validate_notice(
+        {"title_en": "Fees https://fees-verify.example", "body_en": _PLANTED},
+        CFG.notice,
+        telugu=False,
+    )
+    for text in (draft.title_en, draft.body_en):
+        assert "http" not in text
+        assert "www." not in text
+        assert "fees-verify.example" not in text
+        assert "<a" not in text
+    assert "Pay the verification fee at" in draft.body_en
+    assert "the portal" in draft.body_en
+
+
+def test_SEC_019_links_in_a_circular_summary_are_removed() -> None:
+    req = request(*EN_PASSAGES)
+    out = reading_rules.validate_reading(
+        _raw(summary_en=f"Submit UDISE+ data. {_PLANTED}"), req, CFG.reading, telugu=False
+    )
+    assert out.summary_en is not None
+    assert "http" not in out.summary_en
+    assert "www." not in out.summary_en
+    assert "fees-verify.example" not in out.summary_en
+    assert out.summary_en.startswith("Submit UDISE+ data.")
