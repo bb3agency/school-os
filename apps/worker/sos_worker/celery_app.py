@@ -99,6 +99,11 @@ def create_celery() -> Celery:
         result_serializer="json",
         accept_content=["json"],
         result_expires=24 * 3600,
+        # Nothing reads task results. Do not keep return values or failure messages and
+        # tracebacks (which can quote database row values) in Valkey (invariant 5; audit
+        # 2026-10-05 H-02).
+        task_ignore_result=True,
+        task_store_errors_even_if_ignored=False,
         timezone="UTC",
         enable_utc=True,
         broker_connection_retry_on_startup=True,

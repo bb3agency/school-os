@@ -64,7 +64,7 @@ def idempotency_key(task: str, day: date) -> str:
     max_retries=5,
 )
 def archive_daily(day: str | None = None) -> dict[str, Any]:
-    """Archive one UTC day (default: yesterday) for every active/suspended tenant."""
+    """Archive one UTC day (default: yesterday) for every school that can hold a chain."""
     settings = get_settings()
     target = date.fromisoformat(day) if day else datetime.now(UTC).date() - timedelta(days=1)
     results = export_all(

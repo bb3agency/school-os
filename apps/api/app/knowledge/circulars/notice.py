@@ -9,7 +9,8 @@ A notice is drafted from exactly one of:
 Never from student records: the caller has no way to pass them (invariant 8, CLAUDE.md §11 "send
 a field, not a record"; here no student field at all). The draft comes back as four strings; the
 Telugu ones must use Telugu script, every value is cut to the configured length and passed
-through ``core.redaction.redact`` (masks phones, emails, Aadhaar numbers) before it is stored.
+through ``core.redaction.redact`` (masks phones, emails, Aadhaar numbers) and loses any link or
+HTML tag (:func:`reading.strip_links`, SEC-019) before it is stored.
 
 English first (ADR-0036): while Telugu is hidden (``telugu`` false) the model is asked for the
 English part only (:data:`ENGLISH_SCHEMA`), the Telugu fields come back empty and an English
@@ -26,7 +27,7 @@ from dataclasses import dataclass
 from typing import Any, Final, Literal
 
 from app.core.redaction import redact
-from app.knowledge.circulars.reading import Passage
+from app.knowledge.circulars.reading import Passage, strip_links
 from app.knowledge.config.circulars import NoticeConfig
 
 SCHEMA_TAG: Final = "sos:parent_notice.v1"
@@ -139,7 +140,7 @@ def _field(
     value = raw.get(key)
     if not isinstance(value, str):
         return ""
-    text = _tidy(redact(value))
+    text = _tidy(strip_links(redact(value)))
     if telugu and not _TELUGU.search(text):
         return ""
     if english_only and _TELUGU.search(text):
