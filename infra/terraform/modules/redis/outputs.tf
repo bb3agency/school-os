@@ -27,3 +27,8 @@ output "posture" {
     engine             = aws_elasticache_replication_group.this.engine
   }
 }
+
+output "slow_log_kms_key_arn" {
+  description = "CMK of the slow-log group (a key whose policy grants CloudWatch Logs)."
+  value       = aws_cloudwatch_log_group.slow.kms_key_id
+}

@@ -308,7 +308,7 @@ All Python services share one image (`schoolos-python:dev`) with a read-only roo
 | `SOS_MIGRATOR_DATABASE_URL` | local `sos_migrator` URL | Alembic and the partition CLI |
 | `SOS_DB_POOL_SIZE` | 10 | Connection pool per engine |
 | `SOS_DB_STATEMENT_TIMEOUT_MS`, `SOS_WORKER_STATEMENT_TIMEOUT_MS` | 5000, 120000 | Transaction-local statement timeouts (requests; long worker jobs) |
-| `SOS_REDIS_URL` | `redis://localhost:6379/0` | Valkey |
+| `SOS_REDIS_URL` | `redis://localhost:6379/0` | Valkey. Staging/prod refuse a `rediss://` URL without `ssl_cert_reqs=required` (the Celery broker would skip the certificate check) |
 | `SOS_S3_ENDPOINT_URL`, `SOS_S3_BUCKET_FILES`, `SOS_S3_BUCKET_AUDIT` | none, `sos-local-files`, `sos-local-audit-archive` | Object storage (endpoint only for SeaweedFS) |
 | `SOS_S3_PRESIGN_ENDPOINT_URL` | none | Endpoint used only to sign browser-facing presigned URLs (locally `http://localhost:8333`); unset in staging/prod |
 | `SOS_S3_KMS_KEY_ID` | none | KMS key for SSE-KMS on uploaded files (FR-DOC-003): presigned POST policies require it and server writes send it. Shared tier: the data CMK (the files bucket's key); dedicated: `SOS_KMS_DATA_KEY_ARN` (the host key). Unset locally (SeaweedFS) |

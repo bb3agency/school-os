@@ -229,6 +229,11 @@ run "worker_image_and_upload_encryption" {
     ])
     error_message = "api and worker encrypt uploads with the data CMK, the files bucket's key (SOS_S3_KMS_KEY_ID)."
   }
+
+  assert {
+    condition     = module.redis.slow_log_kms_key_arn == "arn:aws:kms:ap-south-1:444455556666:key/00000000-0000-0000-0000-000000000109"
+    error_message = "The Valkey slow-log group uses the logs CMK: the data key does not grant CloudWatch Logs, so CreateLogGroup would fail."
+  }
 }
 
 # SEC-016, SEC-010 (docs/07 §10, §11): browsers upload with presigned POST straight to the files bucket,
