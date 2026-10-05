@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { randomBytes } from "node:crypto";
 import type * as Navigation from "next/navigation";
-import type { ReactElement } from "react";
+import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SessionKind } from "@/server/config";
 import { setAuthRuntimeForTesting } from "@/server/runtime";
@@ -238,7 +238,17 @@ describe("platform layout reads /platform/me", () => {
 
 describe("school picker page (ADR-0019)", () => {
   type PickerProps = { schools: Array<{ tenant_id: string; status: string }>; next: string };
-  type Shell = ReactElement<{ children: ReactElement<PickerProps> }>;
+  type Shell = ReactElement<{ children: ReactNode }>;
+
+  /** The school list inside the shell (pending invitations, DL-09, may sit beside it). */
+  function picker(element: Shell): PickerProps {
+    const found = Children.toArray(element.props.children).find(
+      (child): child is ReactElement<PickerProps> =>
+        isValidElement(child) && "schools" in (child.props as object),
+    );
+    if (!found) throw new Error("no school list in the picker page");
+    return found.props;
+  }
 
   it("lists the user's schools (no X-Active-Tenant) and keeps a safe next", async () => {
     await signInDirect("staff", null);
@@ -255,11 +265,8 @@ describe("school picker page (ADR-0019)", () => {
     const element = (await ChooseSchoolPage({
       searchParams: Promise.resolve({ next: "https://evil.example/phish" }),
     })) as Shell;
-    expect(element.props.children.props.schools.map((s) => s.status)).toEqual([
-      "active",
-      "suspended",
-    ]);
-    expect(element.props.children.props.next).toBe("/");
+    expect(picker(element).schools.map((s) => s.status)).toEqual(["active", "suspended"]);
+    expect(picker(element).next).toBe("/");
     const call = h.apiCalls.find((r) => new URL(r.url).pathname === "/api/v1/me/schools");
     expect(call?.headers.has("x-active-tenant")).toBe(false);
   });
@@ -271,16 +278,16 @@ describe("school picker page (ADR-0019)", () => {
     const element = (await ChooseSchoolPage({
       searchParams: Promise.resolve({ next: "/settings/users" }),
     })) as Shell;
-    expect(element.props.children.props.next).toBe("/settings/users");
+    expect(picker(element).next).toBe("/settings/users");
     // An old prefixed return address loses its prefix; the picker itself is never "next".
     const legacy = (await ChooseSchoolPage({
       searchParams: Promise.resolve({ next: "/te/settings/users" }),
     })) as Shell;
-    expect(legacy.props.children.props.next).toBe("/settings/users");
+    expect(picker(legacy).next).toBe("/settings/users");
     const loop = (await ChooseSchoolPage({
       searchParams: Promise.resolve({ next: "/choose-school?next=%2F" }),
     })) as Shell;
-    expect(loop.props.children.props.next).toBe("/");
+    expect(picker(loop).next).toBe("/");
 
     h.setApi((request) =>
       new URL(request.url).pathname === "/api/v1/me/schools"

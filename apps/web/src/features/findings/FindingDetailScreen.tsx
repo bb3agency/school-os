@@ -189,7 +189,10 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
                 </ButtonLink>
               ) : null}
               {blocker && can("dq.findings.resolve") && !can("dq.findings.waive") ? (
-                <p className="max-w-prose text-sm text-ink-muted" data-testid="blocker-resolve-hint">
+                <p
+                  className="max-w-prose text-sm text-ink-muted"
+                  data-testid="blocker-resolve-hint"
+                >
                   {td("blockerNeedsWaive")}
                 </p>
               ) : null}
