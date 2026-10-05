@@ -3401,6 +3401,7 @@
     "durationHours": "{hours, plural, one {# గంట} other {# గంటలు}}",
     "durationMinutes": "{minutes} నిమిషాలు",
     "scopeWholeSchool": "మొత్తం పాఠశాల",
+    "scopeIgnored": "Also sent by SchoolOS, but these do not limit what they can see: {items}.",
     "status": {
       "requested": "మీ కోసం వేచి ఉంది",
       "approved": "SchoolOS నిర్ధారించింది",

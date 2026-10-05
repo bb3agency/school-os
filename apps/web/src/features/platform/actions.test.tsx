@@ -939,6 +939,33 @@ describe("fleet, flags, audit, operators, announcements, break-glass, support", 
     });
   });
 
+  it("break-glass: a request is for the whole school, said so, and sends an empty scope (DL-10)", async () => {
+    stub.routes["GET /bff/api/v1/platform/break-glass-requests"] = () => page([]);
+    stub.routes["POST /bff/api/v1/platform/break-glass-requests"] = () =>
+      Response.json({ id: "0192f3a4-0000-7000-8000-00000000f102" }, { status: 201 });
+    const user = userEvent.setup();
+    renderWithIntl(<BreakGlassScreen />);
+    await user.click(await screen.findByRole("button", { name: pm.breakGlass.request }));
+    const dialog = screen.getByRole("dialog", { name: pm.breakGlass.requestTitle });
+    expect(within(dialog).getByText(/the whole school/)).toBeInTheDocument();
+    await user.selectOptions(
+      within(dialog).getByLabelText(pm.breakGlass.colSchool),
+      TENANT_SUMMARY.tenant_id,
+    );
+    await user.type(
+      within(dialog).getByLabelText(pm.breakGlass.colReason),
+      "The school asked for help with an import that failed",
+    );
+    await user.click(within(dialog).getByRole("button", { name: pm.breakGlass.request }));
+    await waitFor(() =>
+      expect(stub.callsTo("POST /bff/api/v1/platform/break-glass-requests")).toHaveLength(1),
+    );
+    expect(bodyOf("POST /bff/api/v1/platform/break-glass-requests")).toMatchObject({
+      tenant_id: T,
+      scope: {},
+    });
+  });
+
   it("break-glass: the requester cannot give the second emergency confirmation (409)", async () => {
     stub.routes["GET /bff/api/v1/platform/break-glass-requests"] = () =>
       page([
@@ -948,7 +975,7 @@ describe("fleet, flags, audit, operators, announcements, break-glass, support", 
           requested_by: OP,
           reason_code: "security_incident",
           reason: "Suspected account compromise reported by principal",
-          scope: { access: "read" },
+          scope: {},
           duration_minutes: 60,
           emergency: true,
           emergency_confirmed_by_1: OP,

@@ -6760,7 +6760,7 @@ export interface components {
              */
             reason_code: "support_request" | "security_incident" | "legal_obligation";
             /** Scope */
-            scope: {
+            scope?: {
                 [key: string]: string;
             };
             /**

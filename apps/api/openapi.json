@@ -2104,19 +2104,16 @@
             "type": "string"
           },
           "scope": {
-            "maxProperties": 10,
-            "patternProperties": {
-              "^[a-z_]{1,40}$": {
-                "anyOf": [
-                  {
-                    "format": "uuid",
-                    "type": "string"
-                  },
-                  {
-                    "type": "string"
-                  }
-                ]
-              }
+            "additionalProperties": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxProperties": 2,
+            "propertyNames": {
+              "enum": [
+                "section_id",
+                "class_id"
+              ]
             },
             "title": "Scope",
             "type": "object"
@@ -2131,7 +2128,6 @@
           "tenant_id",
           "reason_code",
           "reason",
-          "scope",
           "duration_minutes"
         ],
         "title": "BreakGlassIn",

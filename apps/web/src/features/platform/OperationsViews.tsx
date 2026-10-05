@@ -713,7 +713,9 @@ export function BreakGlassScreen() {
               submit={(data) =>
                 unwrap(
                   api.POST("/api/v1/platform/break-glass-requests", {
-                    body: { ...data, scope: { access: "read" } },
+                    // DL-10: only section_id/class_id narrow a grant; the panel asks for the
+                    // whole school and says so (requestBody).
+                    body: { ...data, scope: {} },
                   }),
                 )
               }

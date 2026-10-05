@@ -1447,7 +1447,7 @@
       "openSchool": "Open the school",
       "openSchoolHint": "Support sign-in: you sign in again with MFA. Only the operator who asked can use it. Read only; every page is recorded in the school's audit log.",
       "requestTitle": "Request temporary access",
-      "requestBody": "Read-only access for the time you choose. Every action is audited in the school's log.",
+      "requestBody": "Read-only access to the whole school for the time you choose. The school approves it unless two operators confirm an emergency. Every action is audited in the school's log.",
       "colSchool": "School",
       "colReason": "Reason",
       "colDuration": "Duration",
@@ -3401,6 +3401,7 @@
     "durationHours": "{hours, plural, one {# hour} other {# hours}}",
     "durationMinutes": "{minutes} minutes",
     "scopeWholeSchool": "The whole school",
+    "scopeIgnored": "Also sent by SchoolOS, but these do not limit what they can see: {items}.",
     "status": {
       "requested": "Waiting for you",
       "approved": "Confirmed by SchoolOS",

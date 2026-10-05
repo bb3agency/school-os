@@ -8,7 +8,6 @@ are described by ID, code, public name, plan, status and counts only (BR-09). Mo
 from __future__ import annotations
 
 import datetime as dt
-import re
 import unicodedata
 import uuid
 from decimal import Decimal
@@ -21,7 +20,6 @@ from pydantic import (
     ConfigDict,
     Field,
     StringConstraints,
-    field_validator,
     model_validator,
 )
 
@@ -1005,23 +1003,19 @@ class TicketOut(Out):
 # --- break-glass ------------------------------------------------------------------------------
 
 
+BreakGlassScopeKey = Literal["section_id", "class_id"]
+
+
 class BreakGlassIn(In):
     tenant_id: uuid.UUID
     reason_code: Literal["support_request", "security_incident", "legal_obligation"]
     reason: Reason
-    scope: dict[Annotated[str, StringConstraints(pattern=r"^[a-z_]{1,40}$")], uuid.UUID | str] = (
-        Field(max_length=10)
-    )
+    # Audit DL-10: only keys that really narrow the grant (they become membership scopes in the
+    # school, app.breakglass) are accepted; any other key (student, batch, document...) would look
+    # narrow to the approver but grant the whole school. Empty = the whole school, shown as such.
+    scope: dict[BreakGlassScopeKey, uuid.UUID] = Field(default_factory=dict, max_length=2)
     duration_minutes: int = Field(ge=15, le=480)
     emergency: bool = False
-
-    @field_validator("scope")
-    @classmethod
-    def _scope_values(cls, v: dict[str, uuid.UUID | str]) -> dict[str, uuid.UUID | str]:
-        for value in v.values():
-            if isinstance(value, str) and not re.fullmatch(r"[a-z_.]{1,60}", value):
-                raise ValueError("scope values are resource IDs or permission-like codes")
-        return v
 
 
 class BreakGlassOut(Out):

@@ -55,29 +55,59 @@ function useDuration(): (minutes: number | null) => string | null {
   };
 }
 
-/** Scope as the school reads it: "Section: Class 9 · A". IDs that are not sections stay IDs. */
+/** The only scope keys that narrow the grant (they become membership scopes, app.breakglass). */
+const NARROWING_KEYS = ["section_id", "class_id"] as const;
+
+/**
+ * The real reach of the grant as the school reads it: "Section: Class 9 · A", or "The whole
+ * school". Audit DL-10: any other key (student, import, document...) does not narrow access, so
+ * it is never shown as if it did; it is listed apart as not limiting what support can see.
+ */
 function ScopeText({ scope }: { scope: Grant["scope"] }) {
   const t = useTranslations("breakGlass");
   const { sections } = useSectionOptions();
   const entries = Object.entries(scope);
-  if (entries.length === 0) return <>{t("scopeWholeSchool")}</>;
+  const narrowing = entries.filter(([key]) => (NARROWING_KEYS as readonly string[]).includes(key));
+  const ignored = entries.filter(([key]) => !(NARROWING_KEYS as readonly string[]).includes(key));
+  const textOf = (value: unknown) => (typeof value === "string" ? value : JSON.stringify(value));
   return (
-    <ul className="space-y-1">
-      {entries.map(([key, value]) => {
-        const text = typeof value === "string" ? value : JSON.stringify(value);
-        const section = key === "section_id" ? sections.find((item) => item.id === text) : null;
-        return (
-          <li key={key}>
-            <span className="font-semibold">
-              {translateOr(t, `scopeKeys.${key}`, "scopeKeys.other")}:
-            </span>{" "}
-            <span className={section ? "" : "font-mono text-sm break-all"}>
-              {section ? section.label : text}
-            </span>
-          </li>
-        );
-      })}
-    </ul>
+    <>
+      <div data-testid="breakglass-reach">
+        {narrowing.length === 0 ? (
+          <span className="font-semibold">{t("scopeWholeSchool")}</span>
+        ) : (
+          <ul className="space-y-1">
+            {narrowing.map(([key, value]) => {
+              const text = textOf(value);
+              const section =
+                key === "section_id" ? sections.find((item) => item.id === text) : null;
+              return (
+                <li key={key}>
+                  <span className="font-semibold">
+                    {translateOr(t, `scopeKeys.${key}`, "scopeKeys.other")}:
+                  </span>{" "}
+                  <span className={section ? "" : "font-mono text-sm break-all"}>
+                    {section ? section.label : text}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+      {ignored.length > 0 ? (
+        <p className="mt-1 text-sm text-ink-muted" data-testid="breakglass-scope-ignored">
+          {t("scopeIgnored", {
+            items: ignored
+              .map(
+                ([key, value]) =>
+                  `${translateOr(t, `scopeKeys.${key}`, "scopeKeys.other")} ${textOf(value)}`,
+              )
+              .join("; "),
+          })}
+        </p>
+      ) : null}
+    </>
   );
 }
 

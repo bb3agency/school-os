@@ -98,6 +98,24 @@ describe("support access request (US-103 AC1/AC2)", () => {
     );
   });
 
+  it("states the real reach: keys that do not narrow access read as the whole school (DL-10)", async () => {
+    detail({ scope: { student_id: "0192f3a4-0000-7000-8000-00000000aaaa", access: "read" } });
+    renderWithIntl(<BreakGlassDetailScreen grantId={ID} />);
+    const reach = await screen.findByTestId("breakglass-reach");
+    expect(reach).toHaveTextContent("The whole school");
+    expect(reach).not.toHaveTextContent(/^Student:/);
+    expect(screen.getByTestId("breakglass-scope-ignored")).toHaveTextContent(
+      /do not limit what they can see/,
+    );
+  });
+
+  it("an empty scope says the whole school, with no extra note (DL-10)", async () => {
+    detail({ scope: {} });
+    renderWithIntl(<BreakGlassDetailScreen grantId={ID} />);
+    expect(await screen.findByTestId("breakglass-reach")).toHaveTextContent("The whole school");
+    expect(screen.queryByTestId("breakglass-scope-ignored")).toBeNull();
+  });
+
   it("explains when support withdrew the request", async () => {
     detail();
     stub.routes[`POST /bff/api/v1/breakglass/requests/${ID}/deny`] = () =>
