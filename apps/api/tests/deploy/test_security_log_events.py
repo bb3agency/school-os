@@ -63,10 +63,15 @@ def test_SEC_007_audit_chain_alarms_match_the_worker_log_lines(lines: io.StringI
         ("fleet.heartbeat.rejected", API / "app" / "platform" / "fleet.py"),
         ("platform.operator.denied", API / "app" / "platform" / "auth.py"),
         ("http.request", API / "app" / "core" / "middleware.py"),
-        ("refresh_token_reuse_detected", ROOT / "apps" / "web" / "src" / "server" / "auth" / "refresh.ts"),
+        (
+            "refresh_token_reuse_detected",
+            ROOT / "apps" / "web" / "src" / "server" / "auth" / "refresh.ts",
+        ),
     ],
 )
-def test_docs07_s15_every_filtered_event_is_written_by_its_service(event: str, source: Path) -> None:
+def test_docs07_s15_every_filtered_event_is_written_by_its_service(
+    event: str, source: Path
+) -> None:
     assert event in _filter_events()
     assert f'"{event}"' in source.read_text(encoding="utf-8")
 
