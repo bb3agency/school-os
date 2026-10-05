@@ -127,3 +127,13 @@ run "security_baseline_can_be_disabled" {
     error_message = "enable_security_baseline = false creates nothing."
   }
 }
+
+# Audit W3-06 (b): staging exercises the locked files copy with the DR path.
+run "files_locked_copy_with_the_dr_path" {
+  command = plan
+
+  assert {
+    condition     = length(module.files_replica) == 1 && module.files_replica[0].posture.object_lock_mode == "GOVERNANCE" && module.files_replica[0].posture.object_lock_days >= 90
+    error_message = "Staging replicates the files bucket to a locked bucket in ap-south-2."
+  }
+}

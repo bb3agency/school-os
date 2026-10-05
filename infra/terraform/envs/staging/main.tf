@@ -82,6 +82,7 @@ module "kms_dr" {
   deletion_window_in_days = 7
   keys = {
     backup = { description = "SchoolOS staging: replicated RDS backups in ap-south-2" }
+    files  = { description = "SchoolOS staging: locked copy of the files bucket in ap-south-2" }
   }
 }
 
@@ -93,6 +94,22 @@ module "rds_dr" {
   source_db_instance_arn = module.platform.rds_arn
   kms_key_arn            = module.kms_dr.key_arns["backup"]
   retention_days         = var.dr_backup_retention_days
+}
+
+# Audit W3-06 (b): the locked copy of the files bucket, as in prod (on with the DR path). Its versions
+# stay locked for retention_days, so tearing staging down waits for the lock (synthetic data only).
+module "files_replica" {
+  source    = "../../modules/s3_replica"
+  count     = var.dr_backup_replication_enabled ? 1 : 0
+  providers = { aws = aws.dr }
+
+  name                = "sos-staging-files-replica-${var.aws_account_id}"
+  source_region       = var.aws_region
+  source_bucket_id    = module.platform.buckets.files
+  source_kms_key_arn  = module.platform.kms_key_arns["data"]
+  replica_kms_key_arn = module.kms_dr.key_arns["files"]
+  retention_days      = var.files_replica_retention_days
+  force_destroy       = true
 }
 
 # --- Account security baseline (SEC-023) ---------------------------------------------------------

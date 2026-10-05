@@ -34,6 +34,7 @@ module "kms_backup" {
   name_prefix = local.name
   keys = {
     backup = { description = "SchoolOS dedicated ${var.school_code}: backups in ap-south-2" }
+    files  = { description = "SchoolOS dedicated ${var.school_code}: locked copy of the files bucket in ap-south-2" }
   }
 }
 
@@ -143,4 +144,21 @@ module "host" {
   imds_hop_limit                 = var.imds_hop_limit
   termination_protection         = var.termination_protection
   route53_zone_id                = var.route53_zone_id
+}
+
+# --- Locked copy of the files bucket (ap-south-2; audit W3-06 (b)) -----------------------------
+# Object Lock GOVERNANCE for the 90-day recovery window, SSE-KMS under the school's backup-region key,
+# replication role trusted by S3 only (neither the api nor the worker role can reach it).
+
+module "files_replica" {
+  source    = "../../modules/s3_replica"
+  providers = { aws = aws.backup }
+
+  name                = "${local.name}-frep-${data.aws_caller_identity.current.account_id}"
+  source_region       = var.aws_region
+  source_bucket_id    = module.host.files_bucket
+  source_kms_key_arn  = module.kms.key_arns["data"]
+  replica_kms_key_arn = module.kms_backup.key_arns["files"]
+  retention_days      = var.files_replica_retention_days
+  tags                = { school_code = var.school_code }
 }
