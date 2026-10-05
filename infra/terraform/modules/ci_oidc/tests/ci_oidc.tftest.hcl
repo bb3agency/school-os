@@ -13,11 +13,34 @@ mock_provider "aws" {
 }
 
 variables {
-  name_prefix         = "sos-test"
-  deploy_environment  = "production"
-  ecr_repository_arns = ["arn:aws:ecr:ap-south-1:111122223333:repository/schoolos/api"]
-  ecs_cluster_arn     = "arn:aws:ecs:ap-south-1:111122223333:cluster/sos-test"
-  passable_role_arns  = ["arn:aws:iam::111122223333:role/sos-test-api-task"]
+  name_prefix           = "sos-test"
+  deploy_environment    = "production"
+  ecr_repository_arns   = ["arn:aws:ecr:ap-south-1:111122223333:repository/schoolos/api"]
+  ecs_cluster_arn       = "arn:aws:ecs:ap-south-1:111122223333:cluster/sos-test"
+  passable_role_arns    = ["arn:aws:iam::111122223333:role/sos-test-api-task"]
+  one_off_task_families = ["sos-test-migrate"]
+}
+
+# Audit 2026-10-05 P2-04: RunTask on any task definition let the deploy role start the db-bootstrap
+# task (RDS master user secret) with a command override and read its output from the task logs.
+run "deploy_role_runs_only_the_listed_one_off_tasks" {
+  command = plan
+
+  assert {
+    condition = alltrue(flatten([
+      for s in data.aws_iam_policy_document.deploy.statement : [
+        for r in s.resources : r == "arn:aws:ecs:*:111122223333:task-definition/sos-test-migrate:*"
+      ] if contains(s.actions, "ecs:RunTask")
+    ]))
+    error_message = "ecs:RunTask only on the listed one-off task definition families."
+  }
+
+  assert {
+    condition = length([
+      for s in data.aws_iam_policy_document.deploy.statement : s if contains(s.actions, "ecs:RunTask")
+    ]) == 1
+    error_message = "Exactly one statement grants ecs:RunTask."
+  }
 }
 
 run "prod_deploy_requires_environment" {

@@ -49,8 +49,18 @@ variable "ecs_cluster_arn" {
 }
 
 variable "passable_role_arns" {
-  description = "Task/execution role ARNs the deploy role may pass to ECS."
+  description = "Task/execution role ARNs the deploy role may pass to ECS. Never a role that can read the RDS master secret (db-bootstrap)."
   type        = list(string)
+}
+
+variable "one_off_task_families" {
+  description = "Task definition families the deploy role may start with ecs:RunTask (the migrate task). Never db-bootstrap: it holds the RDS master password."
+  type        = list(string)
+
+  validation {
+    condition     = length(var.one_off_task_families) > 0 && alltrue([for f in var.one_off_task_families : can(regex("^[A-Za-z0-9_-]{1,255}$", f)) && !strcontains(f, "db-bootstrap")])
+    error_message = "List at least one task definition family (no wildcards), and never db-bootstrap."
+  }
 }
 
 variable "enable_artifacts_publish" {

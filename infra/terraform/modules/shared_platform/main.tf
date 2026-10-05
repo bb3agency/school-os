@@ -824,10 +824,13 @@ module "ci" {
   allow_main_branch          = var.github_allow_main_branch
   ecr_repository_arns        = values(module.ecr.repository_arns)
   ecs_cluster_arn            = module.cluster.arn
+  # Not db_bootstrap: its execution role reads the RDS master secret. Operators start it with their
+  # own credentials (docs/10 §8); CI never does (audit 2026-10-05 P2-04).
   passable_role_arns = flatten([
-    for m in [module.web, module.api, module.worker, module.worker_pdf, module.beat, module.migrate, module.db_bootstrap] :
+    for m in [module.web, module.api, module.worker, module.worker_pdf, module.beat, module.migrate] :
     [m.task_role_arn, m.execution_role_arn]
   ])
+  one_off_task_families    = [module.migrate.task_definition_family]
   enable_artifacts_publish = true
   artifacts_bucket_arn     = module.s3.artifacts_bucket_arn
   artifacts_kms_key_arn    = local.kms_data
