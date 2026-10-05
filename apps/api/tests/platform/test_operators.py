@@ -44,8 +44,18 @@ def test_FR_PLT_028_invite_assign_roles_and_deactivate(
     assert (own.status_code, own.json()["code"]) == (409, "own_roles")
     gone = api.call("POST", f"/operators/{op_id}/deactivate", owner)
     assert gone.json()["status"] == "deactivated"
-    listing = api.call("GET", "/operators?limit=200", owner).json()["data"]
-    assert any(o["id"] == op_id for o in listing)
+    # The shared test database can hold more than one page of operators in a full run: follow
+    # the cursor so the deactivated operator is found wherever its UUIDv7 id sorts.
+    listed: list[str] = []
+    cursor: str | None = None
+    while True:
+        query = "/operators?limit=200" + (f"&cursor={cursor}" if cursor else "")
+        page = api.call("GET", query, owner).json()
+        listed += [o["id"] for o in page["data"]]
+        cursor = page.get("next_cursor")
+        if not cursor:
+            break
+    assert op_id in listed
     stale = api.call("POST", "/operators", owner, json=body, fresh=False)
     assert stale.status_code == 428
 
