@@ -848,9 +848,39 @@ def set_roles(
             resource_id=membership.id,
             summary={"user_id": user_id, "role_key": role.key, "role_id": role.id},
         )
+    membership = _start_time_bound_window(session, ctx, membership, added)
     if added or revoked:
         cache.invalidate_on_commit(session, ctx.tenant_id, membership.id)
     return _user_out(session, membership)
+
+
+def _start_time_bound_window(
+    session: Session, ctx: UserContext, membership: Membership, added: Sequence[Role]
+) -> Membership:
+    """A role with a membership TTL (``auditor_readonly``, docs/07 §6.2) is time-bound however it
+    is given: adding it caps the membership's expiry at now + TTL, as an invitation does. An
+    earlier expiry is kept; nothing is ever extended (audit 2026-10-05 A-02)."""
+    templates = system_roles()
+    ttls = [
+        d.membership_ttl
+        for r in added
+        if r.is_system and (d := templates.get(r.key)) is not None and d.membership_ttl
+    ]
+    if not ttls:
+        return membership
+    ends = dt.datetime.now(dt.UTC) + min(ttls)
+    if membership.expires_at is not None and membership.expires_at <= ends:
+        return membership
+    updated = repo.set_membership_expiry(session, membership.id, expires_at=ends)
+    _record(
+        session,
+        ctx,
+        action="membership.expiry_set",
+        resource_type="membership",
+        resource_id=membership.id,
+        summary={"user_id": membership.user_id, "expires_at": ends.isoformat()},
+    )
+    return updated
 
 
 def _add_scopes(

@@ -376,6 +376,25 @@ def set_membership_window(
     return membership
 
 
+def set_membership_expiry(
+    session: Session, membership_id: uuid.UUID, *, expires_at: dt.datetime
+) -> Membership:
+    """Set a membership's expiry (a time-bound role given later, docs/07 §6.2).
+
+    Audit: ``membership.expiry_set``.
+    """
+    membership = session.scalars(
+        update(Membership)
+        .where(Membership.id == membership_id)
+        .values(expires_at=expires_at, version=Membership.version + 1)
+        .returning(Membership),
+        execution_options={"populate_existing": True, "synchronize_session": False},
+    ).one_or_none()
+    if membership is None:
+        raise NotFound("Membership not found")
+    return membership
+
+
 # --- roles and permissions -----------------------------------------------------------------
 
 
