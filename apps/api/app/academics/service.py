@@ -585,6 +585,23 @@ def section_marks(
     )
 
 
+def _marks_in_other_sections(
+    ctx: UserContext, section_id: uuid.UUID, existing: Iterable[Any], entries: Sequence[MarkIn]
+) -> list[dict[str, str]]:
+    """Errors for papers a scoped recorder finds already recorded under another section
+    (:data:`OTHER_SECTION_CODE`); none for a school-wide recorder."""
+    if ctx.scope_for(MARKS_RECORD).school_wide:
+        return []
+    elsewhere = {
+        (m.student_id, m.subject.casefold()) for m in existing if m.section_id != section_id
+    }
+    return [
+        _error(f"entries.{i}.subject", OTHER_SECTION_CODE)
+        for i, entry in enumerate(entries)
+        if (entry.student_id, entry.subject.casefold()) in elsewhere
+    ]
+
+
 def record_marks(
     session: Session,
     ctx: UserContext,
@@ -639,14 +656,7 @@ def record_marks(
         spelling.setdefault(subject.casefold(), subject)
     existing = repo.exam_marks(session, exam.id, {e.student_id for e in data.entries})
     stored = {(m.student_id, m.subject.casefold()): m.subject for m in existing}
-    if not ctx.scope_for(MARKS_RECORD).school_wide:
-        elsewhere = {
-            (m.student_id, m.subject.casefold()) for m in existing if m.section_id != sec.section.id
-        }
-        for i, entry in enumerate(data.entries):
-            if (entry.student_id, entry.subject.casefold()) in elsewhere:
-                errors.append(_error(f"entries.{i}.subject", OTHER_SECTION_CODE))
-        _refuse(errors)
+    _refuse(_marks_in_other_sections(ctx, sec.section.id, existing, data.entries))
 
     def _subject(entry: MarkIn) -> str:
         folded = entry.subject.casefold()
