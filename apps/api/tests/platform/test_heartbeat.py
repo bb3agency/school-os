@@ -379,7 +379,7 @@ def test_AA_09_older_usage_is_ignored_but_the_heartbeat_counts(
     assert res.status_code == 200, res.text
     assert _usage_dates(dep["tenant_id"]) == []
     with platform_session() as s:
-        seen = s.execute(
+        seen: dt.datetime | None = s.execute(
             text("SELECT last_heartbeat_at FROM platform.deployments WHERE id = :d"),
             {"d": dep["deployment_id"]},
         ).scalar_one()

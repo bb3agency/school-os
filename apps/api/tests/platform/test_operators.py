@@ -185,7 +185,7 @@ def test_DL_10_breakglass_scope_must_really_narrow_the_grant(
             },
         )
 
-    for wide in (
+    wide_scopes: tuple[dict[str, object], ...] = (
         {"student_id": str(uuid.uuid4())},
         {"import_batch_id": str(uuid.uuid4())},
         {"document_id": str(uuid.uuid4())},
@@ -193,7 +193,8 @@ def test_DL_10_breakglass_scope_must_really_narrow_the_grant(
         {"area": "imports"},
         {"section_id": "not-a-uuid"},
         {"section_id": str(uuid.uuid4()), "student_id": str(uuid.uuid4())},
-    ):
+    )
+    for wide in wide_scopes:
         res = ask(wide)
         assert res.status_code == 422, (wide, res.text)
     whole = ask({})
