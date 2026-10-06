@@ -173,6 +173,22 @@ def test_ADR_0034_an_explicit_item_is_saved_listed_edited_and_deleted(
     assert "short" not in str(W.audit_events(admin_engine, world.a.tenant_id, "kb.memory.created"))
 
 
+def test_R_05_a_retried_memory_item_is_saved_once(
+    world: Any, api: Any, admin_engine: Engine, fake: Any
+) -> None:
+    """Audit 2026-10-06 R-05 (docs/09 §2): a retried POST with the same Idempotency-Key replays
+    the first answer instead of saving a second item and running the screen again."""
+    who = _person(admin_engine, world)
+    key = {"Idempotency-Key": f"mem-{uuid.uuid4().hex}"}
+    body = {"text": "Keep answers short"}
+    one = api.call(who, "POST", "/api/v1/knowledge/memories", json=body, headers=key)
+    two = api.call(who, "POST", "/api/v1/knowledge/memories", json=body, headers=key)
+    assert one.status_code == two.status_code == 201, two.text
+    assert one.json()["id"] == two.json()["id"]
+    assert two.headers.get("Idempotent-Replayed") == "true"
+    assert len(_items(api, who)) == 1
+
+
 @pytest.mark.parametrize(
     ("note", "code"),
     [

@@ -373,14 +373,15 @@ def list_memories(ctx: Asker, db: TenantDB) -> Page[MemoryOut]:
 
 
 @router.post("/knowledge/memories", response_model=MemoryOut, status_code=201)
-def create_memory(ctx: Asker, db: TenantDB, body: MemoryIn) -> MemoryOut:
+def create_memory(ctx: Asker, db: TenantDB, body: MemoryIn, idem: IdempotencyDep) -> Response:
     """Add a memory item: your own preference or work context (e.g. "Keep answers short").
     Never details about students, parents or other staff: refused with 422
     (``memory_personal_number``, ``memory_date``, ``memory_long_number``, ``memory_others``,
     ``memory_unsure``, ``memory_too_long``); 503 ``memory_check_unavailable`` when the check
     cannot run; 409 ``memory_off`` or ``memory_full``; 429 ``ai_rate_limited`` (the item check
-    counts against your per-minute question limit)."""
-    return service.get_service().create_memory(db, ctx, body)
+    counts against your per-minute question limit). Accepts ``Idempotency-Key``: a retry with
+    the same key replays the first answer without running the check again."""
+    return idem.run(db, body, lambda: service.get_service().create_memory(db, ctx, body))
 
 
 @router.delete("/knowledge/memories", status_code=204)
