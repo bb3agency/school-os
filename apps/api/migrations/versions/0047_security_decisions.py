@@ -5,8 +5,9 @@ docstring: later catalog changes get their own revision that re-runs the upsert)
 
 - R-17 adds ``support.manage`` (read and reply on every support ticket of the school). Without
   it a member reads and answers only the tickets they opened themselves; ticket subjects and
-  messages may name students (OWASP API3, DPDP purpose limit). ``support.ticket.create`` gets
-  the matching description (open tickets; read and reply on the ones you opened).
+  messages may name students (OWASP API3, DPDP purpose limit). The description of
+  ``support.ticket.create`` is unchanged (catalog rows written by earlier revisions keep their
+  meaning; docs/07 §6.2 states the narrower reach).
 
 The rows are written out here rather than read from ``permissions.yaml`` so this revision means
 the same thing whatever the YAML says later.
@@ -65,12 +66,6 @@ NEW_PERMISSIONS: tuple[dict[str, object], ...] = (
         "is_platform": False,
     },
 )
-
-TICKET_CREATE_DESCRIPTION = {
-    "new": "Open support tickets and read and reply on the ones you opened",
-    "old": "Open and read the school's own support tickets",
-}
-SET_DESCRIPTION = sa.text("UPDATE core.permissions SET description = :d WHERE key = :k")
 
 UPSERT = sa.text(
     """
@@ -148,18 +143,12 @@ def upgrade() -> None:
     bind = op.get_bind()
     for row in NEW_PERMISSIONS:
         bind.execute(UPSERT, row)
-    bind.execute(
-        SET_DESCRIPTION, {"k": "support.ticket.create", "d": TICKET_CREATE_DESCRIPTION["new"]}
-    )
 
 
 def downgrade() -> None:
     for statement in (*VERIFICATIONS_DOWN, *SECURITY_HOLD_DOWN):
         op.execute(statement)
     bind = op.get_bind()
-    bind.execute(
-        SET_DESCRIPTION, {"k": "support.ticket.create", "d": TICKET_CREATE_DESCRIPTION["old"]}
-    )
     for row in NEW_PERMISSIONS:
         savepoint = bind.begin_nested()
         try:

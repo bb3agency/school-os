@@ -47,7 +47,7 @@ permissions:
     sensitivity: critical
     step_up: true
   support.ticket.create:
-    description: Open support tickets and read and reply on the ones you opened
+    description: Open and read the school's own support tickets
     sensitivity: normal
     step_up: false
   support.manage:
