@@ -17,7 +17,8 @@ export function FilterCard({
   const t = useTranslations("platform.schools");
   return (
     <Card padding="sm">
-      <form method="get" className="flex flex-wrap items-end gap-3">
+      {/* One column on phones (docs/17 §5.7): every filter takes the full width. */}
+      <form method="get" className="flex flex-wrap items-end gap-3 max-sm:[&>*]:w-full">
         {children}
         <div className="relative flex flex-wrap gap-2">
           <Button type="submit" variant="secondary">
