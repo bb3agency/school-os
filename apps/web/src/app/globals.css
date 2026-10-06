@@ -485,6 +485,15 @@
     overscroll-behavior: contain;
   }
 
+  /* A dialog's action row: stuck to the bottom of the dialog while its body scrolls, so the
+     buttons never leave the screen (docs/17 §5.7; the phone sheet adds the home-indicator
+     inset below). */
+  .dialog-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+  }
+
   .drawer-sheet {
     display: flex;
     flex-direction: column;
@@ -873,6 +882,53 @@
   }
   to {
     transform: translateX(0);
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/*
+ * Dialogs on phones (docs/17 §5.7): below 640px every modal dialog (not the menu drawer) is a
+ * bottom sheet: the full width, pinned to the bottom edge, at most the screen minus a strip of
+ * the dimmed page at the top (100vh first, dvh second), rounded top corners. The sheet scrolls
+ * as one box and its footer (`.dialog-footer`) stays stuck to the bottom, clear of the home
+ * indicator, so the actions are always on screen. Unlayered and with :modal, so it wins over
+ * the width and margin utilities each dialog sets for wider screens. Without
+ * prefers-reduced-motion it rises from the bottom on the drawer curve; the exit is played by
+ * lib/dialog-motion.ts.
+ */
+@media (width < 40rem) {
+  dialog:modal:not(.drawer) {
+    margin: auto 0 0;
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100vh - 2.5rem);
+    max-height: calc(100dvh - max(2.5rem, env(safe-area-inset-top)));
+    border-inline-width: 0;
+    border-bottom-width: 0;
+    border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .dialog-footer {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+    border-radius: 0;
+  }
+}
+
+@media (width < 40rem) and (prefers-reduced-motion: no-preference) {
+  dialog[open]:modal:not(.drawer) {
+    animation:
+      fade-in var(--duration-quick) var(--ease-out),
+      sheet-in var(--duration-drawer) var(--ease-drawer);
   }
 }
 

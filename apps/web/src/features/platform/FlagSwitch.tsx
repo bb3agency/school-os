@@ -99,7 +99,7 @@ export function FlagSwitch({ flag, manage }: { flag: FeatureFlag; manage: boolea
               <p className="text-sm text-ink-muted">{tc("stepUpNote")}</p>
               <ApiErrorAlert error={form.error} />
             </div>
-            <div className="flex flex-wrap justify-end gap-2 rounded-b-xl border-t border-border bg-surface-muted px-6 py-4">
+            <div className="dialog-footer flex flex-wrap justify-end gap-2 rounded-b-xl border-t border-border bg-surface-muted px-6 py-4">
               <Button variant="secondary" onClick={close}>
                 {tc("cancel")}
               </Button>
