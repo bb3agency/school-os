@@ -8,12 +8,14 @@ two places (INR), never a float; a positive balance is what the party owes the s
 from __future__ import annotations
 
 import datetime as dt
+import unicodedata
 import uuid
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator
 
+from app.core.redaction import mask_aadhaar
 from app.core.textnorm import nfc
 from app.tally.config import VERSION_PATTERN
 
@@ -22,8 +24,25 @@ LinkFilter = Literal["all", "linked", "unlinked"]
 MAX_AMOUNT = Decimal("999999999999.99")
 
 
+# Bidi overrides and isolates, marks and invisible separators (ZWJ/ZWNJ stay: Indic scripts use
+# them).
+_FORMAT_CHARS = frozenset(
+    map(chr, (0x200B, 0x200E, 0x200F, *range(0x202A, 0x202F), *range(0x2066, 0x206A), 0xFEFF))
+)
+
+
 def _clean(value: Any) -> Any:
-    return nfc(value).strip() if isinstance(value, str) else value
+    """NFC, trimmed, no control or bidi format characters, Aadhaar-like numbers masked.
+
+    Agent text is the school's own Tally data typed by people (audit 2026-10-06 R-08): a ledger
+    name may hold an Aadhaar number (invariant 4) or characters that make one ledger look like
+    another. It is cleaned, never refused, so one ledger cannot stop a whole sync."""
+    if not isinstance(value, str):
+        return value
+    text = "".join(
+        c for c in nfc(value) if c not in _FORMAT_CHARS and unicodedata.category(c) != "Cc"
+    )
+    return mask_aadhaar(text).strip()
 
 
 Text = Annotated[str, BeforeValidator(_clean)]
