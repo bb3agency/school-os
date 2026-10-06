@@ -535,7 +535,7 @@ function StudentTable({
             return (
               <Tr key={row.id} className="relative">
                 <Td>
-                  <div className="flex items-center gap-3">
+                  <div className="flex min-w-44 items-center gap-3">
                     {row.display_name ? (
                       <Avatar name={row.display_name} size="sm" decorative />
                     ) : null}
@@ -555,7 +555,7 @@ function StudentTable({
                   </div>
                 </Td>
                 <Td>
-                  <span className="font-mono text-sm">
+                  <span className="block max-w-56 font-mono text-sm break-all">
                     <Value>{row.admission_no}</Value>
                   </span>
                 </Td>

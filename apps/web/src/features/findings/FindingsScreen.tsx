@@ -140,7 +140,7 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
             <Value>{row.student.display_name}</Value>
           </span>
           {row.student.admission_no ? (
-            <span className="block font-mono text-xs whitespace-nowrap text-ink-muted">
+            <span className="block max-w-56 font-mono text-xs break-all text-ink-muted">
               {t("admissionNo", { number: row.student.admission_no })}
             </span>
           ) : null}
@@ -158,7 +158,12 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
         </span>
       ),
     },
-    { key: "values", header: t("colValues"), cell: (row) => <FindingValues values={row.values} /> },
+    {
+      key: "values",
+      header: t("colValues"),
+      className: "min-w-44",
+      cell: (row) => <FindingValues values={row.values} />,
+    },
     {
       key: "explanation",
       header: t("colExplanation"),

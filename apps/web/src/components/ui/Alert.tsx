@@ -55,7 +55,7 @@ export function Alert({ tone = "info", title, children, className, live = false 
         <circle cx="12" cy="12" r="9" />
         {icons[tone]}
       </svg>
-      <div className="min-w-0 space-y-1 text-sm">
+      <div className="min-w-0 flex-1 space-y-1 text-sm">
         {title ? <p className="font-semibold">{title}</p> : null}
         {children ? <div>{children}</div> : null}
       </div>
