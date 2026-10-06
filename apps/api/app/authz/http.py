@@ -116,6 +116,17 @@ def if_match_version(request: Request) -> int:
 IfMatch = Annotated[int, Depends(if_match_version)]
 
 
+def optional_if_match_version(request: Request) -> int | None:
+    """The version in ``If-Match`` when sent, else None. For updates whose callers do not send it
+    yet (backward compatibility); when it is sent it is honoured (412 when stale)."""
+    if request.headers.get("if-match") is None:
+        return None
+    return if_match_version(request)
+
+
+OptionalIfMatch = Annotated[int | None, Depends(optional_if_match_version)]
+
+
 # --- idempotency ---------------------------------------------------------------------------
 
 

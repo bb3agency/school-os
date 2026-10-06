@@ -28,6 +28,7 @@ from app.authz.http import (
     IdempotencyDep,
     IfMatch,
     Limit,
+    OptionalIfMatch,
     Page,
     decode_cursor,
     encode_cursor,
@@ -263,20 +264,36 @@ def update_user(
 
 @router.put("/users/{user_id}/roles", response_model=UserOut)
 def replace_user_roles(
-    ctx: RoleAssigner, db: TenantDB, user_id: uuid.UUID, body: RolesIn
+    ctx: RoleAssigner,
+    db: TenantDB,
+    user_id: uuid.UUID,
+    body: RolesIn,
+    version: OptionalIfMatch,
+    response: Response,
 ) -> UserOut:
     """Replace a staff member's roles (permission ``role.assign``, step-up). Effective within
     60 s (FR-IAM-014). An empty list answers 422 ``roles_required``: suspend or remove the
-    member instead."""
-    return identity.set_roles(db, ctx, user_id, body.roles)
+    member instead. ``If-Match`` is optional; when sent it is checked (412 when stale). Every
+    replacement moves the user's ``version`` (the ETag) on."""
+    user = identity.set_roles(db, ctx, user_id, body.roles, expected_version=version)
+    response.headers["ETag"] = etag(user.version)
+    return user
 
 
 @router.put("/users/{user_id}/scopes", response_model=UserOut)
 def replace_user_scopes(
-    ctx: RoleAssigner, db: TenantDB, user_id: uuid.UUID, body: ScopesIn
+    ctx: RoleAssigner,
+    db: TenantDB,
+    user_id: uuid.UUID,
+    body: ScopesIn,
+    version: OptionalIfMatch,
+    response: Response,
 ) -> UserOut:
-    """Replace a staff member's class/section scopes (permission ``role.assign``, step-up)."""
-    return identity.set_scopes(db, ctx, user_id, body.scopes)
+    """Replace a staff member's class/section scopes (permission ``role.assign``, step-up).
+    ``If-Match`` is optional; when sent it is checked (412 when stale)."""
+    user = identity.set_scopes(db, ctx, user_id, body.scopes, expected_version=version)
+    response.headers["ETag"] = etag(user.version)
+    return user
 
 
 # --- roles and permissions ----------------------------------------------------------------------
