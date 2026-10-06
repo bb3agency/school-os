@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, MutableMapping
 from typing import Any, Final
 from zoneinfo import ZoneInfo
 
@@ -630,7 +630,13 @@ def get_circular(session: Session, ctx: UserContext, document_id: uuid.UUID) -> 
     )
 
 
-def request_reading(session: Session, ctx: UserContext, document_id: uuid.UUID) -> CircularDetail:
+def request_reading(
+    session: Session,
+    ctx: UserContext,
+    document_id: uuid.UUID,
+    *,
+    scope: MutableMapping[str, Any] | None = None,
+) -> CircularDetail:
     """Read (or read again) the current version of a circular (``circular.review``, FR-CIR-001).
 
     409 ``document_not_ready`` (not scanned yet), ``reading_in_progress``, ``reading_done`` (a
@@ -645,6 +651,7 @@ def request_reading(session: Session, ctx: UserContext, document_id: uuid.UUID) 
         )
     row = repo.reading_for_version(session, version.id)
     if row is None:
+        knowledge.admit_ai_request(ctx, scope=scope)  # SEC-020 / R-20
         reading_id = _queue_reading(session, doc.id, version.id, version.version_no)
         if reading_id is None:
             raise Conflict("This circular is already being read.", code="reading_in_progress")
@@ -658,6 +665,7 @@ def request_reading(session: Session, ctx: UserContext, document_id: uuid.UUID) 
             code="reading_attempts_used",
         )
     else:
+        knowledge.admit_ai_request(ctx, scope=scope)  # SEC-020 / R-20
         reading_id = row.id
         repo.update_reading(
             session,
@@ -1244,7 +1252,13 @@ def _queue_draft(session: Session, notice_id: uuid.UUID) -> None:
     ops.enqueue_event(session, DRAFT_EVENT, {"notice_id": notice_id})
 
 
-def create_notice(session: Session, ctx: UserContext, data: NoticeCreate) -> NoticeOut:
+def create_notice(
+    session: Session,
+    ctx: UserContext,
+    data: NoticeCreate,
+    *,
+    scope: MutableMapping[str, Any] | None = None,
+) -> NoticeOut:
     """Start a parent notice (``notice.draft``; FR-NOTICE-001..003). From a circular (C1 only,
     else 422 ``notice_source_personal``) or staff text (422 ``notice_personal_data`` with phone
     numbers, emails or Aadhaar-like numbers) the notice starts ``drafting`` and the worker
@@ -1255,6 +1269,8 @@ def create_notice(session: Session, ctx: UserContext, data: NoticeCreate) -> Not
         raise Forbidden()
     document_id = _checked_source(session, ctx, data)
     by_ai = data.source != "blank"
+    if by_ai:  # SEC-020 / R-20: the same per-user AI admission as Ask (429 ai_rate_limited)
+        knowledge.admit_ai_request(ctx, scope=scope)
     notice = repo.insert_notice(
         session,
         {
@@ -1382,7 +1398,12 @@ def abandon_draft(tenant_id: uuid.UUID, notice_id: uuid.UUID, code: str) -> None
 
 
 def retry_notice_draft(
-    session: Session, ctx: UserContext, notice_id: uuid.UUID, version: int
+    session: Session,
+    ctx: UserContext,
+    notice_id: uuid.UUID,
+    version: int,
+    *,
+    scope: MutableMapping[str, Any] | None = None,
 ) -> NoticeOut:
     """Ask the AI again after it could not draft the notice (``notice.draft``; ``If-Match``):
     ``draft_failed -> drafting``, with the source checked again with the caller's access (422
@@ -1408,6 +1429,7 @@ def retry_notice_draft(
             text=notice.source_text,
         ),
     )
+    knowledge.admit_ai_request(ctx, scope=scope)  # SEC-020 / R-20
     notice = repo.update_notice(session, notice.id, {"status": "drafting", "draft_error": None})
     _queue_draft(session, notice.id)
     _audit(

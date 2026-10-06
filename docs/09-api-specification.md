@@ -74,7 +74,9 @@ Budgets are versioned in `apps/api/app/core/rate_limits.yaml` (invariant 13); th
 | `support_tickets` | 10 / 3600 s | person | open | `POST /support/tickets`, `POST /platform/support/tickets` |
 | `emergency` | 30 / 600 s | person | open | break-glass support session start and grant revoke |
 | `platform_emergency` | 60 / 600 s | operator | open | `POST /platform/invoice-runs` |
-| `kb_ask` | `models.yaml` (10 / 60 s) | person | open | `POST /knowledge/ask` (429 `ai_rate_limited`) |
+| `kb_ask` | `models.yaml` (10 / 60 s) | person | open | `POST /knowledge/ask`, and one unit per AI notice draft (`POST /notices` except `blank`, `POST /notices/{notice_id}/draft`) and per circular reading asked for (`POST /circulars/{document_id}/read`; audit 2026-10-06 R-20) (429 `ai_rate_limited` with `Retry-After` and the RateLimit headers) |
+| `audit_verify` | `rate_limits.yaml` (1 / 600 s) | school | open | `POST /audit/verify`, charged after the permission check (R-19) |
+| `platform_audit_verify` | `rate_limits.yaml` (1 / 600 s) | operator | open | `POST /platform/audit/verify` (R-19) |
 
 The shared ALB's WAF adds coarse per-IP rules in front (docs/10 §5); dedicated hosts have no WAF and rely on these limits.
 

@@ -26648,7 +26648,7 @@
     },
     "/api/v1/circulars/{document_id}/read": {
       "post": {
-        "description": "Read the circular's current version with AI now, or try again after \"needs manual\nreview\" (``circular.review``). 409 ``document_not_ready``, ``reading_in_progress``,\n``reading_done`` or ``reading_attempts_used``.",
+        "description": "Read the circular's current version with AI now, or try again after \"needs manual\nreview\" (``circular.review``). 409 ``document_not_ready``, ``reading_in_progress``,\n``reading_done`` or ``reading_attempts_used``. 429 ``ai_rate_limited`` over your AI budget\n(the same per-person limit as Ask; SEC-020).",
         "operationId": "request_reading_api_v1_circulars__document_id__read_post",
         "parameters": [
           {
@@ -34487,7 +34487,7 @@
         ]
       },
       "post": {
-        "description": "Start a parent notice in English (and Telugu only while Telugu is shown, ADR-0036;\n``notice.draft``): AI-drafted from a\ncircular (only C1, else 422 ``notice_source_personal``) or from your text (422\n``notice_personal_data`` if it holds phone numbers, emails or Aadhaar-like numbers), or\n``blank``. 202 with ``Location``: an AI notice starts ``drafting`` and is drafted in the\nbackground; ask ``GET /notices/{notice_id}`` until it is ``draft`` or ``draft_failed``\n(``draft_error`` says why: try again with ``POST /notices/{notice_id}/draft`` or write it\nyourself). A ``blank`` notice starts as ``draft``. Only the circular's text is sent to the\nAI, never student records. Accepts ``Idempotency-Key`` (a retry replays the first answer\nand queues nothing).",
+        "description": "Start a parent notice in English (and Telugu only while Telugu is shown, ADR-0036;\n``notice.draft``): AI-drafted from a\ncircular (only C1, else 422 ``notice_source_personal``) or from your text (422\n``notice_personal_data`` if it holds phone numbers, emails or Aadhaar-like numbers), or\n``blank``. 202 with ``Location``: an AI notice starts ``drafting`` and is drafted in the\nbackground; ask ``GET /notices/{notice_id}`` until it is ``draft`` or ``draft_failed``\n(``draft_error`` says why: try again with ``POST /notices/{notice_id}/draft`` or write it\nyourself). A ``blank`` notice starts as ``draft``. Only the circular's text is sent to the\nAI, never student records. Accepts ``Idempotency-Key`` (a retry replays the first answer\nand queues nothing). An AI draft counts against your AI budget, the same per-person limit\nas Ask (429 ``ai_rate_limited``; SEC-020); a blank notice does not.",
         "operationId": "create_notice_api_v1_notices_post",
         "requestBody": {
           "content": {
@@ -34859,7 +34859,7 @@
     },
     "/api/v1/notices/{notice_id}/draft": {
       "post": {
-        "description": "Ask the AI to draft the notice again after it could not (``notice.draft``;\n``If-Match``): ``draft_failed`` becomes ``drafting``; the source is checked again (422 as\nfor ``POST /notices``). 409 ``notice_not_draft_failed`` in any other state.",
+        "description": "Ask the AI to draft the notice again after it could not (``notice.draft``;\n``If-Match``): ``draft_failed`` becomes ``drafting``; the source is checked again (422 as\nfor ``POST /notices``). 409 ``notice_not_draft_failed`` in any other state. 429\n``ai_rate_limited`` over your AI budget (SEC-020).",
         "operationId": "retry_notice_draft_api_v1_notices__notice_id__draft_post",
         "parameters": [
           {

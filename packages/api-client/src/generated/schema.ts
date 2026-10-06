@@ -1061,7 +1061,8 @@ export interface paths {
          * Request Reading
          * @description Read the circular's current version with AI now, or try again after "needs manual
          *     review" (``circular.review``). 409 ``document_not_ready``, ``reading_in_progress``,
-         *     ``reading_done`` or ``reading_attempts_used``.
+         *     ``reading_done`` or ``reading_attempts_used``. 429 ``ai_rate_limited`` over your AI budget
+         *     (the same per-person limit as Ask; SEC-020).
          */
         post: operations["request_reading_api_v1_circulars__document_id__read_post"];
         delete?: never;
@@ -3068,7 +3069,8 @@ export interface paths {
          *     (``draft_error`` says why: try again with ``POST /notices/{notice_id}/draft`` or write it
          *     yourself). A ``blank`` notice starts as ``draft``. Only the circular's text is sent to the
          *     AI, never student records. Accepts ``Idempotency-Key`` (a retry replays the first answer
-         *     and queues nothing).
+         *     and queues nothing). An AI draft counts against your AI budget, the same per-person limit
+         *     as Ask (429 ``ai_rate_limited``; SEC-020); a blank notice does not.
          */
         post: operations["create_notice_api_v1_notices_post"];
         delete?: never;
@@ -3161,7 +3163,8 @@ export interface paths {
          * Retry Notice Draft
          * @description Ask the AI to draft the notice again after it could not (``notice.draft``;
          *     ``If-Match``): ``draft_failed`` becomes ``drafting``; the source is checked again (422 as
-         *     for ``POST /notices``). 409 ``notice_not_draft_failed`` in any other state.
+         *     for ``POST /notices``). 409 ``notice_not_draft_failed`` in any other state. 429
+         *     ``ai_rate_limited`` over your AI budget (SEC-020).
          */
         post: operations["retry_notice_draft_api_v1_notices__notice_id__draft_post"];
         delete?: never;

@@ -36,10 +36,10 @@ import json
 import re
 import time
 import uuid
-from collections.abc import Generator, Iterator
+from collections.abc import Generator, Iterator, MutableMapping
 from contextlib import closing
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Any, Final
 
 from app.audit import service as audit
 from app.core import languages, ratelimit, retention
@@ -245,10 +245,18 @@ class SchoolKnowledgeService:
 
     # --- ask ------------------------------------------------------------------------------------
 
-    def admit(self, ctx: UserContext) -> None:
+    def admit(self, ctx: UserContext, *, scope: MutableMapping[str, Any] | None = None) -> None:
         """Before streaming: permission and the per-user question rate (docs/06 §5 step 1)."""
         if not ctx.has(ASK):
             raise Forbidden()
+        self.admit_ai(ctx, scope=scope)
+
+    def admit_ai(self, ctx: UserContext, *, scope: MutableMapping[str, Any] | None = None) -> None:
+        """The per-user AI admission (SEC-020): one unit of the person's question budget for
+        any model call a person asks for (a question, a memory check, a notice draft, a
+        circular reading; audit 2026-10-06 R-20), so one person cannot drain the school's
+        shared rate limit or budget. ``scope``: the request scope, so the 429 and the success
+        carry the RateLimit headers. 429 ``ai_rate_limited`` with ``Retry-After``."""
         limit = self.runtime.llm_config.rate_limit.questions_per_minute_per_user
         # The shared API limiter (GCRA, app/core/ratelimit.py); the number stays in models.yaml.
         # Fails open: the school's budget and the gateway's rate limit still apply.
@@ -263,6 +271,8 @@ class SchoolKnowledgeService:
         )
         partition = f"{ctx.tenant_id}:{ctx.user_id}"
         decision = ratelimit.get_rate_limiter().check([ratelimit.Bucket(policy, partition)])
+        if scope is not None:
+            ratelimit.remember(scope, decision)
         if not decision.allowed:
             raise AiRateLimited(
                 "Too many questions. Wait a minute and try again.",
@@ -1903,6 +1913,13 @@ def get_service() -> SchoolKnowledgeService:
     return _service
 
 
+def admit_ai_request(ctx: UserContext, *, scope: MutableMapping[str, Any] | None = None) -> None:
+    """For other modules: admit one model call a person asked for (notice drafts, circular
+    readings) against the same per-user budget as Ask (SEC-020; audit 2026-10-06 R-20). Raises
+    429 ``ai_rate_limited``; pass the request ``scope`` for the RateLimit headers."""
+    get_service().admit_ai(ctx, scope=scope)
+
+
 def circulars_config() -> CircularsConfig:
     """Limits for circular reading and notice drafting (``knowledge/config/circulars.yaml``)."""
     return circular_ai.config()
@@ -1957,6 +1974,7 @@ __all__ = [
     "SearchFilters",
     "StatusEvent",
     "TokenEvent",
+    "admit_ai_request",
     "adopt_conversations",
     "check_provider_agreements",
     "circular_passages",
