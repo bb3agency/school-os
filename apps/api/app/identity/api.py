@@ -266,6 +266,7 @@ def update_user(
 def replace_user_roles(
     ctx: RoleAssigner,
     db: TenantDB,
+    *,
     user_id: uuid.UUID,
     body: RolesIn,
     version: OptionalIfMatch,
@@ -284,6 +285,7 @@ def replace_user_roles(
 def replace_user_scopes(
     ctx: RoleAssigner,
     db: TenantDB,
+    *,
     user_id: uuid.UUID,
     body: ScopesIn,
     version: OptionalIfMatch,

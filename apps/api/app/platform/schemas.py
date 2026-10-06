@@ -188,7 +188,7 @@ class PlanPatch(In):
     included_students: int | None = Field(default=None, ge=0)
     trial_days: int | None = Field(default=None, ge=0, le=365)
     limits: PlanLimits | None = None
-    features: dict[FlagKey, bool] | None = None
+    features: dict[FlagKey, bool] | None = Field(default=None, max_length=50)
     one_time_fee_inr: Money | None = None
     description: PlanDescription | None = None
 
