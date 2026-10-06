@@ -1,4 +1,4 @@
-"""Owner decisions on the 2026-10-06 API route audit (R-17, R-18).
+"""Owner decisions on the 2026-10-06 API route audit (R-17, R-18, R-19).
 
 Data migration on the global catalog ``core.permissions`` (no RLS; ``0004_authz_seed``'s
 docstring: later catalog changes get their own revision that re-runs the upsert):
@@ -19,13 +19,24 @@ the same thing whatever the YAML says later.
   Backfill: a suspended school whose reason is not ``billing`` was suspended by an operator
   (``tenants.suspend``), so it is on hold.
 
+- R-19 adds ``audit.chain_verifications``: one row per school with the latest stored result of
+  the chain verification (daily job or on-demand run) and the checkpoint (seq and hash of the
+  last verified event) that on-demand runs verify from. ``GET /audit/verify`` serves it instead
+  of re-hashing the whole chain on every call (OWASP API4, CWE-400). A tenant table: RLS
+  ENABLE + FORCE with the standard policy; ``sos_app`` SELECT/INSERT/UPDATE (no DELETE or
+  TRUNCATE; like ``audit.chain_heads``), ``sos_readonly`` SELECT, no ``sos_platform`` access.
+  It is evidence about the chain, so it is retained with ``audit.events`` at offboarding and
+  deleted with the chain when the audit retention ends (``sos_purger`` under
+  ``core.tenant_audit_purge_allowed()``, as ``0032_offboarding`` does for the chain).
+
 **Role grants of existing schools are NOT changed here** (system roles are tenant rows under
 FORCE RLS; see ``0019_export_access``). New schools get ``support.manage`` for owner, principal
 and office admin from ``roles.yaml`` at provisioning; existing schools get it from
 ``python -m app.identity.sync_system_roles --apply`` (docs/10 runbook). Until then their owner,
 principal and office admin see only the tickets they opened themselves: the change fails safe.
 
-Downgrade drops the hold column (a school held and suspended for billing at once keeps its hold
+Downgrade drops the verification table (stored results only; the next daily run re-creates
+them on re-upgrade), the hold column (a school held and suspended for billing at once keeps its hold
 reason; the previous code then refuses reactivation while the subscription is suspended, A-08),
 then deletes the key in a savepoint and keeps it while a role still holds it (the
 foreign-key check sees rows RLS hides from the migrator), exactly like ``0019_export_access``.
@@ -88,8 +99,51 @@ SECURITY_HOLD_DOWN = (
 )
 
 
+VERIFICATIONS_UP = (
+    """
+    CREATE TABLE audit.chain_verifications (
+      tenant_id        uuid        PRIMARY KEY,
+      verified_at      timestamptz,
+      mode             text        CHECK (mode IN ('full','incremental')),
+      source           text        CHECK (source IN ('daily','on_demand')),
+      ok               boolean,
+      checked          bigint      NOT NULL DEFAULT 0 CHECK (checked >= 0),
+      first_bad_seq    bigint      CHECK (first_bad_seq >= 0),
+      reason           text        CHECK (reason ~ '^[a-z_]{1,64}$'),
+      checkpoint_seq   bigint      NOT NULL DEFAULT 0 CHECK (checkpoint_seq >= 0),
+      checkpoint_hash  bytea       CHECK (octet_length(checkpoint_hash) = 32),
+      checkpoint_at    timestamptz,
+      last_full_at     timestamptz,
+      requested_at     timestamptz,
+      requested_by     uuid,
+      requested_full   boolean     NOT NULL DEFAULT false,
+      updated_at       timestamptz NOT NULL DEFAULT now(),
+      CONSTRAINT chain_verifications_checkpoint
+        CHECK ((checkpoint_seq = 0) = (checkpoint_hash IS NULL)),
+      CONSTRAINT chain_verifications_result
+        CHECK ((verified_at IS NULL) = (ok IS NULL))
+    )
+    """,
+    "ALTER TABLE audit.chain_verifications ENABLE ROW LEVEL SECURITY",
+    "ALTER TABLE audit.chain_verifications FORCE ROW LEVEL SECURITY",
+    """
+    CREATE POLICY tenant_isolation ON audit.chain_verifications
+      USING (tenant_id = core.current_tenant())
+      WITH CHECK (tenant_id = core.current_tenant())
+    """,
+    "REVOKE ALL ON audit.chain_verifications "
+    "FROM PUBLIC, sos_app, sos_readonly, sos_definer, sos_platform",
+    "GRANT SELECT, INSERT, UPDATE ON audit.chain_verifications TO sos_app",
+    "GRANT SELECT ON audit.chain_verifications TO sos_readonly",
+    "GRANT SELECT, DELETE ON audit.chain_verifications TO sos_purger",
+    "CREATE POLICY offboarding_purge ON audit.chain_verifications AS RESTRICTIVE FOR ALL "
+    "TO sos_purger USING (core.tenant_audit_purge_allowed())",
+)
+VERIFICATIONS_DOWN = ("DROP TABLE IF EXISTS audit.chain_verifications",)
+
+
 def upgrade() -> None:
-    for statement in SECURITY_HOLD_UP:
+    for statement in (*SECURITY_HOLD_UP, *VERIFICATIONS_UP):
         op.execute(statement)
     bind = op.get_bind()
     for row in NEW_PERMISSIONS:
@@ -100,7 +154,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    for statement in SECURITY_HOLD_DOWN:
+    for statement in (*VERIFICATIONS_DOWN, *SECURITY_HOLD_DOWN):
         op.execute(statement)
     bind = op.get_bind()
     bind.execute(

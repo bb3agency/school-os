@@ -39,7 +39,8 @@ from .purge_support import School, populate_school, row_counts, tables_without_r
 
 pytestmark = pytest.mark.db
 
-RETAINED = {"audit.events", "audit.chain_heads"}
+# The chain and its stored verification (R-19) stay until the audit retention ends.
+RETAINED = {"audit.events", "audit.chain_heads", "audit.chain_verifications"}
 KEYS = "core.tenant_keys"
 
 
@@ -442,6 +443,7 @@ def test_FR_PLT_005_audit_chain_deleted_only_after_retention(
     counts = row_counts(admin_engine, a.tenant_id)
     assert counts["audit.events"] == 0
     assert counts["audit.chain_heads"] == 0
+    assert counts["audit.chain_verifications"] == 0
     assert row_counts(admin_engine, b.tenant_id)["audit.events"] == 1
     # The owner and sos_app still cannot delete audit events at all.
     with pytest.raises(DBAPIError), admin_engine.begin() as c:

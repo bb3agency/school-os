@@ -554,9 +554,7 @@
         "noAccessTitle": "మీరు ఆడిట్ లాగ్‌ను తనిఖీ చేయలేరు",
         "noAccessBody": "ఈ తనిఖీ ఆడిట్ లాగ్ చదవగల సిబ్బందికి, ఉదాహరణకు ప్రిన్సిపాల్‌కు మాత్రమే. ఇది అవసరమైతే మీ పాఠశాల ఆఫీస్ అడ్మిన్‌ను అడగండి.",
         "howTitle": "తనిఖీ ఎలా పనిచేస్తుంది",
-        "howBody": "ప్రతి ఆడిట్ సంఘటన దాని ముందు సంఘటనతో ఒక వేలిముద్ర ద్వారా అనుసంధానమై ఉంటుంది. తనిఖీ మొదటి సంఘటన నుండి చివరి వరకు ప్రతి వేలిముద్రను మళ్లీ లెక్కిస్తుంది. ఇది మొత్తం లాగ్‌ను చదువుతుంది, కాబట్టి పెద్ద పాఠశాలలో ఒక నిమిషం పట్టవచ్చు.",
-        "checking": "తనిఖీ చేస్తున్నాం…",
-        "checkingBody": "ఆడిట్ లాగ్‌ను తనిఖీ చేస్తున్నాం. ఈ పేజీని తెరిచే ఉంచండి.",
+        "howBody": "Every audit event is linked to the one before it by a fingerprint. SchoolOS checks every fingerprint each night. \"Check again\" also checks the events added since the last check; you can ask once every 10 minutes.",
         "checkAgain": "మళ్లీ తనిఖీ చేయండి",
         "okTitle": "ఆడిట్ లాగ్ చెక్కుచెదరకుండా ఉంది",
         "okBody": "సంఘటన {last} వరకు ధృవీకరించబడింది: {count, plural, one {# సంఘటన} other {# సంఘటనలు}} తనిఖీ చేశాము, ఏదీ మారలేదు.",
@@ -565,7 +563,6 @@
         "brokenIntact": "దాని ముందు సంఘటనలు సరిగ్గా ఉన్నాయి ({count, plural, one {# సంఘటన} other {# సంఘటనలు}}, సంఘటన {last} వరకు).",
         "brokenFromStart": "సమస్య మొదటి సంఘటన నుండే మొదలవుతుంది.",
         "brokenAction": "దీన్ని మీరే సరిచేయడానికి ప్రయత్నించవద్దు. వెంటనే SchoolOS సపోర్ట్‌ను సంప్రదించి, పైన ఉన్న సంఘటన సంఖ్యను చెప్పండి.",
-        "checkedAt": "{time}న తనిఖీ చేశాము.",
         "reason": {
           "duplicate_seq": "రెండు సంఘటనలకు ఒకే సంఖ్య ఉంది.",
           "seq_gap": "ఒక సంఘటన లేదు: సంఖ్యలలో ఒకటి దాటవేయబడింది.",
@@ -573,12 +570,19 @@
           "hash_mismatch": "ఈ సంఘటన నమోదైన తర్వాత మార్చబడింది.",
           "head_missing": "చివరి సంఘటన యొక్క నమోదు లేదు.",
           "head_mismatch": "చివరి సంఘటన లాగ్ యొక్క నమోదైన ముగింపుతో సరిపోలడం లేదు.",
-          "other": "సంఘటనలు ఆశించినట్లు అనుసంధానమై లేవు."
+          "other": "సంఘటనలు ఆశించినట్లు అనుసంధానమై లేవు.",
+          "checkpoint_mismatch": "The last verified event was changed after it was checked."
         },
         "statusLabel": "చివరి తనిఖీ ఫలితం",
         "notRunTitle": "ఇంకా తనిఖీ చేయలేదు",
-        "notRunBody": "ప్రతి ఈవెంట్ దాని ముందు ఈవెంట్‌తో ఇంకా అనుసంధానమై ఉందో లేదో చూడటానికి తనిఖీ నడపండి.",
-        "eventsChecked": "తనిఖీ చేసిన ఈవెంట్లు"
+        "notRunBody": "The first check runs tonight, or now when you select Check integrity.",
+        "eventsChecked": "తనిఖీ చేసిన ఈవెంట్లు",
+        "queued": "Check queued",
+        "queuedBody": "The check is waiting to run. The result appears here in a few minutes; you can leave this page.",
+        "okIncremental": "Verified up to event {last}: {count, plural, =0 {no new events since the last check} one {# new event was checked} other {# new events were checked}} and none was changed.",
+        "lastVerifiedAt": "Last verified on {time}.",
+        "coolDownTitle": "The log was checked a moment ago",
+        "coolDownBody": "You can ask for another check in {minutes, plural, one {# minute} other {# minutes}}. SchoolOS also checks the whole log every night."
       },
       "home": "హోమ్",
       "filterActionPlaceholder": "ఉదాహరణకు student.update",

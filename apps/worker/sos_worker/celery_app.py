@@ -109,6 +109,8 @@ def create_celery() -> Celery:
         broker_connection_retry_on_startup=True,
         task_routes={
             "maintenance.*": {"queue": "maintenance"},
+            # R-19: an on-demand audit-chain check (outbox consumer of POST /audit/verify).
+            "audit.verify_chain": {"queue": "maintenance"},
             # FR-DOC-002: AV scans run on the ingest queue (send_task honours routes only).
             "documents.scan": {"queue": "ingest"},
             # PRV-016: deleting the files of discarded versions (outbox consumer + daily sweep).

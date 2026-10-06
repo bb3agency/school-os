@@ -1396,6 +1396,211 @@
         "title": "AuditEventOut",
         "type": "object"
       },
+      "AuditVerificationOut": {
+        "description": "The school's latest stored verification (``GET``/``POST /audit/verify``).",
+        "properties": {
+          "checked": {
+            "title": "Checked",
+            "type": "integer"
+          },
+          "checkpoint_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkpoint At"
+          },
+          "checkpoint_seq": {
+            "title": "Checkpoint Seq",
+            "type": "integer"
+          },
+          "first_bad_seq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Bad Seq"
+          },
+          "last_full_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Full At"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "full",
+                  "incremental"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
+          "ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ok"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "requested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested At"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "daily",
+                  "on_demand"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "verified_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified At"
+          }
+        },
+        "required": [
+          "ok",
+          "checked",
+          "first_bad_seq",
+          "reason",
+          "verified_at",
+          "mode",
+          "source",
+          "checkpoint_seq",
+          "checkpoint_at",
+          "last_full_at",
+          "pending",
+          "requested_at"
+        ],
+        "title": "AuditVerificationOut",
+        "type": "object"
+      },
+      "AuditVerifyOut": {
+        "properties": {
+          "checked": {
+            "title": "Checked",
+            "type": "integer"
+          },
+          "first_bad_seq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Bad Seq"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "job_id",
+          "ok",
+          "checked",
+          "first_bad_seq",
+          "reason"
+        ],
+        "title": "AuditVerifyOut",
+        "type": "object"
+      },
+      "AuditVerifyRequest": {
+        "additionalProperties": false,
+        "description": "``full``: re-hash the whole chain instead of the events after the last checkpoint.",
+        "properties": {
+          "full": {
+            "default": false,
+            "title": "Full",
+            "type": "boolean"
+          }
+        },
+        "title": "AuditVerifyRequest",
+        "type": "object"
+      },
       "BatchCreate": {
         "additionalProperties": false,
         "description": "Start extraction for register-page photos already uploaded as ``register_scan``\ndocuments (JPG or PNG, one page each, malware scan passed).",
@@ -22082,48 +22287,6 @@
         "title": "MemberOut",
         "type": "object"
       },
-      "app__audit__viewer__AuditVerifyOut": {
-        "properties": {
-          "checked": {
-            "title": "Checked",
-            "type": "integer"
-          },
-          "first_bad_seq": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "First Bad Seq"
-          },
-          "ok": {
-            "title": "Ok",
-            "type": "boolean"
-          },
-          "reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reason"
-          }
-        },
-        "required": [
-          "ok",
-          "checked",
-          "first_bad_seq",
-          "reason"
-        ],
-        "title": "AuditVerifyOut",
-        "type": "object"
-      },
       "app__authz__http__Page_TicketOut_": {
         "properties": {
           "data": {
@@ -22329,54 +22492,6 @@
           "settings"
         ],
         "title": "MeOut",
-        "type": "object"
-      },
-      "app__platform__schemas__AuditVerifyOut": {
-        "properties": {
-          "checked": {
-            "title": "Checked",
-            "type": "integer"
-          },
-          "first_bad_seq": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "First Bad Seq"
-          },
-          "job_id": {
-            "format": "uuid",
-            "title": "Job Id",
-            "type": "string"
-          },
-          "ok": {
-            "title": "Ok",
-            "type": "boolean"
-          },
-          "reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reason"
-          }
-        },
-        "required": [
-          "job_id",
-          "ok",
-          "checked",
-          "first_bad_seq",
-          "reason"
-        ],
-        "title": "AuditVerifyOut",
         "type": "object"
       },
       "app__platform__schemas__MeOut": {
@@ -24127,14 +24242,14 @@
     },
     "/api/v1/audit/verify": {
       "get": {
-        "description": "Check that the school's audit chain is unbroken (permission ``audit.read``; US-1001 AC2).",
+        "description": "The latest stored check of the school's audit chain (permission ``audit.read``; US-1001\nAC2). It does not re-hash the chain: the daily job and on-demand runs store their result\n(``verified_at`` is null before the first run; ``pending`` while a run is queued; audit\n2026-10-06 R-19).",
         "operationId": "verify_audit_chain_api_v1_audit_verify_get",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__audit__viewer__AuditVerifyOut"
+                  "$ref": "#/components/schemas/AuditVerificationOut"
                 }
               }
             },
@@ -24166,6 +24281,77 @@
           }
         },
         "summary": "Verify Audit Chain",
+        "tags": [
+          "audit"
+        ]
+      },
+      "post": {
+        "description": "Queue a new check of the school's audit chain (permission ``audit.read``; 202). It\nverifies the events after the last verified checkpoint, or the whole chain with ``full``.\nAt most once per school every 10 minutes: 429 ``rate_limited`` with ``Retry-After``. A\ncheck already queued is not queued twice. Read the result with ``GET /audit/verify``.",
+        "operationId": "request_audit_verification_api_v1_audit_verify_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AuditVerifyRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditVerificationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Request Audit Verification",
         "tags": [
           "audit"
         ]
@@ -35797,7 +35983,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__platform__schemas__AuditVerifyOut"
+                  "$ref": "#/components/schemas/AuditVerifyOut"
                 }
               }
             },

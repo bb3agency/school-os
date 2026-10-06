@@ -1225,6 +1225,7 @@ SPECS: dict[tuple[str, str], Builder] = {
         {},
     ),
     ("GET", "/api/v1/audit/verify"): lambda w, r, a: ("/api/v1/audit/verify", None, {}),
+    ("POST", "/api/v1/audit/verify"): lambda w, r, a: ("/api/v1/audit/verify", {}, {}),
     # Invitation email (US-102): the target member is active and email is off in tests, so a
     # permitted caller reaches the service and gets 409 (see _success); others get 403.
     ("POST", "/api/v1/users/{user_id}/invitation-email"): lambda w, r, a: (
@@ -1977,6 +1978,8 @@ def _success(method: str, path: str) -> int:
         "/api/v1/notices",
         "/api/v1/notices/{notice_id}/draft",
         "/api/v1/notices/{notice_id}/render",
+        # R-19: a chain check is queued; the result is read with GET /audit/verify.
+        "/api/v1/audit/verify",
     }
     if method == "POST" and path in accepted:
         return 202

@@ -96,12 +96,12 @@ Effective table privileges after migrations `0002`–`0007` (default privileges,
 
 | Role | Privileges |
 |---|---|
-| `sos_app` | DML on `sis`, `kb` and most of `core`/`ops`, **narrowed** in `0003`/`0006`: `core.tenants` SELECT + `UPDATE (name, settings, version)` only; `core.users` SELECT + `UPDATE (display_name, email, phone_ciphertext, preferred_language, last_login_at, version)` only (**no INSERT/DELETE**; users come from definer functions); `core.permissions` SELECT only; `core.tenant_keys` SELECT, INSERT + `UPDATE (retired_at)` only; `ops.outbox` SELECT, INSERT only. Audit: SELECT + INSERT on `audit.events`, SELECT + INSERT + UPDATE on `audit.chain_heads`, nothing on partitions. Platform: SELECT on `platform.feature_flags` only. EXECUTE on the definer functions granted to it (§3.4) |
+| `sos_app` | DML on `sis`, `kb` and most of `core`/`ops`, **narrowed** in `0003`/`0006`: `core.tenants` SELECT + `UPDATE (name, settings, version)` only; `core.users` SELECT + `UPDATE (display_name, email, phone_ciphertext, preferred_language, last_login_at, version)` only (**no INSERT/DELETE**; users come from definer functions); `core.permissions` SELECT only; `core.tenant_keys` SELECT, INSERT + `UPDATE (retired_at)` only; `ops.outbox` SELECT, INSERT only. Audit: SELECT + INSERT on `audit.events`, SELECT + INSERT + UPDATE on `audit.chain_heads` and `audit.chain_verifications` (0047), nothing on partitions. Platform: SELECT on `platform.feature_flags` only. EXECUTE on the definer functions granted to it (§3.4) |
 | `sos_platform` | DML on `platform` tables (audit tables: `platform.audit_events` SELECT + INSERT, `platform.audit_chain_head` SELECT + UPDATE); **no privileges on any table in `core`, `sis`, `kb`, `audit`, `ops`**; EXECUTE on the definer functions granted to it. It physically cannot read student data |
 | `sos_readonly` | SELECT on `core`, `sis`, `kb`, `audit` (RLS applies); nothing on `core.tenant_keys`, `ops` or `platform` |
 | `sos_definer` | Only what its functions need (§3.4); NOLOGIN; only `sos_migrator` and the bootstrap admin can `SET ROLE` to it (never a runtime role) |
 | `sos_migrator` | Nothing directly (`INHERIT FALSE`); acts as `sos_owner` (and, inside migrations, `sos_definer`) via `SET ROLE` |
-| `sos_purger` | ADR-0029 (migration `0032_offboarding`). NOLOGIN, NOBYPASSRLS; granted to `sos_app` `WITH INHERIT FALSE, SET TRUE` (so `sos_app` gains nothing unless it runs `SET LOCAL ROLE sos_purger`, which only the offboarding purge does). `SELECT, DELETE` on the tables the purge deletes (`kb.document_chunks`, `kb.verified_answers`, `kb.queries`, `kb.llm_calls`, `kb.embedding_cache`, `kb.upload_intents`, `kb.documents`, `sis.extraction_*`, `sis.dq_findings`, `sis.dq_runs`, `sis.change_requests`, `sis.promotion_runs`, `sis.student_guardians`, `sis.guardians`, `sis.enrollments`, `sis.students`, `sis.attribute_definitions`, `sis.import_batches`, `sis.import_mapping_templates`, `ops.exports`, `ops.tenant_exports`, `ops.retention_settings`, `ops.notifications`, `ops.break_glass_grants`, `ops.job_runs`, `ops.idempotency_keys`, `ops.outbox`, `core.membership_scopes`, `core.membership_roles`, `core.memberships`, `core.role_permissions`, `core.roles`, `core.sections`, `core.classes`, `core.academic_years`, `core.tenant_keys`) and on `audit.events`/`audit.chain_heads`; `SELECT (id, status)` on `core.tenants`. Nothing on `core.users`, `core.permissions` or `platform`. Each of those tables has the **restrictive** policy `offboarding_purge TO sos_purger USING (core.tenant_purge_allowed())` (audit tables: `core.tenant_audit_purge_allowed()`); `tenant_isolation` applies as well. `core.tenant_purge_allowed()`: `current_user` is `sos_purger` (migration `0044_purge_flag_role`: a setting is not a privilege, so the flag alone never lets `sos_app` past a row guard such as the students delete trigger), tenant context set, transaction flag `app.purge_tenant` = the tenant, school `offboarding`. `core.tenant_audit_purge_allowed()`: `current_user` is `sos_purger`, flag `app.purge_audit`, school `deleted`; `audit.block_mutation()` additionally requires the event to be older than 365 days. Both are plain SQL, SECURITY INVOKER, `search_path` pinned (docs/16 §5.5.1) |
+| `sos_purger` | ADR-0029 (migration `0032_offboarding`). NOLOGIN, NOBYPASSRLS; granted to `sos_app` `WITH INHERIT FALSE, SET TRUE` (so `sos_app` gains nothing unless it runs `SET LOCAL ROLE sos_purger`, which only the offboarding purge does). `SELECT, DELETE` on the tables the purge deletes (`kb.document_chunks`, `kb.verified_answers`, `kb.queries`, `kb.llm_calls`, `kb.embedding_cache`, `kb.upload_intents`, `kb.documents`, `sis.extraction_*`, `sis.dq_findings`, `sis.dq_runs`, `sis.change_requests`, `sis.promotion_runs`, `sis.student_guardians`, `sis.guardians`, `sis.enrollments`, `sis.students`, `sis.attribute_definitions`, `sis.import_batches`, `sis.import_mapping_templates`, `ops.exports`, `ops.tenant_exports`, `ops.retention_settings`, `ops.notifications`, `ops.break_glass_grants`, `ops.job_runs`, `ops.idempotency_keys`, `ops.outbox`, `core.membership_scopes`, `core.membership_roles`, `core.memberships`, `core.role_permissions`, `core.roles`, `core.sections`, `core.classes`, `core.academic_years`, `core.tenant_keys`) and on `audit.events`/`audit.chain_heads`/`audit.chain_verifications` (0047); `SELECT (id, status)` on `core.tenants`. Nothing on `core.users`, `core.permissions` or `platform`. Each of those tables has the **restrictive** policy `offboarding_purge TO sos_purger USING (core.tenant_purge_allowed())` (audit tables: `core.tenant_audit_purge_allowed()`); `tenant_isolation` applies as well. `core.tenant_purge_allowed()`: `current_user` is `sos_purger` (migration `0044_purge_flag_role`: a setting is not a privilege, so the flag alone never lets `sos_app` past a row guard such as the students delete trigger), tenant context set, transaction flag `app.purge_tenant` = the tenant, school `offboarding`. `core.tenant_audit_purge_allowed()`: `current_user` is `sos_purger`, flag `app.purge_audit`, school `deleted`; `audit.block_mutation()` additionally requires the event to be older than 365 days. Both are plain SQL, SECURITY INVOKER, `search_path` pinned (docs/16 §5.5.1) |
 
 ### 3.2 Tenant context
 
@@ -1091,6 +1091,30 @@ GRANT SELECT, INSERT, UPDATE ON audit.chain_heads TO sos_app;   -- own tenant's 
 GRANT SELECT ON audit.chain_heads TO sos_readonly;
 GRANT SELECT, INSERT ON audit.chain_heads TO sos_definer;
 
+-- Latest stored verification and checkpoint per school (0047_security_decisions; audit
+-- 2026-10-06 R-19). GET /audit/verify serves this row instead of re-hashing the chain.
+CREATE TABLE audit.chain_verifications (
+  tenant_id        uuid        PRIMARY KEY,
+  verified_at      timestamptz,                       -- last finished run (NULL: never)
+  mode             text        CHECK (mode IN ('full','incremental')),
+  source           text        CHECK (source IN ('daily','on_demand')),
+  ok               boolean,                           -- NULL exactly when verified_at is NULL
+  checked          bigint      NOT NULL DEFAULT 0 CHECK (checked >= 0),
+  first_bad_seq    bigint      CHECK (first_bad_seq >= 0),
+  reason           text        CHECK (reason ~ '^[a-z_]{1,64}$'),
+  checkpoint_seq   bigint      NOT NULL DEFAULT 0 CHECK (checkpoint_seq >= 0),
+  checkpoint_hash  bytea       CHECK (octet_length(checkpoint_hash) = 32),  -- NULL iff seq 0
+  checkpoint_at    timestamptz,
+  last_full_at     timestamptz,
+  requested_at     timestamptz,                       -- an on-demand run is queued
+  requested_by     uuid,
+  requested_full   boolean     NOT NULL DEFAULT false,
+  updated_at       timestamptz NOT NULL DEFAULT now()
+);
+-- ENABLE + FORCE RLS, tenant_isolation; sos_app SELECT, INSERT, UPDATE (no DELETE/TRUNCATE);
+-- sos_readonly SELECT; nothing for sos_definer or sos_platform. Retained with the chain at
+-- offboarding and deleted with it (sos_purger, core.tenant_audit_purge_allowed()).
+
 -- Platform (control-plane) chain: no RLS, privilege separation instead (16 §7)
 CREATE TABLE platform.audit_events (
   id                uuid        PRIMARY KEY,
@@ -1140,7 +1164,9 @@ GRANT SELECT, UPDATE ON platform.audit_chain_head TO sos_platform;
 - There is **no DEFAULT partition**: an insert outside every partition fails (fail closed) instead of landing in a catch-all table.
 - The daily verification job logs `audit.partitions.low_runway` (alerted) when less than 90 days of partitions remain.
 
-**Daily jobs** (beat, UTC): `audit.archive_daily` at 20:30 (02:00 IST) writes a signed JSONL.gz archive per tenant and day to the audit bucket (`t/<tenant_id>/yyyy/mm/dd/audit-<date>.jsonl.gz` + `.sig`; KMS `ECDSA_SHA_256` with `SOS_AUDIT_SIGNING_KEY_ARN`, or a local Ed25519 key outside staging/prod); `audit.verify_all_chains` at 20:45 verifies every active or suspended tenant (IDs from `core.list_tenant_ids`) in its own `tenant_session`, plus the platform chain on the shared deployment. `python -m app.audit.verify_all` does the same on demand (restore drills).
+**Daily jobs** (beat, UTC): `audit.archive_daily` at 20:30 (02:00 IST) writes a signed JSONL.gz archive per tenant and day to the audit bucket (`t/<tenant_id>/yyyy/mm/dd/audit-<date>.jsonl.gz` + `.sig`; KMS `ECDSA_SHA_256` with `SOS_AUDIT_SIGNING_KEY_ARN`, or a local Ed25519 key outside staging/prod); `audit.verify_all_chains` at 20:45 verifies every tenant that can hold a chain (IDs from `core.list_tenant_ids`) in its own `tenant_session`, always the whole chain, and stores each result and checkpoint in `audit.chain_verifications`; plus the platform chain on the shared deployment. `python -m app.audit.verify_all` does the same on demand (restore drills).
+
+**Stored verification and checkpoint (audit 2026-10-06 R-19).** `GET /audit/verify` returns the stored row and never re-hashes. `POST /audit/verify` queues an on-demand run (outbox event `audit.verify_requested` -> task `audit.verify_chain`; a run already queued within the cool-down is not queued twice) and is limited to one per school every 10 minutes (`audit_verify` in `app/core/rate_limits.yaml`, charged after the permission check so refused members cannot spend it). An on-demand run verifies from the checkpoint: it re-checks the checkpoint event (exactly one row at that seq, stored hash = checkpoint hash, hash recomputes from its content; else `checkpoint_mismatch`), walks the later events from the checkpoint hash and compares the head; `{"full": true}` or a missing checkpoint re-hashes everything. A run that finds a break stores it and never moves the checkpoint. A change before the checkpoint needs database-owner rights (events are append-only for the app roles, `0002`, `0046`) and is caught by the next daily full run and the signed archive.
 
 ### 7.2 Ops (tenant-side operations)
 

@@ -35,7 +35,8 @@ from .conftest import Api, MakeOperator, Operator, provision_payload
 pytestmark = pytest.mark.db
 
 PDF = b"%PDF-1.7\n% synthetic certificate render\n"
-RETAINED = {"audit.events", "audit.chain_heads"}
+# The chain and its stored verification (R-19) stay until the audit retention ends.
+RETAINED = {"audit.events", "audit.chain_heads", "audit.chain_verifications"}
 
 
 def _load(name: str, rel: str) -> ModuleType:

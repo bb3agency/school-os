@@ -18,10 +18,10 @@ from datetime import UTC, date, datetime, timedelta
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import ProgrammingError
 
-from app.audit import repository
+from app.audit import repository, verification
 from app.audit.partitions import RUNWAY_WARN_DAYS, partition_upper_bound
 from app.audit.schemas import VerifyResult
-from app.audit.service import verify_chain, verify_platform_chain
+from app.audit.service import verify_platform_chain
 from app.core.db import context_free_session, platform_session, tenant_session
 
 logger = logging.getLogger("app.audit.verify")
@@ -84,7 +84,10 @@ def verify_all(
             with tenant_session(
                 tenant_id, statement_timeout_ms=statement_timeout_ms, engine=engine
             ) as session:
-                result = verify_chain(session, tenant_id)
+                # Always the whole chain; the result and checkpoint are stored for
+                # GET /audit/verify (audit 2026-10-06 R-19).
+                out = verification.run(session, tenant_id, full=True, source="daily")
+            result = VerifyResult(bool(out.ok), out.checked, out.first_bad_seq, out.reason)
         except Exception:
             logger.exception("audit.chain.verify_error", extra={"tenant_id": str(tenant_id)})
             result = VerifyResult(False, 0, None, "verify_error")

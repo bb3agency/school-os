@@ -848,6 +848,12 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             t=t,
             h=b"\x00" * 32,
         )
+        _run(
+            c,
+            "INSERT INTO audit.chain_verifications (tenant_id, verified_at, mode, source, ok) "
+            "VALUES (:t, now(), 'full', 'daily', true) ON CONFLICT (tenant_id) DO NOTHING",
+            t=t,
+        )
     return School(
         tenant_id=t,
         user_id=u["user"],

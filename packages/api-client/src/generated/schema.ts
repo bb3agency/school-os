@@ -415,11 +415,21 @@ export interface paths {
         };
         /**
          * Verify Audit Chain
-         * @description Check that the school's audit chain is unbroken (permission ``audit.read``; US-1001 AC2).
+         * @description The latest stored check of the school's audit chain (permission ``audit.read``; US-1001
+         *     AC2). It does not re-hash the chain: the daily job and on-demand runs store their result
+         *     (``verified_at`` is null before the first run; ``pending`` while a run is queued; audit
+         *     2026-10-06 R-19).
          */
         get: operations["verify_audit_chain_api_v1_audit_verify_get"];
         put?: never;
-        post?: never;
+        /**
+         * Request Audit Verification
+         * @description Queue a new check of the school's audit chain (permission ``audit.read``; 202). It
+         *     verifies the events after the last verified checkpoint, or the whole chain with ``full``.
+         *     At most once per school every 10 minutes: 429 ``rate_limited`` with ``Retry-After``. A
+         *     check already queued is not queued twice. Read the result with ``GET /audit/verify``.
+         */
+        post: operations["request_audit_verification_api_v1_audit_verify_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6217,17 +6227,6 @@ export interface components {
              */
             membership_id: string;
         };
-        /** AuditVerifyOut */
-        app__audit__viewer__AuditVerifyOut: {
-            /** Checked */
-            checked: number;
-            /** First Bad Seq */
-            first_bad_seq: number | null;
-            /** Ok */
-            ok: boolean;
-            /** Reason */
-            reason: string | null;
-        };
         /** Page[TicketOut] */
         app__authz__http__Page_TicketOut_: {
             /** Data */
@@ -6321,22 +6320,6 @@ export interface components {
              * Format: uuid
              */
             user_id: string;
-        };
-        /** AuditVerifyOut */
-        app__platform__schemas__AuditVerifyOut: {
-            /** Checked */
-            checked: number;
-            /** First Bad Seq */
-            first_bad_seq: number | null;
-            /**
-             * Job Id
-             * Format: uuid
-             */
-            job_id: string;
-            /** Ok */
-            ok: boolean;
-            /** Reason */
-            reason: string | null;
         };
         /** MeOut */
         app__platform__schemas__MeOut: {
@@ -6621,6 +6604,63 @@ export interface components {
             summary: {
                 [key: string]: unknown;
             };
+        };
+        /**
+         * AuditVerificationOut
+         * @description The school's latest stored verification (``GET``/``POST /audit/verify``).
+         */
+        AuditVerificationOut: {
+            /** Checked */
+            checked: number;
+            /** Checkpoint At */
+            checkpoint_at: string | null;
+            /** Checkpoint Seq */
+            checkpoint_seq: number;
+            /** First Bad Seq */
+            first_bad_seq: number | null;
+            /** Last Full At */
+            last_full_at: string | null;
+            /** Mode */
+            mode: ("full" | "incremental") | null;
+            /** Ok */
+            ok: boolean | null;
+            /** Pending */
+            pending: boolean;
+            /** Reason */
+            reason: string | null;
+            /** Requested At */
+            requested_at: string | null;
+            /** Source */
+            source: ("daily" | "on_demand") | null;
+            /** Verified At */
+            verified_at: string | null;
+        };
+        /** AuditVerifyOut */
+        AuditVerifyOut: {
+            /** Checked */
+            checked: number;
+            /** First Bad Seq */
+            first_bad_seq: number | null;
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /** Ok */
+            ok: boolean;
+            /** Reason */
+            reason: string | null;
+        };
+        /**
+         * AuditVerifyRequest
+         * @description ``full``: re-hash the whole chain instead of the events after the last checkpoint.
+         */
+        AuditVerifyRequest: {
+            /**
+             * Full
+             * @default false
+             */
+            full: boolean;
         };
         /**
          * BatchCreate
@@ -14985,7 +15025,53 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__audit__viewer__AuditVerifyOut"];
+                    "application/json": components["schemas"]["AuditVerificationOut"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    request_audit_verification_api_v1_audit_verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["AuditVerifyRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditVerificationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
             /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
@@ -21798,7 +21884,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__platform__schemas__AuditVerifyOut"];
+                    "application/json": components["schemas"]["AuditVerifyOut"];
                 };
             };
             /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */

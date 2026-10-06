@@ -579,6 +579,32 @@ const OPERATOR_PERMISSIONS = [
   "platform.audit.read",
 ];
 
+const AUDIT_NOT_VERIFIED = {
+  ok: null,
+  checked: 0,
+  first_bad_seq: null,
+  reason: null,
+  verified_at: null,
+  mode: null,
+  source: null,
+  checkpoint_seq: 0,
+  checkpoint_at: null,
+  last_full_at: null,
+  pending: false,
+  requested_at: null,
+};
+const AUDIT_VERIFIED = {
+  ...AUDIT_NOT_VERIFIED,
+  ok: true,
+  checked: 1234,
+  verified_at: "2026-10-06T05:00:00Z",
+  mode: "full",
+  source: "on_demand",
+  checkpoint_seq: 1234,
+  checkpoint_at: "2026-10-06T05:00:00Z",
+  last_full_at: "2026-10-06T05:00:00Z",
+};
+
 function apiAnswer(method: string, path: string, subject: string): [number, unknown] {
   const multi = subject === "multi";
   const schools = [
@@ -720,8 +746,10 @@ function apiAnswer(method: string, path: string, subject: string): [number, unkn
         ],
       },
     ];
-  if (path === "/api/v1/audit/verify")
-    return [200, { ok: true, checked: 1234, first_bad_seq: null, reason: null }];
+  // R-19: GET serves the stored check (none yet here); POST queues one. The stand-in's
+  // "worker" is instant, so the POST answers with the finished result.
+  if (path === "/api/v1/audit/verify" && method === "GET") return [200, AUDIT_NOT_VERIFIED];
+  if (path === "/api/v1/audit/verify" && method === "POST") return [202, AUDIT_VERIFIED];
   if (path === `/api/v1/platform/tenants/${T3}`) return [200, PROVISIONING_DETAIL];
   if (path === "/api/v1/platform/me")
     return [
