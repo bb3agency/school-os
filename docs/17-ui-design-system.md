@@ -810,7 +810,9 @@ Inline links in a sentence are the exception. Citation chips get a larger invisi
 `StackedRows`: one framed card, a list named by the caption; the title column (the first by
 default, `stack: "title"`) is the first line, other columns are `<dl>` label/value pairs,
 columns with an empty header (or `stack: "actions"`) are a row of actions (44px links on
-touch), `stack: "hidden"` drops a repeat. A stretched row link still covers the card. Only one
+touch), `stack: "wide"` puts a long value (a reason, a note) under its label across the whole
+card instead of a narrow value column (invoice payments: a reversal's reason),
+`stack: "hidden"` drops a repeat. A stretched row link still covers the card. Only one
 layout is in the DOM (`NarrowSwitch`, `useMediaQuery`); the server and hydration render the
 table, phones switch in the first browser render (before the rows usually load).
 
