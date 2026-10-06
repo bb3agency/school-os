@@ -47,6 +47,10 @@ export const viewport: Viewport = {
   initialScale: 1,
   // Draw under notches and rounded corners; globals.css pads with env(safe-area-inset-*).
   viewportFit: "cover",
+  // The on-screen keyboard shrinks the layout viewport (Chrome and Firefox on Android; Safari
+  // ignores it and scrolls the focused field into view itself), so bottom-docked controls
+  // such as the Ask composer stay above the keyboard instead of under it (docs/17 §5.7).
+  interactiveWidget: "resizes-content",
   colorScheme: "light",
 };
 

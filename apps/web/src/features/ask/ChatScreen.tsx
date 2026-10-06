@@ -492,7 +492,7 @@ export function ChatScreen({ conversationId }: { conversationId: string | null }
           className={cn(
             empty
               ? "relative"
-              : "chat-dock sticky bottom-0 z-10 -mx-4 px-4 pt-6 pb-3 sm:-mx-6 sm:px-6",
+              : "chat-dock sticky bottom-0 z-10 -mx-4 px-4 pt-6 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:-mx-6 sm:px-6",
           )}
         >
           {!stick.pinned && !empty ? (

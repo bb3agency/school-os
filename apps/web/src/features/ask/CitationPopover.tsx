@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useLayoutEffect, useRef, type RefObject } from "react";
+import { useLayoutEffect, useRef, type PointerEvent, type RefObject } from "react";
 import { Pill } from "@/components/ui/Badge";
 import { Link } from "@/i18n/navigation";
 import { parseSource, sourceHref, type AskCitation } from "./answer";
@@ -28,7 +28,7 @@ export default function CitationPopover({
   anchor: RefObject<HTMLElement | null>;
   id: string;
   onPointerEnter: () => void;
-  onPointerLeave: () => void;
+  onPointerLeave: (event: PointerEvent<HTMLSpanElement>) => void;
 }) {
   const t = useTranslations("ask.answer");
   const tt = useTranslations("tally");
