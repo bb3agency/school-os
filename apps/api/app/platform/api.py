@@ -967,9 +967,16 @@ FleetManage = Depends(require_platform("platform.fleet.manage"))
 
 @router.get("/deployments", response_model=Page[DeploymentOut])
 def list_deployments(
-    *, ctx: Annotated[Ctx, FleetRead], status: str | None = None
+    *,
+    ctx: Annotated[Ctx, FleetRead],
+    status: str | None = None,
+    tenant_id: uuid.UUID | None = None,
+    limit: Limit = 50,
+    cursor: str | None = None,
 ) -> Page[DeploymentOut]:
-    return Page[DeploymentOut](data=fleet.list_deployments(status))
+    """Deployments, newest first, cursor-paged (R-14); ``tenant_id`` for one school's."""
+    items, nxt = fleet.list_deployments(status, tenant_id=tenant_id, limit=limit, cursor=cursor)
+    return Page[DeploymentOut](data=items, next_cursor=nxt)
 
 
 @router.get("/deployments/{deployment_id}", response_model=DeploymentOut)
@@ -998,7 +1005,9 @@ def update_deployment(
 def rotate_heartbeat_key(
     *, deployment_id: uuid.UUID, ctx: Annotated[Ctx, FleetManage], wrapper: Wrapper
 ) -> HeartbeatKeyOut:
-    """Returns the new key ONCE for the runbook (SSM Parameter Store)."""
+    """Returns the new key ONCE for the runbook (SSM Parameter Store). The old key stays valid
+    for the overlap (billing.yaml ``fleet.key_rotation_overlap_days``); 409 ``rotation_pending``
+    while an earlier rotation is inside it (audit 2026-10-06 R-15)."""
     return fleet.rotate_key(_actor(ctx), deployment_id, wrapper=wrapper)
 
 
@@ -1023,8 +1032,12 @@ AnnManage = Depends(require_platform("platform.announcements.manage"))
 def list_announcements(
     *,
     ctx: Annotated[Ctx, Depends(require_platform(ANY_OPERATOR))],
+    limit: Limit = 50,
+    cursor: str | None = None,
 ) -> Page[AnnouncementOut]:
-    return Page[AnnouncementOut](data=announcements.list_announcements())
+    """Announcements, newest first, cursor-paged (R-14)."""
+    items, nxt = announcements.list_announcements(limit=limit, cursor=cursor)
+    return Page[AnnouncementOut](data=items, next_cursor=nxt)
 
 
 @router.post("/announcements", response_model=AnnouncementOut, status_code=201)
@@ -1203,8 +1216,12 @@ def list_breakglass(
     *,
     ctx: Annotated[Ctx, Depends(require_platform(ANY_OPERATOR))],
     tenant_id: uuid.UUID | None = None,
+    limit: Limit = 50,
+    cursor: str | None = None,
 ) -> Page[BreakGlassOut]:
-    return Page[BreakGlassOut](data=breakglass.list_requests(tenant_id))
+    """Break-glass requests, newest first, cursor-paged (R-14)."""
+    items, nxt = breakglass.list_requests(tenant_id, limit=limit, cursor=cursor)
+    return Page[BreakGlassOut](data=items, next_cursor=nxt)
 
 
 @router.post("/break-glass-requests", response_model=BreakGlassOut, status_code=201)

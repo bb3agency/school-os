@@ -8,6 +8,8 @@ from typing import Any
 import pytest
 from sqlalchemy import Engine
 
+from app.audit import verification
+
 pytestmark = pytest.mark.db
 W = sys.modules["sos_test_api_world"]
 
@@ -71,6 +73,10 @@ def test_FR_AUD_005_cross_tenant_events_never_visible(world: Any, api: Any) -> N
 
 
 def test_US_1001_AC2_verify_reports_intact_chain(world: Any, api: Any) -> None:
+    # The result is stored by a verification run (the daily job or a queued one; R-19).
+    queued = api.call(world.person("principal"), "POST", "/api/v1/audit/verify", json={})
+    assert queued.status_code == 202, queued.text
+    verification.run_requested(world.a.tenant_id)
     res = api.call(world.person("principal"), "GET", "/api/v1/audit/verify")
     assert res.status_code == 200, res.text
     body = res.json()

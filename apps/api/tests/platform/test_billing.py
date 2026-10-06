@@ -521,14 +521,148 @@ def test_FR_PLT_004_lifting_a_security_hold_does_not_lift_a_billing_suspension(
         exam_window_override=False,
         today=dt.date(2026, 2, 16),
     )
+    # Audit 2026-10-06 R-18: lifting the hold succeeds but leaves the billing suspension.
     res = api.call("POST", f"/tenants/{tid}/reactivate", engineer, json=hold)
-    assert res.status_code == 409, res.text
-    assert res.json()["code"] == "billing_suspension"
-    with admin_engine.connect() as c:
-        assert (
-            c.execute(text("SELECT status FROM core.tenants WHERE id = :t"), {"t": tid}).scalar()
-            == "suspended"
+    assert res.status_code == 200, res.text
+    assert (res.json()["tenant_status"], res.json()["security_hold"]) == ("suspended", False)
+    assert res.json()["tenant_status_reason"] == "billing"
+    assert _core_status(admin_engine, tid) == "suspended"
+    # With only the billing suspension left, reactivation is refused (A-08).
+    again = api.call("POST", f"/tenants/{tid}/reactivate", engineer, json=hold)
+    assert (again.status_code, again.json()["code"]) == (409, "billing_suspension")
+    assert _core_status(admin_engine, tid) == "suspended"
+
+
+def _core_status(admin: Engine, tid: str) -> Any:
+    with admin.connect() as c:
+        return c.execute(text("SELECT status FROM core.tenants WHERE id = :t"), {"t": tid}).scalar()
+
+
+def _platform_actions(tid: str) -> list[str]:
+    with platform_session() as s:
+        return list(
+            s.execute(
+                text(
+                    "SELECT action FROM platform.audit_events "
+                    "WHERE subject_tenant_id = :t ORDER BY seq"
+                ),
+                {"t": tid},
+            ).scalars()
         )
+
+
+def _billing_suspended_school(api: Api, owner: Operator, plan: uuid.UUID) -> tuple[str, str, str]:
+    """A live school with an overdue invoice, past due since 2026-02-01 (grace ends 02-16)."""
+    school = _school(api, owner, plan)
+    sub, tid = school["subscription_id"], school["tenant_id"]
+    api.call("POST", f"/tenants/{tid}/activate", owner)
+    inv = _issue_overdue(owner, sub, dt.date(2026, 1, 5))
+    billing.mark_past_due(today=dt.date(2026, 2, 1))
+    return sub, tid, inv
+
+
+def _suspend_for_billing(billing_admin: Operator, sub: str) -> None:
+    billing.suspend_subscription(
+        billing_admin.actor,
+        uuid.UUID(sub),
+        "Unpaid for two months",
+        actor_is_owner=False,
+        exam_window_override=False,
+        today=dt.date(2026, 2, 16),
+    )
+
+
+def _pay_and_reactivate(api: Api, billing_admin: Operator, sub: str, inv: str) -> None:
+    due = api.call("GET", f"/invoices/{inv}", billing_admin).json()["balance_due_inr"]
+    billing.record_payment(
+        billing_admin.actor,
+        uuid.UUID(inv),
+        PaymentIn(
+            method="cheque",
+            amount_inr=D(due),
+            received_on=dt.date(2026, 2, 19),
+            reference="CHQ-R18-0001",
+        ),
+        today=dt.date(2026, 2, 20),
+    )
+    back = billing.reactivate_subscription(
+        billing_admin.actor, uuid.UUID(sub), today=dt.date(2026, 2, 20)
+    )
+    assert back.status == "active"
+
+
+def test_R_18_security_hold_on_a_billing_suspended_school_is_independent(
+    api: Api,
+    owner: Operator,
+    make_operator: MakeOperator,
+    make_plan: Callable[..., uuid.UUID],
+    admin_engine: Engine,
+) -> None:
+    """Audit 2026-10-06 R-18: an operator can hold a school that is already suspended for
+    billing; lifting the hold keeps the billing suspension, and paying keeps nothing else."""
+    engineer, billing_admin = make_operator("platform_engineer"), make_operator("billing_admin")
+    sub, tid, inv = _billing_suspended_school(api, owner, make_plan())
+    _suspend_for_billing(billing_admin, sub)
+    assert _core_status(admin_engine, tid) == "suspended"
+
+    hold = {"reason": "Security incident reported by the school"}
+    placed = api.call("POST", f"/tenants/{tid}/suspend", engineer, json=hold)
+    assert placed.status_code == 200, placed.text
+    body = placed.json()
+    assert (body["tenant_status"], body["security_hold"]) == ("suspended", True)
+    twice = api.call("POST", f"/tenants/{tid}/suspend", engineer, json=hold)
+    assert (twice.status_code, twice.json()["code"]) == (409, "already_on_hold")
+
+    lifted = api.call("POST", f"/tenants/{tid}/reactivate", engineer, json=hold)
+    assert lifted.status_code == 200, lifted.text
+    assert (lifted.json()["tenant_status"], lifted.json()["security_hold"]) == (
+        "suspended",
+        False,
+    )
+    assert lifted.json()["tenant_status_reason"] == "billing"
+    assert _core_status(admin_engine, tid) == "suspended"
+
+    _pay_and_reactivate(api, billing_admin, sub, inv)
+    assert _core_status(admin_engine, tid) == "active"
+    actions = _platform_actions(tid)
+    assert "tenant.security_hold_placed" in actions
+    assert "tenant.security_hold_lifted" in actions
+    with admin_engine.connect() as c:
+        school_chain: set[str] = set(
+            c.execute(
+                text("SELECT action FROM audit.events WHERE tenant_id = :t"), {"t": tid}
+            ).scalars()
+        )
+    assert {"tenant.security_hold_placed", "tenant.security_hold_lifted"} <= school_chain
+
+
+def test_R_18_paying_the_bill_while_held_keeps_the_hold(
+    api: Api,
+    owner: Operator,
+    make_operator: MakeOperator,
+    make_plan: Callable[..., uuid.UUID],
+    admin_engine: Engine,
+) -> None:
+    engineer, billing_admin = make_operator("platform_engineer"), make_operator("billing_admin")
+    sub, tid, inv = _billing_suspended_school(api, owner, make_plan())
+    hold = {"reason": "Abuse report under investigation"}
+    placed = api.call("POST", f"/tenants/{tid}/suspend", engineer, json=hold)
+    assert placed.status_code == 200, placed.text
+    assert placed.json()["security_hold"] is True
+    _suspend_for_billing(billing_admin, sub)
+
+    _pay_and_reactivate(api, billing_admin, sub, inv)
+    detail = api.call("GET", f"/tenants/{tid}", engineer).json()
+    assert (detail["tenant_status"], detail["security_hold"]) == ("suspended", True)
+    assert _core_status(admin_engine, tid) == "suspended"
+
+    lifted = api.call("POST", f"/tenants/{tid}/reactivate", engineer, json=hold)
+    assert lifted.status_code == 200, lifted.text
+    assert (lifted.json()["tenant_status"], lifted.json()["security_hold"]) == ("active", False)
+    assert _core_status(admin_engine, tid) == "active"
+    actions = _platform_actions(tid)
+    assert actions.index("tenant.suspended") < actions.index("subscription.suspended")
+    assert actions[-1] == "tenant.reactivated"
 
 
 def test_FR_PLT_014_overdue_sweep_marks_past_due_and_never_suspends(

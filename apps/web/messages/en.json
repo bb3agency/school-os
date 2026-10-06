@@ -554,9 +554,7 @@
         "noAccessTitle": "You can't check the audit log",
         "noAccessBody": "This check is for staff who can read the audit log, such as the principal. Ask your school's office admin if you need this.",
         "howTitle": "How the check works",
-        "howBody": "Every audit event is linked to the one before it by a fingerprint. The check recomputes every fingerprint from the first event to the last. It reads the whole log, so it can take a minute in a large school.",
-        "checking": "Checking…",
-        "checkingBody": "Checking the audit log. Keep this page open.",
+        "howBody": "Every audit event is linked to the one before it by a fingerprint. SchoolOS checks every fingerprint each night. \"Check again\" also checks the events added since the last check; you can ask once every 10 minutes.",
         "checkAgain": "Check again",
         "okTitle": "The audit log is intact",
         "okBody": "Verified up to event {last}: {count, plural, one {# event was} other {# events were}} checked and none was changed.",
@@ -565,7 +563,6 @@
         "brokenIntact": "Events before it are intact ({count, plural, one {# event} other {# events}}, up to event {last}).",
         "brokenFromStart": "The problem starts at the first event.",
         "brokenAction": "Do not try to fix this yourself. Contact SchoolOS support now and tell them the event number above.",
-        "checkedAt": "Checked on {time}.",
         "reason": {
           "duplicate_seq": "Two events have the same number.",
           "seq_gap": "An event is missing: the numbers skip one.",
@@ -573,12 +570,19 @@
           "hash_mismatch": "This event was changed after it was recorded.",
           "head_missing": "The record of the latest event is missing.",
           "head_mismatch": "The latest event does not match the recorded end of the log.",
-          "other": "The events do not link up as expected."
+          "other": "The events do not link up as expected.",
+          "checkpoint_mismatch": "The last verified event was changed after it was checked."
         },
         "statusLabel": "Result of the last check",
         "notRunTitle": "Not checked yet",
-        "notRunBody": "Run the check to see whether every event is still linked to the one before it.",
-        "eventsChecked": "Events checked"
+        "notRunBody": "The first check runs tonight, or now when you select Check integrity.",
+        "eventsChecked": "Events checked",
+        "queued": "Check queued",
+        "queuedBody": "The check is waiting to run. The result appears here in a few minutes; you can leave this page.",
+        "okIncremental": "Verified up to event {last}: {count, plural, =0 {no new events since the last check} one {# new event was checked} other {# new events were checked}} and none was changed.",
+        "lastVerifiedAt": "Last verified on {time}.",
+        "coolDownTitle": "The log was checked a moment ago",
+        "coolDownBody": "You can ask for another check in {minutes, plural, one {# minute} other {# minutes}}. SchoolOS also checks the whole log every night."
       },
       "home": "Home",
       "filterActionPlaceholder": "Such as student.update",
@@ -606,6 +610,8 @@
       "ticketTitle": "Support ticket",
       "description": "Ask SchoolOS for help. We reply here and by email.",
       "listTitle": "Your school's tickets",
+      "listTitleOwn": "Tickets you opened",
+      "ownOnlyNote": "You see the tickets you opened. The owner, principal and office admin see every ticket of the school.",
       "colNumber": "Ticket",
       "colSubject": "Subject",
       "colStatus": "Status",
@@ -631,6 +637,7 @@
     }
   },
   "platform": {
+    "showMore": "Show more",
     "badge": "Platform admin",
     "nav": {
       "label": "Platform",
@@ -760,6 +767,13 @@
       "reactivate": "Reactivate school",
       "reactivateTitle": "Reactivate this school?",
       "reactivateBody": "Staff can sign in again straight away.",
+      "securityHold": "security hold",
+      "placeHold": "Place security hold",
+      "placeHoldTitle": "Place a security hold on this school?",
+      "placeHoldBody": "The school is already suspended for non-payment. A security hold keeps it suspended after the subscription is paid, until you lift the hold.",
+      "liftHold": "Lift security hold",
+      "liftHoldTitle": "Lift the security hold?",
+      "liftHoldBillingBody": "The school stays suspended for non-payment until its subscription is reactivated.",
       "offboard": "Request offboarding",
       "offboardTitle": "Request offboarding for this school?",
       "offboardBody": "After a second operator approves, the school's data is exported, then deleted within 30 days and its keys destroyed. This cannot be undone.",
@@ -1824,6 +1838,18 @@
       "certificate_pending": {
         "title": "The certificate is not ready yet",
         "body": "It is issued a few minutes after the keys are destroyed. Try again later."
+      },
+      "rotation_pending": {
+        "title": "A key rotation is already in progress",
+        "body": "The new heartbeat key is valid now and the old one keeps working for 7 days. Rotate again after that."
+      },
+      "already_on_hold": {
+        "title": "This school is already on a security hold",
+        "body": "Reload the page to see its current state."
+      },
+      "value_out_of_range": {
+        "title": "The number or date is too large",
+        "body": "This number or date is too large. Check it and try again."
       }
     },
     "stepUp": {

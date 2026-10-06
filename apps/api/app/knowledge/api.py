@@ -38,7 +38,7 @@ from dataclasses import asdict
 from typing import Annotated, Any
 
 import anyio
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
@@ -149,7 +149,7 @@ async def _sse_stream(stream: service.AskStream) -> AsyncGenerator[str, None]:
     response_class=StreamingResponse,
     responses=_SSE_DOC,
 )
-def ask(ctx: Asker, db: TenantDB, body: AskIn) -> StreamingResponse:
+def ask(ctx: Asker, db: TenantDB, body: AskIn, request: Request) -> StreamingResponse:
     """Ask a question of the school's records and documents (permission ``kb.ask``).
 
     Answers cite their sources (``sos://`` URIs) or say the answer was not found in the school
@@ -168,7 +168,7 @@ def ask(ctx: Asker, db: TenantDB, body: AskIn) -> StreamingResponse:
     in English (``meta.language`` is ``en``) unless Telugu is switched on for the deployment.
     """
     svc = service.get_service()
-    svc.admit(ctx)
+    svc.admit(ctx, scope=request.scope)
     stream = svc.start_stream(
         db,
         ctx,

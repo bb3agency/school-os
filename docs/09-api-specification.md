@@ -74,7 +74,9 @@ Budgets are versioned in `apps/api/app/core/rate_limits.yaml` (invariant 13); th
 | `support_tickets` | 10 / 3600 s | person | open | `POST /support/tickets`, `POST /platform/support/tickets` |
 | `emergency` | 30 / 600 s | person | open | break-glass support session start and grant revoke |
 | `platform_emergency` | 60 / 600 s | operator | open | `POST /platform/invoice-runs` |
-| `kb_ask` | `models.yaml` (10 / 60 s) | person | open | `POST /knowledge/ask` (429 `ai_rate_limited`) |
+| `kb_ask` | `models.yaml` (10 / 60 s) | person | open | `POST /knowledge/ask`, and one unit per AI notice draft (`POST /notices` except `blank`, `POST /notices/{notice_id}/draft`) and per circular reading asked for (`POST /circulars/{document_id}/read`; audit 2026-10-06 R-20) (429 `ai_rate_limited` with `Retry-After` and the RateLimit headers) |
+| `audit_verify` | `rate_limits.yaml` (1 / 600 s) | school | open | `POST /audit/verify`, charged after the permission check (R-19) |
+| `platform_audit_verify` | `rate_limits.yaml` (1 / 600 s) | operator | open | `POST /platform/audit/verify` (R-19) |
 
 The shared ALB's WAF adds coarse per-IP rules in front (docs/10 §5); dedicated hosts have no WAF and rely on these limits.
 
@@ -147,9 +149,9 @@ The active school is sent by the BFF as `X-Active-Tenant`. A user with several m
 | GET | `/tenant/billing` | `tenant.billing.read` | Current plan, status, period, trial end, usage vs limits (via `core.current_subscription()`); `ai_bundle`: the AI answer bundle (name, included answers, ex-GST price and price per extra answer, this IST month's answers so far) or `null` (docs/16 §5.18) (**built**) |
 | GET | `/tenant/billing/invoices` | `tenant.billing.read` | Own issued invoices, newest first (last 24): number, period, total, amount due, status (**built**) |
 | GET | `/announcements` | any active member | Active platform announcements for this school, English and Telugu text (Telugu empty while hidden, ADR-0036) (**built**) |
-| POST · GET | `/support/tickets` | `support.ticket.create` | Open (201) or list the school's own tickets; text is redacted before storage (**built**) |
-| GET | `/support/tickets/{ticket_id}` | `support.ticket.create` | One of the school's tickets with its messages; internal notes never shown (**built**) |
-| POST | `/support/tickets/{ticket_id}/messages` | `support.ticket.create` | Reply on the school's own ticket (200) (**built**) |
+| POST · GET | `/support/tickets` | `support.ticket.create` | Open (201) or list tickets; text is redacted before storage. The list holds the tickets the caller opened, or every ticket of the school with `support.manage` (audit 2026-10-06 R-17) (**built**) |
+| GET | `/support/tickets/{ticket_id}` | `support.ticket.create` | One ticket with its messages; internal notes never shown. 404 for a ticket another member opened unless the caller holds `support.manage` (**built**) |
+| POST | `/support/tickets/{ticket_id}/messages` | `support.ticket.create` | Reply on a ticket the caller opened, or on any ticket of the school with `support.manage` (200; 404 otherwise) (**built**) |
 
 ### Students
 | Method | Path | Permission | Notes |
@@ -463,7 +465,8 @@ All **built** (modules `app/academics` and `app/insights`, docs/05 §5.8, purpos
 | POST | `/exports/student-list` (`columns`, `scope`, `format`, `language`) → 202 (**M1**) | `student.export` (step-up); C3 columns need `student.read_sensitive` |
 | GET | `/exports?requested_by=me\|all` · `/exports/{export_id}` (**M1**) | any export permission or `export.read_all`; own exports, or every export of the school with `export.read_all` (`requested_by=all` without it → 403; someone else's id without it → 404) |
 | GET | `/exports/{export_id}/download-url?format=` → presigned URL (**M1**) | any export permission or `export.download_any`. Own export: the export's own permission; step-up for student lists and sensitive pre-checks. Someone else's: `export.download_any` + school-wide `student.read_basic` (+ `student.read_sensitive` for sensitive exports), **always step-up**; `403 not_own_export` for `export.read_all` holders without it, else 404 |
-| GET | `/audit/events` (`actor`, `resource_type`, `resource_id`, `action`, `from`, `to`; newest first) · `/audit/verify` | `audit.read` (**built**) |
+| GET | `/audit/events` (`actor`, `resource_type`, `resource_id`, `action`, `from`, `to`; newest first) · `/audit/verify` (the latest **stored** check: `ok` (null before the first run), `checked`, `first_bad_seq`, `reason`, `verified_at`, `mode` full/incremental, `source` daily/on_demand, `checkpoint_seq`, `last_full_at`, `pending`; it never re-hashes the chain, audit 2026-10-06 R-19) | `audit.read` (**built**) |
+| POST | `/audit/verify` (`{"full": false}`; 202, `Location: /api/v1/audit/verify`) | `audit.read`: queues a check from the last checkpoint (or the whole chain with `full`); one per school every 10 minutes, `429 rate_limited` with `Retry-After` and the RateLimit headers (R-19) (**built**) |
 | GET | `/audit/export` (same filters) → `text/csv` file | `audit.read`, **step-up** (07 §5.2: creating any export). UTF-8 with BOM, oldest first, columns `seq`, `occurred_at_utc`, `occurred_at_ist`, `actor_type`, `actor_id`, `action`, `resource_type`, `resource_id`, `request_id`, `summary` (the event summary as JSON: IDs, codes and counts only; never hashes); cells neutralised against formulas (SEC-017); `Content-Disposition: attachment`, `Cache-Control: no-store`, `X-Audit-Export-Rows`. Streamed in pages of 1,000 events (one short transaction each); more than 200,000 matching events → `422 too_many_events` (choose a shorter date range; limits in `app/audit/export.yaml`). Audited `audit.exported` (filters, row count, `up_to_seq`) before the first byte, so a file never contains its own event (FR-AUD-005, **built**) |
 | POST | `/admin/tenant-export` (`{"include_sensitive": false}`) → 202 + `Location` (**built**; FR-ADM-001) | `tenant.export_all` school-wide (the owner), **step-up**; `include_sensitive` also needs school-wide `student.read_sensitive` (403 `sensitive_not_allowed`); one at a time per school (409 `tenant_export_in_progress`); `Idempotency-Key` accepted |
 | GET | `/admin/tenant-export` (newest first, cursor) · `/admin/tenant-export/{tenant_export_id}` (**built**) | `tenant.export_all` school-wide; another school's or an unknown id → 404 |

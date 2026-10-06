@@ -1225,6 +1225,7 @@ SPECS: dict[tuple[str, str], Builder] = {
         {},
     ),
     ("GET", "/api/v1/audit/verify"): lambda w, r, a: ("/api/v1/audit/verify", None, {}),
+    ("POST", "/api/v1/audit/verify"): lambda w, r, a: ("/api/v1/audit/verify", {}, {}),
     # Invitation email (US-102): the target member is active and email is off in tests, so a
     # permitted caller reaches the service and gets 409 (see _success); others get 403.
     ("POST", "/api/v1/users/{user_id}/invitation-email"): lambda w, r, a: (
@@ -1320,12 +1321,12 @@ SPECS: dict[tuple[str, str], Builder] = {
     ),
     ("GET", "/api/v1/academic-years/{year_id}/promotions"): _promotion_list,
     ("GET", "/api/v1/support/tickets/{ticket_id}"): lambda w, r, a: (
-        f"/api/v1/support/tickets/{_ticket(w)}",
+        f"/api/v1/support/tickets/{_ticket(w, r)}",
         None,
         {},
     ),
     ("POST", "/api/v1/support/tickets/{ticket_id}/messages"): lambda w, r, a: (
-        f"/api/v1/support/tickets/{_ticket(w)}/messages",
+        f"/api/v1/support/tickets/{_ticket(w, r)}/messages",
         {"body": "Synthetic follow-up"},
         {},
     ),
@@ -1800,13 +1801,14 @@ def _notification(tenant_id: uuid.UUID, membership_id: uuid.UUID) -> uuid.UUID:
     return uuid.UUID(str(value))
 
 
-def _ticket(w: Any) -> uuid.UUID:
-    """A ticket of school A (opened through the platform service, as the owner)."""
+def _ticket(w: Any, role: str) -> uuid.UUID:
+    """A ticket of school A opened by the caller (through the platform service): a member reads
+    and answers only the tickets they opened, unless they hold support.manage (R-17)."""
     from app.platform import service as platform_service
 
     ticket = platform_service.open_ticket_from_tenant(
         w.a.tenant_id,
-        w.a.people["owner"].user_id,
+        w.a.people[role].user_id,
         platform_service.TicketCreateSchool(
             category="other", subject="Matrix ticket", body="Synthetic question"
         ),
@@ -1976,6 +1978,8 @@ def _success(method: str, path: str) -> int:
         "/api/v1/notices",
         "/api/v1/notices/{notice_id}/draft",
         "/api/v1/notices/{notice_id}/render",
+        # R-19: a chain check is queued; the result is read with GET /audit/verify.
+        "/api/v1/audit/verify",
     }
     if method == "POST" and path in accepted:
         return 202

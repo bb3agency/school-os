@@ -27,7 +27,14 @@ from app.core.languages import telugu_enabled
 from app.core.logging import get_logger
 from app.platform import models as m
 from app.platform import repository as repo
-from app.platform.common import Actor, audit_platform, db_errors, now
+from app.platform.common import (
+    Actor,
+    audit_platform,
+    clamp_limit,
+    db_errors,
+    now,
+    parse_cursor,
+)
 from app.platform.schemas import AnnouncementBrief, AnnouncementIn, AnnouncementOut
 
 log = get_logger(__name__)
@@ -127,12 +134,16 @@ def has_ended(ends_at: dt.datetime, at: dt.datetime) -> bool:
     return ends_at <= at
 
 
-def list_announcements() -> list[AnnouncementOut]:
+def list_announcements(
+    *, limit: int = 50, cursor: str | None = None
+) -> tuple[list[AnnouncementOut], str | None]:
+    """Newest first, keyset-paged on the UUIDv7 id (audit 2026-10-06 R-14: the list stopped at
+    200 rows with no cursor, so older announcements were silently missing)."""
+    limit = clamp_limit(limit)
     with platform_session() as s:
-        rows = s.execute(
-            select(m.announcements).order_by(m.announcements.c.starts_at.desc()).limit(200)
-        ).mappings()
-        return [_out(r) for r in rows]
+        rows = repo.list_rows(s, m.announcements, limit=limit, cursor=parse_cursor(cursor))
+    items = [_out(r) for r in rows[:limit]]
+    return items, (str(rows[limit - 1]["id"]) if len(rows) > limit else None)
 
 
 def get(announcement_id: uuid.UUID) -> AnnouncementOut:

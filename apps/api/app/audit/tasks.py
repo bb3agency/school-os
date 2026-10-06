@@ -3,7 +3,11 @@
 Scheduled by beat (apps/worker/sos_worker/celery_app.py):
 - ``audit.archive_daily``      20:30 UTC (02:00 IST): signed export of the previous UTC day.
 - ``audit.verify_all_chains``  20:45 UTC: verify every tenant chain (+ the platform chain on the
-  shared deployment) and check partition runway.
+  shared deployment) and check partition runway. Each school's result is stored
+  (``audit.chain_verifications``) and served by ``GET /audit/verify`` (R-19).
+
+Outbox consumer: ``audit.verify_chain`` runs an on-demand verification queued by
+``POST /audit/verify`` (from the stored checkpoint, or the whole chain when asked).
 
 Both are idempotent: the archive is keyed by (tenant, day) and skips identical objects;
 verification is read-only. They carry no personal data (dates and IDs only).
@@ -11,12 +15,14 @@ verification is read-only. They carry no personal data (dates and IDs only).
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import boto3
 from celery import shared_task
 
+from app.audit import verification
 from app.audit.archive import (
     ArchiveIncompleteError,
     export_all,
@@ -102,3 +108,11 @@ def verify_all_chains() -> dict[str, Any]:
         "platform_ok": platform_ok,
         "partitions_until": bound.isoformat() if bound else None,
     }
+
+
+@shared_task(name=verification.VERIFY_TASK, acks_late=True, ignore_result=True)
+def verify_chain(tenant_id: str, event_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """One queued on-demand verification (R-19). IDs, counts and codes only."""
+    del event_id, payload  # the stored request says full or incremental
+    out = verification.run_requested(uuid.UUID(tenant_id))
+    return {"ok": out.ok, "checked": out.checked, "mode": out.mode}

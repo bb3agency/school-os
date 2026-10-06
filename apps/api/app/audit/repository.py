@@ -11,7 +11,13 @@ from sqlalchemy import RowMapping, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from app.audit.models import chain_heads, events, platform_chain_head, platform_events
+from app.audit.models import (
+    chain_heads,
+    chain_verifications,
+    events,
+    platform_chain_head,
+    platform_events,
+)
 from app.audit.schemas import ZERO_HASH
 
 STREAM_BATCH = 1000
@@ -85,6 +91,48 @@ def iter_events(
     stmt = stmt.order_by(events.c.seq, events.c.occurred_at, events.c.id)
     result = session.execute(stmt.execution_options(yield_per=STREAM_BATCH))
     yield from result.mappings()
+
+
+def events_at(session: Session, tenant_id: uuid.UUID, seq: int) -> list[RowMapping]:
+    """Every row with this ``seq`` (normally one; more is a duplicated sequence)."""
+    stmt = select(events).where(events.c.tenant_id == tenant_id, events.c.seq == seq)
+    return list(session.execute(stmt).mappings())
+
+
+def iter_events_after(session: Session, tenant_id: uuid.UUID, seq: int) -> Iterator[RowMapping]:
+    """Stream a tenant's events after ``seq`` in chain order (incremental verification)."""
+    stmt = (
+        select(events)
+        .where(events.c.tenant_id == tenant_id, events.c.seq > seq)
+        .order_by(events.c.seq, events.c.occurred_at, events.c.id)
+    )
+    result = session.execute(stmt.execution_options(yield_per=STREAM_BATCH))
+    yield from result.mappings()
+
+
+# ---- stored verification results (R-19) ----
+
+
+def get_verification(
+    session: Session, tenant_id: uuid.UUID, *, for_update: bool = False
+) -> RowMapping | None:
+    stmt = select(chain_verifications).where(chain_verifications.c.tenant_id == tenant_id)
+    if for_update:
+        stmt = stmt.with_for_update()
+    return session.execute(stmt).mappings().one_or_none()
+
+
+def save_verification(session: Session, tenant_id: uuid.UUID, values: Mapping[str, Any]) -> None:
+    """Insert or update the school's verification row."""
+    stmt = pg_insert(chain_verifications).values(
+        tenant_id=tenant_id, updated_at=func.now(), **values
+    )
+    session.execute(
+        stmt.on_conflict_do_update(
+            index_elements=[chain_verifications.c.tenant_id],
+            set_={**values, "updated_at": func.now()},
+        )
+    )
 
 
 # ---- platform chain ----

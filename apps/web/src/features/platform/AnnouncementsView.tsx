@@ -13,11 +13,12 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { announcementTone, known } from "@/features/status";
-import { ApiError, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
+import { ApiError, unwrap, useBffClient } from "@/lib/bff/query";
 import { cn } from "@/lib/cn";
 import { AnnouncementEditDialog, AnnouncementEditor } from "./AnnouncementEditor";
-import { PK, useCan } from "./data";
+import { LIST_PAGE_SIZE, PK, useCan, usePagedList } from "./data";
 import { MonoTime } from "./pills";
+import { ShowMore } from "./ShowMore";
 
 const SEVERITIES = ["info", "maintenance", "warning", "critical"] as const;
 const SEVERITY_TONE: Record<(typeof SEVERITIES)[number], BadgeTone> = {
@@ -60,10 +61,14 @@ export function AnnouncementsScreen() {
     const timer = setInterval(() => setNow(Date.now()), 60_000);
     return () => clearInterval(timer);
   }, []);
-  const announcements = useApiQuery(
-    [...PK.announcements, "list"],
-    async () => (await unwrap(api.GET("/api/v1/platform/announcements"))).data,
+  const announcementList = usePagedList([...PK.announcements, "list"], (cursor) =>
+    unwrap(
+      api.GET("/api/v1/platform/announcements", {
+        params: { query: { limit: LIST_PAGE_SIZE, ...(cursor ? { cursor } : {}) } },
+      }),
+    ),
   );
+  const announcements = announcementList.state;
 
   const audienceLabel = (row: Announcement) => {
     if (row.audience === "all") return t("audienceAll");
@@ -183,9 +188,12 @@ export function AnnouncementsScreen() {
       return <EmptyState icon="megaphone" title={t("emptyTitle")} body={t("emptyBody")} />;
     }
     return (
-      <ul aria-label={t("listTitle")} className="grid gap-4 lg:grid-cols-2">
-        {announcements.data.map(item)}
-      </ul>
+      <>
+        <ul aria-label={t("listTitle")} className="grid gap-4 lg:grid-cols-2">
+          {announcements.data.map(item)}
+        </ul>
+        <ShowMore list={announcementList} />
+      </>
     );
   }
 

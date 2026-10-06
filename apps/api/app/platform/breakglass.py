@@ -27,7 +27,15 @@ from app.core.ids import new_id
 from app.core.logging import get_logger
 from app.platform import models as m
 from app.platform import repository as repo
-from app.platform.common import SYSTEM, Actor, audit_platform, db_errors, now
+from app.platform.common import (
+    SYSTEM,
+    Actor,
+    audit_platform,
+    clamp_limit,
+    db_errors,
+    now,
+    parse_cursor,
+)
 from app.platform.schemas import BreakGlassIn, BreakGlassOut
 
 log = get_logger(__name__)
@@ -188,14 +196,19 @@ def record_session_started(
         return True
 
 
-def list_requests(tenant_id: uuid.UUID | None = None) -> list[BreakGlassOut]:
+def list_requests(
+    tenant_id: uuid.UUID | None = None, *, limit: int = 50, cursor: str | None = None
+) -> tuple[list[BreakGlassOut], str | None]:
+    """Newest first, keyset-paged on the UUIDv7 id (audit 2026-10-06 R-14: the list stopped at
+    200 rows with no cursor)."""
+    limit = clamp_limit(limit)
+    conds = [m.breakglass_requests.c.tenant_id == tenant_id] if tenant_id else []
     with platform_session() as s:
-        stmt = select(m.breakglass_requests).order_by(m.breakglass_requests.c.created_at.desc())
-        if tenant_id:
-            stmt = stmt.where(m.breakglass_requests.c.tenant_id == tenant_id)
-        return [
-            BreakGlassOut.model_validate(dict(r)) for r in s.execute(stmt.limit(200)).mappings()
-        ]
+        rows = repo.list_rows(
+            s, m.breakglass_requests, *conds, limit=limit, cursor=parse_cursor(cursor)
+        )
+    items = [BreakGlassOut.model_validate(dict(r)) for r in rows[:limit]]
+    return items, (str(rows[limit - 1]["id"]) if len(rows) > limit else None)
 
 
 def get_request(request_id: uuid.UUID) -> BreakGlassOut:

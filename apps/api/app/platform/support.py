@@ -347,15 +347,32 @@ def open_ticket_from_tenant(
         return _out(s, row, include_internal=False)
 
 
+def _visible_to(row: Any, tenant_id: uuid.UUID, viewer: uuid.UUID | None) -> bool:
+    """A school ticket is visible to its school only, and there to the member who opened it,
+    or to every member when ``viewer`` is ``None`` (``support.manage``; audit 2026-10-06 R-17)."""
+    if row["tenant_id"] != tenant_id:
+        return False
+    return viewer is None or row["opened_by_user_id"] == viewer
+
+
 def list_tenant_tickets(
-    tenant_id: uuid.UUID, *, limit: int = 50, cursor: str | None = None
+    tenant_id: uuid.UUID,
+    *,
+    viewer: uuid.UUID | None,
+    limit: int = 50,
+    cursor: str | None = None,
 ) -> tuple[list[TicketOut], str | None]:
+    """The school's tickets, newest first: all of them for ``viewer=None`` (``support.manage``),
+    otherwise only the ones ``viewer`` opened (R-17)."""
     limit = clamp_limit(limit)
+    conds = [m.support_tickets.c.tenant_id == tenant_id]
+    if viewer is not None:
+        conds.append(m.support_tickets.c.opened_by_user_id == viewer)
     with platform_session() as s:
         rows = repo.list_rows(
             s,
             m.support_tickets,
-            m.support_tickets.c.tenant_id == tenant_id,
+            *conds,
             limit=limit,
             cursor=parse_cursor(cursor),
         )
@@ -363,20 +380,31 @@ def list_tenant_tickets(
     return items, (str(rows[limit - 1]["id"]) if len(rows) > limit else None)
 
 
-def get_tenant_ticket(tenant_id: uuid.UUID, ticket_id: uuid.UUID) -> TicketOut:
+def get_tenant_ticket(
+    tenant_id: uuid.UUID, ticket_id: uuid.UUID, *, viewer: uuid.UUID | None
+) -> TicketOut:
+    """One ticket; 404 for another school's and, without ``support.manage``, for another
+    member's (R-17)."""
     with platform_session() as s:
         row = repo.get(s, m.support_tickets, ticket_id)
-        if row is None or row["tenant_id"] != tenant_id:
+        if row is None or not _visible_to(row, tenant_id, viewer):
             raise NotFound("Ticket not found")
         return _out(s, row, include_internal=False)
 
 
 def reply_from_tenant(
-    tenant_id: uuid.UUID, user_id: uuid.UUID, ticket_id: uuid.UUID, body: str
+    tenant_id: uuid.UUID,
+    user_id: uuid.UUID,
+    ticket_id: uuid.UUID,
+    body: str,
+    *,
+    manager: bool,
 ) -> TicketOut:
+    """Reply as ``user_id``: on their own ticket, or on any ticket of the school when
+    ``manager`` (``support.manage``); 404 otherwise (R-17)."""
     with platform_session() as s, db_errors():
         row = repo.get(s, m.support_tickets, ticket_id, for_update=True)
-        if row is None or row["tenant_id"] != tenant_id:
+        if row is None or not _visible_to(row, tenant_id, None if manager else user_id):
             raise NotFound("Ticket not found")
         if row["status"] == "closed":
             raise Conflict("The ticket is closed.", code="ticket_closed")

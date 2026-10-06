@@ -248,7 +248,9 @@ def purge_expired_audit_chain(tenant_id: uuid.UUID, *, engine: Engine | None = N
     with _session(tenant_id, engine) as s:
         _require_status(s, "deleted")
         with purging.purge_role(s, tenant_id, flag="app.purge_audit"):
-            deleted = purging.delete_rows(s, ("audit.events", "audit.chain_heads"))
+            deleted = purging.delete_rows(
+                s, ("audit.events", "audit.chain_heads", "audit.chain_verifications")
+            )
     return deleted["audit.events"]
 
 

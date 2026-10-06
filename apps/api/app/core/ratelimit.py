@@ -778,6 +778,25 @@ def enforce(
         raise RateLimitExceeded(decision.retry_after_s)
 
 
+def charge(request: Request, policy_name: str, partition: str) -> Decision:
+    """Charge one per-route budget from inside the handler, AFTER authorization.
+
+    The route guards charge ``routes:`` policies before the permission check; a budget shared
+    by a whole school (``per: school``) charged there could be spent by members who are then
+    refused (403), locking out the people allowed to use the route. Such budgets are charged
+    here instead (audit 2026-10-06 R-19: ``audit_verify``). The policy shows in the RateLimit
+    headers like the others; raises :class:`RateLimitExceeded` (429 ``rate_limited``)."""
+    limiter = get_rate_limiter()
+    if not limiter.enabled:
+        return Decision(True, 0, ())
+    decision = limiter.check([Bucket(limiter.config.policy(policy_name), partition, 1)])
+    remember(request.scope, decision)
+    if not decision.allowed:
+        _log_limited(request, decision, limiter.ip_hash(client_ip_of(request)))
+        raise RateLimitExceeded(decision.retry_after_s)
+    return decision
+
+
 def _log_limited(request: Request, decision: Decision, hashed_ip: str) -> None:
     template = _route_template(request)
     log.warning(

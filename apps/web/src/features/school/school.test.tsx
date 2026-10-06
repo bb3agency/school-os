@@ -373,6 +373,23 @@ describe("support (FR-PLT-027)", () => {
     expect(screen.getByLabelText(sm.support.subject)).toHaveValue("");
   });
 
+  it("names the list after what the caller may read (R-17: own tickets, or every ticket with support.manage)", async () => {
+    stub.routes["GET /bff/api/v1/support/tickets"] = () => page([]);
+    stub.routes["GET /bff/api/v1/me"] = () => Response.json(me(["support.ticket.create"]));
+    const { unmount } = renderWithIntl(<SupportScreen />);
+    expect(
+      await screen.findByRole("heading", { name: sm.support.listTitleOwn }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(sm.support.ownOnlyNote)).toBeInTheDocument();
+    unmount();
+
+    stub.routes["GET /bff/api/v1/me"] = () =>
+      Response.json(me(["support.ticket.create", "support.manage"]));
+    renderWithIntl(<SupportScreen />);
+    expect(await screen.findByRole("heading", { name: sm.support.listTitle })).toBeInTheDocument();
+    expect(screen.queryByText(sm.support.ownOnlyNote)).not.toBeInTheDocument();
+  });
+
   it("shows the thread and posts a reply", async () => {
     const id = "0192f3a4-0000-7000-8000-00000000f201";
     const ticket = {

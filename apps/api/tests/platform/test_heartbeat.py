@@ -20,7 +20,7 @@ from app.core.db import platform_session
 from app.core.errors import Unauthenticated
 from app.identity.service_token import InMemoryReplayStore
 from app.platform import fleet, heartbeat_client
-from app.platform.common import today_ist
+from app.platform.common import fleet_cfg, today_ist
 from app.platform.schemas import HeartbeatIn
 
 from .conftest import Api, Operator, provision_payload
@@ -236,6 +236,56 @@ def test_SEC_028_key_rotation_overlap(
         ts=int(later.timestamp()),
     )
     fleet.verify_heartbeat(new_headers, new_raw, wrapper=wrapper, stores=stores, at=later)
+
+
+def test_R_15_second_rotation_while_one_is_pending_is_409_and_keeps_both_keys(
+    api: Api, dep: dict[str, Any], owner: Operator, wrapper: Any
+) -> None:
+    """Audit 2026-10-06 R-15: a second rotation (double click, retry) used to promote the
+    pending key and drop the one the host still signs with. Now it answers 409
+    ``rotation_pending`` until the overlap (billing.yaml fleet.key_rotation_overlap_days, 7)
+    has passed; the old key keeps working during the overlap and stops after it."""
+    rotate = f"/deployments/{dep['deployment_id']}/heartbeat-key:rotate"
+    first = api.call("POST", rotate, owner)
+    assert first.status_code == 200, first.text
+    new = first.json()
+    second = api.call("POST", rotate, owner)
+    assert (second.status_code, second.json()["code"]) == (409, "rotation_pending")
+
+    stores = fleet.FleetStores(InMemoryReplayStore(), InMemoryReplayStore())
+    overlap = dt.timedelta(days=int(fleet_cfg()["key_rotation_overlap_days"]))
+    assert overlap == dt.timedelta(days=7)
+    inside = dt.datetime.now(dt.UTC) + overlap - dt.timedelta(hours=1)
+    for key, key_id in (
+        (dep["heartbeat_key"], dep["heartbeat_key_id"]),
+        (new["heartbeat_key"], new["heartbeat_key_id"]),
+    ):
+        raw, headers = _signed(
+            dep, _payload(dep), key=key, key_id=key_id, ts=int(inside.timestamp())
+        )
+        fleet.verify_heartbeat(headers, raw, wrapper=wrapper, stores=stores, at=inside)
+        _next_minute(stores)
+    after = dt.datetime.now(dt.UTC) + overlap + dt.timedelta(hours=1)
+    old_raw, old_headers = _signed(dep, _payload(dep), ts=int(after.timestamp()))
+    with pytest.raises(Unauthenticated):
+        fleet.verify_heartbeat(old_headers, old_raw, wrapper=wrapper, stores=stores, at=after)
+
+    # Once the overlap has passed, the next rotation is accepted again (the pending key is
+    # promoted first, so the key the host now uses stays valid during the new overlap).
+    with platform_session() as s:
+        s.execute(
+            text(
+                "UPDATE platform.deployments SET heartbeat_rotation_started_at = "
+                "heartbeat_rotation_started_at - interval '8 days' WHERE id = :d"
+            ),
+            {"d": dep["deployment_id"]},
+        )
+    third = api.call("POST", rotate, owner)
+    assert third.status_code == 200, third.text
+    raw, headers = _signed(
+        dep, _payload(dep), key=new["heartbeat_key"], key_id=new["heartbeat_key_id"]
+    )
+    fleet.verify_heartbeat(headers, raw, wrapper=wrapper, stores=stores)
 
 
 def test_FR_PLT_025_staleness_marks_unreachable(api: Api, dep: dict[str, Any]) -> None:

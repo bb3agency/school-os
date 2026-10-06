@@ -38,7 +38,7 @@ export type Scope = Schemas["ScopeOut"];
 export type TenantRole = Schemas["RoleOut"];
 /** Audit event; `summary` is an object of IDs, field names, counts and codes (no PII). */
 export type AuditEvent = Schemas["AuditEventOut"];
-export type AuditVerify = Schemas["app__audit__viewer__AuditVerifyOut"];
+export type AuditVerify = Schemas["AuditVerificationOut"];
 export type Me = Schemas["app__identity__schemas__MeOut"];
 export type TenantProfile = Schemas["TenantOut"];
 export type SchoolChoice = Schemas["SchoolChoiceOut"];
@@ -109,7 +109,7 @@ export type OperatorInvite = Schemas["OperatorInvite"];
 export type PlatformRole = Operator["roles"][number];
 export type PersonStatus = Operator["status"];
 export type PlatformAuditEvent = Schemas["PlatformAuditEventOut"];
-export type PlatformAuditVerify = Schemas["app__platform__schemas__AuditVerifyOut"];
+export type PlatformAuditVerify = Schemas["AuditVerifyOut"];
 
 /* Status strings the API documents as `string` (values from the 0005_platform CHECKs). */
 export type DeploymentStatus =

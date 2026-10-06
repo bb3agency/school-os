@@ -415,11 +415,21 @@ export interface paths {
         };
         /**
          * Verify Audit Chain
-         * @description Check that the school's audit chain is unbroken (permission ``audit.read``; US-1001 AC2).
+         * @description The latest stored check of the school's audit chain (permission ``audit.read``; US-1001
+         *     AC2). It does not re-hash the chain: the daily job and on-demand runs store their result
+         *     (``verified_at`` is null before the first run; ``pending`` while a run is queued; audit
+         *     2026-10-06 R-19).
          */
         get: operations["verify_audit_chain_api_v1_audit_verify_get"];
         put?: never;
-        post?: never;
+        /**
+         * Request Audit Verification
+         * @description Queue a new check of the school's audit chain (permission ``audit.read``; 202). It
+         *     verifies the events after the last verified checkpoint, or the whole chain with ``full``.
+         *     At most once per school every 10 minutes: 429 ``rate_limited`` with ``Retry-After``. A
+         *     check already queued is not queued twice. Read the result with ``GET /audit/verify``.
+         */
+        post: operations["request_audit_verification_api_v1_audit_verify_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1051,7 +1061,8 @@ export interface paths {
          * Request Reading
          * @description Read the circular's current version with AI now, or try again after "needs manual
          *     review" (``circular.review``). 409 ``document_not_ready``, ``reading_in_progress``,
-         *     ``reading_done`` or ``reading_attempts_used``.
+         *     ``reading_done`` or ``reading_attempts_used``. 429 ``ai_rate_limited`` over your AI budget
+         *     (the same per-person limit as Ask; SEC-020).
          */
         post: operations["request_reading_api_v1_circulars__document_id__read_post"];
         delete?: never;
@@ -3058,7 +3069,8 @@ export interface paths {
          *     (``draft_error`` says why: try again with ``POST /notices/{notice_id}/draft`` or write it
          *     yourself). A ``blank`` notice starts as ``draft``. Only the circular's text is sent to the
          *     AI, never student records. Accepts ``Idempotency-Key`` (a retry replays the first answer
-         *     and queues nothing).
+         *     and queues nothing). An AI draft counts against your AI budget, the same per-person limit
+         *     as Ask (429 ``ai_rate_limited``; SEC-020); a blank notice does not.
          */
         post: operations["create_notice_api_v1_notices_post"];
         delete?: never;
@@ -3151,7 +3163,8 @@ export interface paths {
          * Retry Notice Draft
          * @description Ask the AI to draft the notice again after it could not (``notice.draft``;
          *     ``If-Match``): ``draft_failed`` becomes ``drafting``; the source is checked again (422 as
-         *     for ``POST /notices``). 409 ``notice_not_draft_failed`` in any other state.
+         *     for ``POST /notices``). 409 ``notice_not_draft_failed`` in any other state. 429
+         *     ``ai_rate_limited`` over your AI budget (SEC-020).
          */
         post: operations["retry_notice_draft_api_v1_notices__notice_id__draft_post"];
         delete?: never;
@@ -3310,7 +3323,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Announcements */
+        /**
+         * List Announcements
+         * @description Announcements, newest first, cursor-paged (R-14).
+         */
         get: operations["list_announcements_api_v1_platform_announcements_get"];
         put?: never;
         /** Create Announcement */
@@ -3399,7 +3415,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Breakglass */
+        /**
+         * List Breakglass
+         * @description Break-glass requests, newest first, cursor-paged (R-14).
+         */
         get: operations["list_breakglass_api_v1_platform_break_glass_requests_get"];
         put?: never;
         /**
@@ -3458,7 +3477,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Deployments */
+        /**
+         * List Deployments
+         * @description Deployments, newest first, cursor-paged (R-14); ``tenant_id`` for one school's.
+         */
         get: operations["list_deployments_api_v1_platform_deployments_get"];
         put?: never;
         post?: never;
@@ -3514,7 +3536,9 @@ export interface paths {
         put?: never;
         /**
          * Rotate Heartbeat Key
-         * @description Returns the new key ONCE for the runbook (SSM Parameter Store).
+         * @description Returns the new key ONCE for the runbook (SSM Parameter Store). The old key stays valid
+         *     for the overlap (billing.yaml ``fleet.key_rotation_overlap_days``); 409 ``rotation_pending``
+         *     while an earlier rotation is inside it (audit 2026-10-06 R-15).
          */
         post: operations["rotate_heartbeat_key_api_v1_platform_deployments__deployment_id__heartbeat_key_rotate_post"];
         delete?: never;
@@ -5206,7 +5230,8 @@ export interface paths {
         };
         /**
          * List Tickets
-         * @description This school's tickets, newest first (permission ``support.ticket.create``).
+         * @description This school's tickets, newest first (permission ``support.ticket.create``): the ones
+         *     you opened, or every ticket of the school with ``support.manage``.
          */
         get: operations["list_tickets_api_v1_support_tickets_get"];
         put?: never;
@@ -5231,7 +5256,8 @@ export interface paths {
         };
         /**
          * Get Ticket
-         * @description One of this school's tickets with its messages (internal notes are never shown).
+         * @description One of this school's tickets with its messages (internal notes are never shown). 404
+         *     for a ticket someone else opened unless you hold ``support.manage``.
          */
         get: operations["get_ticket_api_v1_support_tickets__ticket_id__get"];
         put?: never;
@@ -5253,7 +5279,8 @@ export interface paths {
         put?: never;
         /**
          * Reply To Ticket
-         * @description Reply on this school's ticket (permission ``support.ticket.create``). Accepts
+         * @description Reply on a ticket you opened, or on any ticket of the school with ``support.manage``
+         *     (404 otherwise; permission ``support.ticket.create``). Accepts
          *     ``Idempotency-Key``: a retry with the same key does not post the reply twice.
          */
         post: operations["reply_to_ticket_api_v1_support_tickets__ticket_id__messages_post"];
@@ -6203,17 +6230,6 @@ export interface components {
              */
             membership_id: string;
         };
-        /** AuditVerifyOut */
-        app__audit__viewer__AuditVerifyOut: {
-            /** Checked */
-            checked: number;
-            /** First Bad Seq */
-            first_bad_seq: number | null;
-            /** Ok */
-            ok: boolean;
-            /** Reason */
-            reason: string | null;
-        };
         /** Page[TicketOut] */
         app__authz__http__Page_TicketOut_: {
             /** Data */
@@ -6307,22 +6323,6 @@ export interface components {
              * Format: uuid
              */
             user_id: string;
-        };
-        /** AuditVerifyOut */
-        app__platform__schemas__AuditVerifyOut: {
-            /** Checked */
-            checked: number;
-            /** First Bad Seq */
-            first_bad_seq: number | null;
-            /**
-             * Job Id
-             * Format: uuid
-             */
-            job_id: string;
-            /** Ok */
-            ok: boolean;
-            /** Reason */
-            reason: string | null;
         };
         /** MeOut */
         app__platform__schemas__MeOut: {
@@ -6607,6 +6607,63 @@ export interface components {
             summary: {
                 [key: string]: unknown;
             };
+        };
+        /**
+         * AuditVerificationOut
+         * @description The school's latest stored verification (``GET``/``POST /audit/verify``).
+         */
+        AuditVerificationOut: {
+            /** Checked */
+            checked: number;
+            /** Checkpoint At */
+            checkpoint_at: string | null;
+            /** Checkpoint Seq */
+            checkpoint_seq: number;
+            /** First Bad Seq */
+            first_bad_seq: number | null;
+            /** Last Full At */
+            last_full_at: string | null;
+            /** Mode */
+            mode: ("full" | "incremental") | null;
+            /** Ok */
+            ok: boolean | null;
+            /** Pending */
+            pending: boolean;
+            /** Reason */
+            reason: string | null;
+            /** Requested At */
+            requested_at: string | null;
+            /** Source */
+            source: ("daily" | "on_demand") | null;
+            /** Verified At */
+            verified_at: string | null;
+        };
+        /** AuditVerifyOut */
+        AuditVerifyOut: {
+            /** Checked */
+            checked: number;
+            /** First Bad Seq */
+            first_bad_seq: number | null;
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /** Ok */
+            ok: boolean;
+            /** Reason */
+            reason: string | null;
+        };
+        /**
+         * AuditVerifyRequest
+         * @description ``full``: re-hash the whole chain instead of the events after the last checkpoint.
+         */
+        AuditVerifyRequest: {
+            /**
+             * Full
+             * @default false
+             */
+            full: boolean;
         };
         /**
          * BatchCreate
@@ -13094,6 +13151,11 @@ export interface components {
             provisioning?: components["schemas"]["ProvisioningOut"] | null;
             /** School Name */
             school_name: string;
+            /**
+             * Security Hold
+             * @default false
+             */
+            security_hold: boolean;
             subscription: components["schemas"]["SubscriptionOut"] | null;
             /** Subscription Status */
             subscription_status: ("trial" | "active" | "past_due" | "suspended" | "cancelled") | null;
@@ -14966,7 +15028,53 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__audit__viewer__AuditVerifyOut"];
+                    "application/json": components["schemas"]["AuditVerificationOut"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    request_audit_verification_api_v1_audit_verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["AuditVerifyRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditVerificationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
             /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
@@ -21529,7 +21637,10 @@ export interface operations {
     };
     list_announcements_api_v1_platform_announcements_get: {
         parameters: {
-            query?: never;
+            query?: {
+                cursor?: string | null;
+                limit?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -21543,6 +21654,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_AnnouncementOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
             /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
@@ -21767,7 +21887,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__platform__schemas__AuditVerifyOut"];
+                    "application/json": components["schemas"]["AuditVerifyOut"];
                 };
             };
             /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
@@ -21788,6 +21908,8 @@ export interface operations {
     list_breakglass_api_v1_platform_break_glass_requests_get: {
         parameters: {
             query?: {
+                cursor?: string | null;
+                limit?: number;
                 tenant_id?: string | null;
             };
             header?: never;
@@ -21957,7 +22079,10 @@ export interface operations {
     list_deployments_api_v1_platform_deployments_get: {
         parameters: {
             query?: {
+                cursor?: string | null;
+                limit?: number;
                 status?: string | null;
+                tenant_id?: string | null;
             };
             header?: never;
             path?: never;

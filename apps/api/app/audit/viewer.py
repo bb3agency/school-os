@@ -16,7 +16,6 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
-from app.audit import service
 from app.audit.models import events
 
 
@@ -33,15 +32,6 @@ class AuditEventOut(BaseModel):
     resource_id: uuid.UUID | None
     summary: dict[str, Any]
     request_id: str | None
-
-
-class AuditVerifyOut(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    ok: bool
-    checked: int
-    first_bad_seq: int | None
-    reason: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,13 +107,3 @@ def list_events(
     rows = session.execute(stmt.order_by(events.c.seq.desc()).limit(limit + 1)).mappings().all()
     page = [AuditEventOut.model_validate(dict(r)) for r in rows[:limit]]
     return page, (page[-1].seq if len(rows) > limit and page else None)
-
-
-def verify(session: Session, tenant_id: uuid.UUID) -> AuditVerifyOut:
-    result = service.verify_chain(session, tenant_id)
-    return AuditVerifyOut(
-        ok=result.ok,
-        checked=result.checked,
-        first_bad_seq=result.first_bad_seq,
-        reason=result.reason,
-    )

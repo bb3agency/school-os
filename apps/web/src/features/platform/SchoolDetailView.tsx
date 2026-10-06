@@ -72,6 +72,10 @@ export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: S
 
   function actions(data: TenantDetail) {
     const status = data.tenant_status;
+    // R-18: a security hold is independent of a billing suspension. A school suspended only
+    // for billing is reactivated from its subscription; it can still be put on hold.
+    const held = data.security_hold === true;
+    const billingSuspended = data.subscription?.status === "suspended";
     const offboardPending =
       data.offboard_requested_at !== null && data.offboard_approved_at === null;
     return (
@@ -115,12 +119,13 @@ export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: S
             />
           </>
         ) : null}
-        {status === "active" && can("platform.tenants.suspend") ? (
+        {(status === "active" || (status === "suspended" && !held)) &&
+        can("platform.tenants.suspend") ? (
           <ActionDialog
-            triggerLabel={t("suspend")}
-            title={t("suspendDialogTitle")}
-            description={t("suspendDialogBody")}
-            confirmLabel={t("suspendConfirm")}
+            triggerLabel={status === "active" ? t("suspend") : t("placeHold")}
+            title={status === "active" ? t("suspendDialogTitle") : t("placeHoldTitle")}
+            description={status === "active" ? t("suspendDialogBody") : t("placeHoldBody")}
+            confirmLabel={status === "active" ? t("suspendConfirm") : t("placeHold")}
             confirmVariant="danger"
             stepUp
             schema={reasonSchema}
@@ -137,12 +142,12 @@ export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: S
             {(errors) => <ReasonField error={errors.reason} />}
           </ActionDialog>
         ) : null}
-        {status === "suspended" && can("platform.tenants.suspend") ? (
+        {status === "suspended" && held && can("platform.tenants.suspend") ? (
           <ActionDialog
-            triggerLabel={t("reactivate")}
-            title={t("reactivateTitle")}
-            description={t("reactivateBody")}
-            confirmLabel={t("reactivate")}
+            triggerLabel={billingSuspended ? t("liftHold") : t("reactivate")}
+            title={billingSuspended ? t("liftHoldTitle") : t("reactivateTitle")}
+            description={billingSuspended ? t("liftHoldBillingBody") : t("reactivateBody")}
+            confirmLabel={billingSuspended ? t("liftHold") : t("reactivate")}
             stepUp
             schema={reasonSchema}
             invalidate={invalidate}
@@ -377,6 +382,7 @@ function OverviewTab({ school }: { school: TenantDetail }) {
             <dd>
               {tschool(school.tenant_status)}
               {school.tenant_status_reason ? ` · ${school.tenant_status_reason}` : ""}
+              {school.security_hold ? ` · ${t("securityHold")}` : ""}
             </dd>
             {school.provisioning ? (
               <>
@@ -569,9 +575,17 @@ function DeploymentTab({ schoolId }: { schoolId: string }) {
   const tdep = useTranslations("status.deployment");
   const tmode = useTranslations("deploymentMode");
   const api = useBffClient("operator");
+  // One deployment per school: ask for this school's row only (the list is paged, R-14).
   const deployments = useApiQuery(
-    [...PK.deployments, "list", {}],
-    async () => (await unwrap(api.GET("/api/v1/platform/deployments"))).data,
+    [...PK.deployments, "list", { tenant_id: schoolId }],
+    async () =>
+      (
+        await unwrap(
+          api.GET("/api/v1/platform/deployments", {
+            params: { query: { tenant_id: schoolId, limit: 1 } },
+          }),
+        )
+      ).data,
   );
   if (deployments.status !== "ready") {
     return <FleetTableState state={deployments} />;

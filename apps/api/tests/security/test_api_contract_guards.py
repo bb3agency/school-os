@@ -391,6 +391,8 @@ IDEMPOTENCY_EXEMPT = {
     ("POST", "/api/v1/academic-years/{year_id}/promotions:undo"): "a state transition",
     ("POST", "/api/v1/platform/invoice-runs"): "idempotent per month (one run per month)",
     ("POST", "/api/v1/platform/audit/verify"): "re-runs a read-only verification",
+    ("POST", "/api/v1/audit/verify"): "queues a read-only verification; a queued one is not "
+    "queued twice (R-19)",
     ("POST", "/api/v1/platform/tenants/{tenant_id}/offboarding"): "a state transition (409 on "
     "repeat)",
     ("POST", "/api/v1/platform/tenants/{tenant_id}/owner-invite:resend"): "re-sends the same "

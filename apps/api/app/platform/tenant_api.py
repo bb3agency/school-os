@@ -12,7 +12,9 @@ Mounted in BOTH deployment modes (they are tenant routes guarded by ``require``)
 - ``GET /api/v1/announcements`` (any member): active banners for this school and tier.
 - ``POST/GET /api/v1/support/tickets``, ``GET /support/tickets/{id}``,
   ``POST /support/tickets/{id}/messages`` (``support.ticket.create``): the school's own tickets;
-  text is redacted before storage; other schools' tickets answer 404.
+  text is redacted before storage; other schools' tickets answer 404. A member reads and
+  answers only the tickets they opened; ``support.manage`` holders every ticket of the school
+  (others' tickets answer 404 too; audit 2026-10-06 R-17).
 """
 
 from __future__ import annotations
@@ -45,6 +47,14 @@ router = APIRouter(prefix="/api/v1", tags=["school"])
 BillingReader = Annotated[UserContext, Depends(require("tenant.billing.read"))]
 Member = Annotated[UserContext, Depends(require(AUTHENTICATED))]
 TicketUser = Annotated[UserContext, Depends(require("support.ticket.create"))]
+SUPPORT_MANAGE = "support.manage"
+
+
+def _ticket_viewer(ctx: UserContext) -> uuid.UUID | None:
+    """``None`` (every ticket of the school) for ``support.manage`` holders, otherwise the
+    caller: a member sees only the tickets they opened (audit 2026-10-06 R-17)."""
+    return None if ctx.has(SUPPORT_MANAGE) else ctx.user_id
+
 
 # plan limit key -> usage field in core.current_subscription()["usage"]
 _USAGE_FOR_LIMIT = {
@@ -189,15 +199,19 @@ def open_ticket(
 
 @router.get("/support/tickets", response_model=Page[TicketOut])
 def list_tickets(ctx: TicketUser, limit: Limit = 50, cursor: Cursor = None) -> Page[TicketOut]:
-    """This school's tickets, newest first (permission ``support.ticket.create``)."""
-    items, nxt = service.list_tenant_tickets(ctx.tenant_id, limit=limit, cursor=cursor)
+    """This school's tickets, newest first (permission ``support.ticket.create``): the ones
+    you opened, or every ticket of the school with ``support.manage``."""
+    items, nxt = service.list_tenant_tickets(
+        ctx.tenant_id, viewer=_ticket_viewer(ctx), limit=limit, cursor=cursor
+    )
     return Page[TicketOut](data=items, next_cursor=nxt)
 
 
 @router.get("/support/tickets/{ticket_id}", response_model=TicketOut)
 def get_ticket(ctx: TicketUser, ticket_id: uuid.UUID) -> TicketOut:
-    """One of this school's tickets with its messages (internal notes are never shown)."""
-    return service.get_tenant_ticket(ctx.tenant_id, ticket_id)
+    """One of this school's tickets with its messages (internal notes are never shown). 404
+    for a ticket someone else opened unless you hold ``support.manage``."""
+    return service.get_tenant_ticket(ctx.tenant_id, ticket_id, viewer=_ticket_viewer(ctx))
 
 
 @router.post("/support/tickets/{ticket_id}/messages", response_model=TicketOut)
@@ -208,11 +222,14 @@ def reply_to_ticket(
     body: SchoolTicketMessageIn,
     idem: IdempotencyDep,
 ) -> Response:
-    """Reply on this school's ticket (permission ``support.ticket.create``). Accepts
+    """Reply on a ticket you opened, or on any ticket of the school with ``support.manage``
+    (404 otherwise; permission ``support.ticket.create``). Accepts
     ``Idempotency-Key``: a retry with the same key does not post the reply twice."""
 
     def operation() -> TicketOut:
-        ticket = service.reply_from_tenant(ctx.tenant_id, ctx.user_id, ticket_id, body)
+        ticket = service.reply_from_tenant(
+            ctx.tenant_id, ctx.user_id, ticket_id, body, manager=ctx.has(SUPPORT_MANAGE)
+        )
         audit.record(
             db,
             action="support.ticket_updated",

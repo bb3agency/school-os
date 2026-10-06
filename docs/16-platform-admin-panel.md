@@ -135,8 +135,9 @@ The owner accepts the invite on first sign-in (`POST /api/v1/me/accept-invitatio
 Result for **dedicated**: the deployment row (`status = provisioning`), billing account, subscription, a new heartbeat key and a `completed` run are created in one control-plane transaction; the tenant row itself is created **on the host** by the provisioning runbook (§13) with the tenant ID chosen here. The heartbeat key is returned once in the `201` response (`heartbeat_key_id`, `heartbeat_key`) and never again: submitting the same request again replays the result without it (rotate the key if the first response was lost).
 
 ### 5.5 Suspend, reactivate, offboard
-- **Suspend (non-billing)** — `platform.tenants.suspend` (ᴿ): reason required (security incident, abuse, school's written request). Calls `core.set_tenant_status(tenant, 'suspended')` for shared; for dedicated, the engineer runs the fleet command (§13.3). Billing suspensions go through the subscription (§5.7).
-- **Reactivate** — same permission and step-up; reason required. A billing suspension is lifted from the subscription instead (`409 billing_suspension`), also when the school was first held for another reason and its subscription was suspended meanwhile (audit 2026-10-05 A-08).
+- **Suspend (security hold)** — `platform.tenants.suspend` (ᴿ): reason required (security incident, abuse, school's written request). Sets `deployments.security_hold` and calls `core.set_tenant_status(tenant, 'suspended')` for shared; for dedicated, the engineer runs the fleet command (§13.3). Billing suspensions go through the subscription (§5.7).
+- **The hold is independent of billing** (audit 2026-10-06 R-18, migration 0047). The school is active only when it has neither a security hold nor a billing suspension. An operator can place a hold on a school already suspended for billing (it stays suspended; event `tenant.security_hold_placed`); the hold is lifted only by its own release, never by paying or reactivating the subscription; `409 already_on_hold` when it is already held.
+- **Reactivate (lift the hold)** — same permission and step-up; reason required. When the school is also suspended for billing (shared tier), lifting the hold leaves it suspended with reason `billing` (event `tenant.security_hold_lifted`); the subscription lifts that. Without a hold, a billing suspension is lifted from the subscription instead (`409 billing_suspension`), also when a dedicated school was first held and its subscription was suspended meanwhile (audit 2026-10-05 A-08).
 - **Activate (go-live)** — `platform.tenants.provision` (ᴿ): `provisioning → active` through `core.set_tenant_status`, which refuses a tenant without an unretired data key.
 - **What suspension does** (decided 2026-09-27; BR-08, FR-PLT-004): while a school is `suspended` (and also while it is `offboarding`), the school's **owner and principal** may still use only these routes, and every other school route answers `403 tenant_suspended` for every role. The problem detail says in plain language that Plan & billing and the data export remain available to the owner and principal. The allowlist is one explicit list of (method, route template, roles), `SUSPENDED_SCHOOL_ALLOWLIST` in `apps/api/app/authz/resolver.py`, pinned by `tests/authz/test_suspended_allowlist.py` and an enumeration over every school route (`tests/api/test_suspended_school.py`). The route permission still applies on top (for example `tenant.billing.read`).
 
@@ -424,6 +425,7 @@ CREATE TABLE platform.deployments (
   tenant_status             text NOT NULL CHECK (tenant_status IN
                               ('provisioning','active','suspended','offboarding','deleted')),
   tenant_status_reason      text,
+  security_hold             boolean NOT NULL DEFAULT false,  -- operator hold, independent of billing (0047, R-18)
   status                    text NOT NULL CHECK (status IN
                               ('provisioning','healthy','degraded','unreachable','decommissioned')),
   app_version               text,
@@ -463,7 +465,9 @@ CREATE TABLE platform.deployments (
     CHECK (offboard_approved_by IS NULL
            OR (offboard_requested_by IS NOT NULL AND offboard_approved_by <> offboard_requested_by)),
   CONSTRAINT deployments_suspension_reason
-    CHECK (tenant_status <> 'suspended' OR tenant_status_reason IS NOT NULL)
+    CHECK (tenant_status <> 'suspended' OR tenant_status_reason IS NOT NULL),
+  CONSTRAINT deployments_security_hold_not_active
+    CHECK (NOT security_hold OR tenant_status <> 'active')
 );
 
 CREATE TABLE platform.subscriptions (
@@ -837,7 +841,7 @@ Conventions from 09 §2 apply (problem+json, `Idempotency-Key` on creating POSTs
 | POST | `/platform/tenants/{tenant_id}/provisioning:resume` | `platform.tenants.provision` ᴿ | 200 | Resume an unfinished or failed provisioning (§5.4) and return its result; a finished one is returned as it is; `409 provisioning_in_progress` while another request holds it; `409 resume_needs_request` for a run from before `0020` |
 | POST | `/platform/tenants/{tenant_id}/activate` | `platform.tenants.provision` ᴿ | 200 | Go-live `provisioning → active`; `409 provisioning_incomplete` until provisioning completed; the database refuses without a data key (`core.set_tenant_status`) |
 | POST | `/platform/tenants/{tenant_id}/owner-invite:resend` | `platform.tenants.provision` ᴿ | 202 | Only while `provisioning`; records `tenant.owner_invite_sent` (email delivery not built yet) |
-| POST | `/platform/tenants/{tenant_id}/suspend` · `/reactivate` | `platform.tenants.suspend` ᴿ | 200 | Reason required; non-billing; a billing suspension is lifted from the subscription (`409 billing_suspension`) |
+| POST | `/platform/tenants/{tenant_id}/suspend` · `/reactivate` | `platform.tenants.suspend` ᴿ | 200 | Reason required; place or lift the security hold, independent of billing (R-18: a billing-suspended school can be held; lifting keeps the billing suspension; `409 already_on_hold`); a billing suspension is lifted from the subscription (`409 billing_suspension`) |
 | POST | `/platform/tenants/{tenant_id}/offboarding` | `platform.tenants.offboard` ᴿ | 202 | Two-person step 1: request (`409 already_requested` on repeat) |
 | POST | `/platform/tenants/{tenant_id}/offboarding:approve` | `platform.tenants.offboard` ᴿ | 200 | Step 2 by a different operator (`409 same_operator`; DB CHECK too); tenant → `offboarding`; creates the offboarding run (deadline + 30 days) |
 | GET | `/platform/tenants/{tenant_id}/offboarding` | `platform.tenants.read` | 200 | Offboarding progress (§5.5.1); `409 not_offboarding` if never approved |
@@ -873,12 +877,12 @@ Conventions from 09 §2 apply (problem+json, `Idempotency-Key` on creating POSTs
 | GET | `/platform/flags` | `platform.flags.read` | 200 | Global rows and overrides |
 | PUT | `/platform/flags/{key}` | `platform.flags.manage` ᴿ | 200 | Global value and rollout % |
 | PUT · DELETE | `/platform/flags/{key}/tenants/{tenant_id}` | `platform.flags.manage` ᴿ | 200 · 204 | Per-school override |
-| GET | `/platform/deployments` · `/platform/deployments/{deployment_id}` | `platform.fleet.read` | 200 | |
+| GET | `/platform/deployments` · `/platform/deployments/{deployment_id}` | `platform.fleet.read` | 200 | List: newest first, cursor-paged (`limit` 1-200, default 50; `cursor`; `next_cursor`), optional `status` and `tenant_id` (audit 2026-10-06 R-14) |
 | PATCH | `/platform/deployments/{deployment_id}` | `platform.fleet.manage` ᴿ | 200 | `target_version`, `custom_domain`, `hostname`, `host_ref` (dedicated only; `If-Match`) |
-| POST | `/platform/deployments/{deployment_id}/heartbeat-key:rotate` | `platform.fleet.manage` ᴿ | 200 | Returns the new key **once** for the runbook |
+| POST | `/platform/deployments/{deployment_id}/heartbeat-key:rotate` | `platform.fleet.manage` ᴿ | 200 | Returns the new key **once** for the runbook; `409 rotation_pending` while an earlier rotation is inside its 7-day overlap (audit 2026-10-06 R-15) |
 | POST | `/platform/deployments/{deployment_id}/decommission` | `platform.fleet.manage` ᴿ | 200 | After an approved offboarding |
 | GET | `/platform/fleet/versions` | `platform.fleet.read` | 200 | Running versions across deployments (version skew) |
-| GET | `/platform/announcements` | any operator | 200 | |
+| GET | `/platform/announcements` | any operator | 200 | Newest first, cursor-paged (`limit` 1-200, default 50; `cursor`; `next_cursor`; audit 2026-10-06 R-14) |
 | POST | `/platform/announcements` | `platform.announcements.manage` | 201 | |
 | PATCH | `/platform/announcements/{announcement_id}` | `platform.announcements.manage` | 200 | |
 | POST | `/platform/announcements/{announcement_id}/cancel` | `platform.announcements.manage` | 200 | |
@@ -886,7 +890,7 @@ Conventions from 09 §2 apply (problem+json, `Idempotency-Key` on creating POSTs
 | POST | `/platform/support/tickets` | `platform.support.manage` | 201 | Operator-created (email/phone/WhatsApp) |
 | POST | `/platform/support/tickets/{ticket_id}/messages` | `platform.support.manage` | 201 | Reply or internal note |
 | PATCH | `/platform/support/tickets/{ticket_id}` | `platform.support.manage` | 200 | Status, priority, assignee, personal-data flag |
-| GET | `/platform/break-glass-requests` | any operator | 200 | Status list, optional `tenant_id` |
+| GET | `/platform/break-glass-requests` | any operator | 200 | Status list, newest first, cursor-paged (`limit` 1-200, default 50; `cursor`; `next_cursor`; audit 2026-10-06 R-14), optional `tenant_id` |
 | POST | `/platform/break-glass-requests` | `platform.breakglass.request` | 201 | Records the request (school approval workflow: M1). `scope` is `{}` (the whole school) or `section_id` and/or `class_id` (UUIDs); any other key is `422` (audit DL-10) |
 | POST | `/platform/break-glass-requests/{request_id}/emergency-confirm` | `platform.breakglass.emergency` ᴿ | 200 | Two different operators (SEC-029) |
 | GET | `/platform/operators` | `platform.operators.manage` (no step-up) | 200 | |
@@ -894,7 +898,7 @@ Conventions from 09 §2 apply (problem+json, `Idempotency-Key` on creating POSTs
 | PUT | `/platform/operators/{operator_id}/roles` | `platform.operators.manage` ᴿ | 200 | Not own roles; keep ≥ 1 owner |
 | POST | `/platform/operators/{operator_id}/deactivate` | `platform.operators.manage` ᴿ | 200 | |
 | GET | `/platform/audit/events` | `platform.audit.read` | 200 | Filters: `actor`, `action`, `tenant_id`, `from`, `to`; CSV via `Accept: text/csv` |
-| POST | `/platform/audit/verify` | `platform.audit.read` | 202 | Runs verification; result in the job |
+| POST | `/platform/audit/verify` | `platform.audit.read` | 202 | Runs verification; result in the job. One per operator every 10 minutes (`platform_audit_verify`, `429 rate_limited`; audit 2026-10-06 R-19) |
 | GET | `/platform/jobs/{job_id}` | any operator | 200 | Visible to the job's creator or holders of `platform.audit.read`; otherwise 404 |
 
 ### 8.2 Fleet (machine to machine)
@@ -913,8 +917,8 @@ Served by `app/platform/tenant_api.py` in the caller's `tenant_session`.
 | GET | `/tenant/billing/invoices` | `tenant.billing.read` | 200 | Own issued invoices, newest first (last 24): number, period, total, amount due, status |
 | GET | `/announcements` | any active member (`session.authenticated`) | 200 | Active announcements for this school, EN and TE (§14) |
 | POST | `/support/tickets` | `support.ticket.create` | 201 | Opens a ticket via `platform.service.open_ticket_from_tenant`; text redacted before storage |
-| GET | `/support/tickets` · `/support/tickets/{ticket_id}` | `support.ticket.create` | 200 | The school's own tickets; internal notes never shown |
-| POST | `/support/tickets/{ticket_id}/messages` | `support.ticket.create` | 200 | Reply on the school's own ticket |
+| GET | `/support/tickets` · `/support/tickets/{ticket_id}` | `support.ticket.create` | 200 | The tickets the caller opened, or every ticket of the school with `support.manage` (owner, principal, office admin); others' tickets answer 404 (audit 2026-10-06 R-17); internal notes never shown |
+| POST | `/support/tickets/{ticket_id}/messages` | `support.ticket.create` | 200 | Reply on a ticket the caller opened, or on any ticket of the school with `support.manage` |
 
 ## 9. Billing lifecycle
 
@@ -944,7 +948,7 @@ stateDiagram-v2
 | Past due | The daily job (`billing.mark_past_due`, 06:00 IST) sets `past_due` when any issued invoice is unpaid after its due date; `past_due_since` = first such day; `grace_ends_on` = `past_due_since` + 15 days |
 | Grace | **15 days**. During grace nothing changes for the school except reminder emails and a banner on its Plan & billing page |
 | Suspension | **Never automatic.** Only a `billing_admin` (or `platform_owner`) with step-up, after `grace_ends_on`, with a reason. The service re-checks every condition |
-| Reactivation | Automatic back to `active` when a past-due school pays; from `suspended`, a billing admin reactivates after payment |
+| Reactivation | Automatic back to `active` when a past-due school pays; from `suspended`, a billing admin reactivates after payment. A school on a security hold stays suspended until an operator lifts the hold (§5.5, R-18) |
 | Trial end | Operators and the school's billing contact are reminded 14 and 3 days before; nothing happens automatically at the end; the dashboard lists expired trials for a decision |
 | Reminders | Billing email at issue, 3 days before due, on the due date, and 7 and 14 days after (EN/TE templates) |
 | Cancellation | Stops future invoices; issued invoices stay payable; offboarding is a separate, explicit flow (§5.5) |
@@ -1027,7 +1031,7 @@ The control plane (`require_fleet_signature()` in `app/platform/fleet.py`) check
 
 Rejections are logged as `fleet.heartbeat.rejected` with a reason code (not audited individually).
 
-Keys are 32 random bytes, one per deployment, generated at provisioning and on rotation, stored **wrapped** (KMS; the local-dev wrapper outside AWS) in `platform.deployments` — not hashed, because the control plane must recompute the HMAC — and on the host in AWS Secrets Manager (read at start-up by `deploy/dedicated/scripts/fetch-secrets.sh` into a 0600 env file). Rotation keeps the old and new keys valid together for 7 days.
+Keys are 32 random bytes, one per deployment, generated at provisioning and on rotation, stored **wrapped** (KMS; the local-dev wrapper outside AWS) in `platform.deployments` — not hashed, because the control plane must recompute the HMAC — and on the host in AWS Secrets Manager (read at start-up by `deploy/dedicated/scripts/fetch-secrets.sh` into a 0600 env file). Rotation keeps the old and new keys valid together for 7 days (`fleet.key_rotation_overlap_days` in `billing.yaml`). A second rotation inside that overlap answers `409 rotation_pending`: it would otherwise promote the pending key and drop the one the host may still sign with (double click or retry; the new key is shown once, so the request cannot be replayed). After the overlap the pending key is promoted first and the rotation proceeds (audit 2026-10-06 R-15).
 
 ### 12.3 Payload (schema version 1)
 
@@ -1149,7 +1153,7 @@ Written with `audit.service.record_platform(...)` in `platform.audit_events`, in
 | Area | Actions |
 |---|---|
 | Operators | `operator.invited`, `operator.activated` (first MFA sign-in), `operator.bootstrapped` (system, bootstrap CLI), `operator.roles_changed`, `operator.deactivated` (`operator.login` and `operator.step_up` are not recorded yet) |
-| Schools | `tenant.provisioned` (+ T), `tenant.provisioning_failed` (step, error code, attempt), `tenant.provisioning_resumed` (from state, attempt), `tenant.owner_invite_created`, `tenant.owner_invite_sent`, `tenant.activated` (+ T), `tenant.suspended` (+ T), `tenant.reactivated` (+ T), `tenant.offboard_requested`, `tenant.offboard_approved` (+ T), `tenant.export_confirmed` (+ T), `tenant.deletion_started` (system), `tenant.data_deleted` (system), `tenant.keys_destroyed` (system), `tenant.teardown_confirmed`, `tenant.deletion_failed` (system; step, error code, attempt), `tenant.deletion_certified` (system), `tenant.deleted` (+ T, system), `tenant.deletion_overdue` (system), `tenant.deletion_certificate_downloaded`, `tenant.audit_chain_deleted` (system). The school chain also gets `tenant.data_purged` and `tenant.keys_destroyed` from the purge itself |
+| Schools | `tenant.provisioned` (+ T), `tenant.provisioning_failed` (step, error code, attempt), `tenant.provisioning_resumed` (from state, attempt), `tenant.owner_invite_created`, `tenant.owner_invite_sent`, `tenant.activated` (+ T), `tenant.suspended` (+ T), `tenant.reactivated` (+ T), `tenant.security_hold_placed` (+ T), `tenant.security_hold_lifted` (+ T), `tenant.offboard_requested`, `tenant.offboard_approved` (+ T), `tenant.export_confirmed` (+ T), `tenant.deletion_started` (system), `tenant.data_deleted` (system), `tenant.keys_destroyed` (system), `tenant.teardown_confirmed`, `tenant.deletion_failed` (system; step, error code, attempt), `tenant.deletion_certified` (system), `tenant.deleted` (+ T, system), `tenant.deletion_overdue` (system), `tenant.deletion_certificate_downloaded`, `tenant.audit_chain_deleted` (system). The school chain also gets `tenant.data_purged` and `tenant.keys_destroyed` from the purge itself |
 | Plans | `plan.created`, `plan.updated`, `plan.published`, `plan.retired` |
 | Subscriptions | `subscription.activated`, `subscription.trial_extended`, `subscription.plan_changed`, `subscription.price_override_set`, `subscription.ai_bundle_set` (bundle code and version), `subscription.ai_bundle_removed`, `subscription.past_due` (system), `subscription.suspended` (summary records `exam_window_override`), `subscription.reactivated`, `subscription.cancelled` |
 | Billing | `billing_account.updated`, `invoice.created` (manual draft), `invoice.generated` (system), `invoice.updated`, `invoice.draft_discarded`, `invoice.issued`, `invoice.voided`, `payment.recorded`, `payment.reversed`, `invoice.paid` (system), `invoice.pdf_rendered` (system; number, template version, size), `invoice.pdf_downloaded` |
@@ -1228,7 +1232,7 @@ In addition to the general suites (12 §4):
 | Q3 | GST registration and SAC code. Below the registration threshold SchoolOS may not charge GST; the correct SAC for SaaS needs confirming; services to schools are generally taxable at 18% but check exemptions. TDS deducted by schools also needs handling. | Confirm with a CA; until registered, issue invoices with GST rate 0 and a note; keep `tds_inr` in payments | Founder + CA |
 | Q4 | Identity for dedicated hosts: per-deployment app client in the shared Cognito user pool, or a separate user pool per host? | Per-deployment app client (callback URLs per host); revisit for schools that require full separation | Engineering |
 | Q5 | Feature flags on dedicated hosts: the host's local `platform.feature_flags` cannot be written by the control plane. | The deploy pipeline writes the deployment's flag set on each release (`updated_by` NULL); M1: consider delivering flags in the heartbeat response | Engineering |
-| Q6 | Opening tickets from the school app needs a tenant permission. | **Settled:** `support.ticket.create` is in the catalog and granted to every staff role (07 §6.2); school routes in §8.3 | Product owner |
+| Q6 | Opening tickets from the school app needs a tenant permission. | **Settled:** `support.ticket.create` is in the catalog and granted to every staff role (07 §6.2); school routes in §8.3. A member reads only the tickets they opened; `support.manage` (owner, principal, office admin) reads every ticket of the school (audit 2026-10-06 R-17, migration 0047; existing schools get the grant from `python -m app.identity.sync_system_roles --apply`) | Product owner |
 | Q7 | Dedicated schools' Plan & billing page and in-app tickets need data from the control plane. | M1: billing summary in the heartbeat response; tickets via email/phone until an authenticated outbound ticket call is designed | Product owner |
 | Q8 | Default trial length and pilot terms. | **Implemented** per plan: `platform.plans.trial_days` (default 30), extendable by billing admin; design partner per signed pilot terms | Founder |
 | Q9 | Should `admin.<domain>` be restricted by IP allowlist in addition to MFA? | Not at Stage 0 (operators travel); WAF rate rules and geo-restriction to India; revisit at Stage 1 | Engineering |

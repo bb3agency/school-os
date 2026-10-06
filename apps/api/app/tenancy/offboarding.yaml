@@ -35,5 +35,6 @@ deferred_constraints:
 retained:
   audit.events: School audit chain (IDs, codes, counts only); deleted after the audit retention.
   audit.chain_heads: Head of the school audit chain; deleted with the chain.
+  audit.chain_verifications: Latest stored chain verification (counts, codes, a hash); deleted with the chain.
 # Destroyed by the crypto-shredding step after the purge is verified.
 keys_table: core.tenant_keys

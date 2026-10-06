@@ -1396,6 +1396,211 @@
         "title": "AuditEventOut",
         "type": "object"
       },
+      "AuditVerificationOut": {
+        "description": "The school's latest stored verification (``GET``/``POST /audit/verify``).",
+        "properties": {
+          "checked": {
+            "title": "Checked",
+            "type": "integer"
+          },
+          "checkpoint_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkpoint At"
+          },
+          "checkpoint_seq": {
+            "title": "Checkpoint Seq",
+            "type": "integer"
+          },
+          "first_bad_seq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Bad Seq"
+          },
+          "last_full_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Full At"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "full",
+                  "incremental"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
+          "ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ok"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "requested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested At"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "daily",
+                  "on_demand"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "verified_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified At"
+          }
+        },
+        "required": [
+          "ok",
+          "checked",
+          "first_bad_seq",
+          "reason",
+          "verified_at",
+          "mode",
+          "source",
+          "checkpoint_seq",
+          "checkpoint_at",
+          "last_full_at",
+          "pending",
+          "requested_at"
+        ],
+        "title": "AuditVerificationOut",
+        "type": "object"
+      },
+      "AuditVerifyOut": {
+        "properties": {
+          "checked": {
+            "title": "Checked",
+            "type": "integer"
+          },
+          "first_bad_seq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Bad Seq"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "job_id",
+          "ok",
+          "checked",
+          "first_bad_seq",
+          "reason"
+        ],
+        "title": "AuditVerifyOut",
+        "type": "object"
+      },
+      "AuditVerifyRequest": {
+        "additionalProperties": false,
+        "description": "``full``: re-hash the whole chain instead of the events after the last checkpoint.",
+        "properties": {
+          "full": {
+            "default": false,
+            "title": "Full",
+            "type": "boolean"
+          }
+        },
+        "title": "AuditVerifyRequest",
+        "type": "object"
+      },
       "BatchCreate": {
         "additionalProperties": false,
         "description": "Start extraction for register-page photos already uploaded as ``register_scan``\ndocuments (JPG or PNG, one page each, malware scan passed).",
@@ -19600,6 +19805,11 @@
             "title": "School Name",
             "type": "string"
           },
+          "security_hold": {
+            "default": false,
+            "title": "Security Hold",
+            "type": "boolean"
+          },
           "subscription": {
             "anyOf": [
               {
@@ -22077,48 +22287,6 @@
         "title": "MemberOut",
         "type": "object"
       },
-      "app__audit__viewer__AuditVerifyOut": {
-        "properties": {
-          "checked": {
-            "title": "Checked",
-            "type": "integer"
-          },
-          "first_bad_seq": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "First Bad Seq"
-          },
-          "ok": {
-            "title": "Ok",
-            "type": "boolean"
-          },
-          "reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reason"
-          }
-        },
-        "required": [
-          "ok",
-          "checked",
-          "first_bad_seq",
-          "reason"
-        ],
-        "title": "AuditVerifyOut",
-        "type": "object"
-      },
       "app__authz__http__Page_TicketOut_": {
         "properties": {
           "data": {
@@ -22324,54 +22492,6 @@
           "settings"
         ],
         "title": "MeOut",
-        "type": "object"
-      },
-      "app__platform__schemas__AuditVerifyOut": {
-        "properties": {
-          "checked": {
-            "title": "Checked",
-            "type": "integer"
-          },
-          "first_bad_seq": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "First Bad Seq"
-          },
-          "job_id": {
-            "format": "uuid",
-            "title": "Job Id",
-            "type": "string"
-          },
-          "ok": {
-            "title": "Ok",
-            "type": "boolean"
-          },
-          "reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reason"
-          }
-        },
-        "required": [
-          "job_id",
-          "ok",
-          "checked",
-          "first_bad_seq",
-          "reason"
-        ],
-        "title": "AuditVerifyOut",
         "type": "object"
       },
       "app__platform__schemas__MeOut": {
@@ -24122,14 +24242,14 @@
     },
     "/api/v1/audit/verify": {
       "get": {
-        "description": "Check that the school's audit chain is unbroken (permission ``audit.read``; US-1001 AC2).",
+        "description": "The latest stored check of the school's audit chain (permission ``audit.read``; US-1001\nAC2). It does not re-hash the chain: the daily job and on-demand runs store their result\n(``verified_at`` is null before the first run; ``pending`` while a run is queued; audit\n2026-10-06 R-19).",
         "operationId": "verify_audit_chain_api_v1_audit_verify_get",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__audit__viewer__AuditVerifyOut"
+                  "$ref": "#/components/schemas/AuditVerificationOut"
                 }
               }
             },
@@ -24161,6 +24281,77 @@
           }
         },
         "summary": "Verify Audit Chain",
+        "tags": [
+          "audit"
+        ]
+      },
+      "post": {
+        "description": "Queue a new check of the school's audit chain (permission ``audit.read``; 202). It\nverifies the events after the last verified checkpoint, or the whole chain with ``full``.\nAt most once per school every 10 minutes: 429 ``rate_limited`` with ``Retry-After``. A\ncheck already queued is not queued twice. Read the result with ``GET /audit/verify``.",
+        "operationId": "request_audit_verification_api_v1_audit_verify_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AuditVerifyRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditVerificationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Request Audit Verification",
         "tags": [
           "audit"
         ]
@@ -26457,7 +26648,7 @@
     },
     "/api/v1/circulars/{document_id}/read": {
       "post": {
-        "description": "Read the circular's current version with AI now, or try again after \"needs manual\nreview\" (``circular.review``). 409 ``document_not_ready``, ``reading_in_progress``,\n``reading_done`` or ``reading_attempts_used``.",
+        "description": "Read the circular's current version with AI now, or try again after \"needs manual\nreview\" (``circular.review``). 409 ``document_not_ready``, ``reading_in_progress``,\n``reading_done`` or ``reading_attempts_used``. 429 ``ai_rate_limited`` over your AI budget\n(the same per-person limit as Ask; SEC-020).",
         "operationId": "request_reading_api_v1_circulars__document_id__read_post",
         "parameters": [
           {
@@ -34296,7 +34487,7 @@
         ]
       },
       "post": {
-        "description": "Start a parent notice in English (and Telugu only while Telugu is shown, ADR-0036;\n``notice.draft``): AI-drafted from a\ncircular (only C1, else 422 ``notice_source_personal``) or from your text (422\n``notice_personal_data`` if it holds phone numbers, emails or Aadhaar-like numbers), or\n``blank``. 202 with ``Location``: an AI notice starts ``drafting`` and is drafted in the\nbackground; ask ``GET /notices/{notice_id}`` until it is ``draft`` or ``draft_failed``\n(``draft_error`` says why: try again with ``POST /notices/{notice_id}/draft`` or write it\nyourself). A ``blank`` notice starts as ``draft``. Only the circular's text is sent to the\nAI, never student records. Accepts ``Idempotency-Key`` (a retry replays the first answer\nand queues nothing).",
+        "description": "Start a parent notice in English (and Telugu only while Telugu is shown, ADR-0036;\n``notice.draft``): AI-drafted from a\ncircular (only C1, else 422 ``notice_source_personal``) or from your text (422\n``notice_personal_data`` if it holds phone numbers, emails or Aadhaar-like numbers), or\n``blank``. 202 with ``Location``: an AI notice starts ``drafting`` and is drafted in the\nbackground; ask ``GET /notices/{notice_id}`` until it is ``draft`` or ``draft_failed``\n(``draft_error`` says why: try again with ``POST /notices/{notice_id}/draft`` or write it\nyourself). A ``blank`` notice starts as ``draft``. Only the circular's text is sent to the\nAI, never student records. Accepts ``Idempotency-Key`` (a retry replays the first answer\nand queues nothing). An AI draft counts against your AI budget, the same per-person limit\nas Ask (429 ``ai_rate_limited``; SEC-020); a blank notice does not.",
         "operationId": "create_notice_api_v1_notices_post",
         "requestBody": {
           "content": {
@@ -34668,7 +34859,7 @@
     },
     "/api/v1/notices/{notice_id}/draft": {
       "post": {
-        "description": "Ask the AI to draft the notice again after it could not (``notice.draft``;\n``If-Match``): ``draft_failed`` becomes ``drafting``; the source is checked again (422 as\nfor ``POST /notices``). 409 ``notice_not_draft_failed`` in any other state.",
+        "description": "Ask the AI to draft the notice again after it could not (``notice.draft``;\n``If-Match``): ``draft_failed`` becomes ``drafting``; the source is checked again (422 as\nfor ``POST /notices``). 409 ``notice_not_draft_failed`` in any other state. 429\n``ai_rate_limited`` over your AI budget (SEC-020).",
         "operationId": "retry_notice_draft_api_v1_notices__notice_id__draft_post",
         "parameters": [
           {
@@ -35287,7 +35478,38 @@
     },
     "/api/v1/platform/announcements": {
       "get": {
+        "description": "Announcements, newest first, cursor-paged (R-14).",
         "operationId": "list_announcements_api_v1_platform_announcements_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -35298,6 +35520,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           },
           "429": {
             "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
@@ -35751,7 +35983,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__platform__schemas__AuditVerifyOut"
+                  "$ref": "#/components/schemas/AuditVerifyOut"
                 }
               }
             },
@@ -35790,6 +36022,7 @@
     },
     "/api/v1/platform/break-glass-requests": {
       "get": {
+        "description": "Break-glass requests, newest first, cursor-paged (R-14).",
         "operationId": "list_breakglass_api_v1_platform_break_glass_requests_get",
         "parameters": [
           {
@@ -35807,6 +36040,34 @@
                 }
               ],
               "title": "Tenant Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
             }
           }
         ],
@@ -36059,6 +36320,7 @@
     },
     "/api/v1/platform/deployments": {
       "get": {
+        "description": "Deployments, newest first, cursor-paged (R-14); ``tenant_id`` for one school's.",
         "operationId": "list_deployments_api_v1_platform_deployments_get",
         "parameters": [
           {
@@ -36075,6 +36337,51 @@
                 }
               ],
               "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tenant_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tenant Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
             }
           }
         ],
@@ -36357,7 +36664,7 @@
     },
     "/api/v1/platform/deployments/{deployment_id}/heartbeat-key:rotate": {
       "post": {
-        "description": "Returns the new key ONCE for the runbook (SSM Parameter Store).",
+        "description": "Returns the new key ONCE for the runbook (SSM Parameter Store). The old key stays valid\nfor the overlap (billing.yaml ``fleet.key_rotation_overlap_days``); 409 ``rotation_pending``\nwhile an earlier rotation is inside it (audit 2026-10-06 R-15).",
         "operationId": "rotate_heartbeat_key_api_v1_platform_deployments__deployment_id__heartbeat_key_rotate_post",
         "parameters": [
           {
@@ -44987,7 +45294,7 @@
     },
     "/api/v1/support/tickets": {
       "get": {
-        "description": "This school's tickets, newest first (permission ``support.ticket.create``).",
+        "description": "This school's tickets, newest first (permission ``support.ticket.create``): the ones\nyou opened, or every ticket of the school with ``support.manage``.",
         "operationId": "list_tickets_api_v1_support_tickets_get",
         "parameters": [
           {
@@ -45142,7 +45449,7 @@
     },
     "/api/v1/support/tickets/{ticket_id}": {
       "get": {
-        "description": "One of this school's tickets with its messages (internal notes are never shown).",
+        "description": "One of this school's tickets with its messages (internal notes are never shown). 404\nfor a ticket someone else opened unless you hold ``support.manage``.",
         "operationId": "get_ticket_api_v1_support_tickets__ticket_id__get",
         "parameters": [
           {
@@ -45210,7 +45517,7 @@
     },
     "/api/v1/support/tickets/{ticket_id}/messages": {
       "post": {
-        "description": "Reply on this school's ticket (permission ``support.ticket.create``). Accepts\n``Idempotency-Key``: a retry with the same key does not post the reply twice.",
+        "description": "Reply on a ticket you opened, or on any ticket of the school with ``support.manage``\n(404 otherwise; permission ``support.ticket.create``). Accepts\n``Idempotency-Key``: a retry with the same key does not post the reply twice.",
         "operationId": "reply_to_ticket_api_v1_support_tickets__ticket_id__messages_post",
         "parameters": [
           {
