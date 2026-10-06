@@ -140,6 +140,7 @@ export function UsersScreen() {
         }
       />
       <DataTable
+        stacked
         caption={t("title")}
         captionHidden
         columns={columns}
@@ -157,6 +158,7 @@ export function UsersScreen() {
       {roles.fetchStatus !== "idle" || roles.data ? (
         <Card title={t("rolesTitle")} description={t("rolesDescription")}>
           <DataTable
+            stacked
             caption={t("rolesTitle")}
             captionHidden
             columns={roleColumns}

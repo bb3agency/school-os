@@ -12,7 +12,8 @@ import { TextAreaField, TextField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SelectField } from "@/components/ui/Select";
-import { Table, TableScroll, TBody, Td, Th, THead, Tr } from "@/components/ui/Table";
+import { NarrowSwitch } from "@/components/ui/NarrowSwitch";
+import { StackedRows, Table, TableScroll, TBody, Td, Th, THead, Tr } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { Link } from "@/i18n/navigation";
 import { newIdempotencyKey, unwrap, useBffClient } from "@/lib/bff/query";
@@ -234,6 +235,20 @@ export function TasksScreen() {
   const list = useTasks(filters, allowed);
   const [edited, setEdited] = useState(false);
   const today = todayIst();
+  const taskCell = (task: Task) => (
+    <>
+      <p className="font-semibold break-words text-ink">{task.title}</p>
+      {task.details ? <p className="text-sm break-words text-ink-muted">{task.details}</p> : null}
+      {task.document_id && task.citation ? (
+        <Link
+          href={`/circulars/${task.document_id}`}
+          className="text-xs text-primary underline underline-offset-4"
+        >
+          {t("fromCircular")}
+        </Link>
+      ) : null}
+    </>
+  );
 
   return (
     <div className="space-y-6">
@@ -300,58 +315,93 @@ export function TasksScreen() {
                 page.data.length === 0 ? (
                   <EmptyState icon="calendar" title={t("emptyTitle")} body={t("emptyBody")} />
                 ) : (
-                  <TableScroll label={t("listTitle")}>
-                    <Table>
-                      <THead>
-                        <Tr>
-                          <Th>{t("columns.task")}</Th>
-                          <Th>{t("columns.due")}</Th>
-                          <Th>{t("columns.owner")}</Th>
-                          <Th>{t("columns.status")}</Th>
-                          <Th>
-                            <span className="sr-only">{t("columns.actions")}</span>
-                          </Th>
-                        </Tr>
-                      </THead>
-                      <TBody>
-                        {page.data.map((task) => (
-                          <Tr key={task.id}>
-                            <Td>
-                              <p className="font-semibold break-words text-ink">{task.title}</p>
-                              {task.details ? (
-                                <p className="text-sm break-words text-ink-muted">{task.details}</p>
-                              ) : null}
-                              {task.document_id && task.citation ? (
-                                <Link
-                                  href={`/circulars/${task.document_id}`}
-                                  className="text-xs text-primary underline underline-offset-4"
-                                >
-                                  {t("fromCircular")}
-                                </Link>
-                              ) : null}
-                            </Td>
-                            <Td>
+                  // Below 640px the tasks are cards (docs/17 §5.7); the table from there.
+                  <NarrowSwitch
+                    narrow={
+                      <StackedRows
+                        caption={t("listTitle")}
+                        captionHidden
+                        rows={page.data}
+                        rowKey={(task) => task.id}
+                        columns={[
+                          { key: "task", header: t("columns.task"), cell: taskCell },
+                          {
+                            key: "due",
+                            header: t("columns.due"),
+                            cell: (task) => (
                               <span className="flex flex-wrap items-center gap-1">
                                 <Value>{formatDate(task.due_on)}</Value>
                                 <DuePill state={dueState(task, today)} />
                               </span>
-                            </Td>
-                            <Td>{task.owner.display_name ?? t("formerStaff")}</Td>
-                            <Td>
-                              <TaskStatusPill status={task.status} />
-                            </Td>
-                            <Td>
+                            ),
+                          },
+                          {
+                            key: "owner",
+                            header: t("columns.owner"),
+                            cell: (task) => task.owner.display_name ?? t("formerStaff"),
+                          },
+                          {
+                            key: "status",
+                            header: t("columns.status"),
+                            cell: (task) => <TaskStatusPill status={task.status} />,
+                          },
+                          {
+                            key: "actions",
+                            header: t("columns.actions"),
+                            stack: "actions",
+                            cell: (task) => (
                               <RowActions
                                 task={task}
                                 manager={manager}
                                 onEdited={() => setEdited(true)}
                               />
-                            </Td>
-                          </Tr>
-                        ))}
-                      </TBody>
-                    </Table>
-                  </TableScroll>
+                            ),
+                          },
+                        ]}
+                      />
+                    }
+                    wide={
+                      <TableScroll label={t("listTitle")}>
+                        <Table>
+                          <THead>
+                            <Tr>
+                              <Th>{t("columns.task")}</Th>
+                              <Th>{t("columns.due")}</Th>
+                              <Th>{t("columns.owner")}</Th>
+                              <Th>{t("columns.status")}</Th>
+                              <Th>
+                                <span className="sr-only">{t("columns.actions")}</span>
+                              </Th>
+                            </Tr>
+                          </THead>
+                          <TBody>
+                            {page.data.map((task) => (
+                              <Tr key={task.id}>
+                                <Td>{taskCell(task)}</Td>
+                                <Td>
+                                  <span className="flex flex-wrap items-center gap-1">
+                                    <Value>{formatDate(task.due_on)}</Value>
+                                    <DuePill state={dueState(task, today)} />
+                                  </span>
+                                </Td>
+                                <Td>{task.owner.display_name ?? t("formerStaff")}</Td>
+                                <Td>
+                                  <TaskStatusPill status={task.status} />
+                                </Td>
+                                <Td>
+                                  <RowActions
+                                    task={task}
+                                    manager={manager}
+                                    onEdited={() => setEdited(true)}
+                                  />
+                                </Td>
+                              </Tr>
+                            ))}
+                          </TBody>
+                        </Table>
+                      </TableScroll>
+                    }
+                  />
                 )
               }
             </LoadGate>

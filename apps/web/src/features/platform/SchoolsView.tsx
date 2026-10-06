@@ -201,6 +201,7 @@ export function SchoolsView({
         </form>
       </Card>
       <DataTable
+        stacked
         caption={t("title")}
         captionHidden
         columns={columns}

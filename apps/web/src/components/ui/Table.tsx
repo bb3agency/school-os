@@ -6,6 +6,7 @@ import { Alert } from "./Alert";
 import { EmptyState } from "./EmptyState";
 import { LoadFade } from "./LoadFade";
 import { LoadingState } from "./LoadingState";
+import { NarrowSwitch } from "./NarrowSwitch";
 
 /**
  * `comfortable` (default): rows about 56px high, like the reference tables.
@@ -155,6 +156,95 @@ export interface Column<T> {
   className?: string;
   /** Counts and amounts: right-aligned, tabular figures (header and cells). */
   numeric?: boolean;
+  /**
+   * Its place in the stacked layout of a `stacked` table below 640px (docs/17 §5.7):
+   * `title` (the row's name, the card's first line; the first column by default), `field`
+   * (header and value as a label/value pair; the default for the others), `actions` (buttons
+   * and links in a row at the end of the card; also any column with an empty header) or
+   * `hidden` (repeats what the card already shows).
+   */
+  stack?: "title" | "field" | "actions" | "hidden";
+}
+
+type StackPlace = NonNullable<Column<unknown>["stack"]>;
+
+/** Where a column goes in the stacked layout (see `Column.stack`). */
+export function stackPlace<T>(column: Column<T>, index: number): StackPlace {
+  if (column.stack) return column.stack;
+  if (index === 0) return "title";
+  const header: unknown = column.header;
+  if (header === "" || header === null || header === undefined || header === false)
+    return "actions";
+  return "field";
+}
+
+export interface StackedRowsProps<T> {
+  caption: string;
+  captionHidden?: boolean;
+  columns: ReadonlyArray<Column<T>>;
+  rows: readonly T[];
+  rowKey: (row: T) => string;
+}
+
+/**
+ * The stacked layout of a table (docs/17 §5.7): one framed card, one list item per row. The
+ * title column is the item's first line, the other columns are label/value pairs (`<dl>`, the
+ * header as the muted label) and the actions sit in a row at the end. A list named by the
+ * caption keeps "list, 12 items" for screen readers, and nothing scrolls sideways.
+ */
+export function StackedRows<T>({
+  caption,
+  captionHidden = false,
+  columns,
+  rows,
+  rowKey,
+}: StackedRowsProps<T>) {
+  const places = columns.map((column, index) => stackPlace(column, index));
+  const titles = columns.filter((_, i) => places[i] === "title");
+  const fields = columns.filter((_, i) => places[i] === "field");
+  const actions = columns.filter((_, i) => places[i] === "actions");
+  return (
+    <div
+      data-stacked-list=""
+      className="min-w-0 rounded-xl border border-border bg-surface shadow-card print:shadow-none"
+    >
+      {captionHidden ? null : (
+        <p className="border-b border-border px-4 py-3 font-semibold text-ink">{caption}</p>
+      )}
+      <ul aria-label={caption} className="divide-y divide-border">
+        {rows.map((row) => (
+          <li key={rowKey(row)} className="relative min-w-0 space-y-2 px-4 py-3.5">
+            {titles.map((column) => (
+              <div key={column.key} className="min-w-0 text-ink">
+                {column.cell(row)}
+              </div>
+            ))}
+            {fields.length > 0 ? (
+              <dl className="grid grid-cols-label-value gap-x-4 gap-y-1.5 text-sm [&_a]:relative [&_a]:z-[1] [&_button]:relative [&_button]:z-[1]">
+                {fields.map((column) => (
+                  <div key={column.key} className="contents">
+                    <dt className="text-ink-muted">{column.header}</dt>
+                    <dd className={cn("text-ink", column.numeric && "tabular-nums")}>
+                      {column.cell(row)}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
+            {actions.length > 0 ? (
+              <div className="relative z-[1] flex flex-wrap items-center gap-2 pt-1 [&_a]:inline-flex [&_a]:items-center pointer-coarse:[&_a]:min-h-11">
+                {actions.map((column) => (
+                  <div key={column.key} className="min-w-0">
+                    {column.cell(row)}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 export interface DataTableProps<T> {
@@ -171,6 +261,11 @@ export interface DataTableProps<T> {
   density?: TableDensity;
   /** Keep the first column in view while the table scrolls sideways below md. */
   stickyFirstColumn?: boolean;
+  /**
+   * Below 640px show the rows as a list of cards (`StackedRows`) instead of a table that
+   * scrolls sideways: the key record lists use it (docs/17 §5.7).
+   */
+  stacked?: boolean;
 }
 
 /**
@@ -188,6 +283,7 @@ export function DataTable<T>({
   captionHidden = false,
   density = "comfortable",
   stickyFirstColumn = false,
+  stacked = false,
 }: DataTableProps<T>) {
   const t = useTranslations("common");
   const te = useTranslations("errors");
@@ -206,7 +302,7 @@ export function DataTable<T>({
   } else if (state.data.length === 0) {
     body = <EmptyState title={emptyTitle} body={emptyBody} action={emptyAction} />;
   } else {
-    body = (
+    const table = (
       <TableScroll label={t("scrollableTable", { caption })} framed>
         <Table density={density} stickyFirstColumn={stickyFirstColumn}>
           <caption
@@ -240,6 +336,22 @@ export function DataTable<T>({
           </TBody>
         </Table>
       </TableScroll>
+    );
+    body = stacked ? (
+      <NarrowSwitch
+        wide={table}
+        narrow={
+          <StackedRows
+            caption={caption}
+            captionHidden={captionHidden}
+            columns={columns}
+            rows={state.data}
+            rowKey={rowKey}
+          />
+        }
+      />
+    ) : (
+      table
     );
   }
 

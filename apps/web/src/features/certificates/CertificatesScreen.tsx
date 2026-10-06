@@ -64,6 +64,7 @@ export function CertificatesScreen({ filters }: { filters: CertificateFilters })
   const columns: Column<Certificate>[] = [
     {
       key: "requested",
+      stack: "field",
       header: t("colRequested"),
       cell: (row) => (
         <span className="font-mono text-xs whitespace-nowrap text-ink-muted">
@@ -73,6 +74,7 @@ export function CertificatesScreen({ filters }: { filters: CertificateFilters })
     },
     {
       key: "certificate",
+      stack: "title",
       header: t("colCertificate"),
       cell: (row) => (
         <span className="flex flex-col gap-0.5">
@@ -107,6 +109,7 @@ export function CertificatesScreen({ filters }: { filters: CertificateFilters })
     },
     {
       key: "open",
+      stack: "actions",
       header: tc("actions"),
       cell: (row) => (
         <Link
@@ -191,6 +194,7 @@ export function CertificatesScreen({ filters }: { filters: CertificateFilters })
         </form>
       </Card>
       <DataTable
+        stacked
         caption={t("title")}
         captionHidden
         columns={columns}

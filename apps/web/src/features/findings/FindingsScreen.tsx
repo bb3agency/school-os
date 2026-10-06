@@ -126,11 +126,13 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
   const columns: Column<Finding>[] = [
     {
       key: "severity",
+      stack: "field",
       header: t("colSeverity"),
       cell: (row) => <SeverityBadge severity={row.severity} />,
     },
     {
       key: "student",
+      stack: "title",
       header: t("colStudent"),
       cell: (row) => (
         <span className="block min-w-36">
@@ -182,6 +184,7 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
     },
     {
       key: "open",
+      stack: "actions",
       header: tc("actions"),
       className: "print:hidden",
       cell: (row) => (
@@ -374,6 +377,7 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
 
       {state.status !== "ready" ? (
         <DataTable
+          stacked
           caption={t("title")}
           captionHidden
           columns={columns}
@@ -391,6 +395,7 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
           >
             {blockers.length > 0 ? (
               <DataTable
+                stacked
                 caption={t("blockersCaption")}
                 captionHidden
                 columns={columns}
@@ -405,6 +410,7 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
           <Card title={t("warningsTitle", { count: others.length })}>
             {others.length > 0 ? (
               <DataTable
+                stacked
                 caption={t("warningsCaption")}
                 captionHidden
                 columns={columns}
