@@ -554,7 +554,7 @@
         "noAccessTitle": "మీరు ఆడిట్ లాగ్‌ను తనిఖీ చేయలేరు",
         "noAccessBody": "ఈ తనిఖీ ఆడిట్ లాగ్ చదవగల సిబ్బందికి, ఉదాహరణకు ప్రిన్సిపాల్‌కు మాత్రమే. ఇది అవసరమైతే మీ పాఠశాల ఆఫీస్ అడ్మిన్‌ను అడగండి.",
         "howTitle": "తనిఖీ ఎలా పనిచేస్తుంది",
-        "howBody": "Every audit event is linked to the one before it by a fingerprint. SchoolOS checks every fingerprint each night. \"Check again\" also checks the events added since the last check; you can ask once every 10 minutes.",
+        "howBody": "ప్రతి ఆడిట్ సంఘటన దాని ముందున్న సంఘటనతో ఒక వేలిముద్ర ద్వారా అనుసంధానించబడి ఉంటుంది. SchoolOS ప్రతి రాత్రి ప్రతి వేలిముద్రను తనిఖీ చేస్తుంది. మళ్లీ తనిఖీ చేయమని అడిగితే, చివరి తనిఖీ తర్వాత జోడించిన సంఘటనలు తనిఖీ అవుతాయి; ప్రతి 10 నిమిషాలకు ఒకసారి అడగవచ్చు.",
         "checkAgain": "మళ్లీ తనిఖీ చేయండి",
         "okTitle": "ఆడిట్ లాగ్ చెక్కుచెదరకుండా ఉంది",
         "okBody": "సంఘటన {last} వరకు ధృవీకరించబడింది: {count, plural, one {# సంఘటన} other {# సంఘటనలు}} తనిఖీ చేశాము, ఏదీ మారలేదు.",
@@ -571,18 +571,18 @@
           "head_missing": "చివరి సంఘటన యొక్క నమోదు లేదు.",
           "head_mismatch": "చివరి సంఘటన లాగ్ యొక్క నమోదైన ముగింపుతో సరిపోలడం లేదు.",
           "other": "సంఘటనలు ఆశించినట్లు అనుసంధానమై లేవు.",
-          "checkpoint_mismatch": "The last verified event was changed after it was checked."
+          "checkpoint_mismatch": "చివరిగా ధృవీకరించిన సంఘటన, తనిఖీ తర్వాత మార్చబడింది."
         },
         "statusLabel": "చివరి తనిఖీ ఫలితం",
         "notRunTitle": "ఇంకా తనిఖీ చేయలేదు",
-        "notRunBody": "The first check runs tonight, or now when you select Check integrity.",
+        "notRunBody": "మొదటి తనిఖీ ఈ రాత్రి జరుగుతుంది. ఇప్పుడే తనిఖీ చేయడానికి పక్కన ఉన్న బటన్‌ను ఎంచుకోండి.",
         "eventsChecked": "తనిఖీ చేసిన ఈవెంట్లు",
-        "queued": "Check queued",
-        "queuedBody": "The check is waiting to run. The result appears here in a few minutes; you can leave this page.",
-        "okIncremental": "Verified up to event {last}: {count, plural, =0 {no new events since the last check} one {# new event was checked} other {# new events were checked}} and none was changed.",
-        "lastVerifiedAt": "Last verified on {time}.",
-        "coolDownTitle": "The log was checked a moment ago",
-        "coolDownBody": "You can ask for another check in {minutes, plural, one {# minute} other {# minutes}}. SchoolOS also checks the whole log every night."
+        "queued": "తనిఖీ వరుసలో ఉంది",
+        "queuedBody": "తనిఖీ నడవడానికి వేచి ఉంది. కొన్ని నిమిషాల్లో ఫలితం ఇక్కడ కనిపిస్తుంది; మీరు ఈ పేజీని వదిలి వెళ్ళవచ్చు.",
+        "okIncremental": "సంఘటన {last} వరకు ధృవీకరించబడింది: {count, plural, =0 {చివరి తనిఖీ తర్వాత కొత్త సంఘటనలు లేవు} one {# కొత్త సంఘటన తనిఖీ చేయబడింది} other {# కొత్త సంఘటనలు తనిఖీ చేయబడ్డాయి}}, ఏదీ మార్చబడలేదు.",
+        "lastVerifiedAt": "చివరిగా {time}న ధృవీకరించబడింది.",
+        "coolDownTitle": "లాగ్ ఇప్పుడే తనిఖీ చేయబడింది",
+        "coolDownBody": "మరో తనిఖీని {minutes, plural, one {# నిమిషం} other {# నిమిషాల}} తర్వాత అడగవచ్చు. SchoolOS ప్రతి రాత్రి మొత్తం లాగ్‌ను కూడా తనిఖీ చేస్తుంది."
       },
       "home": "హోమ్",
       "filterActionPlaceholder": "ఉదాహరణకు student.update",
@@ -610,8 +610,8 @@
       "ticketTitle": "సహాయ టికెట్",
       "description": "SchoolOS సహాయం అడగండి. మేము ఇక్కడ మరియు ఈమెయిల్‌లో జవాబిస్తాము.",
       "listTitle": "మీ పాఠశాల టికెట్లు",
-      "listTitleOwn": "Tickets you opened",
-      "ownOnlyNote": "You see the tickets you opened. The owner, principal and office admin see every ticket of the school.",
+      "listTitleOwn": "మీరు తెరిచిన టికెట్లు",
+      "ownOnlyNote": "మీరు తెరిచిన టికెట్లు మాత్రమే మీకు కనిపిస్తాయి. యజమాని, ప్రధానోపాధ్యాయులు మరియు కార్యాలయ నిర్వాహకులు పాఠశాలలోని ప్రతి టికెట్‌ను చూడగలరు.",
       "colNumber": "టికెట్",
       "colSubject": "విషయం",
       "colStatus": "స్థితి",
@@ -637,7 +637,7 @@
     }
   },
   "platform": {
-    "showMore": "Show more",
+    "showMore": "మరిన్ని చూపించు",
     "badge": "ప్లాట్‌ఫామ్ అడ్మిన్",
     "nav": {
       "label": "ప్లాట్‌ఫామ్",
@@ -767,13 +767,13 @@
       "reactivate": "పాఠశాలను మళ్లీ సక్రియం చేయండి",
       "reactivateTitle": "ఈ పాఠశాలను మళ్లీ సక్రియం చేయాలా?",
       "reactivateBody": "సిబ్బంది వెంటనే మళ్లీ సైన్ ఇన్ చేయగలరు.",
-      "securityHold": "security hold",
-      "placeHold": "Place security hold",
-      "placeHoldTitle": "Place a security hold on this school?",
-      "placeHoldBody": "The school is already suspended for non-payment. A security hold keeps it suspended after the subscription is paid, until you lift the hold.",
-      "liftHold": "Lift security hold",
-      "liftHoldTitle": "Lift the security hold?",
-      "liftHoldBillingBody": "The school stays suspended for non-payment until its subscription is reactivated.",
+      "securityHold": "భద్రతా నిలుపుదల",
+      "placeHold": "భద్రతా నిలుపుదల పెట్టండి",
+      "placeHoldTitle": "ఈ పాఠశాలపై భద్రతా నిలుపుదల పెట్టాలా?",
+      "placeHoldBody": "చెల్లింపు లేనందున ఈ పాఠశాల ఇప్పటికే నిలిపివేయబడింది. చందా చెల్లించిన తర్వాత కూడా, మీరు నిలుపుదల తీసే వరకు భద్రతా నిలుపుదల పాఠశాలను నిలిపివేసి ఉంచుతుంది.",
+      "liftHold": "భద్రతా నిలుపుదల తీసివేయండి",
+      "liftHoldTitle": "భద్రతా నిలుపుదల తీసివేయాలా?",
+      "liftHoldBillingBody": "చందా మళ్లీ సక్రియం అయ్యే వరకు చెల్లింపు లేనందున పాఠశాల నిలిపివేయబడి ఉంటుంది.",
       "offboard": "ఆఫ్‌బోర్డింగ్ అభ్యర్థించండి",
       "offboardTitle": "ఈ పాఠశాలకు ఆఫ్‌బోర్డింగ్ అభ్యర్థించాలా?",
       "offboardBody": "రెండో ఆపరేటర్ ఆమోదించిన తర్వాత, పాఠశాల డేటా ఎగుమతి చేయబడి, 30 రోజుల్లో తొలగించబడి, కీలు నాశనం చేయబడతాయి. దీన్ని వెనక్కి తీసుకోలేము.",
@@ -1840,12 +1840,12 @@
         "body": "కీలు నాశనం చేసిన కొన్ని నిమిషాల తర్వాత ఇది జారీ చేయబడుతుంది. తర్వాత మళ్లీ ప్రయత్నించండి."
       },
       "rotation_pending": {
-        "title": "A key rotation is already in progress",
-        "body": "The new heartbeat key is valid now and the old one keeps working for 7 days. Rotate again after that."
+        "title": "కీ మార్పు ఇప్పటికే జరుగుతోంది",
+        "body": "కొత్త హార్ట్‌బీట్ కీ ఇప్పుడే పనిచేస్తుంది, పాత కీ 7 రోజులు పనిచేస్తూనే ఉంటుంది. ఆ తర్వాత మళ్లీ మార్చండి."
       },
       "already_on_hold": {
-        "title": "This school is already on a security hold",
-        "body": "Reload the page to see its current state."
+        "title": "ఈ పాఠశాలపై ఇప్పటికే భద్రతా నిలుపుదల ఉంది",
+        "body": "ప్రస్తుత స్థితిని చూడటానికి పేజీని మళ్లీ లోడ్ చేయండి."
       },
       "value_out_of_range": {
         "title": "The number or date is too large",
