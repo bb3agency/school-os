@@ -1,0 +1,151 @@
+# API request rate limits (audit 2026-10-05 P2-07; OWASP API4:2023; ASVS 4.0.3 2.2.1, 11.1.4;
+# docs/09 §2.7, docs/07 §11.1). Read by app/core/ratelimit.py; numbers live here, never inline
+# (invariant 13). Versioned configuration shipped inside the package.
+#
+# Algorithm: GCRA (the token-bucket equivalent of the Generic Cell Rate Algorithm), one atomic Lua
+# script per check in Valkey (all buckets of a request are checked and charged together, or none
+# is), Valkey server time. A policy allows `quota` units per `window_s` seconds with a burst of up
+# to `quota`; units refill evenly over the window.
+version: 1
+key_prefix: "sos:rl:v1"
+
+# Weighted cost on the per-person and per-school layers: reads 1 unit, writes 3 units.
+cost:
+  read: 1
+  write: 3
+
+# Paths that are never limited: the public health checks (PUBLIC_PATHS in app/core/health.py; a
+# test keeps the two equal). CORS preflight (OPTIONS) is never limited either.
+exempt_paths:
+  - /healthz
+  - /readyz
+
+# Machine paths (no user session): HMAC-signed fleet heartbeat and the Tally edge agent. Their
+# per-deployment / per-device limits stay where they are (app/platform/billing.yaml
+# fleet.rate_limit_seconds, app/tally/config.yaml rate_limits_seconds); here they get the
+# fail-closed per-IP layer before any signature is checked.
+machine_path_prefixes:
+  - /api/v1/fleet/
+  - /api/v1/edge/
+
+# per:   ip (client IP from the trusted proxy chain), user (the signed-in caller: issuer kind +
+#        subject; on /api/v1/platform/* that is the operator), school (the active school),
+#        operator (same partition as user, named for the control-plane layer).
+# fail:  open = allow while Valkey is unreachable; closed = fall back to a per-process in-memory
+#        limiter with the same budget (sign-in and credential paths).
+# report: false = an aggregate the caller shares with others; its counters are shown in the
+#        RateLimit headers only on the 429 it causes.
+# weighted: true = the cost table above applies; otherwise every request costs 1.
+policies:
+  # Layer 1, before authentication: every request that is not exempt. One office NAT carries a
+  # whole school, so this is generous; it stops floods, not people.
+  ip:
+    {quota: 1200, window_s: 60, per: ip, fail: open, report: false, weighted: false}
+  # Machine paths per IP (signature checks), fail closed.
+  machine_ip:
+    {quota: 120, window_s: 60, per: ip, fail: closed, report: true, weighted: false}
+  # Layer 2: each signed-in person (school staff and SchoolOS support).
+  user:
+    {quota: 600, window_s: 60, per: user, fail: open, report: true, weighted: true}
+  # Layer 3: each school, so one school cannot starve the shared tier.
+  school:
+    {quota: 6000, window_s: 60, per: school, fail: open, report: false, weighted: true}
+  # Layer 2 for /api/v1/platform/*: each operator.
+  operator:
+    {quota: 600, window_s: 60, per: operator, fail: open, report: true, weighted: true}
+  # Layer 4: stricter per-route budgets (cost 1 per request).
+  login_event:
+    {quota: 10, window_s: 60, per: user, fail: closed, report: true, weighted: false}
+  sign_in:
+    {quota: 60, window_s: 300, per: user, fail: closed, report: true, weighted: false}
+  exports:
+    {quota: 30, window_s: 600, per: user, fail: open, report: true, weighted: false}
+  data_export:
+    {quota: 3, window_s: 3600, per: school, fail: open, report: true, weighted: false}
+  imports:
+    {quota: 60, window_s: 600, per: user, fail: open, report: true, weighted: false}
+  uploads:
+    {quota: 120, window_s: 600, per: user, fail: open, report: true, weighted: false}
+  search:
+    {quota: 60, window_s: 60, per: user, fail: open, report: true, weighted: false}
+  invitations:
+    {quota: 30, window_s: 3600, per: user, fail: closed, report: true, weighted: false}
+  render:
+    {quota: 60, window_s: 600, per: user, fail: open, report: true, weighted: false}
+  heavy_jobs:
+    {quota: 10, window_s: 600, per: school, fail: open, report: true, weighted: false}
+  support_tickets:
+    {quota: 10, window_s: 3600, per: user, fail: open, report: true, weighted: false}
+  # Break-glass and operator emergency paths: limited, but generously.
+  emergency:
+    {quota: 30, window_s: 600, per: user, fail: open, report: true, weighted: false}
+  platform_emergency:
+    {quota: 60, window_s: 600, per: operator, fail: open, report: true, weighted: false}
+
+# Route template (method + path, as in openapi.json) -> stricter per-route policies. A test fails
+# when a key is not a route, and when an expensive-looking route (export, import, upload, search,
+# render, invite, support ticket) has none.
+routes:
+  # sign-in (tenantless /me routes the BFF calls after the OIDC callback)
+  POST /api/v1/me/login-event: [login_event]
+  POST /api/v1/me/accept-invitations: [sign_in]
+  POST /api/v1/me/invitations/{membership_id}/accept: [sign_in]
+  POST /api/v1/me/invitations/{membership_id}/decline: [sign_in]
+  POST /api/v1/me/active-tenant: [sign_in]
+  # exports and data export
+  POST /api/v1/exports: [exports]
+  POST /api/v1/exports/student-list: [exports]
+  GET /api/v1/audit/export: [exports]
+  POST /api/v1/documents/{document_id}/sheet/export: [exports]
+  GET /api/v1/imports/{import_id}/sheet/export: [exports]
+  POST /api/v1/admin/tenant-export: [data_export]
+  # imports and sheet uploads
+  POST /api/v1/imports: [imports]
+  PUT /api/v1/imports/{import_id}/mapping: [imports]
+  POST /api/v1/imports/{import_id}/validate: [imports]
+  POST /api/v1/imports/{import_id}/commit: [imports]
+  POST /api/v1/imports/{import_id}/revert: [imports]
+  POST /api/v1/import-templates: [imports]
+  POST /api/v1/documents/{document_id}/sheet/versions: [imports]
+  POST /api/v1/sections/{section_id}/attendance/sheet: [imports]
+  POST /api/v1/sections/{section_id}/exams/{exam_id}/marks/sheet: [imports]
+  # upload presign
+  POST /api/v1/documents/uploads: [uploads]
+  # search
+  POST /api/v1/students/search: [search]
+  POST /api/v1/knowledge/search: [search]
+  POST /api/v1/tally/parties/search: [search]
+  # invitations (create and resend)
+  POST /api/v1/users: [invitations]
+  POST /api/v1/users/{user_id}/invitation-email: [invitations]
+  POST /api/v1/platform/operators: [invitations]
+  POST /api/v1/platform/tenants/{tenant_id}/owner-invite:resend: [invitations]
+  # rendering (Chromium PDF jobs and previews)
+  POST /api/v1/certificates/{certificate_id}/render: [render]
+  POST /api/v1/certificates/{certificate_id}/duplicates: [render]
+  GET /api/v1/certificates/{certificate_id}/print: [render]
+  GET /api/v1/students/{student_id}/certificates/preview: [render]
+  POST /api/v1/notices/{notice_id}/render: [render]
+  # queue-heavy school jobs
+  POST /api/v1/dq/runs: [heavy_jobs]
+  POST /api/v1/academic-years/{year_id}/promotions:preview: [heavy_jobs]
+  POST /api/v1/platform/invoice-runs: [platform_emergency]
+  # support tickets
+  POST /api/v1/support/tickets: [support_tickets]
+  POST /api/v1/platform/support/tickets: [support_tickets]
+  # break-glass (generous)
+  POST /api/v1/breakglass/support-session: [emergency]
+  POST /api/v1/breakglass/grants/{grant_id}/revoke: [emergency]
+
+# Progressive delay after failed authentication (ASVS 2.2.1: soft lockout and exponential backoff,
+# no hard account lockout). Failures are counted per client IP (`ip`: rejected access or service
+# tokens) and per person + IP (`subject_ip`: refused sign-ins, refused operator sign-ins), never
+# per person alone, so nobody can lock a victim out from another address. After `free_failures`
+# the next attempt waits base_delay_s, doubling per failure up to max_delay_s; the count is
+# forgotten `reset_after_s` after the last failure, and a successful sign-in clears the person + IP
+# count. Both fail closed (per-process fallback while Valkey is unreachable).
+auth_failures:
+  ip:
+    {free_failures: 20, base_delay_s: 1, max_delay_s: 300, reset_after_s: 3600}
+  subject_ip:
+    {free_failures: 5, base_delay_s: 1, max_delay_s: 900, reset_after_s: 3600}

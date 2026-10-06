@@ -42,8 +42,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
 from app.audit import service as audit
-from app.authz.kv import KVUnavailable, kv_store
-from app.core import languages, retention
+from app.core import languages, ratelimit, retention
 from app.core import purge as purging
 from app.core.db import tenant_session
 from app.core.errors import (
@@ -251,14 +250,24 @@ class SchoolKnowledgeService:
         if not ctx.has(ASK):
             raise Forbidden()
         limit = self.runtime.llm_config.rate_limit.questions_per_minute_per_user
-        minute = dt.datetime.now(dt.UTC).strftime("%Y%m%d%H%M")
-        key = f"sos:rl:kb:ask:{ctx.tenant_id}:{ctx.user_id}:{minute}"
-        try:
-            count = kv_store().incr(key, ttl_s=120)
-        except KVUnavailable:
-            return  # fail open: the school's budget and the gateway's rate limit still apply
-        if count > limit:
-            raise AiRateLimited("Too many questions. Wait a minute and try again.")
+        # The shared API limiter (GCRA, app/core/ratelimit.py); the number stays in models.yaml.
+        # Fails open: the school's budget and the gateway's rate limit still apply.
+        policy = ratelimit.Policy(
+            name="kb_ask",
+            quota=limit,
+            window_s=60,
+            per="user",
+            fail="open",
+            report=True,
+            weighted=False,
+        )
+        partition = f"{ctx.tenant_id}:{ctx.user_id}"
+        decision = ratelimit.get_rate_limiter().check([ratelimit.Bucket(policy, partition)])
+        if not decision.allowed:
+            raise AiRateLimited(
+                "Too many questions. Wait a minute and try again.",
+                retry_after_s=decision.retry_after_s,
+            )
 
     def ask(self, session: Session, ctx: UserContext, request: AskRequest) -> Iterator[AskEvent]:
         """All events of one question; the query row and audit event are written first."""

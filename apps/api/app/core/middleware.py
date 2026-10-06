@@ -12,6 +12,12 @@
   ``multipart/form-data``, also 1 MiB: no route takes multipart (files go straight to presigned
   S3 URLs), so the header must not let an unauthenticated client make the API buffer more
   (SEC-010). Oversized requests get a 413 problem+json.
+- ``RateLimitMiddleware`` (P2-07, docs/09 §2.7): resolves the client IP from the trusted proxy
+  chain, applies the per-IP layer (``machine_ip`` on the machine paths) and the IP's
+  authentication backoff before the body is read, answers 429 problem+json with ``Retry-After``,
+  and writes the ``RateLimit-Policy`` / ``RateLimit`` headers of every policy the request met
+  (the route guards add theirs: ``app.core.ratelimit.enforce``). Health checks and CORS
+  preflight are exempt.
 
 Pure ASGI (not ``BaseHTTPMiddleware``) so streaming, background tasks and context variables
 behave normally.
@@ -30,6 +36,7 @@ from starlette.requests import Request
 from starlette.routing import Match, Route
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from app.core import ratelimit
 from app.core.config import Settings
 from app.core.errors import problem
 from app.core.ids import new_id
@@ -41,6 +48,7 @@ __all__ = [
     "DEFAULT_MAX_MULTIPART_BYTES",
     "REQUEST_ID_HEADER",
     "BodySizeLimitMiddleware",
+    "RateLimitMiddleware",
     "RequestContextMiddleware",
     "SecurityHeadersMiddleware",
     "install_middleware",
@@ -289,6 +297,74 @@ class BodySizeLimitMiddleware:
             await self._reject(scope, receive, send, limit)
 
 
+class RateLimitMiddleware:
+    """Layer 1 (per client IP) and the RateLimit response headers (docs/09 §2.7)."""
+
+    def __init__(self, app: ASGIApp, *, settings: Settings) -> None:
+        self.app = app
+        self.trusted = settings.trusted_proxy_networks
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        limiter = ratelimit.get_rate_limiter()
+        config = limiter.config
+        ip, internal = ratelimit.client_ip(scope, self.trusted)
+        scope.setdefault("state", {})[ratelimit.CLIENT_IP_STATE] = ip
+        path = str(scope.get("path", ""))
+        method = str(scope.get("method", "")).upper()
+        send_with_headers = self._with_headers(scope, send)
+        exempt = method == "OPTIONS" or path in config.exempt_paths
+        if limiter.enabled and not exempt:
+            hashed = limiter.ip_hash(ip)
+            policy = config.policy("machine_ip" if config.is_machine_path(path) else "ip")
+            buckets = [] if internal else [ratelimit.Bucket(policy, hashed)]
+            decision = limiter.check(buckets, [limiter.block_key("ip", hashed)])
+            ratelimit.remember(scope, decision)
+            if not decision.allowed:
+                get_logger(_LOGGER_NAME).warning(
+                    "security.rate_limited",
+                    policy=decision.denied.name if decision.denied else "auth_backoff",
+                    route=f"{method} unmatched",
+                    ip_hash=hashed,
+                    retry_after_s=decision.retry_after_s,
+                )
+                await self._reject(scope, receive, send_with_headers, decision)
+                return
+        await self.app(scope, receive, send_with_headers)
+
+    @staticmethod
+    def _with_headers(scope: Scope, send: Send) -> Send:
+        async def send_with_headers(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                states = scope.get("state", {}).get(ratelimit.RATE_LIMIT_STATE) or []
+                values = ratelimit.header_values(states)
+                if values is not None:
+                    headers = MutableHeaders(scope=message)
+                    headers["RateLimit-Policy"] = values[0]
+                    headers["RateLimit"] = values[1]
+            await send(message)
+
+        return send_with_headers
+
+    @staticmethod
+    async def _reject(
+        scope: Scope, receive: Receive, send: Send, decision: ratelimit.Decision
+    ) -> None:
+        seconds = max(1, decision.retry_after_s)
+        response = problem(
+            Request(scope),
+            status=429,
+            code="rate_limited",
+            title="Too many requests",
+            detail=f"Too many requests. Wait {seconds} seconds and try again.",
+            extra={"retry_after": seconds},
+            headers={"Retry-After": str(seconds)},
+        )
+        await response(scope, receive, send)
+
+
 def install_middleware(
     app: FastAPI,
     settings: Settings,
@@ -297,7 +373,8 @@ def install_middleware(
     max_multipart_bytes: int = DEFAULT_MAX_MULTIPART_BYTES,
     quiet_paths: Iterable[str] = ("/healthz", "/readyz"),
 ) -> None:
-    """Add the middleware in the right order (outermost last): headers > context > body limit."""
+    """Add the middleware in the right order (outermost last): headers > context > rate limit >
+    body limit."""
     docs_paths: set[str] = set()
     if not settings.is_production_like:
         for path in (app.docs_url, app.redoc_url, app.swagger_ui_oauth2_redirect_url):
@@ -308,5 +385,6 @@ def install_middleware(
         max_body_bytes=max_body_bytes,
         max_multipart_bytes=max_multipart_bytes,
     )
+    app.add_middleware(RateLimitMiddleware, settings=settings)
     app.add_middleware(RequestContextMiddleware, quiet_paths=quiet_paths)
     app.add_middleware(SecurityHeadersMiddleware, csp_exempt_paths=docs_paths)
