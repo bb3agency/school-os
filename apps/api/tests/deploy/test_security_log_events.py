@@ -67,6 +67,13 @@ def test_SEC_007_audit_chain_alarms_match_the_worker_log_lines(lines: io.StringI
             "refresh_token_reuse_detected",
             ROOT / "apps" / "web" / "src" / "server" / "auth" / "refresh.ts",
         ),
+        ("security.rate_limited", API / "app" / "core" / "ratelimit.py"),
+        ("security.rate_limited", API / "app" / "core" / "middleware.py"),
+        ("security.auth.failed", API / "app" / "core" / "ratelimit.py"),
+        ("security.rate_limit.unavailable", API / "app" / "core" / "ratelimit.py"),
+        ("signin_failed", ROOT / "apps" / "web" / "src" / "server" / "auth" / "handlers.ts"),
+        ("step_up_failed", ROOT / "apps" / "web" / "src" / "server" / "auth" / "handlers.ts"),
+        ("auth_rate_limited", ROOT / "apps" / "web" / "src" / "server" / "auth" / "handlers.ts"),
     ],
 )
 def test_docs07_s15_every_filtered_event_is_written_by_its_service(
@@ -84,6 +91,13 @@ def test_docs07_s15_every_filter_event_is_pinned_here() -> None:
         "platform.operator.denied",
         "http.request",
         "refresh_token_reuse_detected",
+        # P2-07: rate limits and failed sign-ins (API and BFF).
+        "security.rate_limited",
+        "security.auth.failed",
+        "security.rate_limit.unavailable",
+        "signin_failed",
+        "step_up_failed",
+        "auth_rate_limited",
     }
     assert _filter_events() == pinned
 

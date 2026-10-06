@@ -521,6 +521,8 @@ module "web" {
     APP_BASE_URL            = "https://${var.app_domain}"
     PLATFORM_BASE_URL       = "https://${var.admin_domain}"
     API_INTERNAL_URL        = "http://api:8000"
+    # One proxy (the ALB) appends the client address to X-Forwarded-For (P2-07 rate limits).
+    TRUSTED_PROXY_HOPS = "1"
     OIDC_ISSUER             = module.cognito.tenant_issuer
     OIDC_CLIENT_ID          = module.cognito.tenant_client_id
     PLATFORM_OIDC_ISSUER    = module.cognito.platform_issuer
@@ -589,7 +591,8 @@ module "api" {
     client_alias_port = 8000
   }
 
-  environment             = merge(local.app_env, local.email_env, { SOS_SERVICE_NAME = "api" })
+  # X-Forwarded-For is trusted only from the VPC (the ALB and the web/BFF tasks; P2-07).
+  environment             = merge(local.app_env, local.email_env, { SOS_SERVICE_NAME = "api", SOS_TRUSTED_PROXIES = module.network.vpc_cidr_block })
   secrets                 = merge(local.app_base_secrets, local.provider_secrets)
   secret_arns             = concat(local.app_base_secret_arns, local.provider_secret_arns)
   secrets_kms_key_arns    = [local.kms_data]

@@ -249,18 +249,90 @@ resource "aws_wafv2_web_acl" "this" {
     allow {}
   }
 
+  custom_response_body {
+    key          = "rate_limited"
+    content_type = "APPLICATION_JSON"
+    content      = jsonencode({ type = "https://docs.schoolos.example/errors/rate_limited", title = "Too many requests", status = 429, code = "rate_limited", detail = "Too many requests from this network. Wait a few minutes and try again." })
+  }
+
+  # Machine paths (fleet heartbeat, Tally edge agent; P2-07): a tight per-IP budget in front of the
+  # HMAC checks. The app adds its own fail-closed per-IP layer and per-device limits.
   rule {
-    name     = "rate-limit-auth"
-    priority = 1
+    name     = "rate-limit-machine"
+    priority = 3
 
     action {
-      block {}
+      block {
+        custom_response {
+          response_code            = 429
+          custom_response_body_key = "rate_limited"
+          response_header {
+            name  = "Retry-After"
+            value = tostring(var.waf_rate_window_sec)
+          }
+        }
+      }
     }
 
     statement {
       rate_based_statement {
-        limit              = var.waf_auth_rate_limit_per_5min
-        aggregate_key_type = "IP"
+        limit                 = var.waf_machine_rate_limit_per_5min
+        aggregate_key_type    = "IP"
+        evaluation_window_sec = var.waf_rate_window_sec
+
+        scope_down_statement {
+          or_statement {
+            dynamic "statement" {
+              for_each = var.waf_machine_path_prefixes
+              content {
+                byte_match_statement {
+                  search_string         = statement.value
+                  positional_constraint = "STARTS_WITH"
+                  field_to_match {
+                    uri_path {}
+                  }
+                  text_transformation {
+                    priority = 0
+                    type     = "LOWERCASE"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${var.name}-rate-limit-machine"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  rule {
+    name     = "rate-limit-auth"
+    priority = 1
+
+    # 429 problem+json with Retry-After (RFC 6585, RFC 9110), like the app's own limits (P2-07).
+    action {
+      block {
+        custom_response {
+          response_code            = 429
+          custom_response_body_key = "rate_limited"
+          response_header {
+            name  = "Retry-After"
+            value = tostring(var.waf_rate_window_sec)
+          }
+        }
+      }
+    }
+
+    statement {
+      rate_based_statement {
+        limit                 = var.waf_auth_rate_limit_per_5min
+        aggregate_key_type    = "IP"
+        evaluation_window_sec = var.waf_rate_window_sec
 
         scope_down_statement {
           byte_match_statement {
@@ -289,14 +361,25 @@ resource "aws_wafv2_web_acl" "this" {
     name     = "rate-limit-ip"
     priority = 2
 
+    # 429 problem+json with Retry-After (RFC 6585, RFC 9110), like the app's own limits (P2-07).
     action {
-      block {}
+      block {
+        custom_response {
+          response_code            = 429
+          custom_response_body_key = "rate_limited"
+          response_header {
+            name  = "Retry-After"
+            value = tostring(var.waf_rate_window_sec)
+          }
+        }
+      }
     }
 
     statement {
       rate_based_statement {
-        limit              = var.waf_rate_limit_per_5min
-        aggregate_key_type = "IP"
+        limit                 = var.waf_rate_limit_per_5min
+        aggregate_key_type    = "IP"
+        evaluation_window_sec = var.waf_rate_window_sec
       }
     }
 

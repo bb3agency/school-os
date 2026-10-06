@@ -57,6 +57,36 @@ locals {
       pattern   = "{ $.event = \"platform.operator.denied\" }"
       metric    = "OperatorDenied"
     }
+    # Rate limits (audit 2026-10-05 P2-07, app/core/ratelimit.py): a 429 from any API layer.
+    api_rate_limited = {
+      log_group = var.api_log_group_name
+      pattern   = "{ $.event = \"security.rate_limited\" }"
+      metric    = "ApiRateLimited"
+    }
+    # Rejected tokens and refused sign-ins counted by the API backoff (ASVS 2.2.1).
+    api_auth_failed = {
+      log_group = var.api_log_group_name
+      pattern   = "{ $.event = \"security.auth.failed\" }"
+      metric    = "ApiAuthFailed"
+    }
+    # The limiter could not reach Valkey: open policies are not enforced (logged at most every 10 s).
+    rate_limiter_unavailable = {
+      log_group = var.api_log_group_name
+      pattern   = "{ $.event = \"security.rate_limit.unavailable\" }"
+      metric    = "RateLimiterUnavailable"
+    }
+    # Refused sign-in and step-up callbacks in the BFF (apps/web/src/server/auth/handlers.ts).
+    sign_in_failed = {
+      log_group = var.web_log_group_name
+      pattern   = "{ ($.event = \"signin_failed\") || ($.event = \"step_up_failed\") }"
+      metric    = "SignInFailures"
+    }
+    # The BFF refused a sign-in start or callback for its per-IP limit or backoff.
+    bff_auth_rate_limited = {
+      log_group = var.web_log_group_name
+      pattern   = "{ $.event = \"auth_rate_limited\" }"
+      metric    = "BffAuthRateLimited"
+    }
   }
 
   # key => alarm name suffix, description, period, threshold.
@@ -84,6 +114,36 @@ locals {
       description = "SECURITY: fleet heartbeats rejected (signature, replay or schema; SEC-028)."
       period      = 900
       threshold   = var.heartbeat_rejections_per_15min
+    }
+    api_rate_limited = {
+      name        = "api-rate-limited"
+      description = "SECURITY: many API requests refused by rate limits (flood, scraping or a runaway client; P2-07)."
+      period      = 300
+      threshold   = var.rate_limited_per_5min
+    }
+    api_auth_failed = {
+      name        = "api-auth-failed"
+      description = "SECURITY: many rejected tokens or refused sign-ins at the API (credential stuffing or token guessing; ASVS 2.2.1)."
+      period      = 300
+      threshold   = var.auth_failures_per_5min
+    }
+    rate_limiter_unavailable = {
+      name        = "rate-limiter-unavailable"
+      description = "SECURITY: the API rate limiter cannot reach Valkey; normal traffic is not limited (sign-in paths fall back to per-task limits)."
+      period      = 300
+      threshold   = 1
+    }
+    sign_in_failed = {
+      name        = "sign-in-failures"
+      description = "SECURITY: a spike of refused sign-in or step-up callbacks in the BFF (P2-07)."
+      period      = 300
+      threshold   = var.sign_in_failures_per_5min
+    }
+    bff_auth_rate_limited = {
+      name        = "bff-auth-rate-limited"
+      description = "SECURITY: the BFF is refusing sign-ins for its per-IP limit or backoff (P2-07)."
+      period      = 300
+      threshold   = var.rate_limited_per_5min
     }
     operator_denied = {
       name        = "operator-denied"

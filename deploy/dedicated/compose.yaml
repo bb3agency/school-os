@@ -80,6 +80,9 @@ x-app-env: &app-env
   SOS_HEARTBEAT_KEY: ${SOS_HEARTBEAT_KEY:?}
   SOS_HOST_STATE_DIR: /run/schoolos-state
   SOS_LOG_LEVEL: ${SOS_LOG_LEVEL:-INFO}
+  # Rate limits (P2-07): X-Forwarded-For is trusted only from the internal container network
+  # (Caddy -> web -> api); the api is not published.
+  SOS_TRUSTED_PROXIES: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
 
 services:
   caddy:
@@ -125,6 +128,8 @@ services:
       APP_BASE_URL: https://${SOS_PUBLIC_HOST:?}
       SOS_CUSTOM_DOMAIN: ${SOS_CUSTOM_DOMAIN:-}
       API_INTERNAL_URL: http://api:8000
+      # Caddy appends the client address to X-Forwarded-For (P2-07 sign-in rate limits).
+      TRUSTED_PROXY_HOPS: "1"
       SESSION_SECRET: ${SESSION_SECRET:?}
       SOS_SERVICE_TOKEN_KEY: ${SOS_SERVICE_TOKEN_KEY:?}
       OIDC_ISSUER: ${SOS_OIDC_ISSUER:?}

@@ -105,6 +105,34 @@ variable "waf_auth_path_prefix" {
   default     = "/bff/auth/"
 }
 
+variable "waf_machine_rate_limit_per_5min" {
+  description = "Per-IP limit for the machine paths (fleet heartbeat, Tally edge agent) in one evaluation window (P2-07)."
+  type        = number
+  default     = 300
+}
+
+variable "waf_machine_path_prefixes" {
+  description = "URI prefixes of the machine paths that get the machine rate limit (at least two: WAF or_statement)."
+  type        = list(string)
+  default     = ["/api/v1/fleet/", "/api/v1/edge/"]
+
+  validation {
+    condition     = length(var.waf_machine_path_prefixes) >= 2
+    error_message = "List at least two prefixes (the scope-down is an OR statement)."
+  }
+}
+
+variable "waf_rate_window_sec" {
+  description = "Evaluation window of the rate-based rules in seconds (WAF allows 60, 120, 300 or 600); also the Retry-After of their 429."
+  type        = number
+  default     = 300
+
+  validation {
+    condition     = contains([60, 120, 300, 600], var.waf_rate_window_sec)
+    error_message = "waf_rate_window_sec must be 60, 120, 300 or 600."
+  }
+}
+
 variable "waf_log_retention_days" {
   description = "WAF log retention."
   type        = number

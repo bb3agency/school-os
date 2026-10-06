@@ -264,6 +264,8 @@ def synthetic_value(name: str) -> str:
         "SOS_BILLING_SUPPLIER_ADDRESS": "Synthetic Plot 1; Synthetic Road; Vijayawada 520001",
         # Terraform `anthropic_zdr_confirmed` (bool, default false), rendered with tostring().
         "SOS_ANTHROPIC_ZDR_CONFIRMED": "false",
+        # module.network.vpc_cidr_block (P2-07: the ALB and BFF are the trusted proxies).
+        "SOS_TRUSTED_PROXIES": "10.20.0.0/16",
     }
     if name in values:
         return values[name]

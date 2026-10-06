@@ -320,12 +320,12 @@ class Settings(BaseSettings):
     # the shared tier (the VPC CIDR), Caddy and web on a dedicated host (its container network).
     # Unset: X-Forwarded-For is ignored and the TCP peer is the client.
     rate_limit_enabled: bool = True
-    trusted_proxies: str = ""
+    trusted_proxies: str | None = None
 
     @field_validator("trusted_proxies")
     @classmethod
-    def _valid_proxies(cls, value: str) -> str:
-        for item in (v.strip() for v in value.split(",")):
+    def _valid_proxies(cls, value: str | None) -> str | None:
+        for item in (v.strip() for v in (value or "").split(",")):
             if not item:
                 continue
             try:
@@ -340,7 +340,7 @@ class Settings(BaseSettings):
     def trusted_proxy_networks(self) -> tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...]:
         return tuple(
             ipaddress.ip_network(v.strip(), strict=False)
-            for v in self.trusted_proxies.split(",")
+            for v in (self.trusted_proxies or "").split(",")
             if v.strip()
         )
 

@@ -135,6 +135,24 @@ variable "api_auth_failures_per_5min" {
   default     = 50
 }
 
+variable "rate_limited_per_5min" {
+  description = "Requests refused by API or BFF rate limits in 5 minutes that alarm (P2-07)."
+  type        = number
+  default     = 200
+}
+
+variable "auth_failures_per_5min" {
+  description = "Rejected tokens or refused sign-ins counted by the API backoff in 5 minutes that alarm (ASVS 2.2.1)."
+  type        = number
+  default     = 30
+}
+
+variable "sign_in_failures_per_5min" {
+  description = "Refused sign-in or step-up callbacks in the BFF in 5 minutes that alarm (P2-07)."
+  type        = number
+  default     = 30
+}
+
 variable "heartbeat_rejections_per_15min" {
   description = "Rejected fleet heartbeats (bad signature, replay, schema) in 15 minutes that alarm."
   type        = number

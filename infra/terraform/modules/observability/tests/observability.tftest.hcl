@@ -64,6 +64,26 @@ run "security_events_alarm" {
     error_message = "Missing a security-event alarm (docs/07 §15)."
   }
 
+  # P2-07: rate-limit trips, failed sign-ins and a limiter outage alarm.
+  assert {
+    condition = length(setsubtract(toset([
+      "sos-test-api-rate-limited", "sos-test-api-auth-failed", "sos-test-rate-limiter-unavailable",
+      "sos-test-sign-in-failures", "sos-test-bff-auth-rate-limited",
+    ]), toset(output.alarm_names))) == 0
+    error_message = "Missing a rate-limit or failed sign-in alarm (P2-07)."
+  }
+
+  assert {
+    condition = (
+      aws_cloudwatch_log_metric_filter.security["sign_in_failed"].log_group_name == var.web_log_group_name
+      && aws_cloudwatch_log_metric_filter.security["bff_auth_rate_limited"].log_group_name == var.web_log_group_name
+      && aws_cloudwatch_log_metric_filter.security["api_rate_limited"].log_group_name == var.api_log_group_name
+      && aws_cloudwatch_log_metric_filter.security["api_auth_failed"].pattern == "{ $.event = \"security.auth.failed\" }"
+      && aws_cloudwatch_metric_alarm.security["rate_limiter_unavailable"].threshold == 1
+    )
+    error_message = "Rate-limit and sign-in filters read the service that writes each event (P2-07)."
+  }
+
   assert {
     condition = (
       aws_cloudwatch_log_metric_filter.security["refresh_token_reuse"].log_group_name == var.web_log_group_name
