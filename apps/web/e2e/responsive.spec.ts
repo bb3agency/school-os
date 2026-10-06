@@ -4,6 +4,7 @@ import {
   expectFocusRing,
   expectNoAxeViolations,
   pressOn,
+  settleAnimations,
 } from "./support/a11y-helpers";
 import { installFixtures } from "./support/layout-fixtures";
 import {
@@ -471,6 +472,8 @@ for (const [width, height] of KEY_VIEWPORTS) {
       await page.getByRole("button", { name: "New plan", exact: true }).click();
       const dialog = page.locator("dialog[open]");
       await expect(dialog).toBeVisible();
+      // Measure the settled dialog, not a frame of its 200ms entrance (scale 0.97 to 1).
+      await settleAnimations(page);
       if (width < 640) {
         await expectBottomSheet(dialog, width, height);
       } else {

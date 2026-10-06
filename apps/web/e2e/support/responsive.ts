@@ -257,8 +257,12 @@ export function detectLayout({ vw }: { vw: number }): LayoutReport {
         reportedVp.add(el);
       }
     }
-    let card: Element | null = el.parentElement;
-    while (card && !isCard(card)) card = card.parentElement;
+    // A modal dialog sits in the top layer, not in the card that holds its trigger: its own
+    // box is measured against the screen and its content against the dialog (or cards inside
+    // it), never against a card outside it (docs/17 §5.7: phone dialogs are full-width sheets).
+    let card: Element | null = el.tagName === "DIALOG" ? null : el.parentElement;
+    while (card && !isCard(card) && card.tagName !== "DIALOG") card = card.parentElement;
+    if (card?.tagName === "DIALOG" && !isCard(card)) card = null;
     // A framed scroll region (TableScroll) is its own card: what it scrolls may be wider.
     if (card && !/(auto|scroll)/.test(getComputedStyle(card).overflowX)) {
       const cr = card.getBoundingClientRect();
