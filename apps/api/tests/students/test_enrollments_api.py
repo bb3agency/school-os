@@ -292,3 +292,46 @@ def test_FR_STU_008_unlink_guardian(world: Any, api: Any, admin_engine: Engine) 
     assert ("guardian.deleted", shared) not in actions
     assert ("guardian.unlinked", own) in actions
     assert ("guardian.deleted", own) in actions
+
+
+def test_R_10_scoped_editor_cannot_change_an_enrolment_outside_scope(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """R-10 (API1, SEC-015): a 9A editor reaches a student now in 9A, but not that student's
+    closed 9C enrolment: correcting its roll number or ending it is checked against the
+    enrolment's own section, not only the student's current one."""
+    admin = world.person("office_admin")
+    sid = _student(world, "section_9c")
+    old = _only_enrolment(api, world, sid)
+    res = api.call(
+        admin,
+        "POST",
+        f"{BASE}/{sid}/enrollments/{old['id']}/end",
+        json={"status": "completed"},
+        headers=_if_match(old["version"]),
+    )
+    assert res.status_code == 200, res.text
+    old_version = res.json()["version"]
+    res = api.call(
+        admin,
+        "POST",
+        f"{BASE}/{sid}/enrollments",
+        json={"section_id": str(world.a.ids["section_9a"])},
+    )
+    assert res.status_code == 201, res.text
+    current = res.json()
+    editor = _scoped_editor(world, admin_engine)
+    old_path = f"{BASE}/{sid}/enrollments/{old['id']}"
+    res = api.call(
+        editor, "PATCH", old_path, json={"roll_no": "99"}, headers=_if_match(old_version)
+    )
+    assert res.status_code == 404, res.text
+    # Within scope the editor still corrects the current enrolment.
+    res = api.call(
+        editor,
+        "PATCH",
+        f"{BASE}/{sid}/enrollments/{current['id']}",
+        json={"roll_no": "12"},
+        headers=_if_match(current["version"]),
+    )
+    assert res.status_code == 200, res.text
