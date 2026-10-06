@@ -425,7 +425,7 @@ function AssistantMessage({ turn, handlers }: { turn: TurnModel; handlers: TurnH
                 key={question}
                 type="button"
                 onClick={() => handlers.onFollowUp(question)}
-                className="inline-flex min-h-9 max-w-full items-center gap-2 rounded-full border border-border-soft bg-surface px-3.5 py-1.5 text-start text-sm text-ink hover:border-primary hover:bg-primary-soft hover:text-primary motion-safe:hover:transition-colors"
+                className="inline-flex min-h-9 max-w-full items-center gap-2 rounded-full border border-border-soft bg-surface px-3.5 py-1.5 pointer-coarse:min-h-11 text-start text-sm text-ink hover:border-primary hover:bg-primary-soft hover:text-primary motion-safe:hover:transition-colors"
               >
                 <Icon name="cornerDownRight" className="size-4 shrink-0 text-ink-subtle" />
                 <span className="break-anywhere">{question}</span>

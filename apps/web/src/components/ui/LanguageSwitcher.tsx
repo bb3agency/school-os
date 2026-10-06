@@ -95,7 +95,7 @@ function LanguageButtons({
                 aria-pressed={active}
                 onClick={() => choose(target)}
                 className={cn(
-                  "inline-flex min-h-8 items-center rounded-full px-3 text-sm font-semibold",
+                  "inline-flex min-h-8 items-center rounded-full px-3 text-sm font-semibold pointer-coarse:min-h-11",
                   tone === "dark"
                     ? active
                       ? "bg-platform-ink text-platform"

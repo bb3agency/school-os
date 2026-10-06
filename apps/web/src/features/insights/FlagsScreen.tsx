@@ -141,7 +141,8 @@ function RulesCard({ settings, canManage }: { settings: Settings; canManage: boo
                           min: rule.min,
                           max: rule.max,
                         })}
-                        className="min-h-10 w-20 rounded-md border border-border-control bg-surface px-2 font-mono text-ink"
+                        inputMode="numeric"
+                        className="min-h-10 w-20 rounded-md border border-border-control bg-surface px-2 font-mono text-base text-ink pointer-coarse:min-h-11"
                       />
                     ) : (
                       <span className="font-mono">{rule.threshold}</span>

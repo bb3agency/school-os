@@ -39,7 +39,7 @@ export function ActionButton({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "inline-flex size-8 shrink-0 items-center justify-center rounded-md text-ink-muted",
+        "inline-flex size-8 shrink-0 items-center justify-center rounded-md text-ink-muted pointer-coarse:size-11",
         "hover:bg-surface-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-60",
         "motion-safe:hover:transition-colors",
         pressed && "bg-primary-soft text-primary hover:bg-primary-soft hover:text-primary",

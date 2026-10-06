@@ -360,7 +360,7 @@ export function ChatScreen({ conversationId }: { conversationId: string | null }
     memory.data && memoryOn(memory.data) ? (
       <Link
         href="/ask/memory"
-        className="group/mem relative inline-flex min-h-8 items-center gap-1.5 rounded-full border border-border px-2.5 text-xs font-semibold text-violet-ink hover:bg-violet-soft"
+        className="group/mem relative inline-flex min-h-8 pointer-coarse:min-h-11 items-center gap-1.5 rounded-full border border-border px-2.5 text-xs font-semibold text-violet-ink hover:bg-violet-soft"
         aria-describedby="ask-memory-tip"
       >
         <Icon name="memory" className="size-4" />
@@ -463,7 +463,7 @@ export function ChatScreen({ conversationId }: { conversationId: string | null }
                   <button
                     type="button"
                     onClick={() => setShown((count) => count + INITIAL_TURNS)}
-                    className="inline-flex min-h-9 items-center gap-2 rounded-full border border-border-soft px-4 text-sm font-semibold text-ink hover:bg-surface-muted"
+                    className="inline-flex min-h-9 items-center gap-2 rounded-full border border-border-soft px-4 text-sm font-semibold text-ink hover:bg-surface-muted pointer-coarse:min-h-11"
                   >
                     <Icon name="arrowUp" className="size-4" />
                     {t("chat.showEarlier")}
@@ -500,7 +500,7 @@ export function ChatScreen({ conversationId }: { conversationId: string | null }
               <button
                 type="button"
                 onClick={stick.jump}
-                className="chat-pop pointer-events-auto relative inline-flex min-h-9 items-center gap-2 rounded-full border border-border-soft bg-surface px-4 text-sm font-semibold text-ink shadow-popover hover:bg-surface-muted"
+                className="chat-pop pointer-events-auto relative inline-flex min-h-9 pointer-coarse:min-h-11 items-center gap-2 rounded-full border border-border-soft bg-surface px-4 text-sm font-semibold text-ink shadow-popover hover:bg-surface-muted"
               >
                 <Icon name="arrowDown" className="size-4" />
                 {stick.unread ? t("chat.jumpToLatestUnread") : t("chat.jumpToLatest")}
