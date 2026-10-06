@@ -83,6 +83,22 @@ describe("StackedRows: the card layout of a table", () => {
     expect(screen.queryByRole("table")).toBeNull();
   });
 
+  it("a wide field puts its label above a value that spans the card", () => {
+    const columns: Column<Row>[] = [
+      COLUMNS[0]!,
+      { key: "note", header: "Reason", stack: "wide", cell: (row) => `Long note ${row.id}` },
+    ];
+    renderWithIntl(
+      <StackedRows caption="Payments" columns={columns} rows={ROWS} rowKey={(r) => r.id} />,
+    );
+    const first = screen.getAllByRole("listitem")[0]!;
+    const term = within(first).getByText("Reason");
+    expect(term.tagName).toBe("DT");
+    expect(term).toHaveClass("col-span-2");
+    expect(term.nextElementSibling).toHaveTextContent("Long note a");
+    expect(term.nextElementSibling).toHaveClass("col-span-2");
+  });
+
   it("shows the caption unless it is hidden (the list keeps it as its name)", () => {
     renderWithIntl(
       <StackedRows caption="Students" columns={COLUMNS} rows={ROWS} rowKey={(r) => r.id} />,

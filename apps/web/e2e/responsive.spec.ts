@@ -294,7 +294,8 @@ const INVOICE_PAGE = "/platform/invoices/0192f3a4-0000-7000-8000-0000000c2002";
 test.describe("invoice payments: 'Reverse payment' dialog (FR-PLT-018, NFR-A11Y-001)", () => {
   test.skip(!standIn, "set E2E_STAND_IN=1 (needs Valkey at REDIS_URL)");
 
-  for (const [width, height] of REQUIRED_VIEWPORTS) {
+  // 390×844: the phone where the reversed payment's reason once made a ~460px tall row.
+  for (const [width, height] of [...REQUIRED_VIEWPORTS, [390, 844] as const]) {
     test(`at ${width}×${height}: the page and the dialog fit, keyboard only, no axe violations`, async ({
       page,
     }) => {
@@ -309,6 +310,18 @@ test.describe("invoice payments: 'Reverse payment' dialog (FR-PLT-018, NFR-A11Y-
       await expect(trigger).toHaveCount(1);
       await expect(page.getByText("Reversed", { exact: true })).toBeVisible();
       expect(problems(await measure(page))).toEqual([]);
+      if (width < 640) {
+        // docs/17 §5.7: each payment is a card and the reversal's reason spans the card
+        // (in the narrow status column of the table it was a tall strip of short lines).
+        const list = page.locator("[data-stacked-list]");
+        await expect(list).toHaveCount(1);
+        const card = await list.boundingBox();
+        const reason = await list.getByText(/^Reason: /).boundingBox();
+        expect(card).not.toBeNull();
+        expect(reason).not.toBeNull();
+        // The card's width less its 16px padding on each side (and a little rounding).
+        expect(reason!.width).toBeGreaterThanOrEqual(card!.width - 2 * 16 - 4);
+      }
       await expectNoAxeViolations(page, `invoice page ${width}`);
 
       // Keyboard only: focus the trigger, Enter opens the dialog with focus inside it.

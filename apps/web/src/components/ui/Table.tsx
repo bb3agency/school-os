@@ -174,10 +174,12 @@ export interface Column<T> {
    * Its place in the stacked layout of a `stacked` table below 640px (docs/17 §5.7):
    * `title` (the row's name, the card's first line; the first column by default), `field`
    * (header and value as a label/value pair; the default for the others), `actions` (buttons
-   * and links in a row at the end of the card; also any column with an empty header) or
-   * `hidden` (repeats what the card already shows).
+   * and links in a row at the end of the card; also any column with an empty header), `wide`
+   * (a label/value pair whose value needs the card's full width, such as a long reason: the
+   * label on its own line, the value under it) or `hidden` (repeats what the card already
+   * shows).
    */
-  stack?: "title" | "field" | "actions" | "hidden";
+  stack?: "title" | "field" | "wide" | "actions" | "hidden";
 }
 
 type StackPlace = NonNullable<Column<unknown>["stack"]>;
@@ -215,7 +217,7 @@ export function StackedRows<T>({
 }: StackedRowsProps<T>) {
   const places = columns.map((column, index) => stackPlace(column, index));
   const titles = columns.filter((_, i) => places[i] === "title");
-  const fields = columns.filter((_, i) => places[i] === "field");
+  const fields = columns.filter((_, i) => places[i] === "field" || places[i] === "wide");
   const actions = columns.filter((_, i) => places[i] === "actions");
   return (
     <div
@@ -243,8 +245,16 @@ export function StackedRows<T>({
               <dl className="grid grid-cols-label-value gap-x-4 gap-y-1.5 text-sm [&_a]:relative [&_a]:z-[1] [&_button]:relative [&_button]:z-[1]">
                 {fields.map((column) => (
                   <div key={column.key} className="contents">
-                    <dt className="text-ink-muted">{column.header}</dt>
-                    <dd className={cn("text-ink", column.numeric && "tabular-nums")}>
+                    <dt className={cn("text-ink-muted", column.stack === "wide" && "col-span-2")}>
+                      {column.header}
+                    </dt>
+                    <dd
+                      className={cn(
+                        "text-ink",
+                        column.numeric && "tabular-nums",
+                        column.stack === "wide" && "col-span-2",
+                      )}
+                    >
                       {column.cell(row)}
                     </dd>
                   </div>
