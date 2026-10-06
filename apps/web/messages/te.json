@@ -1833,6 +1833,14 @@
       "certificate_pending": {
         "title": "ధృవీకరణ పత్రం ఇంకా సిద్ధంగా లేదు",
         "body": "కీలు నాశనం చేసిన కొన్ని నిమిషాల తర్వాత ఇది జారీ చేయబడుతుంది. తర్వాత మళ్లీ ప్రయత్నించండి."
+      },
+      "rotation_pending": {
+        "title": "A key rotation is already in progress",
+        "body": "The new heartbeat key is valid now and the old one keeps working for 7 days. Rotate again after that."
+      },
+      "already_on_hold": {
+        "title": "This school is already on a security hold",
+        "body": "Reload the page to see its current state."
       }
     },
     "stepUp": {

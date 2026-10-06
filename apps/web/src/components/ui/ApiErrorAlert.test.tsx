@@ -26,3 +26,16 @@ describe("ApiErrorAlert on 429", () => {
     expect(screen.getByText("Wait a minute, then try again.")).toBeTruthy();
   });
 });
+
+/** Owner decisions on the 2026-10-06 route audit: each refusal says what to do next. */
+describe("ApiErrorAlert for the 2026-10-06 decisions", () => {
+  it.each([
+    ["rotation_pending", 409, "A key rotation is already in progress"],
+    ["already_on_hold", 409, "This school is already on a security hold"],
+  ])("%s has its own plain-language message", (code, status, title) => {
+    const error = new ApiError(status, code, { status, code, request_id: "req_synth" } as never);
+    expect(describeApiError(error)).toMatchObject({ key: code, status });
+    renderWithIntl(<ApiErrorAlert error={error} />);
+    expect(screen.getByText(title)).toBeTruthy();
+  });
+});

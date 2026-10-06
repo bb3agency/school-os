@@ -879,7 +879,7 @@ Conventions from 09 §2 apply (problem+json, `Idempotency-Key` on creating POSTs
 | PUT · DELETE | `/platform/flags/{key}/tenants/{tenant_id}` | `platform.flags.manage` ᴿ | 200 · 204 | Per-school override |
 | GET | `/platform/deployments` · `/platform/deployments/{deployment_id}` | `platform.fleet.read` | 200 | |
 | PATCH | `/platform/deployments/{deployment_id}` | `platform.fleet.manage` ᴿ | 200 | `target_version`, `custom_domain`, `hostname`, `host_ref` (dedicated only; `If-Match`) |
-| POST | `/platform/deployments/{deployment_id}/heartbeat-key:rotate` | `platform.fleet.manage` ᴿ | 200 | Returns the new key **once** for the runbook |
+| POST | `/platform/deployments/{deployment_id}/heartbeat-key:rotate` | `platform.fleet.manage` ᴿ | 200 | Returns the new key **once** for the runbook; `409 rotation_pending` while an earlier rotation is inside its 7-day overlap (audit 2026-10-06 R-15) |
 | POST | `/platform/deployments/{deployment_id}/decommission` | `platform.fleet.manage` ᴿ | 200 | After an approved offboarding |
 | GET | `/platform/fleet/versions` | `platform.fleet.read` | 200 | Running versions across deployments (version skew) |
 | GET | `/platform/announcements` | any operator | 200 | |
@@ -1031,7 +1031,7 @@ The control plane (`require_fleet_signature()` in `app/platform/fleet.py`) check
 
 Rejections are logged as `fleet.heartbeat.rejected` with a reason code (not audited individually).
 
-Keys are 32 random bytes, one per deployment, generated at provisioning and on rotation, stored **wrapped** (KMS; the local-dev wrapper outside AWS) in `platform.deployments` — not hashed, because the control plane must recompute the HMAC — and on the host in AWS Secrets Manager (read at start-up by `deploy/dedicated/scripts/fetch-secrets.sh` into a 0600 env file). Rotation keeps the old and new keys valid together for 7 days.
+Keys are 32 random bytes, one per deployment, generated at provisioning and on rotation, stored **wrapped** (KMS; the local-dev wrapper outside AWS) in `platform.deployments` — not hashed, because the control plane must recompute the HMAC — and on the host in AWS Secrets Manager (read at start-up by `deploy/dedicated/scripts/fetch-secrets.sh` into a 0600 env file). Rotation keeps the old and new keys valid together for 7 days (`fleet.key_rotation_overlap_days` in `billing.yaml`). A second rotation inside that overlap answers `409 rotation_pending`: it would otherwise promote the pending key and drop the one the host may still sign with (double click or retry; the new key is shown once, so the request cannot be replayed). After the overlap the pending key is promoted first and the rotation proceeds (audit 2026-10-06 R-15).
 
 ### 12.3 Payload (schema version 1)
 

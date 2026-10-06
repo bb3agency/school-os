@@ -57,6 +57,8 @@ export const KNOWN_API_CODES = [
   "not_dedicated",
   "not_offboarding",
   "certificate_pending",
+  "rotation_pending",
+  "already_on_hold",
 ] as const;
 export type KnownApiCode = (typeof KNOWN_API_CODES)[number];
 

@@ -998,7 +998,9 @@ def update_deployment(
 def rotate_heartbeat_key(
     *, deployment_id: uuid.UUID, ctx: Annotated[Ctx, FleetManage], wrapper: Wrapper
 ) -> HeartbeatKeyOut:
-    """Returns the new key ONCE for the runbook (SSM Parameter Store)."""
+    """Returns the new key ONCE for the runbook (SSM Parameter Store). The old key stays valid
+    for the overlap (billing.yaml ``fleet.key_rotation_overlap_days``); 409 ``rotation_pending``
+    while an earlier rotation is inside it (audit 2026-10-06 R-15)."""
     return fleet.rotate_key(_actor(ctx), deployment_id, wrapper=wrapper)
 
 

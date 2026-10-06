@@ -3514,7 +3514,9 @@ export interface paths {
         put?: never;
         /**
          * Rotate Heartbeat Key
-         * @description Returns the new key ONCE for the runbook (SSM Parameter Store).
+         * @description Returns the new key ONCE for the runbook (SSM Parameter Store). The old key stays valid
+         *     for the overlap (billing.yaml ``fleet.key_rotation_overlap_days``); 409 ``rotation_pending``
+         *     while an earlier rotation is inside it (audit 2026-10-06 R-15).
          */
         post: operations["rotate_heartbeat_key_api_v1_platform_deployments__deployment_id__heartbeat_key_rotate_post"];
         delete?: never;
