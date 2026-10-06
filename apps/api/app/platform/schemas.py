@@ -31,6 +31,11 @@ def _nfc(value: Any) -> Any:
 
 
 _NO_CONTROL = r"^[^\x00-\x1f\x7f]+$"
+# Free text: no control characters except tab and line breaks; may be empty (min_length
+# decides). A NUL made PostgreSQL refuse the insert (500); others reached operators and the
+# banners of every school (audit 2026-10-06 R-12).
+_NO_CONTROL_LINES = r"^[^\x00-\x08\x0b\x0c\x0e-\x1f\x7f]*$"
+_NO_CONTROL_LINE = r"^[^\x00-\x1f\x7f]*$"
 
 Text200 = Annotated[
     str, BeforeValidator(_nfc), StringConstraints(min_length=1, max_length=200, pattern=_NO_CONTROL)
@@ -399,7 +404,14 @@ class InvoiceCreate(In):
 
 class InvoicePatch(In):
     lines: list[InvoiceLineIn] | None = Field(default=None, min_length=1, max_length=50)
-    notes: Annotated[str, BeforeValidator(_nfc), StringConstraints(max_length=1000)] | None = None
+    notes: (
+        Annotated[
+            str,
+            BeforeValidator(_nfc),
+            StringConstraints(max_length=1000, pattern=_NO_CONTROL_LINES),
+        ]
+        | None
+    ) = None
 
 
 class InvoiceOut(Out):
@@ -452,7 +464,12 @@ class PaymentIn(In):
     tds_inr: Money = Decimal("0")
     received_on: dt.date
     reference: Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9/_.-]{1,64}$")]
-    notes: Annotated[str, BeforeValidator(_nfc), StringConstraints(max_length=500)] | None = None
+    notes: (
+        Annotated[
+            str, BeforeValidator(_nfc), StringConstraints(max_length=500, pattern=_NO_CONTROL_LINES)
+        ]
+        | None
+    ) = None
 
 
 class PaymentOut(Out):
@@ -711,9 +728,12 @@ class UsageDailyOut(Out):
 class FlagIn(In):
     enabled: bool
     rollout_percent: int | None = Field(default=None, ge=0, le=100)
-    description: Annotated[str, BeforeValidator(_nfc), StringConstraints(max_length=300)] | None = (
-        None
-    )
+    description: (
+        Annotated[
+            str, BeforeValidator(_nfc), StringConstraints(max_length=300, pattern=_NO_CONTROL_LINE)
+        ]
+        | None
+    ) = None
 
 
 class FlagOverrideIn(In):
@@ -885,10 +905,22 @@ class AnnouncementIn(In):
     empty, the English text is stored in their place (a new announcement) or the stored text is
     kept (an update). While Telugu is shown they are required (422)."""
 
-    title_en: Annotated[str, BeforeValidator(_nfc), StringConstraints(min_length=1, max_length=120)]
-    title_te: Annotated[str, BeforeValidator(_nfc), StringConstraints(max_length=120)] = ""
-    body_en: Annotated[str, BeforeValidator(_nfc), StringConstraints(min_length=1, max_length=1000)]
-    body_te: Annotated[str, BeforeValidator(_nfc), StringConstraints(max_length=1000)] = ""
+    title_en: Annotated[
+        str,
+        BeforeValidator(_nfc),
+        StringConstraints(min_length=1, max_length=120, pattern=_NO_CONTROL_LINE),
+    ]
+    title_te: Annotated[
+        str, BeforeValidator(_nfc), StringConstraints(max_length=120, pattern=_NO_CONTROL_LINE)
+    ] = ""
+    body_en: Annotated[
+        str,
+        BeforeValidator(_nfc),
+        StringConstraints(min_length=1, max_length=1000, pattern=_NO_CONTROL_LINES),
+    ]
+    body_te: Annotated[
+        str, BeforeValidator(_nfc), StringConstraints(max_length=1000, pattern=_NO_CONTROL_LINES)
+    ] = ""
     severity: Literal["info", "maintenance", "warning", "critical"] = "info"
     audience: Literal["all", "tier", "tenants"] = "all"
     audience_tier: Tier | None = None
@@ -932,7 +964,9 @@ TicketCategory = Literal[
 TicketPriority = Literal["p1", "p2", "p3", "p4"]
 TicketStatus = Literal["open", "in_progress", "waiting_on_school", "resolved", "closed"]
 MessageBody = Annotated[
-    str, BeforeValidator(_nfc), StringConstraints(min_length=1, max_length=4000)
+    str,
+    BeforeValidator(_nfc),
+    StringConstraints(min_length=1, max_length=4000, pattern=_NO_CONTROL_LINES),
 ]
 
 

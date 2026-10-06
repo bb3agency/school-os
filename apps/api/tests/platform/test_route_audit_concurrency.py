@@ -17,7 +17,7 @@ from collections.abc import Callable
 from typing import Any
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import Engine, text
 
 from app.core.db import platform_session
 
@@ -205,4 +205,40 @@ def test_FR_PLT_027_a_retried_operator_reply_is_not_posted_twice(
     assert _message_count(tkt) == before + 1
     plain = api.call("POST", path, agent, json={"body": "Second note"}, idem=None)
     assert plain.status_code == 201, plain.text
+    assert _message_count(tkt) == before + 2
+
+
+def test_FR_PLT_027_a_retried_school_reply_is_not_posted_twice(
+    api: Api, owner: Operator, make_plan: Callable[..., uuid.UUID], admin_engine: Engine
+) -> None:
+    body = provision_payload(make_plan())
+    tid = api.call("POST", "/tenants", owner, json=body).json()["tenant_id"]
+    api.call("POST", f"/tenants/{tid}/activate", owner)
+    with admin_engine.begin() as c:
+        c.execute(
+            text("UPDATE core.memberships SET status = 'active' WHERE tenant_id = :t"), {"t": tid}
+        )
+    subject = body["owner"]["idp_subject"]
+
+    def post(path: str, payload: dict[str, Any], key: str | None) -> Any:
+        headers = api.headers(None, tenant_subject=subject)
+        if key is not None:
+            headers["Idempotency-Key"] = key
+        return api.client.post(path, headers=headers, json=payload)
+
+    ticket = post(
+        "/api/v1/support/tickets",
+        {"category": "other", "subject": "Synthetic", "body": "Hello"},
+        "school-ticket-0001",
+    )
+    assert ticket.status_code == 201, ticket.text
+    tkt = ticket.json()["id"]
+    before = _message_count(tkt)
+    path = f"/api/v1/support/tickets/{tkt}/messages"
+    one = post(path, {"body": "Any news?"}, "school-reply-0001")
+    two = post(path, {"body": "Any news?"}, "school-reply-0001")
+    assert one.status_code == two.status_code == 200, two.text
+    assert two.headers.get("Idempotent-Replayed") == "true"
+    assert _message_count(tkt) == before + 1
+    assert post(path, {"body": "Another"}, None).status_code == 200
     assert _message_count(tkt) == before + 2

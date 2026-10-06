@@ -202,16 +202,25 @@ def get_ticket(ctx: TicketUser, ticket_id: uuid.UUID) -> TicketOut:
 
 @router.post("/support/tickets/{ticket_id}/messages", response_model=TicketOut)
 def reply_to_ticket(
-    ctx: TicketUser, db: TenantDB, ticket_id: uuid.UUID, body: SchoolTicketMessageIn
-) -> TicketOut:
-    """Reply on this school's ticket (permission ``support.ticket.create``)."""
-    ticket = service.reply_from_tenant(ctx.tenant_id, ctx.user_id, ticket_id, body)
-    audit.record(
-        db,
-        action="support.ticket_updated",
-        resource_type="support_ticket",
-        resource_id=ticket_id,
-        summary={"message": "school_reply"},
-        request_id=ctx.request_id,
-    )
-    return ticket
+    ctx: TicketUser,
+    db: TenantDB,
+    ticket_id: uuid.UUID,
+    body: SchoolTicketMessageIn,
+    idem: IdempotencyDep,
+) -> Response:
+    """Reply on this school's ticket (permission ``support.ticket.create``). Accepts
+    ``Idempotency-Key``: a retry with the same key does not post the reply twice."""
+
+    def operation() -> TicketOut:
+        ticket = service.reply_from_tenant(ctx.tenant_id, ctx.user_id, ticket_id, body)
+        audit.record(
+            db,
+            action="support.ticket_updated",
+            resource_type="support_ticket",
+            resource_id=ticket_id,
+            summary={"message": "school_reply"},
+            request_id=ctx.request_id,
+        )
+        return ticket
+
+    return idem.run(db, body, operation, status_code=200)
