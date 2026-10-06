@@ -389,14 +389,6 @@
     --color-focus: #ffffff;
   }
 
-  /* Touch screens (docs/17 §5.7): a checkbox or radio with its text in one label is tapped on
-     the label, which is at least 44px high there (desktops keep their density). */
-  @media (pointer: coarse) {
-    label:has(> input:is([type="checkbox"], [type="radio"])) {
-      min-height: 2.75rem;
-    }
-  }
-
   dialog::backdrop {
     background-color: rgb(15 23 42 / 0.55);
   }
@@ -929,6 +921,15 @@
   .dialog-footer {
     padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
     border-radius: 0;
+  }
+}
+
+/* Touch screens (docs/17 §5.7): a checkbox or radio with its text in one label is tapped on
+   the label, which is at least 44px high there (desktops keep their density). Unlayered, so
+   it wins over the labels' own `min-h-*` utilities. */
+@media (pointer: coarse) {
+  label:has(> input:is([type="checkbox"], [type="radio"])) {
+    min-height: 2.75rem;
   }
 }
 
