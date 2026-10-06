@@ -160,8 +160,16 @@ def _idempotent(
     resource_type: str,
     location: Callable[[uuid.UUID], str],
     status_code: int = 201,
+    required: bool = True,
 ) -> Any:
-    """Run ``run`` once per (operator, Idempotency-Key); replays return the same resource."""
+    """Run ``run`` once per (operator, Idempotency-Key); replays return the same resource.
+    ``required=False`` accepts a request without a key (routes whose callers do not send one
+    yet); a key, when sent, is honoured the same way."""
+    if key is None and not required:
+        rid, result = run()
+        response.status_code = status_code
+        response.headers["Location"] = location(rid)
+        return result
     if key is None:
         raise BadRequest(
             "Send an Idempotency-Key header with this request.", code="idempotency_key_required"
@@ -599,9 +607,12 @@ def list_subscriptions(
 def get_subscription(
     *,
     sub_id: uuid.UUID,
+    response: Response,
     ctx: Annotated[Ctx, Depends(require_platform("platform.subscriptions.read"))],
 ) -> SubscriptionOut:
-    return billing.get_subscription(sub_id)
+    out = billing.get_subscription(sub_id)
+    _etag(response, out.version)
+    return out
 
 
 @router.post("/subscriptions/{sub_id}/activate", response_model=SubscriptionOut)
@@ -632,33 +643,76 @@ def cancel_subscription(
     return billing.cancel_subscription(_actor(ctx), sub_id, data.reason)
 
 
+def _sub_etag(response: Response, out: SubscriptionOut) -> SubscriptionOut:
+    _etag(response, out.version)
+    return out
+
+
 @router.put("/subscriptions/{sub_id}/price-override", response_model=SubscriptionOut)
 def set_price_override(
-    *, sub_id: uuid.UUID, data: PriceOverrideIn, ctx: Annotated[Ctx, SubManage]
+    *,
+    sub_id: uuid.UUID,
+    data: PriceOverrideIn,
+    response: Response,
+    ctx: Annotated[Ctx, SubManage],
+    if_match: IfMatch = None,
 ) -> SubscriptionOut:
-    return billing.set_price_override(_actor(ctx), sub_id, data.price_override_inr, data.reason)
+    """Set a negotiated price. ``If-Match`` (the subscription's ETag) is optional; when sent it
+    is checked (412 when stale), here and on the other price-override and AI-bundle routes."""
+    out = billing.set_price_override(
+        _actor(ctx),
+        sub_id,
+        data.price_override_inr,
+        data.reason,
+        expected_version=_version(if_match),
+    )
+    return _sub_etag(response, out)
 
 
 @router.delete("/subscriptions/{sub_id}/price-override", response_model=SubscriptionOut)
-def clear_price_override(*, sub_id: uuid.UUID, ctx: Annotated[Ctx, SubManage]) -> SubscriptionOut:
-    return billing.set_price_override(_actor(ctx), sub_id, None, None)
+def clear_price_override(
+    *,
+    sub_id: uuid.UUID,
+    response: Response,
+    ctx: Annotated[Ctx, SubManage],
+    if_match: IfMatch = None,
+) -> SubscriptionOut:
+    out = billing.set_price_override(
+        _actor(ctx), sub_id, None, None, expected_version=_version(if_match)
+    )
+    return _sub_etag(response, out)
 
 
 @router.put("/subscriptions/{sub_id}/ai-bundle", response_model=SubscriptionOut)
 def set_ai_bundle(
-    *, sub_id: uuid.UUID, data: AiBundleIn, ctx: Annotated[Ctx, SubManage]
+    *,
+    sub_id: uuid.UUID,
+    data: AiBundleIn,
+    response: Response,
+    ctx: Annotated[Ctx, SubManage],
+    if_match: IfMatch = None,
 ) -> SubscriptionOut:
     """Choose or change the AI answer bundle (monthly plans only; ``409
     ai_bundle_needs_monthly_plan``). It counts from the first full calendar month after today
     (a trial's from the month after activation); answers above the quota are billed on the next
-    invoice at the bundle's price per extra answer."""
-    return billing.set_ai_bundle(_actor(ctx), sub_id, data.ai_bundle_id)
+    invoice at the bundle's price per extra answer. Optional ``If-Match`` (412 when stale)."""
+    out = billing.set_ai_bundle(
+        _actor(ctx), sub_id, data.ai_bundle_id, expected_version=_version(if_match)
+    )
+    return _sub_etag(response, out)
 
 
 @router.delete("/subscriptions/{sub_id}/ai-bundle", response_model=SubscriptionOut)
-def remove_ai_bundle(*, sub_id: uuid.UUID, ctx: Annotated[Ctx, SubManage]) -> SubscriptionOut:
+def remove_ai_bundle(
+    *,
+    sub_id: uuid.UUID,
+    response: Response,
+    ctx: Annotated[Ctx, SubManage],
+    if_match: IfMatch = None,
+) -> SubscriptionOut:
     """Remove the AI answer bundle: no bundle line and no overage from the next invoice."""
-    return billing.set_ai_bundle(_actor(ctx), sub_id, None)
+    out = billing.set_ai_bundle(_actor(ctx), sub_id, None, expected_version=_version(if_match))
+    return _sub_etag(response, out)
 
 
 @router.post("/subscriptions/{sub_id}/suspend", response_model=SubscriptionOut)
@@ -864,15 +918,37 @@ def list_flags(
 
 
 @router.put("/flags/{key}", response_model=FlagOut)
-def put_flag(*, key: FlagKey, data: FlagIn, ctx: Annotated[Ctx, FlagManage]) -> FlagOut:
-    return flags.set_global(_actor(ctx), key, data)
+def put_flag(
+    *,
+    key: FlagKey,
+    data: FlagIn,
+    response: Response,
+    ctx: Annotated[Ctx, FlagManage],
+    if_match: IfMatch = None,
+) -> FlagOut:
+    """Create or replace the global flag. ``If-Match`` (the flag's ETag) is optional; when sent
+    it is checked (412 when stale or when the flag does not exist yet)."""
+    out = flags.set_global(_actor(ctx), key, data, expected_version=_version(if_match))
+    _etag(response, out.version)
+    return out
 
 
 @router.put("/flags/{key}/tenants/{tenant_id}", response_model=FlagOut)
 def put_flag_override(
-    *, key: FlagKey, tenant_id: uuid.UUID, data: FlagOverrideIn, ctx: Annotated[Ctx, FlagManage]
+    *,
+    key: FlagKey,
+    tenant_id: uuid.UUID,
+    data: FlagOverrideIn,
+    response: Response,
+    ctx: Annotated[Ctx, FlagManage],
+    if_match: IfMatch = None,
 ) -> FlagOut:
-    return flags.set_override(_actor(ctx), key, tenant_id, data.enabled)
+    """Set one school's override. ``If-Match`` is optional, as for the global flag."""
+    out = flags.set_override(
+        _actor(ctx), key, tenant_id, data.enabled, expected_version=_version(if_match)
+    )
+    _etag(response, out.version)
+    return out
 
 
 @router.delete("/flags/{key}/tenants/{tenant_id}", status_code=204)
@@ -1075,10 +1151,36 @@ def open_ticket(
 
 @router.post("/support/tickets/{ticket_id}/messages", response_model=TicketOut, status_code=201)
 def add_ticket_message(
-    *, ticket_id: uuid.UUID, data: TicketMessageIn, ctx: Annotated[Ctx, SupManage]
-) -> TicketOut:
-    return support.add_operator_message(
-        _actor(ctx), ticket_id, data.body, internal_note=data.internal_note
+    *,
+    request: Request,
+    response: Response,
+    ticket_id: uuid.UUID,
+    data: TicketMessageIn,
+    ctx: Annotated[Ctx, SupManage],
+    store: Store,
+    idempotency_key: IdemKey = None,
+) -> Any:
+    """Reply on a ticket. An ``Idempotency-Key`` is optional; a retry with the same key does not
+    post the message twice."""
+
+    def run() -> tuple[uuid.UUID, BaseModel]:
+        out = support.add_operator_message(
+            _actor(ctx), ticket_id, data.body, internal_note=data.internal_note
+        )
+        return out.id, out
+
+    return _idempotent(
+        ctx=ctx,
+        request=request,
+        response=response,
+        store=store,
+        key=idempotency_key,
+        body=data,
+        run=run,
+        replay=support.get_ticket,
+        resource_type="support_ticket",
+        location=lambda i: f"/api/v1/platform/support/tickets/{i}",
+        required=False,
     )
 
 
@@ -1108,10 +1210,33 @@ def list_breakglass(
 @router.post("/break-glass-requests", response_model=BreakGlassOut, status_code=201)
 def create_breakglass(
     *,
+    request: Request,
+    response: Response,
     data: BreakGlassIn,
     ctx: Annotated[Ctx, Depends(require_platform("platform.breakglass.request"))],
-) -> BreakGlassOut:
-    return breakglass.create_request(_actor(ctx), data)
+    store: Store,
+    idempotency_key: IdemKey = None,
+) -> Any:
+    """Request break-glass access. An ``Idempotency-Key`` is optional; a retry with the same key
+    answers with the same request instead of opening a second one."""
+
+    def run() -> tuple[uuid.UUID, BaseModel]:
+        out = breakglass.create_request(_actor(ctx), data)
+        return out.id, out
+
+    return _idempotent(
+        ctx=ctx,
+        request=request,
+        response=response,
+        store=store,
+        key=idempotency_key,
+        body=data,
+        run=run,
+        replay=breakglass.get_request,
+        resource_type="breakglass_request",
+        location=lambda i: f"/api/v1/platform/break-glass-requests/{i}",
+        required=False,
+    )
 
 
 @router.post("/break-glass-requests/{request_id}/emergency-confirm", response_model=BreakGlassOut)

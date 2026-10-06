@@ -14004,6 +14004,7 @@
           "included_students": {
             "anyOf": [
               {
+                "maximum": 2147483647.0,
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -14122,6 +14123,7 @@
           "ai_tokens_month": {
             "anyOf": [
               {
+                "maximum": 2147483647.0,
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -14134,6 +14136,7 @@
           "documents": {
             "anyOf": [
               {
+                "maximum": 2147483647.0,
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -14146,6 +14149,7 @@
           "staff_users": {
             "anyOf": [
               {
+                "maximum": 2147483647.0,
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -14158,6 +14162,7 @@
           "storage_gb": {
             "anyOf": [
               {
+                "maximum": 2147483647.0,
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -14170,6 +14175,7 @@
           "students": {
             "anyOf": [
               {
+                "maximum": 2147483647.0,
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -14384,6 +14390,7 @@
           "features": {
             "anyOf": [
               {
+                "maxProperties": 50,
                 "patternProperties": {
                   "^[a-z0-9_]+(\\.[a-z0-9_]+)+$": {
                     "type": "boolean"
@@ -14403,6 +14410,7 @@
           "included_students": {
             "anyOf": [
               {
+                "maximum": 2147483647.0,
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -15969,10 +15977,15 @@
         "description": "The retention period in days per configurable category. A category left out goes back\nto its default.",
         "properties": {
           "rules": {
-            "additionalProperties": {
-              "type": "integer"
-            },
             "maxProperties": 50,
+            "patternProperties": {
+              "^[a-z][a-z0-9_]{0,62}$": {
+                "type": "integer"
+              }
+            },
+            "propertyNames": {
+              "maxLength": 63
+            },
             "title": "Rules",
             "type": "object"
           }
@@ -17268,10 +17281,15 @@
         "additionalProperties": false,
         "properties": {
           "rules": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/RuleSettingIn"
-            },
             "maxProperties": 10,
+            "patternProperties": {
+              "^[a-z][a-z0-9_]{0,63}$": {
+                "$ref": "#/components/schemas/RuleSettingIn"
+              }
+            },
+            "propertyNames": {
+              "maxLength": 64
+            },
             "title": "Rules",
             "type": "object"
           }
@@ -17935,6 +17953,8 @@
         "properties": {
           "columns": {
             "items": {
+              "maxLength": 64,
+              "pattern": "^[a-z][a-z0-9_]{0,63}$",
               "type": "string"
             },
             "maxItems": 60,
@@ -32886,7 +32906,7 @@
         ]
       },
       "post": {
-        "description": "Add a memory item: your own preference or work context (e.g. \"Keep answers short\").\nNever details about students, parents or other staff: refused with 422\n(``memory_personal_number``, ``memory_date``, ``memory_long_number``, ``memory_others``,\n``memory_unsure``, ``memory_too_long``); 503 ``memory_check_unavailable`` when the check\ncannot run; 409 ``memory_off`` or ``memory_full``; 429 ``ai_rate_limited`` (the item check\ncounts against your per-minute question limit).",
+        "description": "Add a memory item: your own preference or work context (e.g. \"Keep answers short\").\nNever details about students, parents or other staff: refused with 422\n(``memory_personal_number``, ``memory_date``, ``memory_long_number``, ``memory_others``,\n``memory_unsure``, ``memory_too_long``); 503 ``memory_check_unavailable`` when the check\ncannot run; 409 ``memory_off`` or ``memory_full``; 429 ``ai_rate_limited`` (the item check\ncounts against your per-minute question limit). Accepts ``Idempotency-Key``: a retry with\nthe same key replays the first answer without running the check again.",
         "operationId": "create_memory_api_v1_knowledge_memories_post",
         "requestBody": {
           "content": {
@@ -35842,7 +35862,26 @@
         ]
       },
       "post": {
+        "description": "Request break-glass access. An ``Idempotency-Key`` is optional; a retry with the same key\nanswers with the same request instead of opening a second one.",
         "operationId": "create_breakglass_api_v1_platform_break_glass_requests_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -36431,6 +36470,7 @@
     },
     "/api/v1/platform/flags/{key}": {
       "put": {
+        "description": "Create or replace the global flag. ``If-Match`` (the flag's ETag) is optional; when sent\nit is checked (412 when stale or when the flag does not exist yet).",
         "operationId": "put_flag_api_v1_platform_flags__key__put",
         "parameters": [
           {
@@ -36442,6 +36482,22 @@
               "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)+$",
               "title": "Key",
               "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
             }
           }
         ],
@@ -36578,6 +36634,7 @@
         ]
       },
       "put": {
+        "description": "Set one school's override. ``If-Match`` is optional, as for the global flag.",
         "operationId": "put_flag_override_api_v1_platform_flags__key__tenants__tenant_id__put",
         "parameters": [
           {
@@ -36599,6 +36656,22 @@
               "format": "uuid",
               "title": "Tenant Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
             }
           }
         ],
@@ -38783,6 +38856,22 @@
               "title": "Sub Id",
               "type": "string"
             }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
           }
         ],
         "responses": {
@@ -38837,7 +38926,7 @@
         ]
       },
       "put": {
-        "description": "Choose or change the AI answer bundle (monthly plans only; ``409\nai_bundle_needs_monthly_plan``). It counts from the first full calendar month after today\n(a trial's from the month after activation); answers above the quota are billed on the next\ninvoice at the bundle's price per extra answer.",
+        "description": "Choose or change the AI answer bundle (monthly plans only; ``409\nai_bundle_needs_monthly_plan``). It counts from the first full calendar month after today\n(a trial's from the month after activation); answers above the quota are billed on the next\ninvoice at the bundle's price per extra answer. Optional ``If-Match`` (412 when stale).",
         "operationId": "set_ai_bundle_api_v1_platform_subscriptions__sub_id__ai_bundle_put",
         "parameters": [
           {
@@ -38848,6 +38937,22 @@
               "format": "uuid",
               "title": "Sub Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
             }
           }
         ],
@@ -39159,6 +39264,22 @@
               "title": "Sub Id",
               "type": "string"
             }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
           }
         ],
         "responses": {
@@ -39213,6 +39334,7 @@
         ]
       },
       "put": {
+        "description": "Set a negotiated price. ``If-Match`` (the subscription's ETag) is optional; when sent it\nis checked (412 when stale), here and on the other price-override and AI-bundle routes.",
         "operationId": "set_price_override_api_v1_platform_subscriptions__sub_id__price_override_put",
         "parameters": [
           {
@@ -39223,6 +39345,22 @@
               "format": "uuid",
               "title": "Sub Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
             }
           }
         ],
@@ -39825,6 +39963,7 @@
     },
     "/api/v1/platform/support/tickets/{ticket_id}/messages": {
       "post": {
+        "description": "Reply on a ticket. An ``Idempotency-Key`` is optional; a retry with the same key does not\npost the message twice.",
         "operationId": "add_ticket_message_api_v1_platform_support_tickets__ticket_id__messages_post",
         "parameters": [
           {
@@ -39835,6 +39974,22 @@
               "format": "uuid",
               "title": "Ticket Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
             }
           }
         ],
@@ -45055,7 +45210,7 @@
     },
     "/api/v1/support/tickets/{ticket_id}/messages": {
       "post": {
-        "description": "Reply on this school's ticket (permission ``support.ticket.create``).",
+        "description": "Reply on this school's ticket (permission ``support.ticket.create``). Accepts\n``Idempotency-Key``: a retry with the same key does not post the reply twice.",
         "operationId": "reply_to_ticket_api_v1_support_tickets__ticket_id__messages_post",
         "parameters": [
           {
@@ -47089,7 +47244,7 @@
     },
     "/api/v1/users/{user_id}/roles": {
       "put": {
-        "description": "Replace a staff member's roles (permission ``role.assign``, step-up). Effective within\n60 s (FR-IAM-014). An empty list answers 422 ``roles_required``: suspend or remove the\nmember instead.",
+        "description": "Replace a staff member's roles (permission ``role.assign``, step-up). Effective within\n60 s (FR-IAM-014). An empty list answers 422 ``roles_required``: suspend or remove the\nmember instead. ``If-Match`` is optional; when sent it is checked (412 when stale). Every\nreplacement moves the user's ``version`` (the ETag) on.",
         "operationId": "replace_user_roles_api_v1_users__user_id__roles_put",
         "parameters": [
           {
@@ -47167,7 +47322,7 @@
     },
     "/api/v1/users/{user_id}/scopes": {
       "put": {
-        "description": "Replace a staff member's class/section scopes (permission ``role.assign``, step-up).",
+        "description": "Replace a staff member's class/section scopes (permission ``role.assign``, step-up).\n``If-Match`` is optional; when sent it is checked (412 when stale).",
         "operationId": "replace_user_scopes_api_v1_users__user_id__scopes_put",
         "parameters": [
           {

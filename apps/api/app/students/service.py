@@ -1218,13 +1218,21 @@ def list_enrollments(
 def _owned_enrollment(
     session: Session, ctx: UserContext, student_id: uuid.UUID, enrollment_id: uuid.UUID
 ) -> tuple[Student, Any]:
-    """The student (in the caller's update scope) and one of its enrolments, locked; else 404."""
+    """The student (in the caller's update scope) and one of its enrolments, locked; else 404.
+
+    A scoped caller must also reach the enrolment's own section (in its own academic year,
+    R-10): reaching the student through the current enrolment does not reach an older one."""
     structure = _structure(session)
     student = _visible_student(
         session, ctx, student_id, permission=UPDATE, structure=structure, lock=True
     )
     enrollment = repo.get_enrollment(session, student_id, enrollment_id, lock=True)
     if enrollment is None:
+        raise NotFound("Enrolment not found")
+    if enrollment.academic_year_id != structure.year_id:
+        structure = _structure(session, enrollment.academic_year_id)
+    allowed = _allowed_sections(ctx, UPDATE, structure)
+    if allowed is not None and enrollment.section_id not in allowed:
         raise NotFound("Enrolment not found")
     return student, enrollment
 

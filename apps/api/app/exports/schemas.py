@@ -5,9 +5,16 @@ from __future__ import annotations
 import datetime as dt
 import re
 import uuid
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 
 ExportKind = Literal["board_precheck", "portal_precheck", "student_list"]
 ExportStatus = Literal["queued", "running", "ready", "failed", "expired"]
@@ -65,7 +72,9 @@ class PrecheckCreate(_In):
 class StudentListCreate(_In):
     """A student list with chosen columns (``student.export``, step-up)."""
 
-    columns: list[str] = Field(min_length=1, max_length=60)
+    columns: list[Annotated[str, StringConstraints(max_length=64, pattern=COLUMN_PATTERN)]] = Field(
+        min_length=1, max_length=60
+    )
     scope: ExportScopeIn = Field(default_factory=ExportScopeIn)
     format: ListFormat = "xlsx"
     language: Language = "en"

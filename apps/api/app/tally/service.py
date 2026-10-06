@@ -466,7 +466,11 @@ def link_party(
 def unlink_party(
     session: Session, ctx: UserContext, party_id: uuid.UUID, student_id: uuid.UUID
 ) -> None:
+    """Remove a ledger's link (FR-TALLY-006). As for linking, the student must be one the
+    caller reads (R-11); otherwise, like an unknown link, 404."""
     _require_on(session, ctx)
+    if student_id not in students.summaries(session, ctx, [student_id]):
+        raise NotFound("Link not found")
     if repo.get_party(session, party_id) is None or not repo.delete_link(
         session, party_id, student_id
     ):

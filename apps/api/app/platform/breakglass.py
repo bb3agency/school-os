@@ -198,6 +198,14 @@ def list_requests(tenant_id: uuid.UUID | None = None) -> list[BreakGlassOut]:
         ]
 
 
+def get_request(request_id: uuid.UUID) -> BreakGlassOut:
+    with platform_session() as s:
+        row = repo.get(s, m.breakglass_requests, request_id)
+    if row is None:
+        raise NotFound("Request not found")
+    return BreakGlassOut.model_validate(dict(row))
+
+
 def create_request(actor: Actor, data: BreakGlassIn) -> BreakGlassOut:
     with platform_session() as s, db_errors():
         if repo.get_by(s, m.deployments, m.deployments.c.tenant_id == data.tenant_id) is None:

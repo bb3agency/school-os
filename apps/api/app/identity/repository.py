@@ -395,6 +395,25 @@ def set_membership_expiry(
     return membership
 
 
+def bump_membership_version(
+    session: Session, membership_id: uuid.UUID, *, expected_version: int | None
+) -> Membership:
+    """Lock the membership and move its version on before its roles or scopes are replaced, so
+    concurrent replacements serialise and a stale ``If-Match`` is refused (412)."""
+    stmt = update(Membership).where(Membership.id == membership_id)
+    if expected_version is not None:
+        stmt = stmt.where(Membership.version == expected_version)
+    membership = session.scalars(
+        stmt.values(version=Membership.version + 1).returning(Membership),
+        execution_options={"populate_existing": True, "synchronize_session": False},
+    ).one_or_none()
+    if membership is None:
+        if expected_version is not None:
+            raise PreconditionFailed("This user was changed by someone else. Reload and try again.")
+        raise NotFound("Membership not found")
+    return membership
+
+
 # --- roles and permissions -----------------------------------------------------------------
 
 

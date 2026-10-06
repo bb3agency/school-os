@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 from sqlalchemy import Engine, text
 
+from app.academics import repository as academics_repo
 from app.academics import service as academics
 from app.academics.schemas import (
     AttendanceEntryIn,
@@ -352,6 +353,26 @@ def test_FR_MRK_001_exams_belong_to_the_current_year(school: Any) -> None:
     with tenant_session(school.tenant_id, actor.user_id) as db:
         listed = academics.list_exams(db, actor)
     assert exam.id in {e.id for e in listed}
+
+
+def test_R_13_a_concurrent_duplicate_exam_is_a_422_not_a_500(
+    school: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two requests creating the same exam at once both pass the name check; the second insert
+    hit the unique constraint and was a 500 (audit 2026-10-06 R-13). The race is simulated by
+    letting the check miss the first exam."""
+    actor = S.principal_ctx(school)
+    today = min(academics.today_ist(), S.YEAR_END)
+    name = f"Synthetic race {uuid.uuid4().hex[:5]}"
+    with tenant_session(school.tenant_id, actor.user_id) as db:
+        academics.create_exam(db, actor, ExamCreate(name=name, held_on=today))
+    monkeypatch.setattr(academics_repo, "exam_name_taken", lambda *_a, **_k: False)
+    with (
+        pytest.raises(ValidationFailed) as err,
+        tenant_session(school.tenant_id, actor.user_id) as db,
+    ):
+        academics.create_exam(db, actor, ExamCreate(name=name, held_on=today))
+    assert "exam_name_taken" in _codes(err)
 
 
 def test_FR_MRK_002_marks_grid_with_percent_and_absent_papers(school: Any) -> None:

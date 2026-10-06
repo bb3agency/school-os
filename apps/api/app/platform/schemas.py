@@ -14,6 +14,7 @@ from decimal import Decimal
 from typing import Annotated, Any, Literal, Self
 
 from pydantic import (
+    AfterValidator,
     AwareDatetime,
     BaseModel,
     BeforeValidator,
@@ -31,6 +32,11 @@ def _nfc(value: Any) -> Any:
 
 
 _NO_CONTROL = r"^[^\x00-\x1f\x7f]+$"
+# Free text: no control characters except tab and line breaks; may be empty (min_length
+# decides). A NUL made PostgreSQL refuse the insert (500); others reached operators and the
+# banners of every school (audit 2026-10-06 R-12).
+_NO_CONTROL_LINES = r"^[^\x00-\x08\x0b\x0c\x0e-\x1f\x7f]*$"
+_NO_CONTROL_LINE = r"^[^\x00-\x1f\x7f]*$"
 
 Text200 = Annotated[
     str, BeforeValidator(_nfc), StringConstraints(min_length=1, max_length=200, pattern=_NO_CONTROL)
@@ -70,6 +76,21 @@ EmailStr = Annotated[
     StringConstraints(max_length=254, pattern=r"^[^@\s]{1,64}@[a-z0-9.-]+\.[a-z]{2,63}$"),
 ]
 Money = Annotated[Decimal, Field(ge=0, max_digits=14, decimal_places=2)]
+# Counts stored in or compared with int4 columns (R-13: a larger number was a 500).
+Count = Annotated[int, Field(ge=0, le=2_147_483_647)]
+# Billing calendar dates: periods are computed a month or more ahead, so a date at the edge of the
+# calendar (year 1 or 9999) overflowed (R-13). The bounds are far outside any real billing date.
+_BILLING_YEARS = (2000, 2999)
+
+
+def _billing_year(value: dt.date) -> dt.date:
+    if not _BILLING_YEARS[0] <= value.year <= _BILLING_YEARS[1]:
+        raise ValueError(f"must be between the years {_BILLING_YEARS[0]} and {_BILLING_YEARS[1]}")
+    return value
+
+
+BillingDate = Annotated[dt.date, AfterValidator(_billing_year)]
+BillingDatetime = Annotated[AwareDatetime, AfterValidator(_billing_year)]
 PlanDescription = Annotated[
     str,
     BeforeValidator(_nfc),
@@ -148,11 +169,11 @@ class MeOut(Out):
 
 
 class PlanLimits(In):
-    students: int | None = Field(default=None, ge=0)
-    staff_users: int | None = Field(default=None, ge=0)
-    storage_gb: int | None = Field(default=None, ge=0)
-    documents: int | None = Field(default=None, ge=0)
-    ai_tokens_month: int | None = Field(default=None, ge=0)
+    students: Count | None = None
+    staff_users: Count | None = None
+    storage_gb: Count | None = None
+    documents: Count | None = None
+    ai_tokens_month: Count | None = None
     ai_budget_inr: Money | None = None
 
 
@@ -164,7 +185,7 @@ class PlanIn(In):
     pricing_model: Literal["flat", "per_student"] = "flat"
     base_price_inr: Money
     per_student_price_inr: Money | None = None
-    included_students: int | None = Field(default=None, ge=0)
+    included_students: Count | None = None
     gst_rate: Literal["0", "5", "12", "18", "28"] = "18"
     sac_code: Annotated[str, StringConstraints(pattern=r"^[0-9]{6}$")] | None = None
     trial_days: int = Field(default=30, ge=0, le=365)
@@ -185,12 +206,31 @@ class PlanPatch(In):
     name: Text100 | None = None
     base_price_inr: Money | None = None
     per_student_price_inr: Money | None = None
-    included_students: int | None = Field(default=None, ge=0)
+    included_students: Count | None = None
     trial_days: int | None = Field(default=None, ge=0, le=365)
     limits: PlanLimits | None = None
-    features: dict[FlagKey, bool] | None = None
+    features: dict[FlagKey, bool] | None = Field(default=None, max_length=50)
     one_time_fee_inr: Money | None = None
     description: PlanDescription | None = None
+
+    @model_validator(mode="after")
+    def _no_null_for_required(self) -> Self:
+        # R-13: these columns are NOT NULL; an explicit null was written as NULL (500).
+        nulls = [
+            k
+            for k in (
+                "name",
+                "base_price_inr",
+                "trial_days",
+                "limits",
+                "features",
+                "one_time_fee_inr",
+            )
+            if k in self.model_fields_set and getattr(self, k) is None
+        ]
+        if nulls:
+            raise ValueError(f"{', '.join(nulls)} cannot be empty")
+        return self
 
 
 class PlanOut(Out):
@@ -333,7 +373,7 @@ class AiBundleIn(In):
 
 
 class ExtendTrialIn(In):
-    trial_ends_at: AwareDatetime
+    trial_ends_at: BillingDatetime
 
 
 class ChangePlanIn(In):
@@ -394,12 +434,19 @@ class InvoiceLineOut(Out):
 
 class InvoiceCreate(In):
     subscription_id: uuid.UUID
-    period_start: dt.date
+    period_start: BillingDate
 
 
 class InvoicePatch(In):
     lines: list[InvoiceLineIn] | None = Field(default=None, min_length=1, max_length=50)
-    notes: Annotated[str, BeforeValidator(_nfc), StringConstraints(max_length=1000)] | None = None
+    notes: (
+        Annotated[
+            str,
+            BeforeValidator(_nfc),
+            StringConstraints(max_length=1000, pattern=_NO_CONTROL_LINES),
+        ]
+        | None
+    ) = None
 
 
 class InvoiceOut(Out):
@@ -452,7 +499,12 @@ class PaymentIn(In):
     tds_inr: Money = Decimal("0")
     received_on: dt.date
     reference: Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9/_.-]{1,64}$")]
-    notes: Annotated[str, BeforeValidator(_nfc), StringConstraints(max_length=500)] | None = None
+    notes: (
+        Annotated[
+            str, BeforeValidator(_nfc), StringConstraints(max_length=500, pattern=_NO_CONTROL_LINES)
+        ]
+        | None
+    ) = None
 
 
 class PaymentOut(Out):
@@ -711,9 +763,12 @@ class UsageDailyOut(Out):
 class FlagIn(In):
     enabled: bool
     rollout_percent: int | None = Field(default=None, ge=0, le=100)
-    description: Annotated[str, BeforeValidator(_nfc), StringConstraints(max_length=300)] | None = (
-        None
-    )
+    description: (
+        Annotated[
+            str, BeforeValidator(_nfc), StringConstraints(max_length=300, pattern=_NO_CONTROL_LINE)
+        ]
+        | None
+    ) = None
 
 
 class FlagOverrideIn(In):
@@ -885,10 +940,22 @@ class AnnouncementIn(In):
     empty, the English text is stored in their place (a new announcement) or the stored text is
     kept (an update). While Telugu is shown they are required (422)."""
 
-    title_en: Annotated[str, BeforeValidator(_nfc), StringConstraints(min_length=1, max_length=120)]
-    title_te: Annotated[str, BeforeValidator(_nfc), StringConstraints(max_length=120)] = ""
-    body_en: Annotated[str, BeforeValidator(_nfc), StringConstraints(min_length=1, max_length=1000)]
-    body_te: Annotated[str, BeforeValidator(_nfc), StringConstraints(max_length=1000)] = ""
+    title_en: Annotated[
+        str,
+        BeforeValidator(_nfc),
+        StringConstraints(min_length=1, max_length=120, pattern=_NO_CONTROL_LINE),
+    ]
+    title_te: Annotated[
+        str, BeforeValidator(_nfc), StringConstraints(max_length=120, pattern=_NO_CONTROL_LINE)
+    ] = ""
+    body_en: Annotated[
+        str,
+        BeforeValidator(_nfc),
+        StringConstraints(min_length=1, max_length=1000, pattern=_NO_CONTROL_LINES),
+    ]
+    body_te: Annotated[
+        str, BeforeValidator(_nfc), StringConstraints(max_length=1000, pattern=_NO_CONTROL_LINES)
+    ] = ""
     severity: Literal["info", "maintenance", "warning", "critical"] = "info"
     audience: Literal["all", "tier", "tenants"] = "all"
     audience_tier: Tier | None = None
@@ -932,7 +999,9 @@ TicketCategory = Literal[
 TicketPriority = Literal["p1", "p2", "p3", "p4"]
 TicketStatus = Literal["open", "in_progress", "waiting_on_school", "resolved", "closed"]
 MessageBody = Annotated[
-    str, BeforeValidator(_nfc), StringConstraints(min_length=1, max_length=4000)
+    str,
+    BeforeValidator(_nfc),
+    StringConstraints(min_length=1, max_length=4000, pattern=_NO_CONTROL_LINES),
 ]
 
 

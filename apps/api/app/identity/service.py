@@ -743,7 +743,8 @@ def update_user(
     (409 ``invalid_state``), and a profile shared with another school is not edited either
     (409 ``profile_shared``, ADR-0028; the whole request is refused). Nobody changes the status
     of their own membership (409 ``own_account``). Unchanged values are ignored; with nothing
-    to change the member is returned as is. Otherwise the membership version is bumped once
+    to change the member is returned as is. Editing another member's profile follows the status
+    reach rule (403 ``role_not_grantable``, R-07). Otherwise the membership version is bumped once
     (the ETag changes).
     Audit: ``user.profile_updated`` with the changed field NAMES only (never values) and
     ``membership.status_changed`` {from, to}.
@@ -776,6 +777,10 @@ def update_user(
         _guard_not_own(ctx, user_id)
         _guard_status_reach(session, ctx, membership)
     if profile:
+        if user_id != ctx.user_id:
+            # R-07 (SEC-003): the email and name of a member outside the caller's reach
+            # (owner, principal, office admin, custom roles) follow the status rule.
+            _guard_status_reach(session, ctx, membership)
         _guard_profile_not_shared(session, user_id)
         with _db_errors():
             repo.update_user_profile(
@@ -806,11 +811,18 @@ def update_user(
 
 
 def set_roles(
-    session: Session, ctx: UserContext, user_id: uuid.UUID, role_keys: Sequence[str]
+    session: Session,
+    ctx: UserContext,
+    user_id: uuid.UUID,
+    role_keys: Sequence[str],
+    *,
+    expected_version: int | None = None,
 ) -> UserOut:
     """Replace a member's roles (``role.assign``, step-up). Audit per granted/revoked role.
 
     An empty list is refused (422 ``roles_required``): suspend or remove the member instead.
+    ``expected_version`` is the optional ``If-Match`` (412 when stale); the membership row is
+    locked and its version moves on, so a stale list cannot restore a revoked role (A-17).
     """
     if not role_keys:
         raise RolesRequired(
@@ -822,6 +834,9 @@ def set_roles(
     _guard_not_breakglass(session, membership)
     if membership.status == "removed":
         raise Conflict("This user has been removed.", code="invalid_state")
+    membership = repo.bump_membership_version(
+        session, membership.id, expected_version=expected_version
+    )
     wanted = _roles_by_key(session, role_keys)
     current = {r.key: r for r in repo.list_roles_for_membership(session, membership.id)}
     added = [wanted[k] for k in wanted if k not in current]
@@ -901,13 +916,22 @@ def _add_scopes(
 
 
 def set_scopes(
-    session: Session, ctx: UserContext, user_id: uuid.UUID, scopes: Sequence[ScopeIn]
+    session: Session,
+    ctx: UserContext,
+    user_id: uuid.UUID,
+    scopes: Sequence[ScopeIn],
+    *,
+    expected_version: int | None = None,
 ) -> UserOut:
-    """Replace a member's class/section scopes (``role.assign``, step-up; FR-IAM-012)."""
+    """Replace a member's class/section scopes (``role.assign``, step-up; FR-IAM-012).
+    ``expected_version`` is the optional ``If-Match``, as for :func:`set_roles`."""
     membership = _membership_for_user(session, user_id)
     _guard_not_breakglass(session, membership)
     if membership.status == "removed":
         raise Conflict("This user has been removed.", code="invalid_state")
+    membership = repo.bump_membership_version(
+        session, membership.id, expected_version=expected_version
+    )
     current = {
         (s.scope_type, s.scope_ref): s for s in repo.list_membership_scopes(session, membership.id)
     }

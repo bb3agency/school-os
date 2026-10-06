@@ -2650,7 +2650,8 @@ export interface paths {
          *     (``memory_personal_number``, ``memory_date``, ``memory_long_number``, ``memory_others``,
          *     ``memory_unsure``, ``memory_too_long``); 503 ``memory_check_unavailable`` when the check
          *     cannot run; 409 ``memory_off`` or ``memory_full``; 429 ``ai_rate_limited`` (the item check
-         *     counts against your per-minute question limit).
+         *     counts against your per-minute question limit). Accepts ``Idempotency-Key``: a retry with
+         *     the same key replays the first answer without running the check again.
          */
         post: operations["create_memory_api_v1_knowledge_memories_post"];
         /**
@@ -3401,7 +3402,11 @@ export interface paths {
         /** List Breakglass */
         get: operations["list_breakglass_api_v1_platform_break_glass_requests_get"];
         put?: never;
-        /** Create Breakglass */
+        /**
+         * Create Breakglass
+         * @description Request break-glass access. An ``Idempotency-Key`` is optional; a retry with the same key
+         *     answers with the same request instead of opening a second one.
+         */
         post: operations["create_breakglass_api_v1_platform_break_glass_requests_post"];
         delete?: never;
         options?: never;
@@ -3543,7 +3548,11 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Put Flag */
+        /**
+         * Put Flag
+         * @description Create or replace the global flag. ``If-Match`` (the flag's ETag) is optional; when sent
+         *     it is checked (412 when stale or when the flag does not exist yet).
+         */
         put: operations["put_flag_api_v1_platform_flags__key__put"];
         post?: never;
         delete?: never;
@@ -3560,7 +3569,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Put Flag Override */
+        /**
+         * Put Flag Override
+         * @description Set one school's override. ``If-Match`` is optional, as for the global flag.
+         */
         put: operations["put_flag_override_api_v1_platform_flags__key__tenants__tenant_id__put"];
         post?: never;
         /** Delete Flag Override */
@@ -3971,7 +3983,7 @@ export interface paths {
          * @description Choose or change the AI answer bundle (monthly plans only; ``409
          *     ai_bundle_needs_monthly_plan``). It counts from the first full calendar month after today
          *     (a trial's from the month after activation); answers above the quota are billed on the next
-         *     invoice at the bundle's price per extra answer.
+         *     invoice at the bundle's price per extra answer. Optional ``If-Match`` (412 when stale).
          */
         put: operations["set_ai_bundle_api_v1_platform_subscriptions__sub_id__ai_bundle_put"];
         post?: never;
@@ -4050,7 +4062,11 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Set Price Override */
+        /**
+         * Set Price Override
+         * @description Set a negotiated price. ``If-Match`` (the subscription's ETag) is optional; when sent it
+         *     is checked (412 when stale), here and on the other price-override and AI-bundle routes.
+         */
         put: operations["set_price_override_api_v1_platform_subscriptions__sub_id__price_override_put"];
         post?: never;
         /** Clear Price Override */
@@ -4142,7 +4158,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Add Ticket Message */
+        /**
+         * Add Ticket Message
+         * @description Reply on a ticket. An ``Idempotency-Key`` is optional; a retry with the same key does not
+         *     post the message twice.
+         */
         post: operations["add_ticket_message_api_v1_platform_support_tickets__ticket_id__messages_post"];
         delete?: never;
         options?: never;
@@ -5233,7 +5253,8 @@ export interface paths {
         put?: never;
         /**
          * Reply To Ticket
-         * @description Reply on this school's ticket (permission ``support.ticket.create``).
+         * @description Reply on this school's ticket (permission ``support.ticket.create``). Accepts
+         *     ``Idempotency-Key``: a retry with the same key does not post the reply twice.
          */
         post: operations["reply_to_ticket_api_v1_support_tickets__ticket_id__messages_post"];
         delete?: never;
@@ -5750,7 +5771,8 @@ export interface paths {
          * Replace User Roles
          * @description Replace a staff member's roles (permission ``role.assign``, step-up). Effective within
          *     60 s (FR-IAM-014). An empty list answers 422 ``roles_required``: suspend or remove the
-         *     member instead.
+         *     member instead. ``If-Match`` is optional; when sent it is checked (412 when stale). Every
+         *     replacement moves the user's ``version`` (the ETag) on.
          */
         put: operations["replace_user_roles_api_v1_users__user_id__roles_put"];
         post?: never;
@@ -5771,6 +5793,7 @@ export interface paths {
         /**
          * Replace User Scopes
          * @description Replace a staff member's class/section scopes (permission ``role.assign``, step-up).
+         *     ``If-Match`` is optional; when sent it is checked (412 when stale).
          */
         put: operations["replace_user_scopes_api_v1_users__user_id__scopes_put"];
         post?: never;
@@ -21809,7 +21832,9 @@ export interface operations {
     create_breakglass_api_v1_platform_break_glass_requests_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -22191,7 +22216,9 @@ export interface operations {
     put_flag_api_v1_platform_flags__key__put: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "If-Match"?: string | null;
+            };
             path: {
                 key: string;
             };
@@ -22239,7 +22266,9 @@ export interface operations {
     put_flag_override_api_v1_platform_flags__key__tenants__tenant_id__put: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "If-Match"?: string | null;
+            };
             path: {
                 key: string;
                 tenant_id: string;
@@ -23590,7 +23619,9 @@ export interface operations {
     set_ai_bundle_api_v1_platform_subscriptions__sub_id__ai_bundle_put: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "If-Match"?: string | null;
+            };
             path: {
                 sub_id: string;
             };
@@ -23638,7 +23669,9 @@ export interface operations {
     remove_ai_bundle_api_v1_platform_subscriptions__sub_id__ai_bundle_delete: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "If-Match"?: string | null;
+            };
             path: {
                 sub_id: string;
             };
@@ -23826,7 +23859,9 @@ export interface operations {
     set_price_override_api_v1_platform_subscriptions__sub_id__price_override_put: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "If-Match"?: string | null;
+            };
             path: {
                 sub_id: string;
             };
@@ -23874,7 +23909,9 @@ export interface operations {
     clear_price_override_api_v1_platform_subscriptions__sub_id__price_override_delete: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "If-Match"?: string | null;
+            };
             path: {
                 sub_id: string;
             };
@@ -24201,7 +24238,9 @@ export interface operations {
     add_ticket_message_api_v1_platform_support_tickets__ticket_id__messages_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
             path: {
                 ticket_id: string;
             };

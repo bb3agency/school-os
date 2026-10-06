@@ -697,3 +697,52 @@ def test_FR_TALLY_005_old_sync_records_are_deleted_unless_a_ledger_points_to_the
         )
         == 1
     )
+
+
+def _ledger_only_configurer(admin: Engine, school: Any) -> Any:
+    """A member with a custom role holding tally.configure but not student.read_basic, given a
+    school-wide scope (so the tally routes are open to them, ADR-0032 §5)."""
+    key = f"ledger_clerk_{uuid.uuid4().hex[:8]}"
+    role_id = uuid.uuid4()
+    with admin.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO core.roles (id, tenant_id, key, name_en, name_te) "
+                "VALUES (:r, :t, :k, 'Synthetic ledger clerk', 'కృత్రిమ గుమాస్తా')"
+            ),
+            {"r": role_id, "t": school.tenant_id, "k": key},
+        )
+        c.execute(
+            text(
+                "INSERT INTO core.role_permissions (tenant_id, role_id, permission_key) "
+                "VALUES (:t, :r, 'tally.configure')"
+            ),
+            {"t": school.tenant_id, "r": role_id},
+        )
+    return T.W.add_member(admin, school.tenant_id, [key], scopes=[("school", None)])
+
+
+def test_R_11_unlinking_needs_the_student_to_be_visible(api: Any, admin_engine: Engine) -> None:
+    """R-11 (API1, FR-TALLY-006): linking already needs a student the caller reads; unlinking
+    did not, so a ledger clerk without student.read_basic could remove any student's ledger
+    link (and with it that student's dues) by guessing or replaying student ids."""
+    school, agent = _ready(api, admin_engine)
+    sita = T.SW.create(
+        school, name="Synthetica Sita Devi", section_key="section_9c", admission_no="T-911"
+    )
+    T.snapshot(api, agent, [T.party("Synthetic Shared Ledger", "10.00")])
+    accountant = school.people["accountant"]
+    party_id = api.call(accountant, "GET", "/api/v1/tally/parties").json()["data"][0]["id"]
+    path = f"/api/v1/tally/parties/{party_id}/links"
+    res = api.call(accountant, "POST", path, json={"student_id": str(sita)})
+    assert res.status_code == 201, res.text
+    clerk = _ledger_only_configurer(admin_engine, school)
+    res = api.call(clerk, "POST", path, json={"student_id": str(sita)})
+    assert res.status_code == 422, "linking already needs a visible student"
+    res = api.call(clerk, "DELETE", f"{path}/{sita}")
+    assert res.status_code == 404, res.text
+    count = "SELECT count(*) FROM ops.tally_party_links WHERE tenant_id = :t"
+    assert _scalar(admin_engine, count, t=school.tenant_id) == 1
+    # A caller who reads the student still unlinks.
+    assert api.call(accountant, "DELETE", f"{path}/{sita}").status_code == 204
+    assert _scalar(admin_engine, count, t=school.tenant_id) == 0

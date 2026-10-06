@@ -18,7 +18,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.core.db import context_free_session, platform_session
-from app.core.errors import NotFound
+from app.core.errors import NotFound, PreconditionFailed
 from app.core.ids import new_id
 from app.platform import models as m
 from app.platform import repository as repo
@@ -62,9 +62,19 @@ def _snapshot(row: Mapping[Any, Any] | None) -> dict[str, Any]:
     return {"enabled": bool(row["enabled"]), "rollout_percent": row["rollout_percent"]}
 
 
-def set_global(actor: Actor, key: str, data: FlagIn) -> FlagOut:
+def _check_version(row: Mapping[Any, Any] | None, expected_version: int | None) -> None:
+    """The optional If-Match of a flag PUT (412 when stale, or when the flag does not exist yet;
+    audit 2026-10-06 R-04: a stale form must not turn a switched-off flag back on)."""
+    if expected_version is not None and (row is None or row["version"] != expected_version):
+        raise PreconditionFailed()
+
+
+def set_global(
+    actor: Actor, key: str, data: FlagIn, *, expected_version: int | None = None
+) -> FlagOut:
     with platform_session() as s, db_errors():
         row = repo.flag_row(s, key, None)
+        _check_version(row, expected_version)
         before = _snapshot(row)
         values = {
             "enabled": data.enabled,
@@ -88,11 +98,19 @@ def set_global(actor: Actor, key: str, data: FlagIn) -> FlagOut:
         return FlagOut.model_validate(dict(row))
 
 
-def set_override(actor: Actor, key: str, tenant_id: uuid.UUID, enabled: bool) -> FlagOut:
+def set_override(
+    actor: Actor,
+    key: str,
+    tenant_id: uuid.UUID,
+    enabled: bool,
+    *,
+    expected_version: int | None = None,
+) -> FlagOut:
     with platform_session() as s, db_errors():
         if repo.get_by(s, m.deployments, m.deployments.c.tenant_id == tenant_id) is None:
             raise NotFound("School not found")
         row = repo.flag_row(s, key, tenant_id)
+        _check_version(row, expected_version)
         before = _snapshot(row)
         values = {"enabled": enabled, "updated_by": actor.operator_id, "updated_at": now()}
         if row is None:

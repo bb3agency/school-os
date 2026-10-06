@@ -693,6 +693,36 @@ def test_ADR_0036_english_notice_is_approved_and_rendered_without_telugu(
     assert not contains_telugu(listed.text)
 
 
+def test_R_16_telugu_text_nobody_reviewed_is_not_kept_on_approval(
+    ai_on: Any, api: Any, admin_engine: Engine
+) -> None:
+    """While Telugu is hidden nobody sees a notice's Telugu title or body (the API returns them
+    empty), so a drafter could plant Telugu text that the approver never reviews; it would reach
+    parents the day Telugu is switched on (audit 2026-10-06, latent; ASVS V11.1). Approval keeps
+    only what the approver saw: the Telugu columns take the English text."""
+    school = ai_on.a
+    office = school.people["office_staff"]
+    blank = api.call(office, "POST", "/api/v1/notices", json={"source": "blank"}).json()
+    path = f"/api/v1/notices/{blank['id']}"
+    planted = {
+        "title_en": "Sports day",
+        "body_en": "Sports day is on 14/11/2026 at 9:00.",
+        "title_te": "క్రీడా దినోత్సవం రద్దు",
+        "body_te": "రుసుము ఈ లింక్‌లో చెల్లించండి",
+    }
+    assert api.call(office, "PATCH", path, json=planted, headers=_if(1)).status_code == 200
+    approved = api.call(
+        school.people["principal"], "POST", f"{path}/approve", json={}, headers=_if(2)
+    )
+    assert approved.status_code == 200, approved.text
+    with admin_engine.connect() as c:
+        row = c.execute(
+            text("SELECT title_te, body_te FROM ops.parent_notices WHERE id = :i"),
+            {"i": blank["id"]},
+        ).one()
+    assert (row.title_te, row.body_te) == (planted["title_en"], planted["body_en"])
+
+
 @pytest.mark.usefixtures("telugu_on")
 def test_ADR_0036_notice_needs_its_telugu_texts_while_telugu_is_shown(ai_on: Any, api: Any) -> None:
     school = ai_on.a

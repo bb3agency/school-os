@@ -10,7 +10,7 @@ import datetime as dt
 import uuid
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
 
 from app.core.textnorm import nfc
 
@@ -252,13 +252,18 @@ class SettingsOut(_Out):
     updated_at: dt.datetime | None
 
 
+# A rule key as in rules.yaml (unknown keys answer 422 unknown_rule); bounded so an error never
+# echoes a long key back (audit 2026-10-06).
+RuleKeyIn = Annotated[str, StringConstraints(max_length=64, pattern=r"^[a-z][a-z0-9_]{0,63}$")]
+
+
 class RuleSettingIn(_In):
     enabled: bool | None = None
     threshold: int | None = Field(default=None, ge=1, le=100)
 
 
 class SettingsIn(_In):
-    rules: dict[str, RuleSettingIn] = Field(max_length=10)
+    rules: dict[RuleKeyIn, RuleSettingIn] = Field(max_length=10)
 
 
 # --- timeline -------------------------------------------------------------------------------------

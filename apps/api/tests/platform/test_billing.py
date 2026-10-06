@@ -782,3 +782,84 @@ def test_FR_PLT_015_invoice_lines_use_plan_sac_and_rate() -> None:
         {"sac_code": "998314", "gst_rate": D("18.00")},
     )
     assert (rows[0]["amount_inr"], rows[0]["sac_code"]) == (D("249.98"), "998314")
+
+
+# --- out-of-range input is a clean 4xx (audit 2026-10-06 R-13, API8) ----------------------------
+
+
+@pytest.mark.parametrize(
+    "field", ["name", "base_price_inr", "trial_days", "limits", "features", "one_time_fee_inr"]
+)
+def test_R_13_plan_patch_refuses_null_for_a_required_field(
+    api: Api, billing_admin: Operator, field: str
+) -> None:
+    """An explicit null for a field the plan always has was written as NULL (500)."""
+    body = {"code": f"nul-{uuid.uuid4().hex[:8]}", "name": "Synthetic", "base_price_inr": "10.00"}
+    plan = api.call("POST", "/plans", billing_admin, json=body).json()
+    res = api.call("PATCH", f"/plans/{plan['id']}", billing_admin, json={field: None})
+    assert res.status_code == 422, res.text
+    assert res.json()["code"] == "validation_error"
+
+
+def test_R_13_plan_student_counts_are_bounded(api: Api, billing_admin: Operator) -> None:
+    """``included_students`` and the plan limits are int4 columns or compared with them: a
+    number past 2**31 was a 500 (numeric value out of range)."""
+    body = {"code": f"big-{uuid.uuid4().hex[:8]}", "name": "Synthetic", "base_price_inr": "10.00"}
+    huge = 2**40
+    res = api.call("POST", "/plans", billing_admin, json=dict(body, included_students=huge))
+    assert res.status_code == 422, res.text
+    plan = api.call("POST", "/plans", billing_admin, json=body).json()
+    res = api.call("PATCH", f"/plans/{plan['id']}", billing_admin, json={"included_students": huge})
+    assert res.status_code == 422, res.text
+    for key in ("students", "staff_users", "storage_gb", "documents", "ai_tokens_month"):
+        res = api.call(
+            "PATCH", f"/plans/{plan['id']}", billing_admin, json={"limits": {key: 2**70}}
+        )
+        assert res.status_code == 422, (key, res.text)
+
+
+def test_R_13_invoice_line_overflow_is_a_422(
+    api: Api, billing_admin: Operator, owner: Operator, make_plan: Callable[..., uuid.UUID]
+) -> None:
+    """quantity x unit price (or the invoice total) past the Numeric(14, 2) columns was a 500."""
+    sub = _school(api, owner, make_plan())["subscription_id"]
+    draft = _drafts(sub)[0]
+    big = {
+        "kind": "subscription",
+        "description": "Synthetic",
+        "quantity": "999999999.000",
+        "unit_price_inr": "999999999999.99",
+    }
+    res = api.call("PATCH", f"/invoices/{draft['id']}", billing_admin, json={"lines": [big]})
+    assert res.status_code == 422, res.text
+    many = [dict(big, quantity="1") for _ in range(50)]
+    res = api.call("PATCH", f"/invoices/{draft['id']}", billing_admin, json={"lines": many})
+    assert res.status_code == 422, res.text
+
+
+@pytest.mark.parametrize("day", ["9999-12-01", "0001-01-01"])
+def test_R_13_invoice_period_at_the_calendar_edge_is_a_422(
+    api: Api,
+    billing_admin: Operator,
+    owner: Operator,
+    make_plan: Callable[..., uuid.UUID],
+    day: str,
+) -> None:
+    sub = _school(api, owner, make_plan())["subscription_id"]
+    res = api.call(
+        "POST", "/invoices", billing_admin, json={"subscription_id": sub, "period_start": day}
+    )
+    assert res.status_code in (409, 422), res.text
+
+
+def test_R_13_trial_extension_at_the_calendar_edge_is_a_4xx(
+    api: Api, owner: Operator, make_plan: Callable[..., uuid.UUID]
+) -> None:
+    sub = _school(api, owner, make_plan(), start_as="trial")["subscription_id"]
+    res = api.call(
+        "POST",
+        f"/subscriptions/{sub}/extend-trial",
+        owner,
+        json={"trial_ends_at": "9999-12-31T23:00:00Z"},
+    )
+    assert 400 <= res.status_code < 500, res.text

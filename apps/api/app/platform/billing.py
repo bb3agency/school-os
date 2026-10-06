@@ -517,11 +517,23 @@ def change_plan(actor: Actor, sub_id: uuid.UUID, plan_id: uuid.UUID) -> Subscrip
         return SubscriptionOut.model_validate(dict(sub))
 
 
+def _check_sub_version(sub: Mapping[Any, Any], expected_version: int | None) -> None:
+    """The optional If-Match of a subscription update (412 when stale; audit 2026-10-06 R-04)."""
+    if expected_version is not None and sub["version"] != expected_version:
+        raise PreconditionFailed()
+
+
 def set_price_override(
-    actor: Actor, sub_id: uuid.UUID, amount: Decimal | None, reason: str | None
+    actor: Actor,
+    sub_id: uuid.UUID,
+    amount: Decimal | None,
+    reason: str | None,
+    *,
+    expected_version: int | None = None,
 ) -> SubscriptionOut:
     with platform_session() as s, db_errors():
         sub = _sub_or_404(s, sub_id)
+        _check_sub_version(sub, expected_version)
         sub = repo.update_row(
             s, m.subscriptions, sub_id, {"price_override_inr": amount, "override_reason": reason}
         )
@@ -561,6 +573,7 @@ def set_ai_bundle(
     bundle_id: uuid.UUID | None,
     *,
     today: dt.date | None = None,
+    expected_version: int | None = None,
 ) -> SubscriptionOut:
     """Choose, change or remove the AI answer bundle (docs/16 §5.7).
 
@@ -571,6 +584,7 @@ def set_ai_bundle(
     today = today or today_ist()
     with platform_session() as s, db_errors():
         sub = _sub_or_404(s, sub_id)
+        _check_sub_version(sub, expected_version)
         if sub["status"] == "cancelled":
             raise Conflict("The subscription is cancelled.", code="invalid_state")
         if bundle_id is None:
