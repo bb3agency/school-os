@@ -173,6 +173,10 @@ export function SheetGrid({
   onCommit,
 }: SheetGridProps) {
   const t = useTranslations("sheets.grid");
+  const tc = useTranslations("common");
+  const tt = useTranslations("touch");
+  // The pointer of the last press on a cell: a touch tap opens the editor (docs/17 §4.1, §5.7).
+  const lastPointer = useRef("");
   const helpId = useId();
   const errorId = useId();
   const table = useRef<HTMLTableElement>(null);
@@ -390,6 +394,7 @@ export function SheetGrid({
       ) : null}
       <p id={helpId} className="text-sm text-ink-muted">
         {editable ? t("keyboardHelpEdit") : t("keyboardHelpRead")}
+        {editable ? <span className="hidden pointer-coarse:inline"> {tt("sheetHelp")}</span> : null}
       </p>
       <TableScroll
         label={t("scrollLabel", { caption })}
@@ -508,6 +513,17 @@ export function SheetGrid({
                         if (event.target === event.currentTarget) onCellKeyDown(event, r, c);
                       }}
                       onDoubleClick={() => startEditing(r, c)}
+                      onPointerDown={(event) => {
+                        lastPointer.current = event.pointerType;
+                      }}
+                      onClick={() => {
+                        // Touch has no double click: one tap (never a scroll, which fires no
+                        // click) opens the editor. Mouse and keyboard keep their behaviour.
+                        const touch =
+                          lastPointer.current === "touch" || lastPointer.current === "pen";
+                        lastPointer.current = "";
+                        if (touch && !isEditing) startEditing(r, c);
+                      }}
                       className={cn(
                         "max-w-72 min-w-36 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-focus",
                         cell?.pending
@@ -533,15 +549,37 @@ export function SheetGrid({
                               setEditing({ ...editing, draft: event.target.value, problem: null })
                             }
                             onKeyDown={onInputKeyDown}
-                            className="w-full min-w-32 rounded-md border border-border-control bg-surface px-2 py-1 text-sm text-ink"
+                            enterKeyHint="done"
+                            // 16px on touch screens, so iOS does not zoom the page on focus.
+                            className="w-full min-w-32 rounded-md border border-border-control bg-surface px-2 py-1 text-sm text-ink pointer-coarse:min-h-11 pointer-coarse:text-base"
                           />
                           {editing.problem ? (
                             <span id={errorId} className="text-xs text-danger">
                               {t(`problem.${editing.problem}`)}
                             </span>
                           ) : (
-                            <span className="text-xs text-ink-muted">{t("editHint")}</span>
+                            <span className="text-xs text-ink-muted pointer-coarse:hidden">
+                              {t("editHint")}
+                            </span>
                           )}
+                          {/* No Enter or Escape key on most phones' screens: buttons instead,
+                              on touch screens only (keyboard use stays exactly as it was). */}
+                          <span className="hidden gap-2 pointer-coarse:flex">
+                            <button
+                              type="button"
+                              onClick={() => void save(editing)}
+                              className="inline-flex min-h-11 items-center rounded-md border border-action bg-action px-3 text-sm font-semibold text-on-action"
+                            >
+                              {tc("save")}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={stopEditing}
+                              className="inline-flex min-h-11 items-center rounded-md border border-border-soft bg-surface px-3 text-sm font-semibold text-ink"
+                            >
+                              {tc("cancel")}
+                            </button>
+                          </span>
                         </span>
                       ) : (
                         cellContent(cell, column)
