@@ -47,8 +47,8 @@ const variants: Record<ButtonVariant, string> = {
 
 const sizes: Record<ButtonSize, string> = {
   lg: "min-h-12 px-6 py-2.5 text-base",
-  md: "min-h-10 px-4 py-2 text-sm",
-  sm: "min-h-8 px-3 py-1 text-sm",
+  md: "min-h-10 px-4 py-2 text-sm pointer-coarse:min-h-11",
+  sm: "min-h-8 px-3 py-1 text-sm pointer-coarse:min-h-11",
 };
 
 /** Classes of a button, for links and summaries that must look like one. */
@@ -140,8 +140,8 @@ const iconVariants: Record<IconButtonVariant, string> = {
 };
 
 const iconSizes: Record<IconButtonSize, string> = {
-  sm: "size-8",
-  md: "size-10",
+  sm: "size-8 pointer-coarse:size-11",
+  md: "size-10 pointer-coarse:size-11",
   lg: "size-12",
 };
 

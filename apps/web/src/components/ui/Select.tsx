@@ -20,7 +20,14 @@ export interface SelectProps extends Omit<ComponentProps<"select">, "children"> 
  */
 export function Select({ options, placeholder, className, ...props }: SelectProps) {
   return (
-    <select className={cn(controlClasses, "select-chevron min-h-10 pr-10", className)} {...props}>
+    <select
+      className={cn(
+        controlClasses,
+        "select-chevron min-h-10 pr-10 pointer-coarse:min-h-11",
+        className,
+      )}
+      {...props}
+    >
       {placeholder !== undefined ? <option value="">{placeholder}</option> : null}
       {options.map((option) => (
         <option key={option.value} value={option.value} disabled={option.disabled}>
