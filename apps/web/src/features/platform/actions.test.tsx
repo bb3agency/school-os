@@ -232,6 +232,46 @@ describe("school detail actions (FR-PLT-004..005, SEC-027)", () => {
     });
   });
 
+  it("R-18: a billing-suspended school can be put on hold; lifting the hold says billing stays", async () => {
+    const billingOnly = {
+      ...DETAIL,
+      tenant_status: "suspended",
+      tenant_status_reason: "billing",
+      security_hold: false,
+      subscription_status: "suspended",
+      subscription: { ...SUB, status: "suspended" },
+    };
+    stub.routes[`GET /bff/api/v1/platform/tenants/${T}`] = () => Response.json(billingOnly);
+    stub.routes[`POST /bff/api/v1/platform/tenants/${T}/suspend`] = () =>
+      Response.json({ ...billingOnly, security_hold: true });
+    const user = userEvent.setup();
+    const { unmount } = renderWithIntl(<SchoolDetailScreen schoolId={T} tab="overview" />);
+    // Billing only: no "Reactivate" (the subscription lifts it), but a hold can be placed.
+    await user.click(await screen.findByRole("button", { name: pm.schoolDetail.placeHold }));
+    expect(screen.queryByRole("button", { name: pm.schoolDetail.reactivate })).toBeNull();
+    const dialog = screen.getByRole("dialog", { name: pm.schoolDetail.placeHoldTitle });
+    expect(within(dialog).getByText(pm.schoolDetail.placeHoldBody)).toBeVisible();
+    await user.type(within(dialog).getByLabelText(cm.reason), "Security incident under review");
+    await user.click(within(dialog).getByRole("button", { name: pm.schoolDetail.placeHold }));
+    await waitFor(() =>
+      expect(stub.callsTo(`POST /bff/api/v1/platform/tenants/${T}/suspend`)).toHaveLength(1),
+    );
+    unmount();
+
+    stub.routes[`GET /bff/api/v1/platform/tenants/${T}`] = () =>
+      Response.json({
+        ...billingOnly,
+        tenant_status_reason: "Security incident",
+        security_hold: true,
+      });
+    renderWithIntl(<SchoolDetailScreen schoolId={T} tab="overview" />);
+    await user.click(await screen.findByRole("button", { name: pm.schoolDetail.liftHold }));
+    const lift = screen.getByRole("dialog", { name: pm.schoolDetail.liftHoldTitle });
+    expect(within(lift).getByText(pm.schoolDetail.liftHoldBillingBody)).toBeVisible();
+    expect(screen.queryByRole("button", { name: pm.schoolDetail.placeHold })).toBeNull();
+    expect(screen.getByText(new RegExp(`· ${pm.schoolDetail.securityHold}$`))).toBeVisible();
+  });
+
   it("the second offboarding step by the same operator explains the two-person rule (409)", async () => {
     stub.routes[`GET /bff/api/v1/platform/tenants/${T}`] = () =>
       Response.json({ ...DETAIL, offboard_requested_at: "2026-09-20T04:30:00Z" });

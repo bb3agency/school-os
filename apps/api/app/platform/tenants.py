@@ -185,6 +185,7 @@ def get_tenant(tenant_id: uuid.UUID, *, with_counts: bool = True) -> TenantDetai
             **dict(row),
             "boards": list(dep["boards"]),
             "tenant_status_reason": dep["tenant_status_reason"],
+            "security_hold": bool(dep["security_hold"]),
             "offboard_requested_at": dep["offboard_requested_at"],
             "offboard_approved_at": dep["offboard_approved_at"],
             "subscription": SubscriptionOut.model_validate(dict(sub)) if sub else None,
@@ -297,7 +298,14 @@ def activate(actor: Actor, tenant_id: uuid.UUID) -> TenantDetailOut:
 
 
 def suspend(actor: Actor, tenant_id: uuid.UUID, reason: str) -> TenantDetailOut:
-    """Non-billing suspension (security incident, abuse, school's request). Never automatic."""
+    """Security hold (security incident, abuse, school's request). Never automatic.
+
+    Independent of billing (audit 2026-10-06 R-18): an active school is suspended with the hold;
+    a school already suspended for billing stays suspended and gains the hold, so paying the
+    invoice cannot lift a block the operator wanted to keep. 409 ``already_on_hold`` twice."""
+    dep0 = _deployment(tenant_id)
+    if dep0["tenant_status"] == "suspended":
+        return _change_hold(actor, tenant_id, place=True, reason=reason)
     return _set_status(
         actor,
         tenant_id,
@@ -305,6 +313,15 @@ def suspend(actor: Actor, tenant_id: uuid.UUID, reason: str) -> TenantDetailOut:
         allowed_from=("active",),
         action="tenant.suspended",
         reason=reason,
+        extra={"security_hold": True},
+    )
+
+
+def _billing_suspended(s: Session, dep: RowMapping) -> bool:
+    """The school is suspended for billing, or its subscription is (docs/16 §9)."""
+    sub = repo.live_subscription(s, dep["tenant_id"])
+    return dep["tenant_status_reason"] == "billing" or (
+        sub is not None and sub["status"] == "suspended"
     )
 
 
@@ -313,17 +330,65 @@ def _not_billing_suspended(s: Session, dep: RowMapping) -> None:
     school suspended for billing, and a school already held for another reason whose
     subscription was suspended meanwhile (audit 2026-10-05 A-08: reactivating it made the
     school live while its subscription stayed suspended and was no longer invoiced)."""
-    sub = repo.live_subscription(s, dep["tenant_id"])
-    if dep["tenant_status_reason"] == "billing" or (
-        sub is not None and sub["status"] == "suspended"
-    ):
+    if _billing_suspended(s, dep):
         raise Conflict(
             "Billing suspensions are lifted from the subscription.", code="billing_suspension"
         )
 
 
+def _change_hold(
+    actor: Actor, tenant_id: uuid.UUID, *, place: bool, reason: str | None
+) -> TenantDetailOut:
+    """Place or lift the security hold of a school that stays suspended for billing (R-18).
+
+    Placing: the school must be suspended and not yet held. Lifting: it must be held, shared
+    (a billing suspension suspends only shared schools) and still billing-suspended; the reason
+    goes back to ``billing``. Both are checked under the deployment lock."""
+    action = "tenant.security_hold_placed" if place else "tenant.security_hold_lifted"
+    with platform_session() as s, db_errors():
+        dep = repo.get_by(s, m.deployments, m.deployments.c.tenant_id == tenant_id, for_update=True)
+        if dep is None:
+            raise NotFound("School not found")
+        if dep["tenant_status"] != "suspended":
+            raise Conflict("The school changed. Reload and try again.", code="invalid_state")
+        if place:
+            if dep["security_hold"]:
+                raise Conflict("The school is already on a security hold.", code="already_on_hold")
+            values: dict[str, Any] = {"security_hold": True, "tenant_status_reason": reason}
+        else:
+            if not dep["security_hold"] or not _billing_suspended(s, dep):
+                raise Conflict("The school changed. Reload and try again.", code="invalid_state")
+            values = {"security_hold": False, "tenant_status_reason": "billing"}
+        repo.update_row(s, m.deployments, dep["id"], values)
+        summary = {"from": "suspended", "to": "suspended"}
+        audit_platform(
+            s,
+            actor,
+            action,
+            "tenant",
+            tenant_id,
+            {**summary, "tier": dep["mode"]},
+            tenant_id=tenant_id,
+        )
+        shared = dep["mode"] == "shared"
+        if shared:  # dedicated schools' chains live on their host
+            tenant_audit.enqueue(s, tenant_id, actor, action, summary)
+    if shared:
+        tenant_audit.deliver_now(tenant_id)
+    return get_tenant(tenant_id, with_counts=False)
+
+
 def reactivate(actor: Actor, tenant_id: uuid.UUID, reason: str) -> TenantDetailOut:
+    """Lift the security hold. A school that is also suspended for billing stays suspended
+    (R-18): only the subscription lifts that. Without a hold, a billing suspension answers 409
+    ``billing_suspension`` (A-08)."""
     del reason  # recorded in the platform audit event action only (free text is not audited)
+    dep0 = _deployment(tenant_id)
+    if dep0["security_hold"] and dep0["mode"] == "shared" and dep0["tenant_status"] == "suspended":
+        with platform_session() as s:
+            billing_held = _billing_suspended(s, dep0)
+        if billing_held:
+            return _change_hold(actor, tenant_id, place=False, reason=None)
     return _set_status(
         actor,
         tenant_id,
@@ -331,6 +396,7 @@ def reactivate(actor: Actor, tenant_id: uuid.UUID, reason: str) -> TenantDetailO
         allowed_from=("suspended",),
         action="tenant.reactivated",
         reason=None,
+        extra={"security_hold": False},
         check=_not_billing_suspended,
     )
 

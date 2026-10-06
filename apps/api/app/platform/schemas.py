@@ -727,6 +727,9 @@ class OffboardingOut(Out):
 class TenantDetailOut(TenantSummaryOut):
     boards: list[str]
     tenant_status_reason: str | None
+    # An operator security hold is on (audit 2026-10-06 R-18). It is independent of a billing
+    # suspension: the school is active only when neither is set (docs/16 §9).
+    security_hold: bool = False
     offboard_requested_at: dt.datetime | None
     offboard_approved_at: dt.datetime | None
     subscription: SubscriptionOut | None

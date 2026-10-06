@@ -529,6 +529,7 @@ const PROVISIONING_DETAIL = {
   ...provisioningSummary(),
   boards: ["CBSE"],
   tenant_status_reason: null,
+  security_hold: false,
   offboard_requested_at: null,
   offboard_approved_at: null,
   subscription: null,

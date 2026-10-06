@@ -137,6 +137,8 @@ deployments = Table(
     Column("custom_domain", CITEXT),
     Column("tenant_status", Text, nullable=False),
     Column("tenant_status_reason", Text),
+    # Operator security hold, independent of a billing suspension (audit 2026-10-06 R-18).
+    Column("security_hold", Boolean, nullable=False, server_default="false"),
     Column("status", Text, nullable=False),
     Column("app_version", Text),
     Column("target_version", Text),

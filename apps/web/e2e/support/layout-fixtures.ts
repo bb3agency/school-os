@@ -1269,6 +1269,7 @@ function tenantDetail(tenant_id: string): Schemas["TenantDetailOut"] {
       : {}),
     boards: ["STATE_AP", "CBSE", "CISCE"],
     tenant_status_reason: summary.tenant_status === "suspended" ? LONG_TEXT : null,
+    security_hold: summary.tenant_status === "suspended",
     offboard_requested_at: summary.tenant_status === "offboarding" ? at(21) : null,
     offboard_approved_at: null,
     subscription: subscription(0, tenant_id),

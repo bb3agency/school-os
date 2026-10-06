@@ -1,4 +1,4 @@
-"""Owner decisions on the 2026-10-06 API route audit (R-17).
+"""Owner decisions on the 2026-10-06 API route audit (R-17, R-18).
 
 Data migration on the global catalog ``core.permissions`` (no RLS; ``0004_authz_seed``'s
 docstring: later catalog changes get their own revision that re-runs the upsert):
@@ -11,13 +11,23 @@ docstring: later catalog changes get their own revision that re-runs the upsert)
 The rows are written out here rather than read from ``permissions.yaml`` so this revision means
 the same thing whatever the YAML says later.
 
+- R-18 adds ``platform.deployments.security_hold`` (control-plane schema: no RLS, written only by
+  ``sos_platform``, no student data). An operator security hold is tracked apart from a billing
+  suspension (which lives on the subscription and shows as ``tenant_status_reason = 'billing'``),
+  so a hold can be placed on a school suspended for billing and paying never lifts a hold. The
+  school is active only when neither is set; a CHECK refuses a held school that is active.
+  Backfill: a suspended school whose reason is not ``billing`` was suspended by an operator
+  (``tenants.suspend``), so it is on hold.
+
 **Role grants of existing schools are NOT changed here** (system roles are tenant rows under
 FORCE RLS; see ``0019_export_access``). New schools get ``support.manage`` for owner, principal
 and office admin from ``roles.yaml`` at provisioning; existing schools get it from
 ``python -m app.identity.sync_system_roles --apply`` (docs/10 runbook). Until then their owner,
 principal and office admin see only the tickets they opened themselves: the change fails safe.
 
-Downgrade deletes the key in a savepoint and keeps it while a role still holds it (the
+Downgrade drops the hold column (a school held and suspended for billing at once keeps its hold
+reason; the previous code then refuses reactivation while the subscription is suspended, A-08),
+then deletes the key in a savepoint and keeps it while a role still holds it (the
 foreign-key check sees rows RLS hides from the migrator), exactly like ``0019_export_access``.
 
 Revision ID: 0047_security_decisions
@@ -64,7 +74,23 @@ UPSERT = sa.text(
 )
 
 
+SECURITY_HOLD_UP = (
+    "ALTER TABLE platform.deployments ADD COLUMN security_hold boolean NOT NULL DEFAULT false",
+    "UPDATE platform.deployments SET security_hold = true "
+    "WHERE tenant_status = 'suspended' AND tenant_status_reason IS DISTINCT FROM 'billing'",
+    "ALTER TABLE platform.deployments ADD CONSTRAINT deployments_security_hold_not_active "
+    "CHECK (NOT security_hold OR tenant_status <> 'active')",
+)
+SECURITY_HOLD_DOWN = (
+    "ALTER TABLE platform.deployments DROP CONSTRAINT IF EXISTS "
+    "deployments_security_hold_not_active",
+    "ALTER TABLE platform.deployments DROP COLUMN IF EXISTS security_hold",
+)
+
+
 def upgrade() -> None:
+    for statement in SECURITY_HOLD_UP:
+        op.execute(statement)
     bind = op.get_bind()
     for row in NEW_PERMISSIONS:
         bind.execute(UPSERT, row)
@@ -74,6 +100,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    for statement in SECURITY_HOLD_DOWN:
+        op.execute(statement)
     bind = op.get_bind()
     bind.execute(
         SET_DESCRIPTION, {"k": "support.ticket.create", "d": TICKET_CREATE_DESCRIPTION["old"]}

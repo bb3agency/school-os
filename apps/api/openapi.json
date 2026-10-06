@@ -19600,6 +19600,11 @@
             "title": "School Name",
             "type": "string"
           },
+          "security_hold": {
+            "default": false,
+            "title": "Security Hold",
+            "type": "boolean"
+          },
           "subscription": {
             "anyOf": [
               {
@@ -44987,7 +44992,7 @@
     },
     "/api/v1/support/tickets": {
       "get": {
-        "description": "This school's tickets, newest first (permission ``support.ticket.create``).",
+        "description": "This school's tickets, newest first (permission ``support.ticket.create``): the ones\nyou opened, or every ticket of the school with ``support.manage``.",
         "operationId": "list_tickets_api_v1_support_tickets_get",
         "parameters": [
           {
@@ -45142,7 +45147,7 @@
     },
     "/api/v1/support/tickets/{ticket_id}": {
       "get": {
-        "description": "One of this school's tickets with its messages (internal notes are never shown).",
+        "description": "One of this school's tickets with its messages (internal notes are never shown). 404\nfor a ticket someone else opened unless you hold ``support.manage``.",
         "operationId": "get_ticket_api_v1_support_tickets__ticket_id__get",
         "parameters": [
           {
@@ -45210,7 +45215,7 @@
     },
     "/api/v1/support/tickets/{ticket_id}/messages": {
       "post": {
-        "description": "Reply on this school's ticket (permission ``support.ticket.create``). Accepts\n``Idempotency-Key``: a retry with the same key does not post the reply twice.",
+        "description": "Reply on a ticket you opened, or on any ticket of the school with ``support.manage``\n(404 otherwise; permission ``support.ticket.create``). Accepts\n``Idempotency-Key``: a retry with the same key does not post the reply twice.",
         "operationId": "reply_to_ticket_api_v1_support_tickets__ticket_id__messages_post",
         "parameters": [
           {

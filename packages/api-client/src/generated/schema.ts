@@ -5206,7 +5206,8 @@ export interface paths {
         };
         /**
          * List Tickets
-         * @description This school's tickets, newest first (permission ``support.ticket.create``).
+         * @description This school's tickets, newest first (permission ``support.ticket.create``): the ones
+         *     you opened, or every ticket of the school with ``support.manage``.
          */
         get: operations["list_tickets_api_v1_support_tickets_get"];
         put?: never;
@@ -5231,7 +5232,8 @@ export interface paths {
         };
         /**
          * Get Ticket
-         * @description One of this school's tickets with its messages (internal notes are never shown).
+         * @description One of this school's tickets with its messages (internal notes are never shown). 404
+         *     for a ticket someone else opened unless you hold ``support.manage``.
          */
         get: operations["get_ticket_api_v1_support_tickets__ticket_id__get"];
         put?: never;
@@ -5253,7 +5255,8 @@ export interface paths {
         put?: never;
         /**
          * Reply To Ticket
-         * @description Reply on this school's ticket (permission ``support.ticket.create``). Accepts
+         * @description Reply on a ticket you opened, or on any ticket of the school with ``support.manage``
+         *     (404 otherwise; permission ``support.ticket.create``). Accepts
          *     ``Idempotency-Key``: a retry with the same key does not post the reply twice.
          */
         post: operations["reply_to_ticket_api_v1_support_tickets__ticket_id__messages_post"];
@@ -13094,6 +13097,11 @@ export interface components {
             provisioning?: components["schemas"]["ProvisioningOut"] | null;
             /** School Name */
             school_name: string;
+            /**
+             * Security Hold
+             * @default false
+             */
+            security_hold: boolean;
             subscription: components["schemas"]["SubscriptionOut"] | null;
             /** Subscription Status */
             subscription_status: ("trial" | "active" | "past_due" | "suspended" | "cancelled") | null;

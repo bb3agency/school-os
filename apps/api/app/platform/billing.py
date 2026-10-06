@@ -792,13 +792,17 @@ def reactivate_subscription(
         )
     if sub0 is None or dep is None:
         raise NotFound("Subscription not found")
-    resume_tenant = (
-        dep["mode"] == "shared"
-        and dep["tenant_status"] == "suspended"
-        and dep["tenant_status_reason"] == "billing"
-    )
     with platform_session() as s, db_errors():
         sub = _sub_or_404(s, sub_id)
+        # Under the deployment lock: a security hold placed meanwhile keeps the school
+        # suspended; paying never lifts a hold (audit 2026-10-06 R-18).
+        dep = must(repo.get(s, m.deployments, dep["id"], for_update=True))
+        resume_tenant = (
+            dep["mode"] == "shared"
+            and dep["tenant_status"] == "suspended"
+            and dep["tenant_status_reason"] == "billing"
+            and not dep["security_hold"]
+        )
         if sub["status"] != "suspended":
             raise Conflict(
                 "Only a suspended subscription can be reactivated.", code="invalid_state"
