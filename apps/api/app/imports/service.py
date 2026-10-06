@@ -726,6 +726,18 @@ def set_mapping(
             mapping[str(column.index)] = column.target
     specs = _specs(session)
     problems += mapping_problems(mapping, len(batch.columns), specs, batch.source)
+    if not ctx.has(READ_SENSITIVE):
+        # A restricted column may go to "ignore" or another restricted field, never to a field
+        # whose checked values the caller could then read (audit 2026-10-06 R-06).
+        restricted = _restricted_columns(batch, len(batch.columns), specs)
+        for i, column in enumerate(data.columns):
+            spec = specs.get(column.target)
+            if (
+                column.index in restricted
+                and column.target != IGNORE
+                and not (spec and spec.sensitive)
+            ):
+                problems.append(issue(f"columns.{i}.target", "column_restricted"))
     if problems:
         raise ValidationFailed(problems)
     repo.replace_rows(session, batch.tenant_id, batch.id, [])

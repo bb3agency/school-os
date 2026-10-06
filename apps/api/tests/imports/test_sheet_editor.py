@@ -141,9 +141,13 @@ def test_SEC_015_a_column_once_mapped_to_a_restricted_field_stays_hidden(
     sheet = _sheet(api, staff, batch_id)
     assert sheet.json()["columns"][7]["restricted"] is True
     assert "Synthetic faith" not in sheet.text
-    res = put(staff, [*columns, {"index": 7, "target": "mother_tongue"}])  # a C2 field
-    assert res.status_code == 200, res.text
+    # Nor may it go to a C2 field, whose checked values /rows would then show.
+    res = put(staff, [*columns, {"index": 7, "target": "mother_tongue"}])
+    assert res.status_code == 422, res.text
+    assert res.json()["errors"][0]["code"] == "column_restricted"
     assert "Synthetic faith" not in _sheet(api, staff, batch_id).text
+    # Someone who may read restricted values can still correct the mapping.
+    assert put(admin, [*columns, {"index": 7, "target": "mother_tongue"}]).status_code == 200
 
 
 def test_FR_IMP_008_edit_rechecks_the_row_and_commit_adds_the_edited_values(
