@@ -13,6 +13,7 @@ from typing import Any
 
 from sqlalchemy import func, literal_column, or_, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.academics.models import AttendanceMark, Exam, ExamMark
@@ -117,10 +118,19 @@ def student_marks(
 # --- exams ----------------------------------------------------------------------------------------
 
 
-def insert_exam(session: Session, values: Mapping[str, Any]) -> Exam:
+def insert_exam(session: Session, values: Mapping[str, Any]) -> Exam | None:
+    """The new exam, or ``None`` when a concurrent request created one with the same name in
+    the same year first (``exams_name_per_year``; the savepoint keeps the transaction usable)."""
     exam = Exam(tenant_id=current_tenant_id(session), **values)
-    session.add(exam)
-    session.flush()
+    try:
+        with session.begin_nested():
+            session.add(exam)
+            session.flush()
+    except IntegrityError as exc:
+        diag = getattr(exc.orig, "diag", None)
+        if getattr(diag, "constraint_name", None) == "exams_name_per_year":
+            return None
+        raise
     session.refresh(exam)
     return exam
 

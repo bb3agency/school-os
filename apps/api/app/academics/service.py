@@ -516,6 +516,11 @@ def create_exam(session: Session, ctx: UserContext, data: ExamCreate) -> ExamOut
             "created_by": ctx.user_id,
         },
     )
+    if exam is None:  # R-13: a concurrent request created the same exam first
+        raise ValidationFailed(
+            [_error("name", "exam_name_taken")],
+            detail="Some entries cannot be saved. Fix them and try again.",
+        )
     _audit(
         session,
         "exam.created",

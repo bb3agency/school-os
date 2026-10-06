@@ -96,6 +96,18 @@ def translate_db_error(exc: DBAPIError) -> DomainError | None:  # noqa: PLR0911
         )
     if state == "42501":
         return Forbidden()
+    if state in ("22003", "22008"):
+        # R-13: a computed amount or date the column cannot hold (e.g. quantity x unit price
+        # past Numeric(14, 2)) is a request for an impossible value, not a server fault.
+        return ValidationFailed(
+            [
+                {
+                    "field": "body",
+                    "code": "value_out_of_range",
+                    "message_key": "errors.value_out_of_range",
+                }
+            ]
+        )
     return None
 
 

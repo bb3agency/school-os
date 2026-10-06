@@ -14,6 +14,7 @@ from decimal import Decimal
 from typing import Annotated, Any, Literal, Self
 
 from pydantic import (
+    AfterValidator,
     AwareDatetime,
     BaseModel,
     BeforeValidator,
@@ -75,6 +76,21 @@ EmailStr = Annotated[
     StringConstraints(max_length=254, pattern=r"^[^@\s]{1,64}@[a-z0-9.-]+\.[a-z]{2,63}$"),
 ]
 Money = Annotated[Decimal, Field(ge=0, max_digits=14, decimal_places=2)]
+# Counts stored in or compared with int4 columns (R-13: a larger number was a 500).
+Count = Annotated[int, Field(ge=0, le=2_147_483_647)]
+# Billing calendar dates: periods are computed a month or more ahead, so a date at the edge of the
+# calendar (year 1 or 9999) overflowed (R-13). The bounds are far outside any real billing date.
+_BILLING_YEARS = (2000, 2999)
+
+
+def _billing_year(value: dt.date) -> dt.date:
+    if not _BILLING_YEARS[0] <= value.year <= _BILLING_YEARS[1]:
+        raise ValueError(f"must be between the years {_BILLING_YEARS[0]} and {_BILLING_YEARS[1]}")
+    return value
+
+
+BillingDate = Annotated[dt.date, AfterValidator(_billing_year)]
+BillingDatetime = Annotated[AwareDatetime, AfterValidator(_billing_year)]
 PlanDescription = Annotated[
     str,
     BeforeValidator(_nfc),
@@ -153,11 +169,11 @@ class MeOut(Out):
 
 
 class PlanLimits(In):
-    students: int | None = Field(default=None, ge=0)
-    staff_users: int | None = Field(default=None, ge=0)
-    storage_gb: int | None = Field(default=None, ge=0)
-    documents: int | None = Field(default=None, ge=0)
-    ai_tokens_month: int | None = Field(default=None, ge=0)
+    students: Count | None = None
+    staff_users: Count | None = None
+    storage_gb: Count | None = None
+    documents: Count | None = None
+    ai_tokens_month: Count | None = None
     ai_budget_inr: Money | None = None
 
 
@@ -169,7 +185,7 @@ class PlanIn(In):
     pricing_model: Literal["flat", "per_student"] = "flat"
     base_price_inr: Money
     per_student_price_inr: Money | None = None
-    included_students: int | None = Field(default=None, ge=0)
+    included_students: Count | None = None
     gst_rate: Literal["0", "5", "12", "18", "28"] = "18"
     sac_code: Annotated[str, StringConstraints(pattern=r"^[0-9]{6}$")] | None = None
     trial_days: int = Field(default=30, ge=0, le=365)
@@ -190,12 +206,31 @@ class PlanPatch(In):
     name: Text100 | None = None
     base_price_inr: Money | None = None
     per_student_price_inr: Money | None = None
-    included_students: int | None = Field(default=None, ge=0)
+    included_students: Count | None = None
     trial_days: int | None = Field(default=None, ge=0, le=365)
     limits: PlanLimits | None = None
     features: dict[FlagKey, bool] | None = Field(default=None, max_length=50)
     one_time_fee_inr: Money | None = None
     description: PlanDescription | None = None
+
+    @model_validator(mode="after")
+    def _no_null_for_required(self) -> Self:
+        # R-13: these columns are NOT NULL; an explicit null was written as NULL (500).
+        nulls = [
+            k
+            for k in (
+                "name",
+                "base_price_inr",
+                "trial_days",
+                "limits",
+                "features",
+                "one_time_fee_inr",
+            )
+            if k in self.model_fields_set and getattr(self, k) is None
+        ]
+        if nulls:
+            raise ValueError(f"{', '.join(nulls)} cannot be empty")
+        return self
 
 
 class PlanOut(Out):
@@ -338,7 +373,7 @@ class AiBundleIn(In):
 
 
 class ExtendTrialIn(In):
-    trial_ends_at: AwareDatetime
+    trial_ends_at: BillingDatetime
 
 
 class ChangePlanIn(In):
@@ -399,7 +434,7 @@ class InvoiceLineOut(Out):
 
 class InvoiceCreate(In):
     subscription_id: uuid.UUID
-    period_start: dt.date
+    period_start: BillingDate
 
 
 class InvoicePatch(In):

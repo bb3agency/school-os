@@ -155,7 +155,44 @@ def install_error_handlers(app: FastAPI) -> None:
                     ]
                 },
             )
+        if _is_out_of_range(exc):
+            return problem(
+                request,
+                status=422,
+                code="value_out_of_range",
+                title="Validation failed",
+                detail="A number or date is too large. Use a smaller value and try again.",
+                extra={
+                    "errors": [
+                        {
+                            "field": "body",
+                            "code": "value_out_of_range",
+                            "message_key": "errors.value_out_of_range",
+                        }
+                    ]
+                },
+            )
         return problem(request, status=500, code="internal_error", title="Something went wrong")
+
+
+# SQLSTATE 22003 numeric_value_out_of_range, 22008 datetime_field_overflow.
+_OUT_OF_RANGE_STATES = frozenset({"22003", "22008"})
+
+
+def _is_out_of_range(exc: BaseException) -> bool:
+    """PostgreSQL's refusal of a number or date its column cannot hold (for example a computed
+    invoice amount past Numeric(14, 2)), raised directly or wrapped by SQLAlchemy. The request
+    asked for an impossible value, so it is a 422, not a 500 (audit 2026-10-06 R-13). The
+    transaction has already been rolled back by the session scope."""
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if getattr(current, "sqlstate", None) in _OUT_OF_RANGE_STATES:
+            return True
+        orig = getattr(current, "orig", None)
+        current = orig if isinstance(orig, BaseException) else current.__cause__
+    return False
 
 
 _NUL_MESSAGE = "cannot contain NUL"

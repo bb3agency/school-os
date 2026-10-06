@@ -136,7 +136,7 @@ def test_R_07_office_admin_cannot_edit_the_profile_of_an_owner_or_principal(
             res = _profile(api, office_admin, target.user_id, body)
             assert res.status_code == 403, res.text
             assert res.json()["code"] == "role_not_grantable"
-    assert [e for e in W.audit_events(admin_engine, tid, "user.profile_updated")] == []
+    assert W.audit_events(admin_engine, tid, "user.profile_updated") == []
     # The owner still edits everyone, and a member still edits their own profile.
     res = _profile(api, owner, principal.user_id, {"display_name": "Synthetic Principal"})
     assert res.status_code == 200, res.text
