@@ -110,6 +110,39 @@ async function tabIntoGrid(user: ReturnType<typeof userEvent.setup>) {
   await user.tab();
 }
 
+describe("SheetGrid: touch (docs/17 §5.7)", () => {
+  it("one tap opens the editor; Save sends the value, Cancel keeps the cell", async () => {
+    const commit = vi.fn();
+    renderWithIntl(<Harness onCommit={commit} />);
+    const grid = screen.getByRole("grid", { name: "Rows" });
+    const cell = within(grid).getAllByRole("gridcell")[1]!;
+    fireEvent.pointerDown(cell, { pointerType: "touch" });
+    fireEvent.click(cell);
+    const input = screen.getByRole("textbox");
+    expect(input).toHaveAttribute("enterkeyhint", "done");
+    fireEvent.change(input, { target: { value: "Synthetica Tapped" } });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(commit).not.toHaveBeenCalled();
+
+    fireEvent.pointerDown(cell, { pointerType: "touch" });
+    fireEvent.click(cell);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Synthetica Tapped" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(commit).toHaveBeenCalledWith(2, 1, "Synthetica Tapped"));
+  });
+
+  it("a mouse click only selects; the mouse still edits with a double click", () => {
+    renderWithIntl(<Harness onCommit={vi.fn()} />);
+    const cell = within(screen.getByRole("grid", { name: "Rows" })).getAllByRole("gridcell")[1]!;
+    fireEvent.pointerDown(cell, { pointerType: "mouse" });
+    fireEvent.click(cell);
+    expect(screen.queryByRole("textbox")).toBeNull();
+    fireEvent.doubleClick(cell);
+    expect(screen.getByRole("textbox")).toBeInTheDocument();
+  });
+});
+
 describe("SheetGrid: keyboard use (arrows, Enter, Escape)", () => {
   it("moves with the arrow keys, edits with Enter and cancels with Escape", async () => {
     const commit = vi.fn();
