@@ -51,6 +51,7 @@ roles:
       export.read_all: school
       export.download_any: school_step_up
       support.ticket.create: school
+      support.manage: school
       certificate.read: school
       certificate.approve: school_step_up
       register.read: school_step_up
@@ -105,6 +106,7 @@ roles:
       marks.read: school
       breakglass.approve: school_step_up
       support.ticket.create: school
+      support.manage: school
       certificate.read: school
       certificate.issue: school
       certificate.approve: school_step_up
@@ -143,6 +145,7 @@ roles:
       export.read_all: school
       audit.read: school
       support.ticket.create: school
+      support.manage: school
       certificate.read: school
       certificate.issue: school
       register.read: school_step_up

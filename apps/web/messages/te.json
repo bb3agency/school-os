@@ -606,6 +606,8 @@
       "ticketTitle": "సహాయ టికెట్",
       "description": "SchoolOS సహాయం అడగండి. మేము ఇక్కడ మరియు ఈమెయిల్‌లో జవాబిస్తాము.",
       "listTitle": "మీ పాఠశాల టికెట్లు",
+      "listTitleOwn": "Tickets you opened",
+      "ownOnlyNote": "You see the tickets you opened. The owner, principal and office admin see every ticket of the school.",
       "colNumber": "టికెట్",
       "colSubject": "విషయం",
       "colStatus": "స్థితి",

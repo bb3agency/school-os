@@ -913,8 +913,8 @@ Served by `app/platform/tenant_api.py` in the caller's `tenant_session`.
 | GET | `/tenant/billing/invoices` | `tenant.billing.read` | 200 | Own issued invoices, newest first (last 24): number, period, total, amount due, status |
 | GET | `/announcements` | any active member (`session.authenticated`) | 200 | Active announcements for this school, EN and TE (§14) |
 | POST | `/support/tickets` | `support.ticket.create` | 201 | Opens a ticket via `platform.service.open_ticket_from_tenant`; text redacted before storage |
-| GET | `/support/tickets` · `/support/tickets/{ticket_id}` | `support.ticket.create` | 200 | The school's own tickets; internal notes never shown |
-| POST | `/support/tickets/{ticket_id}/messages` | `support.ticket.create` | 200 | Reply on the school's own ticket |
+| GET | `/support/tickets` · `/support/tickets/{ticket_id}` | `support.ticket.create` | 200 | The tickets the caller opened, or every ticket of the school with `support.manage` (owner, principal, office admin); others' tickets answer 404 (audit 2026-10-06 R-17); internal notes never shown |
+| POST | `/support/tickets/{ticket_id}/messages` | `support.ticket.create` | 200 | Reply on a ticket the caller opened, or on any ticket of the school with `support.manage` |
 
 ## 9. Billing lifecycle
 
@@ -1228,7 +1228,7 @@ In addition to the general suites (12 §4):
 | Q3 | GST registration and SAC code. Below the registration threshold SchoolOS may not charge GST; the correct SAC for SaaS needs confirming; services to schools are generally taxable at 18% but check exemptions. TDS deducted by schools also needs handling. | Confirm with a CA; until registered, issue invoices with GST rate 0 and a note; keep `tds_inr` in payments | Founder + CA |
 | Q4 | Identity for dedicated hosts: per-deployment app client in the shared Cognito user pool, or a separate user pool per host? | Per-deployment app client (callback URLs per host); revisit for schools that require full separation | Engineering |
 | Q5 | Feature flags on dedicated hosts: the host's local `platform.feature_flags` cannot be written by the control plane. | The deploy pipeline writes the deployment's flag set on each release (`updated_by` NULL); M1: consider delivering flags in the heartbeat response | Engineering |
-| Q6 | Opening tickets from the school app needs a tenant permission. | **Settled:** `support.ticket.create` is in the catalog and granted to every staff role (07 §6.2); school routes in §8.3 | Product owner |
+| Q6 | Opening tickets from the school app needs a tenant permission. | **Settled:** `support.ticket.create` is in the catalog and granted to every staff role (07 §6.2); school routes in §8.3. A member reads only the tickets they opened; `support.manage` (owner, principal, office admin) reads every ticket of the school (audit 2026-10-06 R-17, migration 0047; existing schools get the grant from `python -m app.identity.sync_system_roles --apply`) | Product owner |
 | Q7 | Dedicated schools' Plan & billing page and in-app tickets need data from the control plane. | M1: billing summary in the heartbeat response; tickets via email/phone until an authenticated outbound ticket call is designed | Product owner |
 | Q8 | Default trial length and pilot terms. | **Implemented** per plan: `platform.plans.trial_days` (default 30), extendable by billing admin; design partner per signed pilot terms | Founder |
 | Q9 | Should `admin.<domain>` be restricted by IP allowlist in addition to MFA? | Not at Stage 0 (operators travel); WAF rate rules and geo-restriction to India; revisit at Stage 1 | Engineering |

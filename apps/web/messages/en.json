@@ -606,6 +606,8 @@
       "ticketTitle": "Support ticket",
       "description": "Ask SchoolOS for help. We reply here and by email.",
       "listTitle": "Your school's tickets",
+      "listTitleOwn": "Tickets you opened",
+      "ownOnlyNote": "You see the tickets you opened. The owner, principal and office admin see every ticket of the school.",
       "colNumber": "Ticket",
       "colSubject": "Subject",
       "colStatus": "Status",

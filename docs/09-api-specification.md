@@ -147,9 +147,9 @@ The active school is sent by the BFF as `X-Active-Tenant`. A user with several m
 | GET | `/tenant/billing` | `tenant.billing.read` | Current plan, status, period, trial end, usage vs limits (via `core.current_subscription()`); `ai_bundle`: the AI answer bundle (name, included answers, ex-GST price and price per extra answer, this IST month's answers so far) or `null` (docs/16 §5.18) (**built**) |
 | GET | `/tenant/billing/invoices` | `tenant.billing.read` | Own issued invoices, newest first (last 24): number, period, total, amount due, status (**built**) |
 | GET | `/announcements` | any active member | Active platform announcements for this school, English and Telugu text (Telugu empty while hidden, ADR-0036) (**built**) |
-| POST · GET | `/support/tickets` | `support.ticket.create` | Open (201) or list the school's own tickets; text is redacted before storage (**built**) |
-| GET | `/support/tickets/{ticket_id}` | `support.ticket.create` | One of the school's tickets with its messages; internal notes never shown (**built**) |
-| POST | `/support/tickets/{ticket_id}/messages` | `support.ticket.create` | Reply on the school's own ticket (200) (**built**) |
+| POST · GET | `/support/tickets` | `support.ticket.create` | Open (201) or list tickets; text is redacted before storage. The list holds the tickets the caller opened, or every ticket of the school with `support.manage` (audit 2026-10-06 R-17) (**built**) |
+| GET | `/support/tickets/{ticket_id}` | `support.ticket.create` | One ticket with its messages; internal notes never shown. 404 for a ticket another member opened unless the caller holds `support.manage` (**built**) |
+| POST | `/support/tickets/{ticket_id}/messages` | `support.ticket.create` | Reply on a ticket the caller opened, or on any ticket of the school with `support.manage` (200; 404 otherwise) (**built**) |
 
 ### Students
 | Method | Path | Permission | Notes |

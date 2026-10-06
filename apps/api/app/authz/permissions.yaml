@@ -47,8 +47,12 @@ permissions:
     sensitivity: critical
     step_up: true
   support.ticket.create:
-    description: Open and read the school's own support tickets
+    description: Open support tickets and read and reply on the ones you opened
     sensitivity: normal
+    step_up: false
+  support.manage:
+    description: Read and reply on every support ticket of the school
+    sensitivity: sensitive
     step_up: false
   breakglass.approve:
     description: Approve or revoke temporary platform support access
