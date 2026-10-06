@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 from sqlalchemy import Engine, text
 
+from app.academics import repository as academics_repo
 from app.academics import service as academics
 from app.academics.schemas import (
     AttendanceEntryIn,
@@ -365,7 +366,7 @@ def test_R_13_a_concurrent_duplicate_exam_is_a_422_not_a_500(
     name = f"Synthetic race {uuid.uuid4().hex[:5]}"
     with tenant_session(school.tenant_id, actor.user_id) as db:
         academics.create_exam(db, actor, ExamCreate(name=name, held_on=today))
-    monkeypatch.setattr(academics.repo, "exam_name_taken", lambda *_a, **_k: False)
+    monkeypatch.setattr(academics_repo, "exam_name_taken", lambda *_a, **_k: False)
     with (
         pytest.raises(ValidationFailed) as err,
         tenant_session(school.tenant_id, actor.user_id) as db,
