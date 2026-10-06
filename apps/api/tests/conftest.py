@@ -27,6 +27,7 @@ from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.engine import make_url
 
 from app.core import db as core_db
+from app.core import ratelimit
 
 # Synthetic supplier identity so tests that build staging/prod Settings pass the invoice guard
 # (FR-PLT-016). Tests of the guard itself pass the dev placeholders explicitly.
@@ -186,6 +187,17 @@ def readonly_engine(test_database: TestDatabase) -> Iterator[Engine]:
 @pytest.fixture(scope="session")
 def make_alembic_config() -> type[Config] | object:
     return alembic_config
+
+
+@pytest.fixture(autouse=True)
+def _full_rate_limit_budgets() -> None:
+    """Every test starts with full rate-limit budgets, like a fresh minute. Limiting itself stays
+    ON in tests (tests/core/test_ratelimit.py proves it); only the per-process counters of the
+    previous test are forgotten, so suites that share one synthetic school do not add up."""
+    limiter = ratelimit.get_rate_limiter()
+    if isinstance(limiter.store, ratelimit.InMemoryRateLimitStore):
+        limiter.store.reset()
+    limiter.fallback.reset()
 
 
 @pytest.fixture

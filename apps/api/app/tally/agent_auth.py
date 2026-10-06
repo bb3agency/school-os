@@ -241,7 +241,10 @@ def verify_signed(
     _claim_nonce(stores, tenant_id, nonce)
     window = dt.timedelta(seconds=getattr(rules().rate_limits_seconds, route))
     if not stores.rate.claim(f"{device_id}:{route}", window):
-        raise RateLimited("Too many requests from this Tally agent; try again later.")
+        raise RateLimited(
+            "Too many requests from this Tally agent; try again later.",
+            retry_after_s=int(window.total_seconds()),
+        )
     return AgentCaller(
         tenant_id=tenant_id,
         device_id=device_id,
@@ -264,7 +267,10 @@ def verify_enrolment(
     slots = rules().enrolment.max_attempts_per_hour
     ttl = dt.timedelta(hours=1)
     if not any(stores.enrolment.claim(f"{tenant_id}:{hour}:{i}", ttl) for i in range(slots)):
-        raise RateLimited("Too many enrolment attempts for this school; try again in an hour.")
+        raise RateLimited(
+            "Too many enrolment attempts for this school; try again in an hour.",
+            retry_after_s=3600 - int(current.timestamp()) % 3600,
+        )
     return EnrolmentCaller(tenant_id=tenant_id, agent_version=_agent_version(headers))
 
 

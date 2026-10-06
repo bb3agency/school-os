@@ -67,7 +67,22 @@ class StepUpRequired(DomainError):
 
 
 class RateLimited(DomainError):
+    """429 (RFC 6585). ``retry_after_s`` becomes the ``Retry-After`` header (RFC 9110 §10.2.3)
+    and the ``retry_after`` member of the problem body, so the UI can say how long to wait."""
+
     status, code, title = 429, "rate_limited", "Too many requests"
+    retry_after_s: int | None = None
+
+    def __init__(
+        self,
+        detail: str | None = None,
+        *,
+        code: str | None = None,
+        retry_after_s: int | None = None,
+    ) -> None:
+        super().__init__(detail, code=code)
+        if retry_after_s is not None:
+            self.retry_after_s = max(1, int(retry_after_s))
 
 
 class ServiceUnavailable(DomainError):
@@ -82,6 +97,7 @@ def problem(
     title: str,
     detail: str | None = None,
     extra: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
 ) -> JSONResponse:
     body: dict[str, Any] = {
         "type": ERROR_TYPE_BASE + code,
@@ -95,13 +111,19 @@ def problem(
         body["detail"] = detail
     if extra:
         body.update(extra)
-    return JSONResponse(body, status_code=status, media_type=PROBLEM_JSON)
+    return JSONResponse(body, status_code=status, media_type=PROBLEM_JSON, headers=headers)
 
 
 def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(DomainError)
     async def _domain(request: Request, exc: DomainError) -> JSONResponse:
-        extra = {"errors": exc.errors} if isinstance(exc, ValidationFailed) else None
+        extra: dict[str, Any] | None = (
+            {"errors": exc.errors} if isinstance(exc, ValidationFailed) else None
+        )
+        headers: dict[str, str] | None = None
+        if isinstance(exc, RateLimited) and exc.retry_after_s is not None:
+            headers = {"Retry-After": str(exc.retry_after_s)}
+            extra = {"retry_after": exc.retry_after_s}
         return problem(
             request,
             status=exc.status,
@@ -109,6 +131,7 @@ def install_error_handlers(app: FastAPI) -> None:
             title=exc.title,
             detail=exc.detail,
             extra=extra,
+            headers=headers,
         )
 
     @app.exception_handler(RequestValidationError)

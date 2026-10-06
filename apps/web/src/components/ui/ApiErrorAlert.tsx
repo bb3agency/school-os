@@ -85,7 +85,11 @@ export function ApiErrorAlert({
   }
   return (
     <Alert tone="danger" live title={t(`${described.key}.title`)} className={className}>
-      <p>{t(`${described.key}.body`)}</p>
+      <p>
+        {described.key === "rate_limited" && described.retryAfter !== undefined
+          ? t("rate_limited.bodyWait", { seconds: described.retryAfter })
+          : t(`${described.key}.body`)}
+      </p>
       {described.requestId ? (
         <p className="mt-1 text-xs">{t("reference", { id: described.requestId })}</p>
       ) : null}

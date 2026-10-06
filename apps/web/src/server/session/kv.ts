@@ -16,6 +16,11 @@ export interface KeyValue {
   sadd(key: string, member: string): Promise<number>;
   srem(key: string, member: string): Promise<void>;
   smembers(key: string): Promise<string[]>;
+  /**
+   * INCR, with PEXPIRE ms when the key is new (a fixed window), in one atomic step; returns
+   * the new count and the window's remaining time (rate limits, src/server/auth/rate-limit.ts).
+   */
+  incr(key: string, windowMs: number): Promise<{ count: number; ttlMs: number }>;
 }
 
 type Entry = { value: string | Set<string>; expiresAt: number | null };
@@ -98,5 +103,18 @@ export class MemoryKeyValue implements KeyValue {
   async smembers(key: string): Promise<string[]> {
     const entry = this.live(key);
     return entry && typeof entry.value !== "string" ? [...entry.value] : [];
+  }
+
+  async incr(key: string, windowMs: number): Promise<{ count: number; ttlMs: number }> {
+    let entry = this.live(key);
+    if (!entry) {
+      entry = { value: "0", expiresAt: this.now() + Math.max(1, Math.ceil(windowMs)) };
+      this.data.set(key, entry);
+    }
+    if (typeof entry.value !== "string") throw new Error("WRONGTYPE");
+    const count = Number(entry.value) + 1;
+    entry.value = String(count);
+    const ttlMs = entry.expiresAt === null ? -1 : entry.expiresAt - this.now();
+    return { count, ttlMs };
   }
 }

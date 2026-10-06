@@ -66,6 +66,31 @@ run "waf_rules" {
     error_message = "The stricter auth rate limit covers the BFF sign-in routes (/bff/auth/*, apps/web)."
   }
 
+  # P2-07: rate rules answer 429 problem+json with Retry-After; the machine paths have their own rule.
+  assert {
+    condition = alltrue([
+      for r in aws_wafv2_web_acl.this.rule :
+      one(one(one(r.action).block).custom_response).response_code == 429
+      && one(one(one(one(r.action).block).custom_response).response_header).name == "Retry-After"
+      if startswith(r.name, "rate-limit-")
+    ]) && length([for r in aws_wafv2_web_acl.this.rule : r if startswith(r.name, "rate-limit-")]) == 3
+    error_message = "Every WAF rate rule answers 429 with Retry-After (RFC 6585, RFC 9110)."
+  }
+
+  assert {
+    condition = one([
+      for r in aws_wafv2_web_acl.this.rule :
+      one(one(r.statement).rate_based_statement).limit
+      if r.name == "rate-limit-machine"
+    ]) == var.waf_machine_rate_limit_per_5min
+    error_message = "The machine paths (fleet heartbeat, Tally edge) have their own per-IP rate rule."
+  }
+
+  assert {
+    condition     = one(aws_wafv2_web_acl.this.custom_response_body).content_type == "APPLICATION_JSON"
+    error_message = "The WAF 429 body is a JSON problem."
+  }
+
   assert {
     condition     = length(aws_wafv2_web_acl_logging_configuration.this.redacted_fields) == 4
     error_message = "WAF logs redact authorization, cookie and service-token headers and the query string (SEC-008)."

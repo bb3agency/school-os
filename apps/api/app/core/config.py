@@ -6,6 +6,7 @@ Secrets arrive via environment variables injected from AWS Secrets Manager (or a
 
 from __future__ import annotations
 
+import ipaddress
 import json
 from enum import StrEnum
 from functools import lru_cache
@@ -313,6 +314,36 @@ class Settings(BaseSettings):
 
     otel_exporter_otlp_endpoint: str | None = None
 
+    # API rate limiting (app/core/ratelimit.py, budgets in app/core/rate_limits.yaml; docs/09
+    # §2.7, audit 2026-10-05 P2-07). Must stay on in staging/prod. Trusted proxies: comma-separated
+    # CIDRs (or addresses) whose X-Forwarded-For names the client: the ALB and web/BFF subnets on
+    # the shared tier (the VPC CIDR), Caddy and web on a dedicated host (its container network).
+    # Unset: X-Forwarded-For is ignored and the TCP peer is the client.
+    rate_limit_enabled: bool = True
+    trusted_proxies: str | None = None
+
+    @field_validator("trusted_proxies")
+    @classmethod
+    def _valid_proxies(cls, value: str | None) -> str | None:
+        for item in (v.strip() for v in (value or "").split(",")):
+            if not item:
+                continue
+            try:
+                net = ipaddress.ip_network(item, strict=False)
+            except ValueError as exc:
+                raise ValueError("SOS_TRUSTED_PROXIES must list CIDRs or IP addresses") from exc
+            if net.prefixlen == 0:
+                raise ValueError("SOS_TRUSTED_PROXIES must not trust every address")
+        return value
+
+    @property
+    def trusted_proxy_networks(self) -> tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...]:
+        return tuple(
+            ipaddress.ip_network(v.strip(), strict=False)
+            for v in (self.trusted_proxies or "").split(",")
+            if v.strip()
+        )
+
     # Email (invitations; app/notifications/email.py). Off by default. ``email_from`` is the
     # verified SES sender ("SchoolOS <no-reply@example.org>"); ``email_app_url`` is the web app
     # address put in links (each dedicated host has its own). Never logged with recipients.
@@ -462,6 +493,9 @@ class Settings(BaseSettings):
         self._guard_email()
         self._guard_llm_credentials()
         if self.is_production_like:
+            # Anti-automation is a production control (OWASP API4:2023, ASVS 2.2.1).
+            if not self.rate_limit_enabled:
+                raise ValueError(f"SOS_RATE_LIMIT_ENABLED must stay true in {self.env}")
             if self.key_wrapper is KeyWrapperKind.LOCAL_DEV:
                 raise ValueError("SOS_KEY_WRAPPER=local-dev is not allowed in staging/prod")
             for name in ("database_url", "platform_database_url", "service_token_key"):

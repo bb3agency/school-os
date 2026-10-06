@@ -13,6 +13,7 @@ import {
 } from "@/server/bff/http";
 import { callApi } from "@/server/bff/upstream";
 import { signedOutPath, type SessionKind } from "@/server/config";
+import { ipHash, clientIp } from "@/server/auth/rate-limit";
 import { logEvent } from "@/server/log";
 import type { AuthRuntime } from "@/server/runtime";
 import {
@@ -54,7 +55,8 @@ export type SignInError =
   | "mfa_required"
   | "step_up_failed"
   | "support_not_allowed"
-  | "support_ended";
+  | "support_ended"
+  | "too_many_attempts";
 
 function signedOutUrl(kind: SessionKind, error?: SignInError): string {
   const base = signedOutPath(kind);
@@ -72,14 +74,45 @@ function kindDisabled(runtime: AuthRuntime, kind: SessionKind): boolean {
   return false;
 }
 
+function clientHash(request: Request, runtime: AuthRuntime): string {
+  return ipHash(
+    runtime.config.serviceTokenKey,
+    clientIp(request.headers, runtime.config.trustedProxyHops),
+  );
+}
+
+/**
+ * Per-IP sign-in limit and failure backoff (P2-07, ASVS 2.2.1): null to go ahead, otherwise
+ * the signed-out page with "too many attempts" (`auth_rate_limited`, ip_hash only).
+ */
+async function tooManyAttempts(
+  request: Request,
+  runtime: AuthRuntime,
+  kind: SessionKind,
+  hash: string,
+): Promise<Response | null> {
+  const retryAfter = await runtime.authLimiter.check(hash);
+  if (retryAfter === 0) return null;
+  logEvent("auth_rate_limited", {
+    kind,
+    ip_hash: hash,
+    retry_after_s: retryAfter,
+    request_id: requestIdFrom(request.headers),
+  });
+  return seeOther(runtime, signedOutUrl(kind, "too_many_attempts"));
+}
+
 /** Redirect the browser to the IdP with a new sign-in transaction (PKCE S256, state, nonce). */
 async function startSignIn(
+  request: Request,
   runtime: AuthRuntime,
   kind: SessionKind,
   next: string,
   stepUpSessionId: string | null,
   support?: { requestId: string; tenantId: string },
 ): Promise<Response> {
+  const limited = await tooManyAttempts(request, runtime, kind, clientHash(request, runtime));
+  if (limited) return limited;
   const state = oauth.randomState();
   const nonce = oauth.randomNonce();
   const codeVerifier = oauth.randomPKCECodeVerifier();
@@ -126,7 +159,7 @@ export async function handleLogin(request: Request, runtime: AuthRuntime, kind: 
   }
   const next = safeNext(new URL(request.url).searchParams.get("next"), kind);
   if (await readSession(request, runtime, kind, { touch: false })) return seeOther(runtime, next);
-  return startSignIn(runtime, kind, next, null);
+  return startSignIn(request, runtime, kind, next, null);
 }
 
 /** GET /bff/auth/step-up?next= : re-authenticate now (prompt=login, max_age=0; ADR-0018). */
@@ -136,7 +169,7 @@ export async function handleStepUp(request: Request, runtime: AuthRuntime, kind:
   }
   const next = safeNext(new URL(request.url).searchParams.get("next"), kind);
   const current = await readSession(request, runtime, kind, { touch: false });
-  return startSignIn(runtime, kind, next, current?.session.id ?? null);
+  return startSignIn(request, runtime, kind, next, current?.session.id ?? null);
 }
 
 /** One JSON call from the BFF to the API on the user's behalf (sign-in helpers). */
@@ -360,7 +393,7 @@ export async function handleSupportLogin(request: Request, runtime: AuthRuntime)
     return seeOther(runtime, `/bff/auth/support/login?${canonical.toString()}`);
   }
   const next = safeNext(params.get("next"), "support");
-  return startSignIn(runtime, "support", next, null, {
+  return startSignIn(request, runtime, "support", next, null, {
     requestId: platformRequestId.toLowerCase(),
     tenantId: tenantId.toLowerCase(),
   });
@@ -385,16 +418,30 @@ export async function handleCallback(request: Request, runtime: AuthRuntime, kin
   const secure = config.secureCookies;
   const cookies = parseCookies(request.headers.get("cookie"));
   const clearTransaction = clearCookie(transactionCookieName(kind, secure), secure);
-  const fail = (error: SignInError) => {
-    logEvent("signin_failed", { kind, code: error, request_id: requestId });
+  const hash = clientHash(request, runtime);
+  let stepUp = false;
+  // Every refused callback is a failed sign-in (or step-up) from this address: a security event
+  // with ip_hash only, and the per-IP backoff (P2-07, ASVS 2.2.1).
+  const fail = async (error: SignInError) => {
+    const delay = await runtime.authLimiter.fail(hash);
+    logEvent(stepUp ? "step_up_failed" : "signin_failed", {
+      kind,
+      code: error,
+      ip_hash: hash,
+      retry_after_s: delay,
+      request_id: requestId,
+    });
     return seeOther(runtime, signedOutUrl(kind, error), [clearTransaction]);
   };
+  const limited = await tooManyAttempts(request, runtime, kind, hash);
+  if (limited) return limited;
 
   const transaction = runtime.transactions.decode(
     cookies.get(transactionCookieName(kind, secure)),
     kind,
   );
   if (!transaction) return fail("signin_expired");
+  stepUp = transaction.stepUpSessionId !== null && transaction.stepUpSessionId !== undefined;
 
   // The IdP redirected to our registered callback; rebuild it from APP_BASE_URL, not Host.
   const incoming = new URL(request.url);
@@ -511,6 +558,7 @@ export async function handleCallback(request: Request, runtime: AuthRuntime, kin
       next = "/no-access";
     }
   }
+  await runtime.authLimiter.clear(hash);
   logEvent(
     transaction.stepUpSessionId ? "step_up_completed" : "signin_completed",
     { kind },

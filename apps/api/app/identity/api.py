@@ -35,7 +35,8 @@ from app.authz.http import (
     paginate,
 )
 from app.authz.resolver import AuthzResolver
-from app.core.errors import Forbidden, ValidationFailed
+from app.core import ratelimit
+from app.core.errors import DomainError, Forbidden, ValidationFailed
 from app.identity import service as identity
 from app.identity.principal import Principal, get_principal
 from app.identity.schemas import (
@@ -194,10 +195,20 @@ def set_active_tenant(
 def record_login_event(principal: Caller, resolver: Resolver, request: Request) -> LoginEventOut:
     """Called once by the BFF after sign-in: audits ``auth.login.succeeded`` (or
     ``auth.login.denied`` with the reason) in the school's log (permission: authenticated;
-    rate-limited per user)."""
-    ctx = authz_service.record_login(
-        resolver, principal, tenant_hint=tenant_hint(request), request_id=request_id_of(request)
-    )
+    rate-limited per user, policy ``login_event``). A refused sign-in also counts against this
+    person from this address (``security.auth.failed``); after a few, sign-in waits with an
+    exponential delay (429 ``rate_limited`` with ``Retry-After``; ASVS 2.2.1 soft lockout). A
+    successful sign-in clears the count."""
+    key = ratelimit.principal_key(principal.kind, principal.issuer, principal.subject)
+    try:
+        ctx = authz_service.record_login(
+            resolver, principal, tenant_hint=tenant_hint(request), request_id=request_id_of(request)
+        )
+    except DomainError as refused:
+        if refused.status in (401, 403, 404):
+            ratelimit.record_auth_failure(request, reason=refused.code, principal=key)
+        raise
+    ratelimit.clear_auth_failures(request, principal=key)
     return LoginEventOut(recorded=True, tenant_id=ctx.tenant_id)
 
 

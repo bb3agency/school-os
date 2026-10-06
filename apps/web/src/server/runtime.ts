@@ -2,6 +2,7 @@ import "server-only";
 import { TransactionCodec } from "@/server/auth/transaction";
 import { createOidcClient, type CustomFetch, type OidcClient } from "@/server/auth/oidc";
 import { TokenRefresher } from "@/server/auth/refresh";
+import { AuthLimiter } from "@/server/auth/rate-limit";
 import { loadAuthConfig, type AuthConfig, type SessionKind } from "@/server/config";
 import type { KeyValue } from "@/server/session/kv";
 import { connectRedis } from "@/server/session/redis";
@@ -17,6 +18,8 @@ export interface AuthRuntime {
   oidc: Record<SessionKind, OidcClient>;
   refresher: TokenRefresher;
   transactions: TransactionCodec;
+  /** Per-IP limits and failure backoff on the sign-in routes (P2-07). */
+  authLimiter: AuthLimiter;
   /** fetch used for calls to the API (API_INTERNAL_URL). */
   apiFetch: typeof fetch;
   now: () => number;
@@ -52,6 +55,7 @@ export function createAuthRuntime(config: AuthConfig, deps: RuntimeDependencies)
       ...(deps.refreshPollMs !== undefined ? { pollMs: deps.refreshPollMs } : {}),
     }),
     transactions: new TransactionCodec(config.sessionSecret, now),
+    authLimiter: new AuthLimiter(deps.kv, now),
     apiFetch: deps.apiFetch ?? fetch,
     now,
   };

@@ -29,6 +29,23 @@ async function call(path: string, init: RequestInit = {}) {
 }
 
 describe("BFF proxy /bff/api/v1/* (SEC-004)", () => {
+  it("passes the API's 429, Retry-After and RateLimit headers through unchanged (P2-07)", async () => {
+    await h.signIn("staff", clerk);
+    h.setApi(() =>
+      json({ code: "rate_limited", status: 429, retry_after: 12 }, 429, {
+        "retry-after": "12",
+        "ratelimit-policy": '"user";q=600;w=60, "search";q=60;w=60',
+        ratelimit: '"user";r=500;t=10, "search";r=0;t=12',
+      }),
+    );
+    const response = await call("/bff/api/v1/students/search", { method: "GET" });
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("12");
+    expect(response.headers.get("ratelimit-policy")).toBe('"user";q=600;w=60, "search";q=60;w=60');
+    expect(response.headers.get("ratelimit")).toBe('"user";r=500;t=10, "search";r=0;t=12');
+    await expect(response.json()).resolves.toMatchObject({ retry_after: 12 });
+  });
+
   it("answers 401 problem+json without a session and never calls the API", async () => {
     const response = await call("/bff/api/v1/users");
     expect(response.status).toBe(401);
@@ -123,14 +140,15 @@ describe("BFF proxy /bff/api/v1/* (SEC-004)", () => {
         "x-active-tenant": "0192f3a4-0000-7000-8000-00000000dead",
         connection: "keep-alive, x-secret",
         "proxy-authorization": "Basic abc",
-        "x-forwarded-for": "10.0.0.1",
+        "x-forwarded-for": "10.0.0.1, 6.6.6.6, 198.51.100.40",
         "if-none-match": '"v0"',
       },
     });
     const upstream = h.apiCalls[0];
     expect(upstream?.headers.get("cookie")).toBeNull();
     expect(upstream?.headers.get("proxy-authorization")).toBeNull();
-    expect(upstream?.headers.get("x-forwarded-for")).toBeNull();
+    // Never the browser's chain as sent: only the address the trusted proxy appended (P2-07).
+    expect(upstream?.headers.get("x-forwarded-for")).toBe("198.51.100.40");
     expect(upstream?.headers.get("authorization")).not.toBe("Bearer attacker-token");
     expect(upstream?.headers.get("x-service-token")).not.toBe("forged");
     expect(upstream?.headers.get("x-active-tenant")).toBe(TENANT);

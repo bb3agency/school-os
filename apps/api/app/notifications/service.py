@@ -354,7 +354,8 @@ def resend_invitation_email(
     if not _cooldown(user.membership_id):
         minutes = max(1, email.resend_cooldown_s() // 60)
         raise RateLimited(
-            f"An invitation email was sent recently. Wait {minutes} minutes and try again."
+            f"An invitation email was sent recently. Wait {minutes} minutes and try again.",
+            retry_after_s=email.resend_cooldown_s(),
         )
     request_email(
         session,
