@@ -115,3 +115,30 @@ def test_SEC_003_profile_edits_are_not_changed_by_the_status_rule(
         headers={"If-Match": etag},
     )
     assert res.status_code == 200, res.text
+
+
+def _profile(api: Any, who: Any, user_id: uuid.UUID, body: dict[str, str]) -> Any:
+    etag = api.call(who, "GET", f"{USERS}/{user_id}").headers["ETag"]
+    return api.call(who, "PATCH", f"{USERS}/{user_id}", json=body, headers={"If-Match": etag})
+
+
+def test_R_07_office_admin_cannot_edit_the_profile_of_an_owner_or_principal(
+    api: Any, admin_engine: Engine
+) -> None:
+    """R-07 (SEC-003, API5): the email is where an owner's invitations and sign-in notices go,
+    so editing the profile of a member outside the caller's reach follows the status rule."""
+    tid = W.provision_school()
+    owner = W.add_member(admin_engine, tid, ["owner"])
+    office_admin = W.add_member(admin_engine, tid, ["office_admin"])
+    principal = W.add_member(admin_engine, tid, ["principal"])
+    for target in (owner, principal):
+        for body in ({"email": "synthetic.taken@example.test"}, {"display_name": "Synthetic X"}):
+            res = _profile(api, office_admin, target.user_id, body)
+            assert res.status_code == 403, res.text
+            assert res.json()["code"] == "role_not_grantable"
+    assert [e for e in W.audit_events(admin_engine, tid, "user.profile_updated")] == []
+    # The owner still edits everyone, and a member still edits their own profile.
+    res = _profile(api, owner, principal.user_id, {"display_name": "Synthetic Principal"})
+    assert res.status_code == 200, res.text
+    res = _profile(api, office_admin, office_admin.user_id, {"display_name": "Synthetic Me"})
+    assert res.status_code == 200, res.text

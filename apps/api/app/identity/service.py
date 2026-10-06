@@ -743,7 +743,8 @@ def update_user(
     (409 ``invalid_state``), and a profile shared with another school is not edited either
     (409 ``profile_shared``, ADR-0028; the whole request is refused). Nobody changes the status
     of their own membership (409 ``own_account``). Unchanged values are ignored; with nothing
-    to change the member is returned as is. Otherwise the membership version is bumped once
+    to change the member is returned as is. Editing another member's profile follows the status
+    reach rule (403 ``role_not_grantable``, R-07). Otherwise the membership version is bumped once
     (the ETag changes).
     Audit: ``user.profile_updated`` with the changed field NAMES only (never values) and
     ``membership.status_changed`` {from, to}.
@@ -776,6 +777,10 @@ def update_user(
         _guard_not_own(ctx, user_id)
         _guard_status_reach(session, ctx, membership)
     if profile:
+        if user_id != ctx.user_id:
+            # R-07 (SEC-003): the email and name of a member outside the caller's reach
+            # (owner, principal, office admin, custom roles) follow the status rule.
+            _guard_status_reach(session, ctx, membership)
         _guard_profile_not_shared(session, user_id)
         with _db_errors():
             repo.update_user_profile(
