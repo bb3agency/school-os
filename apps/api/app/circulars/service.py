@@ -1530,14 +1530,14 @@ def approve_notice(
         "source_text": None,
     }
     # The database still requires both languages on an approved notice
-    # (parent_notices_approved_complete). While Telugu is hidden an empty Telugu title or body
-    # takes the English text, so no migration is needed; it is never shown as Telugu (the page
-    # skips a Telugu section that repeats the English one, and the API hides it).
+    # (parent_notices_approved_complete). While Telugu is hidden the Telugu title and body take
+    # the English text, so no migration is needed; it is never shown as Telugu (the page skips a
+    # Telugu section that repeats the English one, and the API hides it). Any Telugu text already
+    # there is replaced too: the approver could not see it (the API hides it), so it was never
+    # reviewed and must not reach parents when Telugu is switched on (audit 2026-10-06 R-16).
     if not telugu_enabled():
-        if not notice.title_te.strip():
-            values["title_te"] = notice.title_en
-        if not notice.body_te.strip():
-            values["body_te"] = notice.body_en
+        values["title_te"] = notice.title_en
+        values["body_te"] = notice.body_en
     notice = repo.update_notice(session, notice.id, values)
     _queue_render(session, notice.id)
     _audit(
