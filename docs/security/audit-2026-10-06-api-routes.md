@@ -54,6 +54,22 @@ under "Needs owner decision" with a recommendation. The route inventory is in th
 | R-19 | API4, CWE-400 | `GET /audit/verify` (tenant and platform) re-hashes the whole chain synchronously on every call, without limit | Run verification as a job (or verify only since the last verified checkpoint) and rate-limit the route |
 | R-20 | LLM10, API4 | Notice drafts call the LLM with no per-user admission, so one user can spend the school's AI budget | Put notice drafting under the same per-user AI admission as "Ask the school" (rate-limit work, branch wip/rate-limits) |
 
+## Owner decisions of 2026-10-06: implemented (branch wip/sec3-decisions)
+
+The owner approved the recommendations above on 2026-10-06. Each was built with a test that failed first. Migration `0047_security_decisions` holds the schema parts (`support.manage` in `core.permissions`, `platform.deployments.security_hold`, `audit.chain_verifications`).
+
+| ID | What was built | Commit | Proving tests |
+|---|---|---|---|
+| R-17 | New tenant permission `support.manage` (owner, principal, office admin). Without it a member lists, reads and answers only the tickets they opened; others' tickets answer 404. The operator side is unchanged. Web: "Tickets you opened" with a note. Existing schools get the grant from `python -m app.identity.sync_system_roles --apply` (role fingerprint re-pinned) | ce7c49f | `tests/api/test_support_ticket_visibility.py`; matrix opens the caller's own ticket |
+| R-18 | `security_hold` tracked apart from billing. A hold can be placed on a billing-suspended school (`tenant.security_hold_placed`). Lifting it leaves the billing suspension (`tenant.security_hold_lifted`, reason `billing`). Paying or reactivating the subscription never lifts a hold. `409 already_on_hold`. A-08 kept. Operator UI: "Place security hold" and "Lift security hold" | bccb5cb | `tests/platform/test_billing.py::test_R_18_*`, the A-08 test (now: lift succeeds, school stays suspended, second reactivate 409) |
+| R-15 | A second heartbeat-key rotation inside the overlap (`fleet.key_rotation_overlap_days`, 7) answers `409 rotation_pending`. After the overlap the pending key is promoted first | a6521f1 | `tests/platform/test_heartbeat.py::test_R_15_*` |
+| R-14 | Deployments, announcements and break-glass requests take `limit` and `cursor` and return the standard `Page`, newest first; `/deployments` also takes `tenant_id`. Web: "Show more" on the three views; the school Deployment tab asks for its own row | a022207 | `tests/platform/test_operator_list_paging.py`; `apps/web/src/features/platform/paging.test.tsx` |
+| R-19 | `GET /audit/verify` serves the stored result. The daily job still verifies every chain in full and stores the result. `POST /audit/verify` queues a check that runs from the checkpoint (or `full`); it is limited to one per school every 10 minutes (`audit_verify`), charged after the permission check. Platform verify: one per operator every 10 minutes. Web: "Last verified on", a queued state and the cool-down message | 3cff9a6 | `tests/audit/test_verify_checkpoint.py`, `tests/api/test_audit_verify_jobs.py`; `test_tamper.py` and `test_verify_all_and_tasks.py` unchanged |
+| R-20 | AI notice drafts, retried drafts and circular readings asked for by a person take one unit of the same per-person bucket as Ask (`kb_ask`): 429 `ai_rate_limited` with `Retry-After` and the RateLimit headers. Blank notices are never limited. Ask now sends the RateLimit headers too | de6bc7e | `tests/circulars/test_ai_admission.py`; `make eval` passed before and after |
+| (hardening) | Web message for `value_out_of_range` | 7aff3f2 | `apps/web/src/components/ui/ApiErrorAlert.test.tsx` |
+
+New hardening found while building R-19 (not fixed): route budgets shared by a whole school (`per: school` in `rate_limits.yaml`: `data_export`, `heavy_jobs`) are charged by the route guard before the permission check. A member without the permission can therefore spend the school's budget with requests that are refused (403), and lock the people who may use the route out for the window. Recommendation: charge per-school route budgets after authorization, with `ratelimit.charge` as `audit_verify` now does.
+
 ## Hardening (no exploit path; not fixed here)
 
 - Naive datetimes on the audit filters are read as UTC without saying so.
@@ -63,7 +79,7 @@ under "Needs owner decision" with a recommendation. The route inventory is in th
 - Tally device-cap check races (two enrolments at once can exceed the cap by one).
 - Bidi control characters are accepted in tenant free text.
 - Exam names: the unique constraint is case-sensitive while the check is not, so two concurrent creates differing only in case both succeed (needs a `lower(name)` unique index, a migration).
-- The web has no message for the new `value_out_of_range` code (it shows the generic problem detail).
+- ~~The web has no message for the new `value_out_of_range` code~~: fixed in 7aff3f2.
 
 ## Appendix: route inventory
 
