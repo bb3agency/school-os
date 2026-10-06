@@ -521,8 +521,7 @@ module "web" {
     APP_BASE_URL            = "https://${var.app_domain}"
     PLATFORM_BASE_URL       = "https://${var.admin_domain}"
     API_INTERNAL_URL        = "http://api:8000"
-    # One proxy (the ALB) appends the client address to X-Forwarded-For (P2-07 rate limits).
-    TRUSTED_PROXY_HOPS = "1"
+    TRUSTED_PROXY_HOPS      = "1" # the ALB appends the client address (P2-07)
     OIDC_ISSUER             = module.cognito.tenant_issuer
     OIDC_CLIENT_ID          = module.cognito.tenant_client_id
     PLATFORM_OIDC_ISSUER    = module.cognito.platform_issuer

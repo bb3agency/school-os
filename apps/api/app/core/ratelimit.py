@@ -832,3 +832,28 @@ def header_values(states: Sequence[PolicyState]) -> tuple[str, str] | None:
     policy = ", ".join(f'"{n}";q={s.policy.quota};w={s.policy.window_s}' for n, s in seen.items())
     current = ", ".join(f'"{n}";r={s.remaining};t={s.reset_s}' for n, s in seen.items())
     return policy, current
+
+
+OPENAPI_429: Final[dict[int | str, dict[str, Any]]] = {
+    429: {
+        "description": (
+            "Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with "
+            "`retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`."
+        ),
+        "headers": {
+            "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 §10.2.3).",
+                "schema": {"type": "integer", "minimum": 1},
+            },
+            "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {"type": "string"},
+            },
+            "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {"type": "string"},
+            },
+        },
+    }
+}
+"""Documented on every rate-limited route (``create_app``)."""

@@ -37,8 +37,46 @@ Dedicated host beat ──(HMAC-signed heartbeat, outbound only)──▶ contro
 | Filtering/sorting | Explicit query params per endpoint (e.g., `?section_id=&status=`); `sort=field` or `sort=-field` from an allowlist. Query params carry only IDs, codes, enums, record dates, cursors and page sizes |
 | Personal data in URLs | **Never.** Names, phone numbers, emails, dates of birth, addresses, admission numbers, Aadhaar-like input and free-text searches go in a JSON body: searches use `POST /<collection>/search` with the filters, `limit` and `cursor` in the body and the same response as the list (`200`, no `Idempotency-Key`). ALB access logs keep full URLs and cannot redact them (07 §11; `tests/security/test_no_pii_in_urls.py`) |
 | Async jobs | `202 Accepted` + `Location: /api/v1/jobs/{id}`; job resource shows `status`, `progress`, `result_url` |
-| Rate limits | `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset` headers; `429` with `Retry-After` |
+| Rate limits | `RateLimit-Policy` and `RateLimit` header fields (IETF draft-ietf-httpapi-ratelimit-headers-11, which replaced the older `RateLimit-Limit`/`-Remaining`/`-Reset` triple); `429` problem+json `rate_limited` with `Retry-After` (seconds) and `retry_after`. See §2.7 |
 | Deprecation | Additive changes only within v1; removals announced with `Deprecation` (RFC 9745, `@<unix seconds>`), `Sunset` (RFC 8594, HTTP-date) and, where a replacement exists, `Link: <...>; rel="successor-version"` headers, sent only on responses that use the deprecated feature, and marked `deprecated` in OpenAPI |
+
+### 2.7 Rate limits (audit 2026-10-05 P2-07; OWASP API4:2023; ASVS 2.2.1, 11.1.4)
+
+Budgets are versioned in `apps/api/app/core/rate_limits.yaml` (invariant 13); the code is `app/core/ratelimit.py`.
+
+- **Algorithm.** GCRA (token bucket) in Valkey: one Lua script per check reads the Valkey clock, checks every bucket of the request plus any sign-in backoff, and charges all of them or none (one round trip, no race between API tasks). Keys `sos:rl:v1:<policy>:<partition>` hold hashes and IDs only. Locally and in CI the same algorithm runs in memory.
+- **Layers, in order.** (1) per client IP, in the middleware before authentication and before the body is read; (2) per signed-in person (issuer + subject) or per operator on `/api/v1/platform/*`; (3) per school; (4) the stricter per-route budgets below. Layers 2-4 run in the route guards (`require`, `require_any`, `require_principal`, `require_platform`), after authentication and before the permission check, so refused calls count too. A test (`tests/security/test_rate_limit_routes.py`) fails when a route's guard does not apply the limiter or an expensive-looking route has no per-route budget.
+- **Cost.** On layers 2 and 3 a read (`GET`, `HEAD`) costs 1 unit and a write 3; per-route budgets count requests.
+- **Client IP.** `X-Forwarded-For` is honoured only when the TCP peer is in `SOS_TRUSTED_PROXIES` (the ALB and BFF on the shared tier, Caddy and web on a dedicated host), read right to left skipping trusted hops. The BFF sends the address its own proxy appended (`TRUSTED_PROXY_HOPS`), never the browser's header. A trusted peer that names no client (the BFF's server-side calls) skips the per-IP layer only.
+- **Headers.** Every limited response carries `RateLimit-Policy: "user";q=600;w=60, "search";q=60;w=60` and `RateLimit: "user";r=597;t=1, "search";r=59;t=1` for the policies that applied to the caller (`r` remaining units, `t` seconds until the quota is full again). Aggregates shared with others (the IP and school layers) appear only on the 429 they cause; nothing about another school is ever shown.
+- **429.** `application/problem+json`, `code: rate_limited`, `Retry-After: <seconds>` and the same number as `retry_after`, and the plain detail "Too many requests. Wait N seconds and try again." The web shows that sentence (`errors.api.rate_limited.bodyWait`). The BFF passes the 429 and all these headers through unchanged. The older limits keep their codes and now also send `Retry-After`: `ai_rate_limited` (Ask, per person, number in `models.yaml`, same GCRA limiter), the invitation e-mail cool-down, the fleet heartbeat (per deployment) and the Tally edge agent (per device).
+- **Failure mode.** Valkey unreachable: `fail: open` policies allow the request and the API logs `security.rate_limit.unavailable` (alarmed); `fail: closed` policies (sign-in, invitations, machine paths) and the sign-in backoff fall back to a per-process limiter with the same budget, so an outage cannot be used to brute-force.
+- **Sign-in backoff (soft lockout).** Rejected tokens count per client IP, refused sign-ins (`POST /me/login-event` denied, a non-operator at the control plane) per person + IP; after the free failures each attempt waits 1 s, doubling to 15 min, forgotten after an hour or cleared by a successful sign-in. There is no account lockout, so nobody can lock a colleague out from another address. Each failure logs `security.auth.failed` (IDs, reason, `ip_hash`). The BFF does the same per IP for its own sign-in, step-up and callback routes (`signin_failed`, `step_up_failed`, `auth_rate_limited`; 300 starts per 5 minutes per IP).
+- **Exempt.** `/healthz`, `/readyz` and CORS preflight (`OPTIONS`). Every BFF call carries a user token, so there are no unlimited service-only calls; break-glass routes have a generous budget.
+
+| Policy | Budget | Partition | Fails | Applies to |
+|---|---|---|---|---|
+| `ip` | 1200 / 60 s | client IP | open | every request (layer 1) |
+| `machine_ip` | 120 / 60 s | client IP | closed | `/api/v1/fleet/*`, `/api/v1/edge/*` (instead of `ip`) |
+| `user` | 600 units / 60 s | person | open | every tenant and `/me` route (layer 2) |
+| `operator` | 600 units / 60 s | operator | open | every `/api/v1/platform/*` route (layer 2) |
+| `school` | 6000 units / 60 s | school | open | every tenant route (layer 3) |
+| `login_event` | 10 / 60 s | person | closed | `POST /me/login-event` |
+| `sign_in` | 60 / 300 s | person | closed | `POST /me/accept-invitations`, `/me/invitations/{id}/accept`, `/decline`, `POST /me/active-tenant` |
+| `exports` | 30 / 600 s | person | open | `POST /exports`, `/exports/student-list`, `GET /audit/export`, sheet exports |
+| `data_export` | 3 / 3600 s | school | open | `POST /admin/tenant-export` |
+| `imports` | 60 / 600 s | person | open | import create, mapping, validate, commit, revert, import templates, sheet versions, attendance and marks sheet uploads |
+| `uploads` | 120 / 600 s | person | open | `POST /documents/uploads` (presign) |
+| `search` | 60 / 60 s | person | open | `POST /students/search`, `/knowledge/search`, `/tally/parties/search` |
+| `invitations` | 30 / 3600 s | person | closed | `POST /users`, `/users/{id}/invitation-email`, `POST /platform/operators`, owner-invite resend |
+| `render` | 60 / 600 s | person | open | certificate render, duplicates, print, preview; notice render |
+| `heavy_jobs` | 10 / 600 s | school | open | `POST /dq/runs`, promotions preview |
+| `support_tickets` | 10 / 3600 s | person | open | `POST /support/tickets`, `POST /platform/support/tickets` |
+| `emergency` | 30 / 600 s | person | open | break-glass support session start and grant revoke |
+| `platform_emergency` | 60 / 600 s | operator | open | `POST /platform/invoice-runs` |
+| `kb_ask` | `models.yaml` (10 / 60 s) | person | open | `POST /knowledge/ask` (429 `ai_rate_limited`) |
+
+The shared ALB's WAF adds coarse per-IP rules in front (docs/10 §5); dedicated hosts have no WAF and rely on these limits.
 
 ## 3. Errors (RFC 9457 problem details)
 
@@ -69,7 +107,7 @@ Dedicated host beat ──(HMAC-signed heartbeat, outbound only)──▶ contro
 | 413 / 415 | File too large / unsupported type |
 | 422 | Validation errors |
 | 428 | Step-up authentication required (`code: step_up_required`): MFA and `auth_time` within 5 minutes; the BFF re-authenticates with `prompt=login` |
-| 429 | Rate limited / budget exhausted (`code: ai_budget_exhausted`) |
+| 429 | Rate limited (`code: rate_limited`, with `Retry-After` and `retry_after` in seconds, §2.7), AI question limit (`ai_rate_limited`) / budget exhausted (`ai_budget_exhausted`) |
 | 5xx | Server errors, no internals exposed |
 
 ## 4. Endpoint catalog (core)

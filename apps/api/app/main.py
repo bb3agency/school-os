@@ -11,6 +11,7 @@ from app.breakglass.api import router as breakglass_router
 from app.certificates.api import router as certificates_router
 from app.changes.api import router as changes_router
 from app.circulars.api import router as circulars_router
+from app.core import ratelimit
 from app.core.config import DeploymentMode, Settings, get_settings
 from app.core.errors import install_error_handlers
 from app.core.health import router as health_router
@@ -52,6 +53,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url=f"{API_PREFIX}/openapi.json" if docs_enabled else None,
         docs_url=f"{API_PREFIX}/docs" if docs_enabled else None,
         redoc_url=None,
+        # Every route may answer 429 (docs/09 §2.7; only the health checks are exempt).
+        responses=ratelimit.OPENAPI_429,
     )
     install_error_handlers(app)
     install_middleware(app, settings)

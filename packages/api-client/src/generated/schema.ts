@@ -2999,7 +2999,10 @@ export interface paths {
          * Record Login Event
          * @description Called once by the BFF after sign-in: audits ``auth.login.succeeded`` (or
          *     ``auth.login.denied`` with the reason) in the school's log (permission: authenticated;
-         *     rate-limited per user).
+         *     rate-limited per user, policy ``login_event``). A refused sign-in also counts against this
+         *     person from this address (``security.auth.failed``); after a few, sign-in waits with an
+         *     exponential delay (429 ``rate_limited`` with ``Retry-After``; ASVS 2.2.1 soft lockout). A
+         *     successful sign-in clears the count.
          */
         post: operations["record_login_event_api_v1_me_login_event_post"];
         delete?: never;
@@ -14022,6 +14025,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     create_academic_year_api_v1_academic_years_post: {
@@ -14055,6 +14071,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_academic_year_api_v1_academic_years__year_id__get: {
@@ -14085,6 +14114,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -14121,6 +14163,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     archive_academic_year_api_v1_academic_years__year_id__archive_post: {
@@ -14151,6 +14206,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -14183,6 +14251,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_promotions_api_v1_academic_years__year_id__promotions_get: {
@@ -14213,6 +14294,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -14249,6 +14343,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     preview_promotion_api_v1_academic_years__year_id__promotions_preview_post: {
@@ -14284,6 +14391,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     undo_promotion_api_v1_academic_years__year_id__promotions_undo_post: {
@@ -14314,6 +14434,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -14346,6 +14479,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_retention_api_v1_admin_retention_get: {
@@ -14365,6 +14511,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["RetentionOut"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -14398,6 +14557,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -14433,6 +14605,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     request_tenant_export_api_v1_admin_tenant_export_post: {
@@ -14466,6 +14651,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_tenant_export_api_v1_admin_tenant_export__tenant_export_id__get: {
@@ -14496,6 +14694,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -14528,6 +14739,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_announcements_api_v1_announcements_get: {
@@ -14548,6 +14772,19 @@ export interface operations {
                     "application/json": components["schemas"]["AnnouncementBrief"][];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_attributes_api_v1_attributes_get: {
@@ -14567,6 +14804,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AttributeOut"][];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -14609,6 +14859,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     export_audit_events_api_v1_audit_export_get: {
@@ -14650,6 +14913,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     verify_audit_chain_api_v1_audit_verify_get: {
@@ -14669,6 +14945,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["app__audit__viewer__AuditVerifyOut"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -14705,6 +14994,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     revoke_grant_api_v1_breakglass_grants__grant_id__revoke_post: {
@@ -14735,6 +15037,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -14772,6 +15087,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_request_api_v1_breakglass_requests__request_id__get: {
@@ -14802,6 +15130,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -14834,6 +15175,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     deny_request_api_v1_breakglass_requests__request_id__deny_post: {
@@ -14864,6 +15218,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -14897,6 +15264,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -14936,6 +15316,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_certificate_api_v1_certificates__certificate_id__get: {
@@ -14966,6 +15359,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -15002,6 +15408,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     cancel_certificate_api_v1_certificates__certificate_id__cancel_post: {
@@ -15037,6 +15456,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     certificate_download_url_api_v1_certificates__certificate_id__download_url_get: {
@@ -15067,6 +15499,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -15103,6 +15548,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     print_certificate_api_v1_certificates__certificate_id__print_get: {
@@ -15133,6 +15591,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -15169,6 +15640,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     retry_certificate_pdf_api_v1_certificates__certificate_id__render_post: {
@@ -15199,6 +15683,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -15231,6 +15728,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_certificate_types_api_v1_certificates_types_get: {
@@ -15250,6 +15760,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CertificateTypeOut"][];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -15287,6 +15810,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     submit_change_request_api_v1_change_requests_post: {
@@ -15320,6 +15856,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_change_request_api_v1_change_requests__change_request_id__get: {
@@ -15350,6 +15899,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -15386,6 +15948,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     cancel_change_request_api_v1_change_requests__change_request_id__cancel_post: {
@@ -15417,6 +15992,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     change_request_memo_api_v1_change_requests__change_request_id__memo_get: {
@@ -15447,6 +16035,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -15483,6 +16084,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     confirm_suggestion_api_v1_circular_suggestions__suggestion_id__confirm_post: {
@@ -15517,6 +16131,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -15553,6 +16180,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_circulars_api_v1_circulars_get: {
@@ -15587,6 +16227,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_circular_api_v1_circulars__document_id__get: {
@@ -15618,6 +16271,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     request_reading_api_v1_circulars__document_id__read_post: {
@@ -15648,6 +16314,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -15683,6 +16362,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -15720,6 +16412,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     create_class_api_v1_classes_post: {
@@ -15753,6 +16458,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_class_api_v1_classes__class_id__get: {
@@ -15783,6 +16501,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -15819,6 +16550,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     archive_class_api_v1_classes__class_id__archive_post: {
@@ -15849,6 +16593,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -15881,6 +16638,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     add_default_classes_api_v1_classes_defaults_post: {
@@ -15900,6 +16670,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Page_ClassOut_"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -15939,6 +16722,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     register_document_api_v1_documents_post: {
@@ -15972,6 +16768,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_document_api_v1_documents__document_id__get: {
@@ -16003,6 +16812,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     delete_document_api_v1_documents__document_id__delete: {
@@ -16031,6 +16853,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -16067,6 +16902,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     set_acl_api_v1_documents__document_id__acl_put: {
@@ -16102,6 +16950,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     archive_document_api_v1_documents__document_id__archive_post: {
@@ -16132,6 +16993,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -16165,6 +17039,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -16202,6 +17089,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     export_sheet_api_v1_documents__document_id__sheet_export_post: {
@@ -16238,6 +17138,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     save_sheet_version_api_v1_documents__document_id__sheet_versions_post: {
@@ -16273,6 +17186,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     unarchive_document_api_v1_documents__document_id__unarchive_post: {
@@ -16303,6 +17229,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -16339,6 +17278,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     create_upload_api_v1_documents_uploads_post: {
@@ -16371,6 +17323,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -16413,6 +17378,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_finding_api_v1_dq_findings__finding_id__get: {
@@ -16443,6 +17421,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -16479,6 +17470,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     waive_finding_api_v1_dq_findings__finding_id__waive_post: {
@@ -16514,6 +17518,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_profiles_api_v1_dq_profiles_get: {
@@ -16534,6 +17551,19 @@ export interface operations {
                     "application/json": components["schemas"]["ProfileOut"][];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_rules_api_v1_dq_rules_get: {
@@ -16553,6 +17583,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["RuleOut"][];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -16587,6 +17630,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_run_api_v1_dq_runs__run_id__get: {
@@ -16617,6 +17673,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -16649,6 +17718,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -16683,6 +17765,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     agent_config_api_v1_edge_tally_config_get: {
@@ -16702,6 +17797,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AgentConfigOut"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -16736,6 +17844,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     rotate_key_api_v1_edge_tally_key_rotation_post: {
@@ -16755,6 +17876,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["KeyRotationOut"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -16789,6 +17923,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_exams_api_v1_exams_get: {
@@ -16820,6 +17967,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -16854,6 +18014,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_export_profiles_api_v1_export_profiles_get: {
@@ -16873,6 +18046,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ExportProfileOut"][];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -16909,6 +18095,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     create_precheck_export_api_v1_exports_post: {
@@ -16942,6 +18141,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_export_api_v1_exports__export_id__get: {
@@ -16972,6 +18184,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -17006,6 +18231,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     create_student_list_export_api_v1_exports_student_list_post: {
@@ -17038,6 +18276,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -17073,6 +18324,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     create_batch_api_v1_extraction_batches_post: {
@@ -17106,6 +18370,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_batch_api_v1_extraction_batches__batch_id__get: {
@@ -17136,6 +18413,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -17173,6 +18463,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_item_api_v1_extraction_items__item_id__get: {
@@ -17203,6 +18506,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -17239,6 +18555,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     reject_item_api_v1_extraction_items__item_id__reject_post: {
@@ -17274,6 +18603,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     heartbeat_api_v1_fleet_heartbeat_post: {
@@ -17294,6 +18636,19 @@ export interface operations {
                     "application/json": components["schemas"]["HeartbeatOut"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_templates_api_v1_import_templates_get: {
@@ -17313,6 +18668,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TemplateOut"][];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -17346,6 +18714,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -17382,6 +18763,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     create_import_api_v1_imports_post: {
@@ -17415,6 +18809,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_import_api_v1_imports__import_id__get: {
@@ -17445,6 +18852,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -17481,6 +18901,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     set_mapping_api_v1_imports__import_id__mapping_put: {
@@ -17516,6 +18949,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     revert_import_api_v1_imports__import_id__revert_post: {
@@ -17546,6 +18992,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -17584,6 +19043,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_sheet_api_v1_imports__import_id__sheet_get: {
@@ -17620,6 +19092,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     export_sheet_api_v1_imports__import_id__sheet_export_get: {
@@ -17654,6 +19139,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -17692,6 +19190,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     validate_import_api_v1_imports__import_id__validate_post: {
@@ -17722,6 +19233,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -17764,6 +19288,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_flag_api_v1_insights_flags__flag_id__get: {
@@ -17794,6 +19331,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -17830,6 +19380,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     assign_flag_api_v1_insights_flags__flag_id__assign_post: {
@@ -17864,6 +19427,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -17900,6 +19476,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     erase_flag_api_v1_insights_flags__flag_id__erase_post: {
@@ -17935,6 +19524,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     flag_owners_api_v1_insights_flags__flag_id__owners_get: {
@@ -17966,6 +19568,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_settings_api_v1_insights_settings_get: {
@@ -17985,6 +19600,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SettingsOut"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -18019,6 +19647,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     summary_api_v1_insights_summary_get: {
@@ -18050,6 +19691,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -18121,6 +19775,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_conversations_api_v1_knowledge_conversations_get: {
@@ -18155,6 +19822,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_conversation_api_v1_knowledge_conversations__conversation_id__get: {
@@ -18186,6 +19866,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     delete_conversation_api_v1_knowledge_conversations__conversation_id__delete: {
@@ -18214,6 +19907,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -18250,6 +19956,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_memories_api_v1_knowledge_memories_get: {
@@ -18269,6 +19988,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Page_MemoryOut_"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -18303,6 +20035,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     forget_memories_api_v1_knowledge_memories_delete: {
@@ -18317,6 +20062,19 @@ export interface operations {
             /** @description Successful Response */
             204: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -18349,6 +20107,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -18385,6 +20156,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     confirm_memory_api_v1_knowledge_memories__memory_id__confirm_post: {
@@ -18416,6 +20200,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_memory_settings_api_v1_knowledge_memory_settings_get: {
@@ -18435,6 +20232,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["MemorySettingsOut"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -18468,6 +20278,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -18504,6 +20327,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     search_api_v1_knowledge_search_post: {
@@ -18536,6 +20372,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -18572,6 +20421,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     create_verified_answer_api_v1_knowledge_verified_answers_post: {
@@ -18605,6 +20467,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     retire_verified_answer_api_v1_knowledge_verified_answers__answer_id__retire_post: {
@@ -18635,6 +20510,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -18671,6 +20559,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_me_api_v1_me_get: {
@@ -18691,6 +20592,19 @@ export interface operations {
                     "application/json": components["schemas"]["app__identity__schemas__MeOut"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     accept_my_invitations_api_v1_me_accept_invitations_post: {
@@ -18710,6 +20624,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AcceptedInvitationsOut"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -18744,6 +20671,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_my_invitations_api_v1_me_invitations_get: {
@@ -18763,6 +20703,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["InvitationsOut"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -18795,6 +20748,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     decline_my_invitation_api_v1_me_invitations__membership_id__decline_post: {
@@ -18826,6 +20792,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     record_login_event_api_v1_me_login_event_post: {
@@ -18846,6 +20825,19 @@ export interface operations {
                     "application/json": components["schemas"]["LoginEventOut"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_my_schools_api_v1_me_schools_get: {
@@ -18865,6 +20857,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SchoolChoicesOut"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -18901,6 +20906,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     create_notice_api_v1_notices_post: {
@@ -18934,6 +20952,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_notice_api_v1_notices__notice_id__get: {
@@ -18964,6 +20995,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -19000,6 +21044,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     approve_notice_api_v1_notices__notice_id__approve_post: {
@@ -19035,6 +21092,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     notice_download_url_api_v1_notices__notice_id__download_url_get: {
@@ -19068,6 +21138,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -19104,6 +21187,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     render_notice_api_v1_notices__notice_id__render_post: {
@@ -19138,6 +21234,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -19177,6 +21286,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     mark_read_api_v1_notifications__notification_id__read_post: {
@@ -19210,6 +21332,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     mark_all_read_api_v1_notifications_read_all_post: {
@@ -19230,6 +21365,19 @@ export interface operations {
                     "application/json": components["schemas"]["MarkedReadOut"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     unread_count_api_v1_notifications_unread_count_get: {
@@ -19249,6 +21397,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["UnreadCountOut"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -19284,6 +21445,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_ai_bundles_api_v1_platform_ai_bundles_get: {
@@ -19315,6 +21489,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_announcements_api_v1_platform_announcements_get: {
@@ -19334,6 +21521,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Page_AnnouncementOut_"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -19369,6 +21569,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -19407,6 +21620,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     cancel_announcement_api_v1_platform_announcements__announcement_id__cancel_post: {
@@ -19437,6 +21663,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -19475,6 +21714,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     verify_audit_api_v1_platform_audit_verify_post: {
@@ -19494,6 +21746,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["app__platform__schemas__AuditVerifyOut"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -19525,6 +21790,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -19559,6 +21837,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     confirm_breakglass_api_v1_platform_break_glass_requests__request_id__emergency_confirm_post: {
@@ -19590,6 +21881,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_dashboard_api_v1_platform_dashboard_get: {
@@ -19609,6 +21913,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DashboardOut"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -19641,6 +21958,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_deployment_api_v1_platform_deployments__deployment_id__get: {
@@ -19671,6 +22001,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -19709,6 +22052,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     decommission_deployment_api_v1_platform_deployments__deployment_id__decommission_post: {
@@ -19739,6 +22095,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -19771,6 +22140,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_flags_api_v1_platform_flags_get: {
@@ -19790,6 +22172,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Page_FlagOut_"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -19825,6 +22220,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -19862,6 +22270,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     delete_flag_override_api_v1_platform_flags__key__tenants__tenant_id__delete: {
@@ -19892,6 +22313,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     fleet_versions_api_v1_platform_fleet_versions_get: {
@@ -19911,6 +22345,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["FleetVersionOut"][];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -19944,6 +22391,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -19980,6 +22440,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     create_invoice_api_v1_platform_invoices_post: {
@@ -20015,6 +22488,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_invoice_api_v1_platform_invoices__invoice_id__get: {
@@ -20046,6 +22532,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     discard_invoice_api_v1_platform_invoices__invoice_id__delete: {
@@ -20074,6 +22573,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -20112,6 +22624,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     invoice_download_url_api_v1_platform_invoices__invoice_id__download_url_get: {
@@ -20142,6 +22667,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -20174,6 +22712,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_invoice_payments_api_v1_platform_invoices__invoice_id__payments_get: {
@@ -20204,6 +22755,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -20242,6 +22806,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     void_invoice_api_v1_platform_invoices__invoice_id__void_post: {
@@ -20277,6 +22854,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_job_api_v1_platform_jobs__job_id__get: {
@@ -20308,6 +22898,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     me_api_v1_platform_me_get: {
@@ -20327,6 +22930,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["app__platform__schemas__MeOut"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -20359,6 +22975,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -20395,6 +23024,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     deactivate_operator_api_v1_platform_operators__operator_id__deactivate_post: {
@@ -20425,6 +23067,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -20461,6 +23116,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     reverse_payment_api_v1_platform_payments__payment_id__reverse_post: {
@@ -20496,6 +23164,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_plans_api_v1_platform_plans_get: {
@@ -20526,6 +23207,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -20562,6 +23256,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_plan_api_v1_platform_plans__plan_id__get: {
@@ -20592,6 +23299,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -20630,6 +23350,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     publish_plan_api_v1_platform_plans__plan_id__publish_post: {
@@ -20661,6 +23394,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     retire_plan_api_v1_platform_plans__plan_id__retire_post: {
@@ -20691,6 +23437,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -20725,6 +23484,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_subscription_api_v1_platform_subscriptions__sub_id__get: {
@@ -20756,6 +23528,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     activate_subscription_api_v1_platform_subscriptions__sub_id__activate_post: {
@@ -20786,6 +23571,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -20822,6 +23620,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     remove_ai_bundle_api_v1_platform_subscriptions__sub_id__ai_bundle_delete: {
@@ -20852,6 +23663,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -20888,6 +23712,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     change_plan_api_v1_platform_subscriptions__sub_id__change_plan_post: {
@@ -20922,6 +23759,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -20958,6 +23808,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     set_price_override_api_v1_platform_subscriptions__sub_id__price_override_put: {
@@ -20993,6 +23856,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     clear_price_override_api_v1_platform_subscriptions__sub_id__price_override_delete: {
@@ -21024,6 +23900,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     reactivate_subscription_api_v1_platform_subscriptions__sub_id__reactivate_post: {
@@ -21054,6 +23943,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -21089,6 +23991,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -21126,6 +24041,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     open_ticket_api_v1_platform_support_tickets_post: {
@@ -21161,6 +24089,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_ticket_api_v1_platform_support_tickets__ticket_id__get: {
@@ -21191,6 +24132,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -21229,6 +24183,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     add_ticket_message_api_v1_platform_support_tickets__ticket_id__messages_post: {
@@ -21263,6 +24230,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -21302,6 +24282,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     provision_tenant_api_v1_platform_tenants_post: {
@@ -21337,6 +24330,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_tenant_api_v1_platform_tenants__tenant_id__get: {
@@ -21367,6 +24373,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -21399,6 +24418,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_billing_account_api_v1_platform_tenants__tenant_id__billing_account_get: {
@@ -21429,6 +24461,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -21467,6 +24512,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     deletion_certificate_download_url_api_v1_platform_tenants__tenant_id__deletion_certificate_download_url_get: {
@@ -21498,6 +24556,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_offboarding_api_v1_platform_tenants__tenant_id__offboarding_get: {
@@ -21528,6 +24599,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -21564,6 +24648,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     approve_offboarding_api_v1_platform_tenants__tenant_id__offboarding_approve_post: {
@@ -21594,6 +24691,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -21630,6 +24740,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     confirm_offboarding_teardown_api_v1_platform_tenants__tenant_id__offboarding_confirm_teardown_post: {
@@ -21665,6 +24788,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     resend_owner_invite_api_v1_platform_tenants__tenant_id__owner_invite_resend_post: {
@@ -21698,6 +24834,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     resume_provisioning_api_v1_platform_tenants__tenant_id__provisioning_resume_post: {
@@ -21728,6 +24877,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -21764,6 +24926,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     suspend_tenant_api_v1_platform_tenants__tenant_id__suspend_post: {
@@ -21799,6 +24974,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     tenant_usage_api_v1_platform_tenants__tenant_id__usage_get: {
@@ -21833,6 +25021,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     all_usage_api_v1_platform_usage_get: {
@@ -21865,6 +25066,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -21905,6 +25119,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -21947,6 +25174,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     transfer_certificate_register_api_v1_registers_transfer_certificates_get: {
@@ -21987,6 +25227,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_roles_api_v1_roles_get: {
@@ -22020,6 +25273,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -22059,6 +25325,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     create_section_api_v1_sections_post: {
@@ -22092,6 +25371,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_section_api_v1_sections__section_id__get: {
@@ -22122,6 +25414,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -22158,6 +25463,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     archive_section_api_v1_sections__section_id__archive_post: {
@@ -22188,6 +25506,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -22222,6 +25553,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -22258,6 +25602,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     attendance_month_api_v1_sections__section_id__attendance_month_get: {
@@ -22291,6 +25648,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -22327,6 +25697,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     section_marks_api_v1_sections__section_id__exams__exam_id__marks_get: {
@@ -22358,6 +25741,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -22395,6 +25791,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     preview_marks_sheet_api_v1_sections__section_id__exams__exam_id__marks_sheet_post: {
@@ -22431,6 +25840,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     unarchive_section_api_v1_sections__section_id__unarchive_post: {
@@ -22461,6 +25883,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -22495,6 +25930,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -22545,6 +25993,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     create_student_api_v1_students_post: {
@@ -22578,6 +26039,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_student_api_v1_students__student_id__get: {
@@ -22608,6 +26082,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -22644,6 +26131,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_notes_api_v1_students__student_id__behaviour_notes_get: {
@@ -22674,6 +26174,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -22710,6 +26223,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     request_certificate_api_v1_students__student_id__certificates_post: {
@@ -22745,6 +26271,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     preview_certificate_api_v1_students__student_id__certificates_preview_get: {
@@ -22778,6 +26317,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_enrollments_api_v1_students__student_id__enrollments_get: {
@@ -22808,6 +26360,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -22843,6 +26408,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -22880,6 +26458,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     end_enrollment_api_v1_students__student_id__enrollments__enrollment_id__end_post: {
@@ -22916,6 +26507,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     raise_flag_api_v1_students__student_id__flags_post: {
@@ -22951,6 +26555,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_guardians_api_v1_students__student_id__guardians_get: {
@@ -22981,6 +26598,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -23017,6 +26647,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     remove_guardian_api_v1_students__student_id__guardians__guardian_id__delete: {
@@ -23046,6 +26689,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -23083,6 +26739,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     reveal_sensitive_api_v1_students__student_id__sensitive_reveal_post: {
@@ -23118,6 +26787,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     timeline_api_v1_students__student_id__timeline_get: {
@@ -23148,6 +26830,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -23181,6 +26876,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -23216,6 +26924,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -23253,6 +26974,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     search_students_by_body_api_v1_students_search_post: {
@@ -23285,6 +27019,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -23320,6 +27067,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     open_ticket_api_v1_support_tickets_post: {
@@ -23353,6 +27113,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_ticket_api_v1_support_tickets__ticket_id__get: {
@@ -23383,6 +27156,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -23419,6 +27205,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_devices_api_v1_tally_devices_get: {
@@ -23438,6 +27237,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DeviceOut"][];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -23469,6 +27281,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -23504,6 +27329,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     create_enrolment_code_api_v1_tally_enrolment_codes_post: {
@@ -23537,6 +27375,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_groups_api_v1_tally_groups_get: {
@@ -23556,6 +27407,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["GroupOut"][];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -23589,6 +27453,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -23626,6 +27503,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_party_api_v1_tally_parties__party_id__get: {
@@ -23656,6 +27546,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -23692,6 +27595,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     unlink_party_api_v1_tally_parties__party_id__links__student_id__delete: {
@@ -23721,6 +27637,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -23760,6 +27689,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_status_api_v1_tally_status_get: {
@@ -23780,6 +27722,19 @@ export interface operations {
                     "application/json": components["schemas"]["ConnectorStatus"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_assignees_api_v1_task_assignees_get: {
@@ -23799,6 +27754,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AssigneeOut"][];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -23840,6 +27808,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     create_task_api_v1_tasks_post: {
@@ -23873,6 +27854,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_task_api_v1_tasks__task_id__get: {
@@ -23903,6 +27897,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -23939,6 +27946,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     set_task_status_api_v1_tasks__task_id__status_post: {
@@ -23974,6 +27994,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_tenant_api_v1_tenant_get: {
@@ -23993,6 +28026,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TenantOut"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -24027,6 +28073,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_billing_api_v1_tenant_billing_get: {
@@ -24047,6 +28106,19 @@ export interface operations {
                     "application/json": components["schemas"]["TenantBillingOut"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     list_billing_invoices_api_v1_tenant_billing_invoices_get: {
@@ -24066,6 +28138,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Page_TenantInvoice_"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -24101,6 +28186,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     invite_user_api_v1_users_post: {
@@ -24134,6 +28232,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_user_api_v1_users__user_id__get: {
@@ -24164,6 +28275,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -24200,6 +28324,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     resend_invitation_email_api_v1_users__user_id__invitation_email_post: {
@@ -24230,6 +28367,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -24266,6 +28416,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     replace_user_scopes_api_v1_users__user_id__scopes_put: {
@@ -24301,6 +28464,19 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     healthz_healthz_get: {
@@ -24321,6 +28497,19 @@ export interface operations {
                     "application/json": components["schemas"]["HealthOut"];
                 };
             };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     readyz_readyz_get: {
@@ -24340,6 +28529,19 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ReadyOut"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Service Unavailable */
             503: {

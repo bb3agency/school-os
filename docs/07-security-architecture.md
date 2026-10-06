@@ -353,7 +353,7 @@ Cross-Origin-Resource-Policy: same-origin
 | API1 Broken object level authorization | Scoped repositories, UUIDs, 404 on out-of-scope, BOLA tests |
 | API2 Broken authentication | OIDC via BFF, MFA, short tokens, rotation, throttling |
 | API3 Broken object property level authorization | Explicit request/response schemas; C3 gating |
-| API4 Unrestricted resource consumption | Rate limits, pagination caps, file/page limits, AI budgets, statement timeouts |
+| API4 Unrestricted resource consumption | Layered rate limits (per IP, person, school, operator and per route; GCRA in Valkey; 09 §2.7), WAF rate rules, pagination caps, file/page limits, AI budgets, statement timeouts |
 | API5 Broken function level authorization | `require()` on every route, route-enumeration test |
 | API6 Unrestricted access to sensitive business flows | Step-up MFA and throttles on exports, approvals, role changes |
 | API7 SSRF | No user-supplied URL fetching in core; egress allowlist |
@@ -369,6 +369,14 @@ Cross-Origin-Resource-Policy: same-origin
 Therefore: **No personal data in URLs.** Names (student, parent, staff), phone numbers, emails, dates of birth, addresses, admission numbers, Aadhaar-like input and free-text searches never go in a path or query string: the shared-tier ALB access logs record every full request URL in S3 and cannot filter parameters, and proxies and browsers keep URLs too. Searches and filters that can carry such values use `POST …/search` with a JSON body (e.g. `POST /api/v1/students/search`); query strings carry only IDs, codes, enums, record dates, cursors and page sizes. `apps/api/tests/security/test_no_pii_in_urls.py` fails on a new tenant query parameter that looks like personal data or free text (SEC-008). `GET /api/v1/students?query=&admission_no=` still works for old clients but is deprecated (OpenAPI `deprecated`, `Deprecation` and `Link: rel="successor-version"` headers); the web app uses `POST /api/v1/students/search`.
 
 **Other:** CORS disabled for API (BFF same-origin); request size limits; idempotency keys on POSTs that create resources; `statement_timeout` 5 s for API transactions (longer for workers); problem+json errors without stack traces; 404 (not 403) when revealing existence would leak information.
+
+### 11.1 Anti-automation and failed sign-in monitoring (ASVS 2.2.1, 11.1.4; audit 2026-10-05 P2-07)
+
+- **Edge (shared tier):** WAF rate-based rules per IP: all traffic, `/bff/auth/*`, and the machine paths (`/api/v1/fleet/`, `/api/v1/edge/`); they answer 429 with `Retry-After`. Dedicated hosts have no WAF and Caddy has no built-in rate limiter (only the third-party `caddy-ratelimit` plugin), so they rely on the application limits below.
+- **BFF:** per-IP limit on sign-in, step-up and support starts and callbacks; refused callbacks count per IP with exponential backoff; Valkey down falls back to a per-process limiter.
+- **API:** per IP (before authentication), per person, per school, per operator and per route, weighted for writes; credential and sign-in paths fail closed (09 §2.7). The client IP comes from `X-Forwarded-For` only from `SOS_TRUSTED_PROXIES`.
+- **Soft lockout, not hard lockout:** failures are counted per IP and per person + IP, never per account alone, with an exponential delay capped at 15 minutes, so an attacker cannot lock a victim out (ASVS 2.2.1). Cognito's own lockout still applies to passwords typed into its managed login; Cognito threat protection (PLUS tier) and a WAF on the user pools remain an owner decision (P2-07).
+- **Monitoring:** `security.rate_limited`, `security.auth.failed`, `security.rate_limit.unavailable` (API) and `signin_failed`, `step_up_failed`, `auth_rate_limited` (BFF) carry IDs and `ip_hash` (keyed HMAC of the address) only. CloudWatch metric filters turn them into `SchoolOS/Security/<env>` metrics with alarms (docs/10 §12); the event names are pinned by `tests/deploy/test_security_log_events.py`.
 
 ## 12. LLM application security (OWASP Top 10 for LLM Applications, 2025)
 
