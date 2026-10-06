@@ -371,14 +371,14 @@ export function SheetGrid({
             labelVisible
             value={query}
             onChange={(event) => setQuery(event.currentTarget.value)}
-            wrapperClassName="w-full max-w-xs"
+            wrapperClassName="w-full sm:max-w-xs"
             autoComplete="off"
           />
           <SelectField
             label={t("searchColumn")}
             value={searchColumn}
             onChange={(event) => setSearchColumn(event.currentTarget.value)}
-            className="w-full max-w-56"
+            className="w-full sm:max-w-56"
             options={[
               { value: ALL, label: t("allColumns") },
               ...searchColumns.map((column) => ({

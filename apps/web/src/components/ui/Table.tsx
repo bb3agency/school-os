@@ -21,7 +21,19 @@ export interface TableProps extends ComponentProps<"table"> {
    * a wide table scrolls sideways below md. Use it when the first cell identifies the row.
    */
   stickyFirstColumn?: boolean;
+  /**
+   * A record's fields (label, value, notes per row): below 640px each row becomes a block
+   * (label line, then the value, then the rest) instead of a narrow table that scrolls
+   * sideways; the header row stays for screen readers only (docs/17 §5.7).
+   */
+  reflow?: boolean;
 }
+
+/** `reflow` below 640px: rows as blocks, cells full width, header visually hidden. */
+const reflowRows =
+  "max-sm:block max-sm:[&_tbody]:block max-sm:[&_tr]:block max-sm:[&_tr]:py-2 " +
+  "max-sm:[&_td]:block max-sm:[&_td]:py-1 max-sm:[&_tbody_th]:block max-sm:[&_tbody_th]:py-1 " +
+  "max-sm:[&_thead]:sr-only max-sm:[&_tr>:first-child]:static max-sm:[&_tr>:first-child]:shadow-none";
 
 /** Sticky first column below md: header cell on the header tint, body cells on white. */
 const stickyFirst =
@@ -38,6 +50,7 @@ export function Table({
   className,
   density = "comfortable",
   stickyFirstColumn = false,
+  reflow = false,
   ...props
 }: TableProps) {
   return (
@@ -47,6 +60,7 @@ export function Table({
         // Tabular figures: digits line up in columns (counts, amounts, dates).
         "group/table w-full border-collapse text-left text-sm tabular-nums",
         stickyFirstColumn && stickyFirst,
+        reflow && reflowRows,
         className,
       )}
       {...props}

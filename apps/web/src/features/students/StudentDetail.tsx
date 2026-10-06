@@ -681,7 +681,7 @@ export function StudentDetailView({
           <p className="text-sm text-ink-muted">{t("noValues")}</p>
         ) : (
           <TableScroll label={t("valuesTable")}>
-            <Table stickyFirstColumn>
+            <Table stickyFirstColumn reflow>
               <caption className="sr-only">{t("valuesTable")}</caption>
               <THead>
                 <Tr>
