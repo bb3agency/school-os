@@ -38,4 +38,19 @@ describe("ApiErrorAlert for the 2026-10-06 decisions", () => {
     renderWithIntl(<ApiErrorAlert error={error} />);
     expect(screen.getByText(title)).toBeTruthy();
   });
+
+  it("value_out_of_range (422, R-13) says the number or date is too large, in en and te", () => {
+    const error = new ApiError(422, "value_out_of_range", {
+      status: 422,
+      code: "value_out_of_range",
+      request_id: "req_synth",
+    } as never);
+    expect(describeApiError(error)).toMatchObject({ key: "value_out_of_range", status: 422 });
+    const body = "This number or date is too large. Check it and try again.";
+    const { unmount } = renderWithIntl(<ApiErrorAlert error={error} />);
+    expect(screen.getByText(body)).toBeTruthy();
+    unmount();
+    renderWithIntl(<ApiErrorAlert error={error} />, "te");
+    expect(screen.getByText(body)).toBeTruthy();
+  });
 });

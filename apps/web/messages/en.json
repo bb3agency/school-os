@@ -1846,6 +1846,10 @@
       "already_on_hold": {
         "title": "This school is already on a security hold",
         "body": "Reload the page to see its current state."
+      },
+      "value_out_of_range": {
+        "title": "The number or date is too large",
+        "body": "This number or date is too large. Check it and try again."
       }
     },
     "stepUp": {
