@@ -138,4 +138,39 @@ def install_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
+        if _is_nul_refusal(exc):
+            return problem(
+                request,
+                status=422,
+                code="invalid_characters",
+                title="Validation failed",
+                detail="Remove the invisible NUL character from the text and try again.",
+                extra={
+                    "errors": [
+                        {
+                            "field": "body",
+                            "code": "invalid_characters",
+                            "message_key": "errors.invalid_characters",
+                        }
+                    ]
+                },
+            )
         return problem(request, status=500, code="internal_error", title="Something went wrong")
+
+
+_NUL_MESSAGE = "cannot contain NUL"
+
+
+def _is_nul_refusal(exc: BaseException) -> bool:
+    """The driver's refusal of a NUL (U+0000) in text (psycopg ``DataError``), raised directly or
+    wrapped by SQLAlchemy. Free text in many request models may carry one; the database is the
+    last place it is refused, so it is answered as a 422, not a 500 (audit 2026-10-06 R-12)."""
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if type(current).__name__ == "DataError" and _NUL_MESSAGE in str(current):
+            return True
+        orig = getattr(current, "orig", None)
+        current = orig if isinstance(orig, BaseException) else current.__cause__
+    return False
