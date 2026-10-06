@@ -232,7 +232,10 @@ export function StackedRows<T>({
             className="relative min-w-0 space-y-2 px-4 py-3.5 break-anywhere [&_*]:min-w-0 [&_*]:whitespace-normal"
           >
             {titles.map((column) => (
-              <div key={column.key} className="min-w-0 text-ink">
+              <div
+                key={column.key}
+                className="min-w-0 text-ink pointer-coarse:[&_a]:inline-block pointer-coarse:[&_a]:py-3 pointer-coarse:[&_a]:-my-3"
+              >
                 {column.cell(row)}
               </div>
             ))}
