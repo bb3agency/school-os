@@ -192,7 +192,7 @@ export function NotificationBell() {
           if (!open) void queryClient.invalidateQueries({ queryKey: NOTIFICATION_KEYS.latest });
           setOpen((value) => !value);
         }}
-        className="pressable relative inline-flex size-10 items-center justify-center rounded-full border border-border-soft bg-surface text-ink hover:bg-surface-muted"
+        className="pressable relative inline-flex size-10 items-center justify-center rounded-full border border-border-soft bg-surface text-ink hover:bg-surface-muted pointer-coarse:size-11"
       >
         <svg
           aria-hidden="true"

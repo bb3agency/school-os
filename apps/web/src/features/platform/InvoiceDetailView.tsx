@@ -126,7 +126,7 @@ export function InvoicePayments({
       header: t("colAmount"),
       numeric: true,
       cell: (row) => (
-        <span className="flex flex-col items-end">
+        <span className="flex flex-col items-start sm:items-end">
           <Mono>{inr(row.amount_inr)}</Mono>
           {Number(row.tds_inr) > 0 ? (
             <span className="text-xs whitespace-nowrap text-ink-muted">
@@ -167,8 +167,10 @@ export function InvoicePayments({
     {
       key: "status",
       header: t("colStatus"),
+      // On a phone card the status and a reversal's reason take the card's full width.
+      stack: "wide" as const,
       cell: (row) => (
-        <span className="flex max-w-60 min-w-32 flex-col items-start gap-1">
+        <span className="flex min-w-32 flex-col items-start gap-1 sm:max-w-60">
           <PaymentStatusPill status={row.status} />
           {row.status === "reversed" ? (
             <span className="text-xs [overflow-wrap:anywhere] text-ink-muted">
@@ -186,7 +188,9 @@ export function InvoicePayments({
         </span>
       ),
     },
-    ...(manage ? [{ key: "actions", header: t("colActions"), cell: action }] : []),
+    ...(manage
+      ? [{ key: "actions", header: t("colActions"), cell: action, stack: "actions" as const }]
+      : []),
   ];
 
   return (
@@ -200,6 +204,9 @@ export function InvoicePayments({
         columns={columns}
         state={payments}
         density="compact"
+        // Below 640px each payment is a card (docs/17 §5.7): the reversal reason gets the
+        // card's width instead of a narrow status column that made the row ~460px tall.
+        stacked
         rowKey={(row) => row.id}
         emptyTitle={t("emptyTitle")}
         emptyBody={t("emptyBody")}

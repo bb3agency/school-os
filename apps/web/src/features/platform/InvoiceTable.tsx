@@ -324,11 +324,12 @@ export function InvoiceTable({
       header: t("colStatus"),
       cell: (row) => <InvoiceStatusPill status={row.status} />,
     },
-    { key: "actions", header: t("colActions"), cell: actions },
+    { key: "actions", header: t("colActions"), cell: actions, stack: "actions" },
   ];
 
   return (
     <DataTable
+      stacked
       caption={caption}
       captionHidden
       columns={columns}

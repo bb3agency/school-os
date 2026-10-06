@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, type RefObject } from "react";
 import { cssEasing, DURATION, EASE_OUT, prefersReducedMotion } from "./motion";
+import { NARROW_QUERY } from "./use-media-query";
 
 /**
  * Exit motion for native `<dialog>`s (docs/17 §5.5). The entrance is CSS (`.dialog-motion`,
@@ -27,6 +28,21 @@ const EXIT_FRAMES: Record<DialogMotionKind, Keyframe[]> = {
   drawer: [{ transform: "translateX(0)" }, { transform: "translateX(-100%)" }],
 };
 
+/** Below 640px a modal is a bottom sheet (globals.css, docs/17 §5.7): it slides back down. */
+const SHEET_FRAMES: Keyframe[] = [
+  { transform: "translateY(0)" },
+  { transform: "translateY(100%)" },
+];
+export const SHEET_QUERY = NARROW_QUERY;
+
+function framesFor(kind: DialogMotionKind): Keyframe[] {
+  const narrow =
+    kind === "modal" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia(SHEET_QUERY).matches;
+  return narrow ? SHEET_FRAMES : EXIT_FRAMES[kind];
+}
+
 /** Attribute set while the exit plays (the backdrop fades out with it, globals.css). */
 export const CLOSING_ATTRIBUTE = "data-closing";
 
@@ -47,7 +63,7 @@ export function closeDialog(dialog: HTMLDialogElement | null, kind: DialogMotion
     if (dialog.open) dialog.close();
   };
   try {
-    const animation = dialog.animate(EXIT_FRAMES[kind], {
+    const animation = dialog.animate(framesFor(kind), {
       duration: DURATION.quick,
       easing: cssEasing(EASE_OUT),
     });

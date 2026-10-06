@@ -349,6 +349,7 @@ export function ImportsView({
       <Card title={t("historyTitle")}>
         <div className="space-y-3">
           <DataTable
+            stacked
             caption={t("historyTitle")}
             captionHidden
             columns={columns}
@@ -362,6 +363,7 @@ export function ImportsView({
       </Card>
       <Card title={t("templatesTitle")} description={t("templatesDescription")}>
         <DataTable
+          stacked
           caption={t("templatesTitle")}
           captionHidden
           columns={templateColumns}

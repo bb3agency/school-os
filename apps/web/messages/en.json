@@ -4399,6 +4399,9 @@
       "unConfirm": "Unarchive"
     }
   },
+  "touch": {
+    "sheetHelp": "On a touch screen, tap a cell to change it, then tap Save or Cancel."
+  },
   "sheets": {
     "grid": {
       "keyboardHelpEdit": "Use the arrow keys to move between cells. Press Enter or F2 to change a cell, Enter to save it or Escape to cancel. Tab leaves the table.",

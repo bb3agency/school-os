@@ -126,11 +126,13 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
   const columns: Column<Finding>[] = [
     {
       key: "severity",
+      stack: "field",
       header: t("colSeverity"),
       cell: (row) => <SeverityBadge severity={row.severity} />,
     },
     {
       key: "student",
+      stack: "title",
       header: t("colStudent"),
       cell: (row) => (
         <span className="block min-w-36">
@@ -138,7 +140,7 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
             <Value>{row.student.display_name}</Value>
           </span>
           {row.student.admission_no ? (
-            <span className="block font-mono text-xs whitespace-nowrap text-ink-muted">
+            <span className="block max-w-56 font-mono text-xs break-all text-ink-muted">
               {t("admissionNo", { number: row.student.admission_no })}
             </span>
           ) : null}
@@ -156,7 +158,12 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
         </span>
       ),
     },
-    { key: "values", header: t("colValues"), cell: (row) => <FindingValues values={row.values} /> },
+    {
+      key: "values",
+      header: t("colValues"),
+      className: "min-w-44",
+      cell: (row) => <FindingValues values={row.values} />,
+    },
     {
       key: "explanation",
       header: t("colExplanation"),
@@ -182,6 +189,7 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
     },
     {
       key: "open",
+      stack: "actions",
       header: tc("actions"),
       className: "print:hidden",
       cell: (row) => (
@@ -374,6 +382,7 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
 
       {state.status !== "ready" ? (
         <DataTable
+          stacked
           caption={t("title")}
           captionHidden
           columns={columns}
@@ -391,6 +400,7 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
           >
             {blockers.length > 0 ? (
               <DataTable
+                stacked
                 caption={t("blockersCaption")}
                 captionHidden
                 columns={columns}
@@ -405,6 +415,7 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
           <Card title={t("warningsTitle", { count: others.length })}>
             {others.length > 0 ? (
               <DataTable
+                stacked
                 caption={t("warningsCaption")}
                 captionHidden
                 columns={columns}

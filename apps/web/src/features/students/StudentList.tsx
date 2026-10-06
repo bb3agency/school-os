@@ -13,7 +13,19 @@ import { TextField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SelectField, type SelectOption } from "@/components/ui/Select";
-import { DataTable, Table, TableScroll, TBody, THead, Td, Th, Tr } from "@/components/ui/Table";
+import { NarrowSwitch } from "@/components/ui/NarrowSwitch";
+import {
+  DataTable,
+  StackedRows,
+  Table,
+  TableScroll,
+  TBody,
+  THead,
+  Td,
+  Th,
+  Tr,
+  type Column,
+} from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { classLabel as classDisplay } from "@/lib/school-class";
 import { Link } from "@/i18n/navigation";
@@ -432,6 +444,78 @@ function StudentRows({
   matchedOn: (row: StudentSummary) => string | null;
 }) {
   const t = useTranslations("students.list");
+  // Below 640px the same rows as cards: the name stretches over its card (docs/17 §5.7).
+  const columns: Column<StudentSummary>[] = [
+    {
+      key: "name",
+      header: t("colName"),
+      cell: (row) => {
+        const found = matchedOn(row);
+        return (
+          <div className="flex items-center gap-3">
+            {row.display_name ? <Avatar name={row.display_name} size="sm" decorative /> : null}
+            <div className="min-w-0">
+              <Link
+                href={`/students/${row.id}`}
+                className="font-semibold break-anywhere text-primary underline-offset-4 after:absolute after:inset-0 hover:underline"
+              >
+                {row.display_name ?? t("unnamed")}
+              </Link>
+              {found ? (
+                <p className="text-xs text-ink-muted" data-print="hide">
+                  {t("matchedOn", { field: found })}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: "admission",
+      header: t("colAdmissionNo"),
+      cell: (row) => (
+        <span className="font-mono text-sm">
+          <Value>{row.admission_no}</Value>
+        </span>
+      ),
+    },
+    {
+      key: "class",
+      header: t("colClassSection"),
+      cell: (row) =>
+        row.class_section ? <Pill variant="tag">{row.class_section}</Pill> : <Value>{null}</Value>,
+    },
+    {
+      key: "status",
+      header: t("colStatus"),
+      cell: (row) => <StudentStatusBadge status={row.status} />,
+    },
+  ];
+  return (
+    <NarrowSwitch
+      narrow={
+        <StackedRows
+          caption={t("resultsTitle")}
+          captionHidden
+          columns={columns}
+          rows={rows}
+          rowKey={(row) => row.id}
+        />
+      }
+      wide={<StudentTable rows={rows} matchedOn={matchedOn} />}
+    />
+  );
+}
+
+function StudentTable({
+  rows,
+  matchedOn,
+}: {
+  rows: readonly StudentSummary[];
+  matchedOn: (row: StudentSummary) => string | null;
+}) {
+  const t = useTranslations("students.list");
   const tc = useTranslations("common");
   return (
     <TableScroll label={tc("scrollableTable", { caption: t("resultsTitle") })} framed>
@@ -451,7 +535,7 @@ function StudentRows({
             return (
               <Tr key={row.id} className="relative">
                 <Td>
-                  <div className="flex items-center gap-3">
+                  <div className="flex min-w-44 items-center gap-3">
                     {row.display_name ? (
                       <Avatar name={row.display_name} size="sm" decorative />
                     ) : null}
@@ -471,7 +555,7 @@ function StudentRows({
                   </div>
                 </Td>
                 <Td>
-                  <span className="font-mono text-sm">
+                  <span className="block max-w-56 font-mono text-sm break-all">
                     <Value>{row.admission_no}</Value>
                   </span>
                 </Td>

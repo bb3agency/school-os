@@ -234,6 +234,7 @@ export function DocumentsScreen({
             {busy ? tl("updating") : null}
           </div>
           <DataTable
+            stacked
             caption={t("title")}
             captionHidden
             columns={columns}

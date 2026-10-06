@@ -4399,6 +4399,9 @@
       "unConfirm": "ఆర్కైవ్ నుండి తీసివేయండి"
     }
   },
+  "touch": {
+    "sheetHelp": "On a touch screen, tap a cell to change it, then tap Save or Cancel."
+  },
   "sheets": {
     "grid": {
       "keyboardHelpEdit": "గడుల మధ్య కదలడానికి బాణం కీలను వాడండి. గడిని మార్చడానికి Enter నొక్కండి, సేవ్ చేయడానికి మళ్లీ Enter, రద్దు చేయడానికి Escape నొక్కండి.",

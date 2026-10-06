@@ -855,6 +855,7 @@ export function SubscriptionsScreen({ status = "" }: { status?: string }) {
         />
       </FilterCard>
       <DataTable
+        stacked
         caption={t("title")}
         captionHidden
         columns={columns}

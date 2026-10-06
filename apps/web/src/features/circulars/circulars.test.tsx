@@ -337,6 +337,32 @@ describe("circulars inbox and detail (US-1601, US-1602)", () => {
 });
 
 describe("tasks (US-1603, US-1604)", () => {
+  it("below 640px the tasks are cards: title, due in words, owner, status, actions (docs/17 §5.7)", async () => {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) => ({
+        matches: query === "(width < 40rem)",
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      })),
+    );
+    try {
+      signedIn(["task.read"]);
+      stub.routes["GET /bff/api/v1/tasks"] = () => page([task()]);
+      renderWithIntl(<TasksScreen />);
+      const list = await screen.findByRole("list", { name: en.tasks.listTitle });
+      const card = within(list).getByRole("listitem");
+      expect(within(card).getByText(task().title)).toBeVisible();
+      expect(within(card).getByText(en.tasks.due.overdue)).toBeVisible();
+      expect(
+        within(card).getByRole("button", { name: `${en.tasks.move.done}: ${task().title}` }),
+      ).toBeVisible();
+      expect(screen.queryByRole("table")).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("shows my tasks with overdue in words and marks one done with If-Match", async () => {
     signedIn(["task.read"]);
     stub.routes["GET /bff/api/v1/tasks"] = () => page([task()]);

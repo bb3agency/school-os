@@ -283,7 +283,7 @@ export function IdleWarning({
           {t("body")}
         </p>
       </div>
-      <div className="flex flex-wrap justify-end gap-2 rounded-b-xl border-t border-border bg-surface-muted px-5 py-4">
+      <div className="dialog-footer flex flex-wrap justify-end gap-2 rounded-b-xl border-t border-border bg-surface-muted px-5 py-4">
         <Button variant="secondary" onClick={() => void expire()}>
           {t("signOut")}
         </Button>

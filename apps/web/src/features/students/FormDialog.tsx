@@ -133,7 +133,7 @@ export function FormDialog<TSchema extends z.ZodType, TResult>({
               <DialogCloseButton label={tc("close")} onClick={close} />
             </div>
             <form noValidate onSubmit={form.onSubmit}>
-              <div className="max-h-[60vh] space-y-4 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">
+              <div className="max-h-[60vh] space-y-4 overflow-y-auto overscroll-contain px-4 py-4 max-sm:max-h-none sm:px-6">
                 {children?.(form.errors)}
                 <ProblemAlert
                   error={form.error}
@@ -141,7 +141,7 @@ export function FormDialog<TSchema extends z.ZodType, TResult>({
                   action={form.error !== undefined ? problemAction?.(form.error) : undefined}
                 />
               </div>
-              <div className="flex flex-wrap justify-end gap-2 rounded-b-xl border-t border-border bg-surface-muted px-4 py-3 max-sm:[&>*]:flex-1 sm:px-6 sm:py-4">
+              <div className="dialog-footer flex flex-wrap justify-end gap-2 rounded-b-xl border-t border-border bg-surface-muted px-4 py-3 max-sm:[&>*]:flex-1 sm:px-6 sm:py-4">
                 <Button variant="secondary" onClick={close}>
                   {tc("cancel")}
                 </Button>

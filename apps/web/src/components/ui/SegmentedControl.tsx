@@ -77,6 +77,7 @@ export function SegmentedControl({
               "has-focus-visible:outline-3 has-focus-visible:outline-offset-2 has-focus-visible:outline-focus",
               "has-disabled:cursor-not-allowed has-disabled:opacity-60",
               size === "sm" ? "min-h-8 px-3 text-xs" : "min-h-9 px-4 text-sm",
+              "pointer-coarse:min-h-11 pointer-coarse:min-w-11",
               block && "flex-1",
             )}
           >

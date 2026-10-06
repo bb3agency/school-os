@@ -196,7 +196,7 @@ export function ConversationMenu({ conversation }: { conversation: ConversationS
         aria-label={t("chat.optionsLabel")}
         title={t("chat.optionsLabel")}
         onClick={() => setOpen((value) => !value)}
-        className="inline-flex size-9 items-center justify-center rounded-full border border-border-soft text-ink-muted hover:bg-surface-muted hover:text-ink"
+        className="inline-flex size-9 items-center justify-center rounded-full border border-border-soft text-ink-muted hover:bg-surface-muted hover:text-ink pointer-coarse:size-11"
       >
         <Icon name="more" className="size-5" />
       </button>
