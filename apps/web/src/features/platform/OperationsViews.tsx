@@ -38,12 +38,13 @@ import {
   requiredInt,
   uuid,
 } from "@/lib/validation";
-import { PK, useCan, useSchoolDirectory } from "./data";
+import { LIST_PAGE_SIZE, PK, useCan, usePagedList, useSchoolDirectory } from "./data";
 import { DeploymentActions } from "./DeploymentActions";
 import { FilterCard } from "./FilterCard";
 import { FlagSwitch } from "./FlagSwitch";
 import { HeartbeatPill } from "./HeartbeatPill";
 import { Mono, MonoTime, TierTag } from "./pills";
+import { ShowMore } from "./ShowMore";
 import { UsageTable } from "./UsageTable";
 
 /* ------------------------------------------------------------------ usage */
@@ -419,10 +420,14 @@ export function FleetScreen({ status = "" }: { status?: string }) {
   const locale = useLocale();
   const api = useBffClient("operator");
   const query = status ? { status } : {};
-  const deployments = useApiQuery(
-    [...PK.deployments, "list", query],
-    async () => (await unwrap(api.GET("/api/v1/platform/deployments", { params: { query } }))).data,
+  const deploymentList = usePagedList([...PK.deployments, "list", query], (cursor) =>
+    unwrap(
+      api.GET("/api/v1/platform/deployments", {
+        params: { query: { ...query, limit: LIST_PAGE_SIZE, ...(cursor ? { cursor } : {}) } },
+      }),
+    ),
   );
+  const deployments = deploymentList.state;
   const versions = useApiQuery(PK.versions, () =>
     unwrap(api.GET("/api/v1/platform/fleet/versions")),
   );
@@ -554,6 +559,7 @@ export function FleetScreen({ status = "" }: { status?: string }) {
           emptyTitle={t("emptyTitle")}
           emptyBody={t("emptyBody")}
         />
+        <ShowMore list={deploymentList} />
       </Card>
       <Card title={t("versionsTitle")}>
         <DataTable
@@ -604,10 +610,14 @@ export function BreakGlassScreen() {
   const can = useCan();
   const hintId = useId();
   const { nameOf, schools } = useSchoolDirectory();
-  const requests = useApiQuery(
-    [...PK.breakGlass, "list"],
-    async () => (await unwrap(api.GET("/api/v1/platform/break-glass-requests"))).data,
+  const requestList = usePagedList([...PK.breakGlass, "list"], (cursor) =>
+    unwrap(
+      api.GET("/api/v1/platform/break-glass-requests", {
+        params: { query: { limit: LIST_PAGE_SIZE, ...(cursor ? { cursor } : {}) } },
+      }),
+    ),
   );
+  const requests = requestList.state;
   const columns: Column<BreakGlassRequest>[] = [
     { key: "school", header: t("colSchool"), cell: (row) => nameOf(row.tenant_id) },
     {
@@ -782,6 +792,7 @@ export function BreakGlassScreen() {
         emptyTitle={t("emptyTitle")}
         emptyBody={t("emptyBody")}
       />
+      <ShowMore list={requestList} />
     </div>
   );
 }

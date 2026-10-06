@@ -633,6 +633,7 @@
     }
   },
   "platform": {
+    "showMore": "Show more",
     "badge": "ప్లాట్‌ఫామ్ అడ్మిన్",
     "nav": {
       "label": "ప్లాట్‌ఫామ్",

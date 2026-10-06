@@ -3310,7 +3310,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Announcements */
+        /**
+         * List Announcements
+         * @description Announcements, newest first, cursor-paged (R-14).
+         */
         get: operations["list_announcements_api_v1_platform_announcements_get"];
         put?: never;
         /** Create Announcement */
@@ -3399,7 +3402,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Breakglass */
+        /**
+         * List Breakglass
+         * @description Break-glass requests, newest first, cursor-paged (R-14).
+         */
         get: operations["list_breakglass_api_v1_platform_break_glass_requests_get"];
         put?: never;
         /**
@@ -3458,7 +3464,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Deployments */
+        /**
+         * List Deployments
+         * @description Deployments, newest first, cursor-paged (R-14); ``tenant_id`` for one school's.
+         */
         get: operations["list_deployments_api_v1_platform_deployments_get"];
         put?: never;
         post?: never;
@@ -21539,7 +21548,10 @@ export interface operations {
     };
     list_announcements_api_v1_platform_announcements_get: {
         parameters: {
-            query?: never;
+            query?: {
+                cursor?: string | null;
+                limit?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -21553,6 +21565,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_AnnouncementOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
             /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
@@ -21798,6 +21819,8 @@ export interface operations {
     list_breakglass_api_v1_platform_break_glass_requests_get: {
         parameters: {
             query?: {
+                cursor?: string | null;
+                limit?: number;
                 tenant_id?: string | null;
             };
             header?: never;
@@ -21967,7 +21990,10 @@ export interface operations {
     list_deployments_api_v1_platform_deployments_get: {
         parameters: {
             query?: {
+                cursor?: string | null;
+                limit?: number;
                 status?: string | null;
+                tenant_id?: string | null;
             };
             header?: never;
             path?: never;

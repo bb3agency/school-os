@@ -633,6 +633,7 @@
     }
   },
   "platform": {
+    "showMore": "Show more",
     "badge": "Platform admin",
     "nav": {
       "label": "Platform",

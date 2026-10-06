@@ -1,9 +1,9 @@
 "use client";
 
 import type { AiBundle, OperatorMe, Plan, TenantSummary } from "@schoolos/api-client";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, type QueryKey } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
+import { toLoadable, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import type { Loadable } from "@/lib/loadable";
 
 /** Query-key roots for the control plane; mutations invalidate by these prefixes. */
@@ -26,6 +26,41 @@ export const PK = {
   operators: ["operator", "operators"],
   audit: ["operator", "audit"],
 } as const;
+
+/** Rows per page of the cursor-paged operator lists (the API caps `limit` at 200). */
+export const LIST_PAGE_SIZE = 50;
+
+export interface PagedList<T> {
+  state: Loadable<readonly T[]>;
+  hasMore: boolean;
+  loadingMore: boolean;
+  loadMore: () => void;
+}
+
+/**
+ * A cursor-paged operator list (`{ data, next_cursor }`): the first page, then "Show more"
+ * follows `next_cursor` (audit 2026-10-06 R-14: deployments, announcements and break-glass
+ * requests were unpaged or cut off at 200 rows).
+ */
+export function usePagedList<T>(
+  queryKey: QueryKey,
+  load: (cursor: string | null) => Promise<{ data: T[]; next_cursor?: string | null }>,
+): PagedList<T> {
+  const list = useInfiniteQuery({
+    queryKey,
+    queryFn: ({ pageParam }) => load(pageParam),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.next_cursor ?? null,
+    retry: false,
+  });
+  const rows = list.data?.pages.flatMap((one) => one.data) ?? [];
+  return {
+    state: toLoadable({ ...list, data: rows as readonly T[] }),
+    hasMore: list.hasNextPage,
+    loadingMore: list.isFetchingNextPage,
+    loadMore: () => void list.fetchNextPage(),
+  };
+}
 
 /** The signed-in operator's roles and effective permissions (GET /platform/me). */
 export function useOperatorMe(): OperatorMe | undefined {

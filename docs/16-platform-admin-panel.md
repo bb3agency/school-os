@@ -877,12 +877,12 @@ Conventions from 09 §2 apply (problem+json, `Idempotency-Key` on creating POSTs
 | GET | `/platform/flags` | `platform.flags.read` | 200 | Global rows and overrides |
 | PUT | `/platform/flags/{key}` | `platform.flags.manage` ᴿ | 200 | Global value and rollout % |
 | PUT · DELETE | `/platform/flags/{key}/tenants/{tenant_id}` | `platform.flags.manage` ᴿ | 200 · 204 | Per-school override |
-| GET | `/platform/deployments` · `/platform/deployments/{deployment_id}` | `platform.fleet.read` | 200 | |
+| GET | `/platform/deployments` · `/platform/deployments/{deployment_id}` | `platform.fleet.read` | 200 | List: newest first, cursor-paged (`limit` 1-200, default 50; `cursor`; `next_cursor`), optional `status` and `tenant_id` (audit 2026-10-06 R-14) |
 | PATCH | `/platform/deployments/{deployment_id}` | `platform.fleet.manage` ᴿ | 200 | `target_version`, `custom_domain`, `hostname`, `host_ref` (dedicated only; `If-Match`) |
 | POST | `/platform/deployments/{deployment_id}/heartbeat-key:rotate` | `platform.fleet.manage` ᴿ | 200 | Returns the new key **once** for the runbook; `409 rotation_pending` while an earlier rotation is inside its 7-day overlap (audit 2026-10-06 R-15) |
 | POST | `/platform/deployments/{deployment_id}/decommission` | `platform.fleet.manage` ᴿ | 200 | After an approved offboarding |
 | GET | `/platform/fleet/versions` | `platform.fleet.read` | 200 | Running versions across deployments (version skew) |
-| GET | `/platform/announcements` | any operator | 200 | |
+| GET | `/platform/announcements` | any operator | 200 | Newest first, cursor-paged (`limit` 1-200, default 50; `cursor`; `next_cursor`; audit 2026-10-06 R-14) |
 | POST | `/platform/announcements` | `platform.announcements.manage` | 201 | |
 | PATCH | `/platform/announcements/{announcement_id}` | `platform.announcements.manage` | 200 | |
 | POST | `/platform/announcements/{announcement_id}/cancel` | `platform.announcements.manage` | 200 | |
@@ -890,7 +890,7 @@ Conventions from 09 §2 apply (problem+json, `Idempotency-Key` on creating POSTs
 | POST | `/platform/support/tickets` | `platform.support.manage` | 201 | Operator-created (email/phone/WhatsApp) |
 | POST | `/platform/support/tickets/{ticket_id}/messages` | `platform.support.manage` | 201 | Reply or internal note |
 | PATCH | `/platform/support/tickets/{ticket_id}` | `platform.support.manage` | 200 | Status, priority, assignee, personal-data flag |
-| GET | `/platform/break-glass-requests` | any operator | 200 | Status list, optional `tenant_id` |
+| GET | `/platform/break-glass-requests` | any operator | 200 | Status list, newest first, cursor-paged (`limit` 1-200, default 50; `cursor`; `next_cursor`; audit 2026-10-06 R-14), optional `tenant_id` |
 | POST | `/platform/break-glass-requests` | `platform.breakglass.request` | 201 | Records the request (school approval workflow: M1). `scope` is `{}` (the whole school) or `section_id` and/or `class_id` (UUIDs); any other key is `422` (audit DL-10) |
 | POST | `/platform/break-glass-requests/{request_id}/emergency-confirm` | `platform.breakglass.emergency` ᴿ | 200 | Two different operators (SEC-029) |
 | GET | `/platform/operators` | `platform.operators.manage` (no step-up) | 200 | |

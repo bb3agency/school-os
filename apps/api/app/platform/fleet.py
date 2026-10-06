@@ -52,10 +52,12 @@ from app.platform.common import (
     SYSTEM,
     Actor,
     audit_platform,
+    clamp_limit,
     db_errors,
     fleet_cfg,
     must,
     now,
+    parse_cursor,
     today_ist,
 )
 from app.platform.schemas import (
@@ -80,12 +82,23 @@ _REJECTED = "Heartbeat rejected"
 # --- deployments ------------------------------------------------------------------------------
 
 
-def list_deployments(status: str | None = None) -> list[DeploymentOut]:
+def list_deployments(
+    status: str | None = None,
+    *,
+    tenant_id: uuid.UUID | None = None,
+    limit: int = 50,
+    cursor: str | None = None,
+) -> tuple[list[DeploymentOut], str | None]:
+    """Newest first, keyset-paged on the UUIDv7 id (audit 2026-10-06 R-14: the list was unpaged,
+    one row per school). ``tenant_id`` narrows it to one school's deployment."""
+    limit = clamp_limit(limit)
+    conds = [m.deployments.c.status == status] if status else []
+    if tenant_id is not None:
+        conds.append(m.deployments.c.tenant_id == tenant_id)
     with platform_session() as s:
-        stmt = select(m.deployments).order_by(m.deployments.c.tenant_code)
-        if status:
-            stmt = stmt.where(m.deployments.c.status == status)
-        return [DeploymentOut.model_validate(dict(r)) for r in s.execute(stmt).mappings()]
+        rows = repo.list_rows(s, m.deployments, *conds, limit=limit, cursor=parse_cursor(cursor))
+    items = [DeploymentOut.model_validate(dict(r)) for r in rows[:limit]]
+    return items, (str(rows[limit - 1]["id"]) if len(rows) > limit else None)
 
 
 def get_deployment(deployment_id: uuid.UUID) -> DeploymentOut:

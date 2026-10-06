@@ -20,7 +20,7 @@ from app.core.db import platform_session
 from app.core.errors import Unauthenticated
 from app.identity.service_token import InMemoryReplayStore
 from app.platform import fleet, heartbeat_client
-from app.platform.common import today_ist
+from app.platform.common import fleet_cfg, today_ist
 from app.platform.schemas import HeartbeatIn
 
 from .conftest import Api, Operator, provision_payload
@@ -253,7 +253,7 @@ def test_R_15_second_rotation_while_one_is_pending_is_409_and_keeps_both_keys(
     assert (second.status_code, second.json()["code"]) == (409, "rotation_pending")
 
     stores = fleet.FleetStores(InMemoryReplayStore(), InMemoryReplayStore())
-    overlap = dt.timedelta(days=int(fleet.fleet_cfg()["key_rotation_overlap_days"]))
+    overlap = dt.timedelta(days=int(fleet_cfg()["key_rotation_overlap_days"]))
     assert overlap == dt.timedelta(days=7)
     inside = dt.datetime.now(dt.UTC) + overlap - dt.timedelta(hours=1)
     for key, key_id in (

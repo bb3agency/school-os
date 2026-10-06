@@ -575,9 +575,17 @@ function DeploymentTab({ schoolId }: { schoolId: string }) {
   const tdep = useTranslations("status.deployment");
   const tmode = useTranslations("deploymentMode");
   const api = useBffClient("operator");
+  // One deployment per school: ask for this school's row only (the list is paged, R-14).
   const deployments = useApiQuery(
-    [...PK.deployments, "list", {}],
-    async () => (await unwrap(api.GET("/api/v1/platform/deployments"))).data,
+    [...PK.deployments, "list", { tenant_id: schoolId }],
+    async () =>
+      (
+        await unwrap(
+          api.GET("/api/v1/platform/deployments", {
+            params: { query: { tenant_id: schoolId, limit: 1 } },
+          }),
+        )
+      ).data,
   );
   if (deployments.status !== "ready") {
     return <FleetTableState state={deployments} />;
