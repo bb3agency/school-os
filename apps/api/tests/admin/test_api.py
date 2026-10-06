@@ -97,6 +97,16 @@ def test_FR_ADM_001_include_sensitive_and_idempotency_key(
     )
     assert replay.status_code == 202
     assert replay.headers["Location"] == first.headers["Location"]
+    AD.settle(admin_engine, school)
+
+
+def test_FR_ADM_001_invalid_export_requests_are_422(
+    school: Any, api: Any, admin_engine: Engine
+) -> None:
+    # Split from the idempotency test: the full export allows 3 requests a school an hour
+    # (app/core/rate_limits.yaml data_export, P2-07), and each test starts with a full budget.
+    AD.settle(admin_engine, school)
+    owner = school.people["owner"]
     bad = api.call(owner, "POST", PATH, json={"include_sensitive": "yes please"})
     assert bad.status_code == 422
     unknown = api.call(owner, "POST", PATH, json={"everything": True})

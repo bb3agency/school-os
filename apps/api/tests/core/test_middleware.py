@@ -25,6 +25,7 @@ from app.core.logging import bind_context, setup_logging
 from app.core.middleware import (
     REQUEST_ID_HEADER,
     BodySizeLimitMiddleware,
+    RateLimitMiddleware,
     RequestContextMiddleware,
     SecurityHeadersMiddleware,
     install_middleware,
@@ -411,5 +412,11 @@ def test_NFR_OBS_001_non_http_scopes_pass_through(middleware_cls: type[Any]) -> 
 def test_NFR_OBS_001_middleware_is_installed_by_create_app() -> None:
     app = create_app()
     classes: list[object] = [m.cls for m in app.user_middleware]
-    # Outermost first: headers wrap request context, which wraps the body limit.
-    assert classes == [SecurityHeadersMiddleware, RequestContextMiddleware, BodySizeLimitMiddleware]
+    # Outermost first: headers wrap request context, which wraps the rate limiter (P2-07; a 429
+    # still carries the request id and security headers), which wraps the body limit.
+    assert classes == [
+        SecurityHeadersMiddleware,
+        RequestContextMiddleware,
+        RateLimitMiddleware,
+        BodySizeLimitMiddleware,
+    ]

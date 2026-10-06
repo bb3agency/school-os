@@ -280,7 +280,9 @@ def demo_app(
 
 @pytest.fixture
 def memory_limiter() -> Iterator[rl.RateLimiter]:
-    limiter = limiter_with(rl.InMemoryRateLimitStore())
+    # A frozen clock: quota + 1 calls must not see a refill however slow the machine is
+    # (machine_ip refills every 0.5 s); refill itself is proven with Clock.advance above.
+    limiter = limiter_with(rl.InMemoryRateLimitStore(clock=Clock()))
     yield limiter
     rl.set_rate_limiter(None)
 
@@ -458,7 +460,8 @@ def test_P2_07_valkey_down_fails_open_for_normal_traffic() -> None:
 
 def test_P2_07_valkey_down_fails_closed_for_sign_in_paths() -> None:
     """Closed policies and the authentication backoff fall back to a per-process limiter."""
-    limiter = limiter_with(DownStore())
+    # Frozen fallback clock: quota + 1 calls must not see a refill on a slow machine.
+    limiter = limiter_with(DownStore(), fallback=rl.InMemoryRateLimitStore(clock=Clock()))
     login = limiter.config.policy("login_event")
     decisions = [limiter.check([rl.Bucket(login, "person")]) for _ in range(login.quota + 1)]
     assert [d.allowed for d in decisions] == [True] * login.quota + [False]
