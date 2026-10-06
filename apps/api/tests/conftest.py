@@ -190,7 +190,7 @@ def make_alembic_config() -> type[Config] | object:
 
 
 @pytest.fixture(autouse=True)
-def _full_rate_limit_budgets() -> Iterator[None]:
+def _full_rate_limit_budgets() -> None:
     """Every test starts with full rate-limit budgets, like a fresh minute. Limiting itself stays
     ON in tests (tests/core/test_ratelimit.py proves it); only the per-process counters of the
     previous test are forgotten, so suites that share one synthetic school do not add up."""
@@ -198,7 +198,6 @@ def _full_rate_limit_budgets() -> Iterator[None]:
     if isinstance(limiter.store, ratelimit.InMemoryRateLimitStore):
         limiter.store.reset()
     limiter.fallback.reset()
-    yield
 
 
 @pytest.fixture

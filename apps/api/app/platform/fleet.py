@@ -324,7 +324,10 @@ def verify_heartbeat(
         log.warning("fleet.heartbeat.rejected", error_code="replay", outcome="rejected")
         raise Conflict("This heartbeat was already received.", code="replay")
     if not stores.rate.claim(str(dep["id"]), dt.timedelta(seconds=int(cfg["rate_limit_seconds"]))):
-        raise RateLimited("One heartbeat per minute per deployment.")
+        raise RateLimited(
+            "One heartbeat per minute per deployment.",
+            retry_after_s=int(cfg["rate_limit_seconds"]),
+        )
     return VerifiedHeartbeat(dep, payload)
 
 
