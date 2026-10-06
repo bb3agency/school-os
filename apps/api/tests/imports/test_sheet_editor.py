@@ -105,6 +105,47 @@ def test_FR_IMP_008_sheet_shows_every_column_and_row_with_checks(
     assert rest["next_cursor"] is None
 
 
+def test_SEC_015_a_column_once_mapped_to_a_restricted_field_stays_hidden(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """Audit 2026-10-06 R-06 (API3, BOPLA). The office admin maps an unrecognised column to a
+    restricted (C3) field by hand, so the sheet hides it. A school-wide ``import.run`` holder
+    without ``student.read_sensitive`` remapped it to "ignore" (or to a C2 field) and then read
+    the values in clear in the sheet, or edited them. A column stays restricted for the life of
+    the batch once it was mapped to a restricted field."""
+    admin, staff = world.person("office_admin"), world.person("office_staff")
+    rows, _ = S.class_list(2)
+    rows[0].append(f"Code {uuid.uuid4().hex[:6]}")  # a header the suggester does not know
+    rows[1].append("Synthetic faith")
+    rows[2].append("Synthetic faith")
+    batch_id = S.start(admin_engine, world.a, S.xlsx_bytes(rows))
+    mapping = {int(k): v for k, v in S.batch(admin_engine, batch_id)["mapping"].items()}
+    assert 7 not in mapping
+    columns = [{"index": i, "target": t} for i, t in sorted(mapping.items())]
+
+    def put(who: Any, cols: list[dict[str, Any]]) -> Any:
+        etag = api.call(who, "GET", f"/api/v1/imports/{batch_id}").headers["ETag"]
+        return api.call(
+            who,
+            "PUT",
+            f"/api/v1/imports/{batch_id}/mapping",
+            json={"columns": cols},
+            headers={"If-Match": etag},
+        )
+
+    res = put(admin, [*columns, {"index": 7, "target": "religion"}])
+    assert res.status_code == 200, res.text
+    assert _sheet(api, staff, batch_id).json()["columns"][7]["restricted"] is True
+    res = put(staff, columns)  # column 7 back to "ignore"
+    assert res.status_code == 200, res.text
+    sheet = _sheet(api, staff, batch_id)
+    assert sheet.json()["columns"][7]["restricted"] is True
+    assert "Synthetic faith" not in sheet.text
+    res = put(staff, [*columns, {"index": 7, "target": "mother_tongue"}])  # a C2 field
+    assert res.status_code == 200, res.text
+    assert "Synthetic faith" not in _sheet(api, staff, batch_id).text
+
+
 def test_FR_IMP_008_edit_rechecks_the_row_and_commit_adds_the_edited_values(
     world: Any, api: Any, admin_engine: Engine
 ) -> None:

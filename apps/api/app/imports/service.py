@@ -724,13 +724,15 @@ def set_mapping(
             problems.append(issue(f"columns.{i}.index", "duplicate_column"))
         if column.target != IGNORE:
             mapping[str(column.index)] = column.target
-    problems += mapping_problems(mapping, len(batch.columns), _specs(session), batch.source)
+    specs = _specs(session)
+    problems += mapping_problems(mapping, len(batch.columns), specs, batch.source)
     if problems:
         raise ValidationFailed(problems)
     repo.replace_rows(session, batch.tenant_id, batch.id, [])
     updated = repo.update_batch(
         session,
         batch.id,
+        columns=_sticky_restrictions(batch, mapping, specs),
         mapping=mapping,
         mapping_template_id=None,
         status="parsed",
@@ -902,9 +904,29 @@ def _restricted_columns(
     for column in batch.columns or ():
         index, suggested = column.get("index"), column.get("suggested")
         spec = specs.get(suggested) if isinstance(suggested, str) else None
-        if isinstance(index, int) and 0 <= index < width and spec is not None and spec.sensitive:
+        sticky = column.get("restricted") is True
+        if isinstance(index, int) and 0 <= index < width and (sticky or (spec and spec.sensitive)):
             out.add(index)
     return out
+
+
+def _sticky_restrictions(
+    batch: ImportBatch, mapping: Mapping[str, str], specs: Mapping[str, AttributeSpec]
+) -> list[dict[str, Any]]:
+    """The batch's columns with ``restricted`` set on every column that was ever mapped to a
+    restricted (C3) field, by the old or the new mapping. Unmapping such a column, or mapping it
+    to a C2 field, must not show its values to someone without ``student.read_sensitive``
+    (audit 2026-10-06 R-06)."""
+    sensitive = {
+        int(k)
+        for m in (batch.mapping, mapping)
+        for k, target in m.items()
+        if k.isdigit() and (spec := specs.get(target)) is not None and spec.sensitive
+    }
+    return [
+        {**c, "restricted": True} if c.get("index") in sensitive else dict(c)
+        for c in batch.columns or ()
+    ]
 
 
 def _sheet_cell(cell: Cell, *, restricted: bool, edited: bool) -> SheetCellOut:
