@@ -227,7 +227,10 @@ export function StackedRows<T>({
       )}
       <ul aria-label={caption} className="divide-y divide-border">
         {rows.map((row) => (
-          <li key={rowKey(row)} className="relative min-w-0 space-y-2 px-4 py-3.5">
+          <li
+            key={rowKey(row)}
+            className="relative min-w-0 space-y-2 px-4 py-3.5 break-anywhere [&_*]:min-w-0 [&_*]:whitespace-normal"
+          >
             {titles.map((column) => (
               <div key={column.key} className="min-w-0 text-ink">
                 {column.cell(row)}
