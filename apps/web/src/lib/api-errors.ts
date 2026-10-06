@@ -63,7 +63,14 @@ export type KnownApiCode = (typeof KNOWN_API_CODES)[number];
 export type ApiErrorKind =
   | { kind: "redirecting" }
   | { kind: "unavailable" }
-  | { kind: "api"; key: KnownApiCode | "generic"; status: number; requestId: string | null };
+  | {
+      kind: "api";
+      key: KnownApiCode | "generic";
+      status: number;
+      requestId: string | null;
+      /** Seconds to wait from a 429 (`retry_after` in the problem, RFC 9110 Retry-After). */
+      retryAfter?: number;
+    };
 
 const STATUS_FALLBACK: Record<number, KnownApiCode> = {
   403: "forbidden",
@@ -90,11 +97,15 @@ export function describeApiError(error: unknown): ApiErrorKind {
   }
   if (error instanceof ApiError) {
     const key = isKnown(error.code) ? error.code : (STATUS_FALLBACK[error.status] ?? "generic");
+    const retry = (error.problem as { retry_after?: unknown }).retry_after;
     return {
       kind: "api",
       key,
       status: error.status,
       requestId: typeof error.problem.request_id === "string" ? error.problem.request_id : null,
+      ...(error.status === 429 && typeof retry === "number" && Number.isInteger(retry) && retry > 0
+        ? { retryAfter: retry }
+        : {}),
     };
   }
   // fetch() itself failed: offline or the server is down.

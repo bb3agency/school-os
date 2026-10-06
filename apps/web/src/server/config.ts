@@ -47,6 +47,12 @@ export interface AuthConfig {
    * app. Unset: the support routes answer 404 and approved access cannot be used (fail closed).
    */
   supportEnabled: boolean;
+  /**
+   * TRUSTED_PROXY_HOPS (default 1): proxies in front of the BFF that append the client address
+   * to X-Forwarded-For (the ALB, or Caddy on a dedicated host). 0 = none: the address is
+   * unknown and per-IP sign-in limits share one bucket. Used for rate limits only (P2-07).
+   */
+  trustedProxyHops: number;
 }
 
 /** Where people land after signing out (outside the authenticated route groups). */
@@ -185,6 +191,9 @@ export function loadAuthConfig(env: Env = process.env): AuthConfig {
     "/bff/auth/callback",
   );
   const platformEnabled = (env.SOS_DEPLOYMENT_MODE ?? "shared").trim() !== "dedicated";
+  const hopsRaw = (env.TRUSTED_PROXY_HOPS ?? "1").trim();
+  const trustedProxyHops = /^[0-5]$/.test(hopsRaw) ? Number(hopsRaw) : 1;
+  if (!/^[0-5]$/.test(hopsRaw)) problems.push("TRUSTED_PROXY_HOPS must be a whole number 0-5");
   // Dedicated hosts have no control plane (every operator route answers 404 first), so they
   // carry no operator client: a placeholder that is never used stands in for it.
   const operator: OidcClientConfig = platformEnabled
@@ -246,5 +255,6 @@ export function loadAuthConfig(env: Env = process.env): AuthConfig {
     support,
     platformEnabled,
     supportEnabled,
+    trustedProxyHops,
   };
 }

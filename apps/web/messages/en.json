@@ -1763,7 +1763,8 @@
       },
       "rate_limited": {
         "title": "Too many attempts",
-        "body": "Wait a minute, then try again."
+        "body": "Wait a minute, then try again.",
+        "bodyWait": "Too many requests. Wait {seconds} seconds and try again."
       },
       "bad_gateway": {
         "title": "The server is not responding",
@@ -1874,7 +1875,8 @@
       "mfa_required": "Your account needs two-step verification (MFA). Set it up, then sign in again.",
       "step_up_failed": "We couldn't confirm it's you. Sign in again to continue.",
       "support_not_allowed": "Support access could not be opened. Only the operator who asked can use an approved request, and only while it is active. Check the request in the admin panel.",
-      "support_ended": "This support access has ended or the school revoked it. Ask the school to approve a new request."
+      "support_ended": "This support access has ended or the school revoked it. Ask the school to approve a new request.",
+      "too_many_attempts": "Too many sign-in attempts from this network. Wait a few minutes, then sign in again."
     }
   },
   "validation": {

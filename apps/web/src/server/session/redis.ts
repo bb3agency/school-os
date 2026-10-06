@@ -6,6 +6,9 @@ import type { KeyValue } from "./kv";
 /** Compare-and-delete for lock release: only the holder's token removes the lock. */
 const DEL_IF_EQUALS = `if redis.call("GET", KEYS[1]) == ARGV[1] then return redis.call("DEL", KEYS[1]) else return 0 end`;
 
+/** INCR + PEXPIRE on first use (fixed window), one round trip: returns {count, pttl}. */
+const INCR_WINDOW = `local n = redis.call("INCR", KEYS[1]) if n == 1 then redis.call("PEXPIRE", KEYS[1], ARGV[1]) end return {n, redis.call("PTTL", KEYS[1])}`;
+
 const CONNECT_TIMEOUT_MS = 3_000;
 
 function createValkeyClient(url: string) {
@@ -64,6 +67,14 @@ export class RedisKeyValue implements KeyValue {
 
   async smembers(key: string): Promise<string[]> {
     return (await this.client.sMembers(key)).map(String);
+  }
+
+  async incr(key: string, windowMs: number): Promise<{ count: number; ttlMs: number }> {
+    const result = (await this.client.eval(INCR_WINDOW, {
+      keys: [key],
+      arguments: [String(Math.max(1, Math.ceil(windowMs)))],
+    })) as unknown as [number, number];
+    return { count: Number(result[0]), ttlMs: Number(result[1]) };
   }
 }
 

@@ -15,6 +15,7 @@ export const SIGN_IN_ERRORS = [
   "step_up_failed",
   "support_not_allowed",
   "support_ended",
+  "too_many_attempts",
 ] as const;
 export type SignInError = (typeof SIGN_IN_ERRORS)[number];
 
