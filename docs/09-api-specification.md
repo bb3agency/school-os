@@ -271,8 +271,8 @@ Certificate notes (M3, as built; data model 05 §5.7). The stories and requireme
 | PATCH | `/imports/{id}/sheet/rows/{row_no}` (`{"cells": [{"column", "value"}]}`, `If-Match`) → 200 (edited row after its re-check, new `version`, counts, `changed_rows`) (**built**; FR-IMP-008) | `import.run` |
 | GET | `/imports/{id}/sheet/export?format=csv\|xlsx` → the file (`attachment`, `no-store`) (**built**; FR-IMP-009) | `import.run` + step-up (MFA within 5 min, 428) |
 | GET · POST | `/import-templates` (POST 201: `name`, `import_id`) (**M1**) | `import.run` |
-| GET | `/extraction-items?batch_id=&status=pending_review` | `import.run` |
-| POST | `/extraction-items/{id}/confirm` · `/reject` | `import.commit` |
+| GET | `/extraction-items?batch_id=&status=pending_review` | `import.run`; only rows of register scans the caller can see (document ACL/scope), others 404 (data-layer hardening note 10) |
+| POST | `/extraction-items/{id}/confirm` · `/reject` | `import.commit`; only rows of register scans the caller can see (document ACL/scope), others 404 (data-layer hardening note 10) |
 
 Imports notes (M1, as built; US-401, FR-IMP-001..007):
 - **Upload first** with `POST /documents/uploads` (purpose `import_file`: XLSX or CSV/Google Sheets CSV export, ≤ 10 MB) and `POST /documents`; `POST /imports` accepts the document once it passed the virus scan (`409 document_not_ready` before; `413`/`415` for size/type; `409 import_exists` when the file already has a live batch). Parsing, validation and commit run in workers (queue `ingest`); the body carries `job_id`, `Location` points at the batch, whose `status` moves `uploaded → parsing → parsed → validating → validated → committing → committed` (`failed` with `error_code`, e.g. `header_not_found`, `too_many_rows`, `file_too_complex`).
@@ -288,8 +288,8 @@ Imports notes (M1, as built; US-401, FR-IMP-001..007):
 | POST | `/imports/{id}/commit` · `/imports/{id}/revert` | `import.commit` |
 | GET | `/extraction-batches` · `/extraction-batches/{id}` (progress per page) | `import.run` |
 | POST | `/extraction-batches` (`document_ids` of `register_scan` JPG/PNG documents) → 202 | `import.run` |
-| GET | `/extraction-items?batch_id=&status=pending_review` (cursor) · `/extraction-items/{id}` (page image link, possible matches) | `import.run` |
-| POST | `/extraction-items/{id}/confirm` · `/reject` | `import.commit` |
+| GET | `/extraction-items?batch_id=&status=pending_review` (cursor) · `/extraction-items/{id}` (page image link, possible matches) | `import.run`; only rows of register scans the caller can see (document ACL/scope), others 404 (data-layer hardening note 10) |
+| POST | `/extraction-items/{id}/confirm` · `/reject` | `import.commit`; only rows of register scans the caller can see (document ACL/scope), others 404 (data-layer hardening note 10) |
 
 - Register photos (US-402): a batch reads each page with the configured provider; Aadhaar-like numbers are masked before storage. A page that showed one is `image_redacted` (its image link is the blacked-out copy, available once scanned) or, when it cannot be redacted, `image_withheld` (no image link; its rows answer 409 `evidence_unavailable` on confirm) (PRV-016). Items carry per-field `confidence`, `bbox`, `masked`, `low_confidence`. PDFs answer 422 `pdf_not_supported` (M1).
 - Confirm body: `fields` (the values read on the page; `null` skips), optional `student_id` (add to an existing student) or `section_id`/`roll_no`/`student_status` (new student). Values are recorded with source `admission_register` and the page as evidence; identity values stay unverified (verification is a change request), others are recorded verified by the reviewer. 409 `item_already_reviewed`; 403 `identity_change_required` when a different register identity value exists; 422 `masked_value` for a masked number. Emits outbox `extraction.confirmed` {batch_id, item_id, student_id}.

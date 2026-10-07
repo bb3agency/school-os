@@ -1508,6 +1508,15 @@ def is_visible(session: Session, ctx: UserContext, document_id: uuid.UUID) -> bo
     return repo.get_document(session, document_id, visibility=_visibility(session, ctx)) is not None
 
 
+def visible_document_ids(
+    session: Session, ctx: UserContext, document_ids: Sequence[uuid.UUID]
+) -> set[uuid.UUID]:
+    """The ids among ``document_ids`` whose ACL/scope reaches the caller, in one query (for
+    other modules' lists of rows derived from documents, e.g. the extraction queue: data-layer
+    hardening note 10)."""
+    return repo.visible_ids(session, document_ids, _visibility(session, ctx))
+
+
 def is_own_upload(session: Session, ctx: UserContext, document_id: uuid.UUID) -> bool:
     """Whether the caller can see the document AND uploaded it themselves (for flows that read
     an upload and then delete it, such as attendance and marks sheets: audit DL-04)."""
@@ -2709,6 +2718,7 @@ __all__ = [
     "tenant_export_download_url",
     "update_document",
     "validate_acl",
+    "visible_document_ids",
 ]
 
 

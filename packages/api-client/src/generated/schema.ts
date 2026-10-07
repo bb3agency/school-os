@@ -1998,8 +1998,9 @@ export interface paths {
         };
         /**
          * List Items
-         * @description The verification queue in page order (permission ``import.run``). Each field carries its
-         *     confidence and region; ``low_confidence_fields`` lists the ones to check carefully.
+         * @description The verification queue in page order (permission ``import.run``; only rows of register
+         *     pages whose document you can see). Each field carries its confidence and region;
+         *     ``low_confidence_fields`` lists the ones to check carefully.
          */
         get: operations["list_items_api_v1_extraction_items_get"];
         put?: never;
@@ -2020,7 +2021,7 @@ export interface paths {
         /**
          * Get Item
          * @description One row with a 5-minute link to its page image and students with the same admission
-         *     number (permission ``import.run``; the image also needs ``document.read`` on the page).
+         *     number (permission ``import.run``; 404 unless you can see the page's document).
          */
         get: operations["get_item_api_v1_extraction_items__item_id__get"];
         put?: never;
@@ -2042,7 +2043,8 @@ export interface paths {
         put?: never;
         /**
          * Confirm Item
-         * @description Save the row as you read it on the page (permission ``import.commit``).
+         * @description Save the row as you read it on the page (permission ``import.commit``; 404 unless you
+         *     can see the page's document).
          *
          *     Creates a student (or adds to ``student_id``) with source ``admission_register`` and the
          *     page as evidence; creating a student also needs ``student.create`` (403
@@ -2070,7 +2072,7 @@ export interface paths {
         /**
          * Reject Item
          * @description Discard a row that is not a student entry; nothing is recorded (permission
-         *     ``import.commit``).
+         *     ``import.commit``; 404 unless you can see the page's document).
          */
         post: operations["reject_item_api_v1_extraction_items__item_id__reject_post"];
         delete?: never;

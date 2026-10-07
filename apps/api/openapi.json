@@ -30343,7 +30343,7 @@
     },
     "/api/v1/extraction-items": {
       "get": {
-        "description": "The verification queue in page order (permission ``import.run``). Each field carries its\nconfidence and region; ``low_confidence_fields`` lists the ones to check carefully.",
+        "description": "The verification queue in page order (permission ``import.run``; only rows of register\npages whose document you can see). Each field carries its confidence and region;\n``low_confidence_fields`` lists the ones to check carefully.",
         "operationId": "list_items_api_v1_extraction_items_get",
         "parameters": [
           {
@@ -30472,7 +30472,7 @@
     },
     "/api/v1/extraction-items/{item_id}": {
       "get": {
-        "description": "One row with a 5-minute link to its page image and students with the same admission\nnumber (permission ``import.run``; the image also needs ``document.read`` on the page).",
+        "description": "One row with a 5-minute link to its page image and students with the same admission\nnumber (permission ``import.run``; 404 unless you can see the page's document).",
         "operationId": "get_item_api_v1_extraction_items__item_id__get",
         "parameters": [
           {
@@ -30540,7 +30540,7 @@
     },
     "/api/v1/extraction-items/{item_id}/confirm": {
       "post": {
-        "description": "Save the row as you read it on the page (permission ``import.commit``).\n\nCreates a student (or adds to ``student_id``) with source ``admission_register`` and the\npage as evidence; creating a student also needs ``student.create`` (403\n``student_create_required``). A row already checked answers 409 ``item_already_reviewed``;\nchanging an\nexisting register identity value answers 403 ``identity_change_required`` (use a change\nrequest). Accepts ``Idempotency-Key``.",
+        "description": "Save the row as you read it on the page (permission ``import.commit``; 404 unless you\ncan see the page's document).\n\nCreates a student (or adds to ``student_id``) with source ``admission_register`` and the\npage as evidence; creating a student also needs ``student.create`` (403\n``student_create_required``). A row already checked answers 409 ``item_already_reviewed``;\nchanging an\nexisting register identity value answers 403 ``identity_change_required`` (use a change\nrequest). Accepts ``Idempotency-Key``.",
         "operationId": "confirm_item_api_v1_extraction_items__item_id__confirm_post",
         "parameters": [
           {
@@ -30618,7 +30618,7 @@
     },
     "/api/v1/extraction-items/{item_id}/reject": {
       "post": {
-        "description": "Discard a row that is not a student entry; nothing is recorded (permission\n``import.commit``).",
+        "description": "Discard a row that is not a student entry; nothing is recorded (permission\n``import.commit``; 404 unless you can see the page's document).",
         "operationId": "reject_item_api_v1_extraction_items__item_id__reject_post",
         "parameters": [
           {

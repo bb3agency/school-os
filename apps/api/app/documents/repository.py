@@ -222,6 +222,18 @@ def get_document(
     return session.scalars(stmt, execution_options={"populate_existing": True}).one_or_none()
 
 
+def visible_ids(
+    session: Session, document_ids: Sequence[uuid.UUID], visibility: Visibility
+) -> set[uuid.UUID]:
+    """The ids among ``document_ids`` that ``visibility`` reaches (one query)."""
+    if not document_ids:
+        return set()
+    stmt = select(Document.id).where(
+        Document.id.in_(sorted(set(document_ids))), visible_predicate(visibility)
+    )
+    return set(session.scalars(stmt))
+
+
 def list_documents(
     session: Session,
     visibility: Visibility,
