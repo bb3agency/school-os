@@ -470,3 +470,164 @@ def test_FR_AUD_failed_decisions_leave_no_audit_event(school: Any, admin_engine:
             bad()
     assert CR.actions(admin_engine, school.tenant_id, req.id) == before
     assert _history(school, req.student_id)[0].verification_status == "unverified"
+
+
+# --- hardening (audit 2026-10-05 "Change requests" and "Certificates") ---------------------------
+
+
+def _version_of(admin: Engine, document_id: uuid.UUID) -> uuid.UUID:
+    with admin.connect() as c:
+        value: uuid.UUID = c.execute(
+            text(
+                "SELECT id FROM kb.document_versions WHERE document_id = :d "
+                "ORDER BY version_no DESC LIMIT 1"
+            ),
+            {"d": document_id},
+        ).scalar_one()
+    return value
+
+
+def _set_version_status(admin: Engine, version_id: uuid.UUID, status: str) -> None:
+    with admin.begin() as c:
+        c.execute(
+            text("UPDATE kb.document_versions SET status = :s WHERE id = :v"),
+            {"s": status, "v": version_id},
+        )
+
+
+def test_FR_CR_001_submit_pins_the_evidence_version(school: Any, admin_engine: Engine) -> None:
+    admin = school.people["office_admin"]
+    doc = CR.evidence(admin_engine, school, admin)
+    req = CR.submit(admin_engine, school, admin, "office_admin", evidence_id=doc)
+    assert CR.row(admin_engine, req.id)["evidence_version_id"] == _version_of(admin_engine, doc)
+    # sos_app cannot move the pin afterwards (no UPDATE grant on the column).
+    from sqlalchemy.exc import ProgrammingError
+
+    with (
+        pytest.raises(ProgrammingError, match="permission denied"),
+        tenant_session(school.tenant_id) as s,
+    ):
+        s.execute(
+            text("UPDATE sis.change_requests SET evidence_version_id = NULL WHERE id = :i"),
+            {"i": req.id},
+        )
+
+
+@pytest.mark.parametrize(
+    ("status", "code"),
+    [
+        ("queued", "evidence_not_ready"),
+        ("scanning", "evidence_not_ready"),
+        ("quarantined", "evidence_not_usable"),
+        ("failed", "evidence_not_usable"),
+    ],
+)
+def test_FR_CR_002_approval_needs_the_pinned_evidence_version_ready(
+    school: Any, admin_engine: Engine, status: str, code: str
+) -> None:
+    """Evidence is accepted while its virus scan runs; approval waits until the pinned version
+    is clean (``ready``) and refuses one that failed it."""
+    admin = school.people["office_admin"]
+    doc = CR.evidence(admin_engine, school, admin, status="queued")
+    req = CR.submit(admin_engine, school, admin, "office_admin", evidence_id=doc)
+    version = _version_of(admin_engine, doc)
+    _set_version_status(admin_engine, version, status)
+    with pytest.raises(Conflict) as exc:
+        _approve(school, "principal", req.id)
+    assert exc.value.code == code
+    assert CR.row(admin_engine, req.id)["status"] == "pending"
+    if status == "queued":
+        _set_version_status(admin_engine, version, "ready")
+        assert _approve(school, "principal", req.id).status == "approved"
+
+
+def test_FR_CR_002_a_newer_evidence_version_does_not_replace_the_pinned_one(
+    school: Any, admin_engine: Engine
+) -> None:
+    """The approver decides on the file the requester attached: a later (clean) version of the
+    document does not stand in for a pinned version that failed its scan."""
+    admin = school.people["office_admin"]
+    doc = CR.evidence(admin_engine, school, admin)
+    req = CR.submit(admin_engine, school, admin, "office_admin", evidence_id=doc)
+    pinned = _version_of(admin_engine, doc)
+    with admin_engine.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO kb.document_versions (id, tenant_id, document_id, version_no, "
+                "object_key, sha256, mime_type, size_bytes, status, created_by) SELECT :n, "
+                "tenant_id, document_id, 2, replace(object_key, '/v1/', '/v2/'), sha256, "
+                "mime_type, size_bytes, "
+                "'ready', created_by FROM kb.document_versions WHERE id = :v"
+            ),
+            {"n": uuid.uuid4(), "v": pinned},
+        )
+    _set_version_status(admin_engine, pinned, "quarantined")
+    with pytest.raises(Conflict) as exc:
+        _approve(school, "principal", req.id)
+    assert exc.value.code == "evidence_not_usable"
+
+
+def test_FR_CR_002_approver_must_be_able_to_open_the_evidence(
+    school: Any, admin_engine: Engine
+) -> None:
+    admin = school.people["office_admin"]
+    doc = CR.evidence(admin_engine, school, admin, acl=[("membership", str(admin.membership_id))])
+    req = CR.submit(admin_engine, school, admin, "office_admin", evidence_id=doc)
+    principal = school.people["principal"]
+    base = CR.ctx(school, principal, "principal")
+    blind = dataclasses.replace(base, permissions=base.permissions - {"document.manage_acl"})
+    with pytest.raises(Conflict) as exc:
+        _approve(school, "principal", req.id, ctx=blind)
+    assert exc.value.code == "evidence_not_visible"
+    assert _approve(school, "principal", req.id).status == "approved"
+
+
+def test_FR_CR_002_approval_locks_the_student_before_comparing_the_old_value(
+    school: Any, admin_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A concurrent value write holds the student row lock: approval takes it first, so the
+    old-value check cannot race a write that lands just after it."""
+    req = CR.submit(admin_engine, school, school.people["office_admin"], "office_admin")
+    calls: list[str] = []
+    real_lock = students.lock_student_for_change
+    real_current = changes._current_value
+
+    def lock(*args: Any, **kwargs: Any) -> Any:
+        calls.append("lock")
+        return real_lock(*args, **kwargs)
+
+    def current(*args: Any, **kwargs: Any) -> Any:
+        calls.append("compare")
+        return real_current(*args, **kwargs)
+
+    monkeypatch.setattr(students, "lock_student_for_change", lock)
+    monkeypatch.setattr(changes, "_current_value", current)
+    _approve(school, "principal", req.id)
+    assert calls[:2] == ["lock", "compare"]
+
+
+def test_FR_CR_002_requester_must_still_be_an_active_member(
+    school: Any, admin_engine: Engine
+) -> None:
+    maker = CR.W.add_member(admin_engine, school.tenant_id, ["office_admin"])
+    req = CR.submit(admin_engine, school, maker, "office_admin")
+    with admin_engine.begin() as c:
+        c.execute(
+            text("UPDATE core.memberships SET status = 'suspended' WHERE id = :m"),
+            {"m": maker.membership_id},
+        )
+    with pytest.raises(Conflict) as exc:
+        _approve(school, "principal", req.id)
+    assert exc.value.code == "requester_inactive"
+    assert CR.row(admin_engine, req.id)["status"] == "pending"
+    # The checker can still clear it from the queue.
+    principal = school.people["principal"]
+    with tenant_session(school.tenant_id, principal.user_id) as s:
+        out = changes.reject(
+            s,
+            CR.ctx(school, principal, "principal"),
+            req.id,
+            RejectIn(reason="The person who asked has left the school"),
+            expected_version=1,
+        )
+    assert out.status == "rejected"
