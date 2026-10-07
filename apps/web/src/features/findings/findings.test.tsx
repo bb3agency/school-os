@@ -193,6 +193,20 @@ describe("findings list (US-501 AC1/AC2, FR-DQ-006)", () => {
     renderWithIntl(<FindingsScreen filters={parseFindingFilters({})} />);
     expect(await screen.findByText("No problems found")).toBeInTheDocument();
   });
+
+  it("offers a check run only to people who may resolve findings (read-only holders read)", async () => {
+    common(READ);
+    stub.routes["GET /bff/api/v1/dq/findings"] = () => page([]);
+    const { unmount } = renderWithIntl(<FindingsScreen filters={parseFindingFilters({})} />);
+    expect(await screen.findByText("No problems found")).toBeInTheDocument();
+    await waitFor(() => expect(stub.callsTo("GET /bff/api/v1/me")).toHaveLength(1));
+    expect(screen.queryByRole("button", { name: "Check now" })).not.toBeInTheDocument();
+    unmount();
+    common([...READ, "dq.findings.resolve"]);
+    stub.routes["GET /bff/api/v1/dq/findings"] = () => page([]);
+    renderWithIntl(<FindingsScreen filters={parseFindingFilters({})} />);
+    expect(await screen.findByRole("button", { name: "Check now" })).toBeInTheDocument();
+  });
 });
 
 describe("finding detail (US-502, FR-DQ-020)", () => {
@@ -345,7 +359,7 @@ describe("run checks (FR-DQ-002)", () => {
   });
 
   it("starts a check for the ticked sections with an Idempotency-Key", async () => {
-    common(READ);
+    common([...READ, "dq.findings.resolve"]);
     stub.routes["POST /bff/api/v1/dq/runs"] = () =>
       Response.json(
         {

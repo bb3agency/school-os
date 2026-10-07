@@ -1617,7 +1617,9 @@ export interface paths {
         /**
          * Start Run
          * @description Check sections, classes, students or an import batch, optionally for an export profile
-         *     such as ``cisce-registration-2026`` (permission ``dq.findings.read``). Small scopes are
+         *     such as ``cisce-registration-2026`` (permission ``dq.findings.resolve``: read-only holders
+         *     such as auditors and class teachers read findings but do not start runs; value changes
+         *     re-check students automatically). Small scopes are
          *     checked at once (status ``completed``); bigger ones are queued (status ``queued``) and you
          *     are notified when they finish. Accepts ``Idempotency-Key``.
          */

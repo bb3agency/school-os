@@ -29015,7 +29015,7 @@
     },
     "/api/v1/dq/runs": {
       "post": {
-        "description": "Check sections, classes, students or an import batch, optionally for an export profile\nsuch as ``cisce-registration-2026`` (permission ``dq.findings.read``). Small scopes are\nchecked at once (status ``completed``); bigger ones are queued (status ``queued``) and you\nare notified when they finish. Accepts ``Idempotency-Key``.",
+        "description": "Check sections, classes, students or an import batch, optionally for an export profile\nsuch as ``cisce-registration-2026`` (permission ``dq.findings.resolve``: read-only holders\nsuch as auditors and class teachers read findings but do not start runs; value changes\nre-check students automatically). Small scopes are\nchecked at once (status ``completed``); bigger ones are queued (status ``queued``) and you\nare notified when they finish. Accepts ``Idempotency-Key``.",
         "operationId": "start_run_api_v1_dq_runs_post",
         "requestBody": {
           "content": {
