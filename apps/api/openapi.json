@@ -27534,7 +27534,7 @@
     },
     "/api/v1/documents/uploads": {
       "post": {
-        "description": "Get a presigned POST for one file (permission ``document.upload``).\n\nAccepted: PDF, JPG, PNG, DOCX, XLSX up to 25 MB (evidence and register scans: PDF, JPG,\nPNG; spreadsheet imports: XLSX or CSV up to 10 MB). The form must be posted within 10\nminutes with the returned fields; the key, Content-Type and size are fixed by the policy.\nSend ``document_id`` to upload a new version (409 ``document_archived`` for an archived\ndocument). Accepts ``Idempotency-Key``.",
+        "description": "Get a presigned POST for one file (permission ``document.upload``).\n\nAccepted: PDF, JPG, PNG, DOCX, XLSX up to 25 MB (evidence and register scans: PDF, JPG,\nPNG; spreadsheet imports: XLSX or CSV up to 10 MB). The form must be posted within 10\nminutes with the returned fields; the key, Content-Type and size are fixed by the policy.\nSend ``document_id`` to upload a new version of a document you uploaded, or of any document\nyou can see if you hold ``document.manage_acl`` (403 ``document_owner_only`` otherwise; 409\n``document_archived`` for an archived document). Accepts ``Idempotency-Key``.",
         "operationId": "create_upload_api_v1_documents_uploads_post",
         "requestBody": {
           "content": {
@@ -27725,7 +27725,7 @@
         ]
       },
       "patch": {
-        "description": "Change the title, type, language, issuer or date (permission ``document.upload``; the\ndocument must be visible to you, as for a new version; ``If-Match``). An archived document\nanswers 409 ``document_archived``; a type that does not suit the purpose 422. Audited with\nthe changed field names only.",
+        "description": "Change the title, type, language, issuer or date (permission ``document.upload``; the\ndocument must be visible to you and uploaded by you, unless you hold\n``document.manage_acl``, as for a new version: 403 ``document_owner_only`` otherwise;\n``If-Match``). An archived document\nanswers 409 ``document_archived``; a type that does not suit the purpose 422. Audited with\nthe changed field names only.",
         "operationId": "update_document_api_v1_documents__document_id__patch",
         "parameters": [
           {
@@ -28220,7 +28220,7 @@
     },
     "/api/v1/documents/{document_id}/sheet/versions": {
       "post": {
-        "description": "Save edited cells as the next version (permission ``document.upload``; ``If-Match``;\nFR-DOC-010). The current file is kept in the history; the new version (values only, an\nXLSX) is checked for viruses and indexed like an upload (202). 409 for import files and\nCSVs, archived documents, workbooks with several sheets or with formulas (edit those in a\nspreadsheet program), when a newer version exists, or when nothing changed; 422 for a full\nAadhaar number (enter only the last 4 digits) or line breaks. Accepts ``Idempotency-Key``.",
+        "description": "Save edited cells as the next version (permission ``document.upload``; only for a\ndocument you uploaded, or any visible one with ``document.manage_acl``: 403\n``document_owner_only`` otherwise; ``If-Match``; FR-DOC-010). The current file is kept in the history; the new version (values only, an\nXLSX) is checked for viruses and indexed like an upload (202). 409 for import files and\nCSVs, archived documents, workbooks with several sheets or with formulas (edit those in a\nspreadsheet program), when a newer version exists, or when nothing changed; 422 for a full\nAadhaar number (enter only the last 4 digits) or line breaks. Accepts ``Idempotency-Key``.",
         "operationId": "save_sheet_version_api_v1_documents__document_id__sheet_versions_post",
         "parameters": [
           {
@@ -28366,7 +28366,7 @@
     },
     "/api/v1/documents/{document_id}/versions": {
       "post": {
-        "description": "Register an uploaded file as the next version; history is kept (permission\n``document.upload``). Get the upload with ``POST /documents/uploads`` and ``document_id``.\nAccepts ``Idempotency-Key``. An archived document answers 409 ``document_archived``.",
+        "description": "Register an uploaded file as the next version; history is kept (permission\n``document.upload``; only for a document you uploaded, or any visible one with\n``document.manage_acl``: 403 ``document_owner_only`` otherwise). Get the upload with\n``POST /documents/uploads`` and ``document_id``. Accepts ``Idempotency-Key``. An archived\ndocument answers 409 ``document_archived``.",
         "operationId": "add_version_api_v1_documents__document_id__versions_post",
         "parameters": [
           {

@@ -179,7 +179,7 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | dq.findings.read | ✓ | ✓ | ✓ | ✓ | — | ✓ | S | — | ✓ |
 | dq.findings.resolve | — | ✓ | ✓ | ✓ | — | ✓ | — | — | — |
 | dq.findings.waive | — | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — |
-| document.upload | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | S | — | — |
+| document.upload (new versions and metadata edits only of documents the caller uploaded, unless they also hold document.manage_acl; AA-10) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | S | — | — |
 | document.read | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | S | S | ✓ |
 | document.manage_acl (also gates document delete) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
 | kb.ask | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | S | S | — |

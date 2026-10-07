@@ -159,7 +159,12 @@ def test_SEC_015_patch_follows_document_acl_and_upload_permission(
     in_scope = _doc(world, admin_engine, acl=[("section", str(world.a.ids["section_9a"]))])
     out_of_scope = _doc(world, admin_engine, acl=[("section", str(world.a.ids["section_10a"]))])
     ct = world.person("class_teacher")
-    ok = _patch(api, ct, in_scope, {"title": TITLE}, _etag(api, ct, in_scope))
+    # AA-10: visible is not enough; the owner's document is theirs to change, a manager's too.
+    refused = _patch(api, ct, in_scope, {"title": TITLE}, _etag(api, ct, in_scope))
+    assert refused.status_code == 403, refused.text
+    assert refused.json()["code"] == "document_owner_only"
+    principal = world.person("principal")
+    ok = _patch(api, principal, in_scope, {"title": TITLE}, _etag(api, principal, in_scope))
     assert ok.status_code == 200, ok.text
     hidden = _patch(api, ct, out_of_scope, {"title": TITLE}, 'W/"1"')
     assert hidden.status_code == 404

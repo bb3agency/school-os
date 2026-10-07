@@ -1263,7 +1263,9 @@ export interface paths {
         /**
          * Update Document
          * @description Change the title, type, language, issuer or date (permission ``document.upload``; the
-         *     document must be visible to you, as for a new version; ``If-Match``). An archived document
+         *     document must be visible to you and uploaded by you, unless you hold
+         *     ``document.manage_acl``, as for a new version: 403 ``document_owner_only`` otherwise;
+         *     ``If-Match``). An archived document
          *     answers 409 ``document_archived``; a type that does not suit the purpose 422. Audited with
          *     the changed field names only.
          */
@@ -1394,8 +1396,9 @@ export interface paths {
         put?: never;
         /**
          * Save Sheet Version
-         * @description Save edited cells as the next version (permission ``document.upload``; ``If-Match``;
-         *     FR-DOC-010). The current file is kept in the history; the new version (values only, an
+         * @description Save edited cells as the next version (permission ``document.upload``; only for a
+         *     document you uploaded, or any visible one with ``document.manage_acl``: 403
+         *     ``document_owner_only`` otherwise; ``If-Match``; FR-DOC-010). The current file is kept in the history; the new version (values only, an
          *     XLSX) is checked for viruses and indexed like an upload (202). 409 for import files and
          *     CSVs, archived documents, workbooks with several sheets or with formulas (edit those in a
          *     spreadsheet program), when a newer version exists, or when nothing changed; 422 for a full
@@ -1441,8 +1444,10 @@ export interface paths {
         /**
          * Add Version
          * @description Register an uploaded file as the next version; history is kept (permission
-         *     ``document.upload``). Get the upload with ``POST /documents/uploads`` and ``document_id``.
-         *     Accepts ``Idempotency-Key``. An archived document answers 409 ``document_archived``.
+         *     ``document.upload``; only for a document you uploaded, or any visible one with
+         *     ``document.manage_acl``: 403 ``document_owner_only`` otherwise). Get the upload with
+         *     ``POST /documents/uploads`` and ``document_id``. Accepts ``Idempotency-Key``. An archived
+         *     document answers 409 ``document_archived``.
          */
         post: operations["add_version_api_v1_documents__document_id__versions_post"];
         delete?: never;
@@ -1467,8 +1472,9 @@ export interface paths {
          *     Accepted: PDF, JPG, PNG, DOCX, XLSX up to 25 MB (evidence and register scans: PDF, JPG,
          *     PNG; spreadsheet imports: XLSX or CSV up to 10 MB). The form must be posted within 10
          *     minutes with the returned fields; the key, Content-Type and size are fixed by the policy.
-         *     Send ``document_id`` to upload a new version (409 ``document_archived`` for an archived
-         *     document). Accepts ``Idempotency-Key``.
+         *     Send ``document_id`` to upload a new version of a document you uploaded, or of any document
+         *     you can see if you hold ``document.manage_acl`` (403 ``document_owner_only`` otherwise; 409
+         *     ``document_archived`` for an archived document). Accepts ``Idempotency-Key``.
          */
         post: operations["create_upload_api_v1_documents_uploads_post"];
         delete?: never;
