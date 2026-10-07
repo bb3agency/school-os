@@ -446,11 +446,13 @@ The system instruction of a tool-use turn ends with `citations.marker_instructio
 | Finding | `sos://finding/{finding_id}` | Finding detail |
 | Change request | `sos://change/{change_request_id}` | Change request |
 | Verified answer | `sos://verified/{id}` | Verified answer card |
-| Student count (M2 wave 5) | `sos://count/{id}` (id derived from school, breakdown and day) | No page: the chip shows the title and snippet |
-| Fee dues (M6; behind flag; ADR Proposed) | `sos://fee/{id}` (UUIDv5 of school, student or "school", and snapshot) | Fee dues screen (`/fees`); the chip says "From Tally" |
+| Student count (M2 wave 5) | `sos://count/{id}#s{scope}` (id derived from school, breakdown and day; `scope` below) | No page: the chip shows the title and snippet |
+| Fee dues (M6; behind flag; ADR Proposed) | `sos://fee/{id}#s{scope}` (UUIDv5 of school, student or "school", and snapshot) | Fee dues screen (`/fees`); the chip says "From Tally" |
 | Earlier chat (ADR-0034) | `sos://conversation/{conversation_id}#q{query_id}` | That conversation in Ask, at that question |
 
 URIs never contain names or values.
+
+**Aggregate scope (audit 2026-10-04 W3-09).** A count or fee figure is computed over the caller's reach at that moment, so its source carries `#s{scope}`: 16 hex characters of SHA-256 over the reach of the tool's permission (`student.read_basic` for counts, `finance.read` for fees: "school", or the sorted class and section ids; `sources.scope_fingerprint`). When an earlier answer is shown again, re-sent as context or reused (`knowledge/visibility.py`), the source is visible only while the tool is still offered AND the caller's current reach has the same fingerprint: after the person's scope narrows (or changes), the earlier total is withheld like any source they can no longer see. Keys stored before the fingerprint (no `#s`) stay visible only to a caller whose reach is school-wide (fail closed).
 
 ## 9. Citation validation and output checks
 

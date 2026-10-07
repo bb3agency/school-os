@@ -16,7 +16,11 @@ modules' services (the same rules as the UI and the record tools):
 - ``verified``: an answer of this school that is not retired and whose every citation is a
   document the caller can read, at a version that still exists and is ``ready``.
 - ``count`` / ``fee``: aggregates of a tool; visible while the caller may still use that tool
-  (fail closed when the caller's tools are not known).
+  (fail closed when the caller's tools are not known) AND the scope fingerprint in the source
+  equals the fingerprint of the caller's current reach for the tool's permission, so a total
+  computed over a wider scope is not shown or sent again after the scope narrows (audit
+  2026-10-04 W3-09). A key stored before the fingerprint existed is visible only to a caller
+  whose reach is school-wide.
 - ``conversation``: one of the caller's own conversations that is not deleted, the cited question
   in it, and every source that question's answer cited (the passage repeats that answer).
 
@@ -36,6 +40,7 @@ from app.documents import service as documents
 from app.dq import service as dq
 from app.knowledge import repository as repo
 from app.knowledge import sources
+from app.knowledge.config.tools import load_tools_config
 from app.knowledge.sealed import cited_sources_of
 from app.knowledge.tools.students import ROW_FIELDS
 from app.students import service as students
@@ -121,14 +126,22 @@ class SourceVisibility:
                 case "verified":
                     return self._verified_visible(ref.object_id)
                 case "count":
-                    return COUNT_TOOL in self._tool_names()
+                    return COUNT_TOOL in self._tool_names() and self._same_scope(COUNT_TOOL, ref)
                 case "fee":
-                    return FEE_TOOL in self._tool_names()
+                    return FEE_TOOL in self._tool_names() and self._same_scope(FEE_TOOL, ref)
                 case "conversation":
                     return self._chat_visible(ref.object_id, ref.query_id)
         except DomainError:
             return False
         return False  # pragma: no cover - every SourceKind is matched above
+
+    def _same_scope(self, tool: str, ref: sources.SourceRef) -> bool:
+        """The aggregate was computed over the caller's CURRENT reach for the tool's permission
+        (an old key without a fingerprint: only when that reach is school-wide)."""
+        grant = self._ctx.scope_for(load_tools_config().tools[tool].permission)
+        if ref.scope is None:
+            return grant.school_wide
+        return ref.scope == sources.scope_fingerprint(grant)
 
     def _document(self, document_id: uuid.UUID) -> object | None:
         if document_id not in self._docs:
