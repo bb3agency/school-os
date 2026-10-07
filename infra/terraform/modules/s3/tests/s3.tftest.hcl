@@ -235,3 +235,19 @@ run "files_bucket_discards_tagged_objects_after_one_day" {
     error_message = "Every other deletion stays recoverable for the 90-day window (W3-06)."
   }
 }
+
+# Audit 2026-10-05 hardening (confused deputy): ALB access logs land only under this account's
+# AWSLogs prefix, and a delivery that names its source account must be this one.
+run "alb_log_delivery_pins_the_account" {
+  command = plan
+
+  assert {
+    condition = one([
+      for s in data.aws_iam_policy_document.logs_delivery.statement : anytrue([
+        for c in s.condition : c.variable == "aws:SourceAccount" && toset(c.values) == toset(["111122223333"])
+      ]) && toset(s.resources) == toset(["arn:aws:s3:::sos-test-logs-111122223333/alb/AWSLogs/111122223333/*"])
+      if s.sid == "AlbLogDelivery"
+    ])
+    error_message = "The ALB log delivery statement pins this account (resource prefix and aws:SourceAccount)."
+  }
+}

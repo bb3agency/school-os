@@ -538,12 +538,18 @@ resource "aws_route53_record" "public_host" {
 
 # --- Daily EBS snapshots (crash-consistent, complements pg_dump/WAL-G) ------------------------
 
+# Confused deputy (audit 2026-10-05 hardening): only on behalf of this account.
 data "aws_iam_policy_document" "dlm_assume" {
   statement {
     actions = ["sts:AssumeRole"]
     principals {
       type        = "Service"
       identifiers = ["dlm.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
     }
   }
 }

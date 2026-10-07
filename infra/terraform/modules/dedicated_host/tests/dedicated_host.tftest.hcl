@@ -387,3 +387,17 @@ run "imds_hop_limit_is_one_or_two" {
 
   expect_failures = [var.imds_hop_limit]
 }
+
+# Audit 2026-10-05 hardening (confused deputy): Data Lifecycle Manager assumes the snapshot role
+# only on behalf of this account.
+run "dlm_role_trusts_only_this_account" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for s in data.aws_iam_policy_document.dlm_assume.statement :
+      anytrue([for c in s.condition : c.test == "StringEquals" && c.variable == "aws:SourceAccount" && toset(c.values) == toset([data.aws_caller_identity.current.account_id])])
+    ])
+    error_message = "The DLM trust policy pins aws:SourceAccount (confused deputy)."
+  }
+}

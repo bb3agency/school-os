@@ -77,12 +77,25 @@ resource "aws_cloudwatch_log_group" "this" {
 
 # --- IAM -----------------------------------------------------------------------
 
+data "aws_caller_identity" "current" {}
+
+# Confused deputy (audit 2026-10-05 hardening): only this account's ECS tasks.
 data "aws_iam_policy_document" "assume" {
   statement {
     actions = ["sts:AssumeRole"]
     principals {
       type        = "Service"
       identifiers = ["ecs-tasks.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = ["arn:aws:ecs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:*"]
     }
   }
 }

@@ -178,12 +178,25 @@ resource "aws_cloudwatch_log_group" "flow" {
   tags              = var.tags
 }
 
+data "aws_caller_identity" "current" {}
+
+# Confused deputy (audit 2026-10-05 hardening): only this account's flow logs.
 data "aws_iam_policy_document" "flow_assume" {
   statement {
     actions = ["sts:AssumeRole"]
     principals {
       type        = "Service"
       identifiers = ["vpc-flow-logs.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = ["arn:aws:ec2:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:vpc-flow-log/*"]
     }
   }
 }

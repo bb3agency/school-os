@@ -93,3 +93,18 @@ run "no_nat_option" {
     error_message = "nat_mode=none creates no NAT gateway."
   }
 }
+
+# Audit 2026-10-05 hardening (confused deputy): the flow-log role is assumable only for this
+# account's flow logs.
+run "flow_log_role_trusts_only_this_account" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for s in data.aws_iam_policy_document.flow_assume.statement :
+      anytrue([for c in s.condition : c.test == "StringEquals" && c.variable == "aws:SourceAccount" && toset(c.values) == toset([data.aws_caller_identity.current.account_id])])
+      && anytrue([for c in s.condition : c.test == "ArnLike" && c.variable == "aws:SourceArn" && toset(c.values) == toset(["arn:aws:ec2:ap-south-1:${data.aws_caller_identity.current.account_id}:vpc-flow-log/*"])])
+    ])
+    error_message = "The flow-log trust policy pins aws:SourceAccount and aws:SourceArn (confused deputy)."
+  }
+}

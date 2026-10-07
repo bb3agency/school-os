@@ -129,3 +129,17 @@ run "log_groups_retained_400_days" {
     error_message = "Budget alerts configured when a limit is given."
   }
 }
+
+# Audit 2026-10-05 hardening (confused deputy): CloudWatch and Budgets may publish to the alarm topic
+# only for this account's alarms and budgets.
+run "alarm_topic_accepts_only_this_account" {
+  command = plan
+
+  assert {
+    condition = length(data.aws_iam_policy_document.alarms_topic.statement) == 2 && alltrue([
+      for s in data.aws_iam_policy_document.alarms_topic.statement :
+      anytrue([for c in s.condition : c.test == "StringEquals" && c.variable == "aws:SourceAccount" && toset(c.values) == toset([data.aws_caller_identity.current.account_id])])
+    ])
+    error_message = "Every service statement on the alarm topic pins aws:SourceAccount (confused deputy)."
+  }
+}

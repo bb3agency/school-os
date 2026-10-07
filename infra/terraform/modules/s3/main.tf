@@ -43,7 +43,10 @@ locals {
 
 data "aws_iam_policy_document" "logs_delivery" {
   # ALB access logs (regions launched after 2022 such as ap-south-2 use the service principal;
-  # ap-south-1 also accepts it).
+  # ap-south-1 also accepts it). Confused deputy (audit 2026-10-05 hardening): ELB writes under
+  # AWSLogs/<the load balancer's account>/, so the resource already pins this account; the
+  # IfExists condition also refuses a delivery that names another source account (ELB does not
+  # document the key for this principal, so a plain StringEquals could stop all access logs).
   statement {
     sid       = "AlbLogDelivery"
     actions   = ["s3:PutObject"]
@@ -51,6 +54,11 @@ data "aws_iam_policy_document" "logs_delivery" {
     principals {
       type        = "Service"
       identifiers = ["logdelivery.elasticloadbalancing.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEqualsIfExists"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
     }
   }
 
