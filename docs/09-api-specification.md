@@ -262,7 +262,7 @@ Certificate notes (M3, as built; data model 05 §5.7). The stories and requireme
 ### Imports and extraction
 | Method | Path | Permission |
 |---|---|---|
-| POST | `/imports` (JSON: `document_id` of an uploaded, scanned `import_file`, `source`, `kind` = `spreadsheet`) → 202 (**M1**) | `import.run` |
+| POST | `/imports` (JSON: `document_id` of an uploaded, scanned `import_file`, `source`, `kind` = `spreadsheet`) → 202 (**M1**). Without `student.read_sensitive` only your own upload (else 404; A-15) | `import.run` |
 | GET | `/imports` · `/imports/{id}` (`ETag`) · `/imports/{id}/rows?status=error\|valid\|warning\|committed\|skipped` (cursor) (**M1**) | `import.run` |
 | PUT | `/imports/{id}/mapping` (`If-Match`) (**M1**) | `import.run` |
 | POST | `/imports/{id}/validate` → 202 (**M1**) | `import.run` |
