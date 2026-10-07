@@ -60,6 +60,30 @@ set_version() {
   SOS_VERSION="$version"
 }
 
+# The user the Caddy service of <release dir> runs as (compose.yaml `user:`; none = root).
+caddy_uid_of() {
+  local uid
+  uid="$(awk '/^  caddy:/ {c = 1; next} c && /^  [a-z]/ {exit}
+    c && /^    user:/ {gsub(/[^0-9:]/, "", $2); split($2, a, ":"); print a[1]; exit}' "$1/compose.yaml")"
+  echo "${uid:-0}"
+}
+
+# Caddy's ACME account, certificates and autosaved config belong to the user its release runs it
+# as: 10001 since the 2026-10-05 audit hardening (root before). Caddy has no capability, so root
+# without DAC_OVERRIDE cannot read files owned by 10001 and vice versa: upgrade.sh re-owns the store
+# right before restarting Caddy, and its rollback re-owns it for the previous release. Idempotent.
+prepare_caddy_dirs() {
+  local release_dir="${1:-$(active_release_dir)}" uid
+  uid="$(caddy_uid_of "$release_dir")"
+  [[ $uid =~ ^[0-9]+$ ]] || {
+    log ERR "cannot read the Caddy user of $release_dir"
+    return 1
+  }
+  install -d -m 0700 -o "$uid" -g "$uid" \
+    "$SOS_DATA_DIR/caddy" "$SOS_DATA_DIR/caddy/data" "$SOS_DATA_DIR/caddy/config" || return 1
+  chown -R "$uid:$uid" "$SOS_DATA_DIR/caddy"
+}
+
 # Valkey ACL passwords (audit 2026-10-05 P2-06): one per user (web, api, worker, beat, health),
 # each SHA-256(VALKEY_PASSWORD | "schoolos-valkey-acl-v1" | user) from the generated secret, so a
 # container holding one password learns nothing about another, and existing hosts need no new

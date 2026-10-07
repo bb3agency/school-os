@@ -198,7 +198,7 @@ def valkey() -> Iterator[tuple[str, int]]:
 
     with ValkeyContainer(VALKEY_IMAGE) as container:
         host, port = container.get_container_host_ip(), int(container.get_exposed_port())
-        admin = redis.Redis(host=host, port=port, socket_timeout=5)
+        admin: Any = redis.Redis(host=host, port=port, socket_timeout=5)
         acl = compose_acl()
         for user, (_state, _password, rules) in acl.items():
             if user == "default":
@@ -214,7 +214,7 @@ def valkey() -> Iterator[tuple[str, int]]:
         yield host, port
 
 
-def _client(valkey: tuple[str, int], user: str) -> redis.Redis:
+def _client(valkey: tuple[str, int], user: str) -> Any:  # execute_command is untyped
     host, port = valkey
     return redis.Redis(
         host=host, port=port, username=user, password=f"{user}-synthetic-pw", socket_timeout=5

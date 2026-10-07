@@ -20,7 +20,7 @@ def _url() -> str:
     override = config.attributes.get("url")
     if isinstance(override, str):
         return override
-    return get_settings().migrator_database_url.get_secret_value()
+    return get_settings().checked_migrator_url()
 
 
 def run_migrations_online() -> None:

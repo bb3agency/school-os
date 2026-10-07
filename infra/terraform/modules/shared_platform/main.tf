@@ -759,12 +759,14 @@ module "db_bootstrap" {
   assign_public_ip = local.assign_public_ip
   egress_vpc_ports = [5432]
   entry_point      = ["/bin/sh", "-c"]
+  # psql reads the role passwords from its environment (\getenv, psql 15+), never from its command
+  # line (/proc/*/cmdline); an unset variable stops the script (ON_ERROR_STOP).
   command = [join(" ", [
     "exec psql -X -v ON_ERROR_STOP=1",
-    "-v app_password=\"$SOS_APP_PASSWORD\"",
-    "-v migrator_password=\"$SOS_MIGRATOR_PASSWORD\"",
-    "-v platform_password=\"$SOS_PLATFORM_PASSWORD\"",
-    "-v readonly_password=\"$SOS_READONLY_PASSWORD\"",
+    "-c '\\getenv app_password SOS_APP_PASSWORD'",
+    "-c '\\getenv migrator_password SOS_MIGRATOR_PASSWORD'",
+    "-c '\\getenv platform_password SOS_PLATFORM_PASSWORD'",
+    "-c '\\getenv readonly_password SOS_READONLY_PASSWORD'",
     "-f ${var.db_bootstrap_sql_path}",
   ])]
 

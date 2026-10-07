@@ -347,7 +347,7 @@ jobs:
         # profile blocks the sandbox (ADR-0025); staging/prod keep it required.
         run: |
           docker run --rm --read-only --tmpfs /tmp:size=256m,uid=10001,gid=10001 --cap-drop ALL \
-            --security-opt no-new-privileges:true --network none \
+            --security-opt no-new-privileges:true --network none -e SOS_ENV=ci \
             -v "$PWD/infra/docker/worker-pdf-smoke.py:/smoke/worker-pdf-smoke.py:ro" \
             --entrypoint python "$IMAGE" /smoke/worker-pdf-smoke.py
       - name: Sandboxed PDF render (worker image, ADR-0025, FR-EXP-002)

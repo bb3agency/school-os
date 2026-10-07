@@ -7,13 +7,29 @@
 	admin 127.0.0.1:2019
 	servers {
 		protocols h1 h2 h3
-		trusted_proxies static private_ranges
+		# Caddy is the first hop: no trusted_proxies, so a client's own X-Forwarded-For is never
+		# believed (a client reached through Docker's userland proxy has a private address). Caddy
+		# sets X-Forwarded-For itself; the BFF reads one hop (TRUSTED_PROXY_HOPS=1).
+		# Explicit timeouts: slow-header clients are dropped after 10 s; bodies (25 MB max, slow
+		# office links) get 5 min; idle keep-alive 2 min. No write timeout: it would cut streamed AI
+		# answers (SSE); the proxy's response_header_timeout bounds a silent upstream.
+		timeouts {
+			read_header 10s
+			read_body 5m
+			idle 2m
+		}
 	}
 }
 
 (security_headers) {
+	# HSTS: includeSubDomains + preload only on our own platform host name. A school's custom
+	# domain may be its apex: preloading it would force HTTPS on every subdomain of the school's
+	# domain for two years, which is the school's decision, not ours.
+	@platform_host host {$SOS_PUBLIC_HOST}
+	@custom_domain not host {$SOS_PUBLIC_HOST}
+	header @platform_host Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+	header @custom_domain Strict-Transport-Security "max-age=63072000"
 	header {
-		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		Permissions-Policy "camera=(self), microphone=(), geolocation=(), payment=()"

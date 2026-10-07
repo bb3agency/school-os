@@ -4,9 +4,14 @@
 -- the postgres user on a dedicated host), connected to the target database:
 --
 --   psql -v ON_ERROR_STOP=1 \
---        -v app_password=... -v migrator_password=... \
---        -v platform_password=... -v readonly_password=... \
+--        -c '\getenv app_password SOS_APP_DB_PASSWORD' \
+--        -c '\getenv migrator_password SOS_MIGRATOR_DB_PASSWORD' \
+--        -c '\getenv platform_password SOS_PLATFORM_DB_PASSWORD' \
+--        -c '\getenv readonly_password SOS_READONLY_DB_PASSWORD' \
 --        -d schoolos -f infra/db/bootstrap.sql
+--
+-- (deployments read the passwords from the environment with \getenv so they never appear on a
+-- command line; `-v name=value` works too, for local tools and tests).
 --
 -- The same file is used by docker compose, testcontainers, the ECS one-off task and
 -- dedicated hosts. It never contains secrets. No role here has SUPERUSER or BYPASSRLS.

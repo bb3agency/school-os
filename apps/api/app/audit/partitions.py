@@ -57,7 +57,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Create audit.events monthly partitions.")
     parser.add_argument("--months-ahead", type=int, default=DEFAULT_MONTHS_AHEAD)
     args = parser.parse_args(argv)
-    url = get_settings().migrator_database_url.get_secret_value()
+    url = get_settings().checked_migrator_url()
     engine = create_engine(url, poolclass=pool.NullPool)
     try:
         with engine.begin() as conn:

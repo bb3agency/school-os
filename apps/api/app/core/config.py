@@ -374,6 +374,17 @@ class Settings(BaseSettings):
     def is_production_like(self) -> bool:
         return self.env in (Environment.STAGING, Environment.PROD)
 
+    def checked_migrator_url(self) -> str:
+        """The migrator URL for the migrate entrypoint (Alembic, audit partitions).
+
+        Not a start-up guard: the api and worker never set SOS_MIGRATOR_DATABASE_URL in
+        staging/prod, so only the migrate task refuses the dev-only default (audit 2026-10-04).
+        """
+        url = self.migrator_database_url.get_secret_value()
+        if self.is_production_like and "dev-only" in url:
+            raise ValueError(f"SOS_MIGRATOR_DATABASE_URL uses a dev-only default in {self.env}")
+        return url
+
     @property
     def support_enabled(self) -> bool:
         """True when the break-glass support app client is configured (ADR-0023)."""

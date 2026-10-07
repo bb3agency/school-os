@@ -60,6 +60,7 @@ render_compose_env # back to the active release for the backup
 rollback() {
   warn "upgrade to $version failed; rolling back to $previous"
   activate_release "$previous"
+  prepare_caddy_dirs "$(active_release_dir)" || warn "could not re-own the Caddy store for $previous"
   install_host_profiles "$(active_release_dir)" || warn "could not reinstall the worker sandbox profiles of $previous"
   render_compose_env
   sos_compose up -d --remove-orphans || true
@@ -90,6 +91,8 @@ upgrade_sync_system_roles "$(active_release_dir)/scripts"
 
 # Rolling restart: background services first, then the API, then the web/BFF and the edge.
 for svc in db valkey worker beat api web caddy; do
+  # Caddy's certificate store belongs to the user this release runs Caddy as (10001, not root).
+  [[ $svc != caddy ]] || prepare_caddy_dirs "$(active_release_dir)"
   sos_compose up -d --no-deps "$svc"
   wait_healthy 300
 done

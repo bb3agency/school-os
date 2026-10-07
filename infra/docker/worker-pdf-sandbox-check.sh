@@ -31,7 +31,7 @@ fi
 
 render() {
   docker run --rm --read-only --tmpfs /tmp:size=256m,uid=10001,gid=10001 --cap-drop ALL \
-    --security-opt no-new-privileges:true --network none "$@" \
+    --security-opt no-new-privileges:true --network none -e SOS_ENV=ci "$@" \
     -v "$smoke:/smoke/worker-pdf-smoke.py:ro" \
     --entrypoint python "$image" /smoke/worker-pdf-smoke.py --sandbox
 }

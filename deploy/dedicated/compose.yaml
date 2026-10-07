@@ -87,9 +87,17 @@ x-app-env: &app-env
 services:
   caddy:
     <<: [*hardening, *logging]
-    image: caddy:2.11.4-alpine
+    image: caddy:2.11.4-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
+    # Not root (audit 2026-10-05 hardening). Binding 80/443 needs no capability: the privileged-port
+    # floor is lowered inside this container's own network namespace. NET_BIND_SERVICE stays in the
+    # bounding set only because the image's caddy binary carries that file capability and cannot
+    # be executed without it; no-new-privileges keeps it out of the process (no effective caps).
+    # The ACME data and config directories belong to 10001 (scripts/lib.sh prepare_caddy_dirs).
+    user: "10001:10001"
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: 80
     cap_add:
-      - NET_BIND_SERVICE # binds 80/443 as root with every other capability dropped
+      - NET_BIND_SERVICE
     ports:
       - "80:80"
       - "443:443"
@@ -103,7 +111,7 @@ services:
       - /var/lib/schoolos/caddy/data:/data
       - /var/lib/schoolos/caddy/config:/config
     tmpfs:
-      - /tmp:size=16m
+      - /tmp:size=16m,uid=10001,gid=10001
     networks: [edge]
     depends_on:
       web:
@@ -284,17 +292,20 @@ services:
   db-bootstrap:
     <<: [*hardening, *logging]
     profiles: [tools]
-    image: pgvector/pgvector:0.8.6-pg16-bookworm
+    image: pgvector/pgvector:0.8.6-pg16-bookworm@sha256:ccc6e83d6e35e931dc7c5def2022729d5a6c370318d099181995567ff1fb4d6b
     user: "999:999"
     restart: "no"
     entrypoint: ["/bin/sh", "-c"]
+    # psql reads the role passwords from its environment (\getenv, psql 15+), never from its
+    # command line, which any process on the host can read in /proc/*/cmdline while it runs. An
+    # unset variable leaves :'name' unexpanded and the script stops (ON_ERROR_STOP).
     command:
       - >-
         exec psql -X -v ON_ERROR_STOP=1
-        -v app_password="$$SOS_APP_DB_PASSWORD"
-        -v migrator_password="$$SOS_MIGRATOR_DB_PASSWORD"
-        -v platform_password="$$SOS_PLATFORM_DB_PASSWORD"
-        -v readonly_password="$$SOS_READONLY_DB_PASSWORD"
+        -c '\getenv app_password SOS_APP_DB_PASSWORD'
+        -c '\getenv migrator_password SOS_MIGRATOR_DB_PASSWORD'
+        -c '\getenv platform_password SOS_PLATFORM_DB_PASSWORD'
+        -c '\getenv readonly_password SOS_READONLY_DB_PASSWORD'
         -f /bootstrap/bootstrap.sql
     environment:
       PGHOST: db
@@ -316,7 +327,7 @@ services:
 
   db:
     <<: [*hardening, *logging]
-    image: pgvector/pgvector:0.8.6-pg16-bookworm
+    image: pgvector/pgvector:0.8.6-pg16-bookworm@sha256:ccc6e83d6e35e931dc7c5def2022729d5a6c370318d099181995567ff1fb4d6b
     user: "999:999" # postgres; the data directory is pre-owned by bootstrap-host.sh
     shm_size: 256m
     stop_grace_period: 120s
@@ -374,7 +385,7 @@ services:
 
   valkey:
     <<: [*hardening, *logging]
-    image: valkey/valkey:8.1.10-alpine
+    image: valkey/valkey:8.1.10-alpine@sha256:081c2f5cb575efc901aa80ff9cdbd1ec6a301682fd35e1ebb4b0990a4a4a8507
     user: "999:999"
     # P2-06: one ACL user per service, the default user off. web reaches only its own keys
     # (sos:web:* sessions, sos:rl:v1:bff:* sign-in limits) with read/write commands and EVAL on those
