@@ -97,6 +97,10 @@ class SourceFact:
 
     value_id: uuid.UUID
     value: str | None
+    # A-01: evidence document or verified value, and when it was recorded (a blocker that a
+    # write without evidence removed waits for a confirmation; see engine.reconcile).
+    backed: bool = False
+    recorded_at: dt.datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)

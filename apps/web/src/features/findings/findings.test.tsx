@@ -94,7 +94,7 @@ describe("findings filters (US-501)", () => {
       student_id: STUDENT,
     });
     expect(filters).toEqual({
-      status: ["open", "reopened"],
+      status: ["open", "reopened", "needs_confirmation"],
       severity: ["blocker"],
       ruleId: null,
       profileKey: null,
@@ -102,7 +102,7 @@ describe("findings filters (US-501)", () => {
       studentId: STUDENT,
     });
     expect(findingsQuery(filters)).toEqual({
-      status: ["open", "reopened"],
+      status: ["open", "reopened", "needs_confirmation"],
       severity: ["blocker"],
       student_id: STUDENT,
     });
@@ -150,7 +150,7 @@ describe("findings list (US-501 AC1/AC2, FR-DQ-006)", () => {
     expect(within(warnings).getByText("A. Test")).toBeInTheDocument();
     // Status filter defaults to unresolved (the API's default too).
     const call = stub.callsTo("GET /bff/api/v1/dq/findings")[0];
-    expect(call?.url.searchParams.getAll("status")).toEqual(["open", "reopened"]);
+    expect(call?.url.searchParams.getAll("status")).toEqual(["open", "reopened", "needs_confirmation"]);
   });
 
   it("shows the explanation in Telugu for Telugu readers", async () => {
@@ -294,6 +294,30 @@ describe("finding detail (US-502, FR-DQ-020)", () => {
     expect(within(dialog).getByText(/stops certificates and submissions/)).toBeInTheDocument();
     expect(within(dialog).getByText(/you may be asked to sign in again/)).toBeInTheDocument();
     expect(screen.queryByTestId("blocker-resolve-hint")).not.toBeInTheDocument();
+  });
+
+  it("a blocker waiting for confirmation explains why and lets a waive holder confirm it (A-01)", async () => {
+    detail([...READ, "dq.findings.resolve", "dq.findings.waive"], {
+      severity: "blocker",
+      rule_id: "DQ-002",
+      status: "needs_confirmation",
+    });
+    stub.routes["POST /bff/api/v1/dq/findings/0192f3a4-0000-7000-8000-00000000f001/resolve"] = () =>
+      Response.json(finding({ status: "resolved", severity: "blocker", rule_id: "DQ-002" }));
+    renderWithIntl(<FindingDetailScreen findingId="0192f3a4-0000-7000-8000-00000000f001" />);
+    expect(await screen.findByTestId("needs-confirmation")).toHaveTextContent(
+      /changed without evidence/,
+    );
+    expect(screen.getAllByText("Needs confirmation").length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole("button", { name: "Resolve" }));
+    const dialog = screen.getByRole("dialog", { name: "Resolve this problem" });
+    await userEvent.type(within(dialog).getByLabelText("What was done"), "Checked the card.");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Resolve" }));
+    await waitFor(() =>
+      expect(
+        stub.callsTo("POST /bff/api/v1/dq/findings/0192f3a4-0000-7000-8000-00000000f001/resolve"),
+      ).toHaveLength(1),
+    );
   });
 
   it("accepting (waive) warns about step-up and explains finding_not_open", async () => {

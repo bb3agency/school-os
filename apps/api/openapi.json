@@ -7352,7 +7352,8 @@
               "open",
               "resolved",
               "waived",
-              "reopened"
+              "reopened",
+              "needs_confirmation"
             ],
             "title": "Status",
             "type": "string"
@@ -28520,7 +28521,8 @@
                       "open",
                       "resolved",
                       "waived",
-                      "reopened"
+                      "reopened",
+                      "needs_confirmation"
                     ],
                     "type": "string"
                   },

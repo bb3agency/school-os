@@ -14,6 +14,7 @@ export const severityTone: Record<Severity, BadgeTone> = {
 export const findingStatusTone: Record<FindingStatus, BadgeTone> = {
   open: "warning",
   reopened: "danger",
+  needs_confirmation: "warning",
   resolved: "success",
   waived: "neutral",
 };

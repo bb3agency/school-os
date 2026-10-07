@@ -8748,7 +8748,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "open" | "resolved" | "waived" | "reopened";
+            status: "open" | "resolved" | "waived" | "reopened" | "needs_confirmation";
             student: components["schemas"]["StudentRef"];
             /** Values */
             values: components["schemas"]["FindingValue"][];
@@ -17482,7 +17482,7 @@ export interface operations {
                 rule_id?: ("DQ-001" | "DQ-002" | "DQ-003" | "DQ-004" | "DQ-005" | "DQ-006" | "DQ-007" | "DQ-008" | "DQ-009" | "DQ-010" | "DQ-011" | "DQ-012" | "DQ-021" | "DQ-022")[] | null;
                 section_id?: string | null;
                 severity?: ("blocker" | "high" | "medium" | "low" | "info")[] | null;
-                status?: ("open" | "resolved" | "waived" | "reopened")[] | null;
+                status?: ("open" | "resolved" | "waived" | "reopened" | "needs_confirmation")[] | null;
                 student_id?: string | null;
             };
             header?: never;

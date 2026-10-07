@@ -3025,6 +3025,7 @@
     "status": {
       "open": "తెరిచి ఉంది",
       "reopened": "మళ్లీ వచ్చింది",
+      "needs_confirmation": "Needs confirmation",
       "resolved": "పరిష్కరించబడింది",
       "waived": "అంగీకరించబడింది"
     },
@@ -3098,7 +3099,9 @@
       "resolveConsequence": "Nothing on the student's record changes. The next check looks at it again.",
       "waiveConsequence": "Nothing on the student's record changes.",
       "blockerResolveBody": "This problem stops certificates and submissions. Say what was done, or link the correction request that fixes it. You will be asked to confirm it's you. If the problem is still there at the next check, it opens again.",
-      "blockerNeedsWaive": "This problem stops certificates and submissions. It closes when the correction request that fixes the record is approved, or the office admin or principal can resolve or accept it."
+      "blockerNeedsWaive": "This problem stops certificates and submissions. It closes when the correction request that fixes the record is approved, or the office admin or principal can resolve or accept it.",
+      "needsConfirmationTitle": "Check this correction before it counts",
+      "needsConfirmationBody": "The values now agree, but they were changed without evidence. Certificates and submissions stay blocked until the office admin or principal checks the paper record and confirms the correction with Resolve. If the values disagree again, the problem comes back."
     },
     "rules": {
       "title": "SchoolOS ఏమి తనిఖీ చేస్తుంది",

@@ -18,7 +18,12 @@ One run = one transaction in the school's ``tenant_session``:
    found, ``waived``              stays waived while the conflict is the same
                                   (``conflict_hash``); a changed conflict is ``reopened``
    not found, unresolved          ``resolved``: ``change_request`` when the finding is linked
-                                  to a change request, else ``auto_cleared``
+                                  to a change request, else ``auto_cleared``; a **blocker**
+                                  comparing sources goes to ``needs_confirmation`` instead
+                                  when a compared value changed since the last run without
+                                  evidence or verification (or was withdrawn): A-01
+   found, ``needs_confirmation``  ``reopened`` (the conflict came back)
+   not found, ``needs_confirmation``  stays (only a person, or a linked change request, ends it)
    ============================  ========================================================
 
    "Not found" applies only to what the run evaluated: the students in scope (either side of a
@@ -61,7 +66,7 @@ from app.dq.checks import (
     fingerprint_of,
 )
 from app.dq.matching import load_match_policy, load_variant_dictionary
-from app.dq.models import ACTIVE_STATUSES
+from app.dq.models import ACTIVE_STATUSES, NEEDS_CONFIRMATION
 from app.dq.profiles import Profile, load_engine_config, load_profiles
 from app.dq.rules import Finding, RuleCheck, Severity, load_rules
 from app.students import service as students
@@ -228,7 +233,16 @@ def load_context(
     facts: dict[uuid.UUID, StudentFacts] = {}
     for sid in student_ids:
         values = {
-            key: {src: SourceFact(v.value_id, v.value) for src, v in per_source.items()}
+            key: {
+                src: SourceFact(
+                    v.value_id,
+                    v.value,
+                    backed=v.evidence_document_id is not None
+                    or v.verification_status == "verified",
+                    recorded_at=v.recorded_at,
+                )
+                for src, v in per_source.items()
+            }
             for key, per_source in by_source.get(sid, {}).items()
         }
         canon = _canonical_facts(canonical.get(sid, {}))
@@ -294,6 +308,7 @@ class RunStats:
     updated: int = 0
     unchanged: int = 0
     cleared: int = 0
+    needs_confirmation: int = 0
     blockers: int = 0
     warnings: int = 0
     by_severity: Counter[str] = field(default_factory=Counter)
@@ -308,6 +323,7 @@ class RunStats:
             "updated": self.updated,
             "unchanged": self.unchanged,
             "cleared": self.cleared,
+            "needs_confirmation": self.needs_confirmation,
             "blockers": self.blockers,
             "warnings": self.warnings,
             "by_severity": {s.value: self.by_severity.get(s.value, 0) for s in Severity},
@@ -394,10 +410,36 @@ def _evaluated(row: RowMapping, scope: Collection[uuid.UUID], profiles: Collecti
     return in_scope and (row["profile_key"] is None or row["profile_key"] in profiles)
 
 
+def _unbacked_write(row: RowMapping, context: CheckContext) -> bool:
+    """A-01: did a value this blocker compared change since it was last seen without evidence or
+    verification (or disappear)? Rules on the canonical value are left alone: identity values
+    change only through change requests, and filling a missing field is not hiding a conflict."""
+    sources = [s for s in row["sources"] if s != "canonical"]
+    student = context.students.get(row["student_id"])
+    if row["severity"] != Severity.BLOCKER.value or not sources or student is None:
+        return False
+    if row["attribute_key"] is None:
+        return False
+    for source in sources:
+        key = context.config.physical_key(row["attribute_key"], source)
+        fact = student.values.get(key, {}).get(source)
+        if fact is None:
+            return True  # withdrawn: the conflict is gone because a side was removed
+        changed = fact.recorded_at is None or fact.recorded_at > row["last_seen_at"]
+        if changed and not fact.backed:
+            return True
+    return False
+
+
 def _clear(
-    row: RowMapping, change_request: ChangeRequestLink | None, at: dt.datetime
-) -> dict[str, Any]:
-    """A finding the run no longer finds: resolved by the linked change request, or cleared."""
+    row: RowMapping,
+    change_request: ChangeRequestLink | None,
+    at: dt.datetime,
+    context: CheckContext | None = None,
+) -> dict[str, Any] | None:
+    """A finding the run no longer finds: resolved by the linked change request, or cleared.
+    A blocker that a write without evidence removed waits for a confirmation (A-01); ``None``
+    leaves a row that already waits as it is."""
     linked = row["change_request_id"]
     if (
         change_request is not None
@@ -409,6 +451,20 @@ def _clear(
         )
     ):
         linked = change_request.change_request_id
+    if linked is None and (
+        row["status"] == NEEDS_CONFIRMATION
+        or (context is not None and _unbacked_write(row, context))
+    ):
+        if row["status"] == NEEDS_CONFIRMATION:
+            return None
+        return {
+            "id": row["id"],
+            "status": NEEDS_CONFIRMATION,
+            "resolution": None,
+            "change_request_id": None,
+            "resolved_at": None,
+            "version": row["version"] + 1,
+        }
     return {
         "id": row["id"],
         "status": "resolved",
@@ -427,6 +483,7 @@ def reconcile(
     scope: Collection[uuid.UUID],
     profiles: Collection[str],
     change_request: ChangeRequestLink | None = None,
+    context: CheckContext | None = None,
 ) -> RunStats:
     tenant_id = repo.current_tenant(session)
     at = repo.now(session)
@@ -461,7 +518,7 @@ def reconcile(
             status = "open"
         else:
             status = row["status"]
-            reopened = status == "resolved" or (
+            reopened = status in ("resolved", NEEDS_CONFIRMATION) or (
                 status == "waived" and row["conflict_hash"] != cols["conflict_hash"]
             )
             changed = any(_differs(row[c], cols[c]) for c in _DATA_COLUMNS)
@@ -493,11 +550,13 @@ def reconcile(
             else:
                 stats.warnings += 1
     clears = [
-        _clear(row, change_request, at)
+        cleared
         for fp, row in existing.items()
         if fp not in by_fp and row["status"] != "resolved" and _evaluated(row, scope, profiles)
+        if (cleared := _clear(row, change_request, at, context)) is not None
     ]
-    stats.cleared = len(clears)
+    stats.cleared = sum(1 for c in clears if c["status"] == "resolved")
+    stats.needs_confirmation = len(clears) - stats.cleared
     repo.insert_findings(session, inserts)
     repo.refresh_findings(session, refresh)
     repo.clear_findings(session, clears)
@@ -536,6 +595,7 @@ def execute(
         scope=set(student_ids),
         profiles={p.key for p in profiles},
         change_request=change_request,
+        context=context,
     )
     stats.students = len(student_ids)
     stats.duration_ms = int((time.monotonic() - started) * 1000)

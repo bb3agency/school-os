@@ -452,6 +452,7 @@ def _complete(
             "new": stats.new,
             "reopened": stats.reopened,
             "cleared": stats.cleared,
+            "needs_confirmation": stats.needs_confirmation,
             "blockers": stats.blockers,
             "warnings": stats.warnings,
         },

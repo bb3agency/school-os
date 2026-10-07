@@ -144,6 +144,46 @@ def test_FR_DQ_004_conflict_gone_is_auto_cleared_and_returns_reopened(
     assert back.stats["reopened"] == 1
 
 
+def test_A_01_a_blocker_cleared_by_a_verified_value_resolves_and_an_unbacked_one_waits(
+    world: Any, admin_engine: Engine
+) -> None:
+    """A-01: a verified (or evidence-backed) correction resolves a blocker as before; a plain
+    write leaves it ``needs_confirmation`` (unresolved), and the conflict coming back reopens it."""
+    plain = DS.student(world.a, extra=DS.aadhaar(dob="2012-05-14"))
+    backed = DS.student(world.a, extra=DS.aadhaar(dob="2012-05-14"))
+    DS.run(world.a, plain, backed)
+    for sid, verification in ((plain, "unverified"), (backed, "verified")):
+        DS.call(
+            world.a,
+            students.record_value,
+            sid,
+            "aadhaar_dob_as_printed",
+            "aadhaar_as_printed",
+            "2012-03-14",
+            verification=verification,
+        )
+    out = DS.run(world.a, plain, backed)
+    assert (out.stats["cleared"], out.stats["needs_confirmation"]) == (1, 1)
+    row = DS.one(admin_engine, backed, "DQ-002")
+    assert (row["status"], row["resolution"]) == ("resolved", "auto_cleared")
+    waiting = DS.one(admin_engine, plain, "DQ-002")
+    assert (waiting["status"], waiting["resolution"]) == ("needs_confirmation", None)
+    unresolved = DS.call(world.a, dq.list_findings, FindingFilters(student_id=plain))
+    assert [(f.rule_id, f.status) for f in unresolved.data if f.rule_id == "DQ-002"] == [
+        ("DQ-002", "needs_confirmation")
+    ]
+    DS.call(
+        world.a,
+        students.record_value,
+        plain,
+        "aadhaar_dob_as_printed",
+        "aadhaar_as_printed",
+        "2012-05-14",
+    )
+    DS.run(world.a, plain)
+    assert DS.one(admin_engine, plain, "DQ-002")["status"] == "reopened"
+
+
 def test_US_502_resolved_with_note_reopens_when_the_conflict_is_still_there(
     world: Any, admin_engine: Engine
 ) -> None:
