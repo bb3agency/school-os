@@ -2447,18 +2447,25 @@ def export_records(session: Session) -> list[RecordTable]:
     return repo.export_record_tables(session)
 
 
-def export_files(session: Session) -> list[StoredObject]:
-    """Worker only (as :func:`export_records`): every version of every document that passed the
-    malware scan, oldest first. Quarantined, failed and discarded versions (PRV-016) are never
-    exported."""
-    out: list[StoredObject] = []
-    for v, purpose in repo.ready_versions(session):
-        out.append(
+WITHHELD_FILE_REASON: Final = "restricted, not included"
+WITHHELD_TABLE: Final = "documents_withheld"
+
+
+def _export_split(
+    session: Session, *, include_sensitive: bool
+) -> tuple[list[StoredObject], list[tuple[DocumentVersion, Document]]]:
+    shipped: list[StoredObject] = []
+    withheld: list[tuple[DocumentVersion, Document]] = []
+    for v, doc in repo.ready_versions(session):
+        if _raw_restricted(doc) and not include_sensitive:
+            withheld.append((v, doc))
+            continue
+        shipped.append(
             StoredObject(
                 document_id=v.document_id,
                 version_id=v.id,
                 version_no=v.version_no,
-                purpose=purpose,
+                purpose=doc.purpose,
                 object_key=v.object_key,
                 mime_type=v.mime_type,
                 size_bytes=v.size_bytes,
@@ -2466,7 +2473,53 @@ def export_files(session: Session) -> list[StoredObject]:
                 status=v.status,
             )
         )
-    return out
+    return shipped, withheld
+
+
+def export_files(session: Session, *, include_sensitive: bool = False) -> list[StoredObject]:
+    """Worker only (as :func:`export_records`): every version of every document that passed the
+    malware scan, oldest first. Quarantined, failed and discarded versions (PRV-016) are never
+    exported. Restricted files (C3 documents and raw import spreadsheets, whose stored file only
+    ``student.read_sensitive`` holders open) are left out unless ``include_sensitive`` (the
+    export was asked with restricted details; audit 2026-10-04, DL-07): they are listed in
+    :func:`export_withheld_files` instead."""
+    return _export_split(session, include_sensitive=include_sensitive)[0]
+
+
+def export_withheld_files(session: Session, *, include_sensitive: bool) -> list[RecordTable]:
+    """Worker only: the ``documents_withheld`` record table of the full export, one row per
+    ready version :func:`export_files` leaves out (document id, version, title, classification
+    and the reason ``restricted, not included``; no file bytes). Empty when
+    ``include_sensitive`` (DL-07). Titles are C2 at most."""
+    _, withheld = _export_split(session, include_sensitive=include_sensitive)
+    rows: list[tuple[object, ...]] = [
+        (
+            doc.id,
+            v.id,
+            v.version_no,
+            doc.title,
+            doc.purpose,
+            doc.sensitivity,
+            WITHHELD_FILE_REASON,
+        )
+        for v, doc in withheld
+    ]
+    return [
+        RecordTable(
+            name=WITHHELD_TABLE,
+            columns=(
+                "document_id",
+                "version_id",
+                "version_no",
+                "title",
+                "purpose",
+                "classification",
+                "reason",
+            ),
+            rows=rows,
+            notes=("restricted_files_withheld",) if rows else (),
+        )
+    ]
 
 
 def iter_export_file(
@@ -2551,6 +2604,8 @@ __all__ = [
     "STATUS_CHANGED_HOOKS",
     "TENANT_EXPORT_MIME",
     "VERSION_DISCARDED_HOOKS",
+    "WITHHELD_FILE_REASON",
+    "WITHHELD_TABLE",
     "FileTooLarge",
     "ObjectStore",
     "ObjectWriter",
@@ -2573,6 +2628,7 @@ __all__ = [
     "export_download_url",
     "export_files",
     "export_records",
+    "export_withheld_files",
     "export_sheet",
     "generated_download_url",
     "get_document",

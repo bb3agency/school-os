@@ -114,6 +114,7 @@ def manifest(
     documents: int,
     document_bytes: int,
     audit_events: int,
+    documents_withheld: int = 0,
     never_exported: Sequence[str],
 ) -> bytes:
     """``manifest.json``: what the archive holds (no personal data: school id, code and name,
@@ -136,7 +137,13 @@ def manifest(
             }
             for t in tables
         ],
-        "documents": {"files": documents, "bytes": document_bytes, "folder": "documents/"},
+        "documents": {
+            "files": documents,
+            "bytes": document_bytes,
+            "folder": "documents/",
+            # DL-07: restricted files left out (listed in records/documents_withheld.csv).
+            "withheld": documents_withheld,
+        },
         "audit": {"events": audit_events, "file": "audit/audit-log.csv"},
     }
     return json.dumps(doc, ensure_ascii=False, indent=2).encode("utf-8")

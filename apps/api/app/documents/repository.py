@@ -440,11 +440,11 @@ def export_record_tables(session: Session) -> list[RecordTable]:
     ]
 
 
-def ready_versions(session: Session) -> list[tuple[DocumentVersion, str]]:
-    """Every version that passed the malware scan (``ready``) with its document's purpose,
-    ordered by document and version."""
+def ready_versions(session: Session) -> list[tuple[DocumentVersion, Document]]:
+    """Every version that passed the malware scan (``ready``) with its document, ordered by
+    document and version."""
     stmt = (
-        select(DocumentVersion, Document.purpose)
+        select(DocumentVersion, Document)
         .join(
             Document,
             and_(
