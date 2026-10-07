@@ -23,7 +23,7 @@ from app.platform import fleet, heartbeat_client
 from app.platform.common import fleet_cfg, today_ist
 from app.platform.schemas import HeartbeatIn
 
-from .conftest import Api, Operator, provision_payload
+from .conftest import Api, MakeOperator, Operator, provision_payload
 
 pytestmark = pytest.mark.db
 
@@ -99,11 +99,59 @@ def dep(api: Api, owner: Operator, make_plan: Callable[..., uuid.UUID]) -> dict[
     return _dedicated(api, owner, make_plan)
 
 
-def test_SEC_028_valid_heartbeat_is_accepted_and_recorded(api: Api, dep: dict[str, Any]) -> None:
+def _announce(api: Api, agent: Operator, **audience: Any) -> str:
+    now = dt.datetime.now(dt.UTC)
+    body = {
+        "title_en": "Synthetic maintenance",
+        "body_en": "SchoolOS will be unavailable from 22:00 to 22:30 IST.",
+        "severity": "maintenance",
+        "starts_at": (now - dt.timedelta(minutes=1)).isoformat(),
+        "ends_at": (now + dt.timedelta(minutes=30)).isoformat(),
+        **audience,
+    }
+    res = api.call("POST", "/announcements", agent, json=body)
+    assert res.status_code == 201, res.text
+    return str(res.json()["id"])
+
+
+def _addressed_to(tenant_id: str, ids: set[str]) -> bool:
+    """Every id is an announcement addressed to this dedicated school (all schools, the
+    dedicated tier, or its id)."""
+    if not ids:
+        return True
+    with platform_session() as s:
+        rows = s.execute(
+            text(
+                "SELECT audience, audience_tier, audience_tenant_ids "
+                "FROM platform.announcements WHERE id = ANY(CAST(:ids AS uuid[]))"
+            ),
+            {"ids": sorted(ids)},
+        ).all()
+    return len(rows) == len(ids) and all(
+        r.audience == "all"
+        or (r.audience == "tier" and r.audience_tier == "dedicated")
+        or uuid.UUID(tenant_id) in r.audience_tenant_ids
+        for r in rows
+    )
+
+
+def test_SEC_028_valid_heartbeat_is_accepted_and_recorded(
+    api: Api, dep: dict[str, Any], make_operator: MakeOperator
+) -> None:
+    # Announcements are shared control-plane rows that other tests leave active (they used to
+    # make `announcements == []` fail after test_school_side.py), so assert only on this test's
+    # own: the one for this school is delivered, the one for another school is not, and
+    # everything delivered is addressed to this school.
+    agent = make_operator("support_agent")
+    mine = _announce(api, agent, audience="tenants", audience_tenant_ids=[dep["tenant_id"]])
+    theirs = _announce(api, agent, audience="tenants", audience_tenant_ids=[str(uuid.uuid4())])
     raw, headers = _signed(dep, _payload(dep))
     res = api.client.post(URL, content=raw, headers=headers)
     assert res.status_code == 200, res.text
-    assert res.json()["announcements"] == []
+    delivered = {a["id"] for a in res.json()["announcements"]}
+    assert mine in delivered
+    assert theirs not in delivered
+    assert _addressed_to(dep["tenant_id"], delivered)
     with platform_session() as s:
         row = s.execute(
             text(
