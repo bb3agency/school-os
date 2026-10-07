@@ -1411,7 +1411,7 @@ def retry_notice_draft(
     ``notice.draft_requested``."""
     if not ctx.has(NOTICE_DRAFT):
         raise Forbidden()
-    notice = _notice(session, notice_id, lock=True)
+    notice = _visible_notice(session, ctx, notice_id, lock=True)
     _check_version(notice.version, version)
     if notice.status != "draft_failed":
         raise Conflict(
@@ -1449,6 +1449,30 @@ def _notice(session: Session, notice_id: uuid.UUID, *, lock: bool = False) -> Pa
     return notice
 
 
+def _notice_visible(session: Session, ctx: UserContext, notice: ParentNotice) -> bool:
+    """A-16 (with DL-08): a notice not yet approved that was drafted from a circular is shown
+    only to its drafter and to people who may read that circular (its AI text comes from it).
+    Approved notices are written for parents, so every drafter sees them."""
+    if notice.status == "approved" or notice.source != "circular":
+        return True
+    if notice.created_by == ctx.user_id or notice.document_id is None:
+        return True
+    try:
+        _circular(session, ctx, notice.document_id)
+    except NotFound:
+        return False
+    return True
+
+
+def _visible_notice(
+    session: Session, ctx: UserContext, notice_id: uuid.UUID, *, lock: bool = False
+) -> ParentNotice:
+    notice = _notice(session, notice_id, lock=lock)
+    if not _notice_visible(session, ctx, notice):
+        raise NotFound("Notice not found")
+    return notice
+
+
 def list_notices(
     session: Session, ctx: UserContext, *, status: str | None, limit: int, cursor: str | None
 ) -> Page[NoticeOut]:
@@ -1470,13 +1494,14 @@ def list_notices(
         if more
         else None
     )
-    return Page[NoticeOut](data=[_notice_out(session, n) for n in rows], next_cursor=next_cursor)
+    shown = [n for n in rows if _notice_visible(session, ctx, n)]
+    return Page[NoticeOut](data=[_notice_out(session, n) for n in shown], next_cursor=next_cursor)
 
 
 def get_notice(session: Session, ctx: UserContext, notice_id: uuid.UUID) -> NoticeOut:
     if not ctx.has(NOTICE_DRAFT):
         raise Forbidden()
-    return _notice_out(session, _notice(session, notice_id))
+    return _notice_out(session, _visible_notice(session, ctx, notice_id))
 
 
 def update_notice(
@@ -1485,7 +1510,7 @@ def update_notice(
     """Edit a draft (``notice.draft``; ``If-Match``). 409 ``notice_approved`` once approved."""
     if not ctx.has(NOTICE_DRAFT):
         raise Forbidden()
-    notice = _notice(session, notice_id, lock=True)
+    notice = _visible_notice(session, ctx, notice_id, lock=True)
     _check_version(notice.version, version)
     _refuse_drafting(notice)
     if notice.status == "approved":
@@ -1527,7 +1552,7 @@ def approve_notice(
     (422 ``notice_personal_data``). The PDF and image are rendered next (queue ``pdf``)."""
     if not ctx.has(NOTICE_APPROVE):
         raise Forbidden()
-    notice = _notice(session, notice_id, lock=True)
+    notice = _visible_notice(session, ctx, notice_id, lock=True)
     _check_version(notice.version, version)
     _refuse_drafting(notice)
     if notice.status == "approved":
@@ -1574,7 +1599,7 @@ def request_render(
     """Render the approved notice's files again (``notice.draft``; ``If-Match``)."""
     if not ctx.has(NOTICE_DRAFT):
         raise Forbidden()
-    notice = _notice(session, notice_id, lock=True)
+    notice = _visible_notice(session, ctx, notice_id, lock=True)
     _check_version(notice.version, version)
     if notice.status != "approved":
         raise Conflict("Approve the notice first.", code="notice_not_approved")
@@ -1604,7 +1629,7 @@ def download_url(
     again)."""
     if not ctx.has(NOTICE_DRAFT):
         raise Forbidden()
-    notice = _notice(session, notice_id)
+    notice = _visible_notice(session, ctx, notice_id)
     key = notice.pdf_key if file_format == "pdf" else notice.png_key
     if notice.render_status != "ready" or key is None:
         raise Conflict("The files are not ready yet.", code="notice_files_not_ready")
