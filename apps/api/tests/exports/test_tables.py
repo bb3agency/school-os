@@ -154,6 +154,15 @@ def test_sheet_titles_are_valid_and_unique() -> None:
         assert not set(title) & set("[]:*?/\\")
 
 
+@pytest.mark.parametrize(
+    "value", [" =1+1", " =1+1", "　@SUM(A1)", "\n+1+1", "＝1+1", "＋1", "－1+1", "＠x"]
+)
+def test_DL_hardening_4_hidden_and_full_width_formulas_are_prefixed(value: str) -> None:
+    assert safe_cell(value).startswith("'")
+    table = Table(name="Students", header=("h",), rows=((value,),))
+    assert _csv_rows(write_csv(table, watermark=WATERMARK))[2][0].startswith("'")
+
+
 def test_rows_must_match_header() -> None:
     with pytest.raises(ValueError, match="one value per header"):
         Table(name="x", header=("a", "b"), rows=(("only one",),))

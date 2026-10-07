@@ -47,6 +47,7 @@ from app.core.db import tenant_session
 from app.core.errors import ValidationFailed
 from app.core.logging import get_logger
 from app.core.redaction import mask_aadhaar
+from app.core.spreadsheet import starts_formula
 
 log = get_logger(__name__)
 
@@ -66,7 +67,6 @@ HEADER: Final = (
     "request_id",
     "summary",
 )
-_FORMULA_TRIGGERS: Final = ("=", "+", "-", "@", "\t", "\r")
 _CONTROL_RE: Final = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
 
@@ -184,7 +184,7 @@ def safe_cell(value: object) -> str:
     if value is None:
         return ""
     text = mask_aadhaar(_CONTROL_RE.sub("", unicodedata.normalize("NFC", str(value))))
-    return "'" + text if text.startswith(_FORMULA_TRIGGERS) else text
+    return "'" + text if starts_formula(text) else text
 
 
 def _row(event: Mapping[Any, Any]) -> list[str]:

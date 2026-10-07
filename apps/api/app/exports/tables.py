@@ -11,8 +11,8 @@ Pure module (no database or web). Every value that goes into an exported file pa
    digits from a field whose type and source are known; ADR-0037 option (a), PRV-020). Only the
    exports service creates one, for that column; free text never does.
 3. Formula injection (SEC-017, docs/07 §10): a cell that starts with ``=``, ``+``, ``-``, ``@``,
-   tab or carriage return is prefixed with an apostrophe, so spreadsheet programs show it as
-   text and never evaluate it.
+   tab or carriage return, also after leading whitespace or as a full-width ``＝＋－＠``, is
+   prefixed with an apostrophe, so spreadsheet programs show it as text and never evaluate it.
 
 XLSX cells are additionally written as explicit strings (type ``s``, text number format), so a
 value is never stored as a formula even if a future change skipped step 3. Every file carries
@@ -34,6 +34,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 from app.core.redaction import mask_aadhaar
+from app.core.spreadsheet import starts_formula
 
 FORMULA_TRIGGERS: Final = ("=", "+", "-", "@", "\t", "\r")
 NEUTRALISER: Final = "'"
@@ -67,8 +68,9 @@ def typed_digits12(value: str) -> str:
 
 
 def neutralise_formula(text: str) -> str:
-    """Prefix ``'`` when ``text`` would start a formula (SEC-017)."""
-    return NEUTRALISER + text if text.startswith(FORMULA_TRIGGERS) else text
+    """Prefix ``'`` when ``text`` would start a formula (SEC-017), also behind leading
+    whitespace or a full-width sign (``app.core.spreadsheet.starts_formula``)."""
+    return NEUTRALISER + text if starts_formula(text) else text
 
 
 def clean_text(value: object) -> str:

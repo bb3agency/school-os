@@ -16,8 +16,8 @@ Reading (the rules imports have always used, moved here so documents apply the s
 Writing (:func:`write_csv`, :func:`write_xlsx`): every value passes :func:`safe_cell`: NFC,
 control characters removed, any 12-digit Verhoeff-valid sequence masked
 (:func:`app.core.redaction.mask_aadhaar`, invariant 4) and formula injection neutralised with a
-leading apostrophe (cells starting with ``=``, ``+``, ``-``, ``@``, tab or carriage return; OWASP
-CSV injection). CSV is UTF-8 with a BOM so Excel opens Telugu correctly; XLSX cells are written
+leading apostrophe (cells starting with ``=``, ``+``, ``-``, ``@``, tab or carriage return, also
+after leading whitespace or as full-width ``＝＋－＠``; OWASP CSV injection). CSV is UTF-8 with a BOM so Excel opens Telugu correctly; XLSX cells are written
 as explicit strings (type ``s``), so a value is never stored as a formula.
 """
 
@@ -88,9 +88,29 @@ class Cell:
         return self.value is None or (isinstance(self.value, str) and not self.value.strip())
 
 
+def _formula_head(text: str) -> str:
+    """``text`` without leading whitespace, control and invisible format characters (spreadsheet
+    programs skip them), with its first character NFKC-folded so full-width ``＝＋－＠`` read as
+    ``=+-@`` (audit 2026-10-04 data-layer hardening note 4)."""
+    i = 0
+    while i < len(text) and (text[i].isspace() or unicodedata.category(text[i]) in ("Cc", "Cf")):
+        i += 1
+    rest = text[i:]
+    if not rest:
+        return ""
+    return unicodedata.normalize("NFKC", rest[0]) + rest[1:]
+
+
+def starts_formula(text: str) -> bool:
+    """True when a spreadsheet program could read ``text`` as a formula: it starts with one of
+    :data:`FORMULA_TRIGGERS`, or does so once leading whitespace, control and format characters
+    are skipped and the first sign is NFKC-folded (SEC-017, OWASP CSV injection)."""
+    return text.startswith(FORMULA_TRIGGERS) or _formula_head(text).startswith(FORMULA_TRIGGERS)
+
+
 def looks_like_formula(text: str) -> bool:
     """Text a spreadsheet program would treat as a formula or DDE payload."""
-    stripped = text.lstrip()
+    stripped = _formula_head(text)
     if not stripped:
         return False
     if stripped[0] in "=@":
@@ -290,8 +310,9 @@ def display_text(value: CellValue) -> str | None:
 
 
 def neutralise_formula(text: str) -> str:
-    """Prefix ``'`` when ``text`` would start a formula (SEC-017, OWASP CSV injection)."""
-    return NEUTRALISER + text if text.startswith(FORMULA_TRIGGERS) else text
+    """Prefix ``'`` when ``text`` would start a formula (SEC-017, OWASP CSV injection), also
+    behind leading whitespace or a full-width sign (:func:`starts_formula`)."""
+    return NEUTRALISER + text if starts_formula(text) else text
 
 
 def safe_cell(value: object) -> str:
