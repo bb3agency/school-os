@@ -343,6 +343,10 @@ services:
       - -c
       - idle_in_transaction_session_timeout=60000
       - -c
+      # Backstop for every session (audit 2026-10-05 "Role timeouts"); sos_migrator is exempt
+      # (role setting 0, infra/db/bootstrap.sql), the app sets its own per transaction.
+      - statement_timeout=300000
+      - -c
       - wal_level=replica
       - -c
       - archive_mode=${SOS_PG_ARCHIVE_MODE:-off}
