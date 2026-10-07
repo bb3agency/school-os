@@ -60,7 +60,7 @@ only on the internal network, where the BFF calls it with the signed service tok
 | `school_code`, `deployment_id`, `tenant_id` (from the platform panel: Provision school → Dedicated) | tfvars |
 | Platform host name (`domain`), optional school `custom_domain`, `acme_email` | tfvars |
 | Release `release_version` + `bundle_sha256` (from CI release notes) | tfvars |
-| Shared prod outputs: `buckets.artifacts` (`artifacts_bucket`), `kms_key_arns.artifacts` (`artifacts_kms_key_arn`: the artifacts bucket's own key, never the data key), `control_plane_url` | tfvars |
+| Shared prod outputs: `buckets.artifacts` (`artifacts_bucket`), `kms_key_arns.artifacts` (`artifacts_kms_key_arn`: the artifacts bucket's own key, never the data key), `alarm_topic_arn` (`security_alarm_topic_arn`: the host's security alarms), `control_plane_url` | tfvars |
 | Heartbeat key ID + key (shown once by the panel); when the school has AI: the Vertex AI credential JSON `SOS_LLM_GCP_CREDENTIALS_JSON` (workload identity config, ADR-0033; docs/10 §11.1) and, only for an Anthropic fallback role, the Anthropic API key (ZDR organisation) | Secrets Manager, after apply |
 
 Terraform writes the non-secret host settings to `/etc/schoolos/host.env` under the names the app reads

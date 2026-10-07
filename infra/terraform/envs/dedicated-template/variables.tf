@@ -126,6 +126,11 @@ variable "control_plane_url" {
   type        = string
 }
 
+variable "security_alarm_topic_arn" {
+  description = "The prod stack's alarm topic (prod output alarm_topic_arn): receives this host's security alarms (audit 2026-10-05)."
+  type        = string
+}
+
 variable "operator_user_pool_id" {
   description = "Break-glass support sign-in (ADR-0023): the prod OPERATOR pool ID (prod output oidc.platform_user_pool_id). Creates this host's own support app client there. Null = off (approved break-glass access cannot be used on this host)."
   type        = string

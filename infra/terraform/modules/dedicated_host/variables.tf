@@ -226,6 +226,16 @@ variable "control_plane_url" {
   type        = string
 }
 
+variable "security_alarm_topic_arn" {
+  description = "SNS topic for the host's security alarms (audit 2026-10-05): the shared prod stack's alarm topic (output alarm_topic_arn), same account and region."
+  type        = string
+
+  validation {
+    condition     = can(regex("^arn:aws:sns:ap-south-1:[0-9]{12}:[A-Za-z0-9_-]{1,256}$", var.security_alarm_topic_arn))
+    error_message = "security_alarm_topic_arn: an SNS topic ARN in ap-south-1 (the prod alarm topic)."
+  }
+}
+
 variable "operator_secret_keys" {
   description = "Keys of the operator-supplied JSON secret (placeholders __SET_ME__ until set). SOS_HEARTBEAT_KEY_ID and SOS_HEARTBEAT_KEY are shown once by the panel."
   type        = list(string)

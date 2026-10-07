@@ -84,6 +84,8 @@ variables {
   artifacts_bucket      = "sos-prod-artifacts-111122223333"
   artifacts_kms_key_arn = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000001"
   control_plane_url     = "https://app.example.test"
+
+  security_alarm_topic_arn = "arn:aws:sns:ap-south-1:111122223333:sos-prod-alarms"
 }
 
 run "host_is_hardened" {
