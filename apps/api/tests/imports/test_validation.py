@@ -82,6 +82,7 @@ def _ctx(**changes: Any) -> ValidationContext:
         has_current_year=True,
         allowed_sections=None,
         can_create=True,
+        can_update_sensitive=True,  # a full importer (office admin); A-10 tests narrow it
         existing={},
         config=CFG,
         today=dt.date(2026, 9, 27),
@@ -187,6 +188,38 @@ def test_FR_IMP_003_existing_students_are_updates_and_register_identity_is_prote
     other = validate_sheet(sheet, MAPPING, _ctx(existing=existing, source="udise_plus")).rows[1]
     assert other.status == "valid"
     assert "admission_no" not in other.values
+
+
+def test_A_10_updating_a_sensitive_value_needs_read_sensitive() -> None:
+    """A-10 (owner decision 2026-10-07): ``import.commit`` includes updates of existing
+    students, but writing a C3 value to an existing student needs ``student.read_sensitive``
+    (an exam coordinator cannot overwrite caste or health notes they cannot read)."""
+    existing = {"a-1": ExistingStudent("sid-1", "s9a", {})}
+    header = ["Admission no", "Caste", "Mother tongue"]
+    sheet = read_sheet(
+        S.csv_bytes([header, ["A-1", "Synthetic Caste", "Telugu"]]), "csv", CFG.limits
+    )
+    mapping = {"0": "admission_no", "1": "caste", "2": "mother_tongue"}
+    blocked = validate_sheet(
+        sheet,
+        mapping,
+        _ctx(existing=existing, source="parent_form", can_update_sensitive=False),
+    )
+    assert _codes(blocked) == [{"caste:sensitive_update_not_permitted"}]
+    allowed = validate_sheet(
+        sheet,
+        mapping,
+        _ctx(existing=existing, source="parent_form", can_update_sensitive=True),
+    )
+    assert allowed.rows[0].status == "valid"
+    assert allowed.rows[0].action == "update"
+    # Non-sensitive updates stay part of import.commit.
+    plain = validate_sheet(
+        sheet,
+        {"0": "admission_no", "2": "mother_tongue"},
+        _ctx(existing=existing, source="parent_form", can_update_sensitive=False),
+    )
+    assert plain.rows[0].status == "valid"
 
 
 def test_FR_IMP_003_sources_that_cannot_create_only_match() -> None:

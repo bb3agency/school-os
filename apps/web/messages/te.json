@@ -2520,6 +2520,7 @@
       "duplicate_in_file": "ఇదే ప్రవేశ సంఖ్య వరుస {row} లో కూడా ఉంది. వాటిలో ఒకదాన్నే ఉంచండి.",
       "no_matching_student": "ఈ ప్రవేశ సంఖ్యతో ఏ విద్యార్థీ లేరు. ప్రవేశ రిజిస్టర్ మాత్రమే కొత్త విద్యార్థులను చేర్చగలదు.",
       "student_create_not_permitted": "మీరు కొత్త విద్యార్థులను చేర్చలేరు. మీ ఆఫీస్ అడ్మిన్‌ను అడగండి.",
+      "sensitive_update_not_permitted": "you can't change this sensitive field for an existing student. Ask your office admin.",
       "student_out_of_scope": "ఈ విద్యార్థి మీ తరగతుల్లో లేరు.",
       "class_not_found": "ఈ తరగతి లేదు. పాఠశాల నిర్మాణంలో దాన్ని చేర్చండి, లేదా ఫైల్‌ను సరిచేయండి.",
       "section_not_found": "ఈ సంవత్సరం ఈ సెక్షన్ లేదు. పాఠశాల నిర్మాణంలో దాన్ని చేర్చండి, లేదా ఫైల్‌ను సరిచేయండి.",

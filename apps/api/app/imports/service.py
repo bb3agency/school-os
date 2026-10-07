@@ -471,6 +471,7 @@ def _validation_context(
         has_current_year=structure.year_id is not None,
         allowed_sections=allowed,
         can_create=ctx.has(CREATE_STUDENT),
+        can_update_sensitive=ctx.has(READ_SENSITIVE),
         existing=_existing_students(
             session,
             ctx,

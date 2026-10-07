@@ -119,6 +119,9 @@ class ValidationContext:
     existing: Mapping[str, ExistingStudent]  # key: admission_key(admission number)
     config: ImportConfig
     today: dt.date
+    # A-10: writing a C3 value to an EXISTING student needs student.read_sensitive (import.commit
+    # includes updates of non-sensitive values; docs/07 §6.2). Fails closed when not given.
+    can_update_sensitive: bool = False
 
     @property
     def creates(self) -> bool:
@@ -446,6 +449,11 @@ class _RowValidator:
     def _update_row(self, existing: ExistingStudent, result: RowResult) -> None:
         result.action = "update"
         result.student_id = existing.id
+        if not self.ctx.can_update_sensitive:
+            for key in result.values:
+                spec = self.ctx.specs.get(key)
+                if spec is not None and spec.sensitive:
+                    result.errors.append(issue(key, "sensitive_update_not_permitted"))
         if self.ctx.source == ANCHOR_SOURCE:
             for key, value in result.values.items():
                 spec = self.ctx.specs[key]

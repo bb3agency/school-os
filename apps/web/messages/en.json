@@ -2520,6 +2520,7 @@
       "duplicate_in_file": "the same admission number is also in row {row}. Keep one of them.",
       "no_matching_student": "no student has this admission number. Only the admission register can add new students.",
       "student_create_not_permitted": "you can't add new students. Ask your office admin.",
+      "sensitive_update_not_permitted": "you can't change this sensitive field for an existing student. Ask your office admin.",
       "student_out_of_scope": "this student is not in your classes.",
       "class_not_found": "this class does not exist. Add it under school structure, or fix the file.",
       "section_not_found": "this section does not exist this year. Add it under school structure, or fix the file.",
