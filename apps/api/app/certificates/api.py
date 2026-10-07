@@ -175,14 +175,16 @@ def approve_certificate(
     certificate_id: uuid.UUID,
     expected: IfMatch,
     response: Response,
-    body: ApproveIn | None = None,
+    body: ApproveIn,
 ) -> CertificateOut:
     """Approve and issue a transfer certificate (or a TC duplicate): serial number, register
     entry and, for a TC, the student leaves the rolls (permission ``certificate.approve``, MFA
-    within 5 minutes, not the person who prepared it, ``If-Match``). Errors:
+    within 5 minutes, not the person who prepared it, ``If-Match``). The body carries the
+    ``draft_sha256`` read from ``GET /certificates/{id}``. Errors:
     ``self_approval_forbidden`` (403), ``step_up_required`` (428), ``certificate_not_pending``
-    / ``certificate_blocked`` (409)."""
-    out = service.approve(db, ctx, certificate_id, body or ApproveIn(), expected_version=expected)
+    / ``certificate_blocked`` / ``change_request_pending`` / ``requester_inactive`` /
+    ``certificate_draft_changed`` (409: what it prints changed since it was read)."""
+    out = service.approve(db, ctx, certificate_id, body, expected_version=expected)
     return _with_etag(response, out)
 
 

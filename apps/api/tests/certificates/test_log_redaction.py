@@ -66,7 +66,7 @@ def test_SEC_008_certificate_calls_do_not_log_personal_data(
         principal,
         "POST",
         f"/api/v1/certificates/{tc.json()['id']}/approve",
-        json={"note": NOTE},
+        json={"note": NOTE, "draft_sha256": C.draft_hash(school, tc.json()["id"])},
         headers=h,
     )
     assert approved.status_code == 200, approved.text

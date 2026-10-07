@@ -125,6 +125,21 @@ def list_requests(
     return session.scalars(stmt).all()
 
 
+def pending_keys(
+    session: Session, student_id: uuid.UUID, keys: Collection[str], at: dt.datetime
+) -> set[str]:
+    """Attributes of ``keys`` with an open (pending, unexpired) request for the student."""
+    if not keys:
+        return set()
+    stmt = select(ChangeRequest.attribute_key).where(
+        ChangeRequest.student_id == student_id,
+        ChangeRequest.status == "pending",
+        ChangeRequest.expires_at > at,
+        ChangeRequest.attribute_key.in_(sorted(set(keys))),
+    )
+    return set(session.scalars(stmt).all())
+
+
 def lock_due_for_expiry(
     session: Session, at: dt.datetime, *, limit: int
 ) -> Sequence[ChangeRequest]:

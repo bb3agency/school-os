@@ -801,6 +801,34 @@ def request_student(session: Session, request_id: uuid.UUID) -> uuid.UUID | None
     return row.student_id if row is not None else None
 
 
+@dataclass(frozen=True, slots=True)
+class RequestLink:
+    """What another module needs to validate a link to a request (IDs and codes only)."""
+
+    student_id: uuid.UUID
+    attribute_key: str
+    status: str
+
+
+def request_link(session: Session, request_id: uuid.UUID) -> RequestLink | None:
+    """The student, attribute and status of a request of the current school, or ``None`` (e.g.
+    DQ resolves a finding only with an approved request about its student and field). No
+    permission check, as for :func:`request_student`."""
+    row = repo.get_request(session, request_id)
+    if row is None:
+        return None
+    return RequestLink(student_id=row.student_id, attribute_key=row.attribute_key, status=row.status)
+
+
+def pending_attribute_keys(
+    session: Session, student_id: uuid.UUID, attribute_keys: Collection[str]
+) -> set[str]:
+    """Which of ``attribute_keys`` have a correction waiting for approval for the student (a
+    certificate that prints such a field waits for the decision; audit 2026-10-05). IDs and
+    keys only; no permission check: the caller has checked its own scope on the student."""
+    return repo.pending_keys(session, student_id, attribute_keys, _now(session))
+
+
 # --- correction memo ---------------------------------------------------------------------------
 
 
