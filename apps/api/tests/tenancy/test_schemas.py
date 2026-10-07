@@ -47,6 +47,37 @@ def test_FR_TEN_010_century_rollover_label() -> None:
     assert y.label == "2099-00"
 
 
+@pytest.mark.parametrize(
+    ("label", "starts", "ends"),
+    [
+        ("1999-00", dt.date(1999, 6, 1), dt.date(2000, 4, 30)),
+        ("2999-00", dt.date(2999, 6, 1), dt.date(3000, 4, 30)),
+    ],
+)
+def test_academic_year_dates_are_bounded(label: str, starts: dt.date, ends: dt.date) -> None:
+    """Years 2000-2999 only, like the billing dates of R-13 (audit 2026-10-06 hardening)."""
+    with pytest.raises(ValidationError, match="between the years 2000 and 2999"):
+        AcademicYearCreate(label=label, starts_on=starts, ends_on=ends)
+    with pytest.raises(ValidationError, match="between the years 2000 and 2999"):
+        AcademicYearUpdate(ends_on=dt.date(9999, 12, 31))
+    assert AcademicYearCreate(
+        label="2000-01", starts_on=dt.date(2000, 6, 1), ends_on=dt.date(2001, 4, 30)
+    )
+
+
+def test_enrolment_dates_are_bounded() -> None:
+    from app.students.schemas import EnrollmentEnd, EnrollmentIn
+
+    section = uuid.uuid4()
+    for bad in (dt.date(1, 1, 1), dt.date(1999, 12, 31), dt.date(3000, 1, 1)):
+        with pytest.raises(ValidationError, match="between the years 2000 and 2999"):
+            EnrollmentIn(section_id=section, started_on=bad)
+        with pytest.raises(ValidationError, match="between the years 2000 and 2999"):
+            EnrollmentEnd(ended_on=bad)
+    assert EnrollmentIn(section_id=section, started_on=dt.date(2026, 6, 12)).started_on
+    assert EnrollmentEnd(ended_on=None).ended_on is None
+
+
 def test_year_update_is_partial() -> None:
     assert AcademicYearUpdate(ends_on=dt.date(2027, 1, 1)).model_dump(exclude_unset=True) == {
         "ends_on": dt.date(2027, 1, 1)
