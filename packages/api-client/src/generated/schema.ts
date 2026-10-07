@@ -1898,8 +1898,10 @@ export interface paths {
         /**
          * Get Export Download Url
          * @description A download link for one file of a ready export, valid at most 5 minutes (the first
-         *     format unless ``format`` is given). Your own export: student lists and exports with
-         *     restricted values need a recent sign-in with MFA (428). Someone else's export needs
+         *     format unless ``format`` is given). Your own export: you must still see student records
+         *     (403 ``student_read_required``) and every student in it must still be within your reach
+         *     (403 ``students_out_of_scope``); student lists and exports with restricted values need a
+         *     recent sign-in with MFA (428). Someone else's export needs
          *     ``export.download_any`` and always a recent sign-in with MFA (428); 403 ``not_own_export``
          *     if you can see it (``export.read_all``) but not download it, 404 otherwise. Errors: 409
          *     ``export_not_ready``, ``export_failed``, ``export_expired``. Every download is recorded in
