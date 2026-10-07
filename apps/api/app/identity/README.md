@@ -35,6 +35,10 @@ Authorization:   Bearer <user's OIDC access token>
      Cognito access tokens that have no `aud`, `client_id` must equal it **and**
      `token_use == "access"`. Any token with `token_use` other than `access` (Cognito ID
      tokens) is refused.
+   - The token must say it is an access token: header `typ` `at+jwt` (RFC 9068) **or** the
+     claim `token_use == "access"` (Cognito; the local OIDC stub sets it on every mapping). A
+     plain `JWT` without `token_use` (an ID token of an IdP that puts the client id in `aud`)
+     is refused (audit 2026-10-05, platform hardening).
    - `exp - iat` > 15 min is refused as an IdP misconfiguration. FR-IAM-004 requires ≤ 10 min.
    - `auth_time` (optional) must be numeric and not in the future.
    - Result: `subject`, `issuer`, `issued_at`, `expires_at`, `auth_time`, `mfa`,
