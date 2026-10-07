@@ -111,6 +111,7 @@ from app.documents.storage import (
     ObjectStoreError,
     ObjectWriter,
     derived_key,
+    derived_prefix,
     document_key,
     document_prefix,
     export_key,
@@ -1829,9 +1830,23 @@ def discard_object(
             key = None
     if key is None or not key_in_tenant(key, tenant_id) or not key.startswith(prefix):
         return False
-    (store or get_object_store()).discard(key)
+    store = store or get_object_store()
+    store.discard(key)
+    _discard_derived(store, tenant_id, document_id, key)
     log.info("documents.version.discarded", resource_type="document", resource_id=document_id)
     return True
+
+
+def _discard_derived(
+    store: ObjectStore, tenant_id: uuid.UUID, document_id: uuid.UUID, original_key: str
+) -> None:
+    """Discard the version's derived objects (page renders, text layer under ``v<n>/derived/``)
+    with the original: they show the same content (PRV-016; audit 2026-10-04 data-layer
+    hardening note 7). ``purge_prefix`` tags every stored version of each key (W3-07)."""
+    m = _DOC_KEY.match(original_key)
+    if m is None or m["t"] != str(tenant_id) or m["d"] != str(document_id):
+        return
+    store.purge_prefix(derived_prefix(tenant_id, document_id, int(m["n"])))
 
 
 def sweep_discarded_objects(tenant_id: uuid.UUID, *, store: ObjectStore | None = None) -> int:
@@ -1848,6 +1863,8 @@ def sweep_discarded_objects(tenant_id: uuid.UUID, *, store: ObjectStore | None =
         ]
     for key in keys:
         store.discard(key)
+        if m := _DOC_KEY.match(key):
+            _discard_derived(store, tenant_id, uuid.UUID(m["d"]), key)
     return len(keys)
 
 

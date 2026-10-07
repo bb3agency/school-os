@@ -30,6 +30,8 @@ per school)::
   lifecycle rule ``discarded-1d`` (infra/terraform) expires such versions after one day. Every
   automatic deletion uses it too (retention purges, expired exports and uploads: docs/08 §7,
   :meth:`ObjectStore.purge_prefix` for a prefix); only a person's delete keeps the 90-day window.
+  Discarding a version removes its derived objects too (``v<n>/derived/``, every stored version
+  of each tagged; data-layer hardening note 7).
 
 ``ObjectStore`` is a Protocol so tests can swap in an in-memory store; the real implementation
 is :class:`S3ObjectStore` (boto3; SeaweedFS locally and in CI via an endpoint override).
@@ -129,6 +131,11 @@ def derived_key(
     if not relative or relative.startswith("/") or ".." in relative.split("/"):
         raise ValueError("derived path must be relative without '..'")
     return f"{tenant_prefix(tenant_id)}docs/{document_id}/v{version_no}/derived/{relative}"
+
+
+def derived_prefix(tenant_id: uuid.UUID, document_id: uuid.UUID, version_no: int) -> str:
+    """``t/<tenant_id>/docs/<document_id>/v<n>/derived/``: every derived object of a version."""
+    return f"{tenant_prefix(tenant_id)}docs/{document_id}/v{version_no}/derived/"
 
 
 def import_key(tenant_id: uuid.UUID, batch_id: uuid.UUID, ext: str) -> str:
