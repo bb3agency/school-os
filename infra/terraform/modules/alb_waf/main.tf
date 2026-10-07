@@ -171,7 +171,8 @@ resource "aws_lb_listener" "http" {
   }
 }
 
-# ssl_policy comes from a variable whose validation allows only ELBSecurityPolicy-TLS13-* (TLS 1.2+).
+# ssl_policy comes from a variable whose validation allows only ELBSecurityPolicy-TLS13-1-2-Res-* or
+# ELBSecurityPolicy-TLS13-1-3-* (TLS 1.2+ without CBC suites).
 resource "aws_lb_listener" "https" {
   load_balancer_arn = aws_lb.this.arn
   port              = 443
@@ -386,6 +387,64 @@ resource "aws_wafv2_web_acl" "this" {
     visibility_config {
       cloudwatch_metrics_enabled = true
       metric_name                = "${var.name}-rate-limit-ip"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  # Audit 2026-10-05 detection gap: an ALB-attached WAF inspects only the first 8 KB of a body and
+  # SizeRestrictions_BODY only counts (bulk JSON bodies are legitimate). No route takes anything but
+  # JSON (files go to presigned S3 URLs; the API refuses multipart), so a body over 8 KB that is not
+  # JSON is blocked. Larger JSON is parsed strictly by the BFF and the API (1 MiB cap, Pydantic).
+  rule {
+    name     = "block-oversized-non-json-body"
+    priority = 5
+
+    action {
+      block {}
+    }
+
+    statement {
+      and_statement {
+        statement {
+          size_constraint_statement {
+            comparison_operator = "GT"
+            size                = 8192
+            field_to_match {
+              body {
+                oversize_handling = "MATCH"
+              }
+            }
+            text_transformation {
+              priority = 0
+              type     = "NONE"
+            }
+          }
+        }
+        statement {
+          not_statement {
+            statement {
+              byte_match_statement {
+                search_string         = "json"
+                positional_constraint = "CONTAINS"
+                field_to_match {
+                  single_header {
+                    name = "content-type"
+                  }
+                }
+                text_transformation {
+                  priority = 0
+                  type     = "LOWERCASE"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${var.name}-block-oversized-non-json-body"
       sampled_requests_enabled   = true
     }
   }
