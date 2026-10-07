@@ -251,6 +251,48 @@ def xlsx_sheet_count(data: bytes, limits: ReadLimits) -> int:
 # --- CSV ----------------------------------------------------------------------------------------
 
 
+def _check_csv_row_widths(text: str, dialect: type[csv.Dialect] | csv.Dialect) -> None:
+    """Refuse a record with more than :data:`MAX_ROW_CELLS` fields before the ``csv`` module
+    builds it (it materialises a whole row as a list first: a 10 MB row of commas cost ~150 MB;
+    audit 2026-10-04 api-auth hardening note).
+
+    Streams the text once without copying it: delimiters are counted with ``str.count`` between
+    quote characters and line breaks; text inside quotes (doubled quotes toggle twice, so they
+    cancel out) neither counts nor ends a record. A line break (CR or LF) outside quotes starts a
+    new record. This can only overcount when the sniffed dialect escapes quotes with an escape
+    character, and the per-row check in :func:`csv_rows` still runs afterwards (SEC-017)."""
+    delimiter = dialect.delimiter or ","
+    quote = dialect.quotechar if dialect.quoting != csv.QUOTE_NONE else None
+    limit = MAX_ROW_CELLS - 1  # fields = delimiters + 1
+    count = 0
+    pos = 0
+    end = len(text)
+    while pos < end:
+        next_quote = text.find(quote, pos) if quote else -1
+        stop = next_quote if next_quote != -1 else end
+        # Outside quotes: [pos, stop). Count per physical line.
+        line_start = pos
+        while line_start < stop:
+            cr = text.find("\r", line_start, stop)
+            lf = text.find("\n", line_start, stop)
+            breaks = [b for b in (cr, lf) if b != -1]
+            line_end = min(breaks) if breaks else stop
+            count += text.count(delimiter, line_start, line_end)
+            if count > limit:
+                raise SpreadsheetError("too_many_columns")
+            if line_end < stop:
+                count = 0
+                line_start = line_end + 1
+            else:
+                line_start = stop
+        if next_quote == -1:
+            return
+        closing = text.find(quote, next_quote + 1) if quote else -1
+        if closing == -1:
+            return  # an unterminated quoted field: the csv module reports it
+        pos = closing + 1
+
+
 def csv_rows(data: bytes, limits: ReadLimits) -> Iterator[tuple[int, list[Cell]]]:
     """``(row number, cells)`` of a UTF-8 CSV (BOM accepted, delimiter sniffed)."""
     try:
@@ -266,6 +308,7 @@ def csv_rows(data: bytes, limits: ReadLimits) -> Iterator[tuple[int, list[Cell]]
         )
     except csv.Error:
         dialect = csv.excel
+    _check_csv_row_widths(text, dialect)
     reader = csv.reader(io.StringIO(text, newline=""), dialect)
     try:
         for row_no, raw in enumerate(reader, start=1):

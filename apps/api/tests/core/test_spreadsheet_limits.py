@@ -103,6 +103,34 @@ def test_SEC_017_csv_row_of_millions_of_fields_is_refused_cheaply() -> None:
     assert peak_mb < 60, f"peak {peak_mb:.0f} MB"
 
 
+@pytest.mark.parametrize("delimiter", [",", ";", "\t", "|"])
+def test_AA_hardening_10mb_csv_row_is_refused_before_the_csv_module_builds_it(
+    delimiter: str,
+) -> None:
+    # Audit 2026-10-04 api-auth hardening note: the csv module used to build the whole
+    # 10 M-field row (~150 MB) before the column check ran.
+    # Ordinary rows fill the sniffer's sample, so the delimiter is detected; the wide row follows.
+    ordinary = f"a{delimiter}b{delimiter}c\r\n" * 10_000
+    data = ordinary.encode() + delimiter.encode() * 10_000_000
+    code, peak_mb = _peak(lambda: csv_rows(data, _Limits()))
+    assert code == "too_many_columns"
+    assert peak_mb < 30, f"peak {peak_mb:.0f} MB"
+
+
+def test_AA_hardening_csv_quoted_delimiters_and_line_breaks_do_not_count_as_columns() -> None:
+    inside = "," * (MAX_ROW_CELLS * 2) + "\r\nline two, still the same cell"
+    data = f'name,"{inside}",x\r\n"he said ""hi, there""",b,c\r\nlast,row,here\r\n'.encode()
+    rows = list(csv_rows(data, _Limits()))
+    assert [len(cells) for _, cells in rows] == [3, 3, 3]
+    assert rows[1][1][0].value == 'he said "hi, there"'
+
+
+def test_AA_hardening_csv_wide_row_after_a_quoted_multi_line_cell_is_refused() -> None:
+    data = ('a,"multi\nline, cell",b\n' + "x," * MAX_ROW_CELLS + "x\n").encode()
+    code, _ = _peak(lambda: csv_rows(data, _Limits()))
+    assert code == "too_many_columns"
+
+
 def test_SEC_017_xlsx_row_of_many_cell_elements_is_refused_before_parsing() -> None:
     # Coordinates make each element distinct, so the archive stays under the ratio limit.
     from openpyxl.utils import get_column_letter
