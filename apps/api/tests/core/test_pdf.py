@@ -116,3 +116,86 @@ def test_ADR_0036_telugu_font_is_declared_and_served_when_switched_on(telugu_on:
     other = _Route("https://example.invalid/x.css")
     core_pdf._route(other)  # type: ignore[arg-type]
     assert other.aborted
+
+
+class _FakePage:
+    def __init__(self, seen: dict[str, object]) -> None:
+        self.seen = seen
+
+    def set_default_timeout(self, _ms: int) -> None: ...
+
+    def set_content(self, html: str, wait_until: str) -> None:
+        self.seen["html"] = html
+
+    def emulate_media(self, media: str) -> None: ...
+
+    def pdf(self, **_kw: object) -> bytes:
+        return b"%PDF-fake"
+
+
+class _FakeBrowser:
+    def __init__(self, seen: dict[str, object]) -> None:
+        self.seen = seen
+
+    def new_context(self, **kw: object) -> _FakeBrowser:
+        self.seen["context"] = kw
+        return self
+
+    def route(self, pattern: str, _handler: object) -> None:
+        self.seen["route"] = pattern
+
+    def new_page(self) -> _FakePage:
+        return _FakePage(self.seen)
+
+    def close(self) -> None: ...
+
+
+class _FakePlaywright:
+    def __init__(self, seen: dict[str, object]) -> None:
+        self.seen = seen
+        self.chromium = self
+
+    def launch(self, **kw: object) -> _FakeBrowser:
+        self.seen["launch"] = kw
+        return _FakeBrowser(self.seen)
+
+    def __enter__(self) -> _FakePlaywright:
+        return self
+
+    def __exit__(self, *_exc: object) -> None: ...
+
+
+@pytest.mark.parametrize(
+    "html",
+    [
+        "<!doctype html><html><head><title>t</title></head><body>x</body></html>",
+        "<p>no head</p>",
+    ],
+)
+def test_AA_hardening_dns_prefetch_is_off_in_the_pdf_renderer(
+    monkeypatch: pytest.MonkeyPatch, html: str
+) -> None:
+    """Api-auth audit 2026-10-04 hardening note: every request is aborted by the route handler,
+    but Chromium resolves ``<link rel=dns-prefetch>`` hosts outside it. The browser starts with
+    DNS prefetch and background networking off, and every page says
+    ``x-dns-prefetch-control: off`` first thing in its head."""
+    seen: dict[str, object] = {}
+    monkeypatch.setattr(core_pdf, "sync_playwright", lambda: _FakePlaywright(seen))
+    out = core_pdf.ChromiumRenderer(sandbox=False, timeout_ms=1000).render(html)
+    assert out == b"%PDF-fake"
+    launch = seen["launch"]
+    assert isinstance(launch, dict)
+    args = launch["args"]
+    assert isinstance(args, list)
+    assert {
+        "--dns-prefetch-disable",
+        "--disable-background-networking",
+        "--no-pings",
+    } <= set(args)
+    assert seen["route"] == "**/*"
+    rendered = seen["html"]
+    assert isinstance(rendered, str)
+    meta = '<meta http-equiv="x-dns-prefetch-control" content="off">'
+    assert meta in rendered
+    head = rendered.lower().find("<head>")
+    assert rendered.find(meta) < rendered.find("<title>") if head >= 0 else rendered.startswith(meta)
