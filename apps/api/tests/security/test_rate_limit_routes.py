@@ -2,7 +2,9 @@
 
 The per-IP layer runs in the middleware for every request that is not exempt; layers 2-4 run
 inside the route guards (``authz.require`` / ``require_any`` / ``require_principal`` call
-``app.core.ratelimit.enforce``; ``require_platform`` does the same per operator). A new guard
+``app.core.ratelimit.enforce``; ``require_platform`` does the same per operator). Route budgets
+shared by a whole school (``per: school``) are charged by the tenant guards only after
+authorization (``ratelimit.charge_school_routes``; owner decision 2026-10-07). A new guard
 class that skips the limiter, a stale route in ``rate_limits.yaml``, an exempt path that is not a
 health check, or an expensive-looking route without a stricter per-route budget fails here, so a
 new route cannot silently skip limiting.
@@ -134,3 +136,30 @@ def test_P2_07_platform_routes_use_operator_scoped_route_policies(app: FastAPI) 
         for policy in config.route_policies(method, path):
             if path.startswith("/api/v1/platform/"):
                 assert policy.per in {"user", "operator"}, f"{method} {path}: {policy.name}"
+
+
+def test_school_budgets_are_charged_by_tenant_guards_after_authorization() -> None:
+    """Per-school route budgets are charged last in the tenant guards (owner decision
+    2026-10-07): after the permission, scope, step-up and break-glass checks, never before;
+    ``enforce`` (before the permission check) leaves them out."""
+    for guard in (Requirement, AnyOfRequirement):
+        source = inspect.getsource(guard.__call__)
+        charged = source.index("ratelimit.charge_school_routes(")
+        assert charged > source.index("raise Forbidden()"), guard.__name__
+        assert charged > source.index("breakglass_guard.enforce("), guard.__name__
+        if "require_recent_auth(" in source:
+            assert charged > source.index("require_recent_auth("), guard.__name__
+    assert 'policy.per != "school"' in inspect.getsource(rl.enforce)
+
+
+def test_school_budgets_sit_only_on_tenant_guarded_routes(app: FastAPI) -> None:
+    """A ``per: school`` route policy on a route without a tenant guard would never be charged
+    (no school, or a guard that does not call ``charge_school_routes``)."""
+    config = rl.load_config()
+    problems = [
+        f"{method} {path}: {policy.name}"
+        for method, path, route in routes(app)
+        for policy in config.route_policies(method, path)
+        if policy.per == "school" and not isinstance(guard_of(route), Requirement)
+    ]
+    assert problems == []

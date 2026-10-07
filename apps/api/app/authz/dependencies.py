@@ -10,8 +10,11 @@ so the route-enumeration test can check every route against the catalog; ``requi
 permissions fail when the route module is imported.
 
 Order of checks per request: authenticate (401) -> resolve membership (403/409) -> rate limits
-per person, school and route (429, ``app.core.ratelimit.enforce``; the per-IP layer ran in the
-middleware) -> permission (403) -> scope (403) -> step-up (428). Refused calls count too.
+per person, school and per-person route budgets (429, ``app.core.ratelimit.enforce``; the per-IP
+layer ran in the middleware) -> permission (403) -> scope (403) -> step-up (428) -> break-glass
+read-only -> the route's per-school budgets (429, ``ratelimit.charge_school_routes``). Refused
+calls count against the caller's own budgets, never against a budget the whole school shares
+(owner decision 2026-10-07).
 The route then opens exactly one transaction with ``TenantDB``
 (``tenant_session(ctx.tenant_id, ctx.user_id)``), which commits before the response is sent
 (dependency scope ``"function"``) and rolls back on any error.
@@ -140,6 +143,9 @@ class Requirement:
             require_recent_auth(principal)
         # Break-glass sessions: read-only and every call recorded for the school (07 §6.4).
         breakglass_guard.enforce(ctx, request, self.sos_permission)
+        # Per-school route budgets only once the caller is authorized (refused members cannot
+        # spend them for the people allowed to use the route).
+        ratelimit.charge_school_routes(request, ctx.tenant_id)
         return ctx
 
 
@@ -192,6 +198,7 @@ class AnyOfRequirement(Requirement):
             require_recent_auth(principal)
         # Break-glass: read-only, recorded under the first listed permission the caller holds.
         breakglass_guard.enforce(ctx, request, held)
+        ratelimit.charge_school_routes(request, ctx.tenant_id)  # after authorization
         return ctx
 
 

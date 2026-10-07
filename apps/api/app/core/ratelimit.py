@@ -15,8 +15,12 @@ the same semantics under a lock (local/CI, and the per-process fallback below).
 
 **Layers** (each its own budget): per client IP before authentication (middleware; client IP from
 the trusted proxy chain only, :func:`client_ip`), then per signed-in person, per school and the
-stricter per-route budgets in the route guard (``authz.require``), or per operator on
-``/api/v1/platform/*``. Successful and refused responses carry the headers of the policies that
+stricter per-person route budgets in the route guard (``authz.require``) before the permission
+check, or per operator on ``/api/v1/platform/*``. Route budgets shared by a whole school
+(``per: school``: ``data_export``, ``heavy_jobs``, the ``audit_verify`` cool-down) are charged
+only after authorization (:func:`charge_school_routes` in the guard, :func:`charge` in a
+handler), so a member refused with 403 cannot spend them for the others (owner decision
+2026-10-07). Successful and refused responses carry the headers of the policies that
 applied; aggregates shared with other callers (the IP and school layers) show only on the 429 they
 cause, and nothing about another school is ever shown.
 
@@ -742,11 +746,15 @@ def enforce(
     layer: Literal["user", "operator"],
     subject_ip_block: bool = False,
 ) -> None:
-    """Layers 2-4 for an authenticated request (called by the route guards).
+    """Layers 2-4 for an authenticated request (called by the route guards before the
+    permission check).
 
     ``principal``: :func:`principal_key`. ``tenant_id``: the resolved school (never the
     unverified header). ``subject_ip_block``: also refuse while this person + IP is in sign-in
-    backoff (sign-in and operator routes). Raises :class:`RateLimitExceeded`."""
+    backoff (sign-in and operator routes). Per-route policies shared by a whole school
+    (``per: school``) are NOT charged here: the guards charge them after authorization with
+    :func:`charge_school_routes`, so refused members cannot spend them (owner decision
+    2026-10-07). Raises :class:`RateLimitExceeded`."""
     limiter = get_rate_limiter()
     if not limiter.enabled:
         return
@@ -761,13 +769,8 @@ def enforce(
     ip = client_ip_of(request)
     hashed_ip = limiter.ip_hash(ip)
     for policy in config.route_policies(method, _route_template(request)):
-        if policy.per == "school":
-            if tenant_id is None:
-                continue
-            partition = str(tenant_id)
-        else:
-            partition = principal
-        buckets.append(Bucket(policy, partition, 1))
+        if policy.per != "school":  # per-school budgets: charge_school_routes, after authz
+            buckets.append(Bucket(policy, principal, 1))
     blocks = (
         [limiter.block_key("subject_ip", f"{principal}:{hashed_ip}")] if subject_ip_block else []
     )
@@ -778,23 +781,44 @@ def enforce(
         raise RateLimitExceeded(decision.retry_after_s)
 
 
-def charge(request: Request, policy_name: str, partition: str) -> Decision:
-    """Charge one per-route budget from inside the handler, AFTER authorization.
-
-    The route guards charge ``routes:`` policies before the permission check; a budget shared
-    by a whole school (``per: school``) charged there could be spent by members who are then
-    refused (403), locking out the people allowed to use the route. Such budgets are charged
-    here instead (audit 2026-10-06 R-19: ``audit_verify``). The policy shows in the RateLimit
-    headers like the others; raises :class:`RateLimitExceeded` (429 ``rate_limited``)."""
-    limiter = get_rate_limiter()
-    if not limiter.enabled:
-        return Decision(True, 0, ())
-    decision = limiter.check([Bucket(limiter.config.policy(policy_name), partition, 1)])
+def _charge(request: Request, limiter: RateLimiter, buckets: Sequence[Bucket]) -> Decision:
+    decision = limiter.check(buckets)
     remember(request.scope, decision)
     if not decision.allowed:
         _log_limited(request, decision, limiter.ip_hash(client_ip_of(request)))
         raise RateLimitExceeded(decision.retry_after_s)
     return decision
+
+
+def charge(request: Request, policy_name: str, partition: str) -> Decision:
+    """Charge one budget from inside a handler, AFTER authorization.
+
+    A budget shared by a whole school (``per: school``) charged before the permission check
+    could be spent by members who are then refused (403), locking out the people allowed to use
+    the route. Such budgets are charged only once the caller is authorized: by the handler with
+    this function (audit 2026-10-06 R-19: ``audit_verify``), or for the ``routes:`` policies by
+    the route guards with :func:`charge_school_routes`. The policy shows in the RateLimit
+    headers like the others; raises :class:`RateLimitExceeded` (429 ``rate_limited``)."""
+    limiter = get_rate_limiter()
+    if not limiter.enabled:
+        return Decision(True, 0, ())
+    return _charge(request, limiter, [Bucket(limiter.config.policy(policy_name), partition, 1)])
+
+
+def charge_school_routes(request: Request, tenant_id: uuid.UUID | None) -> Decision:
+    """Charge this route's per-school ``routes:`` policies (e.g. ``data_export``,
+    ``heavy_jobs``) for ``tenant_id``; the tenant route guards call it as their LAST step,
+    after the permission, scope, step-up and break-glass checks passed (owner decision
+    2026-10-07). All of the route's per-school policies are charged together, or none is.
+    Same 429 ``rate_limited`` response as :func:`enforce`."""
+    limiter = get_rate_limiter()
+    if not limiter.enabled or tenant_id is None:
+        return Decision(True, 0, ())
+    policies = limiter.config.route_policies(request.method, _route_template(request))
+    buckets = [Bucket(p, str(tenant_id), 1) for p in policies if p.per == "school"]
+    if not buckets:
+        return Decision(True, 0, ())
+    return _charge(request, limiter, buckets)
 
 
 def _log_limited(request: Request, decision: Decision, hashed_ip: str) -> None:
