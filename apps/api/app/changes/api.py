@@ -48,7 +48,14 @@ def submit_change_request(
     Someone else with ``student.identity_change.approve`` decides it. Accepts
     ``Idempotency-Key``. Errors: ``not_identity_attribute``, ``evidence_required`` (422),
     ``duplicate_pending_request`` (409)."""
-    return idem.run(db, body, lambda: service.submit(db, ctx, body), headers=_headers)
+    return idem.run(
+        db,
+        body,
+        lambda: service.submit(db, ctx, body),
+        headers=_headers,
+        # Old and new values and the reason: the replay record keeps no body (audit H-01).
+        refetch=lambda request_id: service.get_request(db, ctx, request_id),
+    )
 
 
 @router.get("/change-requests", response_model=Page[ChangeRequestOut])

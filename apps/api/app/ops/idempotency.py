@@ -6,8 +6,11 @@ stored, so no personal data is duplicated); same key + different hash -> 422
 
 - Control plane: :class:`KVIdempotencyStore` on the shared ``app.authz.kv`` store (Valkey,
   24 h, per operator), because ``sos_platform`` cannot use ``ops.idempotency_keys``.
-- Tenant API: ``app.ops.service.begin_idempotent`` / ``complete_idempotent`` on
-  ``ops.idempotency_keys`` inside the request's ``tenant_session``.
+- Tenant API routes: ``app.authz.http.Idempotency`` on the same Valkey store (24 h, per tenant
+  and user). It keeps the response body, except for routes whose response carries C3 text,
+  which keep only status, id and headers and re-read the body on replay (audit H-01).
+  ``app.ops.service.begin_idempotent`` / ``complete_idempotent`` (``ops.idempotency_keys``)
+  are not used by the routes.
 """
 
 from __future__ import annotations

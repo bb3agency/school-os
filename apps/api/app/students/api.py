@@ -342,6 +342,8 @@ def add_guardian(
         body,
         lambda: students.add_guardian(db, ctx, student_id, body),
         headers=lambda g: {"ETag": etag(g.version)},
+        # C3 phone and address: the replay record keeps no body (audit H-01).
+        refetch=lambda guardian_id: students.get_guardian(db, ctx, student_id, guardian_id),
     )
 
 

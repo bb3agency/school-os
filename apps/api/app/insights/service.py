@@ -1013,6 +1013,20 @@ def list_notes(session: Session, ctx: UserContext, student_id: uuid.UUID) -> lis
     return out
 
 
+def get_note(
+    session: Session, ctx: UserContext, student_id: uuid.UUID, note_id: uuid.UUID
+) -> NoteOut:
+    """One behaviour note of the student (``insights.read``; 404 outside scope or once erased),
+    e.g. to rebuild an ``Idempotency-Key`` replay (audit H-01). Audit ``insights.viewed``."""
+    _ensure_student(session, ctx, student_id)
+    note = next((n for n in repo.notes_of(session, student_id) if n.id == note_id), None)
+    if note is None:
+        raise NotFound("Note not found")
+    out = _note_out(session, note, _members(session, [note.created_by_membership]))
+    _viewed(session, "notes", "student", student_id, count=1)
+    return out
+
+
 def add_note(session: Session, ctx: UserContext, student_id: uuid.UUID, data: NoteIn) -> NoteOut:
     """Write a behaviour note (``insights.note``): category, date (today by default; not in the
     future, at most the configured days back), up to 500 characters, stored encrypted. 422
@@ -1465,6 +1479,7 @@ __all__ = [
     "evaluate",
     "export_records",
     "get_flag",
+    "get_note",
     "get_settings",
     "list_flags",
     "list_notes",

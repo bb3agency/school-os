@@ -123,6 +123,7 @@ def raise_flag(
             "Location": f"/api/v1/insights/flags/{out.id}",
             "ETag": etag(out.version),
         },
+        refetch=lambda flag_id: service.get_flag(db, ctx, flag_id),  # C3 note: no body kept
     )
 
 
@@ -224,6 +225,7 @@ def add_note(
         body,
         lambda: service.add_note(db, ctx, student_id, body),
         headers=lambda out: {"Location": f"/api/v1/students/{student_id}/behaviour-notes"},
+        refetch=lambda note_id: service.get_note(db, ctx, student_id, note_id),  # C3 text
     )
 
 

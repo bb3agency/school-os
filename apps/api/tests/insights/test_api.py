@@ -3,13 +3,16 @@
 
 from __future__ import annotations
 
+import hashlib
 import sys
+import uuid
 from typing import Any
 
 import pytest
 from fastapi.routing import APIRoute, iter_route_contexts
 from sqlalchemy import Engine
 
+from app.authz.kv import kv_store
 from app.main import create_app
 
 S = sys.modules["sos_test_insights_support"]
@@ -123,3 +126,43 @@ def test_FR_EW_014_settings_etag_and_step_up(school: Any, api: Any) -> None:
         headers={"If-Match": reset.headers["ETag"]},
     )
     assert denied.status_code == 403
+
+
+def _idem_record(tenant_id: Any, user_id: Any, path: str, key: str) -> bytes:
+    """The stored Idempotency-Key record of a POST (app/authz/http.py)."""
+    scope = hashlib.sha256(f"POST {path} {key}".encode()).hexdigest()
+    raw = kv_store().get(f"sos:idem:{tenant_id}:{user_id}:{scope}")
+    assert raw is not None
+    return raw
+
+
+@pytest.mark.db
+def test_H_01_behaviour_note_and_flag_replays_keep_no_text_in_valkey(school: Any, api: Any) -> None:
+    """Data-protection H-01: the replay records of a behaviour note and a raised flag hold no
+    note text; the replay re-reads them through the service."""
+    ct = school.people["ct"]
+    student = school.ids["a1"]
+    cases = [
+        (
+            f"/api/v1/students/{student}/behaviour-notes",
+            {"category": "observation", "text": "Synthetic replay note: quiet in class."},
+            "Synthetic replay note",
+        ),
+        (
+            f"/api/v1/students/{student}/flags",
+            {"indicator": "behaviour", "note": "Synthetic replay flag: talk to parents."},
+            "Synthetic replay flag",
+        ),
+    ]
+    for path, body, plaintext in cases:
+        key = f"m5-{uuid.uuid4().hex}"
+        first = api.call(ct, "POST", path, json=body, headers={"Idempotency-Key": key})
+        assert first.status_code == 201, first.text
+        assert plaintext in first.text
+        raw = _idem_record(school.tenant_id, ct.user_id, path, key)
+        assert plaintext.encode() not in raw
+        assert b'"body"' not in raw
+        again = api.call(ct, "POST", path, json=body, headers={"Idempotency-Key": key})
+        assert again.status_code == 201
+        assert again.headers.get("Idempotent-Replayed") == "true"
+        assert again.json() == first.json()

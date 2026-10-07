@@ -3,7 +3,8 @@ Idempotency-Key replay.
 
 These live next to ``require()`` because every tenant route uses them together; they hold no
 business logic. Idempotency records are stored in Valkey for 24 h keyed by tenant + user + route
-+ key (in-process store locally and in CI), and written only after the transaction commits.
++ key (in-process store locally and in CI), and written only after the transaction commits. Routes
+whose response carries C3 text pass ``refetch``: their record keeps no body (audit H-01).
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ import contextlib
 import hashlib
 import json
 import re
+import uuid
 from collections.abc import Callable, Sequence
 from typing import Annotated, Any, Final
 
@@ -146,6 +148,12 @@ class Idempotency:
 
     Same key + same body -> original status, body and Location; same key + different body ->
     422 ``idempotency_key_reused``; first request still running -> 409 ``idempotency_in_progress``.
+
+    ``refetch`` (routes whose response carries C3 text: behaviour notes, flags, guardians,
+    change requests, extraction rows; audit 2026-10-05 H-01): the record keeps status, the
+    resource id and headers but no body, so no decrypted text sits in Valkey (and none survives
+    an erasure or offboarding for 24 h); a replay rebuilds the body with ``refetch(id)``, i.e.
+    re-reads it through the normal service with the caller's current permissions.
     """
 
     def __init__(self, request: Request, ctx: UserContext) -> None:
@@ -169,7 +177,12 @@ class Idempotency:
             out["Idempotent-Replayed"] = "true"
         return JSONResponse(body, status_code=status, headers=out)
 
-    def _replay(self, raw: bytes, body_hash: str) -> JSONResponse:
+    def _replay(
+        self,
+        raw: bytes,
+        body_hash: str,
+        refetch: Callable[[uuid.UUID], BaseModel] | None = None,
+    ) -> JSONResponse:
         record = json.loads(raw)
         if record.get("hash") != body_hash:
             raise IdempotencyKeyReused(
@@ -180,7 +193,13 @@ class Idempotency:
                 "The first request with this Idempotency-Key is still running.",
                 code="idempotency_in_progress",
             )
-        return self._response(record["status"], record["body"], record["headers"], replayed=True)
+        if "ref" in record:
+            if refetch is None:  # pragma: no cover - a route keeps its refetch
+                raise Conflict("Please retry.", code="idempotency_in_progress")
+            body = refetch(uuid.UUID(record["ref"])).model_dump(mode="json")
+        else:
+            body = record["body"]
+        return self._response(record["status"], body, record["headers"], replayed=True)
 
     def run[M: BaseModel](
         self,
@@ -190,6 +209,7 @@ class Idempotency:
         *,
         status_code: int = 201,
         headers: Callable[[M], dict[str, str]] | None = None,
+        refetch: Callable[[uuid.UUID], BaseModel] | None = None,
     ) -> JSONResponse:
         if self.key is None:
             result = operation()
@@ -200,13 +220,13 @@ class Idempotency:
         try:
             existing = store.get(key)
             if existing is not None:
-                return self._replay(existing, body_hash)
+                return self._replay(existing, body_hash, refetch)
             pending = json.dumps({"state": "pending", "hash": body_hash}).encode()
             if not store.set(key, pending, ttl_s=PENDING_TTL_S, nx=True):
                 again = store.get(key)
                 if again is None:
                     raise Conflict("Please retry.", code="idempotency_in_progress")
-                return self._replay(again, body_hash)
+                return self._replay(again, body_hash, refetch)
         except KVUnavailable as exc:
             raise ServiceUnavailable() from exc
 
@@ -223,14 +243,11 @@ class Idempotency:
             raise
         payload = result.model_dump(mode="json")
         extra = headers(result) if headers else {}
+        kept: dict[str, Any] = (
+            {"ref": str(result.id)} if refetch is not None else {"body": payload}  # type: ignore[attr-defined]
+        )
         record = json.dumps(
-            {
-                "state": "done",
-                "hash": body_hash,
-                "status": status_code,
-                "body": payload,
-                "headers": extra,
-            }
+            {"state": "done", "hash": body_hash, "status": status_code, "headers": extra, **kept}
         ).encode()
 
         def store_result(_: Session) -> None:
