@@ -135,9 +135,11 @@ class ChunkContextualizer:
         source = "\n".join(p for p in (document.title, document.issuer or "", document.text) if p)
         checker = rules.ContextChecker(self._config, source)
         system = self._prompt.render(
-            title=document.title,
-            doc_type=document.doc_type.replace("_", " "),
-            document=rules.clip_document(document.text, self._config.max_document_chars),
+            title=rules.escape_tags(document.title),
+            doc_type=rules.escape_tags(document.doc_type.replace("_", " ")),
+            document=rules.escape_tags(
+                rules.clip_document(document.text, self._config.max_document_chars)
+            ),
         )
         metering = Metering(
             tenant_id=document.tenant_id, feature=ROLE, document_id=document.document_id
