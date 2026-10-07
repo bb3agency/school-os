@@ -417,6 +417,12 @@ class InvoiceLineIn(In):
             self.kind != "usage_overage" or self.usage_month.day != 1
         ):
             raise ValueError("usage_month is the first day of a month, on overage lines only")
+        # Audit 2026-10-05 hardening: a negative price would hide a discount inside a charge
+        # line. Only an ``adjustment`` line may be negative (a credit; there are no credit
+        # notes); a ``discount`` is entered as a positive amount and stored as a deduction. The
+        # invoice total can still never go below zero (``negative_total``).
+        if self.unit_price_inr < 0 and self.kind != "adjustment":
+            raise ValueError("unit_price_inr may be negative on adjustment lines only")
         return self
 
 
@@ -731,6 +737,10 @@ class TenantDetailOut(TenantSummaryOut):
     # suspension: the school is active only when neither is set (docs/16 §9).
     security_hold: bool = False
     offboard_requested_at: dt.datetime | None
+    # The operator who asked, and when an unapproved request stops being approvable (audit
+    # 2026-10-05 A-13: two-person requests expire; roles.yaml two_person_request_ttl_hours).
+    offboard_requested_by: uuid.UUID | None = None
+    offboard_request_expires_at: dt.datetime | None = None
     offboard_approved_at: dt.datetime | None
     subscription: SubscriptionOut | None
     counts: UsageCountsOut | None
@@ -990,8 +1000,17 @@ class AnnouncementOut(Out):
     audience_tenant_ids: list[uuid.UUID]
     starts_at: dt.datetime
     ends_at: dt.datetime
+    # draft, pending_approval (a critical announcement waiting for a second operator; schools
+    # do not see it), scheduled, cancelled.
     status: str
     version: int
+    created_by: uuid.UUID | None = None
+    submitted_by: uuid.UUID | None = None
+    submitted_at: dt.datetime | None = None
+    approved_by: uuid.UUID | None = None
+    approved_at: dt.datetime | None = None
+    # When a pending approval stops being approvable (roles.yaml two_person_request_ttl_hours).
+    approval_expires_at: dt.datetime | None = None
 
 
 # --- support ----------------------------------------------------------------------------------
@@ -1076,6 +1095,7 @@ class TicketOut(Out):
 
 
 BreakGlassScopeKey = Literal["section_id", "class_id"]
+EMERGENCY_REASON_CODES = frozenset({"security_incident", "legal_obligation"})
 
 
 class BreakGlassIn(In):
@@ -1088,6 +1108,16 @@ class BreakGlassIn(In):
     scope: dict[BreakGlassScopeKey, uuid.UUID] = Field(default_factory=dict, max_length=2)
     duration_minutes: int = Field(ge=15, le=480)
     emergency: bool = False
+
+    @model_validator(mode="after")
+    def _emergency_reason(self) -> Self:
+        # Audit 2026-10-05 A-13: access without the school's approval is only for an active
+        # security incident or a legal obligation, never an ordinary support request.
+        if self.emergency and self.reason_code not in EMERGENCY_REASON_CODES:
+            raise ValueError(
+                "emergency access needs reason_code security_incident or legal_obligation"
+            )
+        return self
 
 
 class BreakGlassOut(Out):
@@ -1103,6 +1133,9 @@ class BreakGlassOut(Out):
     emergency_confirmed_by_1: uuid.UUID | None
     emergency_confirmed_by_2: uuid.UUID | None
     created_at: dt.datetime | None
+    # When an emergency request still waiting for its two confirmations stops being
+    # confirmable (audit 2026-10-05 A-13); null otherwise.
+    confirm_by: dt.datetime | None = None
 
 
 # --- dashboard / audit ------------------------------------------------------------------------

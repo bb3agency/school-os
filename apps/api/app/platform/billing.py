@@ -26,7 +26,7 @@ import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Any
+from typing import Any, Final
 
 from sqlalchemy import RowMapping, and_, func, select
 from sqlalchemy.orm import Session
@@ -695,6 +695,36 @@ def cancel_subscription(actor: Actor, sub_id: uuid.UUID, reason: str) -> Subscri
         return SubscriptionOut.model_validate(dict(sub))
 
 
+def end_subscription_for_closure(
+    s: Session, actor: Actor, tenant_id: uuid.UUID, *, reason: str
+) -> None:
+    """End the school's live subscription at once because the school is closing (offboarding
+    approved; audit 2026-10-05 hardening "invoices for closed schools"). Called in the
+    offboarding transaction. Issued invoices stay as they are; open drafts are left for the
+    billing admin to discard. No-op without a live subscription."""
+    sub = repo.live_subscription(s, tenant_id, for_update=True)
+    if sub is None:
+        return
+    repo.update_row(
+        s,
+        m.subscriptions,
+        sub["id"],
+        {"status": "cancelled", "cancelled_at": now(), "cancel_reason": reason},
+    )
+    audit_platform(
+        s,
+        actor,
+        "subscription.cancelled",
+        "subscription",
+        sub["id"],
+        {"at_period_end": False, "school_closing": True},
+        tenant_id=tenant_id,
+    )
+
+
+CLOSED_SCHOOL_STATUSES: Final = ("offboarding", "deleted")
+
+
 def in_protected_window(boards: Sequence[str], day: dt.date) -> str | None:
     for window in billing_cfg().get("protected_windows") or []:
         start = dt.date.fromisoformat(str(window["start"]))
@@ -1125,15 +1155,14 @@ def create_draft(
     *,
     lines: Sequence[InvoiceLineIn] | None = None,
 ) -> RowMapping | None:
-    """Create a draft for (subscription, period) unless a live invoice exists. Returns the draft."""
-    existing = repo.get_by(
-        s,
-        m.invoices,
-        m.invoices.c.subscription_id == sub["id"],
-        m.invoices.c.period_start == period_start,
-        m.invoices.c.status != "void",
-    )
-    if existing is not None:
+    """Create a draft for (subscription, period) unless a live invoice already covers any part
+    of that period, or the school is closing. Returns the draft, or None.
+
+    Audit 2026-10-05 hardening: a live (not void) invoice whose period overlaps the new one
+    blocks it, not only one with the same start, so a manual draft cannot bill days twice; a
+    school that is offboarding or deleted is never invoiced again."""
+    dep = repo.get_by(s, m.deployments, m.deployments.c.tenant_id == sub["tenant_id"])
+    if dep is not None and dep["tenant_status"] in CLOSED_SCHOOL_STATUSES:
         return None
     account = repo.get(s, m.billing_accounts, sub["billing_account_id"])
     use_pending = sub["pending_plan_id"] is not None and period_start >= sub["current_period_end"]
@@ -1141,6 +1170,16 @@ def create_draft(
     account = must(account)
     plan = must(plan)
     period_end = add_months(period_start, _period_months(plan))
+    existing = repo.get_by(
+        s,
+        m.invoices,
+        m.invoices.c.subscription_id == sub["id"],
+        m.invoices.c.period_start < period_end,
+        m.invoices.c.period_end > period_start,
+        m.invoices.c.status != "void",
+    )
+    if existing is not None:
+        return None
     settings = get_settings()
     supplier_state = settings.billing_supplier_state_code
     place = account["state_code"]
@@ -1228,9 +1267,12 @@ def create_manual_draft(actor: Actor, sub_id: uuid.UUID, period_start: dt.date) 
             raise Conflict(
                 "Trials and cancelled subscriptions are not invoiced.", code="invalid_state"
             )
+        dep = repo.get_by(s, m.deployments, m.deployments.c.tenant_id == sub["tenant_id"])
+        if dep is not None and dep["tenant_status"] in CLOSED_SCHOOL_STATUSES:
+            raise Conflict("A closing school is not invoiced.", code="invalid_state")
         row = create_draft(s, actor, sub, period_start)
         if row is None:
-            raise Conflict("An invoice already exists for this period.", code="duplicate")
+            raise Conflict("An invoice already covers this period or part of it.", code="duplicate")
         return _invoice_out(s, row)
 
 

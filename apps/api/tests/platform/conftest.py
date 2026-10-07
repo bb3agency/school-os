@@ -150,7 +150,15 @@ MakeOperator = Callable[..., Operator]
 
 @pytest.fixture
 def make_operator(platform_engine: Engine, app_engine: Engine) -> MakeOperator:
-    def _make(*roles: str, status: str = "active") -> Operator:
+    def _make(
+        *roles: str,
+        status: str = "active",
+        role_age_days: int = 30,
+        granted_by: uuid.UUID | None = None,
+    ) -> Operator:
+        """``role_age_days``: how long ago the roles were granted. Two-person second steps need
+        a role at least ``two_person_min_role_age_days`` old (audit 2026-10-05 A-14), so test
+        operators are long-standing unless a test says otherwise."""
         oid = uuid.uuid4()
         subject = f"op-sub-{oid}"
         with platform_session() as s:
@@ -171,10 +179,10 @@ def make_operator(platform_engine: Engine, app_engine: Engine) -> MakeOperator:
             for role in roles:
                 s.execute(
                     text(
-                        "INSERT INTO platform.operator_roles (operator_id, role_key) "
-                        "VALUES (:o, :r)"
+                        "INSERT INTO platform.operator_roles (operator_id, role_key, granted_by, "
+                        "granted_at) VALUES (:o, :r, :g, now() - make_interval(days => :d))"
                     ),
-                    {"o": oid, "r": role},
+                    {"o": oid, "r": role, "g": granted_by, "d": role_age_days},
                 )
         return Operator(oid, subject, tuple(roles))
 

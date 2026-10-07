@@ -341,6 +341,11 @@ announcements = Table(
     Column("ends_at", DateTime(timezone=True), nullable=False),
     Column("status", Text, nullable=False),
     Column("created_by", Uuid, nullable=False),
+    # A critical announcement needs a second operator (0049_open_items; audit 2026-10-05).
+    Column("submitted_by", Uuid),
+    Column("submitted_at", DateTime(timezone=True)),
+    Column("approved_by", Uuid),
+    Column("approved_at", DateTime(timezone=True)),
     Column("created_at", DateTime(timezone=True)),
     Column("updated_at", DateTime(timezone=True)),
     Column("version", Integer),
