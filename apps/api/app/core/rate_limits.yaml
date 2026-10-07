@@ -53,7 +53,12 @@ policies:
   # Layer 2 for /api/v1/platform/*: each operator.
   operator:
     {quota: 600, window_s: 60, per: operator, fail: open, report: true, weighted: true}
-  # Layer 4: stricter per-route budgets (cost 1 per request).
+  # Layer 4: stricter per-route budgets (cost 1 per request). Per-person ones (per: user) are
+  # charged by the route guard before the permission check (a refused caller spends only their
+  # own budget). Ones a whole school shares (per: school: data_export, heavy_jobs) are charged by
+  # the guard only AFTER the permission, scope, step-up and break-glass checks pass
+  # (ratelimit.charge_school_routes; owner decision 2026-10-07), so members refused with 403 or
+  # 428 cannot spend them for the people allowed to use the route.
   login_event:
     {quota: 10, window_s: 60, per: user, fail: closed, report: true, weighted: false}
   sign_in:
@@ -91,8 +96,9 @@ policies:
     {quota: 60, window_s: 600, per: operator, fail: open, report: true, weighted: false}
 
 # Route template (method + path, as in openapi.json) -> stricter per-route policies. A test fails
-# when a key is not a route, and when an expensive-looking route (export, import, upload, search,
-# render, invite, support ticket) has none.
+# when a key is not a route, when an expensive-looking route (export, import, upload, search,
+# render, invite, support ticket) has none, and when a per: school policy is on a route without a
+# tenant guard (it would never be charged).
 routes:
   # sign-in (tenantless /me routes the BFF calls after the OIDC callback)
   POST /api/v1/me/login-event: [login_event]

@@ -7,6 +7,7 @@ functions run synchronously here (the Celery tasks only unpack IDs and call them
 from __future__ import annotations
 
 import datetime as dt
+import re
 import sys
 import uuid
 from typing import Any
@@ -26,6 +27,9 @@ from app.students import service as students
 pytestmark = pytest.mark.db
 S = sys.modules["sos_test_imports_support"]
 W = S.W
+UUID_TEXT = re.compile(
+    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.IGNORECASE
+)
 
 
 def _profile(school: Any, sid: uuid.UUID) -> Any:
@@ -291,7 +295,9 @@ def test_SEC_013_full_aadhaar_rows_fail_and_nothing_is_stored(
     everything = repr(S.batch(admin_engine, batch_id)) + repr(stored)
     everything += repr(W.audit_events(admin_engine, world.a.tenant_id))
     assert number not in everything
-    assert number[-4:] not in everything
+    # The last four digits may occur by chance inside a random UUID of the dump (ids of other
+    # tests' audit events made this flaky); look for them everywhere except inside UUIDs.
+    assert number[-4:] not in UUID_TEXT.sub("<uuid>", everything)
     # Commit only the valid row: the Aadhaar row is skipped and nothing of it is kept.
     assert S.commit(world.a, batch_id, skip_error_rows=True) == "committed"
     assert [r["status"] for r in S.rows(admin_engine, batch_id)] == ["skipped", "committed"]
