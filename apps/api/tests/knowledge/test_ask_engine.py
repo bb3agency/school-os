@@ -617,3 +617,46 @@ def test_english_first_answer_language() -> None:
     assert answer_language("en", telugu=False) == "en"
     assert answer_language("te", telugu=True) == "te"
     assert answer_language("mixed", telugu=True) == "mixed"
+
+
+FEE_SOURCE = f"sos://doc/{uuid.UUID(int=9)}/v1#p1"
+FEE_TEXT = "Tuition fee for Class IX is ₹10,000 per term. Pay at the office."
+FEE_CITED = "Tuition fee for Class IX is ₹10,000 per term."
+
+
+def fee_tool() -> FakeTool:
+    return search_tool(SearchResultBlock(FEE_SOURCE, "Circular · Fees 2026-27 (p.1)", FEE_TEXT))
+
+
+def test_FR_KB_005_W3_08_a_native_citation_must_carry_the_statements_numbers() -> None:
+    """Audit 2026-10-04 W3-08: on the native-citation path (Anthropic fallback) a statement
+    whose figure is not in the cited passage loses its citation, as on the Gemini marker path
+    (``require_numbers_in_passage``): a real sentence saying ₹10,000 does not support ₹12,000."""
+    wrong = AnswerSegment(
+        "The tuition fee is ₹12,000 per term.", (Citation(FEE_SOURCE, FEE_CITED),)
+    )
+    answer = answered(wrong, tool=fee_tool())
+    assert answer.status == "not_found"
+    assert "12,000" not in answer.text
+    assert answer.citations_dropped == 1
+
+
+def test_FR_KB_005_W3_08_native_numbers_may_come_from_the_title_and_roman_class() -> None:
+    right = AnswerSegment(
+        "- The Class 9 tuition fee for 2026-27 is ₹10,000 per term.",
+        (Citation(FEE_SOURCE, FEE_CITED),),
+    )
+    answer = answered(right, tool=fee_tool())
+    assert answer.status == "answered"
+    assert answer.citations_dropped == 0
+    assert "₹10,000" in answer.text
+
+
+def test_FR_KB_005_W3_08_each_sentence_of_a_native_segment_is_checked() -> None:
+    mixed = AnswerSegment(
+        "The tuition fee is ₹10,000 per term. A late fee of ₹500 applies.",
+        (Citation(FEE_SOURCE, FEE_CITED),),
+    )
+    answer = answered(mixed, tool=fee_tool())
+    assert answer.status == "not_found"
+    assert answer.citations_dropped == 1
