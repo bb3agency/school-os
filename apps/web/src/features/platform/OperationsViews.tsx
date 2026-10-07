@@ -33,12 +33,13 @@ import {
   FLAG_KEY_PATTERN,
   UUID_PATTERN,
   checkbox,
+  optionalInt,
   optionalText,
   reason,
   requiredInt,
   uuid,
 } from "@/lib/validation";
-import { LIST_PAGE_SIZE, PK, useCan, usePagedList, useSchoolDirectory } from "./data";
+import { LIST_PAGE_SIZE, PK, ifMatch, useCan, usePagedList, useSchoolDirectory } from "./data";
 import { DeploymentActions } from "./DeploymentActions";
 import { FilterCard } from "./FilterCard";
 import { FlagSwitch } from "./FlagSwitch";
@@ -132,6 +133,8 @@ const flagSchema = z.object({
       error: "invalidPercent",
     })
     .transform((value) => (value === "" ? null : Number(value))),
+  /** The flag's `version` when the dialog opened, for If-Match; empty for a new flag (AA-13). */
+  version: optionalInt(2_147_483_647),
 });
 
 const overrideSchema = z.object({ tenant_id: uuid, enabled: z.enum(["on", "off"]) });
@@ -140,6 +143,8 @@ function FlagForm({ errors, flag }: { errors: Record<string, string>; flag?: Fea
   const t = useTranslations("platform.flags");
   return (
     <>
+      {/* Read once, when the dialog opens: a background reload must not move it (If-Match). */}
+      <input type="hidden" name="version" defaultValue={flag?.version ?? ""} />
       <TextField
         name="key"
         label={t("colKey")}
@@ -194,7 +199,10 @@ export function FlagsScreen() {
   const save = (data: z.output<typeof flagSchema>) =>
     unwrap(
       api.PUT("/api/v1/platform/flags/{key}", {
-        params: { path: { key: data.key } },
+        params: {
+          path: { key: data.key },
+          ...(data.version === null ? {} : { header: { "If-Match": ifMatch(data.version) } }),
+        },
         body: {
           enabled: data.enabled,
           description: data.description,
@@ -273,14 +281,21 @@ export function FlagsScreen() {
                   stepUp
                   schema={overrideSchema}
                   invalidate={[PK.flags, PK.tenants]}
-                  submit={(data) =>
-                    unwrap(
+                  submit={(data) => {
+                    // An existing override is replaced only with its ETag (AA-13).
+                    const current = all.find(
+                      (flag) => flag.key === row.key && flag.tenant_id === data.tenant_id,
+                    );
+                    return unwrap(
                       api.PUT("/api/v1/platform/flags/{key}/tenants/{tenant_id}", {
-                        params: { path: { key: row.key, tenant_id: data.tenant_id } },
+                        params: {
+                          path: { key: row.key, tenant_id: data.tenant_id },
+                          ...(current ? { header: { "If-Match": ifMatch(current.version) } } : {}),
+                        },
                         body: { enabled: data.enabled === "on" },
                       }),
-                    )
-                  }
+                    );
+                  }}
                 >
                   {(errors) => (
                     <>

@@ -249,6 +249,7 @@ describe("feature flags: switch with confirmation (FR-PLT-022)", () => {
     rollout_percent: 25,
     description: "New citation chips",
     updated_at: "2026-09-01T00:00:00Z",
+    version: 3,
   };
 
   it("flipping the switch changes nothing until confirmed, then keeps the other settings", async () => {
@@ -274,6 +275,10 @@ describe("feature flags: switch with confirmation (FR-PLT-022)", () => {
         JSON.parse(stub.callsTo("PUT /bff/api/v1/platform/flags/ask.citations_v2")[0]?.body ?? ""),
       ).toEqual({ enabled: true, description: "New citation chips", rollout_percent: 25 }),
     );
+    // The flag's version read when the dialog opened goes in If-Match (AA-13).
+    expect(
+      stub.callsTo("PUT /bff/api/v1/platform/flags/ask.citations_v2")[0]?.headers.get("if-match"),
+    ).toBe('"3"');
     await waitFor(() => expect(dialog).not.toHaveAttribute("open"));
   });
 

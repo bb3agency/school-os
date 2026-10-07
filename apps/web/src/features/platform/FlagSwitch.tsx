@@ -11,7 +11,8 @@ import { Toggle } from "@/components/ui/Toggle";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { useDialogClose } from "@/lib/dialog-motion";
 import { useApiForm } from "@/lib/forms";
-import { PK } from "./data";
+import { requiredInt } from "@/lib/validation";
+import { PK, ifMatch } from "./data";
 
 /**
  * On/off switch for a global flag in the flags table (FR-PLT-022). Flipping it does not
@@ -34,12 +35,14 @@ export function FlagSwitch({ flag, manage }: { flag: FeatureFlag; manage: boolea
   const close = useDialogClose(dialogRef, "modal");
 
   const form = useApiForm({
-    schema: z.object({}),
+    // The version read when the dialog opened goes in If-Match (AA-13): a flag changed by
+    // someone else meanwhile answers 412 instead of being overwritten.
+    schema: z.object({ version: requiredInt(1, 2_147_483_647) }),
     invalidate: [PK.flags],
-    submit: () =>
+    submit: ({ version }) =>
       unwrap(
         api.PUT("/api/v1/platform/flags/{key}", {
-          params: { path: { key: flag.key } },
+          params: { path: { key: flag.key }, header: { "If-Match": ifMatch(version) } },
           body: {
             enabled: next,
             description: flag.description,
@@ -87,6 +90,7 @@ export function FlagSwitch({ flag, manage }: { flag: FeatureFlag; manage: boolea
       >
         {open ? (
           <form noValidate onSubmit={form.onSubmit}>
+            <input type="hidden" name="version" defaultValue={flag.version} />
             <div className="space-y-2 p-6 pb-2">
               <h2 id={titleId} className="text-lg font-semibold">
                 {next ? t("turnOnTitle", { key: flag.key }) : t("turnOffTitle", { key: flag.key })}

@@ -8,9 +8,10 @@ import { TextAreaField, TextField } from "@/components/ui/Input";
 import { SelectField } from "@/components/ui/Select";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { formatCount, formatDate, formatInr } from "@/lib/format";
-import { checkbox, localDateTime, money, reason, uuid } from "@/lib/validation";
+import { checkbox, localDateTime, money, reason, requiredInt, uuid } from "@/lib/validation";
 import {
   PK,
+  ifMatch,
   planLabel,
   readyOr,
   useAiBundles,
@@ -21,7 +22,13 @@ import {
 
 const reasonSchema = z.object({ reason });
 const changePlanSchema = z.object({ plan_id: uuid });
-const bundleSchema = z.object({ ai_bundle_id: uuid });
+/**
+ * The subscription's `version` when the dialog opened, sent as If-Match on the price-override
+ * and AI-bundle changes (AA-13): a change saved by someone else meanwhile answers 412.
+ */
+const version = requiredInt(1, 2_147_483_647);
+const versionSchema = z.object({ version });
+const bundleSchema = z.object({ ai_bundle_id: uuid, version });
 const extendSchema = z.object({ trial_ends_at: localDateTime });
 /**
  * Negotiated price (FR-PLT-013, docs/16 §5.7): rupees before GST for each billing period, two
@@ -29,7 +36,7 @@ const extendSchema = z.object({ trial_ends_at: localDateTime });
  * 2026-10-04; `money` refuses a minus sign). It replaces the plan's base price on invoices
  * made from now on; the reason (10–500 characters) is required with it, as on the API.
  */
-const overrideSchema = z.object({ price_override_inr: money, reason });
+const overrideSchema = z.object({ price_override_inr: money, reason, version });
 /**
  * Billing suspension (FR-PLT-014, docs/16 §9): past-due only, after the grace period, with a
  * reason; inside a protected board-exam window only a platform owner may approve it.
@@ -62,6 +69,8 @@ export function SubscriptionActions({
   if (!can("platform.subscriptions.manage")) return null;
 
   const path = { sub_id: subscription.id };
+  // Read once, when a dialog opens: a background reload must not move it (If-Match).
+  const versionField = <input type="hidden" name="version" defaultValue={subscription.version} />;
   const current = plans.find((plan) => plan.id === subscription.plan_id);
   const choices = plans.filter(
     (plan) => plan.status === "published" && (!current || plan.tier === current.tier),
@@ -173,31 +182,34 @@ export function SubscriptionActions({
           submit={(data) =>
             unwrap(
               api.PUT("/api/v1/platform/subscriptions/{sub_id}/ai-bundle", {
-                params: { path },
+                params: { path, header: { "If-Match": ifMatch(data.version) } },
                 body: { ai_bundle_id: data.ai_bundle_id },
               }),
             )
           }
         >
           {(errors) => (
-            <SelectField
-              name="ai_bundle_id"
-              label={t("aiBundle")}
-              placeholder={tv("chooseOne")}
-              error={errors.ai_bundle_id}
-              defaultValue={subscription.ai_bundle_id ?? ""}
-              options={bundles
-                .filter((bundle) => bundle.status === "published")
-                .map((bundle) => ({
-                  value: bundle.id,
-                  label: t("aiBundleOption", {
-                    name: bundle.name,
-                    answers: formatCount(bundle.included_answers, locale) ?? "",
-                    price: formatInr(bundle.price_inr, locale) ?? "",
-                    rate: formatInr(bundle.overage_rate_inr, locale) ?? "",
-                  }),
-                }))}
-            />
+            <>
+              {versionField}
+              <SelectField
+                name="ai_bundle_id"
+                label={t("aiBundle")}
+                placeholder={tv("chooseOne")}
+                error={errors.ai_bundle_id}
+                defaultValue={subscription.ai_bundle_id ?? ""}
+                options={bundles
+                  .filter((bundle) => bundle.status === "published")
+                  .map((bundle) => ({
+                    value: bundle.id,
+                    label: t("aiBundleOption", {
+                      name: bundle.name,
+                      answers: formatCount(bundle.included_answers, locale) ?? "",
+                      price: formatInr(bundle.price_inr, locale) ?? "",
+                      rate: formatInr(bundle.overage_rate_inr, locale) ?? "",
+                    }),
+                  }))}
+              />
+            </>
           )}
         </ActionDialog>
       ) : null}
@@ -211,16 +223,18 @@ export function SubscriptionActions({
           description={t("removeAiBundleBody")}
           confirmLabel={t("removeAiBundle")}
           stepUp
-          schema={z.object({})}
+          schema={versionSchema}
           invalidate={INVALIDATE}
-          submit={() =>
+          submit={(data) =>
             unwrap(
               api.DELETE("/api/v1/platform/subscriptions/{sub_id}/ai-bundle", {
-                params: { path },
+                params: { path, header: { "If-Match": ifMatch(data.version) } },
               }),
             )
           }
-        />
+        >
+          {() => versionField}
+        </ActionDialog>
       ) : null}
       {status !== "cancelled" ? (
         <ActionDialog
@@ -236,17 +250,18 @@ export function SubscriptionActions({
           stepUp
           schema={overrideSchema}
           invalidate={INVALIDATE}
-          submit={(data) =>
+          submit={({ version: seen, ...body }) =>
             unwrap(
               api.PUT("/api/v1/platform/subscriptions/{sub_id}/price-override", {
-                params: { path },
-                body: data,
+                params: { path, header: { "If-Match": ifMatch(seen) } },
+                body,
               }),
             )
           }
         >
           {(errors) => (
             <>
+              {versionField}
               <TextField
                 name="price_override_inr"
                 label={t("overrideAmount")}
@@ -272,16 +287,18 @@ export function SubscriptionActions({
           confirmLabel={t("removeOverride")}
           confirmVariant="danger"
           stepUp
-          schema={z.object({})}
+          schema={versionSchema}
           invalidate={INVALIDATE}
-          submit={() =>
+          submit={(data) =>
             unwrap(
               api.DELETE("/api/v1/platform/subscriptions/{sub_id}/price-override", {
-                params: { path },
+                params: { path, header: { "If-Match": ifMatch(data.version) } },
               }),
             )
           }
-        />
+        >
+          {() => versionField}
+        </ActionDialog>
       ) : null}
       {status === "past_due" ? (
         <ActionDialog

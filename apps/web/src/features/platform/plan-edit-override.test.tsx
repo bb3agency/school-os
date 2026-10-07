@@ -398,6 +398,8 @@ describe("negotiated price per school (FR-PLT-013, docs/16 §5.7)", () => {
     await waitFor(() => expect(dialog).not.toHaveAttribute("open"));
     const [call] = stub.callsTo(`PUT ${OVERRIDE}`);
     expect(call?.headers.get("x-csrf-token")).toBe(CSRF);
+    // The subscription's version when the dialog opened goes in If-Match (AA-13).
+    expect(call?.headers.get("if-match")).toBe('"2"');
     expect(bodyOf(`PUT ${OVERRIDE}`)).toEqual({
       price_override_inr: "3999.00",
       reason: "Pilot school, price agreed in writing (ref SS/2026/3)",
@@ -467,6 +469,7 @@ describe("negotiated price per school (FR-PLT-013, docs/16 §5.7)", () => {
     await user.click(within(dialog).getByRole("button", { name: pm.subscriptions.removeOverride }));
     await waitFor(() => expect(stub.callsTo(`DELETE ${OVERRIDE}`)).toHaveLength(1));
     expect(stub.callsTo(`DELETE ${OVERRIDE}`)[0]?.headers.get("x-csrf-token")).toBe(CSRF);
+    expect(stub.callsTo(`DELETE ${OVERRIDE}`)[0]?.headers.get("if-match")).toBe('"2"');
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: pm.subscriptions.removeOverride })).toBeNull(),
     );
