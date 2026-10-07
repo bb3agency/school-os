@@ -484,3 +484,99 @@ def test_PRV_016_property_every_valid_number_is_located(
     assert found
     assert found[0].verhoeff
     assert digits_only(text[found[0].start : found[0].end]) == number
+
+
+# --- Dot, slash or comma separated numbers (audit 2026-10-04 data-layer note 11) -------------
+
+PUNCT_SEPARATORS = (".", "/", ",")
+
+
+def punctuated(n: str, sep: str) -> str:
+    return f"{n[:4]}{sep}{n[4:8]}{sep}{n[8:]}"
+
+
+@pytest.mark.parametrize("sep", PUNCT_SEPARATORS)
+def test_DL_hardening_11_punctuated_aadhaar_is_refused_masked_and_found(sep: str) -> None:
+    text = f"Guardian ID {punctuated(VALID, sep)} on file."
+    assert contains_full_aadhaar(text)
+    assert mask_aadhaar(text) == f"Guardian ID {masked(VALID)} on file."
+    assert redact(text) == f"Guardian ID {masked(VALID)} on file."
+    assert redact(redact(text)) == redact(text)
+    matches = find_aadhaar(text)
+    assert len(matches) == 1
+    start = text.index(punctuated(VALID, sep))
+    assert (matches[0].start, matches[0].end) == (start, start + 14)
+    assert matches[0].digits == VALID
+    assert matches[0].verhoeff
+
+
+@pytest.mark.parametrize("sep", PUNCT_SEPARATORS)
+def test_DL_hardening_11_punctuated_telugu_digits_are_masked(sep: str) -> None:
+    text = f"ఆధార్ {punctuated(VALID, sep).translate(TELUGU_DIGITS)}"
+    assert contains_full_aadhaar(text)
+    assert mask_aadhaar(text).endswith("XXXX XXXX " + VALID[-4:])
+
+
+@pytest.mark.parametrize("sep", PUNCT_SEPARATORS)
+def test_DL_hardening_11_punctuated_needs_verhoeff_and_one_separator(sep: str) -> None:
+    invalid = f"Ref {punctuated(INVALID, sep)}"
+    assert not contains_full_aadhaar(invalid)
+    assert redact(invalid) == invalid
+    other = "/" if sep != "/" else "."
+    mixed = f"Ref {VALID[:4]}{sep}{VALID[4:8]}{other}{VALID[8:]}"
+    assert not contains_full_aadhaar(mixed)
+    assert redact(mixed) == mixed
+
+
+@pytest.mark.parametrize("sep", PUNCT_SEPARATORS)
+@pytest.mark.parametrize(
+    "template",
+    [
+        "{p}{s}1234",  # a fourth group
+        "1234{s}{p}",  # a group in front
+        "9{p}",  # a longer leading group
+        "{p}9",  # a longer trailing group
+        "{p}{s}5",  # a trailing group after the same separator
+    ],
+)
+def test_DL_hardening_11_punctuated_inside_a_longer_run_is_not_aadhaar(
+    sep: str, template: str
+) -> None:
+    text = "No " + template.format(p=punctuated(VALID, sep), s=sep)
+    assert not contains_full_aadhaar(text), text
+    assert mask_aadhaar(text) == text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "SOS/2026-27/000123",
+        "Receipt RCT/2026-27/004512 dated 07.10.2026",
+        "Invoice SOS/2026-27/000123 for 1,234,567.00",
+        "2026/10/07",
+        "07.10.2026",
+        "07/10/2026 and 2026.10.07",
+        "1,234,567.00",
+        "1234.5678",
+        "12,34,567.50",
+        "Amount 1234,5678 paid",
+        "v1.2.3",
+    ],
+)
+def test_DL_hardening_11_structured_numbers_stay_untouched(text: str) -> None:
+    assert not contains_full_aadhaar(text)
+    assert redact(text) == text
+    assert mask_aadhaar(text) == text
+    assert find_aadhaar(text) == []
+
+
+def test_DL_hardening_11_invoice_and_receipt_serials_never_flagged() -> None:
+    for serial in range(3000):
+        for text in (
+            f"SOS/2026-27/{serial:06d}",
+            f"RCT/2026/{serial:04d}",
+            f"{serial:04d}/2026/01",
+            f"{serial:04d}.2026",
+        ):
+            assert not contains_full_aadhaar(text), text
+            assert redact(text) == text

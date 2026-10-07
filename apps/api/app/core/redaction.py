@@ -34,6 +34,10 @@ consecutive whole groups inside a run, so:
 2. Mobile (``redact`` only): a 10-digit window starting 6-9, optionally with ``0``/``91``/``+91``
    prefix, masked as ``XXXXXX1234``.
 3. Email (``redact`` only): replaced by ``[redacted-email]``.
+4. Punctuated Aadhaar (separate check, audit 2026-10-04 data-layer note 11): exactly three
+   4-digit groups joined by the same one of ``.`` ``/`` ``,`` (``1234.5678.9012``), not part of
+   a longer run of digits and those characters, and Verhoeff-valid. Refused by
+   ``contains_full_aadhaar``, masked like rule 1, located by ``find_aadhaar``.
 
 Masking repeats until nothing changes, so ``redact(redact(x)) == redact(x)``.
 """
@@ -269,8 +273,45 @@ def _mobile_regions(groups: list[_Group], taken: set[int]) -> list[tuple[int, in
     return regions
 
 
+# Dot, slash or comma separated form (audit 2026-10-04 data-layer note 11): exactly three
+# 4-digit groups joined by the SAME one of ``.`` ``/`` ``,``, not part of a longer run of digits
+# and those separators (so ``SOS/2026-27/000123``, dates and amounts never match), and only when
+# the 12 digits pass Verhoeff (no keyword rule here: these characters are too common).
+_PUNCT_RE = re.compile(r"(?<!\d)(?<!\d[./,])(\d{4})([./,])(\d{4})\2(\d{4})(?![./,]?\d)")
+
+
+def _punctuated(view: str) -> list[tuple[int, int, str]]:
+    """``(start, end, digits)`` of every Verhoeff-valid punctuated 12-digit number."""
+    found: list[tuple[int, int, str]] = []
+    for m in _PUNCT_RE.finditer(view):
+        digits = "".join(str(unicodedata.digit(c)) for c in m.group(1) + m.group(3) + m.group(4))
+        if verhoeff_valid(digits):
+            found.append((m.start(), m.end(), digits))
+    return found
+
+
+def _mask_punctuated(text: str) -> tuple[str, bool]:
+    found = _punctuated(_scan_view(text))
+    if not found:
+        return text, False
+    pieces: list[str] = []
+    cursor = 0
+    for start, end, digits in found:
+        pieces.append(text[cursor:start])
+        pieces.append(f"XXXX XXXX {digits[-4:]}")
+        cursor = end
+    pieces.append(text[cursor:])
+    return "".join(pieces), True
+
+
 def _mask_runs(text: str, *, mobiles: bool) -> tuple[str, bool]:
     """One masking pass. Returns (new_text, changed)."""
+    text, changed_punct = _mask_punctuated(text)
+    text, changed = _mask_runs_whitespace(text, mobiles=mobiles)
+    return text, changed or changed_punct
+
+
+def _mask_runs_whitespace(text: str, *, mobiles: bool) -> tuple[str, bool]:
     spans = _context_spans(text)
     view = _scan_view(text)
     pieces: list[str] = []
@@ -333,6 +374,8 @@ _COLLAPSE_RE = re.compile(r"[\s\u200b-\u200d\u2060\ufeff]+")
 
 def _has_valid_window(text: str) -> bool:
     normalised = _scan_view(text)
+    if _punctuated(normalised):
+        return True
     for run in _RUN_RE.finditer(normalised):
         groups = _groups(normalised, run)
         for _i, _j, digits in _windows(groups, _AADHAAR_LEN):
@@ -368,4 +411,5 @@ def find_aadhaar(text: str) -> list[AadhaarMatch]:
         groups = _groups(view, run)
         for i, j, digits, valid in _aadhaar_windows(groups, spans):
             found.append(AadhaarMatch(groups[i].start, groups[j].end, digits, valid))
-    return found
+    found.extend(AadhaarMatch(s, e, digits, True) for s, e, digits in _punctuated(view))
+    return sorted(found, key=lambda m: (m.start, m.end))
