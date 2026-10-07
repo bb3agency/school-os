@@ -187,8 +187,8 @@ def test_P2_07_settings_guard_keeps_limiting_on_outside_local_and_ci() -> None:
             env=Environment.STAGING,
             rate_limit_enabled=False,
             key_wrapper="kms",
-            database_url="postgresql+psycopg://sos_app:x@db/schoolos",
-            platform_database_url="postgresql+psycopg://sos_platform:x@db/schoolos",
+            database_url="postgresql+psycopg://sos_app:x@db/schoolos?sslmode=verify-full",
+            platform_database_url="postgresql+psycopg://sos_platform:x@db/schoolos?sslmode=verify-full",
             service_token_key="synthetic-staging-service-token-key-0123456789",
         )
     assert Settings(env=Environment.CI).rate_limit_enabled is True

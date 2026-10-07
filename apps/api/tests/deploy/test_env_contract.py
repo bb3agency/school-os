@@ -245,7 +245,11 @@ def _hcl_literal(expr: str) -> str | None:
 def synthetic_value(name: str) -> str:
     """A syntactically valid, obviously synthetic value for a computed/secret variable."""
     if name.endswith("DATABASE_URL"):
-        return f"postgresql+psycopg://sos_role:synthetic-{name.lower()}@db.example.test:5432/sos"
+        # The shape modules/secrets writes: TLS that checks the certificate and host name.
+        return (
+            f"postgresql+psycopg://sos_role:synthetic-{name.lower()}@db.example.test:5432/sos"
+            "?sslmode=verify-full&sslrootcert=/etc/ssl/rds/global-bundle.pem"
+        )
     values = {
         # The shape modules/redis writes (url_template): TLS with certificate checks.
         "SOS_REDIS_URL": "rediss://:synthetic@valkey.example.test:6379/0?ssl_cert_reqs=required",
