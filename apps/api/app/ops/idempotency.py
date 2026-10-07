@@ -1,13 +1,21 @@
-"""Idempotency-Key store (docs/09 §2; docs/16 §8).
+"""Idempotency-Key records of this module (docs/09 §2; docs/16 §8).
 
-Same key + same request hash -> replay the original status and resource (no response body is
-stored, so no personal data is duplicated); same key + different hash -> 422
-``idempotency_key_reused``; key still running -> 409 ``idempotency_in_progress``.
+Same key + same request hash -> replay the original status and resource; same key + different
+hash -> 422 ``idempotency_key_reused``; key still running -> 409 ``idempotency_in_progress``.
+The records here hold the request hash, status, resource type/id and Location only, never a
+response body.
 
-- Control plane: :class:`KVIdempotencyStore` on the shared ``app.authz.kv`` store (Valkey,
-  24 h, per operator), because ``sos_platform`` cannot use ``ops.idempotency_keys``.
-- Tenant API: ``app.ops.service.begin_idempotent`` / ``complete_idempotent`` on
-  ``ops.idempotency_keys`` inside the request's ``tenant_session``.
+- Control plane: :class:`KVIdempotencyStore` on the shared ``app.authz.kv`` store (Valkey, per
+  operator), because ``sos_platform`` cannot use ``ops.idempotency_keys``. A completed record
+  lives 24 h; the in-progress marker only :data:`PENDING_TTL` (60 s, as on the tenant routes),
+  so a request that died, or whose ``complete`` failed after the commit, does not block
+  retries for a day (audit 2026-10-04 AA-14).
+- Tenant API routes do NOT use this module: they use ``app.authz.http.Idempotency``, which
+  caches the whole first response (status, headers and JSON **body**) in Valkey for 24 h (a
+  60 s pending marker first), and replays it. That body can hold personal data the response
+  carried. ``app.ops.service.begin_idempotent`` / ``complete_idempotent`` (body-free records
+  in ``ops.idempotency_keys`` inside the request's ``tenant_session``) exist but no route
+  calls them today (data-layer audit 2026-10-04, hardening note 5).
 """
 
 from __future__ import annotations
@@ -23,6 +31,8 @@ from app.authz.kv import KVStore, KVUnavailable
 from app.core.errors import Conflict, ServiceUnavailable, ValidationFailed
 
 DEFAULT_TTL = timedelta(hours=24)
+# The in-progress marker: the same 60 s as ``app.authz.http.PENDING_TTL_S`` (AA-14).
+PENDING_TTL = timedelta(seconds=60)
 
 
 def request_hash(method: str, route: str, body: bytes) -> str:
@@ -81,10 +91,16 @@ class KVIdempotencyStore:
     """
 
     def __init__(
-        self, kv: KVStore, *, ttl: timedelta = DEFAULT_TTL, prefix: str = "sos:idem:"
+        self,
+        kv: KVStore,
+        *,
+        ttl: timedelta = DEFAULT_TTL,
+        pending_ttl: timedelta = PENDING_TTL,
+        prefix: str = "sos:idem:",
     ) -> None:
         self._kv = kv
         self._ttl = int(ttl.total_seconds())
+        self._pending_ttl = int(pending_ttl.total_seconds())
         self._prefix = prefix
 
     def _k(self, scope: str, key: str) -> str:
@@ -95,7 +111,7 @@ class KVIdempotencyStore:
         k = self._k(scope, key)
         pending = IdempotencyRecord(request_sha256, "in_progress").to_json().encode()
         try:
-            if self._kv.set(k, pending, ttl_s=self._ttl, nx=True):
+            if self._kv.set(k, pending, ttl_s=self._pending_ttl, nx=True):
                 return None
             raw = self._kv.get(k)
         except KVUnavailable:
