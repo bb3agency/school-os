@@ -154,7 +154,13 @@ def test_FR_PLT_010_plan_accepts_a_one_time_fee(api: Api, owner: Operator) -> No
         "12000.00",
         "Synthetic plan wording.",
     )
-    patched = api.call("PATCH", f"/plans/{res.json()['id']}", owner, json={"one_time_fee_inr": "0"})
+    patched = api.call(
+        "PATCH",
+        f"/plans/{res.json()['id']}",
+        owner,
+        json={"one_time_fee_inr": "0"},
+        headers={"If-Match": f'"{res.json()["row_version"]}"'},
+    )
     assert patched.json()["one_time_fee_inr"] == "0.00"
     bad = api.call("POST", "/plans", owner, json={**body, "one_time_fee_inr": "-1"})
     assert bad.status_code == 422
@@ -316,6 +322,7 @@ def test_FR_PLT_015_bundle_and_overage_lines_with_gst(
         f"/subscriptions/{sub}/ai-bundle",
         billing_admin,
         json={"ai_bundle_id": str(_bundle_id("ai-standard"))},
+        headers=api.if_match(f"/subscriptions/{sub}", billing_admin),
     )
     assert res.status_code == 200, res.text
     assert res.json()["ai_bundle_id"] == str(_bundle_id("ai-standard"))
@@ -379,18 +386,24 @@ def test_FR_PLT_013_bundle_rules_and_removal(
 ) -> None:
     sub = _school(api, owner, make_plan())["subscription_id"]
     path = f"/subscriptions/{sub}/ai-bundle"
-    unknown = api.call("PUT", path, billing_admin, json={"ai_bundle_id": str(uuid.uuid4())})
+    etag = api.if_match(f"/subscriptions/{sub}", billing_admin)
+    unknown = api.call(
+        "PUT", path, billing_admin, json={"ai_bundle_id": str(uuid.uuid4())}, headers=etag
+    )
     assert unknown.status_code == 422
     missing = api.call(
         "PUT",
         f"/subscriptions/{uuid.uuid4()}/ai-bundle",
         billing_admin,
         json={"ai_bundle_id": str(_bundle_id("ai-high"))},
+        headers={"If-Match": '"1"'},
     )
     assert missing.status_code == 404
-    ok = api.call("PUT", path, billing_admin, json={"ai_bundle_id": str(_bundle_id("ai-high"))})
+    ok = api.call(
+        "PUT", path, billing_admin, json={"ai_bundle_id": str(_bundle_id("ai-high"))}, headers=etag
+    )
     assert ok.status_code == 200, ok.text
-    removed = api.call("DELETE", path, billing_admin)
+    removed = api.call("DELETE", path, billing_admin, headers={"If-Match": ok.headers["ETag"]})
     assert removed.status_code == 200, removed.text
     assert (removed.json()["ai_bundle_id"], removed.json()["ai_bundle_from"]) == (None, None)
     with platform_session() as s:
@@ -413,6 +426,7 @@ def test_FR_PLT_013_bundle_needs_a_monthly_plan(
         f"/subscriptions/{sub}/ai-bundle",
         billing_admin,
         json={"ai_bundle_id": str(_bundle_id("ai-lite"))},
+        headers=api.if_match(f"/subscriptions/{sub}", billing_admin),
     )
     assert (res.status_code, res.json()["code"]) == (409, "ai_bundle_needs_monthly_plan")
 
@@ -533,10 +547,17 @@ def test_FR_KB_011_bundle_sets_the_schools_ai_answer_allowance(
     path = f"/subscriptions/{sub}/ai-bundle"
     assert _allowance(admin_engine, tid) is None
     for code, answers in (("ai-standard", 1000), ("ai-high", 3000)):
-        res = api.call("PUT", path, billing_admin, json={"ai_bundle_id": str(_bundle_id(code))})
+        res = api.call(
+            "PUT",
+            path,
+            billing_admin,
+            json={"ai_bundle_id": str(_bundle_id(code))},
+            headers=api.if_match(f"/subscriptions/{sub}", billing_admin),
+        )
         assert res.status_code == 200, res.text
         assert _allowance(admin_engine, tid) == answers
-    assert api.call("DELETE", path, billing_admin).status_code == 200
+    etag = api.if_match(f"/subscriptions/{sub}", billing_admin)
+    assert api.call("DELETE", path, billing_admin, headers=etag).status_code == 200
     assert _allowance(admin_engine, tid) is None
     # The school's own audit chain records each change (system actor, the count only).
     with admin_engine.connect() as c:
@@ -572,12 +593,14 @@ def test_FR_KB_011_a_failed_allowance_write_does_not_fail_the_operator_and_is_re
         raise RuntimeError("synthetic outage")
 
     monkeypatch.setattr(tenancy_service, "set_ai_answer_allowance", down)
+    etag = api.if_match(f"/subscriptions/{sub}", billing_admin)
     with capture_logs() as logs:
         res = api.call(
             "PUT",
             f"/subscriptions/{sub}/ai-bundle",
             billing_admin,
             json={"ai_bundle_id": str(_bundle_id("ai-lite"))},
+            headers=etag,
         )
     assert res.status_code == 200, res.text  # the bundle is set; the school catches up later
     assert _allowance(admin_engine, tid) is None

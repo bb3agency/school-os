@@ -67,7 +67,11 @@ def _bundle(code: str) -> dict[str, Any]:
 def _set_bundle(api: Api, owner: Operator, sub: uuid.UUID, code: str) -> dict[str, Any]:
     bundle = _bundle(code)
     res = api.call(
-        "PUT", f"/subscriptions/{sub}/ai-bundle", owner, json={"ai_bundle_id": str(bundle["id"])}
+        "PUT",
+        f"/subscriptions/{sub}/ai-bundle",
+        owner,
+        json={"ai_bundle_id": str(bundle["id"])},
+        headers=api.if_match(f"/subscriptions/{sub}", owner),
     )
     assert res.status_code == 200, res.text
     return bundle

@@ -228,7 +228,13 @@ def test_FR_PLT_027_school_tickets_are_redacted_scoped_and_answered(
     assert _school_get(api, subject, f"/api/v1/support/tickets/{other.id}").status_code == 404
     listing = _school_get(api, subject, "/api/v1/support/tickets").json()["data"]
     assert [t["id"] for t in listing] == [ticket["id"]]
-    closed = api.call("PATCH", f"/support/tickets/{ticket['id']}", agent, json={"status": "closed"})
+    closed = api.call(
+        "PATCH",
+        f"/support/tickets/{ticket['id']}",
+        agent,
+        json={"status": "closed"},
+        headers=api.if_match(f"/support/tickets/{ticket['id']}", agent),
+    )
     assert closed.json()["status"] == "closed"
     with platform_session() as s:
         s.execute(
@@ -275,10 +281,24 @@ def test_FR_PLT_027_ticket_status_transitions(
         f"/support/tickets/{t['id']}",
         agent,
         json={"status": "resolved", "assigned_to": str(agent.id)},
+        headers={"If-Match": f'"{t["version"]}"'},
     )
     assert ok.json()["assigned_to"] == str(agent.id)
-    api.call("PATCH", f"/support/tickets/{t['id']}", agent, json={"status": "closed"})
-    bad = api.call("PATCH", f"/support/tickets/{t['id']}", agent, json={"status": "open"})
+    closed = api.call(
+        "PATCH",
+        f"/support/tickets/{t['id']}",
+        agent,
+        json={"status": "closed"},
+        headers={"If-Match": ok.headers["ETag"]},
+    )
+    assert closed.status_code == 200, closed.text
+    bad = api.call(
+        "PATCH",
+        f"/support/tickets/{t['id']}",
+        agent,
+        json={"status": "open"},
+        headers={"If-Match": closed.headers["ETag"]},
+    )
     assert bad.status_code == 409
 
 

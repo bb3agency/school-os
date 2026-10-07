@@ -44,7 +44,7 @@ from app.platform import (
     usage,
 )
 from app.platform.auth import OperatorContext, require_platform
-from app.platform.common import Actor, must, today_ist
+from app.platform.common import Actor, if_match_required, must, today_ist
 from app.platform.permissions import ANY_OPERATOR
 from app.platform.schemas import (
     AiBundleIn,
@@ -118,13 +118,25 @@ def _actor(ctx: OperatorContext) -> Actor:
     return Actor(ctx.operator_id, ctx.request_id)
 
 
-def _version(if_match: str | None) -> int | None:
+def _optional_version(if_match: str | None) -> int | None:
+    """The version in ``If-Match`` when sent. Only for the create-or-replace flag routes, whose
+    service requires it once the flag exists (AA-13)."""
     if if_match is None:
         return None
     raw = if_match.removeprefix("W/").strip('"')
     if not raw.isdigit():
         raise BadRequest("If-Match must be an ETag returned by the API.", code="bad_if_match")
     return int(raw)
+
+
+def _version(if_match: str | None) -> int:
+    """The version in the required ``If-Match`` of an update (audit 2026-10-04 AA-13; docs/09
+    §2): missing -> 400 ``if_match_required``, the tenant routes' answer; stale -> 412 from the
+    service. Two operators editing at once can no longer overwrite each other."""
+    version = _optional_version(if_match)
+    if version is None:
+        raise if_match_required()
+    return version
 
 
 def _etag(response: Response, version: int) -> None:
@@ -554,8 +566,9 @@ def update_plan(
     ctx: Annotated[Ctx, Depends(require_platform("platform.plans.manage"))],
     if_match: IfMatch = None,
 ) -> PlanOut:
-    """Edit a draft plan. Optional If-Match with the ETag (``row_version``): 412
-    ``precondition_failed`` when stale; 409 ``plan_published`` once published."""
+    """Edit a draft plan. If-Match with the ETag (``row_version``) is required (400
+    ``if_match_required``); 412 ``precondition_failed`` when stale; 409 ``plan_published`` once
+    published."""
     out = billing.update_plan(_actor(ctx), plan_id, data, expected_version=_version(if_match))
     _etag(response, out.row_version)
     return out
@@ -657,8 +670,9 @@ def set_price_override(
     ctx: Annotated[Ctx, SubManage],
     if_match: IfMatch = None,
 ) -> SubscriptionOut:
-    """Set a negotiated price. ``If-Match`` (the subscription's ETag) is optional; when sent it
-    is checked (412 when stale), here and on the other price-override and AI-bundle routes."""
+    """Set a negotiated price. ``If-Match`` (the subscription's ETag) is required (400
+    ``if_match_required``; 412 when stale), here and on the other price-override and AI-bundle
+    routes."""
     out = billing.set_price_override(
         _actor(ctx),
         sub_id,
@@ -695,7 +709,7 @@ def set_ai_bundle(
     """Choose or change the AI answer bundle (monthly plans only; ``409
     ai_bundle_needs_monthly_plan``). It counts from the first full calendar month after today
     (a trial's from the month after activation); answers above the quota are billed on the next
-    invoice at the bundle's price per extra answer. Optional ``If-Match`` (412 when stale)."""
+    invoice at the bundle's price per extra answer. ``If-Match`` required (412 when stale)."""
     out = billing.set_ai_bundle(
         _actor(ctx), sub_id, data.ai_bundle_id, expected_version=_version(if_match)
     )
@@ -811,10 +825,13 @@ def update_invoice(
     *,
     invoice_id: uuid.UUID,
     data: InvoicePatch,
+    response: Response,
     ctx: Annotated[Ctx, InvManage],
     if_match: IfMatch = None,
 ) -> InvoiceOut:
-    return billing.update_draft(
+    """Edit a draft. ``If-Match`` with the invoice's ETag is required (400
+    ``if_match_required``; 412 when stale)."""
+    out = billing.update_draft(
         _actor(ctx),
         invoice_id,
         lines=data.lines,
@@ -822,6 +839,8 @@ def update_invoice(
         notes_set="notes" in data.model_fields_set,
         expected_version=_version(if_match),
     )
+    _etag(response, out.version)
+    return out
 
 
 @router.delete("/invoices/{invoice_id}", status_code=204)
@@ -926,9 +945,10 @@ def put_flag(
     ctx: Annotated[Ctx, FlagManage],
     if_match: IfMatch = None,
 ) -> FlagOut:
-    """Create or replace the global flag. ``If-Match`` (the flag's ETag) is optional; when sent
-    it is checked (412 when stale or when the flag does not exist yet)."""
-    out = flags.set_global(_actor(ctx), key, data, expected_version=_version(if_match))
+    """Create or replace the global flag. ``If-Match`` (the flag's ETag) is required once the
+    flag exists (400 ``if_match_required``; 412 when stale, or when sent for a flag that does
+    not exist yet); a new flag is created without it."""
+    out = flags.set_global(_actor(ctx), key, data, expected_version=_optional_version(if_match))
     _etag(response, out.version)
     return out
 
@@ -943,9 +963,9 @@ def put_flag_override(
     ctx: Annotated[Ctx, FlagManage],
     if_match: IfMatch = None,
 ) -> FlagOut:
-    """Set one school's override. ``If-Match`` is optional, as for the global flag."""
+    """Set one school's override. ``If-Match`` as for the global flag."""
     out = flags.set_override(
-        _actor(ctx), key, tenant_id, data.enabled, expected_version=_version(if_match)
+        _actor(ctx), key, tenant_id, data.enabled, expected_version=_optional_version(if_match)
     )
     _etag(response, out.version)
     return out
@@ -993,12 +1013,16 @@ def update_deployment(
     *,
     deployment_id: uuid.UUID,
     data: DeploymentPatch,
+    response: Response,
     ctx: Annotated[Ctx, FleetManage],
     if_match: IfMatch = None,
 ) -> DeploymentOut:
-    return fleet.update_deployment(
+    """``If-Match`` with the deployment's ETag is required (400 ``if_match_required``)."""
+    out = fleet.update_deployment(
         _actor(ctx), deployment_id, data, expected_version=_version(if_match)
     )
+    _etag(response, out.version)
+    return out
 
 
 @router.post("/deployments/{deployment_id}/heartbeat-key:rotate", response_model=HeartbeatKeyOut)
@@ -1078,13 +1102,17 @@ def update_announcement(
     *,
     announcement_id: uuid.UUID,
     data: AnnouncementIn,
+    response: Response,
     ctx: Annotated[Ctx, AnnManage],
     if_match: IfMatch = None,
 ) -> AnnouncementOut:
+    """``If-Match`` with the announcement's ETag (its ``version``) is required (400
+    ``if_match_required``)."""
     out = announcements.update(
         _actor(ctx), announcement_id, data, expected_version=_version(if_match)
     )
     announcements.publish()
+    _etag(response, out.version)
     return out
 
 
@@ -1202,10 +1230,14 @@ def update_ticket(
     *,
     ticket_id: uuid.UUID,
     data: TicketPatch,
+    response: Response,
     ctx: Annotated[Ctx, SupManage],
     if_match: IfMatch = None,
 ) -> TicketOut:
-    return support.update_ticket(_actor(ctx), ticket_id, data, expected_version=_version(if_match))
+    """``If-Match`` with the ticket's ETag is required (400 ``if_match_required``)."""
+    out = support.update_ticket(_actor(ctx), ticket_id, data, expected_version=_version(if_match))
+    _etag(response, out.version)
+    return out
 
 
 # --- break-glass ------------------------------------------------------------------------------

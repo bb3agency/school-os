@@ -3,8 +3,9 @@ docs/16 §8). Synthetic data only.
 
 - The price override, the AI bundle and feature flags are replaced by PUT (and cleared by
   DELETE). Two operators editing at once silently overwrote each other; a stale form could turn
-  a kill-switch flag back on. They now honour an optional ``If-Match`` like the other platform
-  updates (412 when stale); the response carries the ETag.
+  a kill-switch flag back on. They now honour ``If-Match`` like the other platform updates
+  (412 when stale; required since AA-13, see test_if_match_required.py); the response carries
+  the ETag.
 - Break-glass requests and support-ticket messages were created on every POST: a retried
   request made a second request or message. They now accept an optional ``Idempotency-Key``
   (a replay answers with the same resource).
@@ -65,9 +66,16 @@ def test_FR_PLT_013_a_stale_price_override_is_refused(
     assert clear.status_code == 412, clear.text
     now = api.call("GET", f"/subscriptions/{sub}", billing).json()
     assert now["price_override_inr"] == "3999.00"
-    # Without If-Match the routes work as before (the operator UI does not send it yet).
+    # Without If-Match the routes are refused (audit 2026-10-04 AA-13; the UI sends it).
     plain = api.call("DELETE", f"/subscriptions/{sub}/price-override", billing)
-    assert plain.status_code == 200, plain.text
+    assert (plain.status_code, plain.json()["code"]) == (400, "if_match_required")
+    current = api.call(
+        "DELETE",
+        f"/subscriptions/{sub}/price-override",
+        billing,
+        headers={"If-Match": first.headers["ETag"]},
+    )
+    assert current.status_code == 200, current.text
 
 
 def test_FR_PLT_013_a_stale_ai_bundle_change_is_refused(
@@ -81,6 +89,7 @@ def test_FR_PLT_013_a_stale_ai_bundle_change_is_refused(
         f"/subscriptions/{sub}/price-override",
         billing,
         json={"price_override_inr": "10.00", "reason": "Moves the version on (SS/2)"},
+        headers={"If-Match": stale},
     )
     res = api.call(
         "DELETE", f"/subscriptions/{sub}/ai-bundle", billing, headers={"If-Match": stale}

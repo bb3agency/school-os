@@ -142,14 +142,24 @@ def test_FR_PLT_010_plans_are_versioned_and_frozen(api: Api, billing_admin: Oper
     v1 = api.call("POST", "/plans", billing_admin, json=body).json()
     assert (v1["version"], v1["status"], v1["sac_code"]) == (1, "draft", "998314")
     patched = api.call(
-        "PATCH", f"/plans/{v1['id']}", billing_admin, json={"base_price_inr": "4200.00"}
+        "PATCH",
+        f"/plans/{v1['id']}",
+        billing_admin,
+        json={"base_price_inr": "4200.00"},
+        headers={"If-Match": f'"{v1["row_version"]}"'},
     )
     assert patched.json()["base_price_inr"] == "4200.00"
     assert (
         api.call("POST", f"/plans/{v1['id']}/publish", billing_admin).json()["status"]
         == "published"
     )
-    frozen = api.call("PATCH", f"/plans/{v1['id']}", billing_admin, json={"base_price_inr": "1.00"})
+    frozen = api.call(
+        "PATCH",
+        f"/plans/{v1['id']}",
+        billing_admin,
+        json={"base_price_inr": "1.00"},
+        headers={"If-Match": patched.headers["ETag"]},
+    )
     assert (frozen.status_code, frozen.json()["code"]) == (409, "plan_published")
     v2 = api.call("POST", "/plans", billing_admin, json=body).json()
     assert v2["version"] == 2
@@ -163,8 +173,8 @@ def test_FR_PLT_010_plans_are_versioned_and_frozen(api: Api, billing_admin: Oper
 
 
 def test_FR_PLT_010_draft_edit_checks_the_row_version(api: Api, billing_admin: Operator) -> None:
-    """Owner decision 2026-10-04: PATCH a draft plan takes If-Match (optional, like every
-    platform edit); a stale ETag gets 412 and changes nothing. ``row_version`` is the edit
+    """Owner decision 2026-10-04: PATCH a draft plan takes If-Match (required since AA-13, like
+    every platform edit); a stale ETag gets 412 and changes nothing. ``row_version`` is the edit
     counter, separate from the catalogue ``version`` (code + version)."""
     body = {"code": f"etag-{uuid.uuid4().hex[:8]}", "name": "Synthetic", "base_price_inr": "10.00"}
     created = api.call("POST", "/plans", billing_admin, json=body)
@@ -191,9 +201,14 @@ def test_FR_PLT_010_draft_edit_checks_the_row_version(api: Api, billing_admin: O
         "PATCH", path, billing_admin, json={"name": "Second"}, headers={"If-Match": 'W/"2"'}
     )
     assert weak.json()["row_version"] == 3
-    # Without If-Match the edit still applies (the house pattern) and the version still moves.
+    # Without If-Match the edit is refused and nothing changes (audit 2026-10-04 AA-13).
     blind = api.call("PATCH", path, billing_admin, json={"name": "Third"})
-    assert (blind.status_code, blind.json()["row_version"]) == (200, 4)
+    assert (blind.status_code, blind.json()["code"]) == (400, "if_match_required")
+    assert api.call("GET", path, billing_admin).json()["row_version"] == 3
+    third = api.call(
+        "PATCH", path, billing_admin, json={"name": "Third"}, headers={"If-Match": '"3"'}
+    )
+    assert (third.status_code, third.json()["row_version"]) == (200, 4)
     bad = api.call("PATCH", path, billing_admin, json={"name": "X"}, headers={"If-Match": "abc"})
     assert (bad.status_code, bad.json()["code"]) == (400, "bad_if_match")
     # Publishing freezes the plan; a stale or current ETag cannot reopen it.
@@ -293,13 +308,25 @@ def test_FR_PLT_015_draft_edit_issue_and_immutability(
             {"kind": "discount", "description": "Pilot discount", "unit_price_inr": "100.00"},
         ]
     }
-    res = api.call("PATCH", f"/invoices/{draft['id']}", billing_admin, json=lines)
+    res = api.call(
+        "PATCH",
+        f"/invoices/{draft['id']}",
+        billing_admin,
+        json=lines,
+        headers={"If-Match": f'"{draft["version"]}"'},
+    )
     assert res.status_code == 200, res.text
     assert (res.json()["taxable_value_inr"], res.json()["total_inr"]) == ("900.00", "1062.00")
     issued = api.call("POST", f"/invoices/{draft['id']}/issue", billing_admin)
     assert issued.status_code == 200, issued.text
     assert issued.json()["status"] == "issued"
-    again = api.call("PATCH", f"/invoices/{draft['id']}", billing_admin, json=lines)
+    again = api.call(
+        "PATCH",
+        f"/invoices/{draft['id']}",
+        billing_admin,
+        json=lines,
+        headers={"If-Match": issued.headers.get("ETag", f'"{issued.json()["version"]}"')},
+    )
     assert (again.status_code, again.json()["code"]) == (409, "invoice_issued")
     assert api.call("DELETE", f"/invoices/{draft['id']}", billing_admin).status_code == 409
 
@@ -855,11 +882,13 @@ def test_FR_PLT_013_negotiated_price_returns_its_reason(
     sub = _school(api, owner, make_plan())["subscription_id"]
     assert api.call("GET", f"/subscriptions/{sub}", billing_admin).json()["override_reason"] is None
     reason = "Pilot school, price agreed in writing (ref SS/2026/3)"
+    etag = api.call("GET", f"/subscriptions/{sub}", billing_admin).headers["ETag"]
     res = api.call(
         "PUT",
         f"/subscriptions/{sub}/price-override",
         billing_admin,
         json={"price_override_inr": "3999.00", "reason": reason},
+        headers={"If-Match": etag},
     )
     assert res.status_code == 200, res.text
     assert (res.json()["price_override_inr"], res.json()["override_reason"]) == ("3999.00", reason)
@@ -868,7 +897,12 @@ def test_FR_PLT_013_negotiated_price_returns_its_reason(
     assert (read["price_override_inr"], read["override_reason"]) == ("3999.00", reason)
     listed = api.call("GET", "/subscriptions", viewer).json()["data"]
     assert next(row for row in listed if row["id"] == sub)["override_reason"] == reason
-    cleared = api.call("DELETE", f"/subscriptions/{sub}/price-override", billing_admin).json()
+    cleared = api.call(
+        "DELETE",
+        f"/subscriptions/{sub}/price-override",
+        billing_admin,
+        headers={"If-Match": res.headers["ETag"]},
+    ).json()
     assert (cleared["price_override_inr"], cleared["override_reason"]) == (None, None)
 
 
@@ -964,10 +998,15 @@ def test_R_13_invoice_line_overflow_is_a_422(
         "quantity": "999999999.000",
         "unit_price_inr": "999999999999.99",
     }
-    res = api.call("PATCH", f"/invoices/{draft['id']}", billing_admin, json={"lines": [big]})
+    etag = {"If-Match": f'"{draft["version"]}"'}
+    res = api.call(
+        "PATCH", f"/invoices/{draft['id']}", billing_admin, json={"lines": [big]}, headers=etag
+    )
     assert res.status_code == 422, res.text
     many = [dict(big, quantity="1") for _ in range(50)]
-    res = api.call("PATCH", f"/invoices/{draft['id']}", billing_admin, json={"lines": many})
+    res = api.call(
+        "PATCH", f"/invoices/{draft['id']}", billing_admin, json={"lines": many}, headers=etag
+    )
     assert res.status_code == 422, res.text
 
 
