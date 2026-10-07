@@ -6,7 +6,9 @@ Invoice numbering is exercised in far-future financial years so each test owns i
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import threading
+import unicodedata
 import uuid
 from collections.abc import Callable
 from decimal import Decimal
@@ -904,6 +906,81 @@ def test_FR_PLT_013_negotiated_price_returns_its_reason(
         headers={"If-Match": res.headers["ETag"]},
     ).json()
     assert (cleared["price_override_inr"], cleared["override_reason"]) == (None, None)
+
+
+def _reason_digest(reason: str) -> str:
+    raw = hashlib.sha256(unicodedata.normalize("NFC", reason).encode()).hexdigest()
+    return raw.translate(str.maketrans("0123456789abcdef", "abcdefghijklmnop"))
+
+
+def test_AA_hardening_every_price_override_event_keeps_amounts_and_binds_its_reason(
+    api: Api, owner: Operator, billing_admin: Operator, make_plan: Callable[..., uuid.UUID]
+) -> None:
+    """Api-auth audit 2026-10-04, hardening note: the reason lived only on the subscription row,
+    so a change lost the earlier one. Each set, change and clear now records the plan, the
+    previous and new amounts and a SHA-256 of the previous and new reasons (the chain holds ids,
+    codes and amounts only, never free text: docs/05 §5, docs/16 §16)."""
+    plan_id = make_plan()
+    plan = str(plan_id)
+    sub = _school(api, owner, plan_id)["subscription_id"]
+    path = f"/subscriptions/{sub}/price-override"
+    first, second = "Pilot school, agreed in writing (SS/1)", "Second year discount (SS/2)"
+    one = api.call(
+        "PUT",
+        path,
+        billing_admin,
+        json={"price_override_inr": "3999.00", "reason": first},
+        headers=api.if_match(f"/subscriptions/{sub}", billing_admin),
+    )
+    two = api.call(
+        "PUT",
+        path,
+        billing_admin,
+        json={"price_override_inr": "3500.00", "reason": second},
+        headers={"If-Match": one.headers["ETag"]},
+    )
+    three = api.call("DELETE", path, billing_admin, headers={"If-Match": two.headers["ETag"]})
+    assert one.status_code == two.status_code == three.status_code == 200
+    with platform_session() as s:
+        rows = (
+            s.execute(
+                text(
+                    "SELECT summary FROM platform.audit_events WHERE resource_id = :s "
+                    "AND action = 'subscription.price_override_set' ORDER BY seq"
+                ),
+                {"s": uuid.UUID(sub)},
+            )
+            .scalars()
+            .all()
+        )
+    assert [dict(r) for r in rows] == [
+        {
+            "change": "set",
+            "plan_id": plan,
+            "previous_price_override_inr": None,
+            "price_override_inr": "3999.00",
+            "previous_reason_sha256": None,
+            "reason_sha256": _reason_digest(first),
+        },
+        {
+            "change": "changed",
+            "plan_id": plan,
+            "previous_price_override_inr": "3999.00",
+            "price_override_inr": "3500.00",
+            "previous_reason_sha256": _reason_digest(first),
+            "reason_sha256": _reason_digest(second),
+        },
+        {
+            "change": "cleared",
+            "plan_id": plan,
+            "previous_price_override_inr": "3500.00",
+            "price_override_inr": None,
+            "previous_reason_sha256": _reason_digest(second),
+            "reason_sha256": None,
+        },
+    ]
+    assert first not in str(rows)
+    assert second not in str(rows)
 
 
 def test_FR_PLT_013_billing_account_gstin_validation_and_etag(
