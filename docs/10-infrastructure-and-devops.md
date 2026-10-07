@@ -74,7 +74,7 @@ infra/terraform/
 │   ├── redis/                ElastiCache for Valkey 8 (TLS, AUTH token via write-only attributes)
 │   ├── s3/                   shared-tier buckets (files, audit archive with Object Lock), lifecycle by tag
 │   ├── s3_bucket/            hardened private bucket used by every stack
-│   ├── kms/                  CMKs (data, audit, backup, logs; annual rotation) + asymmetric audit-signing keys, key policies
+│   ├── kms/                  CMKs (data, audit, backup, artifacts, logs; annual rotation; on the first apply with the artifacts key, set each host's `artifacts_kms_key_arn` to `kms_key_arns.artifacts` and republish the current bundle) + asymmetric audit-signing keys, key policies
 │   ├── secrets/              Secrets Manager secrets (ephemeral generation, write-only values)
 │   ├── ses_email/            SES v2 domain identity (Easy DKIM), configuration set, reputation alarms (§5.2)
 │   ├── ecr/                  repositories (immutable tags, scan on push, KMS)

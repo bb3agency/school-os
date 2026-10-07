@@ -111,7 +111,7 @@ variable "artifacts_bucket" {
 }
 
 variable "artifacts_kms_key_arn" {
-  description = "KMS key of the artifacts bucket (shared prod stack output kms_key_arns.data)."
+  description = "KMS key of the artifacts bucket (shared prod stack output kms_key_arns.artifacts; its own key since audit 2026-10-05, never the data key)."
   type        = string
 }
 

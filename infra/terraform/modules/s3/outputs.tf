@@ -42,3 +42,8 @@ output "artifacts_bucket_arn" {
   description = "Release artifacts bucket ARN."
   value       = module.artifacts.arn
 }
+
+output "artifacts_kms_key_arn" {
+  description = "CMK of the release artifacts bucket (its own key; dedicated hosts decrypt with it)."
+  value       = module.artifacts.kms_key_arn
+}

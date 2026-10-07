@@ -175,11 +175,12 @@ module "audit_archive" {
 
 # --- Release artifacts (dedicated-tier bundles published by CI) ----------------
 
+# Own CMK: every dedicated host may decrypt bundles, so this is never the data key (audit 2026-10-05).
 module "artifacts" {
   source = "../s3_bucket"
 
   name                   = local.names.artifacts
-  kms_key_arn            = var.data_kms_key_arn
+  kms_key_arn            = var.artifacts_kms_key_arn
   access_logging_enabled = true
   access_log_bucket      = module.logs.id
   force_destroy          = var.force_destroy

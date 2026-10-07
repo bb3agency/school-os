@@ -302,7 +302,7 @@ Workers never run "for all tenants" in one transaction; batch jobs get tenant ID
 ## 8. Data protection and key management
 
 - **In transit:** TLS 1.2+ (prefer 1.3) at the edge; TLS to RDS (`sslmode=verify-full`) and Valkey (in-transit encryption); HTTPS to all third parties.
-- **At rest:** RDS, snapshots, S3 and Valkey (ElastiCache) encrypted with KMS customer-managed keys (separate CMKs for data, audit archive, backups).
+- **At rest:** RDS, snapshots, S3 and Valkey (ElastiCache) encrypted with KMS customer-managed keys (separate CMKs for data, audit archive, backups, logs and release artifacts; the artifacts bucket has its own key because every dedicated host may decrypt it, audit 2026-10-05).
 - **Application-layer encryption** for C3 fields (05 §9): AES-256-GCM, per-tenant DEK wrapped by KMS, AAD binds ciphertext to tenant/table/column/row.
 - **Key rotation:** CMKs rotated annually (automatic; the key ARN stays the same, so wrapped DEKs keep unwrapping). DEKs rotated on schedule or incident with background re-encryption (SEC-012; runbook 10 §9.1):
   - *Rotate* (`python -m app.tenancy.rotate_keys --tenant <id> --apply`): adds the next `core.tenant_keys` version with a fresh DEK wrapped by the configured wrapper (KMS, encryption context = tenant id). The newest unretired version is used for new ciphertext; older versions stay for decryption. The blind-index HMAC key is carried over unless `--new-hmac-key` (incident). Audit `tenant.key.rotated`.

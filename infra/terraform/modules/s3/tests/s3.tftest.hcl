@@ -25,10 +25,11 @@ mock_provider "aws" {
 }
 
 variables {
-  name_prefix       = "sos-test"
-  bucket_suffix     = "111122223333"
-  data_kms_key_arn  = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000001"
-  audit_kms_key_arn = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000002"
+  name_prefix           = "sos-test"
+  bucket_suffix         = "111122223333"
+  data_kms_key_arn      = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000001"
+  audit_kms_key_arn     = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000002"
+  artifacts_kms_key_arn = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000003"
 }
 
 run "buckets_block_public_access" {
@@ -63,14 +64,26 @@ run "data_buckets_use_cmk" {
   }
 
   assert {
-    condition     = module.artifacts.sse_algorithm == "aws:kms"
-    error_message = "Artifacts bucket must use SSE-KMS."
+    condition     = module.artifacts.sse_algorithm == "aws:kms" && module.artifacts.kms_key_arn == var.artifacts_kms_key_arn && output.artifacts_kms_key_arn == var.artifacts_kms_key_arn
+    error_message = "Artifacts bucket must use SSE-KMS with its own CMK (every dedicated host may decrypt it; audit 2026-10-05)."
   }
 
   assert {
     condition     = module.logs.sse_algorithm == "AES256"
     error_message = "Log-delivery bucket uses SSE-S3 (ALB/S3 access logs cannot target SSE-KMS)."
   }
+}
+
+# Audit 2026-10-05 hardening (key separation): every dedicated host may decrypt the artifacts key, so
+# it must never be the data key that protects the files bucket, RDS and Secrets Manager.
+run "artifacts_key_is_not_the_data_key" {
+  command = plan
+
+  variables {
+    artifacts_kms_key_arn = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000001"
+  }
+
+  expect_failures = [var.artifacts_kms_key_arn]
 }
 
 run "audit_archive_object_lock_compliance_3y" {
