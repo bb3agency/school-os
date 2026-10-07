@@ -51,8 +51,10 @@ from app.knowledge.config.llm import LlmConfig, load_llm_config
 from app.knowledge.config.retrieval import RetrievalConfig, load_retrieval_config
 from app.knowledge.config.tools import ToolsConfig, load_tools_config
 from app.knowledge.embeddings import CachingTenantEmbedder, select_embeddings_provider
+from app.knowledge.gateway.budget import BudgetGuard
 from app.knowledge.gateway.embeddings_voyage import build_voyage_provider
 from app.knowledge.gateway.factory import build_gateway
+from app.knowledge.gateway.gateway import Gateway
 from app.knowledge.gateway.metering import MeteringSink
 from app.knowledge.gateway.rerank_voyage import build_voyage_reranker
 from app.knowledge.gateway.transport import Transport
@@ -112,6 +114,9 @@ class Runtime:
     """Contextual chunk headers at ingestion (docs/06 §4.11); None while they are off."""
     conversations: ConversationsConfig = field(default_factory=load_conversations_config)
     """Ask conversations, memory and the answer cache (``conversations.yaml``; ADR-0034)."""
+    budget: BudgetGuard | None = None
+    """The gateway's budget guard (deferred settlements, audit W3-10); None for an injected
+    gateway that is not the product gateway (tests)."""
 
     @property
     def telugu(self) -> bool:
@@ -199,6 +204,7 @@ def build_runtime(
         policy=policy,
         contextualizer=contextualizer,
         conversations=conversations_config or load_conversations_config(),
+        budget=gateway.guard if isinstance(gateway, Gateway) else None,
     )
 
 

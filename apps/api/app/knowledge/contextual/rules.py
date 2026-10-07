@@ -141,8 +141,7 @@ def clip_document(text: str, max_chars: int) -> str:
 def passages_message(passages: Sequence[Passage]) -> str:
     """The user text of one call: the passages only, numbered, one line each."""
     body = "\n\n".join(
-        f'<passage n="{p.number}">\n{escape_tags(_one_line(p.text))}\n</passage>'
-        for p in passages
+        f'<passage n="{p.number}">\n{escape_tags(_one_line(p.text))}\n</passage>' for p in passages
     )
     return f"Write one context for each passage below.\n\n{body}"
 
@@ -239,8 +238,8 @@ __all__ = [
     "Passage",
     "clip_document",
     "contexts_from_output",
-    "escape_tags",
     "document_text",
+    "escape_tags",
     "parse_document",
     "parse_passages",
     "passages_message",

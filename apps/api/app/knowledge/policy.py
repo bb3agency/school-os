@@ -36,6 +36,7 @@ from app.knowledge import repository as repo
 from app.knowledge.config.llm import LlmConfig, load_llm_config
 from app.knowledge.gateway.budget import TenantAiSettings, bundle_budget_inr
 from app.knowledge.gateway.metering import MeteringEvent
+from app.ops import service as ops
 from app.tenancy import service as tenancy
 
 if TYPE_CHECKING:
@@ -44,6 +45,10 @@ if TYPE_CHECKING:
 log = get_logger(__name__)
 
 ASK_FLAG: Final = "kb.ask.enabled"
+SETTLE_EVENT: Final = "kb.budget.settle_requested"
+"""Outbox event: settle a billed call whose settlement the spend store refused (audit W3-10)."""
+SETTLE_TASK: Final = "knowledge.settle_spend"
+_MICRO_USD: Final = Decimal(1_000_000)
 POLICY_TTL_S: Final = 15.0
 
 SessionFactory = Callable[[uuid.UUID], AbstractContextManager["Session"]]
@@ -113,7 +118,9 @@ class SchoolAiPolicy:
 
 
 class LedgerMeteringSink:
-    """:class:`~app.knowledge.gateway.metering.MeteringSink` writing ``kb.llm_calls``."""
+    """:class:`~app.knowledge.gateway.metering.MeteringSink` writing ``kb.llm_calls``; a call
+    whose settlement the spend store refused (``event.unsettled``) also queues
+    :data:`SETTLE_EVENT` in the same transaction (ids and the cost in micro-USD only)."""
 
     def __init__(self, *, session_factory: SessionFactory = _session) -> None:
         self._session = session_factory
@@ -140,7 +147,17 @@ class LedgerMeteringSink:
                         "cost_usd": event.cost_usd,
                     },
                 )
-        except SQLAlchemyError as exc:
+                if event.unsettled is not None:
+                    ops.enqueue_event(
+                        s,
+                        SETTLE_EVENT,
+                        {
+                            "reservation_id": event.unsettled.reservation_id,
+                            "month": event.unsettled.month,
+                            "cost_micro_usd": int(event.cost_usd * _MICRO_USD),
+                        },
+                    )
+        except (SQLAlchemyError, ValueError) as exc:  # ValueError: a payload refused
             log.error(
                 "kb.metering.unrecorded",
                 tenant_id=event.tenant_id,
@@ -152,6 +169,8 @@ class LedgerMeteringSink:
 __all__ = [
     "ASK_FLAG",
     "POLICY_TTL_S",
+    "SETTLE_EVENT",
+    "SETTLE_TASK",
     "LedgerMeteringSink",
     "SchoolAiPolicy",
     "read_ai_settings",

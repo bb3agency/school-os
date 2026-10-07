@@ -57,7 +57,13 @@ from app.knowledge.gateway.errors import (
     ProviderUnavailable,
 )
 from app.knowledge.gateway.gemini_wire import GeminiCodec
-from app.knowledge.gateway.metering import MeteringEvent, MeteringSink, Outcome, cost_usd
+from app.knowledge.gateway.metering import (
+    MeteringEvent,
+    MeteringSink,
+    Outcome,
+    UnsettledSpend,
+    cost_usd,
+)
 from app.knowledge.gateway.resilience import CircuitBreaker, backoff_delay
 from app.knowledge.gateway.schema_check import SchemaViolation, validate
 from app.knowledge.gateway.streaming import AadhaarStreamMasker
@@ -159,6 +165,11 @@ class Gateway:
 
     def breaker_for(self, provider: Provider) -> CircuitBreaker:
         return self._routes[provider].breaker
+
+    @property
+    def guard(self) -> BudgetGuard:
+        """The budget guard (the worker settles deferred spend through it, audit W3-10)."""
+        return self._guard
 
     # --- LlmGateway ---------------------------------------------------------------------------
 
@@ -516,14 +527,23 @@ class Gateway:
             self._config.prices[model], self._config.cache_multipliers(role_config.provider), usage
         )
         month_spend: Decimal | None = None
+        unsettled: UnsettledSpend | None = None
         if cost <= 0:
             self._guard.release(call.admission)  # nothing billed: free the reservation
         else:
             try:
                 after = self._guard.settle(call.admission, cost)
             except KVUnavailable:
-                # The reservation lapses on its TTL; this call's cost is missing from the month.
-                log.error("kb.budget.spend_unrecorded", tenant_id=metering.tenant_id)
+                # The store flapped after a billed call: the sink queues the settlement (outbox)
+                # and the worker settles the same reservation later (idempotent; audit W3-10).
+                reservation = call.admission.reservation
+                unsettled = UnsettledSpend(reservation.id, reservation.month)
+                log.warning(
+                    "kb.budget.settle_deferred",
+                    tenant_id=metering.tenant_id,
+                    resource_type="kb_budget_reservation",
+                    resource_id=reservation.id,
+                )
             else:
                 month_spend = after.total_usd
                 if after.alert_crossed:
@@ -548,6 +568,7 @@ class Gateway:
             cost_usd=cost,
             month_spend_usd=month_spend,
             document_id=metering.document_id,
+            unsettled=unsettled,
         )
         (call.span or trace.get_current_span()).set_attributes(
             {

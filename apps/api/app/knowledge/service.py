@@ -36,9 +36,10 @@ import json
 import re
 import time
 import uuid
-from collections.abc import Generator, Iterator, MutableMapping
+from collections.abc import Generator, Iterator, Mapping, MutableMapping
 from contextlib import closing
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Final
 
 from app.audit import service as audit
@@ -67,6 +68,7 @@ from app.knowledge import (
     conversations,
     keys,
     memory,
+    policy,
     sources,
 )
 from app.knowledge import repository as repo
@@ -1989,6 +1991,7 @@ __all__ = [
     "purge_tenant_data",
     "read_circular",
     "reencrypt_queries",
+    "settle_spend",
     "summarise_conversation",
     "tenant_data_counts",
 ]
@@ -2006,6 +2009,8 @@ key_rotation.register_reencryptor("kb_memories", keys.reencrypt_memories_batch)
 SUMMARY_TASK: Final = conversations.SUMMARY_TASK
 # The rolling summary job consumes this outbox event (queue ingest; ADR-0034).
 ops.register_outbox_route(conversations.SUMMARY_EVENT, SUMMARY_TASK)
+# Deferred budget settlements (audit W3-10): the spend store refused a billed call's settlement.
+ops.register_outbox_route(policy.SETTLE_EVENT, policy.SETTLE_TASK)
 
 QUERY_RETENTION_CATEGORY: Final = "kb_queries"
 """The ``app/admin/retention.yaml`` category of the query log (fixed: not school-configurable)."""
@@ -2105,6 +2110,43 @@ def summarise_conversation(tenant_id: uuid.UUID, payload: dict[str, object]) -> 
         composition.runtime().gateway,
         session_factory=tenant_session,
     )
+
+
+_MONTH = re.compile(r"^[0-9]{4}-(0[1-9]|1[0-2])$")
+_MAX_DEFERRED_MICRO_USD: Final = 10**9 - 1
+
+
+def settle_spend(tenant_id: uuid.UUID, payload: Mapping[str, object]) -> str:
+    """Worker job ``knowledge.settle_spend`` (outbox event ``kb.budget.settle_requested``):
+    add a billed call's cost to the school's month after the spend store refused it on the
+    call's path (audit W3-10). The same reservation id, so it counts once. Raises
+    ``KVUnavailable`` while the store is still down (the task retries). Returns ``settled``,
+    ``duplicate``, ``invalid`` (a payload this code never writes) or ``unavailable``."""
+    reservation = payload.get("reservation_id")
+    month = payload.get("month")
+    micro = payload.get("cost_micro_usd")
+    try:
+        reservation_id = uuid.UUID(str(reservation))
+    except ValueError:
+        reservation_id = None
+    if (
+        reservation_id is None
+        or not isinstance(month, str)
+        or not _MONTH.fullmatch(month)
+        or not isinstance(micro, int)
+        or isinstance(micro, bool)
+        or not 0 < micro <= _MAX_DEFERRED_MICRO_USD
+    ):
+        log.error("kb.budget.settle_invalid", tenant_id=tenant_id, action=policy.SETTLE_TASK)
+        return "invalid"
+    guard = composition.runtime().budget
+    if guard is None:
+        log.error("kb.budget.settle_unavailable", tenant_id=tenant_id, resource_id=reservation_id)
+        return "unavailable"
+    after = guard.settle_deferred(
+        tenant_id, reservation_id, month, Decimal(micro) / Decimal(1_000_000)
+    )
+    return "settled" if after.applied else "duplicate"
 
 
 # --- full data export (FR-ADM-001; ADR-0034) --------------------------------------------------
