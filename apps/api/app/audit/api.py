@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import datetime as dt
 import uuid
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, ConfigDict
+from pydantic import AwareDatetime, BaseModel, ConfigDict
 
 from app.audit import export, service, verification, viewer
 from app.audit.verification import AuditVerificationOut
@@ -27,7 +26,10 @@ AuditReader = Annotated[UserContext, Depends(require("audit.read"))]
 ActorFilter = Annotated[uuid.UUID | None, Query(description="Acting user id")]
 ResourceTypeFilter = Annotated[str | None, Query(pattern=r"^[a-z][a-z0-9_]{0,63}$")]
 ActionFilter = Annotated[str | None, Query(pattern=r"^[a-z_]+(\.[a-z_]+)+$", max_length=100)]
-FromFilter = Annotated[dt.datetime | None, Query(alias="from")]
+# Times need an explicit offset (e.g. ``Z`` or ``+05:30``): a bare time used to be read as UTC
+# without saying so (audit 2026-10-06 hardening); now it is 422.
+FromFilter = Annotated[AwareDatetime | None, Query(alias="from")]
+ToFilter = Annotated[AwareDatetime | None, Query()]
 
 
 def recent_sign_in(principal: Annotated[Principal, Depends(get_principal)]) -> None:
@@ -48,7 +50,7 @@ def list_audit_events(
     resource_id: uuid.UUID | None = None,
     action: ActionFilter = None,
     from_: FromFilter = None,
-    to: dt.datetime | None = None,
+    to: ToFilter = None,
 ) -> Page[AuditEventOut]:
     """School audit log, newest first (permission ``audit.read``).
 
@@ -152,7 +154,7 @@ def export_audit_events(
     resource_id: uuid.UUID | None = None,
     action: ActionFilter = None,
     from_: FromFilter = None,
-    to: dt.datetime | None = None,
+    to: ToFilter = None,
 ) -> StreamingResponse:
     """Download the school audit log as a CSV file (permission ``audit.read`` and a recent
     sign-in with MFA, 428 ``step_up_required``).

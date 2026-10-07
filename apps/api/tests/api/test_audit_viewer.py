@@ -64,6 +64,27 @@ def test_FR_AUD_005_filters_and_cursor(world: Any, api: Any, admin_engine: Engin
     )
 
 
+def test_FR_AUD_005_time_filters_need_an_offset(world: Any, api: Any) -> None:
+    """A time without an offset was silently read as UTC (audit 2026-10-06 hardening): the
+    viewer and the export refuse it (422) and take any explicit offset."""
+    owner = world.person("owner")
+    for path in ("/api/v1/audit/events", "/api/v1/audit/export"):
+        for params in (
+            {"from": "2026-10-01T00:00:00"},
+            {"to": "2026-10-01"},
+            {"from": "2026-10-01T00:00:00Z", "to": "2026-10-02T00:00:00"},
+        ):
+            res = api.call(owner, "GET", path, params=params)
+            assert res.status_code == 422, (path, params, res.text)
+        ok = api.call(
+            owner,
+            "GET",
+            path,
+            params={"from": "2000-01-01T00:00:00+05:30", "to": "2000-01-02T00:00:00+05:30"},
+        )
+        assert ok.status_code == 200, (path, ok.text)
+
+
 def test_FR_AUD_005_cross_tenant_events_never_visible(world: Any, api: Any) -> None:
     events = api.call(
         world.person("auditor_readonly"), "GET", "/api/v1/audit/events", params={"limit": 200}

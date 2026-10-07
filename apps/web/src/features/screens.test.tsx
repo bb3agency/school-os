@@ -214,7 +214,8 @@ describe("school screens wired to the BFF (US-202, US-102, FR-AUD-005)", () => {
     expect(href.searchParams.get("from")).toBe("01/06/2026");
     const url = seen.find((u) => u.pathname === "/bff/api/v1/audit/events");
     expect(url?.searchParams.get("actor")).toBe("clerk");
-    expect(url?.searchParams.get("from")).toBe("2026-06-01");
+    // The day starts at midnight India time; the API refuses a time without an offset.
+    expect(url?.searchParams.get("from")).toBe("2026-06-01T00:00:00+05:30");
     expect(url?.searchParams.has("to")).toBe(false);
     expect(url?.searchParams.has("action")).toBe(false);
   });
