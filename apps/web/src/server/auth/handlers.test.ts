@@ -519,6 +519,27 @@ describe("POST /bff/auth/active-tenant", () => {
     expect(session?.activeTenantId).toBe(TENANT);
   });
 
+  it.each([
+    [404, 403],
+    [409, 403],
+    [422, 403],
+    [429, 429],
+    [501, 503],
+    [503, 503],
+  ])(
+    "stores the school only on a 2xx: an API %i keeps the school chosen before (audit W3 hardening)",
+    async (status, expected) => {
+      await h.signIn("staff", clerk);
+      const response = await switchTo(OTHER_TENANT, () => new Response(null, { status }));
+      expect(response.status).toBe(expected);
+      expect(response.headers.get("content-type")).toContain("application/problem+json");
+      const session = await h.runtime.store.load(h.jar.get("__Host-sos_session"), {
+        touch: false,
+      });
+      expect(session?.activeTenantId).toBe(TENANT);
+    },
+  );
+
   it("validates the tenant id", async () => {
     await h.signIn("staff", clerk);
     const response = await handleActiveTenant(

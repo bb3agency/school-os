@@ -741,13 +741,20 @@ export async function handleActiveTenant(request: Request, runtime: AuthRuntime)
     } else {
       await response.body?.cancel();
     }
-    if ([401, 403].includes(response.status)) {
+    // The school is stored only when the API accepted it (2xx). Any other answer keeps the
+    // school chosen before (audit 2026-10-04 hardening: a 404, 422 or 429 never sets it).
+    if (!response.ok) {
+      if (response.status === 429) {
+        return problem(requestId, 429, "rate_limited", "Too many attempts", {
+          detail: "Wait a minute, then choose the school again.",
+        });
+      }
+      if (response.status >= 500) {
+        return problem(requestId, 503, "service_unavailable", "Try again in a moment");
+      }
       return problem(requestId, 403, "tenant_not_available", "You can't open this school", {
         detail: "Ask the school's office admin to give you access.",
       });
-    }
-    if (response.status >= 500 && response.status !== 501) {
-      return problem(requestId, 503, "service_unavailable", "Try again in a moment");
     }
   } catch (error) {
     if (error instanceof SessionEndedError) return unauthenticated(requestId);
