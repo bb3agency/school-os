@@ -253,9 +253,11 @@ describe("circulars inbox and detail (US-1601, US-1602)", () => {
     );
     const call = stub.callsTo(`POST /bff/api/v1/circular-suggestions/${SUGGESTION}/confirm`)[0];
     expect(call?.headers.get("If-Match")).toBe('W/"1"');
+    // DL-08: the task title starts neutral, never the AI summary (task holders may not see
+    // the circular); the reviewer can type their own.
     expect(JSON.parse(call?.body ?? "{}")).toEqual({
       owner_membership_id: OWNER,
-      title: "Submit the UDISE+ sheets",
+      title: en.circulars.suggestion.defaultTaskTitle,
       due_on: "2026-10-15",
     });
   });

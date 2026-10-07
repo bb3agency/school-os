@@ -65,8 +65,9 @@ function Chips({ citations, title }: { citations: readonly Citation[]; title: st
 }
 
 /**
- * Confirm one suggestion as a task: owner (required), title and due date (editable). The due
- * date is shown and typed in the school's format and sent as `YYYY-MM-DD`.
+ * Confirm one suggestion as a task: owner (required), title and due date (editable). The title
+ * starts as a neutral text, never the AI summary (audit DL-08). The due date is shown and typed
+ * in the school's format and sent as `YYYY-MM-DD`.
  */
 function ConfirmForm({
   suggestion,
@@ -149,7 +150,8 @@ function ConfirmForm({
         <TextField
           name="title"
           label={t("taskTitle")}
-          defaultValue={suggestion.title.slice(0, 200)}
+          // DL-08: never the AI summary; whoever holds the task may not see the circular.
+          defaultValue={t("defaultTaskTitle")}
           maxLength={200}
           error={fieldError("title")}
         />

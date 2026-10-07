@@ -17,6 +17,7 @@ import pytest
 from sqlalchemy import Engine, text
 
 from app.circulars import service
+from app.circulars.config import rules as circular_rules
 from app.core.db import tenant_session
 from app.core.errors import Forbidden
 from app.core.languages import contains_telugu
@@ -204,6 +205,37 @@ def test_FR_CIR_004_confirm_creates_one_task_with_the_citation(
     done = api.call(office, "POST", review, json={}, headers={"If-Match": detail.headers["ETag"]})
     assert done.status_code == 200, done.text
     assert done.json()["reviewed"] is True
+
+
+def test_DL_08_a_confirmed_suggestion_does_not_copy_the_ai_summary_into_the_task(
+    ai_on: Any, api: Any, admin_engine: Engine
+) -> None:
+    """Confirmed without a typed title or details, the task gets a neutral title and no
+    details: the owner (who cannot see the circular) never reads the AI summary of it. The
+    creator can still type their own text (previous test); the citation stays hidden."""
+    document_id = C.read_circular(admin_engine, ai_on.a, acl=[("role", "principal")])
+    first = C.suggestions(admin_engine, document_id)[0]
+    principal = ai_on.person("principal")  # circular.review, in the ACL
+    teacher = ai_on.person("teacher")  # outside the ACL
+    assert api.call(teacher, "GET", f"/api/v1/circulars/{document_id}").status_code == 404
+    res = api.call(
+        principal,
+        "POST",
+        f"/api/v1/circular-suggestions/{first['id']}/confirm",
+        json={"owner_membership_id": str(teacher.membership_id)},
+        headers=_if(first["version"]),
+    )
+    assert res.status_code == 201, res.text
+    task = res.json()
+    assert task["title"] == circular_rules().tasks.default_title_from_circular
+    assert task["details"] is None
+    assert task["due_on"] == str(first["due_on"])
+    seen = api.call(teacher, "GET", f"/api/v1/tasks/{task['id']}")
+    assert seen.status_code == 200, seen.text
+    assert seen.json()["citation"] is None
+    for summary in (first["title"], first["details"]):
+        if summary:
+            assert summary not in seen.text
 
 
 def test_FR_CIR_004_owner_must_be_an_active_member_of_this_school(

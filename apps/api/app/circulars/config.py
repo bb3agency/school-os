@@ -24,6 +24,8 @@ class ReminderRules(_Model):
 class TaskRules(_Model):
     max_title_chars: int = Field(ge=20, le=200)
     max_details_chars: int = Field(ge=100, le=2000)
+    default_title_from_circular: str = Field(min_length=1, max_length=200)
+    """Neutral title of a task confirmed from a circular suggestion (DL-08)."""
 
 
 class NoticeRules(_Model):

@@ -18744,7 +18744,7 @@
       },
       "SuggestionConfirmIn": {
         "additionalProperties": false,
-        "description": "Turn a suggestion into a task. Unset fields keep the suggestion's values.",
+        "description": "Turn a suggestion into a task. An unset due date keeps the suggestion's; an unset title\nis a neutral one (\"Follow up circular\") and unset details stay empty: the AI summary is never\ncopied into the task (audit DL-08).",
         "properties": {
           "details": {
             "anyOf": [
@@ -26333,7 +26333,7 @@
     },
     "/api/v1/circular-suggestions/{suggestion_id}/confirm": {
       "post": {
-        "description": "Create a task from a suggested deadline, optionally changing its title, details or due\ndate, with an owner (``circular.review``; ``If-Match`` = the suggestion's version). 409\n``suggestion_decided``; 422 ``owner_not_active``.",
+        "description": "Create a task from a suggested deadline, with an owner, the title and details you type\n(without them a neutral title and no details: the AI summary is never copied into the\ntask) and the suggested or a changed due date (``circular.review``; ``If-Match`` = the\nsuggestion's version). 409 ``suggestion_decided``; 422 ``owner_not_active``.",
         "operationId": "confirm_suggestion_api_v1_circular_suggestions__suggestion_id__confirm_post",
         "parameters": [
           {

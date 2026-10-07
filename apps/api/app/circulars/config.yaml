@@ -15,6 +15,11 @@ reminders:
 tasks:
   max_title_chars: 200
   max_details_chars: 2000
+  # A task confirmed from a circular suggestion without a typed title gets this neutral
+  # title and no details (audit 2026-10-04 DL-08, owner decision 2026-10-07): the AI
+  # summary of the circular is never copied into the task, whose holders may not see the
+  # circular. The person confirming can type their own title and details.
+  default_title_from_circular: "Follow up circular"
 
 notices:
   max_title_chars: 120

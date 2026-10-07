@@ -971,9 +971,10 @@ export interface paths {
         put?: never;
         /**
          * Confirm Suggestion
-         * @description Create a task from a suggested deadline, optionally changing its title, details or due
-         *     date, with an owner (``circular.review``; ``If-Match`` = the suggestion's version). 409
-         *     ``suggestion_decided``; 422 ``owner_not_active``.
+         * @description Create a task from a suggested deadline, with an owner, the title and details you type
+         *     (without them a neutral title and no details: the AI summary is never copied into the
+         *     task) and the suggested or a changed due date (``circular.review``; ``If-Match`` = the
+         *     suggestion's version). 409 ``suggestion_decided``; 422 ``owner_not_active``.
          */
         post: operations["confirm_suggestion_api_v1_circular_suggestions__suggestion_id__confirm_post"];
         delete?: never;
@@ -12768,7 +12769,9 @@ export interface components {
         };
         /**
          * SuggestionConfirmIn
-         * @description Turn a suggestion into a task. Unset fields keep the suggestion's values.
+         * @description Turn a suggestion into a task. An unset due date keeps the suggestion's; an unset title
+         *     is a neutral one ("Follow up circular") and unset details stay empty: the AI summary is never
+         *     copied into the task (audit DL-08).
          */
         SuggestionConfirmIn: {
             /** Details */

@@ -124,9 +124,10 @@ def confirm_suggestion(
     body: SuggestionConfirmIn,
     version: IfMatch,
 ) -> TaskOut:
-    """Create a task from a suggested deadline, optionally changing its title, details or due
-    date, with an owner (``circular.review``; ``If-Match`` = the suggestion's version). 409
-    ``suggestion_decided``; 422 ``owner_not_active``."""
+    """Create a task from a suggested deadline, with an owner, the title and details you type
+    (without them a neutral title and no details: the AI summary is never copied into the
+    task) and the suggested or a changed due date (``circular.review``; ``If-Match`` = the
+    suggestion's version). 409 ``suggestion_decided``; 422 ``owner_not_active``."""
     return service.confirm_suggestion(db, ctx, suggestion_id, body, version)
 
 

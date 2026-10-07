@@ -753,8 +753,10 @@ def confirm_suggestion(
     version: int,
 ) -> TaskOut:
     """Turn a suggested deadline into a task (``circular.review``, FR-CIR-004): a person decides;
-    the task keeps the circular's citation. Audited ``circular.suggestion_confirmed`` and
-    ``task.created``; the owner is notified."""
+    the task keeps the circular's citation. Without a typed title the task gets the neutral
+    configured title and, without typed details, none: the AI summary of the circular is never
+    copied into the task, whose holders may not see the circular (audit DL-08). Audited
+    ``circular.suggestion_confirmed`` and ``task.created``; the owner is notified."""
     suggestion, reading = _locked_suggestion(session, ctx, suggestion_id, version)
     _refuse_aadhaar({"title": data.title, "details": data.details})
     _active_owner(session, data.owner_membership_id, "owner_membership_id")
@@ -766,8 +768,8 @@ def confirm_suggestion(
         session,
         {
             "id": new_id(),
-            "title": _cut(data.title or suggestion.title, limits.max_title_chars),
-            "details": data.details if data.details is not None else suggestion.details,
+            "title": _cut(data.title or limits.default_title_from_circular, limits.max_title_chars),
+            "details": data.details,
             "owner_membership_id": data.owner_membership_id,
             "due_on": data.due_on or suggestion.due_on,
             "status": "open",
