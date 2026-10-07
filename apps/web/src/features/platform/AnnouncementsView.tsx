@@ -15,6 +15,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { announcementTone, known } from "@/features/status";
 import { ApiError, unwrap, useBffClient } from "@/lib/bff/query";
 import { cn } from "@/lib/cn";
+import { formatDateTime } from "@/lib/format";
 import { AnnouncementEditDialog, AnnouncementEditor } from "./AnnouncementEditor";
 import { LIST_PAGE_SIZE, PK, useCan, usePagedList } from "./data";
 import { MonoTime } from "./pills";
@@ -119,6 +120,14 @@ export function AnnouncementsScreen() {
             <MonoTime value={row.ends_at} />
           </dd>
         </dl>
+        {row.status === "pending_approval" && !readOnly ? (
+          <p className="text-sm text-ink-muted">
+            {t("statusPendingApproval")}{" "}
+            {row.approval_expires_at
+              ? t("approvalExpires", { date: formatDateTime(row.approval_expires_at) ?? "" })
+              : null}
+          </p>
+        ) : null}
         {manage ? (
           <div
             className={
@@ -134,6 +143,28 @@ export function AnnouncementsScreen() {
               hidden={readOnly}
               onSaved={() => setUpdated(true)}
               onRefused={() => setNow(Date.now())}
+            />
+            {/* Critical banners are two-person (audit 2026-10-05): a different operator
+                approves; cancelling withdraws the request. */}
+            <ActionDialog
+              triggerLabel={t("approve")}
+              triggerSize="sm"
+              triggerVariant="primary"
+              triggerHidden={readOnly || row.status !== "pending_approval"}
+              triggerDescription={row.title_en}
+              title={t("approveTitle")}
+              description={t("approveBody")}
+              confirmLabel={t("approve")}
+              schema={z.object({})}
+              invalidate={[PK.announcements]}
+              errorNamespace="platform.announcements"
+              submit={() =>
+                unwrap(
+                  api.POST("/api/v1/platform/announcements/{announcement_id}/approve", {
+                    params: { path: { announcement_id: row.id } },
+                  }),
+                )
+              }
             />
             <ActionDialog
               triggerLabel={t("cancelAnnouncement")}

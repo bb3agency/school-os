@@ -114,7 +114,7 @@ export type PlatformAuditVerify = Schemas["AuditVerifyOut"];
 /* Status strings the API documents as `string` (values from the 0005_platform CHECKs). */
 export type DeploymentStatus =
   "provisioning" | "healthy" | "degraded" | "unreachable" | "decommissioned";
-export type AnnouncementStatus = "draft" | "scheduled" | "cancelled";
+export type AnnouncementStatus = "draft" | "pending_approval" | "scheduled" | "cancelled";
 export type BreakGlassStatus =
   "requested" | "approved" | "active" | "expired" | "revoked" | "denied";
 

@@ -665,6 +665,42 @@
       },
       "AnnouncementOut": {
         "properties": {
+          "approval_expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Expires At"
+          },
+          "approved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
+          "approved_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved By"
+          },
           "audience": {
             "title": "Audience",
             "type": "string"
@@ -696,6 +732,18 @@
             "title": "Body Te",
             "type": "string"
           },
+          "created_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
           "ends_at": {
             "format": "date-time",
             "title": "Ends At",
@@ -718,6 +766,30 @@
           "status": {
             "title": "Status",
             "type": "string"
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted At"
+          },
+          "submitted_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted By"
           },
           "title_en": {
             "title": "Title En",
@@ -2340,6 +2412,18 @@
       },
       "BreakGlassOut": {
         "properties": {
+          "confirm_by": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirm By"
+          },
           "created_at": {
             "anyOf": [
               {
@@ -19754,6 +19838,18 @@
             ],
             "title": "Offboard Approved At"
           },
+          "offboard_request_expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offboard Request Expires At"
+          },
           "offboard_requested_at": {
             "anyOf": [
               {
@@ -19765,6 +19861,18 @@
               }
             ],
             "title": "Offboard Requested At"
+          },
+          "offboard_requested_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offboard Requested By"
           },
           "offboarding": {
             "anyOf": [
@@ -35736,6 +35844,74 @@
         ]
       }
     },
+    "/api/v1/platform/announcements/{announcement_id}/approve": {
+      "post": {
+        "description": "A second operator approves a critical announcement (two-person; audit 2026-10-05).\n``409 same_operator``, ``request_expired``, ``requester_not_authorised``,\n``approver_not_eligible`` or ``invalid_state``. To withdraw it, cancel it.",
+        "operationId": "approve_announcement_api_v1_platform_announcements__announcement_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "announcement_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Announcement Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnouncementOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Approve Announcement",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
     "/api/v1/platform/announcements/{announcement_id}/cancel": {
       "post": {
         "operationId": "cancel_announcement_api_v1_platform_announcements__announcement_id__cancel_post",
@@ -36207,7 +36383,7 @@
     },
     "/api/v1/platform/break-glass-requests/{request_id}/emergency-confirm": {
       "post": {
-        "description": "Two different operators must confirm emergency access (SEC-029).",
+        "description": "Two different operators must confirm emergency access (SEC-029), within\n``two_person_request_ttl_hours`` of the request (``confirm_by``; audit 2026-10-05 A-13).\n``409 same_operator``, ``request_expired``, ``requester_not_authorised``,\n``approver_not_eligible`` or ``invalid_state``.",
         "operationId": "confirm_breakglass_api_v1_platform_break_glass_requests__request_id__emergency_confirm_post",
         "parameters": [
           {
@@ -36268,6 +36444,74 @@
           }
         },
         "summary": "Confirm Breakglass",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/break-glass-requests/{request_id}/withdraw": {
+      "post": {
+        "description": "Withdraw a request that is still waiting (audit 2026-10-05 A-13). It ends as\n``revoked``; ``409 invalid_state`` once approved, denied or ended.",
+        "operationId": "withdraw_breakglass_api_v1_platform_break_glass_requests__request_id__withdraw_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BreakGlassOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Withdraw Breakglass",
         "tags": [
           "platform"
         ]
@@ -41338,6 +41582,74 @@
           }
         },
         "summary": "Confirm Offboarding Teardown",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{tenant_id}/offboarding:withdraw": {
+      "post": {
+        "description": "Withdraw a pending offboarding request (audit 2026-10-05 A-13). ``409 not_requested``\nwhen there is none or it was already approved. Requests also expire on their own after\n``two_person_request_ttl_hours`` (``offboard_request_expires_at``).",
+        "operationId": "withdraw_offboarding_api_v1_platform_tenants__tenant_id__offboarding_withdraw_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Withdraw Offboarding",
         "tags": [
           "platform"
         ]

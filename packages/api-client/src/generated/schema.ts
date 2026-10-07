@@ -3354,6 +3354,28 @@ export interface paths {
         patch: operations["update_announcement_api_v1_platform_announcements__announcement_id__patch"];
         trace?: never;
     };
+    "/api/v1/platform/announcements/{announcement_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Announcement
+         * @description A second operator approves a critical announcement (two-person; audit 2026-10-05).
+         *     ``409 same_operator``, ``request_expired``, ``requester_not_authorised``,
+         *     ``approver_not_eligible`` or ``invalid_state``. To withdraw it, cancel it.
+         */
+        post: operations["approve_announcement_api_v1_platform_announcements__announcement_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/announcements/{announcement_id}/cancel": {
         parameters: {
             query?: never;
@@ -3444,9 +3466,33 @@ export interface paths {
         put?: never;
         /**
          * Confirm Breakglass
-         * @description Two different operators must confirm emergency access (SEC-029).
+         * @description Two different operators must confirm emergency access (SEC-029), within
+         *     ``two_person_request_ttl_hours`` of the request (``confirm_by``; audit 2026-10-05 A-13).
+         *     ``409 same_operator``, ``request_expired``, ``requester_not_authorised``,
+         *     ``approver_not_eligible`` or ``invalid_state``.
          */
         post: operations["confirm_breakglass_api_v1_platform_break_glass_requests__request_id__emergency_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/break-glass-requests/{request_id}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw Breakglass
+         * @description Withdraw a request that is still waiting (audit 2026-10-05 A-13). It ends as
+         *     ``revoked``; ``409 invalid_state`` once approved, denied or ended.
+         */
+        post: operations["withdraw_breakglass_api_v1_platform_break_glass_requests__request_id__withdraw_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4381,6 +4427,28 @@ export interface paths {
          *     (Terraform, docs/16 §13.4); the certificate follows. ``409 not_dedicated`` for shared.
          */
         post: operations["confirm_offboarding_teardown_api_v1_platform_tenants__tenant_id__offboarding_confirm_teardown_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/tenants/{tenant_id}/offboarding:withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw Offboarding
+         * @description Withdraw a pending offboarding request (audit 2026-10-05 A-13). ``409 not_requested``
+         *     when there is none or it was already approved. Requests also expire on their own after
+         *     ``two_person_request_ttl_hours`` (``offboard_request_expires_at``).
+         */
+        post: operations["withdraw_offboarding_api_v1_platform_tenants__tenant_id__offboarding_withdraw_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6180,6 +6248,12 @@ export interface components {
         };
         /** AnnouncementOut */
         AnnouncementOut: {
+            /** Approval Expires At */
+            approval_expires_at?: string | null;
+            /** Approved At */
+            approved_at?: string | null;
+            /** Approved By */
+            approved_by?: string | null;
             /** Audience */
             audience: string;
             /** Audience Tenant Ids */
@@ -6190,6 +6264,8 @@ export interface components {
             body_en: string;
             /** Body Te */
             body_te: string;
+            /** Created By */
+            created_by?: string | null;
             /**
              * Ends At
              * Format: date-time
@@ -6209,6 +6285,10 @@ export interface components {
             starts_at: string;
             /** Status */
             status: string;
+            /** Submitted At */
+            submitted_at?: string | null;
+            /** Submitted By */
+            submitted_by?: string | null;
             /** Title En */
             title_en: string;
             /** Title Te */
@@ -6925,6 +7005,8 @@ export interface components {
         };
         /** BreakGlassOut */
         BreakGlassOut: {
+            /** Confirm By */
+            confirm_by?: string | null;
             /** Created At */
             created_at: string | null;
             /** Duration Minutes */
@@ -13141,8 +13223,12 @@ export interface components {
             last_heartbeat_at: string | null;
             /** Offboard Approved At */
             offboard_approved_at: string | null;
+            /** Offboard Request Expires At */
+            offboard_request_expires_at?: string | null;
             /** Offboard Requested At */
             offboard_requested_at: string | null;
+            /** Offboard Requested By */
+            offboard_requested_by?: string | null;
             offboarding?: components["schemas"]["OffboardingOut"] | null;
             /** Open Tickets */
             open_tickets: number;
@@ -21778,6 +21864,50 @@ export interface operations {
             };
         };
     };
+    approve_announcement_api_v1_platform_announcements__announcement_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                announcement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnnouncementOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     cancel_announcement_api_v1_platform_announcements__announcement_id__cancel_post: {
         parameters: {
             query?: never;
@@ -22000,6 +22130,50 @@ export interface operations {
         };
     };
     confirm_breakglass_api_v1_platform_break_glass_requests__request_id__emergency_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BreakGlassOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    withdraw_breakglass_api_v1_platform_break_glass_requests__request_id__withdraw_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -24941,6 +25115,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OffboardingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    withdraw_offboarding_api_v1_platform_tenants__tenant_id__offboarding_withdraw_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantDetailOut"];
                 };
             };
             /** @description Validation Error */

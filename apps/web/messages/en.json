@@ -118,7 +118,8 @@
       "draft": "Draft",
       "scheduled": "Scheduled",
       "cancelled": "Cancelled",
-      "ended": "Ended"
+      "ended": "Ended",
+      "pending_approval": "Waiting for approval"
     },
     "breakGlass": {
       "requested": "Waiting for approval",
@@ -924,7 +925,13 @@
         "hostReference": "Host teardown reference",
         "downloadCertificate": "Download certificate",
         "certificatePending": "The certificate is not ready yet. Try again in a few minutes."
-      }
+      },
+      "withdrawOffboard": "Withdraw offboarding request",
+      "withdrawOffboardTitle": "Withdraw the offboarding request?",
+      "withdrawOffboardBody": "The school stays as it is. Anyone who may offboard schools can request it again later.",
+      "offboardExpires": "If no one approves it by {date}, it expires and must be requested again.",
+      "offboardExpiredTitle": "The offboarding request has expired",
+      "offboardExpiredBody": "Requested on {date} and not approved in time. Withdraw it, or make a new request."
     },
     "provision": {
       "title": "Provision school",
@@ -1401,7 +1408,12 @@
         }
       },
       "emptyTitle": "No announcements yet",
-      "emptyBody": "Announcements you schedule appear here."
+      "emptyBody": "Announcements you schedule appear here.",
+      "statusPendingApproval": "Critical banners wait for a second operator's approval before schools see them.",
+      "approve": "Approve",
+      "approveTitle": "Approve this critical announcement?",
+      "approveBody": "Every school in the audience sees it from its start time. A different operator must approve the one who submitted it.",
+      "approvalExpires": "Approve by {date}"
     },
     "support": {
       "title": "Support tickets",
@@ -1487,7 +1499,11 @@
       "twoPersonNote": "Two-person rule: the operator who requested it cannot confirm it.",
       "emptyTitle": "No break-glass requests",
       "emptyBody": "Requests for temporary access to a school appear here.",
-      "needsSecondOperator": "A different operator must confirm."
+      "needsSecondOperator": "A different operator must confirm.",
+      "withdraw": "Withdraw",
+      "withdrawTitle": "Withdraw this request?",
+      "withdrawBody": "The school no longer sees it and it cannot be approved or confirmed.",
+      "confirmBy": "Confirm by {date}"
     },
     "operators": {
       "title": "Operators and roles",
@@ -1850,6 +1866,18 @@
       "value_out_of_range": {
         "title": "The number or date is too large",
         "body": "This number or date is too large. Check it and try again."
+      },
+      "request_expired": {
+        "title": "This request has expired",
+        "body": "Two-person requests must be approved within 72 hours. Withdraw it, then make a new request if it is still needed."
+      },
+      "requester_not_authorised": {
+        "title": "The first operator can no longer make this request",
+        "body": "The operator who made it has left or lost the permission. Withdraw it; a current operator can make a new request."
+      },
+      "approver_not_eligible": {
+        "title": "Ask another operator to approve",
+        "body": "You cannot be the second person on this request: your role is less than 7 days old, or one of you gave the other their role."
       }
     },
     "stepUp": {
@@ -1959,7 +1987,8 @@
     "chooseWhoCanSee": "Choose at least one role, class, section or staff member, or choose \"Whole school\".",
     "tooManyAclEntries": "Choose at most 50, or choose \"Whole school\".",
     "invalidIssueDate": "Choose a date, or leave it empty.",
-    "noAadhaar": "This looks like a full Aadhaar number. SchoolOS never stores one: remove it."
+    "noAadhaar": "This looks like a full Aadhaar number. SchoolOS never stores one: remove it.",
+    "emergencyReason": "Emergency access is only for a security incident or a legal obligation. Choose one of those, or untick Emergency."
   },
   "support": {
     "piiWarningTitle": "Do not include student personal data",
