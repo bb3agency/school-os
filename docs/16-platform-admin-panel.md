@@ -151,7 +151,7 @@ Result for **dedicated**: the deployment row (`status = provisioning`), billing 
   | GET | `/api/v1/admin/tenant-export`, `/api/v1/admin/tenant-export/{tenant_export_id}`, `…/{tenant_export_id}/download-url` | Follow it and download the archive while it exists (24 h; download always step-up). The worker builds exports of suspended and offboarding schools too |
 
   `GET /me/schools` and `POST /me/accept-invitations` never resolve a school and are not affected; `/me/schools` reports the school's `status`, which the web app uses to show the suspended banner. No data is deleted. Scheduled tenant jobs pause, except audit verification and retention purges.
-- **Offboard** — `platform.tenants.offboard` (ᴿ, **two-person**): operator A records the request (reason, reference to the school's written request); operator B (a different operator holding the permission) approves with step-up. Then: tenant status `offboarding` → school confirms it has its export (or the export is delivered by us per R8) → access disabled → deletion job removes tenant data **within 30 days** → wrapped keys destroyed (crypto-shredding; for dedicated, the host's KMS key is scheduled for deletion and the host destroyed) → certificate of deletion issued → status `deleted`. Invoices and the billing account stay in `platform` as business records (retention in 08 §14).
+- **Offboard** — `platform.tenants.offboard` (ᴿ, **two-person**): operator A records the request (reason, reference to the school's written request); operator B (a different operator holding the permission) approves with step-up. Then: tenant status `offboarding` → school confirms it has its export (or the export is delivered by us per R8) → access disabled → deletion job removes tenant data **within 30 days** → wrapped keys destroyed (crypto-shredding; for dedicated, the host's KMS key is scheduled for deletion and the host destroyed) → certificate of deletion issued → status `deleted`. Invoices and the billing account stay in `platform` as business records (retention in 08 §14). The request expires, can be withdrawn and is re-checked at approval (§5.19). **Approval ends the school's subscription at once** (`subscription.cancelled`, summary `school_closing`), and no draft invoice (monthly run or manual) is ever made for a school that is `offboarding` or `deleted` (audit 2026-10-05 hardening; issued invoices stay, open drafts are left for the billing admin to discard).
 
 #### 5.5.1 Offboarding deletion (M1, built; ADR-0029, FR-PLT-005)
 
@@ -256,6 +256,8 @@ One row per deployment: school, mode, region, host (EC2 instance ID), hostname a
 
 ### 5.13 Announcements
 *Permission:* `platform.announcements.manage` (viewing needs any platform role).
+
+**Critical banners are two-person** (audit 2026-10-05 hardening, owner decision 2026-10-07). A `critical` announcement saved as scheduled (new or edited) is stored as `pending_approval` with `submitted_by`/`submitted_at`; schools do not see it. A different operator holding `platform.announcements.manage` approves it with `POST /platform/announcements/{id}/approve` (→ `scheduled`, `approved_by`/`approved_at`; audit `announcement.approved`), under the rules of §5.19 (`409 same_operator`, `request_expired`, `requester_not_authorised`, `approver_not_eligible`). Any later change sends it back for approval; cancelling withdraws it. The DB CHECK `announcements_critical_two_person` (migration `0049_open_items`, `NOT VALID` so older banners stay readable) refuses a scheduled critical banner without a second operator. Info, maintenance and warning banners stay single-operator. The list shows **Waiting for approval**, the approve-by time and an **Approve** button.
 Bilingual banners (English and Telugu title and body; **while Telugu is hidden (ADR-0036, `SOS_TELUGU_ENABLED` off) only the English title and body are required**: an empty Telugu text is stored as the English one on create (the columns are `NOT NULL`), an update keeps the stored one, and the operator list and the school-side feed return `title_te`/`body_te` empty), severity (info, maintenance, warning, critical), audience (all schools, one tier, or listed schools), start and end time (IST shown, UTC stored). Delivery in §14.
 
 **Edit** (built 2026-10-04). Every announcement that has not ended and is not cancelled shows **Edit** to holders of `platform.announcements.manage` (hidden from other operators). The dialog has the same fields and limits as a new announcement, filled from the stored one (times shown in IST), and sends `PATCH /platform/announcements/{id}` with `If-Match` (the version the operator opened). The API replaces the whole banner (the body is `AnnouncementIn`, not a partial update), so the web sends every field; while Telugu is hidden it sends the Telugu texts empty so the stored ones are kept. Draft, scheduled and live announcements can be edited. **An announcement that has ended is read-only** (owner decision 2026-10-04): once its end time has passed (`ends_at <= now`, server clock, UTC; the same rule that stops the school-side banner, which shows while `starts_at <= now < ends_at`) the API refuses the edit with 409 `invalid_state`, whatever its stored status (a draft whose window has passed has ended too), and a new window does not reopen it: create a new announcement instead. A cancelled one cannot be edited either (409 `invalid_state`). **Cancel** follows the same rule (owner decision 2026-10-04: an ended announcement is fully read-only): `POST /platform/announcements/{id}/cancel` on an ended announcement answers 409 `invalid_state` ("An announcement that has ended cannot change.", checked after the 404, nothing stored); cancelling one that is already cancelled still returns it unchanged (200), ended or not. If it ends while the cancel dialog is open, the 409 is explained in the dialog ("This announcement can't be changed any more") and the list refreshes, as for an edit. An edit may move the end to now or earlier ("end now"), as a new announcement may have any window whose end follows its start; from then on it is read-only. The operator list shows such an announcement as **Ended** (derived from its end time in the browser and re-read every minute) and offers neither **Edit** nor **Cancel**. No step-up (the permission has `step_up: false`) and no `Idempotency-Key` (the update is idempotent with `If-Match`). Someone else's change first (412 `precondition_failed`), or the announcement ending or being cancelled while the dialog is open (409), refreshes the list and says so in plain language (the dialog stays open with the explanation; the refreshed row shows its new status without **Edit**); 422 errors show on their fields. Pinned by `apps/web/src/features/platform/announcements.test.tsx`.
@@ -266,11 +268,11 @@ Queue with SLA timers, filters by status, priority, school, assignee. Ticket vie
 
 ### 5.15 Break-glass requests
 *Permission:* `platform.breakglass.request` to create (M1); any platform role to view the list.
-M0 shows the list and status of requests (requested, approved, active, expired, revoked, denied) with school, reason, scope and times. The approval workflow lives in the school app (07 §6.4) and arrives in M1. Emergency access without school approval needs `platform.breakglass.emergency` (ᴿ, two-person) and is reported to the school within 24 hours. **Using an active grant** ([ADR-0023](adr/ADR-0023-operator-sign-in-for-break-glass-across-user-pools.md) option C): for an `active` request the list offers **Open the school (support sign-in)**, a link to `/bff/auth/support/login?request=<request id>&tenant=<school id>`. The operator signs in again (MFA, fresh sign-in) with the support app client of the operator pool; the school app shows a read-only "SchoolOS support" banner and a sign-out button. The session start is recorded as `breakglass.session_started` in both chains. A host without the support client (`SOS_SUPPORT_OIDC_AUDIENCE` / `SUPPORT_OIDC_CLIENT_ID` unset) keeps the grant unusable (fail closed).
+M0 shows the list and status of requests (requested, approved, active, expired, revoked, denied) with school, reason, scope and times. The approval workflow lives in the school app (07 §6.4) and arrives in M1. Emergency access without school approval needs `platform.breakglass.emergency` (ᴿ, two-person) and is reported to the school within 24 hours. **Using an active grant** ([ADR-0023](adr/ADR-0023-operator-sign-in-for-break-glass-across-user-pools.md) option C): for an `active` request the list offers **Open the school (support sign-in)**, a link to `/bff/auth/support/login?request=<request id>&tenant=<school id>`. The operator signs in again (MFA, fresh sign-in) with the support app client of the operator pool; the school app shows a read-only "SchoolOS support" banner and a sign-out button. The session start is recorded as `breakglass.session_started` in both chains. A host without the support client (`SOS_SUPPORT_OIDC_AUDIENCE` / `SUPPORT_OIDC_CLIENT_ID` unset) keeps the grant unusable (fail closed). **Emergency rules (audit 2026-10-05 A-13):** `emergency=true` needs `reason_code` `security_incident` or `legal_obligation` (422 otherwise); both confirmations must come within the request lifetime (`confirm_by` in the list), and the second re-checks the first confirmer and its own role age (§5.19). A request still `requested` can be **withdrawn** (`POST /platform/break-glass-requests/{id}/withdraw`, `platform.breakglass.request`; audit `breakglass.withdrawn`): it ends as `revoked`, the school stops seeing it and a school approval answers `409 request_withdrawn`.
 
 ### 5.16 Operators and roles
 *Permission:* `platform.operators.manage` (ᴿ).
-Invite (email, name, roles), resend invite, assign or remove roles, deactivate. An operator cannot change their own roles. At least one active `platform_owner` must remain. Operators must enrol MFA before first use.
+Invite (email, name, roles), resend invite, assign or remove roles, deactivate. An operator cannot change their own roles. At least one active `platform_owner` must remain. Operators must enrol MFA before first use. Changing roles keeps the original `granted_at`/`granted_by` of every role that stays (only added roles get new rows), because the two-person waiting period counts from the real grant (§5.19, audit 2026-10-05 A-14).
 
 ### 5.17 Platform audit log
 *Permission:* `platform.audit.read`.
@@ -282,6 +284,37 @@ In the **school** app, for holders of `tenant.billing.read` (owner, principal, a
 **AI answers card** (ADR-0038; built 2026-10-04). `GET /api/v1/tenant/billing` also returns `ai_bundle`: the bundle of that subscription (`code`, `name`, `included_answers` a month, `price_inr` a month and `overage_rate_inr` per extra answer, both ex-GST from the catalogue row), `counts_from` (`ai_bundle_from`), `month_start` (the current calendar month, IST), `answers_used` (billable answers of that month so far, summed from `platform.usage_daily.ai_answers`) and `answers_counted_to` (the last day collected; the collector adds each day the next morning), or `null` without a bundle. `answers_used` is `null` while the month is before `counts_from` (a newly chosen bundle counts from the next month). These are platform rows read by `platform.service.school_ai_bundle(tenant_id, subscription_id)` for the caller's own tenant and the subscription the definer returned (`platform_session`, the same path as announcements and tickets): no tenant-table read, no definer function, no migration. Same permission (`tenant.billing.read`) and suspended-school rules as the rest of the page. The card shows the bundle name, included answers, a usage meter (answers this month of the included number), the bundle price and the price per extra answer (both "plus GST"), and, without a bundle, "No AI answer bundle. Ask SchoolOS support to add one." It shows facts only: no estimate of the overage charge (open question §19 Q21), never tokens. Pinned by `apps/api/tests/platform/test_school_ai_bundle.py` and `apps/web/src/features/school/school.test.tsx`.
 
 On a dedicated host the page shows the summary delivered in the heartbeat response (§12.4); until that lands (M1), it shows plan name and a note that invoices are sent by email.
+
+### 5.19 Two-person requests: expiry, withdrawal, re-checks (audit 2026-10-05 A-13, A-14)
+
+Owner decision 2026-10-07 (the audit's recommendation). The three two-person flows (offboarding
+§5.5, emergency break-glass §5.15, critical announcements §5.13) share these rules, implemented
+once in `apps/api/app/platform/two_person.py`; the values live in
+`apps/api/app/platform/roles.yaml`:
+
+- **Expiry** (`two_person_request_ttl_hours`, 72): the second step must come within 72 hours of
+  the request (offboarding: `offboard_requested_at`; break-glass: the request's `created_at`;
+  announcement: `submitted_at`), else `409 request_expired`. The detail and list responses carry
+  the deadline (`offboard_request_expires_at`, `confirm_by`, `approval_expires_at`). An expired
+  offboarding request can be replaced by a new request.
+- **Withdrawal**: `POST /platform/tenants/{id}/offboarding:withdraw`
+  (`platform.tenants.offboard`; audit `tenant.offboard_withdrawn`), `POST
+  /platform/break-glass-requests/{id}/withdraw`, and cancelling a pending announcement. The web
+  shows a **Withdraw** button where the request is shown.
+- **Re-check of the first operator** at the second step: still `active` and still holding the
+  permission through a role, else `409 requester_not_authorised` (A leaves or is demoted; B can
+  no longer finish alone).
+- **Second operator's eligibility** (`two_person_min_role_age_days`, 7): B must have held a role
+  granting the permission for at least 7 days, and neither operator's qualifying role may have
+  been granted by the other, else `409 approver_not_eligible`. One owner can therefore not invite
+  a second account they control, make it an owner and approve their own request with it; nor can
+  that account ask and its inviter approve. Operator-pool administration and role administration
+  stay one permission (`platform.operators.manage`): splitting it needs a new catalog permission
+  and seed migration, and the grant-source rule above already closes the self-approval path.
+- All checks run under the row lock of the request; `same_operator` keeps its service check and
+  DB CHECK.
+- Tests: `apps/api/tests/platform/test_two_person_requests.py`,
+  `apps/web/src/features/platform/two-person.test.tsx`.
 
 ## 6. Permissions
 
@@ -675,14 +708,22 @@ CREATE TABLE platform.announcements (
   audience_tenant_ids  uuid[] NOT NULL DEFAULT '{}',
   starts_at            timestamptz NOT NULL,
   ends_at              timestamptz NOT NULL,
-  status               text NOT NULL CHECK (status IN ('draft','scheduled','cancelled')),
+  status               text NOT NULL CHECK (status IN ('draft','pending_approval','scheduled','cancelled')),
   created_by           uuid NOT NULL REFERENCES platform.operators(id),
+  -- 0049_open_items: a critical banner needs a second operator (§5.13, §5.19).
+  submitted_by         uuid REFERENCES platform.operators(id),
+  submitted_at         timestamptz,
+  approved_by          uuid REFERENCES platform.operators(id),
+  approved_at          timestamptz,
   created_at           timestamptz NOT NULL DEFAULT now(),
   updated_at           timestamptz NOT NULL DEFAULT now(),
   version              int NOT NULL DEFAULT 1 CHECK (version >= 1),
   CONSTRAINT announcements_window CHECK (ends_at > starts_at),
   CONSTRAINT announcements_tier CHECK ((audience = 'tier') = (audience_tier IS NOT NULL)),
-  CONSTRAINT announcements_tenants CHECK ((audience = 'tenants') = (cardinality(audience_tenant_ids) > 0))
+  CONSTRAINT announcements_tenants CHECK ((audience = 'tenants') = (cardinality(audience_tenant_ids) > 0)),
+  CONSTRAINT announcements_critical_two_person CHECK (severity <> 'critical' OR status <> 'scheduled'
+    OR (approved_by IS NOT NULL AND submitted_by IS NOT NULL AND approved_by <> submitted_by)) -- NOT VALID
+  -- plus announcements_submitted, announcements_approved, announcements_pending_submitted (pairs)
 );
 
 CREATE TABLE platform.support_tickets (
@@ -843,7 +884,8 @@ Conventions from 09 §2 apply (problem+json, `Idempotency-Key` on creating POSTs
 | POST | `/platform/tenants/{tenant_id}/owner-invite:resend` | `platform.tenants.provision` ᴿ | 202 | Only while `provisioning`; records `tenant.owner_invite_sent` (email delivery not built yet) |
 | POST | `/platform/tenants/{tenant_id}/suspend` · `/reactivate` | `platform.tenants.suspend` ᴿ | 200 | Reason required; place or lift the security hold, independent of billing (R-18: a billing-suspended school can be held; lifting keeps the billing suspension; `409 already_on_hold`); a billing suspension is lifted from the subscription (`409 billing_suspension`) |
 | POST | `/platform/tenants/{tenant_id}/offboarding` | `platform.tenants.offboard` ᴿ | 202 | Two-person step 1: request (`409 already_requested` on repeat) |
-| POST | `/platform/tenants/{tenant_id}/offboarding:approve` | `platform.tenants.offboard` ᴿ | 200 | Step 2 by a different operator (`409 same_operator`; DB CHECK too); tenant → `offboarding`; creates the offboarding run (deadline + 30 days) |
+| POST | `/platform/tenants/{tenant_id}/offboarding:approve` | `platform.tenants.offboard` ᴿ | 200 | Step 2 by a different operator (`409 same_operator`; DB CHECK too; `request_expired`, `requester_not_authorised`, `approver_not_eligible`, §5.19); tenant → `offboarding`; creates the offboarding run (deadline + 30 days); ends the subscription |
+| POST | `/platform/tenants/{tenant_id}/offboarding:withdraw` | `platform.tenants.offboard` ᴿ | 200 | Withdraw a pending request (`409 not_requested`; §5.19) |
 | GET | `/platform/tenants/{tenant_id}/offboarding` | `platform.tenants.read` | 200 | Offboarding progress (§5.5.1); `409 not_offboarding` if never approved |
 | POST | `/platform/tenants/{tenant_id}/offboarding:confirm-export` | `platform.tenants.offboard` ᴿ | 200 | Export gate: `{basis: school_confirmed \| delivered_by_us, reference}`; `409 export_already_confirmed` |
 | POST | `/platform/tenants/{tenant_id}/offboarding:confirm-teardown` | `platform.tenants.offboard` ᴿ | 200 | Dedicated: `{kms_deletion_reference, host_teardown_reference}`; `409 not_dedicated`, `409 invalid_state` before the export gate |
@@ -885,6 +927,7 @@ Conventions from 09 §2 apply (problem+json, `Idempotency-Key` on creating POSTs
 | GET | `/platform/announcements` | any operator | 200 | Newest first, cursor-paged (`limit` 1-200, default 50; `cursor`; `next_cursor`; audit 2026-10-06 R-14) |
 | POST | `/platform/announcements` | `platform.announcements.manage` | 201 | |
 | PATCH | `/platform/announcements/{announcement_id}` | `platform.announcements.manage` | 200 | |
+| POST | `/platform/announcements/{announcement_id}/approve` | `platform.announcements.manage` | 200 | Second operator approves a critical banner (§5.13, §5.19) |
 | POST | `/platform/announcements/{announcement_id}/cancel` | `platform.announcements.manage` | 200 | |
 | GET | `/platform/support/tickets` · `/{ticket_id}` | `platform.support.read` | 200 | |
 | POST | `/platform/support/tickets` | `platform.support.manage` | 201 | Operator-created (email/phone/WhatsApp) |
@@ -892,7 +935,8 @@ Conventions from 09 §2 apply (problem+json, `Idempotency-Key` on creating POSTs
 | PATCH | `/platform/support/tickets/{ticket_id}` | `platform.support.manage` | 200 | Status, priority, assignee, personal-data flag |
 | GET | `/platform/break-glass-requests` | any operator | 200 | Status list, newest first, cursor-paged (`limit` 1-200, default 50; `cursor`; `next_cursor`; audit 2026-10-06 R-14), optional `tenant_id` |
 | POST | `/platform/break-glass-requests` | `platform.breakglass.request` | 201 | Records the request (school approval workflow: M1). `scope` is `{}` (the whole school) or `section_id` and/or `class_id` (UUIDs); any other key is `422` (audit DL-10) |
-| POST | `/platform/break-glass-requests/{request_id}/emergency-confirm` | `platform.breakglass.emergency` ᴿ | 200 | Two different operators (SEC-029) |
+| POST | `/platform/break-glass-requests/{request_id}/emergency-confirm` | `platform.breakglass.emergency` ᴿ | 200 | Two different operators (SEC-029), within the request lifetime, with the re-checks of §5.19 |
+| POST | `/platform/break-glass-requests/{request_id}/withdraw` | `platform.breakglass.request` | 200 | Withdraw a waiting request (→ `revoked`; `409 invalid_state` otherwise) |
 | GET | `/platform/operators` | `platform.operators.manage` (no step-up) | 200 | |
 | POST | `/platform/operators` | `platform.operators.manage` ᴿ | 201 | Invite |
 | PUT | `/platform/operators/{operator_id}/roles` | `platform.operators.manage` ᴿ | 200 | Not own roles; keep ≥ 1 owner |
@@ -974,6 +1018,7 @@ Suspension must not cut off a school during board exams or registration deadline
   5. `usage_overage`: the AI answers above the bundle's quota in the calendar month **before** the month the period starts in (M), billed in arrears: "AI answers above the Standard bundle, March 2027: 250 extra answers × ₹1.50" (quantity 250 at ₹1.50 = ₹375.00; `usage_month` = M). Only when M is on or after the bundle's `ai_bundle_from` and no live invoice of the subscription already bills M. Answers = the sum of `usage_daily.ai_answers` over M's IST days (§11); the draft run on the 1st at 02:00 IST follows the collector's 01:30 IST run for the month's last day.
 - Tax: place of supply = billing account state code. If it equals the supplier's state code (supplier legal name, GSTIN and state code from `SOS_BILLING_SUPPLIER_LEGAL_NAME`, `SOS_BILLING_SUPPLIER_GSTIN`, `SOS_BILLING_SUPPLIER_STATE_CODE`; AP = 37; the API refuses to start in staging/prod with the dev placeholders), CGST 9% + SGST 9%; otherwise IGST 18%. Line amounts are rounded half-up to paise; each tax is computed on the taxable value and rounded half-up to paise.
 - Drafts appear in the invoice list for review; a billing admin issues them (usually the same day).
+- **Guards (audit 2026-10-05 hardening):** no draft (run or manual) for a school that is `offboarding` or `deleted`; a draft whose period overlaps any live (not void) invoice of the subscription is not made (manual: `409 duplicate`, "An invoice already covers this period or part of it"); a line's `unit_price_inr` may be negative only on an `adjustment` line (a credit; there are no credit notes): a `discount` is entered positive and stored as a deduction, and the total can never go below zero (`negative_total`).
 
 ### 10.3 Numbering (on issue)
 - Financial year runs 1 April to 31 March (IST): an issue date in April 2026–March 2027 belongs to `2026-27`.
@@ -1153,16 +1198,16 @@ Written with `audit.service.record_platform(...)` in `platform.audit_events`, in
 | Area | Actions |
 |---|---|
 | Operators | `operator.invited`, `operator.activated` (first MFA sign-in), `operator.bootstrapped` (system, bootstrap CLI), `operator.roles_changed`, `operator.deactivated` (`operator.login` and `operator.step_up` are not recorded yet) |
-| Schools | `tenant.provisioned` (+ T), `tenant.provisioning_failed` (step, error code, attempt), `tenant.provisioning_resumed` (from state, attempt), `tenant.owner_invite_created`, `tenant.owner_invite_sent`, `tenant.activated` (+ T), `tenant.suspended` (+ T), `tenant.reactivated` (+ T), `tenant.security_hold_placed` (+ T), `tenant.security_hold_lifted` (+ T), `tenant.offboard_requested`, `tenant.offboard_approved` (+ T), `tenant.export_confirmed` (+ T), `tenant.deletion_started` (system), `tenant.data_deleted` (system), `tenant.keys_destroyed` (system), `tenant.teardown_confirmed`, `tenant.deletion_failed` (system; step, error code, attempt), `tenant.deletion_certified` (system), `tenant.deleted` (+ T, system), `tenant.deletion_overdue` (system), `tenant.deletion_certificate_downloaded`, `tenant.audit_chain_deleted` (system). The school chain also gets `tenant.data_purged` and `tenant.keys_destroyed` from the purge itself |
+| Schools | `tenant.provisioned` (+ T), `tenant.provisioning_failed` (step, error code, attempt), `tenant.provisioning_resumed` (from state, attempt), `tenant.owner_invite_created`, `tenant.owner_invite_sent`, `tenant.activated` (+ T), `tenant.suspended` (+ T), `tenant.reactivated` (+ T), `tenant.security_hold_placed` (+ T), `tenant.security_hold_lifted` (+ T), `tenant.offboard_requested`, `tenant.offboard_withdrawn`, `tenant.offboard_approved` (+ T), `tenant.export_confirmed` (+ T), `tenant.deletion_started` (system), `tenant.data_deleted` (system), `tenant.keys_destroyed` (system), `tenant.teardown_confirmed`, `tenant.deletion_failed` (system; step, error code, attempt), `tenant.deletion_certified` (system), `tenant.deleted` (+ T, system), `tenant.deletion_overdue` (system), `tenant.deletion_certificate_downloaded`, `tenant.audit_chain_deleted` (system). The school chain also gets `tenant.data_purged` and `tenant.keys_destroyed` from the purge itself |
 | Plans | `plan.created`, `plan.updated`, `plan.published`, `plan.retired` |
 | Subscriptions | `subscription.activated`, `subscription.trial_extended`, `subscription.plan_changed`, `subscription.price_override_set`, `subscription.ai_bundle_set` (bundle code and version), `subscription.ai_bundle_removed`, `subscription.past_due` (system), `subscription.suspended` (summary records `exam_window_override`), `subscription.reactivated`, `subscription.cancelled` |
 | Billing | `billing_account.updated`, `invoice.created` (manual draft), `invoice.generated` (system), `invoice.updated`, `invoice.draft_discarded`, `invoice.issued`, `invoice.voided`, `payment.recorded`, `payment.reversed`, `invoice.paid` (system), `invoice.pdf_rendered` (system; number, template version, size), `invoice.pdf_downloaded` |
 | Usage | `usage.limit_threshold_crossed` (system) |
 | Flags | `flag.updated`, `flag.override_set`, `flag.override_removed` |
 | Fleet | `deployment.created`, `deployment.updated`, `deployment.first_heartbeat`, `deployment.status_changed` (system), `deployment.heartbeat_key_rotated`, `deployment.decommissioned` (rejected heartbeats are logged, not audited) |
-| Announcements | `announcement.created`, `announcement.updated`, `announcement.cancelled` |
+| Announcements | `announcement.created`, `announcement.updated`, `announcement.approved` (critical, second operator), `announcement.cancelled` |
 | Support | `support.ticket_opened`, `support.ticket_updated`, `support.personal_data_flagged`, `support.tickets_purged` (system) |
-| Break-glass | `breakglass.requested`, `breakglass.emergency_confirmed` (M1); outcomes reported by the school (`breakglass.active`, `.denied`, `.expired`, `.revoked`) and `breakglass.session_started` (ADR-0023; grant ID and a session reference only) |
+| Break-glass | `breakglass.requested`, `breakglass.emergency_confirmed` (M1), `breakglass.withdrawn`; outcomes reported by the school (`breakglass.active`, `.denied`, `.expired`, `.revoked`) and `breakglass.session_started` (ADR-0023; grant ID and a session reference only) |
 | Audit | `audit.verify_run` |
 
 Summaries hold IDs, field names and before/after values of non-personal fields (e.g., plan code, status, amounts). Never ticket text, emails or phone numbers.
@@ -1207,7 +1252,7 @@ In addition to the general suites (12 §4):
 | Privilege separation catalog | `sos_platform` has no privileges on any table in `core`/`sis`/`kb`/`audit`/`ops`; `sos_app`/`sos_readonly` have none on `platform` except `SELECT platform.feature_flags`; live query as `sos_platform` against `sis.students` fails with `permission denied` | 12 §4.8 |
 | Definer allowlist | Exactly the functions in 05 §3.4 are `SECURITY DEFINER`, owned by `sos_definer`, with `search_path` set; `definer_access` policies exist only on the allowlisted tables | 12 §4.9 |
 | Platform authz matrix | For every `/api/v1/platform/*` route and every platform role: allowed → 2xx, not allowed → 403, missing step-up → 428; tenant users' tokens → 401 | 12 §4.12 |
-| Two-person rules | Same operator cannot request and approve offboarding (API 409 and DB CHECK) | SEC-029 |
+| Two-person rules | Same operator cannot request and approve offboarding (API 409 and DB CHECK); requests expire, can be withdrawn, re-check the first operator, and the second operator's role must be 7 days old and not granted by the first; critical announcements are two-person (`test_two_person_requests.py`) | SEC-029, audit 2026-10-05 A-13, A-14 |
 | Offboarding deletion | Every tenant table populated for a school (`tests/tenancy/purge_support.py`); after the purge zero rows in every catalog table with `tenant_id` except the retained audit chain; other school untouched; files deleted; idempotent; a failing module rolls back everything and the run resumes; refused unless `offboarding` (also by the database for `sos_purger`); keys destroyed and decryption fails; audit chain deleted only when `deleted` and older than a year; `sos_purger` narrow (`tests/tenancy/test_offboarding_purge.py`). Control plane: export gate, lease and resume, failure codes, deadline alerts once, dedicated teardown, certificate content without personal data, hash, download audited (`tests/platform/test_offboarding.py`, `test_deletion_certificate.py`) | FR-PLT-005 |
 | Dedicated mode | With `SOS_DEPLOYMENT_MODE=dedicated`, every platform route returns 404 and platform beat tasks are absent | ADR-0017 |
 | Heartbeat | Valid signature accepted; wrong key, altered body, stale or future timestamp (> 300 s), replayed nonce, unknown field, oversized body, mismatched tenant all rejected | 12 §4.13 |
