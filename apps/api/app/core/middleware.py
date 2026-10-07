@@ -1,11 +1,12 @@
 """Pure ASGI middleware: request ID + access log, API security headers, body size limit.
 
-- ``RequestContextMiddleware`` (NFR-OBS-001, docs/09 §2): accepts a well-formed ``X-Request-Id``
-  or generates ``req_<uuid7 hex>``, stores it in ``request.state.request_id`` and the log context,
-  echoes it on every response and writes ONE ``http.request`` line per request with the route
-  *template*, method, status and duration. Bodies, query strings and headers are never logged
-  (SEC-008). Unhandled exceptions become a problem+json 500 carrying the request ID and are then
-  re-raised so the server and tracing still see them.
+- ``RequestContextMiddleware`` (NFR-OBS-001, docs/09 §2): generates ``req_<uuid7 hex>`` for every
+  request (a client's ``X-Request-Id`` is ignored: audit events store this id, so a caller must
+  not choose it; audit 2026-10-06 hardening), stores it in ``request.state.request_id`` and the
+  log context, returns it on every response and writes ONE ``http.request`` line per request
+  with the route *template*, method, status and duration. Bodies, query strings and headers are
+  never logged (SEC-008). Unhandled exceptions become a problem+json 500 carrying the request
+  ID and are then re-raised so the server and tracing still see them.
 - ``SecurityHeadersMiddleware`` (SEC-010, docs/07 §11): API response headers; ``no-store`` on
   ``/api/v1/*`` unless a route sets its own ``Cache-Control``.
 - ``BodySizeLimitMiddleware`` (docs/07 §11 API4): 1 MiB by default, a separate limit for
@@ -25,7 +26,6 @@ behave normally.
 
 from __future__ import annotations
 
-import re
 import time
 from collections.abc import Iterable
 
@@ -68,19 +68,11 @@ SECURITY_HEADERS: tuple[tuple[str, str], ...] = (
     ("Cross-Origin-Resource-Policy", "same-origin"),
 )
 
-_REQUEST_ID_RE = re.compile(r"[A-Za-z0-9_-]{8,64}")
 _LOGGER_NAME = "app.http"
 
 
 def new_request_id() -> str:
     return f"req_{new_id().hex}"
-
-
-def _incoming_request_id(scope: Scope) -> str | None:
-    value = Headers(scope=scope).get(REQUEST_ID_HEADER)
-    if value is not None and _REQUEST_ID_RE.fullmatch(value):
-        return value
-    return None
 
 
 def _route_template(scope: Scope) -> str | None:
@@ -112,7 +104,7 @@ class RequestContextMiddleware:
             await self.app(scope, receive, send)
             return
 
-        request_id = _incoming_request_id(scope) or new_request_id()
+        request_id = new_request_id()
         scope.setdefault("state", {})["request_id"] = request_id
         status = 500
         started = False

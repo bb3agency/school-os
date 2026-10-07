@@ -155,10 +155,13 @@ def test_NFR_OBS_001_generated_ids_are_unique() -> None:
     assert len({new_request_id() for _ in range(100)}) == 100
 
 
-def test_NFR_OBS_001_valid_incoming_request_id_is_kept(client: TestClient) -> None:
+def test_NFR_OBS_001_client_request_id_is_never_used(client: TestClient) -> None:
+    """The request id is always the API's own: it is what audit events store, so a caller must
+    not choose it, even a well-formed one (audit 2026-10-06 hardening). The response returns
+    the API's id for correlation."""
     res = client.get("/api/v1/items/abc", headers={REQUEST_ID_HEADER: "bff_01J8ZQ-abc_123"})
-    assert res.headers[REQUEST_ID_HEADER] == "bff_01J8ZQ-abc_123"
-    assert res.json()["request_id"] == "bff_01J8ZQ-abc_123"
+    assert GENERATED_ID.match(res.headers[REQUEST_ID_HEADER])
+    assert res.json()["request_id"] == res.headers[REQUEST_ID_HEADER]
 
 
 @pytest.mark.parametrize(
@@ -244,8 +247,8 @@ def test_SEC_010_problem_json_errors_carry_request_id(client: TestClient) -> Non
     res = client.get("/api/v1/missing", headers={REQUEST_ID_HEADER: "req_from_bff_0001"})
     assert res.status_code == 404
     assert res.headers["content-type"].startswith("application/problem+json")
-    assert res.json()["request_id"] == "req_from_bff_0001"
-    assert res.headers[REQUEST_ID_HEADER] == "req_from_bff_0001"
+    assert GENERATED_ID.match(res.json()["request_id"])
+    assert res.headers[REQUEST_ID_HEADER] == res.json()["request_id"]
 
 
 def test_SEC_010_unhandled_errors_are_problem_json_with_request_id(
@@ -337,8 +340,9 @@ def test_SEC_010_declared_oversized_body_is_413_problem_json(client: TestClient)
     assert res.headers["content-type"].startswith("application/problem+json")
     body = res.json()
     assert body["code"] == "payload_too_large"
-    assert body["request_id"] == "req_upload_00001"
-    assert res.headers[REQUEST_ID_HEADER] == "req_upload_00001"
+    # The API's own id, never the one the client sent (audit 2026-10-06 hardening).
+    assert GENERATED_ID.match(body["request_id"])
+    assert res.headers[REQUEST_ID_HEADER] == body["request_id"]
     assert res.headers["X-Content-Type-Options"] == "nosniff"
 
 

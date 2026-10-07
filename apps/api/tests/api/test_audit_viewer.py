@@ -64,6 +64,34 @@ def test_FR_AUD_005_filters_and_cursor(world: Any, api: Any, admin_engine: Engin
     )
 
 
+def test_FR_AUD_001_audit_events_store_the_apis_own_request_id(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """A caller-chosen X-Request-Id never reaches the audit chain (audit 2026-10-06 hardening):
+    the event carries the id the API generated and returned."""
+    from sqlalchemy import text
+
+    owner = world.person("owner")
+    res = api.call(
+        owner,
+        "GET",
+        "/api/v1/audit/export",
+        params={"from": "2000-01-01T00:00:00Z", "to": "2000-01-02T00:00:00Z"},
+        headers={"X-Request-Id": "chosen_by_client_0001"},
+    )
+    assert res.status_code == 200, res.text
+    with admin_engine.connect() as c:
+        stored = c.execute(
+            text(
+                "SELECT request_id FROM audit.events WHERE tenant_id = :t "
+                "AND action = 'audit.exported' ORDER BY seq DESC LIMIT 1"
+            ),
+            {"t": world.a.tenant_id},
+        ).scalar_one()
+    assert stored == res.headers["X-Request-Id"]
+    assert stored != "chosen_by_client_0001"
+
+
 def test_FR_AUD_005_time_filters_need_an_offset(world: Any, api: Any) -> None:
     """A time without an offset was silently read as UTC (audit 2026-10-06 hardening): the
     viewer and the export refuse it (422) and take any explicit offset."""
