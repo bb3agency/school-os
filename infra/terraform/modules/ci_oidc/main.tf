@@ -248,6 +248,18 @@ data "aws_iam_policy_document" "plan" {
       resources = [for b in var.denied_data_bucket_arns : "${b}/*"]
     }
   }
+
+  # Audit 2026-10-05 P2-09: ReadOnlyAccess includes reading every log group (security events, WAF
+  # logs with client IPs, task logs). A refresh only describes log groups, so log data is denied.
+  statement {
+    sid    = "NeverReadLogData"
+    effect = "Deny"
+    actions = [
+      "logs:GetLogEvents", "logs:FilterLogEvents", "logs:StartQuery", "logs:GetQueryResults",
+      "logs:StartLiveTail", "logs:GetLogRecord", "logs:GetLogObject", "logs:Unmask",
+    ]
+    resources = ["*"]
+  }
 }
 
 resource "aws_iam_role_policy" "plan" {

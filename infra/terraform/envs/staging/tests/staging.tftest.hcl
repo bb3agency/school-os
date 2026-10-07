@@ -138,12 +138,20 @@ run "files_locked_copy_with_the_dr_path" {
   }
 }
 
-# Audit W3-04: staging's pull-request plan role reads no secrets.
+# Audit W3-04: staging's plan role reads no secret values. Audit 2026-10-05 P2-09 (owner decision
+# 2026-10-07): the role also reads the state (Cognito client secrets) and, through ReadOnlyAccess,
+# DescribeUserPoolClient, so no pull request may assume it without a reviewer: it trusts only the
+# staging-plan GitHub Environment.
 run "pr_plan_role_reads_no_secrets" {
   command = plan
 
   assert {
-    condition     = !module.platform.github_actions.plan_reads_secrets && contains(module.platform.github_actions.plan_subjects, "repo:bb3agency/school-os:pull_request")
-    error_message = "Staging's plan role trusts every same-repo pull request, so it must not read secrets."
+    condition     = !module.platform.github_actions.plan_reads_secrets
+    error_message = "Staging's plan role must not read secret values (W3-04)."
+  }
+
+  assert {
+    condition     = toset(module.platform.github_actions.plan_subjects) == toset(["repo:bb3agency/school-os:environment:staging-plan"])
+    error_message = "Staging's plan role trusts only the reviewer-gated staging-plan environment, never pull_request or main (P2-09)."
   }
 }
