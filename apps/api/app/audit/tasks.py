@@ -35,6 +35,7 @@ from app.audit.verify_all import (
     verify_platform,
 )
 from app.core.config import DeploymentMode, KeyWrapperKind, Settings, get_settings
+from app.ops.service import TenantTask
 
 
 def _tenant_ids() -> list[Any]:
@@ -110,7 +111,7 @@ def verify_all_chains() -> dict[str, Any]:
     }
 
 
-@shared_task(name=verification.VERIFY_TASK, acks_late=True, ignore_result=True)
+@shared_task(name=verification.VERIFY_TASK, base=TenantTask, acks_late=True, ignore_result=True)
 def verify_chain(tenant_id: str, event_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     """One queued on-demand verification (R-19). IDs, counts and codes only."""
     del event_id, payload  # the stored request says full or incremental

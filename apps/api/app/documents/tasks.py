@@ -34,6 +34,7 @@ from app.core.logging import get_logger
 from app.documents import service
 from app.documents.scanning import ScannerUnavailable
 from app.documents.storage import ObjectStoreError
+from app.ops.service import TenantTask
 from app.tenancy import service as tenancy
 
 log = get_logger(__name__)
@@ -49,6 +50,7 @@ def _uuid(value: object) -> uuid.UUID:
 
 @shared_task(
     name=service.SCAN_TASK,
+    base=TenantTask,
     bind=True,
     queue="ingest",
     acks_late=True,
@@ -71,6 +73,7 @@ def scan(self: Task[Any, Any], tenant_id: str, event_id: str, payload: dict[str,
 
 @shared_task(
     name=service.PURGE_TASK,
+    base=TenantTask,
     bind=True,
     queue="maintenance",
     acks_late=True,
@@ -103,6 +106,7 @@ def purge_objects(
 
 @shared_task(
     name=service.DISCARD_TASK,
+    base=TenantTask,
     bind=True,
     queue="maintenance",
     acks_late=True,
@@ -137,6 +141,7 @@ def discard_object(
 
 @shared_task(
     name=service.OBJECT_DISCARD_TASK,
+    base=TenantTask,
     bind=True,
     queue="maintenance",
     acks_late=True,

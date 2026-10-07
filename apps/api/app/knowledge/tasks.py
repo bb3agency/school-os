@@ -49,6 +49,7 @@ from app.core.logging import get_logger
 from app.knowledge import composition, contextual_backfill, service
 from app.knowledge.config.contextual import load_contextual_config
 from app.knowledge.ingestion import hooks, runtime
+from app.ops.service import TenantTask
 from app.tenancy import service as tenancy
 
 log = get_logger(__name__)
@@ -91,6 +92,7 @@ def _run(task: Task[Any, Any], name: str, document_id: uuid.UUID, work: Callable
 
 @shared_task(
     name=hooks.INGEST_TASK,
+    base=TenantTask,
     bind=True,
     queue="ingest",
     acks_late=True,
@@ -112,6 +114,7 @@ def ingest_version(
 
 @shared_task(
     name=hooks.ACL_TASK,
+    base=TenantTask,
     bind=True,
     queue="ingest",
     acks_late=True,
@@ -132,6 +135,7 @@ def refresh_acl(
 
 @shared_task(
     name=hooks.REMOVE_TASK,
+    base=TenantTask,
     bind=True,
     queue="ingest",
     acks_late=True,
@@ -223,6 +227,7 @@ def tidy_conversations_all() -> dict[str, int]:
 
 @shared_task(
     name=SUMMARY_TASK,
+    base=TenantTask,
     bind=True,
     queue="ingest",
     acks_late=True,

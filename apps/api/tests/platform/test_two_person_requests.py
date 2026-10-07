@@ -103,7 +103,7 @@ def test_A_13_offboarding_request_can_be_withdrawn(
     late = api.call("POST", f"/tenants/{tid}/offboarding:approve", second)
     assert (late.status_code, late.json()["code"]) == (409, "not_requested")
     with platform_session() as s:
-        actions = list(
+        actions: list[str] = list(
             s.execute(
                 text(
                     "SELECT action FROM platform.audit_events WHERE subject_tenant_id = :t "
@@ -252,7 +252,7 @@ def test_A_14_new_owner_cannot_be_the_second_person_for_their_inviter(
             ),
             {"i": sock_id},
         )
-        subject = s.execute(
+        subject: str = s.execute(
             text("SELECT idp_subject FROM platform.operators WHERE id = :i"), {"i": sock_id}
         ).scalar_one()
     sock = Operator(sock_id, subject, ("platform_owner",))
@@ -378,8 +378,8 @@ def test_hardening_critical_announcement_needs_a_second_operator(
 def test_hardening_invoice_lines_refuse_negative_prices_except_adjustments() -> None:
     for kind in ("subscription", "per_student", "one_time_fee", "addon", "discount"):
         with pytest.raises(ValidationError, match="adjustment lines only"):
-            InvoiceLineIn(kind=kind, description="Synthetic", unit_price_inr="-1.00")  # type: ignore[arg-type]
-    InvoiceLineIn(kind="adjustment", description="Synthetic credit", unit_price_inr="-1.00")  # type: ignore[arg-type]
+            InvoiceLineIn(kind=kind, description="Synthetic", unit_price_inr="-1.00")
+    InvoiceLineIn(kind="adjustment", description="Synthetic credit", unit_price_inr="-1.00")
 
 
 def test_hardening_manual_draft_refuses_an_overlapping_period(
@@ -388,7 +388,7 @@ def test_hardening_manual_draft_refuses_an_overlapping_period(
     billing_admin = make_operator("billing_admin")
     sub = _school(api, owner, make_plan())["subscription_id"]
     with platform_session() as s:
-        start = s.execute(
+        start: dt.date = s.execute(
             text(
                 "SELECT period_start FROM platform.invoices WHERE subscription_id = :s "
                 "AND status <> 'void' ORDER BY period_start LIMIT 1"
