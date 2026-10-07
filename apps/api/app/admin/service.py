@@ -608,9 +608,7 @@ def _write_archive(
         tables, school = _collect(session, snap)
         files = documents.export_files(session, include_sensitive=snap.include_sensitive)
     document_bytes = sum(f.size_bytes for f in files)
-    withheld_files = next(
-        (len(t.rows) for t in tables if t.name == documents.WITHHELD_TABLE), 0
-    )
+    withheld_files = next((len(t.rows) for t in tables if t.name == documents.WITHHELD_TABLE), 0)
     if document_bytes > cfg.max_document_bytes:
         raise _Stop("too_large")
     with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True) as zf:

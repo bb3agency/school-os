@@ -155,7 +155,17 @@ def test_sheet_titles_are_valid_and_unique() -> None:
 
 
 @pytest.mark.parametrize(
-    "value", [" =1+1", " =1+1", "　@SUM(A1)", "\n+1+1", "＝1+1", "＋1", "－1+1", "＠x"]
+    "value",
+    [
+        " =1+1",
+        "\u00a0=1+1",
+        "\u3000@SUM(A1)",
+        "\n+1+1",
+        "\uff1d1+1",
+        "\uff0b1",
+        "\uff0d1+1",
+        "\uff20x",
+    ],
 )
 def test_DL_hardening_4_hidden_and_full_width_formulas_are_prefixed(value: str) -> None:
     assert safe_cell(value).startswith("'")

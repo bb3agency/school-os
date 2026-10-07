@@ -17,8 +17,9 @@ Writing (:func:`write_csv`, :func:`write_xlsx`): every value passes :func:`safe_
 control characters removed, any 12-digit Verhoeff-valid sequence masked
 (:func:`app.core.redaction.mask_aadhaar`, invariant 4) and formula injection neutralised with a
 leading apostrophe (cells starting with ``=``, ``+``, ``-``, ``@``, tab or carriage return, also
-after leading whitespace or as full-width ``＝＋－＠``; OWASP CSV injection). CSV is UTF-8 with a BOM so Excel opens Telugu correctly; XLSX cells are written
-as explicit strings (type ``s``), so a value is never stored as a formula.
+after leading whitespace or as full-width ``=+-@``; OWASP CSV injection). CSV is UTF-8 with a
+BOM so Excel opens Telugu correctly; XLSX cells are written as explicit strings (type ``s``), so
+a value is never stored as a formula.
 """
 
 from __future__ import annotations
@@ -90,7 +91,7 @@ class Cell:
 
 def _formula_head(text: str) -> str:
     """``text`` without leading whitespace, control and invisible format characters (spreadsheet
-    programs skip them), with its first character NFKC-folded so full-width ``＝＋－＠`` read as
+    programs skip them), with its first character NFKC-folded so full-width ``=+-@`` read as
     ``=+-@`` (audit 2026-10-04 data-layer hardening note 4)."""
     i = 0
     while i < len(text) and (text[i].isspace() or unicodedata.category(text[i]) in ("Cc", "Cf")):

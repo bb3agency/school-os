@@ -30,7 +30,7 @@ def _event(action: str, resource_type: str) -> PlatformAuditEventOut:
     )
 
 
-@pytest.mark.parametrize("value", ["=1+1", " =1+1", "＝1+1", "　@SUM(A1)", "\t-1+1"])
+@pytest.mark.parametrize("value", ["=1+1", " =1+1", "\uff1d1+1", "\u3000@SUM(A1)", "\t-1+1"])
 def test_DL_hardening_4_platform_audit_csv_neutralises_formulas(value: str) -> None:
     rows = list(csv.reader(io.StringIO(to_csv([_event(value, value)]))))
     assert rows[0] == list(CSV_COLUMNS)

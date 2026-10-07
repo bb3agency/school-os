@@ -296,12 +296,12 @@ def save_sheet_version(
     version: IfMatch,
     idem: IdempotencyDep,
 ) -> Response:
-    """Save edited cells as the next version (permission ``document.upload``; only for a
-    document you uploaded, or any visible one with ``document.manage_acl``: 403
-    ``document_owner_only`` otherwise; ``If-Match``; FR-DOC-010). The current file is kept in the history; the new version (values only, an
-    XLSX) is checked for viruses and indexed like an upload (202). 409 for import files and
-    CSVs, archived documents, workbooks with several sheets or with formulas (edit those in a
-    spreadsheet program), when a newer version exists, or when nothing changed; 422 for a full
+    """Save edited cells as the next version (permission ``document.upload``; only for a document
+    you uploaded, or any visible one with ``document.manage_acl``: 403 ``document_owner_only``
+    otherwise; ``If-Match``; FR-DOC-010). The current file is kept in the history; the new version
+    (values only, an XLSX) is checked for viruses and indexed like an upload (202). 409 for import
+    files and CSVs, archived documents, workbooks with several sheets or with formulas (edit those
+    in a spreadsheet program), when a newer version exists, or when nothing changed; 422 for a full
     Aadhaar number (enter only the last 4 digits) or line breaks. Accepts ``Idempotency-Key``."""
     return idem.run(
         db,

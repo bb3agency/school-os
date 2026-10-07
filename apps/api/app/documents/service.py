@@ -1179,10 +1179,10 @@ def update_document(
     ``document.manage_acl``, like adding a version; ``If-Match``).
 
     404 outside the caller's ACL/scope, 403 ``document_owner_only`` for a visible document the
-    caller neither uploaded nor manages (AA-10), 412 for a stale version, 409 ``document_archived`` for
-    an archived document, 422 ``doc_type_not_allowed_for_purpose``. Unchanged values are
-    ignored (no new version). Audit: ``document.metadata_updated`` with the changed field
-    NAMES only (titles and issuers may name people).
+    caller neither uploaded nor manages (AA-10), 412 for a stale version, 409 ``document_archived``
+    for an archived document, 422 ``doc_type_not_allowed_for_purpose``. Unchanged values are ignored
+    (no new version). Audit: ``document.metadata_updated`` with the changed field NAMES only (titles
+    and issuers may name people).
     """
     doc = repo.get_document(
         session, document_id, visibility=_visibility(session, ctx), for_update=True
@@ -2136,13 +2136,13 @@ def save_sheet_version(
 ) -> DocumentOut:
     """Save edited cells as the next version (permission ``document.upload`` and, like any new
     version, the uploader or a ``document.manage_acl`` holder: 403 ``document_owner_only``
-    otherwise, AA-10; ``If-Match``; FR-DOC-010). The stored file is never changed: the edited sheet is written as a new XLSX
-    version (values only; Aadhaar-like numbers masked), stored SSE-KMS under the tenant prefix,
-    made current, and queued for the malware scan and indexing like any upload (FR-DOC-002,
-    FR-DOC-006). Refused (409) for import files and CSVs, archived documents, workbooks with
-    more than one sheet or with formulas, and when ``base_version_no`` is not the current
-    version. Audit ``document.version_added`` and ``document.sheet_edited`` (cell references and
-    counts, never values)."""
+    otherwise, AA-10; ``If-Match``; FR-DOC-010). The stored file is never changed: the edited sheet
+    is written as a new XLSX version (values only; Aadhaar-like numbers masked), stored SSE-KMS
+    under the tenant prefix, made current, and queued for the malware scan and indexing like any
+    upload (FR-DOC-002, FR-DOC-006). Refused (409) for import files and CSVs, archived documents,
+    workbooks with more than one sheet or with formulas, and when ``base_version_no`` is not the
+    current version. Audit ``document.version_added`` and ``document.sheet_edited`` (cell references
+    and counts, never values)."""
     source = _sheet_source(
         session, ctx, document_id, version_no=data.base_version_no, for_update=True
     )
@@ -2662,8 +2662,8 @@ __all__ = [
     "export_download_url",
     "export_files",
     "export_records",
-    "export_withheld_files",
     "export_sheet",
+    "export_withheld_files",
     "generated_download_url",
     "get_document",
     "get_download_url",

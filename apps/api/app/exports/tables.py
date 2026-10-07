@@ -11,7 +11,7 @@ Pure module (no database or web). Every value that goes into an exported file pa
    digits from a field whose type and source are known; ADR-0037 option (a), PRV-020). Only the
    exports service creates one, for that column; free text never does.
 3. Formula injection (SEC-017, docs/07 §10): a cell that starts with ``=``, ``+``, ``-``, ``@``,
-   tab or carriage return, also after leading whitespace or as a full-width ``＝＋－＠``, is
+   tab or carriage return, also after leading whitespace or as a full-width ``=+-@``, is
    prefixed with an apostrophe, so spreadsheet programs show it as text and never evaluate it.
 
 XLSX cells are additionally written as explicit strings (type ``s``, text number format), so a

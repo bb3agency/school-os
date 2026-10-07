@@ -470,9 +470,7 @@ def test_DL_07_restricted_document_files_are_withheld_unless_restricted_details_
     assert withheld[str(sheet_doc)]["reason"] == "restricted, not included"
     manifest = json.loads(zf.read("manifest.json"))
     assert manifest["documents"]["withheld"] >= 2
-    assert manifest["documents"]["files"] == len(
-        [n for n in names if n.startswith("documents/")]
-    )
+    assert manifest["documents"]["files"] == len([n for n in names if n.startswith("documents/")])
 
     full_id = AD.ready_export(admin_engine, school, include_sensitive=True)
     full = AD.archive(school, full_id)
