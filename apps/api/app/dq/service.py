@@ -872,16 +872,31 @@ def _open_for_change(row: RowMapping, expected_version: int | None) -> None:
 
 
 def _check_change_request(
-    session: Session, change_request_id: uuid.UUID, students_of_finding: Collection[object]
+    session: Session,
+    change_request_id: uuid.UUID,
+    students_of_finding: Collection[object],
+    attribute_key: str | None,
 ) -> None:
-    """A finding is resolved only by a request of this school about one of its students."""
-    student = changes.request_student(session, change_request_id)
-    if student is None:
+    """A finding is resolved only by an APPROVED request of this school about one of its
+    students and, for a finding about one field, about that field (audit 2026-10-06: a
+    pending request may still be rejected, so it corrects nothing yet)."""
+    link = changes.request_link(session, change_request_id)
+    if link is None:
         code, detail = "not_found", "No change request with this id. Check the id and try again."
-    elif student not in students_of_finding:
+    elif link.student_id not in students_of_finding:
         code, detail = (
             "other_student",
             "This change request is about another student. Choose a request for this student.",
+        )
+    elif attribute_key is not None and link.attribute_key != attribute_key:
+        code, detail = (
+            "other_attribute",
+            "This change request corrects another field. Choose a request for this field.",
+        )
+    elif link.status != "approved":
+        code, detail = (
+            "not_approved",
+            "This change request is not approved yet. Resolve the finding once it is approved.",
         )
     else:
         return
@@ -911,7 +926,10 @@ def resolve_finding(
         _require_blocker_clearance(ctx)
     if data.change_request_id is not None:
         _check_change_request(
-            session, data.change_request_id, (row["student_id"], row["related_student_id"])
+            session,
+            data.change_request_id,
+            (row["student_id"], row["related_student_id"]),
+            row["attribute_key"],
         )
     note = data.note.strip() if data.note else None
     updated = repo.update_finding(
