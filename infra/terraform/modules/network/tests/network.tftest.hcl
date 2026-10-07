@@ -71,13 +71,44 @@ run "flow_logs_enabled" {
   command = plan
 
   assert {
-    condition     = length(aws_flow_log.this) == 1 && aws_flow_log.this[0].traffic_type == "REJECT" && aws_flow_log.this[0].max_aggregation_interval == 600
-    error_message = "Sampled (REJECT, 10-minute) flow logs must be on."
+    condition     = length(aws_flow_log.this) == 1 && aws_flow_log.this[0].traffic_type == "ALL" && aws_flow_log.this[0].max_aggregation_interval == 600
+    error_message = "Flow logs record accepted and rejected traffic (ALL, 10-minute aggregation; audit 2026-10-05 detection gap)."
   }
 
   assert {
     condition     = aws_cloudwatch_log_group.flow[0].retention_in_days == 400
     error_message = "Flow logs retained 400 days."
+  }
+}
+
+# Audit 2026-10-05 detection gap: the S3 gateway endpoint had no policy, so a compromised task could
+# copy data to any bucket in the world over it. It now reaches this account's buckets and only the
+# AWS-owned buckets that ECR, dnf and the agents read from.
+run "s3_endpoint_reaches_only_this_accounts_buckets" {
+  command = plan
+
+  assert {
+    condition = anytrue([
+      for s in jsondecode(aws_vpc_endpoint.s3.policy).Statement :
+      s.Effect == "Allow" && s.Action == "s3:*" && s.Resource == "*" && try(s.Condition.StringEquals["aws:ResourceAccount"], "") == data.aws_caller_identity.current.account_id
+    ])
+    error_message = "The S3 endpoint allows any S3 action only on buckets of this account."
+  }
+
+  assert {
+    condition = alltrue([
+      for s in jsondecode(aws_vpc_endpoint.s3.policy).Statement :
+      s.Effect == "Allow" && (try(s.Condition.StringEquals["aws:ResourceAccount"], "") == data.aws_caller_identity.current.account_id || (s.Action == ["s3:GetObject"] && try(alltrue([for r in s.Resource : endswith(r, "/*")]), false)))
+    ])
+    error_message = "Every other endpoint statement is read-only (s3:GetObject) on listed AWS-owned buckets."
+  }
+
+  assert {
+    condition = anytrue([
+      for s in jsondecode(aws_vpc_endpoint.s3.policy).Statement :
+      try(contains(s.Resource, "arn:aws:s3:::prod-ap-south-1-starport-layer-bucket/*"), false)
+    ])
+    error_message = "ECR image layers (the starport layer bucket) stay reachable."
   }
 }
 

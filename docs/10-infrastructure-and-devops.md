@@ -43,6 +43,8 @@ Endpoints: S3 (gateway), ECR, Secrets Manager, KMS, CloudWatch Logs (interface; 
 
 - Security groups: ALB → web (443→3000), web → api (internal port), app → RDS (5432), app → Valkey (6379). Nothing else inbound.
 - Egress: third-party APIs (LLM, embeddings, OCR, IdP) via NAT; Stage 1 adds a domain allowlist (egress proxy or firewall rules).
+- **S3 gateway endpoint policy (audit 2026-10-05 detection gap).** Every route table uses the endpoint, so its policy is the S3 egress control: any action on buckets of this account (`aws:ResourceAccount`), and `s3:GetObject` only on the AWS-owned buckets behind ECR image layers (`prod-<region>-starport-layer-bucket`), the Amazon Linux repositories and the SSM, ECS and CloudWatch agents. Add another read-only bucket with `s3_endpoint_extra_read_bucket_arns`. Test: `modules/network` run `s3_endpoint_reaches_only_this_accounts_buckets`.
+- **VPC flow logs** record ALL traffic (accepted and rejected, audit 2026-10-05 detection gap) with a 10-minute aggregation window, 400 days, logs CMK (`flow_log_traffic_type`; `REJECT` is the cheaper fallback). Test: `modules/network` run `flow_logs_enabled`.
 - **Cost note (Stage 0):** a NAT gateway is a notable fixed monthly cost. Options: single NAT in one AZ; or tasks in public subnets with public IPs and security groups allowing **only** ALB inbound (acceptable for pilot with strict SGs); revisit at Stage 1.
 
 ## 4. Services by stage
