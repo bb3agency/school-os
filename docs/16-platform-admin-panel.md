@@ -48,7 +48,7 @@ Operators are SchoolOS staff, not school users. One person may hold several role
 2. **Narrow bridges only.** The control plane touches tenant data only through the allowlisted definer functions (05 §3.4). Adding a bridge needs an ADR.
 3. **Everything is audited** in the hash-chained platform log, in the same transaction as the action. Actions that change a school also appear in the school's own audit log.
 4. **Step-up for risk, two people for the irreversible.** ᴿ permissions need MFA within 5 minutes; offboarding and emergency break-glass need a second operator (SEC-027, SEC-029).
-5. **Nothing punitive happens automatically.** Suspension is always a human decision with a reason, never during board exam windows without `platform_owner` approval.
+5. **Nothing punitive happens automatically.** Suspension is always a human decision with a reason. A **billing** suspension never happens during a board exam window without `platform_owner` approval (§9.3). A **security** suspension (`platform.tenants.suspend`: incident, abuse, the school's request) is immediate, also inside an exam window, and needs no extra approval: delaying it would keep a compromised or abused school open (owner decision 2026-10-07, audit AA-16); it is audited (`tenant.suspended`) with its reason stored on the school.
 6. **Money is exact.** `numeric(14,2)` INR, issued invoices are immutable, invoice numbers are gapless per financial year.
 7. **Same codebase, same rules.** Same stack, i18n (`en`, `te`), accessibility, logging and error conventions as the school app.
 
@@ -956,7 +956,7 @@ stateDiagram-v2
 
 ### 9.3 Protected board-exam windows
 
-Suspension must not cut off a school during board exams or registration deadlines. Windows are configured per year in `apps/api/app/platform/billing.yaml` (`protected_windows`: name, boards, start, end; empty in M0), maintained from the boards' published calendars. If today is inside a window that applies to the school's boards, suspension additionally requires `exam_window_override_by` = a `platform_owner` who approves with step-up; the event records both operators.
+Suspension for non-payment must not cut off a school during board exams or registration deadlines. This protects billing suspensions only: a security suspension (principle 5) is immediate inside a window too (AA-16). Windows are configured per year in `apps/api/app/platform/billing.yaml` (`protected_windows`: name, boards, start, end; empty in M0), maintained from the boards' published calendars. If today is inside a window that applies to the school's boards, suspension additionally requires `exam_window_override_by` = a `platform_owner` who approves with step-up; the event records both operators.
 
 ## 10. Invoice generation job
 

@@ -298,7 +298,9 @@ def activate(actor: Actor, tenant_id: uuid.UUID) -> TenantDetailOut:
 
 
 def suspend(actor: Actor, tenant_id: uuid.UUID, reason: str) -> TenantDetailOut:
-    """Security hold (security incident, abuse, school's request). Never automatic.
+    """Security hold (security incident, abuse, school's request). Never automatic. Immediate,
+    also inside a protected board-exam window, which guards billing suspensions only (docs/16
+    principle 5 and §9.3; owner decision 2026-10-07, audit AA-16).
 
     Independent of billing (audit 2026-10-06 R-18): an active school is suspended with the hold;
     a school already suspended for billing stays suspended and gains the hold, so paying the

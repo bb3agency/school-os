@@ -20,7 +20,7 @@ from sqlalchemy import Engine, text
 from app.core.db import platform_session
 from app.core.errors import Conflict
 from app.platform import billing
-from app.platform.common import config
+from app.platform.common import config, today_ist
 from app.platform.schemas import InvoiceLineIn, PaymentIn
 
 from .conftest import (
@@ -827,6 +827,58 @@ def test_FR_PLT_014_exam_window_needs_platform_owner(
         owner.actor, sub, "Unpaid", actor_is_owner=True, exam_window_override=True, today=day
     )
     assert out.status == "suspended"
+
+
+def test_AA_16_a_security_suspension_is_immediate_inside_an_exam_window(
+    api: Api,
+    owner: Operator,
+    make_operator: MakeOperator,
+    make_plan: Callable[..., uuid.UUID],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Owner decision 2026-10-07 (audit 2026-10-04 AA-16): the exam-window protection covers
+    billing suspensions only. A security hold (incident, abuse, the school's request) is never
+    delayed by a window and needs no platform_owner approval; it is audited with its reason
+    stored on the school."""
+    engineer = make_operator("platform_engineer")
+    tid = _school(api, owner, make_plan())["tenant_id"]
+    assert api.call("POST", f"/tenants/{tid}/activate", owner).status_code == 200
+    today = dt.datetime.now(dt.UTC).date()
+    monkeypatch.setitem(
+        config()["billing"],
+        "protected_windows",
+        [
+            {
+                "name": "SSC public exams",
+                "boards": ["SSC"],
+                "start": (today - dt.timedelta(days=3)).isoformat(),
+                "end": (today + dt.timedelta(days=3)).isoformat(),
+            }
+        ],
+    )
+    assert billing.in_protected_window(["SSC"], today_ist()) == "SSC public exams"
+    reason = "Security incident reported by the school"
+    res = api.call("POST", f"/tenants/{tid}/suspend", engineer, json={"reason": reason})
+    assert res.status_code == 200, res.text
+    assert res.json()["tenant_status"] == "suspended"
+    with platform_session() as s:
+        stored = s.execute(
+            text(
+                "SELECT tenant_status_reason, security_hold FROM platform.deployments "
+                "WHERE tenant_id = :t"
+            ),
+            {"t": uuid.UUID(tid)},
+        ).one()
+        event = s.execute(
+            text(
+                "SELECT actor_id, summary FROM platform.audit_events WHERE resource_id = :t "
+                "AND action = 'tenant.suspended' ORDER BY seq DESC LIMIT 1"
+            ),
+            {"t": uuid.UUID(tid)},
+        ).one()
+    assert (stored.tenant_status_reason, stored.security_hold) == (reason, True)
+    assert event.actor_id == engineer.id
+    assert (event.summary["from"], event.summary["to"]) == ("active", "suspended")
 
 
 def test_FR_PLT_012_plan_change_applies_next_period_and_cancel_at_period_end(
