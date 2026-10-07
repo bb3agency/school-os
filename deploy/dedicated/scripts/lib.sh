@@ -60,6 +60,21 @@ set_version() {
   SOS_VERSION="$version"
 }
 
+# Valkey ACL passwords (audit 2026-10-05 P2-06): one per user (web, api, worker, beat, health),
+# each SHA-256(VALKEY_PASSWORD | "schoolos-valkey-acl-v1" | user) from the generated secret, so a
+# container holding one password learns nothing about another, and existing hosts need no new
+# secret. Deterministic: rotating VALKEY_PASSWORD (generated_secret_version) rotates all of them.
+# printf is a builtin, so the secret never appears on a command line. Prints compose env lines.
+valkey_user_passwords() {
+  local master user
+  master="$(sed -n "s/^VALKEY_PASSWORD='\(.*\)'\$/\1/p; s/^VALKEY_PASSWORD=\([^']*\)\$/\1/p" "$SOS_SECRETS_ENV" | head -n 1)"
+  [[ -n $master ]] || die "$SOS_SECRETS_ENV has no VALKEY_PASSWORD; run scripts/fetch-secrets.sh"
+  for user in web api worker beat health; do
+    printf "VALKEY_%s_PASSWORD='%s'\n" "${user^^}" \
+      "$(printf '%s|schoolos-valkey-acl-v1|%s' "$master" "$user" | sha256sum | cut -d' ' -f1)"
+  done
+}
+
 # Compose env = host config + release image pins + secrets (0600, root only).
 render_compose_env() {
   local release_dir="${1:-$(active_release_dir)}"
@@ -74,7 +89,8 @@ render_compose_env() {
     [[ $(grep -c . <<<"$line") -eq 1 ]] || die "release.env must set $name exactly once"
     [[ $line =~ ^${name}=[^[:space:]@]+@sha256:[0-9a-f]{64}$ ]] || die "$name must be pinned by digest (@sha256:...)"
   done
-  local tmp
+  local tmp valkey_users
+  valkey_users="$(valkey_user_passwords)" || die "cannot derive the Valkey ACL passwords"
   tmp="$(mktemp "$SOS_ETC/.compose.env.XXXXXX")"
   chmod 0600 "$tmp"
   {
@@ -87,6 +103,7 @@ render_compose_env() {
       echo "SOS_PG_ARCHIVE_MODE=on"
     fi
     cat "$SOS_SECRETS_ENV"
+    echo "$valkey_users"
   } >"$tmp"
   mv -f "$tmp" "$SOS_COMPOSE_ENV"
 }

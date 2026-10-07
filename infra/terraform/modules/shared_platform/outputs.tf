@@ -96,7 +96,7 @@ output "secret_arns" {
     db                     = module.secrets.db_secret_arns
     generated              = module.secrets.random_secret_arns
     operator_supplied      = module.secrets.operator_secret_arns
-    valkey                 = module.redis.secret_arn
+    valkey                 = module.redis.user_secret_arns
     rds_master             = module.rds.master_user_secret_arn
     oidc_tenant_client     = module.cognito.tenant_client_secret_arn
     oidc_platform_client   = module.cognito.platform_client_secret_arn

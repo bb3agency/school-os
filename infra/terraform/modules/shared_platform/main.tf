@@ -87,16 +87,25 @@ locals {
     SOS_PLATFORM_INVOICE_BUCKET = var.platform_invoice_bucket
   }
 
-  # Secrets every app container needs to start: the guarded settings and the broker.
+  # Secrets every app container needs to start: the guarded settings. The broker URL is per task
+  # (redis_secret below).
   app_base_secrets = {
     SOS_DATABASE_URL          = "${local.db_secret["app"]}:url::"
     SOS_PLATFORM_DATABASE_URL = "${local.db_secret["platform"]}:url::"
-    SOS_REDIS_URL             = "${module.redis.secret_arn}:url::"
     SOS_SERVICE_TOKEN_KEY     = local.rnd_secret["service_token_key"]
   }
   app_base_secret_arns = [
-    local.db_secret["app"], local.db_secret["platform"], module.redis.secret_arn, local.rnd_secret["service_token_key"],
+    local.db_secret["app"], local.db_secret["platform"], local.rnd_secret["service_token_key"],
   ]
+
+  # Audit 2026-10-05 P2-06: each task connects to Valkey as its own ElastiCache RBAC user (web only
+  # on its own keys; modules/redis access_strings). worker-pdf is the worker user; migrate runs the
+  # api image and gets the api user only to pass the start-up guard (its security group cannot
+  # reach the cache).
+  redis_secret = {
+    for task, user in { web = "web", api = "api", worker = "worker", worker_pdf = "worker", beat = "beat", migrate = "api" } :
+    task => { url = "${module.redis.user_secret_arns[user]}:url::", arn = module.redis.user_secret_arns[user] }
+  }
 
   # Provider API keys: only for the containers that call providers (api, worker).
   provider_secrets     = { for env_name, short in var.operator_secret_env : env_name => local.op_secret[short] }
@@ -543,12 +552,12 @@ module "web" {
     OIDC_CLIENT_SECRET          = module.cognito.tenant_client_secret_arn
     PLATFORM_OIDC_CLIENT_SECRET = module.cognito.platform_client_secret_arn
     SUPPORT_OIDC_CLIENT_SECRET  = module.cognito.support_client_secret_arn
-    REDIS_URL                   = "${module.redis.secret_arn}:url::"
+    REDIS_URL                   = local.redis_secret["web"].url
   }
   secret_arns = [
     local.rnd_secret["session_secret"], local.rnd_secret["service_token_key"],
     module.cognito.tenant_client_secret_arn, module.cognito.platform_client_secret_arn,
-    module.cognito.support_client_secret_arn, module.redis.secret_arn,
+    module.cognito.support_client_secret_arn, local.redis_secret["web"].arn,
   ]
   secrets_kms_key_arns = [local.kms_data]
   log_kms_key_arn      = local.kms_logs
@@ -592,8 +601,8 @@ module "api" {
 
   # X-Forwarded-For is trusted only from the VPC (the ALB and the web/BFF tasks; P2-07).
   environment             = merge(local.app_env, local.email_env, { SOS_SERVICE_NAME = "api", SOS_TRUSTED_PROXIES = module.network.vpc_cidr_block })
-  secrets                 = merge(local.app_base_secrets, local.provider_secrets)
-  secret_arns             = concat(local.app_base_secret_arns, local.provider_secret_arns)
+  secrets                 = merge(local.app_base_secrets, local.provider_secrets, { SOS_REDIS_URL = local.redis_secret["api"].url })
+  secret_arns             = concat(local.app_base_secret_arns, local.provider_secret_arns, [local.redis_secret["api"].arn])
   secrets_kms_key_arns    = [local.kms_data]
   attach_task_role_policy = true
   task_role_policy_json   = data.aws_iam_policy_document.api.json
@@ -626,8 +635,8 @@ module "worker" {
   service_connect        = { namespace_arn = module.cluster.service_connect_namespace_arn }
 
   environment             = merge(local.app_env, local.email_env, { SOS_SERVICE_NAME = "worker" })
-  secrets                 = merge(local.app_base_secrets, local.provider_secrets)
-  secret_arns             = concat(local.app_base_secret_arns, local.provider_secret_arns)
+  secrets                 = merge(local.app_base_secrets, local.provider_secrets, { SOS_REDIS_URL = local.redis_secret["worker"].url })
+  secret_arns             = concat(local.app_base_secret_arns, local.provider_secret_arns, [local.redis_secret["worker"].arn])
   secrets_kms_key_arns    = [local.kms_data]
   attach_task_role_policy = true
   task_role_policy_json   = data.aws_iam_policy_document.worker.json
@@ -662,8 +671,8 @@ module "worker_pdf" {
   enable_execute_command = var.enable_execute_command
 
   environment             = merge(local.app_env, { SOS_SERVICE_NAME = "worker-pdf" })
-  secrets                 = local.app_base_secrets
-  secret_arns             = local.app_base_secret_arns
+  secrets                 = merge(local.app_base_secrets, { SOS_REDIS_URL = local.redis_secret["worker_pdf"].url })
+  secret_arns             = concat(local.app_base_secret_arns, [local.redis_secret["worker_pdf"].arn])
   secrets_kms_key_arns    = [local.kms_data]
   attach_task_role_policy = true
   task_role_policy_json   = data.aws_iam_policy_document.worker_pdf.json
@@ -693,8 +702,8 @@ module "beat" {
   # Beat only talks to Valkey, but it loads the same Settings, so it needs the full base settings to
   # pass the start-up guards (egress stays limited to 6379).
   environment          = merge(local.app_env, { SOS_SERVICE_NAME = "beat" })
-  secrets              = local.app_base_secrets
-  secret_arns          = local.app_base_secret_arns
+  secrets              = merge(local.app_base_secrets, { SOS_REDIS_URL = local.redis_secret["beat"].url })
+  secret_arns          = concat(local.app_base_secret_arns, [local.redis_secret["beat"].arn])
   secrets_kms_key_arns = [local.kms_data]
   log_kms_key_arn      = local.kms_logs
   tags                 = var.tags
@@ -724,8 +733,9 @@ module "migrate" {
   environment = merge(local.app_env, { SOS_SERVICE_NAME = "migrate" })
   secrets = merge(local.app_base_secrets, {
     SOS_MIGRATOR_DATABASE_URL = "${local.db_secret["migrator"]}:url::"
+    SOS_REDIS_URL             = local.redis_secret["migrate"].url
   })
-  secret_arns          = concat(local.app_base_secret_arns, [local.db_secret["migrator"]])
+  secret_arns          = concat(local.app_base_secret_arns, [local.db_secret["migrator"], local.redis_secret["migrate"].arn])
   secrets_kms_key_arns = [local.kms_data]
   log_kms_key_arn      = local.kms_logs
   tags                 = var.tags

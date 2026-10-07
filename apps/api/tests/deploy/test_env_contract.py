@@ -134,6 +134,16 @@ def template_secret_names() -> set[str]:
     return names
 
 
+def template_derived_names() -> set[str]:
+    """compose.env keys scripts/lib.sh derives from secrets (P2-06 Valkey users)."""
+    names: set[str] = set()
+    for title, lines in _template_sections().items():
+        if title.startswith("compose.env derived keys"):
+            for line in lines:
+                names.update(re.findall(r"\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b", line))
+    return names
+
+
 def synthetic_secret(name: str) -> str:
     if name == "SOS_HEARTBEAT_KEY_ID":
         return "hb-synthetickeyidab"
@@ -145,6 +155,7 @@ def dedicated_host_env() -> dict[str, str]:
     env = template_assignments("host.env")
     env.update(template_assignments("version.env"))
     env.update({name: synthetic_secret(name) for name in template_secret_names()})
+    env.update({name: synthetic_secret(name) for name in template_derived_names()})
     return env
 
 
