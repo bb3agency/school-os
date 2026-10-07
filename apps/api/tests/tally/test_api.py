@@ -164,6 +164,118 @@ def test_FR_TALLY_001_enrolment_attempts_are_limited_per_school(
     assert codes[10] == 429
 
 
+# --- enrolment hardening (audit 2026-10-04 AA-15; docs/07 TB9) ------------------------------------
+
+
+@pytest.fixture
+def frozen_enrolment_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    """One fixed instant for the hour windows (the request timestamps stay within the skew)."""
+    fixed = dt.datetime.now(dt.UTC)
+    monkeypatch.setattr(agent_auth, "_utcnow", lambda: fixed)
+
+
+@pytest.fixture
+def client_address(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """The client address the enrolment guard sees (``[0]``; tests change it)."""
+    current = ["203.0.113.9"]
+    monkeypatch.setattr(agent_auth, "_client_ip", lambda _request: current[0])
+    return current
+
+
+def _code_used(admin: Engine, code_id: str) -> bool:
+    return (
+        _scalar(
+            admin,
+            "SELECT used_at FROM ops.tally_enrolment_codes WHERE id = :i",
+            i=uuid.UUID(code_id),
+        )
+        is not None
+    )
+
+
+def test_AA_15_a_school_that_is_not_active_cannot_enrol_and_learns_nothing(
+    api: Any, admin_engine: Engine
+) -> None:
+    school = T.fresh_school(admin_engine)
+    made = T.new_code(api, school)
+    wrong = T.enrol_with(api, school.tenant_id, "ZZZZ-ZZZZ-ZZZZ")
+    with admin_engine.begin() as c:
+        c.execute(
+            text("UPDATE core.tenants SET status = 'suspended' WHERE id = :t"),
+            {"t": school.tenant_id},
+        )
+    try:
+        refused = T.enrol_with(api, school.tenant_id, made["code"])
+        assert refused.status_code == wrong.status_code == 401
+        assert refused.json()["code"] == wrong.json()["code"] == "unauthenticated"
+        assert refused.json()["detail"] == wrong.json()["detail"]
+        assert not _code_used(admin_engine, made["id"])
+    finally:
+        with admin_engine.begin() as c:
+            c.execute(
+                text("UPDATE core.tenants SET status = 'active' WHERE id = :t"),
+                {"t": school.tenant_id},
+            )
+    assert T.enrol_with(api, school.tenant_id, made["code"]).status_code == 201
+
+
+@pytest.mark.usefixtures("frozen_enrolment_clock")
+def test_AA_15_an_outsider_cannot_use_up_a_schools_enrolment_attempts(
+    api: Any, admin_engine: Engine, client_address: list[str]
+) -> None:
+    """Failed codes are counted per school AND client address: someone who knows the tenant
+    id locks out only their own address, not the school's office PC."""
+    school = T.fresh_school(admin_engine)
+    code = T.new_code(api, school)["code"]
+    tries = [T.enrol_with(api, school.tenant_id, "ZZZZ-ZZZZ-ZZZZ").status_code for _ in range(11)]
+    assert tries == [401] * 10 + [429]
+    client_address[0] = "198.51.100.7"  # the school's office
+    assert T.enrol_with(api, school.tenant_id, code).status_code == 201
+
+
+@pytest.mark.usefixtures("frozen_enrolment_clock")
+def test_AA_15_a_successful_enrolment_does_not_spend_the_failure_budget(
+    api: Any, admin_engine: Engine, client_address: list[str]
+) -> None:
+    school = T.fresh_school(admin_engine)
+    for _ in range(9):
+        assert T.enrol_with(api, school.tenant_id, "ZZZZ-ZZZZ-ZZZZ").status_code == 401
+    assert T.enrol(api, school) is not None  # attempt 10 succeeds
+    assert T.enrol_with(api, school.tenant_id, "ZZZZ-ZZZZ-ZZZZ").status_code == 401  # 10th fail
+    assert T.enrol_with(api, school.tenant_id, "ZZZZ-ZZZZ-ZZZZ").status_code == 429
+
+
+@pytest.mark.usefixtures("frozen_enrolment_clock")
+def test_AA_15_one_address_is_capped_across_schools(
+    api: Any, admin_engine: Engine, client_address: list[str]
+) -> None:
+    """Every attempt from one address counts, any school and any outcome, before anything else
+    is checked (spraying tenant ids)."""
+    cap = service.rules().enrolment.max_attempts_per_address_per_hour
+    codes = [T.enrol_with(api, uuid.uuid4(), "ZZZZ-ZZZZ-ZZZZ").status_code for _ in range(cap + 1)]
+    assert codes == [401] * cap + [429]
+    school = T.fresh_school(admin_engine)
+    code = T.new_code(api, school)["code"]
+    assert T.enrol_with(api, school.tenant_id, code).status_code == 429
+    client_address[0] = "198.51.100.7"
+    assert T.enrol_with(api, school.tenant_id, code).status_code == 201
+
+
+@pytest.mark.usefixtures("frozen_enrolment_clock")
+def test_AA_15_a_school_wide_cap_bounds_guessing_from_many_addresses(
+    api: Any, admin_engine: Engine, client_address: list[str]
+) -> None:
+    cfg = service.rules().enrolment
+    school = T.fresh_school(admin_engine)
+    per_address = cfg.max_failures_per_address_per_hour
+    for n in range(cfg.max_failures_per_school_per_hour // per_address):
+        client_address[0] = f"203.0.113.{n + 10}"
+        for _ in range(per_address):
+            assert T.enrol_with(api, school.tenant_id, "ZZZZ-ZZZZ-ZZZZ").status_code == 401
+    client_address[0] = "198.51.100.7"
+    assert T.enrol_with(api, school.tenant_id, "ZZZZ-ZZZZ-ZZZZ").status_code == 429
+
+
 def test_FR_TALLY_001_at_most_two_active_agents(api: Any, admin_engine: Engine) -> None:
     school = T.fresh_school(admin_engine)
     T.enrol(api, school)

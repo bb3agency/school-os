@@ -5,11 +5,19 @@ BFF service token. Two FastAPI dependencies, both carrying ``sos_edge_agent`` so
 route-enumeration test can accept exactly them on exactly those routes (CLAUDE.md §6.2 as amended
 by ADR-0032, Proposed):
 
-- :func:`require_edge_agent_enrolment` (``POST /edge/tally/enrol``): the school id header, a
-  timestamp within the skew window, a fresh nonce and at most ``max_attempts_per_hour`` attempts
-  per school. The one-time code itself is checked by the service in the school's transaction
-  (row lock, used once). A school whose connector flag is off answers exactly like a wrong code
-  (401), so an unauthenticated caller learns nothing about the flag.
+- :func:`require_edge_agent_enrolment` (``POST /edge/tally/enrol``), in this order: at most
+  ``max_attempts_per_address_per_hour`` attempts from one client address (any school, any
+  outcome; charged first) -> the school id header, a timestamp within the skew window, the
+  connector flag, a fresh nonce -> the school's failure budgets, which only wrong codes spend:
+  ``max_failures_per_address_per_hour`` per school and client address, and the higher
+  ``max_failures_per_school_per_hour`` for the school from all addresses (429 when either is
+  used up). Someone who knows a tenant id can therefore lock out only their own address, not
+  the school's office PC (audit 2026-10-04 AA-15). The one-time code itself, and that the school
+  is active, are checked by the service in the school's transaction (row lock, used once), which
+  records a wrong code with :meth:`EnrolmentCaller.failed`. A school whose connector flag is off,
+  or that is not active, answers exactly like a wrong code (401), so an unauthenticated caller
+  learns nothing about either. Counters live in Valkey under hashed addresses (never an address);
+  Valkey unreachable -> 503 (fail closed).
 - :func:`require_edge_agent_signature` (every other agent route), in this order, storing nothing
   on failure: headers well formed -> the device, its key and the school (read in that school's
   ``tenant_session``, RLS; no definer function) -> timestamp within ``skew_seconds`` -> body size
@@ -39,10 +47,18 @@ from typing import Annotated, Final, Literal
 import redis
 from fastapi import Depends, Request
 
+from app.authz.kv import InMemoryKV, KVStore, KVUnavailable, RedisKV
+from app.core import ratelimit
 from app.core.config import get_settings
 from app.core.crypto import CryptoError, KeyWrapper, get_key_wrapper
 from app.core.db import tenant_session
-from app.core.errors import Conflict, NotFound, RateLimited, Unauthenticated
+from app.core.errors import (
+    Conflict,
+    NotFound,
+    RateLimited,
+    ServiceUnavailable,
+    Unauthenticated,
+)
 from app.core.feature_flags import is_enabled
 from app.core.logging import get_logger
 from app.identity.service_token import InMemoryReplayStore, RedisReplayStore, ReplayStore
@@ -93,7 +109,8 @@ def sign(secret: bytes, *, method: str, path: str, timestamp: str, nonce: str, b
 class AgentStores:
     nonces: ReplayStore
     rate: ReplayStore
-    enrolment: ReplayStore
+    enrolment: KVStore
+    """Enrolment counters (fixed hour windows; keys ``sos:tally-enrol:...``, AA-15)."""
 
 
 @lru_cache(maxsize=1)
@@ -106,9 +123,9 @@ def get_agent_stores() -> AgentStores:
         return AgentStores(
             RedisReplayStore(client, prefix="sos:tally-nonce:"),
             RedisReplayStore(client, prefix="sos:tally-rate:"),
-            RedisReplayStore(client, prefix="sos:tally-enrol:"),
+            RedisKV(client),
         )
-    return AgentStores(InMemoryReplayStore(), InMemoryReplayStore(), InMemoryReplayStore())
+    return AgentStores(InMemoryReplayStore(), InMemoryReplayStore(), InMemoryKV())
 
 
 @lru_cache(maxsize=1)
@@ -136,6 +153,19 @@ class EnrolmentCaller:
 
     tenant_id: uuid.UUID
     agent_version: str | None
+    failure_keys: tuple[str, ...] = ()
+    """The school's failure counters this attempt spends if its code is wrong (AA-15)."""
+    counters: KVStore | None = None
+
+    def failed(self) -> None:
+        """Count a wrong, used or expired code against the school's failure budgets."""
+        if self.counters is None:
+            return
+        try:
+            for key in self.failure_keys:
+                self.counters.incr(key, ttl_s=_WINDOW_S)
+        except KVUnavailable:
+            log.warning("tally.agent.counter_unavailable", error_code="kv_unavailable")
 
 
 def _reject(reason: str, device_id: uuid.UUID | None = None) -> Unauthenticated:
@@ -255,23 +285,70 @@ def verify_signed(
 
 
 def verify_enrolment(
-    headers: Mapping[str, str], *, stores: AgentStores, at: dt.datetime | None = None
+    headers: Mapping[str, str],
+    *,
+    stores: AgentStores,
+    client_ip: str,
+    at: dt.datetime | None = None,
 ) -> EnrolmentCaller:
-    current = at or dt.datetime.now(dt.UTC)
-    tenant_id = _tenant(headers)
-    _, nonce = _check_time_and_nonce(headers, current)
-    if not is_enabled(rules().flag, tenant_id):
-        raise _reject("connector_off")
-    _claim_nonce(stores, tenant_id, nonce)
-    hour = int(current.timestamp()) // 3600
-    slots = rules().enrolment.max_attempts_per_hour
-    ttl = dt.timedelta(hours=1)
-    if not any(stores.enrolment.claim(f"{tenant_id}:{hour}:{i}", ttl) for i in range(slots)):
-        raise RateLimited(
-            "Too many enrolment attempts for this school; try again in an hour.",
-            retry_after_s=3600 - int(current.timestamp()) % 3600,
-        )
-    return EnrolmentCaller(tenant_id=tenant_id, agent_version=_agent_version(headers))
+    current = at or _utcnow()
+    cfg = rules().enrolment
+    hour = int(current.timestamp()) // _WINDOW_S
+    retry = _WINDOW_S - int(current.timestamp()) % _WINDOW_S
+    address = ratelimit.ip_hash(client_ip)
+    counters = stores.enrolment
+    try:
+        # 1. Every attempt from one address, before anything else is checked.
+        if counters.incr(f"{_ENROL}ip:{address}:{hour}", ttl_s=_WINDOW_S) > (
+            cfg.max_attempts_per_address_per_hour
+        ):
+            raise _enrolment_limited("address", retry)
+        tenant_id = _tenant(headers)
+        _, nonce = _check_time_and_nonce(headers, current)
+        if not is_enabled(rules().flag, tenant_id):
+            raise _reject("connector_off")
+        _claim_nonce(stores, tenant_id, nonce)
+        # 2. The school's failure budgets, spent only by wrong codes (EnrolmentCaller.failed).
+        per_address = f"{_ENROL}fail:{tenant_id}:{address}:{hour}"
+        per_school = f"{_ENROL}fail:{tenant_id}:{hour}"
+        if _count(counters, per_address) >= cfg.max_failures_per_address_per_hour:
+            raise _enrolment_limited("school_address", retry)
+        if _count(counters, per_school) >= cfg.max_failures_per_school_per_hour:
+            raise _enrolment_limited("school", retry)
+    except KVUnavailable:
+        log.warning("tally.agent.rejected", error_code="kv_unavailable", outcome="rejected")
+        raise ServiceUnavailable() from None
+    return EnrolmentCaller(
+        tenant_id=tenant_id,
+        agent_version=_agent_version(headers),
+        failure_keys=(per_address, per_school),
+        counters=counters,
+    )
+
+
+_ENROL: Final = "sos:tally-enrol:"
+_WINDOW_S: Final = 3600
+
+
+def _utcnow() -> dt.datetime:
+    return dt.datetime.now(dt.UTC)
+
+
+def _client_ip(request: Request) -> str:
+    """The client address from the trusted proxy chain (``core.ratelimit``); tests replace it."""
+    return ratelimit.client_ip_of(request)
+
+
+def _count(counters: KVStore, key: str) -> int:
+    raw = counters.get(key)
+    return int(raw) if raw is not None else 0
+
+
+def _enrolment_limited(reason: str, retry_after_s: int) -> RateLimited:
+    log.warning("tally.agent.rejected", error_code=f"enrol_limited_{reason}", outcome="rejected")
+    return RateLimited(
+        "Too many enrolment attempts; try again in an hour.", retry_after_s=retry_after_s
+    )
 
 
 # --- FastAPI dependencies ---------------------------------------------------------------------
@@ -321,7 +398,7 @@ class RequireEdgeAgentEnrolment:
         request: Request,
         stores: Annotated[AgentStores, Depends(get_agent_stores)],
     ) -> EnrolmentCaller:
-        return verify_enrolment(request.headers, stores=stores)
+        return verify_enrolment(request.headers, stores=stores, client_ip=_client_ip(request))
 
 
 def require_edge_agent_signature(route: RouteName) -> RequireEdgeAgentSignature:

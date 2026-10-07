@@ -1723,7 +1723,8 @@ export interface paths {
          * Enrol
          * @description Exchange the owner's one-time code for a device credential (returned once). Headers:
          *     ``X-SOS-Tenant``, ``X-SOS-Timestamp``, ``X-SOS-Nonce``. 401 for a wrong, used or expired
-         *     code; 429 after 10 attempts per school per hour.
+         *     code, or a school that is not active; 429 after 10 wrong codes per school and client
+         *     address, 50 per school, or 20 attempts per address in an hour (docs/07 TB9).
          */
         post: operations["enrol_api_v1_edge_tally_enrol_post"];
         delete?: never;

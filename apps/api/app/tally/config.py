@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from functools import lru_cache
 from importlib import resources
+from typing import Self
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 VERSION_PATTERN = r"^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,6}$"
 
@@ -17,8 +18,17 @@ class _Model(BaseModel):
 
 class EnrolmentRules(_Model):
     code_ttl_minutes: int = Field(ge=5, le=120)
-    max_attempts_per_hour: int = Field(ge=1, le=100)
+    max_attempts_per_address_per_hour: int = Field(ge=1, le=1000)
+    max_failures_per_address_per_hour: int = Field(ge=1, le=100)
+    max_failures_per_school_per_hour: int = Field(ge=1, le=1000)
     max_active_devices: int = Field(ge=1, le=5)
+
+    @model_validator(mode="after")
+    def _school_cap_above_address_cap(self) -> Self:
+        """One address alone must never reach the school-wide cap (AA-15)."""
+        if self.max_failures_per_school_per_hour <= self.max_failures_per_address_per_hour:
+            raise ValueError("max_failures_per_school_per_hour must exceed the per-address cap")
+        return self
 
 
 class SigningRules(_Model):

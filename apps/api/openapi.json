@@ -29355,7 +29355,7 @@
     },
     "/api/v1/edge/tally/enrol": {
       "post": {
-        "description": "Exchange the owner's one-time code for a device credential (returned once). Headers:\n``X-SOS-Tenant``, ``X-SOS-Timestamp``, ``X-SOS-Nonce``. 401 for a wrong, used or expired\ncode; 429 after 10 attempts per school per hour.",
+        "description": "Exchange the owner's one-time code for a device credential (returned once). Headers:\n``X-SOS-Tenant``, ``X-SOS-Timestamp``, ``X-SOS-Nonce``. 401 for a wrong, used or expired\ncode, or a school that is not active; 429 after 10 wrong codes per school and client\naddress, 50 per school, or 20 attempts per address in an hour (docs/07 TB9).",
         "operationId": "enrol_api_v1_edge_tally_enrol_post",
         "requestBody": {
           "content": {

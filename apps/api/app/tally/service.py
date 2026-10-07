@@ -645,9 +645,19 @@ def enrol(caller: EnrolmentCaller, data: EnrolIn, *, wrapper: KeyWrapper) -> Enr
     code is a plain 401 (nothing stored); the secret is returned once and stored wrapped."""
     now = _now()
     with tenant_session(caller.tenant_id) as session:
+        # A school that is not active cannot enrol (audit 2026-10-04 AA-15): the same 401 as a
+        # wrong code, checked first, so the code is not used and nothing tells them apart.
+        try:
+            active = tenancy.get_tenant(session).status == "active"
+        except NotFound:
+            active = False
+        if not active:
+            log.warning("tally.agent.rejected", error_code="school_not_active", outcome="rejected")
+            raise Unauthenticated("Edge agent request rejected")
         code = repo.lock_code(session, code_hash(data.code))
         if code is None or code.used_at is not None or code.expires_at <= now:
             log.warning("tally.agent.rejected", error_code="bad_code", outcome="rejected")
+            caller.failed()
             raise Unauthenticated("Edge agent request rejected")
         cfg = rules().enrolment
         if repo.count_active_devices(session) >= cfg.max_active_devices:

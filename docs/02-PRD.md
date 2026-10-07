@@ -403,7 +403,7 @@ Purpose limit (08 §4): these features exist only for the school's educational a
 **US-1801** · As the owner, I want to connect the office PC that runs Tally with a one-time code, so that only that PC can send our Tally figures. [FR-TALLY-001, FR-TALLY-002, FR-TALLY-003] *(Proposed from the roadmap scope; PO to confirm.)*
 - AC1: Given I signed in with MFA recently, when I choose "Add an agent" and name the PC, then SchoolOS shows a one-time code once, with the command to run on the PC and the time it expires (30 minutes); only a hash of the code is kept.
 - AC2: When the agent is enrolled with the code, then the code cannot be used again, the PC appears in the agent list with its version and Tally product, and the event is in the audit log.
-- AC3: A wrong, used or expired code is refused without saying which; after 10 attempts in an hour further attempts are refused; a school has at most 2 active agents.
+- AC3: A wrong, used or expired code is refused without saying which; after 10 wrong codes in an hour from one address (or 50 from all addresses) further attempts are refused, so an outsider cannot lock the office PC out (AA-15); a school that is not active cannot enrol; a school has at most 2 active agents.
 - AC4: The agent only reads from Tally on the same PC and only sends to SchoolOS over HTTPS; nothing personal is written to the PC's disk.
 
 **US-1802** · As the owner, I want to see whether the agent is syncing and revoke it when the PC is replaced or lost. [FR-TALLY-002, FR-TALLY-009] *(Proposed from the roadmap scope; PO to confirm.)*
