@@ -165,7 +165,7 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | tenant.billing.read (Plan & billing page) | ✓ | ✓ | — | — | ✓ | — | — | — | — |
 | support.ticket.create (open support tickets; read and reply on the ones you opened; no student data) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
 | support.manage (read and reply on every support ticket of the school; audit 2026-10-06 R-17) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
-| user.manage (invite, deactivate) | ✓ᴿ | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — |
+| user.manage (invite, deactivate; inviting a scoped role such as class teacher with a `school` scope also needs role.assign: A-19) | ✓ᴿ | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — |
 | role.assign | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
 | student.read_basic | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | S | S | ✓ |
 | student.read_sensitive | ✓ | ✓ | ✓ | — | — | — | S | — | — |
