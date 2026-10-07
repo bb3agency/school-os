@@ -213,3 +213,25 @@ run "cors_origin_must_be_https" {
 
   expect_failures = [var.cors_rules]
 }
+
+# Audit W3-06, PRV-016: the worker tags every automatic deletion (and every image that showed a full
+# Aadhaar number) sos-lifecycle=discarded before deleting it; the files bucket must then expire the
+# object and its noncurrent version after one day instead of keeping it for the 90-day window.
+run "files_bucket_discards_tagged_objects_after_one_day" {
+  command = plan
+
+  assert {
+    condition = (
+      length(module.files.lifecycle_rules["discarded-1d"].tags) == 1 &&
+      module.files.lifecycle_rules["discarded-1d"].tags["sos-lifecycle"] == "discarded" &&
+      module.files.lifecycle_rules["discarded-1d"].expiration_days == 1 &&
+      module.files.lifecycle_rules["discarded-1d"].noncurrent_days == 1
+    )
+    error_message = "The files bucket expires sos-lifecycle=discarded objects and their noncurrent versions after 1 day (W3-06, PRV-016)."
+  }
+
+  assert {
+    condition     = module.files.lifecycle_rules["noncurrent-and-multipart"].noncurrent_days == 90
+    error_message = "Every other deletion stays recoverable for the 90-day window (W3-06)."
+  }
+}
