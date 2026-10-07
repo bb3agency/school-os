@@ -173,6 +173,36 @@ def test_FR_TALLY_001_at_most_two_active_agents(api: Any, admin_engine: Engine) 
     assert res.json()["code"] == "too_many_devices"
 
 
+def test_FR_TALLY_001_agent_cap_is_counted_under_a_per_school_lock(
+    api: Any, admin_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two enrolments at once both counted the active agents before either was inserted, so the
+    cap could be exceeded by one (audit 2026-10-06 hardening). The count now runs while the
+    transaction holds the school's agent-slot advisory lock, so concurrent enrolments queue."""
+    from app.tally import repository
+
+    held: list[bool] = []
+    real = repository.count_active_devices
+
+    def count(session: Any) -> int:
+        held.append(
+            bool(
+                session.execute(
+                    text(
+                        "SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' "
+                        "AND pid = pg_backend_pid() AND granted"
+                    )
+                ).scalar_one()
+            )
+        )
+        return real(session)
+
+    monkeypatch.setattr(repository, "count_active_devices", count)
+    school = T.fresh_school(admin_engine)
+    T.enrol(api, school)  # the code (owner) and the enrolment (agent) both count
+    assert held == [True, True]
+
+
 # --- signed requests (FR-TALLY-002) ---------------------------------------------------------------
 
 
