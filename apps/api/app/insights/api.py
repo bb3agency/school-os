@@ -240,5 +240,6 @@ def erase_note(ctx: Manager, db: TenantDB, note_id: uuid.UUID, body: EraseIn) ->
 @router.get("/students/{student_id}/timeline", response_model=TimelineOut)
 def timeline(ctx: Reader, db: TenantDB, student_id: uuid.UUID) -> TimelineOut:
     """The student's timeline, newest first, with the attendance, behaviour and course
-    indicators (``insights.read``; 404 outside your scope). Audited."""
+    indicators (``insights.read``; 404 outside your scope). Attendance months appear only if you
+    hold ``attendance.read`` for the student, exams only with ``marks.read``. Audited."""
     return service.timeline(db, ctx, student_id)

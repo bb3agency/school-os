@@ -1619,7 +1619,8 @@ export interface paths {
          * @description Check sections, classes, students or an import batch, optionally for an export profile
          *     such as ``cisce-registration-2026`` (permission ``dq.findings.read``). Small scopes are
          *     checked at once (status ``completed``); bigger ones are queued (status ``queued``) and you
-         *     are notified when they finish. Accepts ``Idempotency-Key``.
+         *     are notified when they finish. A section or class outside your scope answers like an unknown
+         *     one (422 ``not_found``). Accepts ``Idempotency-Key``.
          */
         post: operations["start_run_api_v1_dq_runs_post"];
         delete?: never;
@@ -5133,7 +5134,8 @@ export interface paths {
         /**
          * Timeline
          * @description The student's timeline, newest first, with the attendance, behaviour and course
-         *     indicators (``insights.read``; 404 outside your scope). Audited.
+         *     indicators (``insights.read``; 404 outside your scope). Attendance months appear only if you
+         *     hold ``attendance.read`` for the student, exams only with ``marks.read``. Audited.
          */
         get: operations["timeline_api_v1_students__student_id__timeline_get"];
         put?: never;

@@ -118,6 +118,8 @@ MANAGE: Final = "insights.manage"
 SENSITIVE: Final = students.SENSITIVE
 STUDENT_READ: Final = students.READ
 CERTIFICATE_READ: Final = "certificate.read"
+ATTENDANCE_READ: Final = "attendance.read"
+MARKS_READ: Final = "marks.read"
 OWNER_NEEDS: Final = frozenset({STUDENT_READ, SENSITIVE, READ, ACT})
 
 EVALUATE_EVENT: Final = "insights.evaluate.requested"
@@ -1158,10 +1160,22 @@ def _certificate_items(
     ]
 
 
+def _reaches(session: Session, ctx: UserContext, student_id: uuid.UUID, permission: str) -> bool:
+    """True if the caller holds ``permission`` for this student (in scope)."""
+    if not ctx.has(permission):
+        return False
+    try:
+        students.ensure_in_scope(session, ctx, student_id, permission)
+    except NotFound:
+        return False
+    return True
+
+
 def timeline(session: Session, ctx: UserContext, student_id: uuid.UUID) -> TimelineOut:
     """Everything the school holds for the student's educational follow-up, newest first,
-    with the ABC indicators (``insights.read``; 404 outside scope). Audit ``insights.viewed``
-    (view ``timeline``)."""
+    with the ABC indicators (``insights.read``; 404 outside scope). Attendance months only for
+    callers holding ``attendance.read`` for the student, exams only with ``marks.read`` (audit
+    2026-10-04 AA-17). Audit ``insights.viewed`` (view ``timeline``)."""
     _ensure_student(session, ctx, student_id)
     cfg = load_config()
     today = today_ist()
@@ -1204,21 +1218,23 @@ def timeline(session: Session, ctx: UserContext, student_id: uuid.UUID) -> Timel
                 ),
             )
         )
-    items.extend(_attendance_months(marks, cfg.timeline.attendance_months))
-    items.extend(
-        TimelineItem(
-            kind="exam",
-            on=r.held_on,
-            exam=ExamEvent(
-                exam_id=r.exam_id,
-                name=r.name,
-                percent=r.percent,
-                papers=r.papers,
-                absent_papers=r.absent_papers,
-            ),
+    if _reaches(session, ctx, student_id, ATTENDANCE_READ):
+        items.extend(_attendance_months(marks, cfg.timeline.attendance_months))
+    if _reaches(session, ctx, student_id, MARKS_READ):
+        items.extend(
+            TimelineItem(
+                kind="exam",
+                on=r.held_on,
+                exam=ExamEvent(
+                    exam_id=r.exam_id,
+                    name=r.name,
+                    percent=r.percent,
+                    papers=r.papers,
+                    absent_papers=r.absent_papers,
+                ),
+            )
+            for r in results
         )
-        for r in results
-    )
     names = _members(session, [n.created_by_membership for n in notes])
     items.extend(
         TimelineItem(kind="note", on=n.noted_on, note=_note_out(session, n, names)) for n in notes

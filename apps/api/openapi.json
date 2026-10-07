@@ -29013,7 +29013,7 @@
     },
     "/api/v1/dq/runs": {
       "post": {
-        "description": "Check sections, classes, students or an import batch, optionally for an export profile\nsuch as ``cisce-registration-2026`` (permission ``dq.findings.read``). Small scopes are\nchecked at once (status ``completed``); bigger ones are queued (status ``queued``) and you\nare notified when they finish. Accepts ``Idempotency-Key``.",
+        "description": "Check sections, classes, students or an import batch, optionally for an export profile\nsuch as ``cisce-registration-2026`` (permission ``dq.findings.read``). Small scopes are\nchecked at once (status ``completed``); bigger ones are queued (status ``queued``) and you\nare notified when they finish. A section or class outside your scope answers like an unknown\none (422 ``not_found``). Accepts ``Idempotency-Key``.",
         "operationId": "start_run_api_v1_dq_runs_post",
         "requestBody": {
           "content": {
@@ -44966,7 +44966,7 @@
     },
     "/api/v1/students/{student_id}/timeline": {
       "get": {
-        "description": "The student's timeline, newest first, with the attendance, behaviour and course\nindicators (``insights.read``; 404 outside your scope). Audited.",
+        "description": "The student's timeline, newest first, with the attendance, behaviour and course\nindicators (``insights.read``; 404 outside your scope). Attendance months appear only if you\nhold ``attendance.read`` for the student, exams only with ``marks.read``. Audited.",
         "operationId": "timeline_api_v1_students__student_id__timeline_get",
         "parameters": [
           {
