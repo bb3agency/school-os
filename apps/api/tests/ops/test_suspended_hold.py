@@ -58,7 +58,7 @@ def test_A_12_every_outbox_consumer_checks_the_school_first() -> None:
         if not isinstance(celery_app.tasks[name], TenantTask)
     )
     assert missing == []
-    assert RUN_WHILE_SUSPENDED <= set(celery_app.tasks)
+    assert set(celery_app.tasks) >= RUN_WHILE_SUSPENDED
 
 
 def test_A_12_decision_follows_the_school_status(admin_engine: Engine, engines: None) -> None:

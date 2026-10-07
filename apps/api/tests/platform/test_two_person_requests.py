@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 from sqlalchemy import Engine, text
+from sqlalchemy.exc import IntegrityError
 
 from app.core.db import platform_session
 from app.platform.permissions import catalog
@@ -342,18 +343,18 @@ def test_hardening_critical_announcement_needs_a_second_operator(
     same = api.call("POST", f"/announcements/{aid}/approve", agent)
     assert (same.status_code, same.json()["code"]) == (409, "same_operator")
     # Direct DB attempt to publish it without a second operator fails the CHECK.
-    with pytest.raises(Exception, match="announcements_critical_two_person"):
-        with admin_engine.begin() as c:
-            c.execute(
-                text("UPDATE platform.announcements SET status = 'scheduled' WHERE id = :i"),
-                {"i": uuid.UUID(aid)},
-            )
+    with (
+        pytest.raises(IntegrityError, match="announcements_critical_two_person"),
+        admin_engine.begin() as c,
+    ):
+        c.execute(
+            text("UPDATE platform.announcements SET status = 'scheduled' WHERE id = :i"),
+            {"i": uuid.UUID(aid)},
+        )
     ok = api.call("POST", f"/announcements/{aid}/approve", other)
     assert ok.status_code == 200, ok.text
     assert (ok.json()["status"], ok.json()["approved_by"]) == ("scheduled", str(other.id))
     # Any change sends it back for approval.
-    etag = api.call("GET", "/announcements?limit=200", agent)
-    assert etag.status_code == 200
     changed = api.call(
         "PATCH", f"/announcements/{aid}", agent, json=_announcement("critical", title_en="New")
     )
