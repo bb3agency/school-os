@@ -492,6 +492,7 @@ Targets: RPO ≤ 15 min, RTO ≤ 8 h (NFR-AVL-005). The RPO needs continuous WAL
 - Clock sync to Amazon Time Sync Service (CERT-In NTP requirement; 08 §6).
 - Logs shipped to CloudWatch (no personal data; same allowlist and `redact()` as the shared tier).
 - Account-level detection (SEC-023): hosts run in the prod account, so the prod `security_baseline` covers them: CloudTrail records their API calls and object-level access to their `sos-ded-*` buckets, GuardDuty watches EC2 (with EBS malware scans) and the buckets in both regions, and Config/Security Hub check IMDSv2, EBS encryption and open SSH (§5.1). A host placed in any other AWS account needs its own `security_baseline` instance first.
+- Security alarms (audit 2026-10-05 hardening): `modules/dedicated_host` runs the shared tier's P2-02/P2-07 metric filters (audit chain broken or not run, 401 spikes, break-glass session, refresh-token reuse, rate limits, sign-in failures) on the host log group `/schoolos/dedicated/<code>`, in namespace `SchoolOS/Security/dedicated/<code>` (the host role may write only `SchoolOS/Dedicated`), alarming the prod on-call topic (`security_alarm_topic_arn` = prod output `alarm_topic_arn`). Tests: `modules/dedicated_host` runs `security_alarms_on_the_host_log_group`, `security_alarm_topic_required`; `apps/api/tests/deploy/test_dedicated_security_alarms.py`.
 - Operator access only through the pipeline or SSM, under the same break-glass rules as the shared tier; the control plane has no inbound path.
 
 ### 15.5 Fleet upgrades
