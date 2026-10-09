@@ -151,29 +151,53 @@ def test_US_501_run_validation(world: Any, api: Any) -> None:
 def test_AA_18_run_scope_outside_the_callers_reach_answers_like_an_unknown_id(
     world: Any, api: Any
 ) -> None:
-    """A class teacher (section 9A) cannot tell an existing section or class outside their
-    scope from an id that does not exist: both are 422 ``not_found`` on the same field."""
-    who = world.person("class_teacher")
+    """Starting a run needs ``dq.findings.resolve`` (owner decision 2026-10-07), which no system
+    role holds scoped. A read-only class teacher gets the same 403 for an existing section and
+    an unknown id; a custom role with ``dq.findings.resolve`` scoped to 9A cannot tell an
+    existing section or class outside its scope from an id that does not exist: both are 422
+    ``not_found`` on the same field (AA-18)."""
+    import dataclasses
+
+    from app.core.errors import ValidationFailed
+    from app.dq import service as dq
+    from app.dq.schemas import RunCreate, RunScopeIn
+
+    teacher = world.person("class_teacher")
+    refused = [
+        api.call(teacher, "POST", "/api/v1/dq/runs", json={"scope": {"section_ids": [str(x)]}})
+        for x in (world.a.ids["section_9c"], uuid.uuid4())
+    ]
+    assert [r.status_code for r in refused] == [403, 403]
+    assert refused[0].json()["code"] == refused[1].json()["code"]
+
+    base = DS.ctx(world.a, "class_teacher")
+    custom = dataclasses.replace(
+        base,
+        permissions=base.permissions | {dq.RESOLVE},
+        scoped_permissions=base.scoped_permissions | {dq.RESOLVE},
+    )
 
     def run(scope: dict[str, Any]) -> Any:
-        return api.call(who, "POST", "/api/v1/dq/runs", json={"scope": scope})
+        return DS.call(
+            world.a, dq.request_run, RunCreate(scope=RunScopeIn(**scope)), as_ctx=custom
+        )
 
-    def answer(res: Any) -> tuple[int, Any]:
-        return res.status_code, res.json().get("errors")
+    def errors(scope: dict[str, Any]) -> Any:
+        with pytest.raises(ValidationFailed) as exc:
+            run(scope)
+        return exc.value.errors
 
     for field, existing in (
         ("section_ids", world.a.ids["section_9c"]),
         ("class_ids", world.a.ids["class_x"]),
     ):
-        outside = run({field: [str(existing)]})
-        unknown = run({field: [str(uuid.uuid4())]})
-        assert answer(outside) == answer(unknown), (outside.text, unknown.text)
-        assert outside.status_code == 422
-        (error,) = outside.json()["errors"]
+        outside, unknown = errors({field: [existing]}), errors({field: [uuid.uuid4()]})
+        assert outside == unknown
+        [error] = outside
         assert (error["field"], error["code"]) == (f"scope.{field}.0", "not_found")
-    # The caller's own section, and the class that holds it, still run.
-    assert run({"section_ids": [str(world.a.ids["section_9a"])]}).status_code == 202
-    assert run({"class_ids": [str(world.a.ids["class_ix"])]}).status_code == 202
+    # The caller's own section still runs.
+    assert run({"section_ids": [world.a.ids["section_9a"]]}).id is not None
+    assert run({"class_ids": [world.a.ids["class_ix"]]}).id is not None
 
 
 def test_FR_DQ_020_resolve_needs_a_note_or_change_request(world: Any, api: Any) -> None:

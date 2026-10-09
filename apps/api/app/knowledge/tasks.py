@@ -259,6 +259,7 @@ def summarise_conversation(
 
 @shared_task(
     name=SETTLE_TASK,
+    base=TenantTask,
     bind=True,
     queue="maintenance",
     acks_late=True,

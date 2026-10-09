@@ -118,18 +118,20 @@ def test_data_export_refused_members_cannot_spend_the_school_budget(
 def test_heavy_jobs_dq_runs_refused_members_cannot_spend_the_school_budget(
     admin_engine: Engine, api: Any, clock: Clock
 ) -> None:
-    _, people = _school(admin_engine, "accountant", "teacher", "office_staff")
+    _, people = _school(admin_engine, "accountant", "teacher", "office_staff", "office_admin")
     over = _quota("heavy_jobs") + 2
     for role in ("accountant", "teacher"):
         for _ in range(over):
             assert api.call(people[role], "POST", DQ_RUNS, json={}).status_code == 403
 
-    clerk = people["office_staff"]  # holds dq.findings.read
+    # Starting a run needs dq.findings.resolve (owner decision 2026-10-07): the office staff
+    # hold it; the owner, who only reads findings, does not.
+    clerk = people["office_staff"]
     first = api.call(clerk, "POST", DQ_RUNS, json={})
     assert first.status_code == 202, first.text
     assert '"heavy_jobs";q=10;w=600' in first.headers["RateLimit-Policy"]
     for _ in range(_quota("heavy_jobs") - 1):
-        assert api.call(people["owner"], "POST", DQ_RUNS, json={}).status_code == 202
+        assert api.call(people["office_admin"], "POST", DQ_RUNS, json={}).status_code == 202
     _assert_rate_limited(api.call(clerk, "POST", DQ_RUNS, json={}), "heavy_jobs")
     assert api.call(people["accountant"], "POST", DQ_RUNS, json={}).status_code == 403
 
@@ -160,14 +162,14 @@ def test_heavy_jobs_is_shared_by_the_routes_of_one_school(
     admin_engine: Engine, api: Any, clock: Clock
 ) -> None:
     """Still one school-wide budget across its routes, and another school is not affected."""
-    school, people = _school(admin_engine)
-    other, other_people = _school(admin_engine)
+    school, people = _school(admin_engine, "office_admin")
+    other, other_people = _school(admin_engine, "office_admin")
     owner = people["owner"]
     url = f"/api/v1/academic-years/{school.ids['old_year']}/promotions:preview"
     body = {"to_academic_year_id": str(school.ids["year"])}
     for _ in range(_quota("heavy_jobs")):
-        assert api.call(owner, "POST", DQ_RUNS, json={}).status_code == 202
+        assert api.call(people["office_admin"], "POST", DQ_RUNS, json={}).status_code == 202
     _assert_rate_limited(api.call(owner, "POST", url, json=body), "heavy_jobs")
-    assert api.call(other_people["owner"], "POST", DQ_RUNS, json={}).status_code == 202
+    assert api.call(other_people["office_admin"], "POST", DQ_RUNS, json={}).status_code == 202
     assert other.tenant_id != school.tenant_id
     assert isinstance(other.tenant_id, uuid.UUID)

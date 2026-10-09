@@ -106,6 +106,8 @@ RUN_WHILE_SUSPENDED: Final[frozenset[str]] = frozenset(
         "documents.discard_unused_object",
         "knowledge.refresh_acl",
         "knowledge.remove_document",
+        # Bookkeeping for an AI call already made and billed (audit W3-10); no provider call.
+        "knowledge.settle_spend",
     }
 )
 

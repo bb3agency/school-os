@@ -356,7 +356,11 @@ def test_hardening_critical_announcement_needs_a_second_operator(
     assert (ok.json()["status"], ok.json()["approved_by"]) == ("scheduled", str(other.id))
     # Any change sends it back for approval.
     changed = api.call(
-        "PATCH", f"/announcements/{aid}", agent, json=_announcement("critical", title_en="New")
+        "PATCH",
+        f"/announcements/{aid}",
+        agent,
+        json=_announcement("critical", title_en="New"),
+        headers={"If-Match": f'W/"{ok.json()["version"]}"'},
     )
     assert changed.status_code == 200, changed.text
     assert (changed.json()["status"], changed.json()["approved_by"]) == ("pending_approval", None)
