@@ -10,7 +10,9 @@ escaped HTML and get bytes back.
 :class:`PdfRenderer` is the interface; :class:`ChromiumRenderer` the real implementation and
 tests may install a fake with :func:`set_renderer`. Hardening:
 
-- JavaScript is disabled, service workers blocked, downloads refused.
+- JavaScript is disabled, service workers blocked, downloads refused; DNS prefetch and
+  background networking are off (:data:`CHROMIUM_ARGS`, and every page gets
+  ``x-dns-prefetch-control: off`` first in its head).
 - Every request the page makes is intercepted: the bundled Noto Sans Telugu font (checked
   against its SHA-256) is served from memory at :data:`FONT_URL`; everything else is aborted,
   so a template (or a value in it) can never reach the network or a local file.
@@ -114,6 +116,31 @@ def font_stack(fallback: str = "sans-serif") -> str:
     return f'"{FONT_FAMILY}", {fallback}' if telugu_enabled() else fallback
 
 
+# Chromium resolves <link rel="dns-prefetch"> hosts (and runs background networking) outside the
+# route handler that aborts every request (api-auth audit 2026-10-04 hardening note).
+CHROMIUM_ARGS: Final = (
+    "--dns-prefetch-disable",
+    "--disable-background-networking",
+    "--disable-component-update",
+    "--disable-domain-reliability",
+    "--disable-sync",
+    "--no-pings",
+    "--disable-features=NetworkPrediction,Prefetch,PreloadMediaEngagementData",
+)
+NO_DNS_PREFETCH_META: Final = '<meta http-equiv="x-dns-prefetch-control" content="off">'
+
+
+def _no_dns_prefetch(html: str) -> str:
+    """Put ``x-dns-prefetch-control: off`` first in the page's head (or first in the page)."""
+    lower = html.lower()
+    head = lower.find("<head")
+    if head >= 0:
+        end = lower.find(">", head)
+        if end >= 0:
+            return html[: end + 1] + NO_DNS_PREFETCH_META + html[end + 1 :]
+    return NO_DNS_PREFETCH_META + html
+
+
 def _route(route: Route) -> None:
     # The font is served only while Telugu is shown (ADR-0036); otherwise it is refused like
     # any other request, so it cannot be embedded even if a page asks for it.
@@ -138,7 +165,7 @@ class ChromiumRenderer:
 
         def shoot(page: Page) -> bytes:
             page.set_viewport_size({"width": width_px, "height": 400})
-            page.set_content(html, wait_until="load")
+            page.set_content(_no_dns_prefetch(html), wait_until="load")
             page.emulate_media(media="screen")
             return page.screenshot(full_page=True, type="png")
 
@@ -159,7 +186,11 @@ class ChromiumRenderer:
     def _run(self, html: str, work: Callable[[Page], bytes], *, load: bool = True) -> bytes:
         try:
             with sync_playwright() as p:
-                browser = p.chromium.launch(chromium_sandbox=self.sandbox, timeout=self.timeout_ms)
+                browser = p.chromium.launch(
+                    chromium_sandbox=self.sandbox,
+                    timeout=self.timeout_ms,
+                    args=list(CHROMIUM_ARGS),
+                )
                 try:
                     context = browser.new_context(
                         java_script_enabled=False,
@@ -170,7 +201,7 @@ class ChromiumRenderer:
                     page = context.new_page()
                     page.set_default_timeout(self.timeout_ms)
                     if load:
-                        page.set_content(html, wait_until="load")
+                        page.set_content(_no_dns_prefetch(html), wait_until="load")
                     return work(page)
                 finally:
                     browser.close()

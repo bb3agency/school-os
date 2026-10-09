@@ -1731,7 +1731,8 @@ export interface paths {
          * Enrol
          * @description Exchange the owner's one-time code for a device credential (returned once). Headers:
          *     ``X-SOS-Tenant``, ``X-SOS-Timestamp``, ``X-SOS-Nonce``. 401 for a wrong, used or expired
-         *     code; 429 after 10 attempts per school per hour.
+         *     code, or a school that is not active; 429 after 10 wrong codes per school and client
+         *     address, 50 per school, or 20 attempts per address in an hour (docs/07 TB9).
          */
         post: operations["enrol_api_v1_edge_tally_enrol_post"];
         delete?: never;
@@ -3362,7 +3363,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Update Announcement */
+        /**
+         * Update Announcement
+         * @description ``If-Match`` with the announcement's ETag (its ``version``) is required (400
+         *     ``if_match_required``).
+         */
         patch: operations["update_announcement_api_v1_platform_announcements__announcement_id__patch"];
         trace?: never;
     };
@@ -3516,7 +3521,10 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Update Deployment */
+        /**
+         * Update Deployment
+         * @description ``If-Match`` with the deployment's ETag is required (400 ``if_match_required``).
+         */
         patch: operations["update_deployment_api_v1_platform_deployments__deployment_id__patch"];
         trace?: never;
     };
@@ -3586,8 +3594,9 @@ export interface paths {
         get?: never;
         /**
          * Put Flag
-         * @description Create or replace the global flag. ``If-Match`` (the flag's ETag) is optional; when sent
-         *     it is checked (412 when stale or when the flag does not exist yet).
+         * @description Create or replace the global flag. ``If-Match`` (the flag's ETag) is required once the
+         *     flag exists (400 ``if_match_required``; 412 when stale, or when sent for a flag that does
+         *     not exist yet); a new flag is created without it.
          */
         put: operations["put_flag_api_v1_platform_flags__key__put"];
         post?: never;
@@ -3607,7 +3616,7 @@ export interface paths {
         get?: never;
         /**
          * Put Flag Override
-         * @description Set one school's override. ``If-Match`` is optional, as for the global flag.
+         * @description Set one school's override. ``If-Match`` as for the global flag.
          */
         put: operations["put_flag_override_api_v1_platform_flags__key__tenants__tenant_id__put"];
         post?: never;
@@ -3688,7 +3697,11 @@ export interface paths {
         delete: operations["discard_invoice_api_v1_platform_invoices__invoice_id__delete"];
         options?: never;
         head?: never;
-        /** Update Invoice */
+        /**
+         * Update Invoice
+         * @description Edit a draft. ``If-Match`` with the invoice's ETag is required (400
+         *     ``if_match_required``; 412 when stale).
+         */
         patch: operations["update_invoice_api_v1_platform_invoices__invoice_id__patch"];
         trace?: never;
     };
@@ -3915,8 +3928,9 @@ export interface paths {
         head?: never;
         /**
          * Update Plan
-         * @description Edit a draft plan. Optional If-Match with the ETag (``row_version``): 412
-         *     ``precondition_failed`` when stale; 409 ``plan_published`` once published.
+         * @description Edit a draft plan. If-Match with the ETag (``row_version``) is required (400
+         *     ``if_match_required``); 412 ``precondition_failed`` when stale; 409 ``plan_published`` once
+         *     published.
          */
         patch: operations["update_plan_api_v1_platform_plans__plan_id__patch"];
         trace?: never;
@@ -4019,7 +4033,7 @@ export interface paths {
          * @description Choose or change the AI answer bundle (monthly plans only; ``409
          *     ai_bundle_needs_monthly_plan``). It counts from the first full calendar month after today
          *     (a trial's from the month after activation); answers above the quota are billed on the next
-         *     invoice at the bundle's price per extra answer. Optional ``If-Match`` (412 when stale).
+         *     invoice at the bundle's price per extra answer. ``If-Match`` required (412 when stale).
          */
         put: operations["set_ai_bundle_api_v1_platform_subscriptions__sub_id__ai_bundle_put"];
         post?: never;
@@ -4100,8 +4114,9 @@ export interface paths {
         get?: never;
         /**
          * Set Price Override
-         * @description Set a negotiated price. ``If-Match`` (the subscription's ETag) is optional; when sent it
-         *     is checked (412 when stale), here and on the other price-override and AI-bundle routes.
+         * @description Set a negotiated price. ``If-Match`` (the subscription's ETag) is required (400
+         *     ``if_match_required``; 412 when stale), here and on the other price-override and AI-bundle
+         *     routes.
          */
         put: operations["set_price_override_api_v1_platform_subscriptions__sub_id__price_override_put"];
         post?: never;
@@ -4181,7 +4196,10 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Update Ticket */
+        /**
+         * Update Ticket
+         * @description ``If-Match`` with the ticket's ETag is required (400 ``if_match_required``).
+         */
         patch: operations["update_ticket_api_v1_platform_support_tickets__ticket_id__patch"];
         trace?: never;
     };

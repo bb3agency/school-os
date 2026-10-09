@@ -7,7 +7,10 @@ version: 1
 flag: tally.connector.enabled
 enrolment:
   code_ttl_minutes: 30          # one-time code shown once to the owner
-  max_attempts_per_hour: 10     # per school, successful or not
+  # Enrolment brute force and lockout (audit 2026-10-04 AA-15; docs/07 TB9), fixed hour windows:
+  max_attempts_per_address_per_hour: 20  # one client address, any school, any outcome; first
+  max_failures_per_address_per_hour: 10  # wrong codes for one school from one address
+  max_failures_per_school_per_hour: 50   # wrong codes for one school from all addresses
   max_active_devices: 2         # replace an office PC without a gap
 signing:
   skew_seconds: 300             # |now - X-SOS-Timestamp|

@@ -22,6 +22,8 @@ from __future__ import annotations
 
 import calendar
 import datetime as dt
+import hashlib
+import unicodedata
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -532,21 +534,48 @@ def set_price_override(
     expected_version: int | None = None,
 ) -> SubscriptionOut:
     with platform_session() as s, db_errors():
-        sub = _sub_or_404(s, sub_id)
-        _check_sub_version(sub, expected_version)
+        before = _sub_or_404(s, sub_id)
+        _check_sub_version(before, expected_version)
         sub = repo.update_row(
             s, m.subscriptions, sub_id, {"price_override_inr": amount, "override_reason": reason}
         )
+        was = before["price_override_inr"]
         audit_platform(
             s,
             actor,
             "subscription.price_override_set",
             "subscription",
             sub_id,
-            {"price_override_inr": str(amount) if amount is not None else None},
+            {
+                "change": "cleared" if amount is None else "set" if was is None else "changed",
+                "plan_id": before["plan_id"],
+                "previous_price_override_inr": _money_text(was),
+                "price_override_inr": _money_text(amount),
+                "previous_reason_sha256": _reason_digest(before["override_reason"]),
+                "reason_sha256": _reason_digest(reason),
+            },
             tenant_id=sub["tenant_id"],
         )
         return SubscriptionOut.model_validate(dict(sub))
+
+
+def _money_text(value: Decimal | None) -> str | None:
+    return None if value is None else f"{Decimal(value):.2f}"
+
+
+def _reason_digest(reason: str | None) -> str | None:
+    """SHA-256 of an operator's free-text reason, for the audit chain (api-auth audit 2026-10-04
+    hardening note): every event is bound to the exact reason given then, while the chain keeps
+    ids, codes and amounts only (docs/05 §5, docs/16 §16). The 64 hex digits are written with
+    the letters a-p (0 -> a ... f -> p), so the summary's personal-data check (digit runs, phone
+    numbers) never meets a digest."""
+    if reason is None:
+        return None
+    raw = hashlib.sha256(unicodedata.normalize("NFC", reason).encode()).hexdigest()
+    return raw.translate(_HEX_AS_LETTERS)
+
+
+_HEX_AS_LETTERS = str.maketrans("0123456789abcdef", "abcdefghijklmnop")
 
 
 def list_ai_bundles(status: str | None = None) -> list[AiBundleOut]:

@@ -666,6 +666,12 @@ describe("plans, subscriptions and invoices (FR-PLT-010..019)", () => {
         ai_bundle_id: "0192f3a4-0000-7000-8000-00000000d002",
       }),
     );
+    // The subscription's version goes in If-Match (AA-13).
+    expect(
+      stub
+        .callsTo(`PUT /bff/api/v1/platform/subscriptions/${SUB.id}/ai-bundle`)[0]
+        ?.headers.get("if-match"),
+    ).toBe('"2"');
   });
 
   it("removes the AI answer bundle after confirmation", async () => {
@@ -689,6 +695,11 @@ describe("plans, subscriptions and invoices (FR-PLT-010..019)", () => {
         stub.callsTo(`DELETE /bff/api/v1/platform/subscriptions/${SUB.id}/ai-bundle`),
       ).toHaveLength(1),
     );
+    expect(
+      stub
+        .callsTo(`DELETE /bff/api/v1/platform/subscriptions/${SUB.id}/ai-bundle`)[0]
+        ?.headers.get("if-match"),
+    ).toBe('"2"');
   });
 
   it("offers no AI bundle on an annual plan", async () => {
@@ -834,6 +845,10 @@ describe("fleet, flags, audit, operators, announcements, break-glass, support", 
         rollout_percent: 25,
       }),
     );
+    // A new flag has no ETag yet: nothing to overwrite (AA-13).
+    expect(
+      stub.callsTo("PUT /bff/api/v1/platform/flags/ask.citations_v2")[0]?.headers.get("if-match"),
+    ).toBeNull();
   });
 
   it("audit: verifies the chain and downloads CSV with Accept: text/csv", async () => {

@@ -33,7 +33,7 @@ from pydantic import ValidationError
 from sqlalchemy import func, select
 
 from app.core.config import get_settings
-from app.core.crypto import CryptoError, KeyWrapper, get_key_wrapper
+from app.core.crypto import CryptoError, KeyWrapper, get_key_wrapper, unwrap_bound
 from app.core.db import platform_session
 from app.core.errors import (
     Conflict,
@@ -68,7 +68,7 @@ from app.platform.schemas import (
     HeartbeatKeyOut,
     HeartbeatOut,
 )
-from app.platform.tenants import new_heartbeat_key
+from app.platform.tenants import heartbeat_key_resource, new_heartbeat_key
 
 log = get_logger(__name__)
 
@@ -171,7 +171,7 @@ def rotate_key(actor: Actor, deployment_id: uuid.UUID, *, wrapper: KeyWrapper) -
                     code="rotation_pending",
                 )
             values = _promoted(row)
-        key_id, wrapped, plaintext = new_heartbeat_key(row["tenant_id"], wrapper)
+        key_id, wrapped, plaintext = new_heartbeat_key(row["tenant_id"], row["id"], wrapper)
         values.update(
             {
                 "heartbeat_next_key_id": key_id,
@@ -325,7 +325,12 @@ def verify_heartbeat(
             [{"field": "body", "code": "too_large", "message_key": "errors.too_large"}]
         )
     try:
-        key = wrapper.unwrap(wrapped, tenant_id=dep["tenant_id"])
+        key = unwrap_bound(
+            wrapper,
+            wrapped,
+            tenant_id=dep["tenant_id"],
+            resource=heartbeat_key_resource(dep["id"]),
+        )
     except CryptoError:
         raise _reject("key_unwrap_failed") from None
     if not hmac.compare_digest(sign(key, timestamp, body), signature):

@@ -29355,7 +29355,7 @@
     },
     "/api/v1/edge/tally/enrol": {
       "post": {
-        "description": "Exchange the owner's one-time code for a device credential (returned once). Headers:\n``X-SOS-Tenant``, ``X-SOS-Timestamp``, ``X-SOS-Nonce``. 401 for a wrong, used or expired\ncode; 429 after 10 attempts per school per hour.",
+        "description": "Exchange the owner's one-time code for a device credential (returned once). Headers:\n``X-SOS-Tenant``, ``X-SOS-Timestamp``, ``X-SOS-Nonce``. 401 for a wrong, used or expired\ncode, or a school that is not active; 429 after 10 wrong codes per school and client\naddress, 50 per school, or 20 attempts per address in an hour (docs/07 TB9).",
         "operationId": "enrol_api_v1_edge_tally_enrol_post",
         "requestBody": {
           "content": {
@@ -35645,6 +35645,7 @@
     },
     "/api/v1/platform/announcements/{announcement_id}": {
       "patch": {
+        "description": "``If-Match`` with the announcement's ETag (its ``version``) is required (400\n``if_match_required``).",
         "operationId": "update_announcement_api_v1_platform_announcements__announcement_id__patch",
         "parameters": [
           {
@@ -36504,6 +36505,7 @@
         ]
       },
       "patch": {
+        "description": "``If-Match`` with the deployment's ETag is required (400 ``if_match_required``).",
         "operationId": "update_deployment_api_v1_platform_deployments__deployment_id__patch",
         "parameters": [
           {
@@ -36777,7 +36779,7 @@
     },
     "/api/v1/platform/flags/{key}": {
       "put": {
-        "description": "Create or replace the global flag. ``If-Match`` (the flag's ETag) is optional; when sent\nit is checked (412 when stale or when the flag does not exist yet).",
+        "description": "Create or replace the global flag. ``If-Match`` (the flag's ETag) is required once the\nflag exists (400 ``if_match_required``; 412 when stale, or when sent for a flag that does\nnot exist yet); a new flag is created without it.",
         "operationId": "put_flag_api_v1_platform_flags__key__put",
         "parameters": [
           {
@@ -36941,7 +36943,7 @@
         ]
       },
       "put": {
-        "description": "Set one school's override. ``If-Match`` is optional, as for the global flag.",
+        "description": "Set one school's override. ``If-Match`` as for the global flag.",
         "operationId": "put_flag_override_api_v1_platform_flags__key__tenants__tenant_id__put",
         "parameters": [
           {
@@ -37500,6 +37502,7 @@
         ]
       },
       "patch": {
+        "description": "Edit a draft. ``If-Match`` with the invoice's ETag is required (400\n``if_match_required``; 412 when stale).",
         "operationId": "update_invoice_api_v1_platform_invoices__invoice_id__patch",
         "parameters": [
           {
@@ -38688,7 +38691,7 @@
         ]
       },
       "patch": {
-        "description": "Edit a draft plan. Optional If-Match with the ETag (``row_version``): 412\n``precondition_failed`` when stale; 409 ``plan_published`` once published.",
+        "description": "Edit a draft plan. If-Match with the ETag (``row_version``) is required (400\n``if_match_required``); 412 ``precondition_failed`` when stale; 409 ``plan_published`` once\npublished.",
         "operationId": "update_plan_api_v1_platform_plans__plan_id__patch",
         "parameters": [
           {
@@ -39233,7 +39236,7 @@
         ]
       },
       "put": {
-        "description": "Choose or change the AI answer bundle (monthly plans only; ``409\nai_bundle_needs_monthly_plan``). It counts from the first full calendar month after today\n(a trial's from the month after activation); answers above the quota are billed on the next\ninvoice at the bundle's price per extra answer. Optional ``If-Match`` (412 when stale).",
+        "description": "Choose or change the AI answer bundle (monthly plans only; ``409\nai_bundle_needs_monthly_plan``). It counts from the first full calendar month after today\n(a trial's from the month after activation); answers above the quota are billed on the next\ninvoice at the bundle's price per extra answer. ``If-Match`` required (412 when stale).",
         "operationId": "set_ai_bundle_api_v1_platform_subscriptions__sub_id__ai_bundle_put",
         "parameters": [
           {
@@ -39641,7 +39644,7 @@
         ]
       },
       "put": {
-        "description": "Set a negotiated price. ``If-Match`` (the subscription's ETag) is optional; when sent it\nis checked (412 when stale), here and on the other price-override and AI-bundle routes.",
+        "description": "Set a negotiated price. ``If-Match`` (the subscription's ETag) is required (400\n``if_match_required``; 412 when stale), here and on the other price-override and AI-bundle\nroutes.",
         "operationId": "set_price_override_api_v1_platform_subscriptions__sub_id__price_override_put",
         "parameters": [
           {
@@ -40177,6 +40180,7 @@
         ]
       },
       "patch": {
+        "description": "``If-Match`` with the ticket's ETag is required (400 ``if_match_required``).",
         "operationId": "update_ticket_api_v1_platform_support_tickets__ticket_id__patch",
         "parameters": [
           {

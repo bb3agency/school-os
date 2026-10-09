@@ -28,6 +28,15 @@ MAX_PAGE = 200
 log = get_logger(__name__)
 
 
+def if_match_required() -> BadRequest:
+    """A control-plane update sent without ``If-Match`` (audit 2026-10-04 AA-13): the same
+    problem the tenant routes answer (``app.authz.http.if_match_version``)."""
+    return BadRequest(
+        "Send If-Match with the ETag you last read, so changes are not overwritten.",
+        code="if_match_required",
+    )
+
+
 @lru_cache(maxsize=1)
 def config() -> dict[str, Any]:
     raw: dict[str, Any] = yaml.safe_load(

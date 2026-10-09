@@ -6,9 +6,11 @@ Invoice numbering is exercised in far-future financial years so each test owns i
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import threading
+import unicodedata
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from decimal import Decimal
 from typing import Any
 
@@ -18,7 +20,7 @@ from sqlalchemy import Engine, text
 from app.core.db import platform_session
 from app.core.errors import Conflict
 from app.platform import billing
-from app.platform.common import config
+from app.platform.common import config, today_ist
 from app.platform.schemas import InvoiceLineIn, PaymentIn
 
 from .conftest import (
@@ -142,14 +144,24 @@ def test_FR_PLT_010_plans_are_versioned_and_frozen(api: Api, billing_admin: Oper
     v1 = api.call("POST", "/plans", billing_admin, json=body).json()
     assert (v1["version"], v1["status"], v1["sac_code"]) == (1, "draft", "998314")
     patched = api.call(
-        "PATCH", f"/plans/{v1['id']}", billing_admin, json={"base_price_inr": "4200.00"}
+        "PATCH",
+        f"/plans/{v1['id']}",
+        billing_admin,
+        json={"base_price_inr": "4200.00"},
+        headers={"If-Match": f'"{v1["row_version"]}"'},
     )
     assert patched.json()["base_price_inr"] == "4200.00"
     assert (
         api.call("POST", f"/plans/{v1['id']}/publish", billing_admin).json()["status"]
         == "published"
     )
-    frozen = api.call("PATCH", f"/plans/{v1['id']}", billing_admin, json={"base_price_inr": "1.00"})
+    frozen = api.call(
+        "PATCH",
+        f"/plans/{v1['id']}",
+        billing_admin,
+        json={"base_price_inr": "1.00"},
+        headers={"If-Match": patched.headers["ETag"]},
+    )
     assert (frozen.status_code, frozen.json()["code"]) == (409, "plan_published")
     v2 = api.call("POST", "/plans", billing_admin, json=body).json()
     assert v2["version"] == 2
@@ -163,8 +175,8 @@ def test_FR_PLT_010_plans_are_versioned_and_frozen(api: Api, billing_admin: Oper
 
 
 def test_FR_PLT_010_draft_edit_checks_the_row_version(api: Api, billing_admin: Operator) -> None:
-    """Owner decision 2026-10-04: PATCH a draft plan takes If-Match (optional, like every
-    platform edit); a stale ETag gets 412 and changes nothing. ``row_version`` is the edit
+    """Owner decision 2026-10-04: PATCH a draft plan takes If-Match (required since AA-13, like
+    every platform edit); a stale ETag gets 412 and changes nothing. ``row_version`` is the edit
     counter, separate from the catalogue ``version`` (code + version)."""
     body = {"code": f"etag-{uuid.uuid4().hex[:8]}", "name": "Synthetic", "base_price_inr": "10.00"}
     created = api.call("POST", "/plans", billing_admin, json=body)
@@ -191,9 +203,14 @@ def test_FR_PLT_010_draft_edit_checks_the_row_version(api: Api, billing_admin: O
         "PATCH", path, billing_admin, json={"name": "Second"}, headers={"If-Match": 'W/"2"'}
     )
     assert weak.json()["row_version"] == 3
-    # Without If-Match the edit still applies (the house pattern) and the version still moves.
+    # Without If-Match the edit is refused and nothing changes (audit 2026-10-04 AA-13).
     blind = api.call("PATCH", path, billing_admin, json={"name": "Third"})
-    assert (blind.status_code, blind.json()["row_version"]) == (200, 4)
+    assert (blind.status_code, blind.json()["code"]) == (400, "if_match_required")
+    assert api.call("GET", path, billing_admin).json()["row_version"] == 3
+    third = api.call(
+        "PATCH", path, billing_admin, json={"name": "Third"}, headers={"If-Match": '"3"'}
+    )
+    assert (third.status_code, third.json()["row_version"]) == (200, 4)
     bad = api.call("PATCH", path, billing_admin, json={"name": "X"}, headers={"If-Match": "abc"})
     assert (bad.status_code, bad.json()["code"]) == (400, "bad_if_match")
     # Publishing freezes the plan; a stale or current ETag cannot reopen it.
@@ -293,13 +310,25 @@ def test_FR_PLT_015_draft_edit_issue_and_immutability(
             {"kind": "discount", "description": "Pilot discount", "unit_price_inr": "100.00"},
         ]
     }
-    res = api.call("PATCH", f"/invoices/{draft['id']}", billing_admin, json=lines)
+    res = api.call(
+        "PATCH",
+        f"/invoices/{draft['id']}",
+        billing_admin,
+        json=lines,
+        headers={"If-Match": f'"{draft["version"]}"'},
+    )
     assert res.status_code == 200, res.text
     assert (res.json()["taxable_value_inr"], res.json()["total_inr"]) == ("900.00", "1062.00")
     issued = api.call("POST", f"/invoices/{draft['id']}/issue", billing_admin)
     assert issued.status_code == 200, issued.text
     assert issued.json()["status"] == "issued"
-    again = api.call("PATCH", f"/invoices/{draft['id']}", billing_admin, json=lines)
+    again = api.call(
+        "PATCH",
+        f"/invoices/{draft['id']}",
+        billing_admin,
+        json=lines,
+        headers={"If-Match": issued.headers.get("ETag", f'"{issued.json()["version"]}"')},
+    )
     assert (again.status_code, again.json()["code"]) == (409, "invoice_issued")
     assert api.call("DELETE", f"/invoices/{draft['id']}", billing_admin).status_code == 409
 
@@ -800,6 +829,58 @@ def test_FR_PLT_014_exam_window_needs_platform_owner(
     assert out.status == "suspended"
 
 
+def test_AA_16_a_security_suspension_is_immediate_inside_an_exam_window(
+    api: Api,
+    owner: Operator,
+    make_operator: MakeOperator,
+    make_plan: Callable[..., uuid.UUID],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Owner decision 2026-10-07 (audit 2026-10-04 AA-16): the exam-window protection covers
+    billing suspensions only. A security hold (incident, abuse, the school's request) is never
+    delayed by a window and needs no platform_owner approval; it is audited with its reason
+    stored on the school."""
+    engineer = make_operator("platform_engineer")
+    tid = _school(api, owner, make_plan())["tenant_id"]
+    assert api.call("POST", f"/tenants/{tid}/activate", owner).status_code == 200
+    today = dt.datetime.now(dt.UTC).date()
+    monkeypatch.setitem(
+        config()["billing"],
+        "protected_windows",
+        [
+            {
+                "name": "SSC public exams",
+                "boards": ["SSC"],
+                "start": (today - dt.timedelta(days=3)).isoformat(),
+                "end": (today + dt.timedelta(days=3)).isoformat(),
+            }
+        ],
+    )
+    assert billing.in_protected_window(["SSC"], today_ist()) == "SSC public exams"
+    reason = "Security incident reported by the school"
+    res = api.call("POST", f"/tenants/{tid}/suspend", engineer, json={"reason": reason})
+    assert res.status_code == 200, res.text
+    assert res.json()["tenant_status"] == "suspended"
+    with platform_session() as s:
+        stored = s.execute(
+            text(
+                "SELECT tenant_status_reason, security_hold FROM platform.deployments "
+                "WHERE tenant_id = :t"
+            ),
+            {"t": uuid.UUID(tid)},
+        ).one()
+        event = s.execute(
+            text(
+                "SELECT actor_id, summary FROM platform.audit_events WHERE resource_id = :t "
+                "AND action = 'tenant.suspended' ORDER BY seq DESC LIMIT 1"
+            ),
+            {"t": uuid.UUID(tid)},
+        ).one()
+    assert (stored.tenant_status_reason, stored.security_hold) == (reason, True)
+    assert event.actor_id == engineer.id
+    assert (event.summary["from"], event.summary["to"]) == ("active", "suspended")
+
+
 def test_FR_PLT_012_plan_change_applies_next_period_and_cancel_at_period_end(
     api: Api, owner: Operator, billing_admin: Operator, make_plan: Callable[..., uuid.UUID]
 ) -> None:
@@ -855,11 +936,13 @@ def test_FR_PLT_013_negotiated_price_returns_its_reason(
     sub = _school(api, owner, make_plan())["subscription_id"]
     assert api.call("GET", f"/subscriptions/{sub}", billing_admin).json()["override_reason"] is None
     reason = "Pilot school, price agreed in writing (ref SS/2026/3)"
+    etag = api.call("GET", f"/subscriptions/{sub}", billing_admin).headers["ETag"]
     res = api.call(
         "PUT",
         f"/subscriptions/{sub}/price-override",
         billing_admin,
         json={"price_override_inr": "3999.00", "reason": reason},
+        headers={"If-Match": etag},
     )
     assert res.status_code == 200, res.text
     assert (res.json()["price_override_inr"], res.json()["override_reason"]) == ("3999.00", reason)
@@ -868,8 +951,88 @@ def test_FR_PLT_013_negotiated_price_returns_its_reason(
     assert (read["price_override_inr"], read["override_reason"]) == ("3999.00", reason)
     listed = api.call("GET", "/subscriptions", viewer).json()["data"]
     assert next(row for row in listed if row["id"] == sub)["override_reason"] == reason
-    cleared = api.call("DELETE", f"/subscriptions/{sub}/price-override", billing_admin).json()
+    cleared = api.call(
+        "DELETE",
+        f"/subscriptions/{sub}/price-override",
+        billing_admin,
+        headers={"If-Match": res.headers["ETag"]},
+    ).json()
     assert (cleared["price_override_inr"], cleared["override_reason"]) == (None, None)
+
+
+def _reason_digest(reason: str) -> str:
+    raw = hashlib.sha256(unicodedata.normalize("NFC", reason).encode()).hexdigest()
+    return raw.translate(str.maketrans("0123456789abcdef", "abcdefghijklmnop"))
+
+
+def test_AA_hardening_every_price_override_event_keeps_amounts_and_binds_its_reason(
+    api: Api, owner: Operator, billing_admin: Operator, make_plan: Callable[..., uuid.UUID]
+) -> None:
+    """Api-auth audit 2026-10-04, hardening note: the reason lived only on the subscription row,
+    so a change lost the earlier one. Each set, change and clear now records the plan, the
+    previous and new amounts and a SHA-256 of the previous and new reasons (the chain holds ids,
+    codes and amounts only, never free text: docs/05 §5, docs/16 §16)."""
+    plan_id = make_plan()
+    plan = str(plan_id)
+    sub = _school(api, owner, plan_id)["subscription_id"]
+    path = f"/subscriptions/{sub}/price-override"
+    first, second = "Pilot school, agreed in writing (SS/1)", "Second year discount (SS/2)"
+    one = api.call(
+        "PUT",
+        path,
+        billing_admin,
+        json={"price_override_inr": "3999.00", "reason": first},
+        headers=api.if_match(f"/subscriptions/{sub}", billing_admin),
+    )
+    two = api.call(
+        "PUT",
+        path,
+        billing_admin,
+        json={"price_override_inr": "3500.00", "reason": second},
+        headers={"If-Match": one.headers["ETag"]},
+    )
+    three = api.call("DELETE", path, billing_admin, headers={"If-Match": two.headers["ETag"]})
+    assert one.status_code == two.status_code == three.status_code == 200
+    with platform_session() as s:
+        rows: Sequence[Any] = (
+            s.execute(
+                text(
+                    "SELECT summary FROM platform.audit_events WHERE resource_id = :s "
+                    "AND action = 'subscription.price_override_set' ORDER BY seq"
+                ),
+                {"s": uuid.UUID(sub)},
+            )
+            .scalars()
+            .all()
+        )
+    assert [dict(r) for r in rows] == [
+        {
+            "change": "set",
+            "plan_id": plan,
+            "previous_price_override_inr": None,
+            "price_override_inr": "3999.00",
+            "previous_reason_sha256": None,
+            "reason_sha256": _reason_digest(first),
+        },
+        {
+            "change": "changed",
+            "plan_id": plan,
+            "previous_price_override_inr": "3999.00",
+            "price_override_inr": "3500.00",
+            "previous_reason_sha256": _reason_digest(first),
+            "reason_sha256": _reason_digest(second),
+        },
+        {
+            "change": "cleared",
+            "plan_id": plan,
+            "previous_price_override_inr": "3500.00",
+            "price_override_inr": None,
+            "previous_reason_sha256": _reason_digest(second),
+            "reason_sha256": None,
+        },
+    ]
+    assert first not in str(rows)
+    assert second not in str(rows)
 
 
 def test_FR_PLT_013_billing_account_gstin_validation_and_etag(
@@ -964,10 +1127,15 @@ def test_R_13_invoice_line_overflow_is_a_422(
         "quantity": "999999999.000",
         "unit_price_inr": "999999999999.99",
     }
-    res = api.call("PATCH", f"/invoices/{draft['id']}", billing_admin, json={"lines": [big]})
+    etag = {"If-Match": f'"{draft["version"]}"'}
+    res = api.call(
+        "PATCH", f"/invoices/{draft['id']}", billing_admin, json={"lines": [big]}, headers=etag
+    )
     assert res.status_code == 422, res.text
     many = [dict(big, quantity="1") for _ in range(50)]
-    res = api.call("PATCH", f"/invoices/{draft['id']}", billing_admin, json={"lines": many})
+    res = api.call(
+        "PATCH", f"/invoices/{draft['id']}", billing_admin, json={"lines": many}, headers=etag
+    )
     assert res.status_code == 422, res.text
 
 

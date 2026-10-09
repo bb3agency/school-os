@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import uuid
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager
@@ -87,6 +88,29 @@ class FakeS3:
         self.puts.append(params)
         self.objects[(params["Bucket"], params["Key"])] = params
         return {"ETag": '"fake"'}
+
+    def list_objects_v2(self, **params: Any) -> dict[str, Any]:
+        """Keys in lexicographic order, after ``StartAfter``; pages of ``MaxKeys`` (default 2,
+        so tests walk several pages)."""
+        keys = sorted(
+            k
+            for b, k in self.objects
+            if b == params["Bucket"] and k.startswith(params.get("Prefix", ""))
+        )
+        after = params.get("ContinuationToken") or params.get("StartAfter") or ""
+        keys = [k for k in keys if k > after]
+        size = int(params.get("MaxKeys", 2))
+        page, more = keys[:size], len(keys) > size
+        out: dict[str, Any] = {"Contents": [{"Key": k} for k in page], "IsTruncated": more}
+        if more:
+            out["NextContinuationToken"] = page[-1]
+        return out
+
+    def get_object(self, *, Bucket: str, Key: str) -> dict[str, Any]:  # noqa: N803
+        obj = self.objects.get((Bucket, Key))
+        if obj is None:
+            raise ClientError({"Error": {"Code": "NoSuchKey", "Message": "Not Found"}}, "GetObject")
+        return {"Body": io.BytesIO(obj["Body"]), "Metadata": dict(obj["Metadata"])}
 
     def body(self, bucket: str, key: str) -> bytes:
         body: bytes = self.objects[(bucket, key)]["Body"]

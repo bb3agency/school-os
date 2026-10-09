@@ -236,6 +236,13 @@ class Api:
         )
         return res
 
+    def if_match(self, path: str, op: Operator) -> dict[str, str]:
+        """``If-Match`` with the ETag a GET of ``path`` returns: platform updates require it
+        (audit 2026-10-04 AA-13)."""
+        res = self.call("GET", path, op)
+        assert res.status_code == 200, res.text
+        return {"If-Match": res.headers["ETag"]}
+
 
 @pytest.fixture
 def api(  # noqa: PLR0917 - pytest fixture

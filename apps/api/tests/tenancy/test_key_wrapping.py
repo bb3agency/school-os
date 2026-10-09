@@ -15,6 +15,7 @@ from pydantic import SecretStr
 
 from app.core.config import Environment, KeyWrapperKind, Settings
 from app.core.crypto import (
+    BOUND_PREFIX,
     CIPHERTEXT_VERSION,
     CryptoError,
     KeyWrapper,
@@ -27,6 +28,8 @@ from app.core.crypto import (
     generate_tenant_keys,
     get_key_wrapper,
     reencrypt,
+    unwrap_bound,
+    wrap_bound,
 )
 
 MASTER = SecretStr("synthetic-local-dev-master-key-for-tests-0123456789")
@@ -257,3 +260,55 @@ def test_SEC_012_reencrypt_moves_a_value_to_a_new_key_version_in_place() -> None
         reencrypt(old, new, blob, other, key_version=2)
     with pytest.raises(CryptoError):
         reencrypt(new, new, blob, aad, key_version=2)
+
+
+# --- secrets bound to one row (data-protection audit 2026-10-05 H-03) ----------------------
+
+
+def test_H_03_a_bound_secret_copied_to_another_row_does_not_unwrap(
+    wrapper: LocalDevKeyWrapper,
+) -> None:
+    tenant, device, other = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    mine, theirs = f"tally_device/{device}", f"tally_device/{other}"
+    wrapped = wrap_bound(wrapper, b"s" * 32, tenant_id=tenant, resource=mine)
+    assert wrapped.startswith(BOUND_PREFIX)
+    assert unwrap_bound(wrapper, wrapped, tenant_id=tenant, resource=mine) == b"s" * 32
+    with pytest.raises(CryptoError):
+        unwrap_bound(wrapper, wrapped, tenant_id=tenant, resource=theirs)
+    # Stripping the marker does not downgrade it to the tenant-only context.
+    with pytest.raises(CryptoError):
+        unwrap_bound(wrapper, wrapped[len(BOUND_PREFIX) :], tenant_id=tenant, resource=theirs)
+
+
+def test_H_03_secrets_wrapped_before_the_change_still_unwrap(wrapper: LocalDevKeyWrapper) -> None:
+    tenant = uuid.uuid4()
+    legacy = wrapper.wrap(b"s" * 32, tenant_id=tenant)
+    out = unwrap_bound(wrapper, legacy, tenant_id=tenant, resource=f"deployment/{uuid.uuid4()}")
+    assert out == b"s" * 32
+
+
+def test_H_03_kms_bound_wrap_sends_the_row_in_the_encryption_context() -> None:
+    client = boto3.client(
+        "kms",
+        region_name="ap-south-1",
+        aws_access_key_id="synthetic",
+        aws_secret_access_key="synthetic",
+    )
+    tenant, resource = uuid.uuid4(), f"deployment/{uuid.uuid4()}"
+    ctx = {"tenant_id": str(tenant), "resource": resource}
+    with Stubber(client) as stub:
+        stub.add_response(
+            "encrypt",
+            {"CiphertextBlob": b"wrapped", "KeyId": ARN},
+            {"KeyId": ARN, "Plaintext": b"d" * 32, "EncryptionContext": ctx},
+        )
+        stub.add_response(
+            "decrypt",
+            {"Plaintext": b"d" * 32, "KeyId": ARN},
+            {"CiphertextBlob": b"wrapped", "KeyId": ARN, "EncryptionContext": ctx},
+        )
+        kms = KmsKeyWrapper(client, ARN)
+        out = wrap_bound(kms, b"d" * 32, tenant_id=tenant, resource=resource)
+        assert out == BOUND_PREFIX + b"wrapped"
+        assert unwrap_bound(kms, out, tenant_id=tenant, resource=resource) == b"d" * 32
+        stub.assert_no_pending_responses()

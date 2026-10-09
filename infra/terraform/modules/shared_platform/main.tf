@@ -455,6 +455,19 @@ data "aws_iam_policy_document" "worker" {
     resources = ["${module.s3.audit_bucket_arn}/t/*"]
   }
 
+  # The worker lists a school's archive keys to find its last signed manifest (verify_all_chains
+  # compares the DB head with it, H-04) and the days already archived (backfill, H-05).
+  statement {
+    sid       = "AuditArchiveList"
+    actions   = ["s3:ListBucket"]
+    resources = [module.s3.audit_bucket_arn]
+    condition {
+      test     = "StringLike"
+      variable = "s3:prefix"
+      values   = ["t/*"]
+    }
+  }
+
   statement {
     sid       = "AuditKey"
     actions   = ["kms:GenerateDataKey", "kms:Decrypt", "kms:DescribeKey"]

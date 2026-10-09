@@ -25,7 +25,7 @@ from typing import Any
 from sqlalchemy import RowMapping, and_, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.core.crypto import KeyWrapper
+from app.core.crypto import KeyWrapper, wrap_bound
 from app.core.db import platform_session
 from app.core.errors import Conflict, NotFound
 from app.core.logging import get_logger
@@ -56,12 +56,22 @@ HEARTBEAT_KEY_BYTES = 32
 _KEY_ID_ALPHABET = "abcdefghjkmnpqrstuvwxyz"
 
 
-def new_heartbeat_key(tenant_id: uuid.UUID, wrapper: KeyWrapper) -> tuple[str, bytes, str]:
-    """Return (key_id, wrapped key, plaintext key as base64url). Plaintext is shown once."""
+def heartbeat_key_resource(deployment_id: uuid.UUID) -> str:
+    """The row a heartbeat key is bound to in its KMS context (data-protection audit H-03)."""
+    return f"deployment/{deployment_id}"
+
+
+def new_heartbeat_key(
+    tenant_id: uuid.UUID, deployment_id: uuid.UUID, wrapper: KeyWrapper
+) -> tuple[str, bytes, str]:
+    """Return (key_id, wrapped key, plaintext key as base64url). Plaintext is shown once. The
+    key is wrapped bound to the school AND the deployment row (H-03)."""
     raw = secrets.token_bytes(HEARTBEAT_KEY_BYTES)
     # Letters only: key IDs appear in audit summaries, which reject long digit runs.
     key_id = "hb-" + "".join(secrets.choice(_KEY_ID_ALPHABET) for _ in range(16))
-    wrapped = wrapper.wrap(raw, tenant_id=tenant_id)
+    wrapped = wrap_bound(
+        wrapper, raw, tenant_id=tenant_id, resource=heartbeat_key_resource(deployment_id)
+    )
     return key_id, wrapped, base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
 
 
@@ -298,7 +308,9 @@ def activate(actor: Actor, tenant_id: uuid.UUID) -> TenantDetailOut:
 
 
 def suspend(actor: Actor, tenant_id: uuid.UUID, reason: str) -> TenantDetailOut:
-    """Security hold (security incident, abuse, school's request). Never automatic.
+    """Security hold (security incident, abuse, school's request). Never automatic. Immediate,
+    also inside a protected board-exam window, which guards billing suspensions only (docs/16
+    principle 5 and §9.3; owner decision 2026-10-07, audit AA-16).
 
     Independent of billing (audit 2026-10-06 R-18): an active school is suspended with the hold;
     a school already suspended for billing stays suspended and gains the hold, so paying the

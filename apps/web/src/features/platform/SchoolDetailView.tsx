@@ -20,7 +20,7 @@ import { deploymentTone, known, subscriptionTone } from "@/features/status";
 import { ApiError, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { formatCount, formatDate, formatDateTime, formatInr } from "@/lib/format";
 import { ready, type Loadable } from "@/lib/loadable";
-import { reason } from "@/lib/validation";
+import { optionalInt, reason } from "@/lib/validation";
 import { billingAccountSchema } from "./billing-account";
 import { BillingAccountFields } from "./BillingAccountFields";
 import { PK, ifMatch, useCan, usePlanDirectory } from "./data";
@@ -695,6 +695,13 @@ function FlagsTab({ school }: { school: TenantDetail }) {
             cell: (row: FeatureFlag) => {
               const path = { key: row.key, tenant_id: school.tenant_id };
               const has = school.flag_overrides[row.key] !== undefined;
+              // This school's override row, whose version goes in If-Match (AA-13).
+              const existing =
+                flags.status === "ready"
+                  ? flags.data.find(
+                      (flag) => flag.key === row.key && flag.tenant_id === school.tenant_id,
+                    )
+                  : undefined;
               return (
                 <div className="relative flex flex-wrap gap-2">
                   <ActionDialog
@@ -704,12 +711,20 @@ function FlagsTab({ school }: { school: TenantDetail }) {
                     title={t("setOverrideTitle", { key: row.key })}
                     confirmLabel={tc("save")}
                     stepUp
-                    schema={z.object({ enabled: z.enum(["on", "off"]) })}
+                    schema={z.object({
+                      enabled: z.enum(["on", "off"]),
+                      version: optionalInt(2_147_483_647),
+                    })}
                     invalidate={invalidate}
                     submit={(input) =>
                       unwrap(
                         api.PUT("/api/v1/platform/flags/{key}/tenants/{tenant_id}", {
-                          params: { path },
+                          params: {
+                            path,
+                            ...(input.version === null
+                              ? {}
+                              : { header: { "If-Match": ifMatch(input.version) } }),
+                          },
                           body: { enabled: input.enabled === "on" },
                         }),
                       )
@@ -717,6 +732,12 @@ function FlagsTab({ school }: { school: TenantDetail }) {
                   >
                     {() => (
                       <fieldset className="space-y-2">
+                        {/* Read when the dialog opens; empty: no override yet (AA-13). */}
+                        <input
+                          type="hidden"
+                          name="version"
+                          defaultValue={existing?.version ?? ""}
+                        />
                         <legend className="text-sm font-semibold">{t("overrideValue")}</legend>
                         {(["on", "off"] as const).map((value) => (
                           <label key={value} className="flex items-center gap-2 text-sm">

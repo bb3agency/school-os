@@ -22,7 +22,7 @@ from app.core.errors import NotFound, PreconditionFailed
 from app.core.ids import new_id
 from app.platform import models as m
 from app.platform import repository as repo
-from app.platform.common import Actor, audit_platform, db_errors, now
+from app.platform.common import Actor, audit_platform, db_errors, if_match_required, now
 from app.platform.schemas import FlagIn, FlagOut
 
 
@@ -63,9 +63,15 @@ def _snapshot(row: Mapping[Any, Any] | None) -> dict[str, Any]:
 
 
 def _check_version(row: Mapping[Any, Any] | None, expected_version: int | None) -> None:
-    """The optional If-Match of a flag PUT (412 when stale, or when the flag does not exist yet;
-    audit 2026-10-06 R-04: a stale form must not turn a switched-off flag back on)."""
-    if expected_version is not None and (row is None or row["version"] != expected_version):
+    """The If-Match of a flag PUT (audit 2026-10-06 R-04: a stale form must not turn a
+    switched-off flag back on; 2026-10-04 AA-13). Required once the flag exists (400
+    ``if_match_required``); 412 when stale, or when it is sent for a flag that does not exist
+    yet. A new flag is created without it: there is nothing to overwrite."""
+    if expected_version is None:
+        if row is not None:
+            raise if_match_required()
+        return
+    if row is None or row["version"] != expected_version:
         raise PreconditionFailed()
 
 

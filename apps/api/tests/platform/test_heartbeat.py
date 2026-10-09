@@ -16,6 +16,7 @@ from pydantic import SecretStr, ValidationError
 from sqlalchemy import text
 
 from app.core.config import DeploymentMode, Settings
+from app.core.crypto import BOUND_PREFIX, CryptoError, unwrap_bound
 from app.core.db import platform_session
 from app.core.errors import Unauthenticated
 from app.identity.service_token import InMemoryReplayStore
@@ -490,3 +491,45 @@ def test_AA_09_future_usage_is_refused(api: Api, dep: dict[str, Any]) -> None:
     res = api.client.post(URL, content=raw, headers=headers)
     assert (res.status_code, res.json()["code"]) == (422, "usage_date_in_future")
     assert _usage_dates(dep["tenant_id"]) == []
+
+
+def _stored_key(deployment_id: str) -> bytes:
+    with platform_session() as s:
+        return bytes(
+            s.execute(
+                text("SELECT heartbeat_key_ciphertext FROM platform.deployments WHERE id = :d"),
+                {"d": deployment_id},
+            ).scalar_one()
+        )
+
+
+def _store_key(deployment_id: str, wrapped: bytes) -> None:
+    with platform_session() as s:
+        s.execute(
+            text("UPDATE platform.deployments SET heartbeat_key_ciphertext = :w WHERE id = :d"),
+            {"w": wrapped, "d": deployment_id},
+        )
+
+
+def test_H_03_heartbeat_key_is_bound_to_its_deployment_row(
+    api: Api, dep: dict[str, Any], wrapper: Any
+) -> None:
+    """Data-protection audit 2026-10-05 H-03: the key is wrapped with the school AND the
+    deployment id in its context; unwrapping it for another deployment fails, and a key wrapped
+    before the change (school id only) still verifies."""
+    stored = _stored_key(dep["deployment_id"])
+    assert stored.startswith(BOUND_PREFIX)
+    raw = heartbeat_client.decode_key(dep["heartbeat_key"])
+    tenant = uuid.UUID(dep["tenant_id"])
+    with pytest.raises(CryptoError):
+        unwrap_bound(wrapper, stored, tenant_id=tenant, resource=f"deployment/{uuid.uuid4()}")
+    assert (
+        unwrap_bound(
+            wrapper, stored, tenant_id=tenant, resource=f"deployment/{dep['deployment_id']}"
+        )
+        == raw
+    )
+    _store_key(dep["deployment_id"], wrapper.wrap(raw, tenant_id=tenant))  # legacy row
+    body, headers = _signed(dep, _payload(dep))
+    res = api.client.post(URL, content=body, headers=headers)
+    assert res.status_code == 200, res.text
