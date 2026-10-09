@@ -55,7 +55,8 @@ policies:
     {quota: 600, window_s: 60, per: operator, fail: open, report: true, weighted: true}
   # Layer 4: stricter per-route budgets (cost 1 per request). Per-person ones (per: user) are
   # charged by the route guard before the permission check (a refused caller spends only their
-  # own budget). Ones a whole school shares (per: school: data_export, heavy_jobs) are charged by
+  # own budget). Ones a whole school shares (per: school: data_export, heavy_jobs,
+# school_invitations) are charged by
   # the guard only AFTER the permission, scope, step-up and break-glass checks pass
   # (ratelimit.charge_school_routes; owner decision 2026-10-07), so members refused with 403 or
   # 428 cannot spend them for the people allowed to use the route.
@@ -75,6 +76,11 @@ policies:
     {quota: 60, window_s: 60, per: user, fail: open, report: true, weighted: false}
   invitations:
     {quota: 30, window_s: 3600, per: user, fail: closed, report: true, weighted: false}
+  # Invitation emails a whole school sends (invite and resend; audit 2026-10-04 api-auth
+  # hardening note): one insider holding user.manage cannot mail many addresses. Charged after
+  # authorization like data_export; fails closed (per-process fallback) like invitations.
+  school_invitations:
+    {quota: 200, window_s: 86400, per: school, fail: closed, report: true, weighted: false}
   render:
     {quota: 60, window_s: 600, per: user, fail: open, report: true, weighted: false}
   heavy_jobs:
@@ -130,8 +136,8 @@ routes:
   POST /api/v1/knowledge/search: [search]
   POST /api/v1/tally/parties/search: [search]
   # invitations (create and resend)
-  POST /api/v1/users: [invitations]
-  POST /api/v1/users/{user_id}/invitation-email: [invitations]
+  POST /api/v1/users: [invitations, school_invitations]
+  POST /api/v1/users/{user_id}/invitation-email: [invitations, school_invitations]
   POST /api/v1/platform/operators: [invitations]
   POST /api/v1/platform/tenants/{tenant_id}/owner-invite:resend: [invitations]
   # rendering (Chromium PDF jobs and previews)

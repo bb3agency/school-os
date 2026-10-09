@@ -6213,6 +6213,7 @@
       "owner": "బాధ్యులు",
       "chooseOwner": "ఒకరిని ఎంచుకోండి",
       "taskTitle": "పని",
+      "defaultTaskTitle": "Follow up circular",
       "dueOn": "గడువు తేదీ",
       "dueHint": "Use {format}, for example {example}.",
       "dueInvalid": "Enter a real date as {format}, for example {example}.",

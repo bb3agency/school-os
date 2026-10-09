@@ -123,6 +123,7 @@ def raise_flag(
             "Location": f"/api/v1/insights/flags/{out.id}",
             "ETag": etag(out.version),
         },
+        refetch=lambda flag_id: service.get_flag(db, ctx, flag_id),  # C3 note: no body kept
     )
 
 
@@ -224,6 +225,7 @@ def add_note(
         body,
         lambda: service.add_note(db, ctx, student_id, body),
         headers=lambda out: {"Location": f"/api/v1/students/{student_id}/behaviour-notes"},
+        refetch=lambda note_id: service.get_note(db, ctx, student_id, note_id),  # C3 text
     )
 
 
@@ -240,5 +242,6 @@ def erase_note(ctx: Manager, db: TenantDB, note_id: uuid.UUID, body: EraseIn) ->
 @router.get("/students/{student_id}/timeline", response_model=TimelineOut)
 def timeline(ctx: Reader, db: TenantDB, student_id: uuid.UUID) -> TimelineOut:
     """The student's timeline, newest first, with the attendance, behaviour and course
-    indicators (``insights.read``; 404 outside your scope). Audited."""
+    indicators (``insights.read``; 404 outside your scope). Attendance months appear only if you
+    hold ``attendance.read`` for the student, exams only with ``marks.read``. Audited."""
     return service.timeline(db, ctx, student_id)

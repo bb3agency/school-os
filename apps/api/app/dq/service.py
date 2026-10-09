@@ -385,34 +385,45 @@ def _check_profile(profile_key: str | None) -> None:
         )
 
 
-def _check_structure(session: Session, scope: engine.Scope) -> None:
-    """Unknown (or other schools') sections and classes are a 422, like any bad reference."""
+def _not_found(field: str) -> ValidationFailed:
+    return ValidationFailed(
+        [{"field": field, "code": "not_found", "message_key": "errors.not_found"}]
+    )
+
+
+def _check_structure(session: Session, ctx: UserContext, scope: engine.Scope) -> None:
+    """Unknown (or other schools') sections and classes are a 422, like any bad reference.
+
+    So are existing ones outside the caller's scope (audit 2026-10-04 AA-18): the answer must
+    not show whether an id exists. A section is in reach when both ``dq.findings.read`` and
+    ``student.read_basic`` reach it (school-wide, the section, or its class); a class when both
+    reach the class or one of its sections (SEC-015)."""
+    grants = [ctx.scope_for(READ), ctx.scope_for(STUDENT_READ)]
+    scoped = [g for g in grants if not g.school_wide]
+    own_classes: dict[uuid.UUID, uuid.UUID] = {}
+    if scoped:
+        for section_id in {s for g in scoped for s in g.section_ids}:
+            try:
+                own_classes[section_id] = tenancy.get_section(session, section_id).class_id
+            except NotFound:  # pragma: no cover - a scope names a section of this school
+                continue
     for i, section_id in enumerate(scope.section_ids or ()):
         try:
-            tenancy.get_section(session, section_id)
+            section = tenancy.get_section(session, section_id)
         except NotFound:
-            raise ValidationFailed(
-                [
-                    {
-                        "field": f"scope.section_ids.{i}",
-                        "code": "not_found",
-                        "message_key": "errors.not_found",
-                    }
-                ]
-            ) from None
+            raise _not_found(f"scope.section_ids.{i}") from None
+        if not all(section_id in g.section_ids or section.class_id in g.class_ids for g in scoped):
+            raise _not_found(f"scope.section_ids.{i}")
     for i, class_id in enumerate(scope.class_ids or ()):
         try:
             tenancy.get_class(session, class_id)
         except NotFound:
-            raise ValidationFailed(
-                [
-                    {
-                        "field": f"scope.class_ids.{i}",
-                        "code": "not_found",
-                        "message_key": "errors.not_found",
-                    }
-                ]
-            ) from None
+            raise _not_found(f"scope.class_ids.{i}") from None
+        if not all(
+            class_id in g.class_ids or any(own_classes.get(s) == class_id for s in g.section_ids)
+            for g in scoped
+        ):
+            raise _not_found(f"scope.class_ids.{i}")
 
 
 def _scope_of(data: RunCreate) -> engine.Scope:
@@ -523,7 +534,7 @@ def request_run(session: Session, ctx: UserContext, data: RunCreate) -> RunOut:
     else queue it for the worker (status ``queued``; the requester is notified when done)."""
     _check_profile(data.profile_key)
     scope = _scope_of(data)
-    _check_structure(session, scope)
+    _check_structure(session, ctx, scope)
     ids = engine.resolve_students(session, ctx, scope)
     if len(ids) <= load_engine_config().sync_max_students:
         return _run_now(session, ctx, scope, ids, data.profile_key)

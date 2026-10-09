@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import sys
 import uuid
 from typing import Any
@@ -9,6 +10,7 @@ from typing import Any
 import pytest
 from sqlalchemy import Engine, text
 
+from app.authz.kv import kv_store
 from app.core.redaction import verhoeff_check_digit
 
 pytestmark = pytest.mark.db
@@ -474,3 +476,39 @@ def test_SEC_015_student_scope_over_http(
         assert {k: hidden[k] for k in ("status", "code", "detail")} == {
             k: random[k] for k in ("status", "code", "detail")
         }
+
+
+def _idem_record(tenant_id: Any, user_id: Any, path: str, key: str) -> bytes:
+    """The stored Idempotency-Key record of a POST (app/authz/http.py)."""
+    scope = hashlib.sha256(f"POST {path} {key}".encode()).hexdigest()
+    raw = kv_store().get(f"sos:idem:{tenant_id}:{user_id}:{scope}")
+    assert raw is not None
+    return raw
+
+
+def test_H_01_guardian_create_replay_keeps_no_phone_or_address_in_valkey(
+    world: Any, api: Any
+) -> None:
+    """Data-protection H-01: the replay record of POST /guardians holds status, the id and
+    headers, never the decrypted C3 phone and address; the replay re-reads the guardian."""
+    admin = world.person("office_admin")
+    sid = api.call(admin, "POST", BASE, json=new_body("Synthetica Replay Case")).json()["id"]
+    path = f"{BASE}/{sid}/guardians"
+    key = f"guardian-{uuid.uuid4().hex}"
+    body = {
+        "relationship": "father",
+        "full_name": "Synthetic Father Replay",
+        "phone": "9876544321",
+        "address": "Synthetic Lane 7, Replay Nagar",
+    }
+    first = api.call(admin, "POST", path, json=body, headers={"Idempotency-Key": key})
+    assert first.status_code == 201, first.text
+    raw = _idem_record(world.a.tenant_id, admin.user_id, path, key)
+    for plaintext in ("9876544321", "Synthetic Lane 7", "Replay Nagar"):
+        assert plaintext.encode() not in raw
+    assert b'"body"' not in raw
+    again = api.call(admin, "POST", path, json=body, headers={"Idempotency-Key": key})
+    assert again.status_code == 201
+    assert again.headers.get("Idempotent-Replayed") == "true"
+    assert again.headers["ETag"] == first.headers["ETag"]
+    assert again.json() == first.json()

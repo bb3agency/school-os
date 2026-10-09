@@ -148,6 +148,34 @@ def test_US_501_run_validation(world: Any, api: Any) -> None:
     assert two.status_code == 422
 
 
+def test_AA_18_run_scope_outside_the_callers_reach_answers_like_an_unknown_id(
+    world: Any, api: Any
+) -> None:
+    """A class teacher (section 9A) cannot tell an existing section or class outside their
+    scope from an id that does not exist: both are 422 ``not_found`` on the same field."""
+    who = world.person("class_teacher")
+
+    def run(scope: dict[str, Any]) -> Any:
+        return api.call(who, "POST", "/api/v1/dq/runs", json={"scope": scope})
+
+    def answer(res: Any) -> tuple[int, Any]:
+        return res.status_code, res.json().get("errors")
+
+    for field, existing in (
+        ("section_ids", world.a.ids["section_9c"]),
+        ("class_ids", world.a.ids["class_x"]),
+    ):
+        outside = run({field: [str(existing)]})
+        unknown = run({field: [str(uuid.uuid4())]})
+        assert answer(outside) == answer(unknown), (outside.text, unknown.text)
+        assert outside.status_code == 422
+        (error,) = outside.json()["errors"]
+        assert (error["field"], error["code"]) == (f"scope.{field}.0", "not_found")
+    # The caller's own section, and the class that holds it, still run.
+    assert run({"section_ids": [str(world.a.ids["section_9a"])]}).status_code == 202
+    assert run({"class_ids": [str(world.a.ids["class_ix"])]}).status_code == 202
+
+
 def test_FR_DQ_020_resolve_needs_a_note_or_change_request(world: Any, api: Any) -> None:
     fid = DS.high_finding(world.a)
     who = world.person("office_staff")

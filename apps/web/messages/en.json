@@ -6213,6 +6213,7 @@
       "owner": "Owner",
       "chooseOwner": "Choose a person",
       "taskTitle": "Task",
+      "defaultTaskTitle": "Follow up circular",
       "dueOn": "Due date",
       "dueHint": "Use {format}, for example {example}.",
       "dueInvalid": "Enter a real date as {format}, for example {example}.",

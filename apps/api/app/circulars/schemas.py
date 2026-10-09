@@ -131,7 +131,9 @@ class ReviewIn(_In):
 
 
 class SuggestionConfirmIn(_In):
-    """Turn a suggestion into a task. Unset fields keep the suggestion's values."""
+    """Turn a suggestion into a task. An unset due date keeps the suggestion's; an unset title
+    is a neutral one ("Follow up circular") and unset details stay empty: the AI summary is never
+    copied into the task (audit DL-08)."""
 
     owner_membership_id: uuid.UUID
     title: Text | None = Field(default=None, min_length=1, max_length=200)

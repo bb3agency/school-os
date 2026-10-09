@@ -7,12 +7,15 @@ principal headers of ``tests/api/world.py``.
 
 from __future__ import annotations
 
+import hashlib
 import sys
 import uuid
 from typing import Any
 
 import pytest
 from sqlalchemy import Engine
+
+from app.authz.kv import kv_store
 
 pytestmark = pytest.mark.db
 CR = sys.modules["sos_test_changes_objects"]
@@ -288,3 +291,34 @@ def test_SEC_001_other_school_cannot_reach_requests(
     listed = api.call(b_owner, "GET", BASE, params={"limit": 200}).json()["data"]
     assert rid not in {r["id"] for r in listed}
     assert CR.row(admin_engine, uuid.UUID(rid))["status"] == "pending"
+
+
+def _idem_record(tenant_id: Any, user_id: Any, path: str, key: str) -> bytes:
+    """The stored Idempotency-Key record of a POST (app/authz/http.py)."""
+    scope = hashlib.sha256(f"POST {path} {key}".encode()).hexdigest()
+    raw = kv_store().get(f"sos:idem:{tenant_id}:{user_id}:{scope}")
+    assert raw is not None
+    return raw
+
+
+def test_H_01_change_request_replay_keeps_no_values_or_reason_in_valkey(
+    school: Any, api: Any, admin_engine: Engine
+) -> None:
+    """Data-protection H-01: the replay record of POST /change-requests holds no old or new
+    value and no reason; the replay re-reads the request."""
+    who = school.people["office_admin"]
+    sid = CR.student(school)
+    doc = CR.evidence(admin_engine, school, who)
+    key = f"cr-{uuid.uuid4().hex}"
+    body = _body(sid, doc, reason="Synthetic replay reason from the register")
+    first = api.call(who, "POST", BASE, json=body, headers={"Idempotency-Key": key})
+    assert first.status_code == 201, first.text
+    raw = _idem_record(school.tenant_id, who.user_id, BASE, key)
+    for plaintext in ("Synthetic replay reason", first.json()["new_value"]):
+        assert plaintext.encode() not in raw
+    assert b'"body"' not in raw
+    again = api.call(who, "POST", BASE, json=body, headers={"Idempotency-Key": key})
+    assert again.status_code == 201
+    assert again.headers.get("Idempotent-Replayed") == "true"
+    assert again.headers["Location"] == first.headers["Location"]
+    assert again.json() == first.json()

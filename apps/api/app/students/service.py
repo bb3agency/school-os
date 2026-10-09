@@ -2091,6 +2091,17 @@ def _guardian_secret_columns(
     return columns
 
 
+def get_guardian(
+    session: Session, ctx: UserContext, student_id: uuid.UUID, guardian_id: uuid.UUID
+) -> GuardianOut:
+    """One guardian of the student, masked like :func:`list_guardians` (404 when not linked),
+    e.g. to rebuild an ``Idempotency-Key`` replay (audit H-01)."""
+    for guardian in list_guardians(session, ctx, student_id):
+        if guardian.id == guardian_id:
+            return guardian
+    raise NotFound("Guardian not found")
+
+
 def add_guardian(
     session: Session, ctx: UserContext, student_id: uuid.UUID, data: GuardianCreate
 ) -> GuardianOut:

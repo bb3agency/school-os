@@ -971,9 +971,10 @@ export interface paths {
         put?: never;
         /**
          * Confirm Suggestion
-         * @description Create a task from a suggested deadline, optionally changing its title, details or due
-         *     date, with an owner (``circular.review``; ``If-Match`` = the suggestion's version). 409
-         *     ``suggestion_decided``; 422 ``owner_not_active``.
+         * @description Create a task from a suggested deadline, with an owner, the title and details you type
+         *     (without them a neutral title and no details: the AI summary is never copied into the
+         *     task) and the suggested or a changed due date (``circular.review``; ``If-Match`` = the
+         *     suggestion's version). 409 ``suggestion_decided``; 422 ``owner_not_active``.
          */
         post: operations["confirm_suggestion_api_v1_circular_suggestions__suggestion_id__confirm_post"];
         delete?: never;
@@ -1625,7 +1626,8 @@ export interface paths {
          * @description Check sections, classes, students or an import batch, optionally for an export profile
          *     such as ``cisce-registration-2026`` (permission ``dq.findings.read``). Small scopes are
          *     checked at once (status ``completed``); bigger ones are queued (status ``queued``) and you
-         *     are notified when they finish. Accepts ``Idempotency-Key``.
+         *     are notified when they finish. A section or class outside your scope answers like an unknown
+         *     one (422 ``not_found``). Accepts ``Idempotency-Key``.
          */
         post: operations["start_run_api_v1_dq_runs_post"];
         delete?: never;
@@ -5143,7 +5145,8 @@ export interface paths {
         /**
          * Timeline
          * @description The student's timeline, newest first, with the attendance, behaviour and course
-         *     indicators (``insights.read``; 404 outside your scope). Audited.
+         *     indicators (``insights.read``; 404 outside your scope). Attendance months appear only if you
+         *     hold ``attendance.read`` for the student, exams only with ``marks.read``. Audited.
          */
         get: operations["timeline_api_v1_students__student_id__timeline_get"];
         put?: never;
@@ -12776,7 +12779,9 @@ export interface components {
         };
         /**
          * SuggestionConfirmIn
-         * @description Turn a suggestion into a task. Unset fields keep the suggestion's values.
+         * @description Turn a suggestion into a task. An unset due date keeps the suggestion's; an unset title
+         *     is a neutral one ("Follow up circular") and unset details stay empty: the AI summary is never
+         *     copied into the task (audit DL-08).
          */
         SuggestionConfirmIn: {
             /** Details */
