@@ -12,7 +12,7 @@ safe: the previous code then asks for a resolution or a waiver as before), then 
 restored.
 
 Revision ID: 0049_open_items
-Revises: 0047_security_decisions
+Revises: 0048_narrow_app_grants
 Create Date: 2026-10-07
 """
 
