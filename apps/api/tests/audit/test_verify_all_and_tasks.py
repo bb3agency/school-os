@@ -82,10 +82,12 @@ def test_FR_AUD_004_verify_task_runs_per_tenant(
     tenant: uuid.UUID,
     record_events: Any,
     platform_engine: Any,
+    fake_s3: Any,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     record_events(tenant, 2)
     monkeypatch.setattr(audit_tasks, "_tenant_ids", lambda: [tenant])
+    monkeypatch.setattr(audit_tasks, "build_s3_client", lambda _s: fake_s3)  # no archive yet
     out = audit_tasks.verify_all_chains.apply().get()
     assert out["tenants"] == 1
     assert out["broken"] == []

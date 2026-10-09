@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable, Iterator, Mapping
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import RowMapping, func, select, text, update
@@ -91,6 +91,23 @@ def iter_events(
     stmt = stmt.order_by(events.c.seq, events.c.occurred_at, events.c.id)
     result = session.execute(stmt.execution_options(yield_per=STREAM_BATCH))
     yield from result.mappings()
+
+
+def event_days(
+    session: Session, tenant_id: uuid.UUID, *, start: datetime, end: datetime
+) -> list[date]:
+    """The UTC days in ``[start, end)`` on which the tenant has events (archive backfill)."""
+    day = func.date(func.timezone("UTC", events.c.occurred_at))
+    stmt = (
+        select(day)
+        .where(
+            events.c.tenant_id == tenant_id,
+            events.c.occurred_at >= start,
+            events.c.occurred_at < end,
+        )
+        .distinct()
+    )
+    return list(session.execute(stmt).scalars())
 
 
 def events_at(session: Session, tenant_id: uuid.UUID, seq: int) -> list[RowMapping]:

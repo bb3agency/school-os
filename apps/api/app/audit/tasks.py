@@ -1,7 +1,8 @@
 """Celery tasks for the audit module (FR-AUD-004, SEC-007).
 
 Scheduled by beat (apps/worker/sos_worker/celery_app.py):
-- ``audit.archive_daily``      20:30 UTC (02:00 IST): signed export of the previous UTC day.
+- ``audit.archive_daily``      20:30 UTC (02:00 IST): signed export of the previous UTC day, and
+  of any earlier day of the last 31 with events but no manifest in the bucket (H-05).
 - ``audit.verify_all_chains``  20:45 UTC: verify every tenant chain (+ the platform chain on the
   shared deployment) and check partition runway. Each school's result is stored
   (``audit.chain_verifications``) and served by ``GET /audit/verify`` (R-19).
@@ -15,6 +16,7 @@ verification is read-only. They carry no personal data (dates and IDs only).
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
@@ -24,8 +26,10 @@ from celery import shared_task
 
 from app.audit import verification
 from app.audit.archive import (
+    ArchiveCheck,
     ArchiveIncompleteError,
     export_all,
+    export_backfill,
 )
 from app.audit.signing import KmsSigner, LocalDevSigner, Signer, SignerRefused
 from app.audit.verify_all import (
@@ -35,6 +39,8 @@ from app.audit.verify_all import (
     verify_platform,
 )
 from app.core.config import DeploymentMode, KeyWrapperKind, Settings, get_settings
+
+logger = logging.getLogger("app.audit.tasks")
 
 
 def _tenant_ids() -> list[Any]:
@@ -70,33 +76,62 @@ def idempotency_key(task: str, day: date) -> str:
     max_retries=5,
 )
 def archive_daily(day: str | None = None) -> dict[str, Any]:
-    """Archive one UTC day (default: yesterday) for every school that can hold a chain."""
+    """Archive one UTC day (``day``) for every school that can hold a chain; by default
+    (scheduled) every day of the last 31 up to yesterday that has events but no signed manifest
+    in the bucket, oldest first, so a day that failed every retry is archived later (H-05)."""
     settings = get_settings()
-    target = date.fromisoformat(day) if day else datetime.now(UTC).date() - timedelta(days=1)
-    results = export_all(
-        _tenant_ids(),
-        target,
-        s3=build_s3_client(settings),
-        signer=build_signer(settings),
-        bucket=settings.s3_bucket_audit,
-        object_lock_retention_days=(
-            settings.audit_archive_retention_days if settings.is_production_like else None
-        ),
-        statement_timeout_ms=settings.worker_statement_timeout_ms,
-    )
+    retention = settings.audit_archive_retention_days if settings.is_production_like else None
+    common: dict[str, Any] = {
+        "s3": build_s3_client(settings),
+        "signer": build_signer(settings),
+        "bucket": _audit_bucket(settings),
+        "object_lock_retention_days": retention,
+        "statement_timeout_ms": settings.worker_statement_timeout_ms,
+    }
+    if day:
+        target = date.fromisoformat(day)
+        results = export_all(_tenant_ids(), target, **common)
+        return {
+            "idempotency_key": idempotency_key("audit.archive_daily", target),
+            "tenants": len(results),
+            "written": sum(1 for r in results if r.status == "written"),
+            "events": sum(r.event_count for r in results),
+        }
+    target = datetime.now(UTC).date() - timedelta(days=1)
+    tenants = _tenant_ids()
+    done = export_backfill(tenants, target, **common)
     return {
         "idempotency_key": idempotency_key("audit.archive_daily", target),
-        "tenants": len(results),
-        "written": sum(1 for r in results if r.status == "written"),
-        "events": sum(r.event_count for r in results),
+        "tenants": len(tenants),
+        "days": len(done),
+        "written": sum(1 for r in done if r.status == "written"),
+        "events": sum(r.event_count for r in done),
     }
+
+
+def _audit_bucket(settings: Settings) -> str:
+    return settings.s3_bucket_audit
 
 
 @shared_task(name="audit.verify_all_chains", acks_late=True)
 def verify_all_chains() -> dict[str, Any]:
-    """Verify every chain; broken chains are logged as P1 (``audit.chain.broken``)."""
+    """Verify every chain; broken chains are logged as P1 (``audit.chain.broken``). Each school's
+    chain is also compared with its last signed archive manifest (H-04)."""
     settings = get_settings()
-    results = verify_all(_tenant_ids(), statement_timeout_ms=settings.worker_statement_timeout_ms)
+    archive: ArchiveCheck | None = None
+    try:
+        archive = ArchiveCheck(
+            s3=build_s3_client(settings),
+            bucket=_audit_bucket(settings),
+            signer=build_signer(settings),
+        )
+    except SignerRefused:
+        # No signing key configured (the archive job fails loudly on its own): verify the
+        # database chains without the archive reference rather than not at all.
+        logger.error("audit.archive.check_unavailable", extra={"reason": "signer_refused"})
+    results = verify_all(
+        _tenant_ids(), statement_timeout_ms=settings.worker_statement_timeout_ms, archive=archive
+    )
     platform_ok: bool | None = None
     if settings.deployment_mode is DeploymentMode.SHARED:
         platform_ok = verify_platform(statement_timeout_ms=settings.worker_statement_timeout_ms).ok
