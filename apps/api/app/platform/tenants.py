@@ -29,7 +29,7 @@ from app.core.crypto import KeyWrapper, wrap_bound
 from app.core.db import platform_session
 from app.core.errors import Conflict, NotFound
 from app.core.logging import get_logger
-from app.platform import billing, offboarding, tenant_audit
+from app.platform import billing, offboarding, tenant_audit, two_person
 from app.platform import models as m
 from app.platform import repository as repo
 from app.platform.common import (
@@ -197,6 +197,12 @@ def get_tenant(tenant_id: uuid.UUID, *, with_counts: bool = True) -> TenantDetai
             "tenant_status_reason": dep["tenant_status_reason"],
             "security_hold": bool(dep["security_hold"]),
             "offboard_requested_at": dep["offboard_requested_at"],
+            "offboard_requested_by": dep["offboard_requested_by"],
+            "offboard_request_expires_at": (
+                two_person.expires_at(dep["offboard_requested_at"])
+                if dep["offboard_approved_at"] is None
+                else None
+            ),
             "offboard_approved_at": dep["offboard_approved_at"],
             "subscription": SubscriptionOut.model_validate(dict(sub)) if sub else None,
             "counts": counts,
@@ -413,8 +419,15 @@ def reactivate(actor: Actor, tenant_id: uuid.UUID, reason: str) -> TenantDetailO
     )
 
 
+OFFBOARD_PERMISSION = "platform.tenants.offboard"
+
+
 def request_offboarding(actor: Actor, tenant_id: uuid.UUID, reason: str) -> TenantDetailOut:
-    """Two-person rule, step 1 (SEC-029): operator A records the request."""
+    """Two-person rule, step 1 (SEC-029): operator A records the request.
+
+    A request expires after ``two_person_request_ttl_hours`` (roles.yaml; audit 2026-10-05
+    A-13); an expired request is replaced by the new one. A live one answers 409
+    ``already_requested`` (withdraw it first)."""
     with platform_session() as s, db_errors():
         dep = repo.get_by(s, m.deployments, m.deployments.c.tenant_id == tenant_id, for_update=True)
         if dep is None:
@@ -423,7 +436,9 @@ def request_offboarding(actor: Actor, tenant_id: uuid.UUID, reason: str) -> Tena
             raise Conflict(
                 "Only an active or suspended school can be offboarded.", code="invalid_state"
             )
-        if dep["offboard_requested_by"] is not None:
+        if dep["offboard_requested_by"] is not None and not two_person.is_expired(
+            dep["offboard_requested_at"]
+        ):
             raise Conflict("Offboarding was already requested.", code="already_requested")
         repo.update_row(
             s,
@@ -441,14 +456,74 @@ def request_offboarding(actor: Actor, tenant_id: uuid.UUID, reason: str) -> Tena
     return get_tenant(tenant_id, with_counts=False)
 
 
+def withdraw_offboarding(actor: Actor, tenant_id: uuid.UUID) -> TenantDetailOut:
+    """Withdraw a pending offboarding request (audit 2026-10-05 A-13). Any operator holding
+    ``platform.tenants.offboard`` may withdraw it, expired or not; 409 ``not_requested`` when
+    there is none (or it was already approved). Audit ``tenant.offboard_withdrawn``."""
+    with platform_session() as s, db_errors():
+        dep = repo.get_by(s, m.deployments, m.deployments.c.tenant_id == tenant_id, for_update=True)
+        if dep is None:
+            raise NotFound("School not found")
+        if (
+            dep["offboard_requested_by"] is None
+            or dep["offboard_approved_by"] is not None
+            or dep["tenant_status"] not in ("active", "suspended")
+        ):
+            raise Conflict("There is no offboarding request to withdraw.", code="not_requested")
+        repo.update_row(
+            s,
+            m.deployments,
+            dep["id"],
+            {"offboard_requested_by": None, "offboard_requested_at": None, "offboard_reason": None},
+        )
+        audit_platform(
+            s,
+            actor,
+            "tenant.offboard_withdrawn",
+            "tenant",
+            tenant_id,
+            {"requested_by": str(dep["offboard_requested_by"])},
+            tenant_id=tenant_id,
+        )
+    return get_tenant(tenant_id, with_counts=False)
+
+
+def _second_operator_may_approve(actor: Actor) -> Callable[[Session, RowMapping], None]:
+    def check(s: Session, dep: RowMapping) -> None:
+        if dep["offboard_requested_by"] is None:
+            raise Conflict("No offboarding request to approve.", code="not_requested")
+        if dep["offboard_requested_by"] == actor.operator_id:
+            raise Conflict("A different operator must approve.", code="same_operator")
+        two_person.check_second_step(
+            s,
+            first_operator_id=dep["offboard_requested_by"],
+            approver_id=actor.operator_id,
+            permission=OFFBOARD_PERMISSION,
+            requested_at=dep["offboard_requested_at"],
+        )
+
+    return check
+
+
 def approve_offboarding(actor: Actor, tenant_id: uuid.UUID) -> TenantDetailOut:
-    """Two-person rule, step 2: a DIFFERENT operator approves (409 same_operator; DB CHECK)."""
+    """Two-person rule, step 2: a DIFFERENT operator approves (409 same_operator; DB CHECK).
+
+    Under the deployment lock (audit 2026-10-05 A-13, A-14): the request must be younger than
+    the configured lifetime (409 ``request_expired``), its operator still active and allowed
+    (409 ``requester_not_authorised``), and the approver's role old enough and not granted by
+    the requester (409 ``approver_not_eligible``). Approval ends the school's subscription at
+    once, so no more monthly drafts are made for a closing school."""
     dep0 = _deployment(tenant_id)
     if dep0["offboard_requested_by"] is None:
         raise Conflict("No offboarding request to approve.", code="not_requested")
     if dep0["offboard_requested_by"] == actor.operator_id:
         raise Conflict("A different operator must approve.", code="same_operator")
     approved_at = now()
+
+    def after(s: Session, row: RowMapping) -> None:
+        offboarding.create_run(s, row, approved_at)
+        billing.end_subscription_for_closure(s, actor, tenant_id, reason="offboarding")
+
     return _set_status(
         actor,
         tenant_id,
@@ -457,7 +532,8 @@ def approve_offboarding(actor: Actor, tenant_id: uuid.UUID) -> TenantDetailOut:
         action="tenant.offboard_approved",
         reason="offboarding",
         extra={"offboard_approved_by": actor.operator_id, "offboard_approved_at": approved_at},
-        after=lambda s, row: offboarding.create_run(s, row, approved_at),
+        check=_second_operator_may_approve(actor),
+        after=after,
     )
 
 

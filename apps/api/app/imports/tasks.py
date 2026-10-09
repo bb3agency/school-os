@@ -21,6 +21,7 @@ from celery.schedules import crontab
 from app.core.db import context_free_session
 from app.core.logging import get_logger
 from app.imports import service
+from app.ops.service import TenantTask
 from app.tenancy import service as tenancy
 
 log = get_logger(__name__)
@@ -58,7 +59,12 @@ def _retry(task: Task[Any, Any], exc: Exception, a: dict[str, Any], *, status: s
 
 
 @shared_task(
-    name=service.PARSE_TASK, bind=True, queue="ingest", acks_late=True, max_retries=MAX_RETRIES
+    name=service.PARSE_TASK,
+    base=TenantTask,
+    bind=True,
+    queue="ingest",
+    acks_late=True,
+    max_retries=MAX_RETRIES,
 )
 def parse(self: Task[Any, Any], tenant_id: str, event_id: str, payload: dict[str, Any]) -> str:
     a = _args(tenant_id, payload)
@@ -75,7 +81,12 @@ def parse(self: Task[Any, Any], tenant_id: str, event_id: str, payload: dict[str
 
 
 @shared_task(
-    name=service.VALIDATE_TASK, bind=True, queue="ingest", acks_late=True, max_retries=MAX_RETRIES
+    name=service.VALIDATE_TASK,
+    base=TenantTask,
+    bind=True,
+    queue="ingest",
+    acks_late=True,
+    max_retries=MAX_RETRIES,
 )
 def validate(self: Task[Any, Any], tenant_id: str, event_id: str, payload: dict[str, Any]) -> str:
     a = _args(tenant_id, payload)
@@ -91,7 +102,7 @@ def validate(self: Task[Any, Any], tenant_id: str, event_id: str, payload: dict[
         raise _retry(self, exc, a, status="parsed") from exc
 
 
-@shared_task(name=service.COMMIT_TASK, queue="ingest", acks_late=True)
+@shared_task(name=service.COMMIT_TASK, base=TenantTask, queue="ingest", acks_late=True)
 def commit(tenant_id: str, event_id: str, payload: dict[str, Any]) -> str:
     """Not retried automatically: a failed commit rolls back and returns the batch to
     ``validated`` with the reason; the office can try again."""

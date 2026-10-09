@@ -34,6 +34,10 @@ export const KNOWN_API_CODES = [
   "shared_tier",
   "already_requested",
   "not_requested",
+  // Two-person requests (audit 2026-10-05 A-13, A-14): expiry and re-checks.
+  "request_expired",
+  "requester_not_authorised",
+  "approver_not_eligible",
   "billing_suspension",
   "mfa_required",
   "tenant_suspended",

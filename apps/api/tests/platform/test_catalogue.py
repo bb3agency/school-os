@@ -20,6 +20,7 @@ import pytest
 from sqlalchemy import Engine, text
 
 from app.core.db import platform_session
+from app.core.errors import Conflict
 from app.platform import billing, usage
 from app.platform import repository as repo
 from app.platform.common import today_ist
@@ -354,9 +355,12 @@ def test_FR_PLT_015_bundle_and_overage_lines_with_gst(
     )
     assert april.total_inr == D("8110.14")
 
-    # A second invoice starting in April never bills March again.
-    again = billing.create_manual_draft(billing_admin.actor, sub, dt.date(2073, 4, 20))
-    assert "usage_overage" not in [k for k, _, _ in _lines(again)]
+    # A second invoice starting in April never bills March again. Since audit 2026-10-05
+    # (hardening, owner decision 2026-10-07) it is refused outright: its period overlaps the
+    # live April invoice, which would also bill the subscription twice.
+    with pytest.raises(Conflict) as again:
+        billing.create_manual_draft(billing_admin.actor, sub, dt.date(2073, 4, 20))
+    assert again.value.code == "duplicate"
     # February was before the bundle counted: no overage.
     march_inv = billing.create_manual_draft(billing_admin.actor, sub, dt.date(2073, 3, 10))
     assert "usage_overage" not in [k for k, _, _ in _lines(march_inv)]

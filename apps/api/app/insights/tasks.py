@@ -29,6 +29,7 @@ from app.core.db import context_free_session, tenant_session
 from app.core.errors import DomainError
 from app.core.logging import get_logger
 from app.insights import service
+from app.ops.service import TenantTask
 from app.tenancy import service as tenancy
 
 log = get_logger(__name__)
@@ -48,6 +49,7 @@ def _ids(values: object) -> list[uuid.UUID]:
 
 @shared_task(
     name=service.EVALUATE_TASK,
+    base=TenantTask,
     bind=True,
     queue="maintenance",
     acks_late=True,

@@ -83,6 +83,7 @@ export const planTone: Record<PlanStatus, BadgeTone> = {
 /** Stored status, plus "ended" (shown once the end time has passed; see AnnouncementsView). */
 export const announcementTone: Record<AnnouncementStatus | "ended", BadgeTone> = {
   draft: "neutral",
+  pending_approval: "warning",
   scheduled: "info",
   cancelled: "neutral",
   ended: "neutral",

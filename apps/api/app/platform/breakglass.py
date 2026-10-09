@@ -27,6 +27,7 @@ from app.core.ids import new_id
 from app.core.logging import get_logger
 from app.platform import models as m
 from app.platform import repository as repo
+from app.platform import two_person
 from app.platform.common import (
     SYSTEM,
     Actor,
@@ -196,6 +197,16 @@ def record_session_started(
         return True
 
 
+EMERGENCY_PERMISSION: Final = "platform.breakglass.emergency"
+
+
+def _out(row: Any) -> BreakGlassOut:
+    data = dict(row)
+    waiting = data["emergency"] and data["status"] == "requested" and data["created_at"]
+    data["confirm_by"] = two_person.expires_at(data["created_at"]) if waiting else None
+    return BreakGlassOut.model_validate(data)
+
+
 def list_requests(
     tenant_id: uuid.UUID | None = None, *, limit: int = 50, cursor: str | None = None
 ) -> tuple[list[BreakGlassOut], str | None]:
@@ -207,7 +218,7 @@ def list_requests(
         rows = repo.list_rows(
             s, m.breakglass_requests, *conds, limit=limit, cursor=parse_cursor(cursor)
         )
-    items = [BreakGlassOut.model_validate(dict(r)) for r in rows[:limit]]
+    items = [_out(r) for r in rows[:limit]]
     return items, (str(rows[limit - 1]["id"]) if len(rows) > limit else None)
 
 
@@ -216,7 +227,7 @@ def get_request(request_id: uuid.UUID) -> BreakGlassOut:
         row = repo.get(s, m.breakglass_requests, request_id)
     if row is None:
         raise NotFound("Request not found")
-    return BreakGlassOut.model_validate(dict(row))
+    return _out(row)
 
 
 def create_request(actor: Actor, data: BreakGlassIn) -> BreakGlassOut:
@@ -251,11 +262,17 @@ def create_request(actor: Actor, data: BreakGlassIn) -> BreakGlassOut:
             },
             tenant_id=data.tenant_id,
         )
-        return BreakGlassOut.model_validate(dict(row))
+        return _out(row)
 
 
 def emergency_confirm(actor: Actor, request_id: uuid.UUID) -> BreakGlassOut:
-    """First call records confirmer 1; a second, different operator completes approval."""
+    """First call records confirmer 1; a second, different operator completes approval.
+
+    Audit 2026-10-05 A-13, A-14: both confirmations must come within
+    ``two_person_request_ttl_hours`` of the request (409 ``request_expired``); at the second,
+    confirmer 1 must still be active and hold ``platform.breakglass.emergency`` (409
+    ``requester_not_authorised``) and confirmer 2's role must be old enough and not granted by
+    confirmer 1 (409 ``approver_not_eligible``)."""
     with platform_session() as s, db_errors():
         row = repo.get(s, m.breakglass_requests, request_id, for_update=True)
         if row is None:
@@ -263,6 +280,12 @@ def emergency_confirm(actor: Actor, request_id: uuid.UUID) -> BreakGlassOut:
         if not row["emergency"] or row["status"] != "requested":
             raise Conflict(
                 "Only a pending emergency request can be confirmed.", code="invalid_state"
+            )
+        if two_person.is_expired(row["created_at"]):
+            raise Conflict(
+                "This request has expired. Withdraw it and make a new request if it is still "
+                "needed.",
+                code="request_expired",
             )
         if row["emergency_confirmed_by_1"] is None:
             values: dict[str, object] = {"emergency_confirmed_by_1": actor.operator_id}
@@ -272,6 +295,13 @@ def emergency_confirm(actor: Actor, request_id: uuid.UUID) -> BreakGlassOut:
                 "A different operator must give the second confirmation.", code="same_operator"
             )
         else:
+            two_person.check_second_step(
+                s,
+                first_operator_id=row["emergency_confirmed_by_1"],
+                approver_id=actor.operator_id,
+                permission=EMERGENCY_PERMISSION,
+                requested_at=row["created_at"],
+            )
             values = {
                 "emergency_confirmed_by_2": actor.operator_id,
                 "emergency_confirmed_at": now(),
@@ -288,4 +318,33 @@ def emergency_confirm(actor: Actor, request_id: uuid.UUID) -> BreakGlassOut:
             {"confirmation": step},
             tenant_id=row["tenant_id"],
         )
-        return BreakGlassOut.model_validate(dict(row))
+        return _out(row)
+
+
+def withdraw(actor: Actor, request_id: uuid.UUID) -> BreakGlassOut:
+    """Withdraw a request that is still waiting (status ``requested``: the school has not
+    decided, or an emergency request lacks its second confirmation). Audit 2026-10-05 A-13.
+
+    The request ends as ``revoked`` (the status set has no separate "withdrawn"); the school
+    stops seeing it, and a school approval of it answers 409 ``request_withdrawn``. 409
+    ``invalid_state`` once it was approved, denied or has ended. Audit ``breakglass.withdrawn``.
+    """
+    with platform_session() as s, db_errors():
+        row = repo.get(s, m.breakglass_requests, request_id, for_update=True)
+        if row is None:
+            raise NotFound("Request not found")
+        if row["status"] != "requested":
+            raise Conflict("Only a waiting request can be withdrawn.", code="invalid_state")
+        row = repo.update_row(
+            s, m.breakglass_requests, request_id, {"status": "revoked", "updated_at": now()}
+        )
+        audit_platform(
+            s,
+            actor,
+            "breakglass.withdrawn",
+            "breakglass_request",
+            request_id,
+            {"emergency": bool(row["emergency"])},
+            tenant_id=row["tenant_id"],
+        )
+        return _out(row)

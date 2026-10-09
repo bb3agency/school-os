@@ -16,13 +16,15 @@ import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Final, Literal
 
+from celery import Task
 from sqlalchemy.orm import Session
 
 from app.audit.schemas import sanitize_summary
 from app.core import purge as purging
 from app.core.db import context_free_session, tenant_session
+from app.core.errors import NotFound
 from app.core.logging import get_logger
 from app.ops import repository as repo
 from app.ops.idempotency import IdempotencyRecord, check_key, resolve_existing
@@ -81,6 +83,80 @@ def dispatch_outbox(send: SendTask, *, batch: int = 100) -> DispatchResult:
         )
         sent += 1
     return DispatchResult(len(rows), sent, unrouted)
+
+
+# --- suspended schools: hold queued work (audit 2026-10-05 A-12) -------------------------------
+
+# How long a held task waits before it checks the school again. Below the broker's visibility
+# timeout (1 h on Valkey), so a held message is never delivered twice.
+HOLD_COUNTDOWN_SECONDS: Final = 600
+
+# Outbox consumers that still run while a school is suspended or offboarding. Each one either
+# serves a route on the BR-08 suspended-school allowlist (the owner's full data export), is a
+# security response (key rotation re-encryption, the on-demand audit-chain check) or only
+# removes data or narrows access (file deletion, index removal, ACL refresh). None calls an
+# OCR, LLM or email provider. Everything else is held until the school is active again.
+RUN_WHILE_SUSPENDED: Final[frozenset[str]] = frozenset(
+    {
+        "admin.tenant_export",
+        "maintenance.reencrypt_tenant",
+        "audit.verify_chain",
+        "documents.purge_objects",
+        "documents.discard_object",
+        "documents.discard_unused_object",
+        "knowledge.refresh_acl",
+        "knowledge.remove_document",
+    }
+)
+
+WorkDecision = Literal["run", "hold", "drop"]
+_HELD_STATUSES: Final = frozenset({"suspended", "offboarding"})
+
+
+def school_work_decision(tenant_id: uuid.UUID, task_name: str) -> WorkDecision:
+    """Whether queued work of this school may run now (audit 2026-10-05 A-12).
+
+    ``run`` for an active (or provisioning) school and for :data:`RUN_WHILE_SUSPENDED` tasks;
+    ``hold`` while the school is suspended or offboarding (the HTTP side answers 403
+    ``tenant_suspended`` for the same states, BR-08); ``drop`` once it is deleted. An unknown
+    school runs as before (the task fails on its own if the data is missing)."""
+    if task_name in RUN_WHILE_SUSPENDED:
+        return "run"
+    try:
+        with tenant_session(tenant_id) as session:
+            status = tenancy.get_tenant(session).status
+    except NotFound:
+        return "run"
+    if status in _HELD_STATUSES:
+        return "hold"
+    if status == "deleted":
+        return "drop"
+    return "run"
+
+
+class TenantTask(Task):  # type: ignore[type-arg]
+    """Base class of every outbox consumer (``tenant_id``, ``event_id``, ``payload``).
+
+    Before the task body runs (first delivery and every retry), the school's status is checked
+    (:func:`school_work_decision`). Work of a suspended or offboarding school is held, not
+    dropped: the same message is sent again after :data:`HOLD_COUNTDOWN_SECONDS`, and runs once
+    the school is reactivated. Work of a deleted school is dropped. IDs only in logs."""
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        tenant_id = kwargs.get("tenant_id")
+        if tenant_id is not None and "event_id" in kwargs:
+            decision = school_work_decision(uuid.UUID(str(tenant_id)), self.name)
+            if decision != "run":
+                if decision == "hold":
+                    self.apply_async(args=args, kwargs=kwargs, countdown=HOLD_COUNTDOWN_SECONDS)
+                log.info(
+                    "ops.task.held" if decision == "hold" else "ops.task.dropped",
+                    tenant_id=str(tenant_id),
+                    action=self.name,
+                    outcome="school_" + decision,
+                )
+                return None
+        return super().__call__(*args, **kwargs)
 
 
 # --- job runs ---------------------------------------------------------------------------------
@@ -240,9 +316,12 @@ def purge_idempotency_keys() -> int:
 
 
 __all__ = [
+    "HOLD_COUNTDOWN_SECONDS",
     "OUTBOX_ROUTES",
+    "RUN_WHILE_SUSPENDED",
     "DispatchResult",
     "JobRun",
+    "TenantTask",
     "begin_idempotent",
     "complete_idempotent",
     "dispatch_outbox",
@@ -252,6 +331,7 @@ __all__ = [
     "purge_idempotency_keys",
     "purge_tenant_data",
     "register_outbox_route",
+    "school_work_decision",
     "start_job",
     "tenant_data_counts",
 ]

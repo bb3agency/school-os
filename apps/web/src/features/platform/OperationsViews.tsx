@@ -27,7 +27,7 @@ import { breakGlassTone, deploymentTone, known } from "@/features/status";
 import { Link } from "@/i18n/navigation";
 import { createBffFetch } from "@/lib/bff/fetch";
 import { ApiError, unwrap, useApiQuery, useApiMutation, useBffClient } from "@/lib/bff/query";
-import { formatCount } from "@/lib/format";
+import { formatCount, formatDateTime } from "@/lib/format";
 import { ready, type Loadable } from "@/lib/loadable";
 import {
   FLAG_KEY_PATTERN,
@@ -599,15 +599,21 @@ export function supportSignInUrl(row: Pick<BreakGlassRequest, "id" | "tenant_id"
   return `/bff/auth/support/login?${params.toString()}`;
 }
 
-const breakGlassSchema = z.object({
-  tenant_id: uuid,
-  reason_code: z.enum(["support_request", "security_incident", "legal_obligation"], {
-    error: "chooseOption",
-  }),
-  reason,
-  duration_minutes: requiredInt(15, 480),
-  emergency: checkbox,
-});
+const breakGlassSchema = z
+  .object({
+    tenant_id: uuid,
+    reason_code: z.enum(["support_request", "security_incident", "legal_obligation"], {
+      error: "chooseOption",
+    }),
+    reason,
+    duration_minutes: requiredInt(15, 480),
+    emergency: checkbox,
+  })
+  // A-13: emergency access (no school approval) only for an incident or a legal obligation.
+  .refine((data) => !data.emergency || data.reason_code !== "support_request", {
+    path: ["reason_code"],
+    error: "emergencyReason",
+  });
 
 /**
  * Break-glass requests (docs/16 §5.15; 07 §6.4): status list for every operator, request
@@ -677,48 +683,74 @@ export function BreakGlassScreen() {
     {
       key: "actions",
       header: tc("actions"),
-      cell: (row) =>
-        row.status === "active" ? (
-          <span className="flex flex-col gap-1">
-            <a
-              href={supportSignInUrl(row)}
-              className={buttonClasses("secondary", "sm")}
-              aria-describedby={`${hintId}-${row.id}`}
-            >
-              {t("openSchool")}
-            </a>
-            <span id={`${hintId}-${row.id}`} className="text-xs text-ink-muted">
-              {t("openSchoolHint")}
-            </span>
-          </span>
-        ) : row.emergency &&
-          row.status === "requested" &&
-          row.emergency_confirmed_by_2 === null &&
-          can("platform.breakglass.emergency") ? (
-          <ActionDialog
-            triggerLabel={t("confirmEmergency")}
-            triggerSize="sm"
-            triggerVariant="danger"
-            triggerDescription={nameOf(row.tenant_id)}
-            title={t("confirmEmergencyTitle")}
-            description={t("confirmEmergencyBody")}
-            note={t("twoPersonNote")}
-            confirmLabel={t("confirmEmergency")}
-            confirmVariant="danger"
-            stepUp
-            schema={z.object({})}
-            invalidate={[PK.breakGlass]}
-            submit={() =>
-              unwrap(
-                api.POST("/api/v1/platform/break-glass-requests/{request_id}/emergency-confirm", {
-                  params: { path: { request_id: row.id } },
-                }),
-              )
-            }
-          />
-        ) : null,
+      cell: (row) => (
+        <span className="flex flex-wrap items-start gap-2">
+          {breakGlassAction(row)}
+          {row.status === "requested" && can("platform.breakglass.request") ? (
+            <ActionDialog
+              triggerLabel={t("withdraw")}
+              triggerSize="sm"
+              triggerVariant="ghost"
+              triggerDescription={nameOf(row.tenant_id)}
+              title={t("withdrawTitle")}
+              description={t("withdrawBody")}
+              confirmLabel={t("withdraw")}
+              schema={z.object({})}
+              invalidate={[PK.breakGlass]}
+              submit={() =>
+                unwrap(
+                  api.POST("/api/v1/platform/break-glass-requests/{request_id}/withdraw", {
+                    params: { path: { request_id: row.id } },
+                  }),
+                )
+              }
+            />
+          ) : null}
+        </span>
+      ),
     },
   ];
+  function breakGlassAction(row: BreakGlassRequest) {
+    return row.status === "active" ? (
+      <span className="flex flex-col gap-1">
+        <a
+          href={supportSignInUrl(row)}
+          className={buttonClasses("secondary", "sm")}
+          aria-describedby={`${hintId}-${row.id}`}
+        >
+          {t("openSchool")}
+        </a>
+        <span id={`${hintId}-${row.id}`} className="text-xs text-ink-muted">
+          {t("openSchoolHint")}
+        </span>
+      </span>
+    ) : row.emergency &&
+      row.status === "requested" &&
+      row.emergency_confirmed_by_2 === null &&
+      can("platform.breakglass.emergency") ? (
+      <ActionDialog
+        triggerLabel={t("confirmEmergency")}
+        triggerSize="sm"
+        triggerVariant="danger"
+        triggerDescription={nameOf(row.tenant_id)}
+        title={t("confirmEmergencyTitle")}
+        description={t("confirmEmergencyBody")}
+        note={t("twoPersonNote")}
+        confirmLabel={t("confirmEmergency")}
+        confirmVariant="danger"
+        stepUp
+        schema={z.object({})}
+        invalidate={[PK.breakGlass]}
+        submit={() =>
+          unwrap(
+            api.POST("/api/v1/platform/break-glass-requests/{request_id}/emergency-confirm", {
+              params: { path: { request_id: row.id } },
+            }),
+          )
+        }
+      />
+    ) : null;
+  }
   return (
     <div className="space-y-6">
       <PageHeader
@@ -1052,6 +1084,11 @@ function EmergencyConfirmations({ request }: { request: BreakGlassRequest }) {
       </Pill>
       {confirmed < 2 ? (
         <span className="text-xs text-ink-muted">{t("needsSecondOperator")}</span>
+      ) : null}
+      {request.confirm_by ? (
+        <span className="text-xs text-ink-muted">
+          {t("confirmBy", { date: formatDateTime(request.confirm_by) ?? "" })}
+        </span>
       ) : null}
     </span>
   );

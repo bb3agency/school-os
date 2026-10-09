@@ -387,6 +387,18 @@ def approve_offboarding(
     return tenants.approve_offboarding(_actor(ctx), tenant_id)
 
 
+@router.post("/tenants/{tenant_id}/offboarding:withdraw", response_model=TenantDetailOut)
+def withdraw_offboarding(
+    *,
+    tenant_id: uuid.UUID,
+    ctx: Annotated[Ctx, Depends(require_platform("platform.tenants.offboard"))],
+) -> TenantDetailOut:
+    """Withdraw a pending offboarding request (audit 2026-10-05 A-13). ``409 not_requested``
+    when there is none or it was already approved. Requests also expire on their own after
+    ``two_person_request_ttl_hours`` (``offboard_request_expires_at``)."""
+    return tenants.withdraw_offboarding(_actor(ctx), tenant_id)
+
+
 @router.get("/tenants/{tenant_id}/offboarding", response_model=OffboardingOut)
 def get_offboarding(
     *,
@@ -1116,6 +1128,18 @@ def update_announcement(
     return out
 
 
+@router.post("/announcements/{announcement_id}/approve", response_model=AnnouncementOut)
+def approve_announcement(
+    *, announcement_id: uuid.UUID, ctx: Annotated[Ctx, AnnManage]
+) -> AnnouncementOut:
+    """A second operator approves a critical announcement (two-person; audit 2026-10-05).
+    ``409 same_operator``, ``request_expired``, ``requester_not_authorised``,
+    ``approver_not_eligible`` or ``invalid_state``. To withdraw it, cancel it."""
+    out = announcements.approve(_actor(ctx), announcement_id)
+    announcements.publish()
+    return out
+
+
 @router.post("/announcements/{announcement_id}/cancel", response_model=AnnouncementOut)
 def cancel_announcement(
     *, announcement_id: uuid.UUID, ctx: Annotated[Ctx, AnnManage]
@@ -1294,8 +1318,22 @@ def confirm_breakglass(
     request_id: uuid.UUID,
     ctx: Annotated[Ctx, Depends(require_platform("platform.breakglass.emergency"))],
 ) -> BreakGlassOut:
-    """Two different operators must confirm emergency access (SEC-029)."""
+    """Two different operators must confirm emergency access (SEC-029), within
+    ``two_person_request_ttl_hours`` of the request (``confirm_by``; audit 2026-10-05 A-13).
+    ``409 same_operator``, ``request_expired``, ``requester_not_authorised``,
+    ``approver_not_eligible`` or ``invalid_state``."""
     return breakglass.emergency_confirm(_actor(ctx), request_id)
+
+
+@router.post("/break-glass-requests/{request_id}/withdraw", response_model=BreakGlassOut)
+def withdraw_breakglass(
+    *,
+    request_id: uuid.UUID,
+    ctx: Annotated[Ctx, Depends(require_platform("platform.breakglass.request"))],
+) -> BreakGlassOut:
+    """Withdraw a request that is still waiting (audit 2026-10-05 A-13). It ends as
+    ``revoked``; ``409 invalid_state`` once approved, denied or ended."""
+    return breakglass.withdraw(_actor(ctx), request_id)
 
 
 # --- operators --------------------------------------------------------------------------------

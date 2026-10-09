@@ -71,7 +71,12 @@ def make_operator_row(*roles: str, subject: str | None = None, status: str = "ac
         )
         for role in roles:
             s.execute(
-                text("INSERT INTO platform.operator_roles (operator_id, role_key) VALUES (:o, :r)"),
+                # Long-standing roles: a two-person second step needs a role older than
+                # two_person_min_role_age_days (audit 2026-10-05 A-14).
+                text(
+                    "INSERT INTO platform.operator_roles (operator_id, role_key, granted_at) "
+                    "VALUES (:o, :r, now() - interval '30 days')"
+                ),
                 {"o": oid, "r": role},
             )
     return Operator(oid, sub, email)

@@ -25,6 +25,7 @@ from app.admin import service
 from app.admin.config import load_config
 from app.core.db import context_free_session
 from app.core.logging import get_logger
+from app.ops.service import TenantTask
 from app.tenancy import service as tenancy
 
 log = get_logger(__name__)
@@ -40,6 +41,7 @@ def _uuid(value: object) -> uuid.UUID:
 
 @shared_task(
     name=service.EXPORT_TASK,
+    base=TenantTask,
     bind=True,
     queue="exports",
     acks_late=True,

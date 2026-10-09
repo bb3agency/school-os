@@ -20,6 +20,7 @@ from celery.schedules import crontab
 from app.core.db import context_free_session, tenant_session
 from app.core.logging import get_logger
 from app.notifications import email, service
+from app.ops.service import TenantTask
 from app.tenancy import service as tenancy
 
 log = get_logger(__name__)
@@ -45,6 +46,7 @@ def purge_read() -> dict[str, int]:
 
 @shared_task(
     name=service.EMAIL_TASK,
+    base=TenantTask,
     bind=True,
     queue="maintenance",
     acks_late=True,

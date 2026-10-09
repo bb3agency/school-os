@@ -47,6 +47,16 @@ const reasonSchema = z.object({ reason });
  * While the school is `provisioning` it shows where setup stands and offers "Resume
  * provisioning" (FR-PLT-002, docs/16 §5.4); go-live is refused until setup has finished.
  */
+
+/** A-13: an offboarding request not approved before ``offboard_request_expires_at`` expired. */
+export function offboardRequestExpired(
+  school: Pick<TenantDetail, "offboard_request_expires_at">,
+  at: number = Date.now(),
+): boolean {
+  const expires = school.offboard_request_expires_at;
+  return expires != null && Date.parse(expires) <= at;
+}
+
 export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: SchoolTab }) {
   const t = useTranslations("platform.schoolDetail");
   const tn = useTranslations("platform.nav");
@@ -78,6 +88,8 @@ export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: S
     const billingSuspended = data.subscription?.status === "suspended";
     const offboardPending =
       data.offboard_requested_at !== null && data.offboard_approved_at === null;
+    // A-13: an unapproved request expires; it can then be withdrawn or replaced.
+    const offboardExpired = offboardPending && offboardRequestExpired(data);
     return (
       <>
         {status === "provisioning" && can("platform.tenants.provision") ? (
@@ -164,7 +176,7 @@ export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: S
           </ActionDialog>
         ) : null}
         {can("platform.tenants.offboard") &&
-        data.offboard_requested_at === null &&
+        (data.offboard_requested_at === null || offboardExpired) &&
         (status === "active" || status === "suspended") ? (
           <ActionDialog
             triggerLabel={t("offboard")}
@@ -190,6 +202,24 @@ export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: S
           </ActionDialog>
         ) : null}
         {can("platform.tenants.offboard") && offboardPending ? (
+          <ActionDialog
+            triggerLabel={t("withdrawOffboard")}
+            triggerVariant="secondary"
+            title={t("withdrawOffboardTitle")}
+            description={t("withdrawOffboardBody")}
+            confirmLabel={t("withdrawOffboard")}
+            schema={z.object({})}
+            invalidate={invalidate}
+            submit={() =>
+              unwrap(
+                api.POST("/api/v1/platform/tenants/{tenant_id}/offboarding:withdraw", {
+                  params: { path },
+                }),
+              )
+            }
+          />
+        ) : null}
+        {can("platform.tenants.offboard") && offboardPending && !offboardExpired ? (
           <ActionDialog
             triggerLabel={t("approveOffboard")}
             triggerVariant="danger"
@@ -299,13 +329,33 @@ export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: S
         }
         actions={school ? actions(school) : undefined}
       />
-      {school?.offboard_requested_at && !school.offboard_approved_at ? (
+      {school?.offboard_requested_at &&
+      !school.offboard_approved_at &&
+      offboardRequestExpired(school) ? (
+        <Alert tone="warning" title={t("offboardExpiredTitle")}>
+          <p>
+            {t("offboardExpiredBody", {
+              date: formatDateTime(school.offboard_requested_at) ?? "",
+            })}
+          </p>
+        </Alert>
+      ) : null}
+      {school?.offboard_requested_at &&
+      !school.offboard_approved_at &&
+      !offboardRequestExpired(school) ? (
         <Alert tone="warning" title={t("offboardPendingTitle")}>
           <p>
             {t("offboardPendingBody", {
               date: formatDateTime(school.offboard_requested_at) ?? "",
             })}
           </p>
+          {school.offboard_request_expires_at ? (
+            <p>
+              {t("offboardExpires", {
+                date: formatDateTime(school.offboard_request_expires_at) ?? "",
+              })}
+            </p>
+          ) : null}
           {offboardSteps ? (
             <Timeline items={offboardSteps} label={t("offboardStepsTitle")} className="mt-4" />
           ) : null}

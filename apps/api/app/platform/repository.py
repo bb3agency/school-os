@@ -40,6 +40,7 @@ from app.platform import models as m
 _CONSTRAINT_MESSAGES: dict[str, tuple[str, str]] = {
     "deployments_offboard_two_person": ("same_operator", "A different operator must approve."),
     "breakglass_two_person": ("same_operator", "A different operator must confirm."),
+    "announcements_critical_two_person": ("same_operator", "A different operator must approve."),
     "operator_roles_no_self_grant": ("own_roles", "You cannot change your own roles."),
     "one_live_subscription": ("duplicate", "This school already has a live subscription."),
     "one_invoice_per_period": ("duplicate", "An invoice already exists for this period."),
@@ -205,13 +206,38 @@ def roles_by_operator(
 def set_operator_roles(
     session: Session, operator_id: uuid.UUID, roles: Sequence[str], granted_by: uuid.UUID | None
 ) -> None:
-    session.execute(delete(m.operator_roles).where(m.operator_roles.c.operator_id == operator_id))
-    for role in roles:
+    """Replace the operator's roles. Roles kept keep their original ``granted_at`` and
+    ``granted_by`` (audit 2026-10-05 A-14: the two-person waiting period counts from the real
+    grant, so an unrelated role change neither restarts nor launders it)."""
+    wanted = set(roles)
+    current = operator_roles(session, operator_id)
+    removed = current - wanted
+    if removed:
+        session.execute(
+            delete(m.operator_roles).where(
+                m.operator_roles.c.operator_id == operator_id,
+                m.operator_roles.c.role_key.in_(sorted(removed)),
+            )
+        )
+    for role in sorted(wanted - current):
         session.execute(
             insert(m.operator_roles).values(
                 operator_id=operator_id, role_key=role, granted_by=granted_by
             )
         )
+
+
+def operator_role_grants(session: Session, operator_id: uuid.UUID) -> list[RowMapping]:
+    """``role_key``, ``granted_by`` and ``granted_at`` of each role the operator holds."""
+    return list(
+        session.execute(
+            select(
+                m.operator_roles.c.role_key,
+                m.operator_roles.c.granted_by,
+                m.operator_roles.c.granted_at,
+            ).where(m.operator_roles.c.operator_id == operator_id)
+        ).mappings()
+    )
 
 
 def active_owner_ids(session: Session, *, lock: bool = False) -> list[uuid.UUID]:

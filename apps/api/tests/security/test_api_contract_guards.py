@@ -400,6 +400,7 @@ IDEMPOTENCY_EXEMPT = {
     ("POST", "/api/v1/platform/tenants/{tenant_id}/provisioning:resume"): "resumes the same "
     "provisioning",
     ("POST", "/api/v1/platform/tenants/{tenant_id}/offboarding:approve"): "a state transition",
+    ("POST", "/api/v1/platform/tenants/{tenant_id}/offboarding:withdraw"): "a state transition",
     ("POST", "/api/v1/platform/tenants/{tenant_id}/offboarding:confirm-export"): "a state "
     "transition",
     ("POST", "/api/v1/platform/tenants/{tenant_id}/offboarding:confirm-teardown"): "a state "

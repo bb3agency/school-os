@@ -17,6 +17,7 @@ from celery import Task, shared_task
 
 from app.certificates import service
 from app.core.logging import get_logger
+from app.ops.service import TenantTask
 
 log = get_logger(__name__)
 
@@ -28,7 +29,12 @@ def _uuid(value: object) -> uuid.UUID:
 
 
 @shared_task(
-    name=service.RENDER_TASK, bind=True, queue="pdf", acks_late=True, max_retries=MAX_RETRIES
+    name=service.RENDER_TASK,
+    base=TenantTask,
+    bind=True,
+    queue="pdf",
+    acks_late=True,
+    max_retries=MAX_RETRIES,
 )
 def render(self: Task[Any, Any], tenant_id: str, event_id: str, payload: dict[str, Any]) -> str:
     tid = _uuid(tenant_id)

@@ -18,6 +18,7 @@ from celery import shared_task
 
 from app.core.logging import get_logger
 from app.ops import service as ops
+from app.ops.service import TenantTask
 from app.students import rotation
 
 log = get_logger(__name__)
@@ -28,7 +29,13 @@ ops.register_outbox_route(rotation.ROTATED_EVENT, rotation.REENCRYPT_TASK)
 ops.register_outbox_route(rotation.CONTINUE_EVENT, rotation.REENCRYPT_TASK)
 
 
-@shared_task(name=rotation.REENCRYPT_TASK, queue="maintenance", acks_late=True, ignore_result=True)
+@shared_task(
+    name=rotation.REENCRYPT_TASK,
+    base=TenantTask,
+    queue="maintenance",
+    acks_late=True,
+    ignore_result=True,
+)
 def reencrypt_tenant(tenant_id: str, event_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     run = rotation.run_reencryption(
         uuid.UUID(tenant_id), max_batches=MAX_BATCHES, continue_later=True
