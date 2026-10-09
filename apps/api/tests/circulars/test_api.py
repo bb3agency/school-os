@@ -758,6 +758,31 @@ def test_FR_NOTICE_005_approve_render_and_download(
     assert {e["summary"]["format"] for e in downloads} >= {"pdf", "png"}
 
 
+def test_FR_NOTICE_005_self_approval_is_allowed_and_marked_in_the_audit_event(
+    ai_on: Any, api: Any, admin_engine: Engine
+) -> None:
+    """Owner decision 2026-10-09: a principal may still approve a notice they drafted
+    (FR-NOTICE-005 stays), and its ``notice.approved`` event carries ``self_approved: true``
+    so it shows in the audit viewer; a notice someone else drafted carries ``false``."""
+    school = ai_on.a
+    principal, office = school.people["principal"], school.people["office_staff"]
+    texts = {"title_en": "Sports day", "body_en": "Sports day is on 14/11/2026 at 9:00."}
+    ids: dict[str, str] = {}
+    for label, drafter in (("own", principal), ("other", office)):
+        blank = api.call(drafter, "POST", "/api/v1/notices", json={"source": "blank"}).json()
+        path = f"/api/v1/notices/{blank['id']}"
+        assert api.call(drafter, "PATCH", path, json=texts, headers=_if(1)).status_code == 200
+        approved = api.call(principal, "POST", f"{path}/approve", json={}, headers=_if(2))
+        assert approved.status_code == 200, approved.text
+        ids[label] = blank["id"]
+    events = {
+        str(e["resource_id"]): e
+        for e in C.W.audit_events(admin_engine, school.tenant_id, "notice.approved")
+    }
+    assert events[ids["own"]]["summary"]["self_approved"] is True
+    assert events[ids["other"]]["summary"]["self_approved"] is False
+
+
 def test_ADR_0036_english_notice_is_approved_and_rendered_without_telugu(
     ai_on: Any, api: Any, installed: Any
 ) -> None:

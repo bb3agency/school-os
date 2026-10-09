@@ -1560,7 +1560,9 @@ def approve_notice(
     """Approve a draft (``notice.approve``; ``If-Match``; FR-NOTICE-004/005): every title and
     body filled (422 ``notice_incomplete``; the Telugu ones only while Telugu is shown,
     ADR-0036), no phone numbers, emails or Aadhaar-like numbers
-    (422 ``notice_personal_data``). The PDF and image are rendered next (queue ``pdf``)."""
+    (422 ``notice_personal_data``). The PDF and image are rendered next (queue ``pdf``). The
+    drafter may approve their own notice; ``notice.approved`` then carries
+    ``self_approved: true``."""
     if not ctx.has(NOTICE_APPROVE):
         raise Forbidden()
     notice = _visible_notice(session, ctx, notice_id, lock=True)
@@ -1598,8 +1600,14 @@ def approve_notice(
         values["body_te"] = notice.body_en
     notice = repo.update_notice(session, notice.id, values)
     _queue_render(session, notice.id)
+    # Self-approval stays allowed (FR-NOTICE-005); the event says so for the audit viewer
+    # (owner decision 2026-10-09).
     _audit(
-        session, "notice.approved", "parent_notice", notice.id, {"ai_drafted": notice.ai_drafted}
+        session,
+        "notice.approved",
+        "parent_notice",
+        notice.id,
+        {"ai_drafted": notice.ai_drafted, "self_approved": notice.created_by == ctx.user_id},
     )
     return _notice_out(session, notice)
 

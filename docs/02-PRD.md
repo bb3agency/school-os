@@ -332,7 +332,7 @@ Operators are SchoolOS staff with platform roles (16 §2, §6). None of these st
 - AC2: A circular marked personal (C2) or restricted (C3) cannot be used for a notice; free text with phone numbers, email addresses or Aadhaar-like numbers is refused with a message saying what to remove.
 - AC3: If AI is unavailable, an empty draft opens so I can write the notice myself.
 
-**US-1606** · As a principal, I want to approve a notice and then copy its text or download it as a printable A4 page or an image. [FR-NOTICE-005, FR-NOTICE-006] *(Proposed from the roadmap scope; PO to confirm.)*
+**US-1606** · As a principal, I want to approve a notice and then copy its text or download it as a printable A4 page or an image. A principal may approve a notice they drafted themselves; the audit log marks it as self-approved. [FR-NOTICE-005, FR-NOTICE-006] *(Proposed from the roadmap scope; PO to confirm.)*
 - AC1: Only holders of `notice.approve` can approve; both languages must be filled; an approved notice cannot be edited.
 - AC2: After approval the A4 PDF and a PNG image are rendered (Telugu without clipped glyphs); download links last at most 5 minutes and every download is audited; the plain text can be copied for WhatsApp-style groups. *(Telugu part deferred: hidden while `SOS_TELUGU_ENABLED` is off, ADR-0036.)*
 - AC3: SchoolOS never sends the notice to parents itself (no parent logins or messaging in core, §9).
