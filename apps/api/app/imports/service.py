@@ -581,9 +581,7 @@ def create_import(session: Session, ctx: UserContext, data: ImportCreate) -> Imp
     """
     if not documents.is_visible(session, ctx, data.document_id):
         raise NotFound("Document not found")
-    if not ctx.has(READ_SENSITIVE) and not documents.is_own_upload(
-        session, ctx, data.document_id
-    ):
+    if not ctx.has(READ_SENSITIVE) and not documents.is_own_upload(session, ctx, data.document_id):
         raise NotFound("Document not found")
     try:
         obj = documents.document_object(session, data.document_id)

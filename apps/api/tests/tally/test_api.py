@@ -586,9 +586,7 @@ def test_FR_TALLY_007_status_totals_only_for_finance_readers(
     assert owner["groups_selected"] == 2
 
 
-def test_SEC_003_party_balances_only_for_finance_readers(
-    api: Any, admin_engine: Engine
-) -> None:
+def test_SEC_003_party_balances_only_for_finance_readers(api: Any, admin_engine: Engine) -> None:
     """App-logic hardening (custom roles): a ``tally.configure`` holder without school-wide
     ``finance.read`` links ledgers but does not see their balances (null)."""
     import dataclasses

@@ -967,7 +967,9 @@ def _visible_task(
 ) -> Task:
     task = repo.get_task(session, task_id, lock=lock)
     if task is None or not (
-        task.owner_membership_id == ctx.membership_id or _school_grant(ctx, TASK_ALL) or _school_grant(ctx, TASK_MANAGE)
+        task.owner_membership_id == ctx.membership_id
+        or _school_grant(ctx, TASK_ALL)
+        or _school_grant(ctx, TASK_MANAGE)
     ):
         raise NotFound("Task not found")
     return task
