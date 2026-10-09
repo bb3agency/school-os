@@ -1027,7 +1027,7 @@ def test_FR_KB_030_the_drafter_cannot_review_their_own_answer(
     assert own.json()["code"] == "reviewer_must_differ"
     assert "someone else" in own.json()["detail"]
     with admin_engine.connect() as c:
-        stored = c.execute(
+        stored: int = c.execute(
             text("SELECT version FROM kb.verified_answers WHERE id = :i"), {"i": vid}
         ).scalar_one()
     assert stored == 2, "nothing changed"
