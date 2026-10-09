@@ -32,7 +32,9 @@ tenant_export:
 
     This archive holds your school's records as it was when the export was made:
     - records/: one CSV file (opens in Excel) and one JSON file per table.
-    - documents/: every uploaded document version that passed the virus check.
+    - documents/: every uploaded document version that passed the virus check. Restricted
+      documents (and raw import spreadsheets) are included only when the export was made with
+      "include restricted details"; otherwise records/documents_withheld.csv lists them.
     - audit/audit-log.csv: the school's audit log.
     - manifest.json: what is in the archive, row counts and notes.
 

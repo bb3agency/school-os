@@ -189,6 +189,8 @@ EXPECTED_TABLES = {
     "ask_memories",
     "ask_memory_settings",
     "retention_settings",
+    # DL-07: restricted document files left out of an export without restricted details.
+    "documents_withheld",
 }
 
 
@@ -420,6 +422,62 @@ def test_FR_ADM_001_completion_is_audited_notified_and_the_job_finished(
     # Running a finished export again changes nothing (idempotent worker).
     assert AD.run(school, export_id) == "ready"
     assert len(AD.audit_rows(admin_engine, school.tenant_id, export_id)) == 2
+
+
+def test_DL_07_restricted_document_files_are_withheld_unless_restricted_details_are_asked(
+    school: Any, records: dict[str, Any], admin_engine: Engine
+) -> None:
+    owner = school.people["owner"].user_id
+    c3_bytes = b"%PDF-1.4 synthetic restricted evidence DL07"
+    sheet_bytes = b"name,category\r\nSynthetica,obc\r\n"
+    c3_doc = D.make_document(
+        admin_engine,
+        school.tenant_id,
+        owner,
+        sensitivity="C3",
+        purpose="evidence",
+        doc_type="other",
+        data=c3_bytes,
+    )
+    sheet_doc = D.make_document(
+        admin_engine,
+        school.tenant_id,
+        owner,
+        purpose="import_file",
+        doc_type="other",
+        data=sheet_bytes,
+        mime_type="text/csv",
+        ext="csv",
+    )
+
+    masked_id = AD.ready_export(admin_engine, school)
+    zf = AD.archive(school, masked_id)
+    names = set(zf.namelist())
+    assert f"documents/{c3_doc}/v1.pdf" not in names
+    assert f"documents/{sheet_doc}/v1.csv" not in names
+    assert f"documents/{records['document']}/v1.pdf" in names  # C2 files still shipped
+    everything = b"".join(zf.read(n) for n in names)
+    assert c3_bytes not in everything
+    assert sheet_bytes not in everything
+    withheld = {r["document_id"]: r for r in AD.records_csv(zf, "documents_withheld")}
+    assert set(withheld) >= {str(c3_doc), str(sheet_doc)}
+    assert str(records["document"]) not in withheld
+    row = withheld[str(c3_doc)]
+    assert row["title"] == "Synthetic circular"
+    assert row["classification"] == "C3"
+    assert row["version_no"] == "1"
+    assert row["reason"] == "restricted, not included"
+    assert withheld[str(sheet_doc)]["reason"] == "restricted, not included"
+    manifest = json.loads(zf.read("manifest.json"))
+    assert manifest["documents"]["withheld"] >= 2
+    assert manifest["documents"]["files"] == len([n for n in names if n.startswith("documents/")])
+
+    full_id = AD.ready_export(admin_engine, school, include_sensitive=True)
+    full = AD.archive(school, full_id)
+    assert full.read(f"documents/{c3_doc}/v1.pdf") == c3_bytes
+    assert full.read(f"documents/{sheet_doc}/v1.csv") == sheet_bytes
+    assert AD.records_csv(full, "documents_withheld") == []
+    assert json.loads(full.read("manifest.json"))["documents"]["withheld"] == 0
 
 
 def test_FR_ADM_001_include_sensitive_shows_c3_but_never_aadhaar_as_printed(

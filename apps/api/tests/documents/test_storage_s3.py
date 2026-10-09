@@ -352,6 +352,48 @@ def test_PRV_016_purge_prefix_tags_noncurrent_versions_under_the_prefix(
     assert store.purge_prefix(prefix) == 0
 
 
+def test_DL_hardening_7_discard_object_tags_every_version_of_the_derived_renders(
+    versioned_store: tuple[S3ObjectStore, Any], world: Any, admin_engine: Any
+) -> None:
+    """Data-layer hardening note 7: discarding a version also discards its page renders under
+    ``v<n>/derived/``, every stored version of each tagged for the 1-day rule (PRV-016, W3-07),
+    and leaves other versions' renders alone."""
+    from app.core.db import tenant_session
+
+    store, client = versioned_store
+    tenant = world.a.tenant_id
+    doc_id = S.make_document(
+        admin_engine,
+        tenant,
+        world.person("owner").user_id,
+        purpose="register_scan",
+        doc_type="register_scan",
+        data=S.png(),
+        mime_type="image/png",
+        ext="png",
+    )
+    base = f"t/{tenant}/docs/{doc_id}/"
+    original = f"{base}v1/original.png"
+    renders = [f"{base}v1/derived/pages/1.png", f"{base}v1/derived/text/layer.json"]
+    kept = f"{base}v2/derived/pages/1.png"
+    store.put(original, S.png(), "image/png")
+    for key in renders:
+        store.put(key, S.png(), "image/png")
+        store.put(key, S.png() + b"re-rendered", "image/png")  # a noncurrent version too
+    store.put(kept, S.png(), "image/png")
+    with tenant_session(tenant) as s:
+        assert service.discard_version(s, doc_id, 1, "aadhaar_unredactable") is True
+        version_id = service.document_object(s, doc_id, 1, require_ready=False).version_id
+    assert service.discard_object(tenant, doc_id, version_id, store=store) is True
+    for key in (original, *renders):
+        assert store.head(key) is None, key
+        versions = _version_tags(client, key)
+        assert versions, key
+        assert all(tags == DISCARDED_TAGS for _, tags in versions), (key, versions)
+    assert store.head(kept) is not None
+    assert all(tags != DISCARDED_TAGS for _, tags in _version_tags(client, kept))
+
+
 def _stubbed_store() -> tuple[S3ObjectStore, Any]:
     client = boto3.client(
         "s3",

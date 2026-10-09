@@ -174,6 +174,11 @@ def test_SEC_017_cells_are_neutralised_and_masked() -> None:
     assert export.safe_cell("section.created") == "section.created"
 
 
+@pytest.mark.parametrize("value", [" =1+1", "\u3000=1", "\uff1d1+1", "\uff20x", "\u00a0-1+1"])
+def test_DL_hardening_4_hidden_formulas_are_neutralised(value: str) -> None:
+    assert export.safe_cell(value).startswith("'")
+
+
 def test_FR_AUD_005_export_limits_are_versioned_config() -> None:
     export.limits.cache_clear()
     cfg = export.limits()

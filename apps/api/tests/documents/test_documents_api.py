@@ -1483,6 +1483,49 @@ def test_PRV_016_daily_sweep_discards_what_the_task_missed(
     assert key not in store.objects
 
 
+def _derived_pages(tenant: uuid.UUID, doc_id: uuid.UUID, version_no: int) -> list[str]:
+    with tenant_session(tenant) as s:
+        return [
+            service.store_page_image(s, doc_id, version_no, page, S.png(), store=S.memory_store())
+            for page in (1, 2)
+        ]
+
+
+def test_DL_hardening_7_discard_also_clears_the_versions_derived_renders(
+    world: Any, api: Any, admin_engine: Engine, store: Any
+) -> None:
+    """Audit 2026-10-04 data-layer hardening note 7: page renders under ``v<n>/derived/`` show
+    the same Aadhaar number as the original, so the discard removes them too (PRV-016)."""
+    who = world.person("office_admin")
+    tenant = world.a.tenant_id
+    doc_id = uuid.UUID(_page_document(api, who, tenant)["id"])
+    pages = _derived_pages(tenant, doc_id, 1)
+    assert all(k in store.objects for k in pages)
+    with tenant_session(tenant) as s:
+        assert service.discard_version(s, doc_id, 1, "aadhaar_unredactable") is True
+    assert _run_discard(tenant, _discard_payload(admin_engine, tenant, doc_id)) is True
+    assert f"t/{tenant}/docs/{doc_id}/v1/original.png" not in store.objects
+    for key in pages:
+        assert key not in store.objects
+        assert key in store.discarded  # discarded (1-day rule), not a plain delete
+
+
+def test_DL_hardening_7_daily_sweep_clears_derived_renders_too(
+    world: Any, api: Any, admin_engine: Engine, store: Any
+) -> None:
+    who = world.person("office_admin")
+    tenant = world.a.tenant_id
+    doc_id = uuid.UUID(_page_document(api, who, tenant)["id"])
+    pages = _derived_pages(tenant, doc_id, 1)
+    other = f"t/{tenant}/docs/{doc_id}/v2/derived/pages/1.png"
+    store.put(other, S.png(), PNG_CT)  # another version's render stays
+    with tenant_session(tenant) as s:
+        service.discard_version(s, doc_id, 1, "aadhaar_unredactable")
+    assert service.sweep_discarded_objects(tenant, store=store) >= 1
+    assert not any(k in store.objects for k in pages)
+    assert other in store.objects
+
+
 def test_PRV_016_discard_task_never_deletes_a_usable_version(
     world: Any, api: Any, admin_engine: Engine, store: Any
 ) -> None:

@@ -554,6 +554,7 @@ def _collect(session: Session, snap: _Snapshot) -> tuple[list[RecordTable], dict
         *dq.export_records(session),
         *imports.export_records(session),
         *documents.export_records(session),
+        *documents.export_withheld_files(session, include_sensitive=snap.include_sensitive),
         *certificates.export_records(session),
         *circulars.export_records(session),
         *academics.export_records(session),
@@ -605,8 +606,9 @@ def _write_archive(
     out = _HashingWriter(target)
     with _worker_session(tenant_id, snap.requested_by) as session:
         tables, school = _collect(session, snap)
-        files = documents.export_files(session)
+        files = documents.export_files(session, include_sensitive=snap.include_sensitive)
     document_bytes = sum(f.size_bytes for f in files)
+    withheld_files = next((len(t.rows) for t in tables if t.name == documents.WITHHELD_TABLE), 0)
     if document_bytes > cfg.max_document_bytes:
         raise _Stop("too_large")
     with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True) as zf:
@@ -645,6 +647,7 @@ def _write_archive(
                 tables=entries,
                 documents=len(files),
                 document_bytes=document_bytes,
+                documents_withheld=withheld_files,
                 audit_events=plan.rows,
                 never_exported=cfg.never_exported,
             ),

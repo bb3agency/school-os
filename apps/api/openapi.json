@@ -27534,7 +27534,7 @@
     },
     "/api/v1/documents/uploads": {
       "post": {
-        "description": "Get a presigned POST for one file (permission ``document.upload``).\n\nAccepted: PDF, JPG, PNG, DOCX, XLSX up to 25 MB (evidence and register scans: PDF, JPG,\nPNG; spreadsheet imports: XLSX or CSV up to 10 MB). The form must be posted within 10\nminutes with the returned fields; the key, Content-Type and size are fixed by the policy.\nSend ``document_id`` to upload a new version (409 ``document_archived`` for an archived\ndocument). Accepts ``Idempotency-Key``.",
+        "description": "Get a presigned POST for one file (permission ``document.upload``).\n\nAccepted: PDF, JPG, PNG, DOCX, XLSX up to 25 MB (evidence and register scans: PDF, JPG,\nPNG; spreadsheet imports: XLSX or CSV up to 10 MB). The form must be posted within 10\nminutes with the returned fields; the key, Content-Type and size are fixed by the policy.\nSend ``document_id`` to upload a new version of a document you uploaded, or of any document\nyou can see if you hold ``document.manage_acl`` (403 ``document_owner_only`` otherwise; 409\n``document_archived`` for an archived document). Accepts ``Idempotency-Key``.",
         "operationId": "create_upload_api_v1_documents_uploads_post",
         "requestBody": {
           "content": {
@@ -27725,7 +27725,7 @@
         ]
       },
       "patch": {
-        "description": "Change the title, type, language, issuer or date (permission ``document.upload``; the\ndocument must be visible to you, as for a new version; ``If-Match``). An archived document\nanswers 409 ``document_archived``; a type that does not suit the purpose 422. Audited with\nthe changed field names only.",
+        "description": "Change the title, type, language, issuer or date (permission ``document.upload``; the\ndocument must be visible to you and uploaded by you, unless you hold\n``document.manage_acl``, as for a new version: 403 ``document_owner_only`` otherwise;\n``If-Match``). An archived document\nanswers 409 ``document_archived``; a type that does not suit the purpose 422. Audited with\nthe changed field names only.",
         "operationId": "update_document_api_v1_documents__document_id__patch",
         "parameters": [
           {
@@ -28220,7 +28220,7 @@
     },
     "/api/v1/documents/{document_id}/sheet/versions": {
       "post": {
-        "description": "Save edited cells as the next version (permission ``document.upload``; ``If-Match``;\nFR-DOC-010). The current file is kept in the history; the new version (values only, an\nXLSX) is checked for viruses and indexed like an upload (202). 409 for import files and\nCSVs, archived documents, workbooks with several sheets or with formulas (edit those in a\nspreadsheet program), when a newer version exists, or when nothing changed; 422 for a full\nAadhaar number (enter only the last 4 digits) or line breaks. Accepts ``Idempotency-Key``.",
+        "description": "Save edited cells as the next version (permission ``document.upload``; only for a document\nyou uploaded, or any visible one with ``document.manage_acl``: 403 ``document_owner_only``\notherwise; ``If-Match``; FR-DOC-010). The current file is kept in the history; the new version\n(values only, an XLSX) is checked for viruses and indexed like an upload (202). 409 for import\nfiles and CSVs, archived documents, workbooks with several sheets or with formulas (edit those\nin a spreadsheet program), when a newer version exists, or when nothing changed; 422 for a full\nAadhaar number (enter only the last 4 digits) or line breaks. Accepts ``Idempotency-Key``.",
         "operationId": "save_sheet_version_api_v1_documents__document_id__sheet_versions_post",
         "parameters": [
           {
@@ -28366,7 +28366,7 @@
     },
     "/api/v1/documents/{document_id}/versions": {
       "post": {
-        "description": "Register an uploaded file as the next version; history is kept (permission\n``document.upload``). Get the upload with ``POST /documents/uploads`` and ``document_id``.\nAccepts ``Idempotency-Key``. An archived document answers 409 ``document_archived``.",
+        "description": "Register an uploaded file as the next version; history is kept (permission\n``document.upload``; only for a document you uploaded, or any visible one with\n``document.manage_acl``: 403 ``document_owner_only`` otherwise). Get the upload with\n``POST /documents/uploads`` and ``document_id``. Accepts ``Idempotency-Key``. An archived\ndocument answers 409 ``document_archived``.",
         "operationId": "add_version_api_v1_documents__document_id__versions_post",
         "parameters": [
           {
@@ -30031,7 +30031,7 @@
     },
     "/api/v1/exports/{export_id}/download-url": {
       "get": {
-        "description": "A download link for one file of a ready export, valid at most 5 minutes (the first\nformat unless ``format`` is given). Your own export: student lists and exports with\nrestricted values need a recent sign-in with MFA (428). Someone else's export needs\n``export.download_any`` and always a recent sign-in with MFA (428); 403 ``not_own_export``\nif you can see it (``export.read_all``) but not download it, 404 otherwise. Errors: 409\n``export_not_ready``, ``export_failed``, ``export_expired``. Every download is recorded in\nthe audit log.",
+        "description": "A download link for one file of a ready export, valid at most 5 minutes (the first\nformat unless ``format`` is given). Your own export: you must still see student records\n(403 ``student_read_required``) and every student in it must still be within your reach\n(403 ``students_out_of_scope``); student lists and exports with restricted values need a\nrecent sign-in with MFA (428). Someone else's export needs\n``export.download_any`` and always a recent sign-in with MFA (428); 403 ``not_own_export``\nif you can see it (``export.read_all``) but not download it, 404 otherwise. Errors: 409\n``export_not_ready``, ``export_failed``, ``export_expired``. Every download is recorded in\nthe audit log.",
         "operationId": "get_export_download_url_api_v1_exports__export_id__download_url_get",
         "parameters": [
           {
@@ -30343,7 +30343,7 @@
     },
     "/api/v1/extraction-items": {
       "get": {
-        "description": "The verification queue in page order (permission ``import.run``). Each field carries its\nconfidence and region; ``low_confidence_fields`` lists the ones to check carefully.",
+        "description": "The verification queue in page order (permission ``import.run``; only rows of register\npages whose document you can see). Each field carries its confidence and region;\n``low_confidence_fields`` lists the ones to check carefully.",
         "operationId": "list_items_api_v1_extraction_items_get",
         "parameters": [
           {
@@ -30472,7 +30472,7 @@
     },
     "/api/v1/extraction-items/{item_id}": {
       "get": {
-        "description": "One row with a 5-minute link to its page image and students with the same admission\nnumber (permission ``import.run``; the image also needs ``document.read`` on the page).",
+        "description": "One row with a 5-minute link to its page image and students with the same admission\nnumber (permission ``import.run``; 404 unless you can see the page's document).",
         "operationId": "get_item_api_v1_extraction_items__item_id__get",
         "parameters": [
           {
@@ -30540,7 +30540,7 @@
     },
     "/api/v1/extraction-items/{item_id}/confirm": {
       "post": {
-        "description": "Save the row as you read it on the page (permission ``import.commit``).\n\nCreates a student (or adds to ``student_id``) with source ``admission_register`` and the\npage as evidence; creating a student also needs ``student.create`` (403\n``student_create_required``). A row already checked answers 409 ``item_already_reviewed``;\nchanging an\nexisting register identity value answers 403 ``identity_change_required`` (use a change\nrequest). Accepts ``Idempotency-Key``.",
+        "description": "Save the row as you read it on the page (permission ``import.commit``; 404 unless you\ncan see the page's document).\n\nCreates a student (or adds to ``student_id``) with source ``admission_register`` and the\npage as evidence; creating a student also needs ``student.create`` (403\n``student_create_required``). A row already checked answers 409 ``item_already_reviewed``;\nchanging an\nexisting register identity value answers 403 ``identity_change_required`` (use a change\nrequest). Accepts ``Idempotency-Key``.",
         "operationId": "confirm_item_api_v1_extraction_items__item_id__confirm_post",
         "parameters": [
           {
@@ -30618,7 +30618,7 @@
     },
     "/api/v1/extraction-items/{item_id}/reject": {
       "post": {
-        "description": "Discard a row that is not a student entry; nothing is recorded (permission\n``import.commit``).",
+        "description": "Discard a row that is not a student entry; nothing is recorded (permission\n``import.commit``; 404 unless you can see the page's document).",
         "operationId": "reject_item_api_v1_extraction_items__item_id__reject_post",
         "parameters": [
           {

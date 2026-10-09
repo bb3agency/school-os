@@ -625,6 +625,20 @@ def _shared_doc(w: Any, admin: Engine, slot: str) -> uuid.UUID:
     return value
 
 
+def _own_doc(w: Any, admin: Engine, role: str) -> uuid.UUID:
+    """A ready document uploaded by ``role`` itself: since AA-10 only the uploader (or a
+    ``document.manage_acl`` holder) may add versions or edit metadata, so the matrix proves the
+    route guard with the caller's own document (the 403 for others' documents is proved in
+    tests/documents/test_document_writers.py). Scoped uploaders share with their section."""
+    doc: uuid.UUID = D.make_document(
+        admin,
+        w.a.tenant_id,
+        w.person(role).user_id,
+        acl=[(e["principal_type"], e["principal_ref"]) for e in _doc_acl(w)[:1]],
+    )
+    return doc
+
+
 def _doc_register(w: Any, r: str, a: Engine) -> Request:
     intent = D.make_intent(a, w.a.tenant_id, w.person(r).user_id, D.pdf())
     # Scoped uploaders (class teacher) may only share with their own sections.
@@ -633,7 +647,7 @@ def _doc_register(w: Any, r: str, a: Engine) -> Request:
 
 
 def _doc_version(w: Any, r: str, a: Engine) -> Request:
-    doc = _shared_doc(w, a, "versions")
+    doc = _own_doc(w, a, r)
     intent = D.make_intent(a, w.a.tenant_id, w.person(r).user_id, D.pdf(), document_id=doc)
     return f"/api/v1/documents/{doc}/versions", {"upload_id": str(intent)}, {}
 
@@ -648,7 +662,7 @@ def _doc_acl_put(w: Any, r: str, a: Engine) -> Request:
 
 
 def _doc_patch(w: Any, r: str, a: Engine) -> Request:
-    doc = _shared_doc(w, a, "patch")
+    doc = _own_doc(w, a, r)
     return (
         f"/api/v1/documents/{doc}",
         {"title": "Matrix circular"},
@@ -682,15 +696,17 @@ def _doc_delete(w: Any, r: str, a: Engine) -> Request:
 _XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
-def _sheet_doc(w: Any, admin: Engine) -> uuid.UUID:
+def _sheet_doc(w: Any, admin: Engine, uploader: Any = None) -> uuid.UUID:
     """A ready single-sheet XLSX document (C2) of school A that every reader role sees
-    (FR-DOC-009..011)."""
+    (FR-DOC-009..011); ``uploader`` (default the owner) uploaded it."""
     rows = [["Receipt", "Name", "Amount"], ["R-001", "Synthetica Matrix", 1200]]
+    who = uploader or w.a.people["owner"]
+    acl = [(e["principal_type"], e["principal_ref"]) for e in _doc_acl(w)]
     doc: uuid.UUID = D.make_document(
         admin,
         w.a.tenant_id,
-        w.a.people["owner"].user_id,
-        acl=[(e["principal_type"], e["principal_ref"]) for e in _doc_acl(w)],
+        who.user_id,
+        acl=acl if uploader is None else acl[:1],
         data=IM.xlsx_bytes(rows),
         mime_type=_XLSX_MIME,
         ext="xlsx",
@@ -706,7 +722,8 @@ def _shared_sheet_doc(w: Any, admin: Engine) -> uuid.UUID:
 
 
 def _doc_sheet_save(w: Any, r: str, a: Engine) -> Request:
-    doc = _sheet_doc(w, a)  # a fresh one per call: each save adds a version
+    # A fresh one per call (each save adds a version), uploaded by the caller (AA-10).
+    doc = _sheet_doc(w, a, w.person(r))
     body = {"base_version_no": 1, "edits": [{"row_no": 2, "column": 1, "value": "Matrix edit"}]}
     return f"/api/v1/documents/{doc}/sheet/versions", body, _if_match(D.document_version(a, doc))
 

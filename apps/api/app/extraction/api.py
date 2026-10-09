@@ -91,8 +91,9 @@ def list_items(
     limit: Limit = 50,
     cursor: Cursor = None,
 ) -> Page[ItemOut]:
-    """The verification queue in page order (permission ``import.run``). Each field carries its
-    confidence and region; ``low_confidence_fields`` lists the ones to check carefully."""
+    """The verification queue in page order (permission ``import.run``; only rows of register
+    pages whose document you can see). Each field carries its confidence and region;
+    ``low_confidence_fields`` lists the ones to check carefully."""
     return service.list_items(
         db, ctx, batch_id=batch_id, status=status, limit=limit, after_id=_cursor_id(cursor)
     )
@@ -101,7 +102,7 @@ def list_items(
 @router.get("/extraction-items/{item_id}", response_model=ItemDetail)
 def get_item(ctx: Runner, db: TenantDB, item_id: uuid.UUID, response: Response) -> ItemDetail:
     """One row with a 5-minute link to its page image and students with the same admission
-    number (permission ``import.run``; the image also needs ``document.read`` on the page)."""
+    number (permission ``import.run``; 404 unless you can see the page's document)."""
     response.headers["Cache-Control"] = "no-store"
     return service.get_item(db, ctx, item_id)
 
@@ -110,7 +111,8 @@ def get_item(ctx: Runner, db: TenantDB, item_id: uuid.UUID, response: Response) 
 def confirm_item(
     ctx: Committer, db: TenantDB, item_id: uuid.UUID, body: ItemConfirm, idem: IdempotencyDep
 ) -> Response:
-    """Save the row as you read it on the page (permission ``import.commit``).
+    """Save the row as you read it on the page (permission ``import.commit``; 404 unless you
+    can see the page's document).
 
     Creates a student (or adds to ``student_id``) with source ``admission_register`` and the
     page as evidence; creating a student also needs ``student.create`` (403
@@ -125,5 +127,5 @@ def confirm_item(
 @router.post("/extraction-items/{item_id}/reject", response_model=ItemOut)
 def reject_item(ctx: Committer, db: TenantDB, item_id: uuid.UUID, body: ItemReject) -> ItemOut:
     """Discard a row that is not a student entry; nothing is recorded (permission
-    ``import.commit``)."""
+    ``import.commit``; 404 unless you can see the page's document)."""
     return service.reject_item(db, ctx, item_id, body)

@@ -183,8 +183,9 @@ def test_US_402_AC1_item_shows_the_page_image_and_possible_matches(
 def test_US_402_AC1_image_needs_document_read_on_the_page(
     world: Any, api: Any, admin_engine: Engine
 ) -> None:
-    """A page shared only with a membership the reviewer is not: the row is shown, the image
-    is not (the document ACL still applies)."""
+    """A page shared only with a membership the reviewer is not: since data-layer hardening
+    note 10 neither the row nor the image is shown (404, the document ACL applies to the
+    extracted rows too)."""
     a = world.a
     owner = a.people["owner"].user_id
     doc = X.register_scan(
@@ -198,9 +199,7 @@ def test_US_402_AC1_image_needs_document_read_on_the_page(
     service.process_batch(a.tenant_id, batch_id)
     item_id = X.item_ids(admin_engine, batch_id)[0]
     staff = api.call(a.people["office_staff"], "GET", f"/api/v1/extraction-items/{item_id}")
-    assert staff.status_code == 200
-    assert staff.json()["image"] is None
-    assert staff.json()["image_unavailable"] == "not_visible"
+    assert staff.status_code == 404
     # document.manage_acl holders (office admin) see every document.
     admin = api.call(a.people["office_admin"], "GET", f"/api/v1/extraction-items/{item_id}")
     assert admin.json()["image"] is not None

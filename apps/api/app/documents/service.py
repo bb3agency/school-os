@@ -111,6 +111,7 @@ from app.documents.storage import (
     ObjectStoreError,
     ObjectWriter,
     derived_key,
+    derived_prefix,
     document_key,
     document_prefix,
     export_key,
@@ -356,6 +357,27 @@ def _raw_restricted(doc: Document) -> bool:
     return doc.sensitivity == "C3" or doc.purpose == "import_file"
 
 
+OWNER_ONLY_CODE: Final = "document_owner_only"
+
+
+def _may_write(ctx: UserContext, doc: Document) -> bool:
+    """Whether the caller may change a document they can see: they uploaded it, or they hold
+    ``document.manage_acl`` (audit 2026-10-04, AA-10). Seeing a document through its ACL is
+    not enough to replace its file or metadata for everyone else it is shared with."""
+    return doc.created_by == ctx.user_id or ctx.has(MANAGE)
+
+
+def _require_writer(ctx: UserContext, doc: Document) -> None:
+    """403 ``document_owner_only`` for a visible document the caller may not change (call
+    only after the visibility check, so invisible documents stay 404)."""
+    if not _may_write(ctx, doc):
+        raise Forbidden(
+            "Only the person who uploaded this document, or someone who manages documents, "
+            "can change it. Upload your own copy instead.",
+            code=OWNER_ONLY_CODE,
+        )
+
+
 def _visibility(session: Session, ctx: UserContext) -> repo.Visibility:
     everything = ctx.has(MANAGE) and ctx.scope_for(MANAGE).school_wide
     read = ctx.has(READ)
@@ -548,7 +570,9 @@ def create_upload(session: Session, ctx: UserContext, data: UploadCreate) -> Upl
 
     The declared kind must be allowlisted for the purpose and agree with the file extension;
     the size must be within the purpose's limit (FR-DOC-001: 25 MB, imports 10 MB).
-    ``document_id`` asks for a new version of a document the caller can see.
+    ``document_id`` asks for a new version of a document the caller can see (404 otherwise)
+    and uploaded themselves or manages (``document.manage_acl``; 403 ``document_owner_only``
+    otherwise, AA-10).
     """
     settings = get_settings()
     rule = purpose_rule(data.purpose, settings)
@@ -570,6 +594,7 @@ def create_upload(session: Session, ctx: UserContext, data: UploadCreate) -> Upl
         )
         if doc is None:
             raise _not_found()
+        _require_writer(ctx, doc)
         _refuse_archived(doc)
         if doc.purpose != data.purpose:
             raise _invalid("purpose", "purpose_mismatch")
@@ -945,7 +970,9 @@ def add_version(
     session: Session, ctx: UserContext, document_id: uuid.UUID, data: VersionCreate
 ) -> DocumentOut:
     """Register an uploaded object as the next version (permission ``document.upload``; the
-    document must be visible to the caller). History is kept (FR-DOC-006). An archived
+    document must be visible to the caller, 404 otherwise, and the caller must have uploaded it
+    or hold ``document.manage_acl``, 403 ``document_owner_only`` otherwise; AA-10). History is
+    kept (FR-DOC-006). An archived
     document answers 409 ``document_archived`` (the row lock orders this against a concurrent
     archive or unarchive)."""
     doc = repo.get_document(
@@ -953,6 +980,7 @@ def add_version(
     )
     if doc is None:
         raise _not_found()
+    _require_writer(ctx, doc)
     _refuse_archived(doc)
     intent = _claim_intent(session, ctx, data.upload_id, document_id=doc.id)
     if intent.version_no != repo.max_version_no(session, doc.id) + 1:
@@ -1148,18 +1176,21 @@ def update_document(
     expected_version: int,
 ) -> DocumentOut:
     """Change title, type, language, issuer or date (permission ``document.upload``; the
-    document must be visible to the caller, like adding a version; ``If-Match``).
+    document must be visible to the caller and uploaded by them, or the caller holds
+    ``document.manage_acl``, like adding a version; ``If-Match``).
 
-    404 outside the caller's ACL/scope, 412 for a stale version, 409 ``document_archived`` for
-    an archived document, 422 ``doc_type_not_allowed_for_purpose``. Unchanged values are
-    ignored (no new version). Audit: ``document.metadata_updated`` with the changed field
-    NAMES only (titles and issuers may name people).
+    404 outside the caller's ACL/scope, 403 ``document_owner_only`` for a visible document the
+    caller neither uploaded nor manages (AA-10), 412 for a stale version, 409 ``document_archived``
+    for an archived document, 422 ``doc_type_not_allowed_for_purpose``. Unchanged values are ignored
+    (no new version). Audit: ``document.metadata_updated`` with the changed field NAMES only (titles
+    and issuers may name people).
     """
     doc = repo.get_document(
         session, document_id, visibility=_visibility(session, ctx), for_update=True
     )
     if doc is None:
         raise _not_found()
+    _require_writer(ctx, doc)
     if doc.version != expected_version:
         raise PreconditionFailed()
     _refuse_archived(doc)
@@ -1475,6 +1506,15 @@ def evidence_exists(session: Session, document_id: uuid.UUID) -> bool:
 def is_visible(session: Session, ctx: UserContext, document_id: uuid.UUID) -> bool:
     """Whether the caller's ACL/scope reaches the document (for other modules' scoped reads)."""
     return repo.get_document(session, document_id, visibility=_visibility(session, ctx)) is not None
+
+
+def visible_document_ids(
+    session: Session, ctx: UserContext, document_ids: Sequence[uuid.UUID]
+) -> set[uuid.UUID]:
+    """The ids among ``document_ids`` whose ACL/scope reaches the caller, in one query (for
+    other modules' lists of rows derived from documents, e.g. the extraction queue: data-layer
+    hardening note 10)."""
+    return repo.visible_ids(session, document_ids, _visibility(session, ctx))
 
 
 def is_own_upload(session: Session, ctx: UserContext, document_id: uuid.UUID) -> bool:
@@ -1799,9 +1839,23 @@ def discard_object(
             key = None
     if key is None or not key_in_tenant(key, tenant_id) or not key.startswith(prefix):
         return False
-    (store or get_object_store()).discard(key)
+    store = store or get_object_store()
+    store.discard(key)
+    _discard_derived(store, tenant_id, document_id, key)
     log.info("documents.version.discarded", resource_type="document", resource_id=document_id)
     return True
+
+
+def _discard_derived(
+    store: ObjectStore, tenant_id: uuid.UUID, document_id: uuid.UUID, original_key: str
+) -> None:
+    """Discard the version's derived objects (page renders, text layer under ``v<n>/derived/``)
+    with the original: they show the same content (PRV-016; audit 2026-10-04 data-layer
+    hardening note 7). ``purge_prefix`` tags every stored version of each key (W3-07)."""
+    m = _DOC_KEY.match(original_key)
+    if m is None or m["t"] != str(tenant_id) or m["d"] != str(document_id):
+        return
+    store.purge_prefix(derived_prefix(tenant_id, document_id, int(m["n"])))
 
 
 def sweep_discarded_objects(tenant_id: uuid.UUID, *, store: ObjectStore | None = None) -> int:
@@ -1818,6 +1872,8 @@ def sweep_discarded_objects(tenant_id: uuid.UUID, *, store: ObjectStore | None =
         ]
     for key in keys:
         store.discard(key)
+        if m := _DOC_KEY.match(key):
+            _discard_derived(store, tenant_id, uuid.UUID(m["d"]), key)
     return len(keys)
 
 
@@ -1957,7 +2013,7 @@ def _sheet_read_only(ctx: UserContext, source: _SheetSource) -> SheetReadOnly | 
     the first rule that applies, in this order."""
     doc, grid = source.doc, source.grid
     rules: tuple[tuple[bool, SheetReadOnly], ...] = (
-        (not ctx.has(UPLOAD), "no_permission"),
+        (not ctx.has(UPLOAD) or not _may_write(ctx, doc), "no_permission"),
         (not purpose_rule(doc.purpose).versionable or grid.kind != "xlsx", "not_versionable"),
         (doc.status == "archived", "archived"),
         (grid.sheet_count > 1, "several_sheets"),
@@ -2104,14 +2160,15 @@ def save_sheet_version(
     expected_version: int,
     store: ObjectStore | None = None,
 ) -> DocumentOut:
-    """Save edited cells as the next version (permission ``document.upload``; ``If-Match``;
-    FR-DOC-010). The stored file is never changed: the edited sheet is written as a new XLSX
-    version (values only; Aadhaar-like numbers masked), stored SSE-KMS under the tenant prefix,
-    made current, and queued for the malware scan and indexing like any upload (FR-DOC-002,
-    FR-DOC-006). Refused (409) for import files and CSVs, archived documents, workbooks with
-    more than one sheet or with formulas, and when ``base_version_no`` is not the current
-    version. Audit ``document.version_added`` and ``document.sheet_edited`` (cell references and
-    counts, never values)."""
+    """Save edited cells as the next version (permission ``document.upload`` and, like any new
+    version, the uploader or a ``document.manage_acl`` holder: 403 ``document_owner_only``
+    otherwise, AA-10; ``If-Match``; FR-DOC-010). The stored file is never changed: the edited sheet
+    is written as a new XLSX version (values only; Aadhaar-like numbers masked), stored SSE-KMS
+    under the tenant prefix, made current, and queued for the malware scan and indexing like any
+    upload (FR-DOC-002, FR-DOC-006). Refused (409) for import files and CSVs, archived documents,
+    workbooks with more than one sheet or with formulas, and when ``base_version_no`` is not the
+    current version. Audit ``document.version_added`` and ``document.sheet_edited`` (cell references
+    and counts, never values)."""
     source = _sheet_source(
         session, ctx, document_id, version_no=data.base_version_no, for_update=True
     )
@@ -2122,6 +2179,8 @@ def save_sheet_version(
     if reason is not None:
         message, code = _SAVE_REFUSALS[reason]
         if reason == "no_permission":
+            if ctx.has(UPLOAD):  # AA-10: may upload, but not change this document
+                _require_writer(ctx, doc)
             raise Forbidden(message, code=code)
         raise Conflict(message, code=code)
     # Only cells whose value really changes count (a rebuilt workbook never has the same bytes
@@ -2447,18 +2506,25 @@ def export_records(session: Session) -> list[RecordTable]:
     return repo.export_record_tables(session)
 
 
-def export_files(session: Session) -> list[StoredObject]:
-    """Worker only (as :func:`export_records`): every version of every document that passed the
-    malware scan, oldest first. Quarantined, failed and discarded versions (PRV-016) are never
-    exported."""
-    out: list[StoredObject] = []
-    for v, purpose in repo.ready_versions(session):
-        out.append(
+WITHHELD_FILE_REASON: Final = "restricted, not included"
+WITHHELD_TABLE: Final = "documents_withheld"
+
+
+def _export_split(
+    session: Session, *, include_sensitive: bool
+) -> tuple[list[StoredObject], list[tuple[DocumentVersion, Document]]]:
+    shipped: list[StoredObject] = []
+    withheld: list[tuple[DocumentVersion, Document]] = []
+    for v, doc in repo.ready_versions(session):
+        if _raw_restricted(doc) and not include_sensitive:
+            withheld.append((v, doc))
+            continue
+        shipped.append(
             StoredObject(
                 document_id=v.document_id,
                 version_id=v.id,
                 version_no=v.version_no,
-                purpose=purpose,
+                purpose=doc.purpose,
                 object_key=v.object_key,
                 mime_type=v.mime_type,
                 size_bytes=v.size_bytes,
@@ -2466,7 +2532,53 @@ def export_files(session: Session) -> list[StoredObject]:
                 status=v.status,
             )
         )
-    return out
+    return shipped, withheld
+
+
+def export_files(session: Session, *, include_sensitive: bool = False) -> list[StoredObject]:
+    """Worker only (as :func:`export_records`): every version of every document that passed the
+    malware scan, oldest first. Quarantined, failed and discarded versions (PRV-016) are never
+    exported. Restricted files (C3 documents and raw import spreadsheets, whose stored file only
+    ``student.read_sensitive`` holders open) are left out unless ``include_sensitive`` (the
+    export was asked with restricted details; audit 2026-10-04, DL-07): they are listed in
+    :func:`export_withheld_files` instead."""
+    return _export_split(session, include_sensitive=include_sensitive)[0]
+
+
+def export_withheld_files(session: Session, *, include_sensitive: bool) -> list[RecordTable]:
+    """Worker only: the ``documents_withheld`` record table of the full export, one row per
+    ready version :func:`export_files` leaves out (document id, version, title, classification
+    and the reason ``restricted, not included``; no file bytes). Empty when
+    ``include_sensitive`` (DL-07). Titles are C2 at most."""
+    _, withheld = _export_split(session, include_sensitive=include_sensitive)
+    rows: list[tuple[object, ...]] = [
+        (
+            doc.id,
+            v.id,
+            v.version_no,
+            doc.title,
+            doc.purpose,
+            doc.sensitivity,
+            WITHHELD_FILE_REASON,
+        )
+        for v, doc in withheld
+    ]
+    return [
+        RecordTable(
+            name=WITHHELD_TABLE,
+            columns=(
+                "document_id",
+                "version_id",
+                "version_no",
+                "title",
+                "purpose",
+                "classification",
+                "reason",
+            ),
+            rows=rows,
+            notes=("restricted_files_withheld",) if rows else (),
+        )
+    ]
 
 
 def iter_export_file(
@@ -2545,12 +2657,15 @@ __all__ = [
     "GENERATED_PURPOSES",
     "OBJECT_DISCARD_EVENT",
     "OBJECT_DISCARD_TASK",
+    "OWNER_ONLY_CODE",
     "QUARANTINE_HOOKS",
     "READY_HOOKS",
     "RETENTION_REASONS",
     "STATUS_CHANGED_HOOKS",
     "TENANT_EXPORT_MIME",
     "VERSION_DISCARDED_HOOKS",
+    "WITHHELD_FILE_REASON",
+    "WITHHELD_TABLE",
     "FileTooLarge",
     "ObjectStore",
     "ObjectWriter",
@@ -2574,6 +2689,7 @@ __all__ = [
     "export_files",
     "export_records",
     "export_sheet",
+    "export_withheld_files",
     "generated_download_url",
     "get_document",
     "get_download_url",
@@ -2602,6 +2718,7 @@ __all__ = [
     "tenant_export_download_url",
     "update_document",
     "validate_acl",
+    "visible_document_ids",
 ]
 
 

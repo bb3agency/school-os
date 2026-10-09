@@ -16,9 +16,10 @@ Reading (the rules imports have always used, moved here so documents apply the s
 Writing (:func:`write_csv`, :func:`write_xlsx`): every value passes :func:`safe_cell`: NFC,
 control characters removed, any 12-digit Verhoeff-valid sequence masked
 (:func:`app.core.redaction.mask_aadhaar`, invariant 4) and formula injection neutralised with a
-leading apostrophe (cells starting with ``=``, ``+``, ``-``, ``@``, tab or carriage return; OWASP
-CSV injection). CSV is UTF-8 with a BOM so Excel opens Telugu correctly; XLSX cells are written
-as explicit strings (type ``s``), so a value is never stored as a formula.
+leading apostrophe (cells starting with ``=``, ``+``, ``-``, ``@``, tab or carriage return, also
+after leading whitespace or as full-width ``=+-@``; OWASP CSV injection). CSV is UTF-8 with a
+BOM so Excel opens Telugu correctly; XLSX cells are written as explicit strings (type ``s``), so
+a value is never stored as a formula.
 """
 
 from __future__ import annotations
@@ -88,9 +89,29 @@ class Cell:
         return self.value is None or (isinstance(self.value, str) and not self.value.strip())
 
 
+def _formula_head(text: str) -> str:
+    """``text`` without leading whitespace, control and invisible format characters (spreadsheet
+    programs skip them), with its first character NFKC-folded so full-width ``=+-@`` read as
+    ``=+-@`` (audit 2026-10-04 data-layer hardening note 4)."""
+    i = 0
+    while i < len(text) and (text[i].isspace() or unicodedata.category(text[i]) in ("Cc", "Cf")):
+        i += 1
+    rest = text[i:]
+    if not rest:
+        return ""
+    return unicodedata.normalize("NFKC", rest[0]) + rest[1:]
+
+
+def starts_formula(text: str) -> bool:
+    """True when a spreadsheet program could read ``text`` as a formula: it starts with one of
+    :data:`FORMULA_TRIGGERS`, or does so once leading whitespace, control and format characters
+    are skipped and the first sign is NFKC-folded (SEC-017, OWASP CSV injection)."""
+    return text.startswith(FORMULA_TRIGGERS) or _formula_head(text).startswith(FORMULA_TRIGGERS)
+
+
 def looks_like_formula(text: str) -> bool:
     """Text a spreadsheet program would treat as a formula or DDE payload."""
-    stripped = text.lstrip()
+    stripped = _formula_head(text)
     if not stripped:
         return False
     if stripped[0] in "=@":
@@ -231,6 +252,48 @@ def xlsx_sheet_count(data: bytes, limits: ReadLimits) -> int:
 # --- CSV ----------------------------------------------------------------------------------------
 
 
+def _check_csv_row_widths(text: str, dialect: type[csv.Dialect] | csv.Dialect) -> None:
+    """Refuse a record with more than :data:`MAX_ROW_CELLS` fields before the ``csv`` module
+    builds it (it materialises a whole row as a list first: a 10 MB row of commas cost ~150 MB;
+    audit 2026-10-04 api-auth hardening note).
+
+    Streams the text once without copying it: delimiters are counted with ``str.count`` between
+    quote characters and line breaks; text inside quotes (doubled quotes toggle twice, so they
+    cancel out) neither counts nor ends a record. A line break (CR or LF) outside quotes starts a
+    new record. This can only overcount when the sniffed dialect escapes quotes with an escape
+    character, and the per-row check in :func:`csv_rows` still runs afterwards (SEC-017)."""
+    delimiter = dialect.delimiter or ","
+    quote = dialect.quotechar if dialect.quoting != csv.QUOTE_NONE else None
+    limit = MAX_ROW_CELLS - 1  # fields = delimiters + 1
+    count = 0
+    pos = 0
+    end = len(text)
+    while pos < end:
+        next_quote = text.find(quote, pos) if quote else -1
+        stop = next_quote if next_quote != -1 else end
+        # Outside quotes: [pos, stop). Count per physical line.
+        line_start = pos
+        while line_start < stop:
+            cr = text.find("\r", line_start, stop)
+            lf = text.find("\n", line_start, stop)
+            breaks = [b for b in (cr, lf) if b != -1]
+            line_end = min(breaks) if breaks else stop
+            count += text.count(delimiter, line_start, line_end)
+            if count > limit:
+                raise SpreadsheetError("too_many_columns")
+            if line_end < stop:
+                count = 0
+                line_start = line_end + 1
+            else:
+                line_start = stop
+        if next_quote == -1:
+            return
+        closing = text.find(quote, next_quote + 1) if quote else -1
+        if closing == -1:
+            return  # an unterminated quoted field: the csv module reports it
+        pos = closing + 1
+
+
 def csv_rows(data: bytes, limits: ReadLimits) -> Iterator[tuple[int, list[Cell]]]:
     """``(row number, cells)`` of a UTF-8 CSV (BOM accepted, delimiter sniffed)."""
     try:
@@ -246,6 +309,7 @@ def csv_rows(data: bytes, limits: ReadLimits) -> Iterator[tuple[int, list[Cell]]
         )
     except csv.Error:
         dialect = csv.excel
+    _check_csv_row_widths(text, dialect)
     reader = csv.reader(io.StringIO(text, newline=""), dialect)
     try:
         for row_no, raw in enumerate(reader, start=1):
@@ -290,8 +354,9 @@ def display_text(value: CellValue) -> str | None:
 
 
 def neutralise_formula(text: str) -> str:
-    """Prefix ``'`` when ``text`` would start a formula (SEC-017, OWASP CSV injection)."""
-    return NEUTRALISER + text if text.startswith(FORMULA_TRIGGERS) else text
+    """Prefix ``'`` when ``text`` would start a formula (SEC-017, OWASP CSV injection), also
+    behind leading whitespace or a full-width sign (:func:`starts_formula`)."""
+    return NEUTRALISER + text if starts_formula(text) else text
 
 
 def safe_cell(value: object) -> str:

@@ -1263,7 +1263,9 @@ export interface paths {
         /**
          * Update Document
          * @description Change the title, type, language, issuer or date (permission ``document.upload``; the
-         *     document must be visible to you, as for a new version; ``If-Match``). An archived document
+         *     document must be visible to you and uploaded by you, unless you hold
+         *     ``document.manage_acl``, as for a new version: 403 ``document_owner_only`` otherwise;
+         *     ``If-Match``). An archived document
          *     answers 409 ``document_archived``; a type that does not suit the purpose 422. Audited with
          *     the changed field names only.
          */
@@ -1394,11 +1396,12 @@ export interface paths {
         put?: never;
         /**
          * Save Sheet Version
-         * @description Save edited cells as the next version (permission ``document.upload``; ``If-Match``;
-         *     FR-DOC-010). The current file is kept in the history; the new version (values only, an
-         *     XLSX) is checked for viruses and indexed like an upload (202). 409 for import files and
-         *     CSVs, archived documents, workbooks with several sheets or with formulas (edit those in a
-         *     spreadsheet program), when a newer version exists, or when nothing changed; 422 for a full
+         * @description Save edited cells as the next version (permission ``document.upload``; only for a document
+         *     you uploaded, or any visible one with ``document.manage_acl``: 403 ``document_owner_only``
+         *     otherwise; ``If-Match``; FR-DOC-010). The current file is kept in the history; the new version
+         *     (values only, an XLSX) is checked for viruses and indexed like an upload (202). 409 for import
+         *     files and CSVs, archived documents, workbooks with several sheets or with formulas (edit those
+         *     in a spreadsheet program), when a newer version exists, or when nothing changed; 422 for a full
          *     Aadhaar number (enter only the last 4 digits) or line breaks. Accepts ``Idempotency-Key``.
          */
         post: operations["save_sheet_version_api_v1_documents__document_id__sheet_versions_post"];
@@ -1441,8 +1444,10 @@ export interface paths {
         /**
          * Add Version
          * @description Register an uploaded file as the next version; history is kept (permission
-         *     ``document.upload``). Get the upload with ``POST /documents/uploads`` and ``document_id``.
-         *     Accepts ``Idempotency-Key``. An archived document answers 409 ``document_archived``.
+         *     ``document.upload``; only for a document you uploaded, or any visible one with
+         *     ``document.manage_acl``: 403 ``document_owner_only`` otherwise). Get the upload with
+         *     ``POST /documents/uploads`` and ``document_id``. Accepts ``Idempotency-Key``. An archived
+         *     document answers 409 ``document_archived``.
          */
         post: operations["add_version_api_v1_documents__document_id__versions_post"];
         delete?: never;
@@ -1467,8 +1472,9 @@ export interface paths {
          *     Accepted: PDF, JPG, PNG, DOCX, XLSX up to 25 MB (evidence and register scans: PDF, JPG,
          *     PNG; spreadsheet imports: XLSX or CSV up to 10 MB). The form must be posted within 10
          *     minutes with the returned fields; the key, Content-Type and size are fixed by the policy.
-         *     Send ``document_id`` to upload a new version (409 ``document_archived`` for an archived
-         *     document). Accepts ``Idempotency-Key``.
+         *     Send ``document_id`` to upload a new version of a document you uploaded, or of any document
+         *     you can see if you hold ``document.manage_acl`` (403 ``document_owner_only`` otherwise; 409
+         *     ``document_archived`` for an archived document). Accepts ``Idempotency-Key``.
          */
         post: operations["create_upload_api_v1_documents_uploads_post"];
         delete?: never;
@@ -1892,8 +1898,10 @@ export interface paths {
         /**
          * Get Export Download Url
          * @description A download link for one file of a ready export, valid at most 5 minutes (the first
-         *     format unless ``format`` is given). Your own export: student lists and exports with
-         *     restricted values need a recent sign-in with MFA (428). Someone else's export needs
+         *     format unless ``format`` is given). Your own export: you must still see student records
+         *     (403 ``student_read_required``) and every student in it must still be within your reach
+         *     (403 ``students_out_of_scope``); student lists and exports with restricted values need a
+         *     recent sign-in with MFA (428). Someone else's export needs
          *     ``export.download_any`` and always a recent sign-in with MFA (428); 403 ``not_own_export``
          *     if you can see it (``export.read_all``) but not download it, 404 otherwise. Errors: 409
          *     ``export_not_ready``, ``export_failed``, ``export_expired``. Every download is recorded in
@@ -1992,8 +2000,9 @@ export interface paths {
         };
         /**
          * List Items
-         * @description The verification queue in page order (permission ``import.run``). Each field carries its
-         *     confidence and region; ``low_confidence_fields`` lists the ones to check carefully.
+         * @description The verification queue in page order (permission ``import.run``; only rows of register
+         *     pages whose document you can see). Each field carries its confidence and region;
+         *     ``low_confidence_fields`` lists the ones to check carefully.
          */
         get: operations["list_items_api_v1_extraction_items_get"];
         put?: never;
@@ -2014,7 +2023,7 @@ export interface paths {
         /**
          * Get Item
          * @description One row with a 5-minute link to its page image and students with the same admission
-         *     number (permission ``import.run``; the image also needs ``document.read`` on the page).
+         *     number (permission ``import.run``; 404 unless you can see the page's document).
          */
         get: operations["get_item_api_v1_extraction_items__item_id__get"];
         put?: never;
@@ -2036,7 +2045,8 @@ export interface paths {
         put?: never;
         /**
          * Confirm Item
-         * @description Save the row as you read it on the page (permission ``import.commit``).
+         * @description Save the row as you read it on the page (permission ``import.commit``; 404 unless you
+         *     can see the page's document).
          *
          *     Creates a student (or adds to ``student_id``) with source ``admission_register`` and the
          *     page as evidence; creating a student also needs ``student.create`` (403
@@ -2064,7 +2074,7 @@ export interface paths {
         /**
          * Reject Item
          * @description Discard a row that is not a student entry; nothing is recorded (permission
-         *     ``import.commit``).
+         *     ``import.commit``; 404 unless you can see the page's document).
          */
         post: operations["reject_item_api_v1_extraction_items__item_id__reject_post"];
         delete?: never;

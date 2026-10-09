@@ -664,6 +664,83 @@ def test_read_and_download_only_own_exports(
     assert downloaded[0]["summary"]["format"] == "xlsx"
 
 
+def test_AA_12_own_download_needs_read_basic_still(school: Any, section: str) -> None:
+    """Audit 2026-10-04 api-auth AA-12: a requester who lost ``student.read_basic`` cannot
+    download their frozen export any more (403), and the list says so."""
+    EX.student(school, section_key=section)
+    mine = EX.ready_export(school, "exam_coordinator", section_keys=(section,))
+    me = school.people["exam_coordinator"]
+    c_me = EX.ctx(school, me, "exam_coordinator")
+    no_read = dataclasses.replace(c_me, permissions=c_me.permissions - {"student.read_basic"})
+    with tenant_session(school.tenant_id, me.user_id) as db:
+        assert exports.get_export(db, no_read, mine).can_download is False
+        with pytest.raises(Forbidden) as exc:
+            exports.download_url(db, no_read, mine)
+        assert exc.value.code == "student_read_required"
+        assert exports.download_url(db, c_me, mine).format == "xlsx"
+
+
+def test_AA_12_own_download_needs_the_frozen_students_still_in_scope(
+    school: Any, section: str, admin_engine: Engine
+) -> None:
+    """The requester's student scope shrank after the export was made: students outside their
+    current reach must not be downloaded (403 ``students_out_of_scope``); still in reach: OK."""
+    EX.student(school, section_key=section)
+    mine = EX.ready_export(school, "exam_coordinator", section_keys=(section,))
+    me = school.people["exam_coordinator"]
+    c_me = EX.ctx(school, me, "exam_coordinator")
+    elsewhere = dataclasses.replace(
+        c_me,
+        scoped_permissions=frozenset({"student.read_basic"}),
+        scopes=Scopes(school=False, section_ids=frozenset({school.ids["section_9a"]})),
+    )
+    still = dataclasses.replace(
+        c_me,
+        scoped_permissions=frozenset({"student.read_basic"}),
+        scopes=Scopes(school=False, section_ids=frozenset({school.ids[section]})),
+    )
+    no_findings_reach = dataclasses.replace(
+        c_me,
+        scoped_permissions=frozenset({"dq.findings.read"}),
+        scopes=Scopes(school=False, section_ids=frozenset({school.ids["section_9a"]})),
+    )
+    with tenant_session(school.tenant_id, me.user_id) as db:
+        for ctx in (elsewhere, no_findings_reach):
+            with pytest.raises(Forbidden) as exc:
+                exports.download_url(db, ctx, mine)
+            assert exc.value.code == "students_out_of_scope"
+        assert exports.download_url(db, still, mine).format == "xlsx"
+    downloaded = [
+        r
+        for r in EX.audit_rows(admin_engine, school.tenant_id, mine)
+        if r["action"] == "export.downloaded"
+    ]
+    assert len(downloaded) == 1  # refusals are not downloads
+
+
+def test_AA_12_restricted_student_list_needs_sensitive_reach_over_the_frozen_students(
+    school: Any, section: str
+) -> None:
+    EX.student(school, section_key=section)
+    owner = school.people["owner"]
+    c_owner = EX.ctx(school, owner, "owner")
+    out = EX.request_list(
+        school, owner, "owner", columns=("full_name", "category"), section_keys=(section,)
+    )
+    assert out.include_sensitive is True
+    assert EX.run(school, out.id) == "ready"
+    narrowed = dataclasses.replace(
+        c_owner,
+        scoped_permissions=frozenset({"student.read_sensitive"}),
+        scopes=Scopes(school=False, section_ids=frozenset({school.ids["section_9a"]})),
+    )
+    with tenant_session(school.tenant_id, owner.user_id) as db:
+        with pytest.raises(Forbidden) as exc:
+            exports.download_url(db, narrowed, out.id)
+        assert exc.value.code == "students_out_of_scope"
+        assert exports.download_url(db, c_owner, out.id).format == "csv"
+
+
 def test_ADR_0021_read_all_and_download_any_rules(
     school: Any, section: str, admin_engine: Engine
 ) -> None:

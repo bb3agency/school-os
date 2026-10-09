@@ -535,11 +535,43 @@ def _download_problem(ctx: UserContext, row: Export) -> Forbidden | None:
 def _own_problem(ctx: UserContext, row: Export) -> Forbidden | None:
     if not ctx.has(PERMISSION_OF_KIND[row.kind]):
         return Forbidden("You can no longer download this export.")
+    # AA-12: the files hold student records; reading them still needs read_basic.
+    if not ctx.has(STUDENT_READ):
+        return Forbidden(
+            "You can no longer see student records, so you cannot download this export.",
+            code="student_read_required",
+        )
     if row.include_sensitive and not ctx.has(SENSITIVE):
         return Forbidden(
             "You can no longer download restricted details.", code="sensitive_not_allowed"
         )
     return None
+
+
+def _reach_of(row: Export) -> tuple[str, ...]:
+    """The grants whose scope had to reach every frozen student when ``row`` was requested
+    (besides ``student.read_basic``), as :func:`request_precheck` and
+    :func:`request_student_list` check them."""
+    reach: list[str] = [DQ_READ] if row.kind != "student_list" else []
+    if row.include_sensitive:
+        reach.append(SENSITIVE)
+    return tuple(reach)
+
+
+def _frozen_out_of_scope(session: Session, ctx: UserContext, row: Export) -> Forbidden | None:
+    """AA-12: the requester's student scope may have shrunk since the export was frozen.
+    Every frozen student must still be within their current reach (``student.read_basic`` and
+    the grants of :func:`_reach_of`), or the download is refused."""
+    frozen = set(row.student_ids or ())
+    if not frozen:
+        return None
+    reach = set(students.list_students_in_scope(session, ctx, permissions=_reach_of(row)))
+    if frozen <= reach:
+        return None
+    return Forbidden(
+        "Some students in this export are no longer in your classes or reach. Make a new export.",
+        code="students_out_of_scope",
+    )
 
 
 def _others_problem(ctx: UserContext, row: Export) -> Forbidden | None:
@@ -669,13 +701,18 @@ def download_url(
 ) -> ExportDownloadOut:
     """A presigned GET (<= 5 minutes, attachment) for one file of a ready export.
 
-    Your own: you must still hold the export's permission; student lists and exports with
-    sensitive values need step-up (FR-EXP-004). Someone else's (ADR-0021): needs
+    Your own: you must still hold the export's permission and ``student.read_basic`` (403
+    ``student_read_required``), and every frozen student must still be within your reach
+    (with the findings and restricted-value grants the request needed; 403
+    ``students_out_of_scope``, AA-12); student lists and exports with sensitive values need
+    step-up (FR-EXP-004). Someone else's (ADR-0021): needs
     ``export.download_any`` with school-wide reach, always with step-up (403 ``not_own_export``
     for holders of ``export.read_all`` only; 404 for everyone else). Audit:
     ``export.downloaded`` with ``own_export`` and the requester's membership id."""
     row = _visible(session, ctx, export_id, others=(READ_ALL, DOWNLOAD_ANY))
     problem = _download_problem(ctx, row)
+    if problem is None and _own(ctx, row):
+        problem = _frozen_out_of_scope(session, ctx, row)
     if problem is not None:
         raise problem
     if _needs_step_up(ctx, row):
