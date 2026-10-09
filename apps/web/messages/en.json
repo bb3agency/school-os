@@ -1651,6 +1651,7 @@
       "citation_not_found": "No document you can read matches this source. Check it, or copy it again.",
       "citation_not_current": "This is not the current version of the document. Use the newest version's page.",
       "citation_text_not_found": "This text is not on that page. Copy the exact words from the document.",
+      "answer_personal_data": "Remove phone numbers, email addresses and Aadhaar numbers. Everyone in the school can read this answer.",
       "owner_not_active": "This person can no longer be given tasks. Choose someone else.",
       "aadhaar_last4_only": "Don't enter Aadhaar numbers. Use only the last 4 digits."
     },

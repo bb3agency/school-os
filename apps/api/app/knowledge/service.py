@@ -192,6 +192,13 @@ def _error(field: str, code: str) -> dict[str, str]:
     return {"field": field, "code": code, "message_key": f"errors.{code}"}
 
 
+def _refuse_answer_personal(text: str) -> None:
+    """Verified answers are shown to the whole school: no phone numbers, emails or
+    Aadhaar-like numbers in the free text (as for notices and memories; 422)."""
+    if has_personal_numbers(text):
+        raise ValidationFailed([_error("answer_text", "answer_personal_data")])
+
+
 def _result_out(chunk: RankedChunk) -> SearchResultOut:
     return SearchResultOut(
         source=chunk.source,
@@ -1327,6 +1334,7 @@ class SchoolKnowledgeService:
         the current version of a document the caller can read (docs/06 §8-9)."""
         if not ctx.has(MANAGE_VERIFIED):
             raise Forbidden()
+        _refuse_answer_personal(data.answer_text)
         citations = self._checked_citations(session, ctx, [c.model_dump() for c in data.citations])
         now = dt.datetime.now(dt.UTC)
         row = repo.insert_verified_answer(
@@ -1401,6 +1409,7 @@ class SchoolKnowledgeService:
         }
         changed = []
         if data.answer_text is not None:
+            _refuse_answer_personal(data.answer_text)
             values["answer_text"] = mask_aadhaar(nfc(data.answer_text))
             changed.append("answer_text")
         if data.citations is not None:

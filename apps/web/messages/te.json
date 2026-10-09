@@ -1651,6 +1651,7 @@
       "citation_not_found": "మీరు చదవగల ఏ పత్రమూ ఈ ఆధారంతో సరిపోలడం లేదు. తనిఖీ చేయండి లేదా మళ్ళీ కాపీ చేయండి.",
       "citation_not_current": "ఇది పత్రం యొక్క ప్రస్తుత వెర్షన్ కాదు. కొత్త వెర్షన్ పేజీని వాడండి.",
       "citation_text_not_found": "ఈ వాక్యం ఆ పేజీలో లేదు. పత్రంలోని ఖచ్చితమైన పదాలను కాపీ చేయండి.",
+      "answer_personal_data": "Remove phone numbers, email addresses and Aadhaar numbers. Everyone in the school can read this answer.",
       "owner_not_active": "This person can no longer be given tasks. Choose someone else.",
       "aadhaar_last4_only": "Don't enter Aadhaar numbers. Use only the last 4 digits."
     },
