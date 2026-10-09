@@ -48,8 +48,8 @@ deletion, exports.
 | DL-04 | **Low**: availability and read of another person's upload in the same school, no cross-tenant reach | Academics / documents | `app/academics/service.py:375` (`_consume_sheet`) | See note DL-04 below. | Fixed in `3b5c6bf`. The preview now answers 404 unless the caller uploaded the file (`documents.is_own_upload`). | `tests/academics/test_service.py::test_SEC_015_only_the_uploader_may_read_and_delete_a_sheet` |
 | DL-05 | **Low**: defence in depth; only for a school already in `offboarding` | DB roles | `core.tenant_purge_allowed()` / `core.tenant_audit_purge_allowed()` (0032) | See note DL-05 below. | Fixed in `ccd9e46`, migration `0044_purge_flag_role`. Both functions also require `current_user = 'sos_purger'`; the downgrade restores the 0032 bodies. | `tests/tenancy/test_offboarding_purge.py::test_ADR_0029_the_purge_flag_lets_only_sos_purger_past_the_row_guards`; heads pinned in `tests/extraction/test_migration.py` |
 | DL-06 | **Medium**: business-rule bypass of the certificate block. FR-CERT-002 promises that blockers are cleared only by a change request or a step-up waiver | dq / certificates | `app/dq/service.py:887` (`resolve_finding`), `app/certificates/service.py:928` | See note DL-06 below. | Fixed in `cf51730d` (lead recommendation, owner decision 2026-10-04: resolving a **blocker** with a note needs `dq.findings.waive` plus step-up; ordinary findings still resolve with a note). The auto-clear route found later is app-logic A-01. | `tests/dq/test_api.py::test_DL_06_resolving_a_blocker_needs_the_waive_permission_and_step_up`, `::test_DL_06_ordinary_findings_still_resolve_with_a_note`; `tests/certificates/test_api.py::test_DL_06_a_clerk_cannot_note_away_a_blocker_and_issue` |
-| DL-07 | **Medium-low**: a promise mismatch, not an escalation with today's roles | Admin export | `app/admin/service.py:608`, `app/documents/service.py:2297` | See note DL-07 below. | **Reported, needs decision.** Recommendation: skip C3 document files, or list them as withheld, when `include_sensitive` is false. | none |
-| DL-08 | **Low**: a small content leak to task holders | Circulars / tasks | `app/circulars/service.py:761`, `:842` | A task created from a circular suggestion defaults its title and details to the AI summary of that circular. The task owner, and holders of `task.read_all`, see the text even when they cannot see the circular; only the citation is hidden. | **Reported, needs decision** (product: whether a task copied from a summary keeps the summary text). | none |
+| DL-07 | **Medium-low**: a promise mismatch, not an escalation with today's roles | Admin export | `app/admin/service.py:608`, `app/documents/service.py:2297` | See note DL-07 below. | Fixed in `ef2d0b0d` (lead recommendation, owner decision 2026-10-07: withhold and list). Without `include_sensitive`, the full export leaves out C3 documents and raw import spreadsheets. It lists them in `records/documents_withheld`, with no bytes. | `tests/admin/test_export_service.py::test_DL_07_*` |
+| DL-08 | **Low**: a small content leak to task holders | Circulars / tasks | `app/circulars/service.py:761`, `:842` | A task created from a circular suggestion defaults its title and details to the AI summary of that circular. The task owner, and holders of `task.read_all`, see the text even when they cannot see the circular; only the citation is hidden. | Fixed in `2f3c11b4` (lead recommendation, owner decision 2026-10-07: neutral title, no details). A task confirmed from a circular suggestion no longer copies the AI summary. It gets the configured title "Follow up circular". | `tests/circulars/test_api.py::test_DL_08_*` |
 | DL-09 | **Medium-low**: needs the victim's OIDC `sub` (random UUID) | Identity (api-auth area) | `app/identity/service.py:515`; `core.create_user_for_invite`, `core.accept_invitations` | See note DL-09 below. | Fixed in `b0c84f94` and `5874c660` (lead recommendation, owner decision 2026-10-04: an invitation to an existing account needs that person's explicit accept or decline; migration `0045_invitation_consent`, `accept_invitations` takes the issuer; the inviting school sees no contact details or last sign-in until acceptance). | `tests/api/test_invitation_consent.py::test_DL_09_sign_in_does_not_accept_an_invitation_to_an_existing_account`, `::test_DL_09_inviting_school_does_not_see_the_existing_accounts_email`, `::test_DL_09_acceptance_matches_the_issuer`, `::test_DL_09_inviting_school_does_not_see_when_the_existing_account_signs_in` |
 | DL-10 | **Medium**: the approver is misled about the reach of a grant | Break-glass (api-auth area) | `app/platform/schemas.py:1012`, `app/breakglass/service.py:120-133`, `apps/web/src/features/break-glass/BreakGlassScreens.tsx:59-82` | See note DL-10 below. | Fixed in `50d86e08` (lead recommendation, owner decision 2026-10-04: scopes accept only `section_id`/`class_id`, or `{}` shown explicitly as the whole school). | `tests/platform/test_operators.py::test_DL_10_breakglass_scope_must_really_narrow_the_grant` |
 
@@ -153,13 +153,19 @@ deletion, exports.
    `chain_heads` without detection, because `verify_chain` trusts the head in the same database.
    - Compare the head with the last KMS-signed archive manifest.
    - Verify chains of `provisioning` and `offboarding` schools too.
+
+   **Fixed in `c82c469e`** (data-protection H-04): `verify_all_chains` checks each school chain against its last signed manifest and raises P1 `audit.chain.broken`. Tests: `tests/audit/test_archive_head_and_backfill.py::test_H_04_*`. The second point was already fixed in `3916697` (data-protection DP-03).
 4. **Formula neutralisation (`core/spreadsheet.py:248`, `exports/tables.py:71`).** It checks
    only the first character. Check after `lstrip()`, and NFKC-fold full-width `＝＋－＠`.
    `platform/audit_view.py:73` should use `safe_cell`.
+
+   **Fixed in `8fdf3e95`.** `core.spreadsheet.starts_formula` skips leading whitespace, control and format characters and NFKC-folds full-width `＝＋－＠`. Exports and the audit CSV use it; `platform/audit_view.py` writes every cell through `safe_cell`. Tests: `tests/core/test_spreadsheet_formula.py`, `tests/platform/test_audit_view_csv.py`.
 5. **Idempotency replays (`authz/http.py:200`).** These cache whole response bodies in Valkey
    for the TTL, including decrypted behaviour-note text. The cached text survives an erase.
    - Cache only status and IDs for routes that return C3 text.
    - The docstring in `ops/idempotency.py` is wrong.
+
+   **Fixed in `fffc1995`** (data-protection H-01). Routes that return C3 text store only status, id and headers, and re-read the body on replay with the caller's current permissions. Tests: `tests/students/test_api.py::test_H_01_*`, `tests/insights/test_api.py::test_H_01_*`, `tests/changes/test_api.py::test_H_01_*`.
 6. **Crypto-shredding window.** The wrapped DEKs in PITR and cross-region backups stay
    decryptable under the shared CMK until those backups expire. Document the window, or move to
    per-tenant CMKs.
@@ -167,6 +173,8 @@ deletion, exports.
    **Fixed in `0200f01a`** (lead recommendation, owner decision 2026-10-07: document the window; per-school CMKs carry a per-key cost and are not adopted): docs/08 §7 states the window. Docs only, no test.
 7. **Discard of derived page images.** Discard removes only `original.*`. When page renders
    (`v<n>/derived/`) get callers, discard must clear them too (PRV-016).
+
+   **Fixed in `a2fb6d9f`.** Discard and the daily sweep also purge the version's `v<n>/derived/` objects. Tests: `tests/documents/test_documents_api.py::test_DL_hardening_7_*`, `tests/documents/test_storage_s3.py::test_DL_hardening_7_*`.
 8. **Enrolment target scope.** `students.enrol` does not check `section_id` against a scoped
    `student.update_nonidentity` grant. This is latent: every system role holds it school-wide.
 
@@ -177,12 +185,16 @@ deletion, exports.
    **Recorded in `0200f01a`** (docs/08 §5, accepted residual risks). Refusing such phone numbers would refuse about one real mobile number in ten. Docs only, no test.
 10. **Extraction review queue.** It lists extracted rows (C2) to every `import.run` holder,
     whatever the ACL of the source register scan.
+
+    **Fixed in `2000614c`.** List, read, confirm and reject reach only rows whose register scan the caller can see; other rows answer 404. Tests: `tests/extraction/test_queue_visibility.py`.
 11. **Dot, slash or comma separated Aadhaar.** `1234.5678.9012`, `1234/5678/9012` and
     `1234,5678,9012` are neither refused nor masked. Treating these characters as separators
     turns structured identifiers into false positives: invoice numbers such as
     `SOS/2026-27/000123`, dates and amounts. If the owner wants them covered, add a separate
     check that only matches exactly three 4-digit groups (`\d{4}[./,]\d{4}[./,]\d{4}`, not part
     of a longer run), with tests against invoice and receipt numbers.
+
+    **Fixed in `f8cef926`.** Three 4-digit groups joined by the same one of `.`, `/` or `,` that are Verhoeff-valid are masked and refused. Invoice numbers, dates and amounts are untouched. Tests: `tests/core/test_redaction.py::test_DL_hardening_11_*`.
 
 ## Migration
 

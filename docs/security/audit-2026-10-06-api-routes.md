@@ -5,8 +5,9 @@ route by route, against the OWASP API Security Top 10 (2023) and ASVS V4/V5/V13.
 (`audit-2026-10-04-*.md`) and round-two (`audit-2026-10-05-*.md`) findings were read first and
 are not repeated. Paths are relative to `apps/api/`. Synthetic data only.
 
-**Status: complete.** Every verified finding is fixed with a test that failed first, or is listed
-under "Needs owner decision" with a recommendation. The route inventory is in the appendix.
+**Status: complete.** Every verified finding is fixed with a test that failed first. The ones
+reported for an owner decision were decided on 2026-10-06 and built (see below). The route
+inventory is in the appendix.
 
 ## Method
 
@@ -43,7 +44,7 @@ under "Needs owner decision" with a recommendation. The route inventory is in th
 | R-13 | Low | API8, CWE-20, CWE-190 | 500s now clean 422s: PlanPatch refuses explicit nulls for NOT NULL fields; `included_students` and plan limits bounded to int4; invoice period start and trial end in the years 2000–2999 (a 9999 date overflowed the period maths); a computed amount past Numeric(14, 2) maps to 422 `value_out_of_range` (platform translator, plus a central safety net for SQLSTATE 22003/22008); a concurrent duplicate exam create answers 422 `exam_name_taken` (savepoint) | 70e37c6 | `tests/platform/test_billing.py::test_R_13_*`, `tests/core/test_errors.py::test_R_13_*`, `tests/academics/test_service.py::test_R_13_*` |
 | R-16 | Low (latent, Telugu hidden) | API6, ASVS V11.1, ADR-0036 | Approving a notice while Telugu is hidden replaces the Telugu title and body with the English text. Before, Telugu text planted by a drafter (hidden from the approver by the API) was approved unseen and would reach parents once Telugu is switched on | 9234b19 | `tests/circulars/test_api.py::test_R_16_telugu_text_nobody_reviewed_is_not_kept_on_approval` |
 
-## Needs owner decision (reported, no code)
+## Reported for owner decision (all decided 2026-10-06 and built, next section)
 
 | ID | Ref | Finding | Recommendation |
 |---|---|---|---|
@@ -70,15 +71,15 @@ The owner approved the recommendations above on 2026-10-06. Each was built with 
 
 ~~New hardening found while building R-19: route budgets shared by a whole school (`per: school` in `rate_limits.yaml`: `data_export`, `heavy_jobs`) are charged by the route guard before the permission check. A member without the permission can therefore spend the school's budget with requests that are refused (403), and lock the people who may use the route out for the window. Recommendation: charge per-school route budgets after authorization, with `ratelimit.charge` as `audit_verify` now does.~~ **Fixed** (owner decision 2026-10-07, branch `wip/school-budget-after-authz`): the tenant guards (`require`, `require_any`) charge a route's `per: school` budgets (`data_export`, `heavy_jobs`) as their last step, after the permission, scope, step-up and break-glass checks (`ratelimit.charge_school_routes`), and `enforce` no longer charges them before authorization. Every other budget was audited: the per-IP, per-person, per-operator and per-person route budgets stay before authorization (a refused caller spends only their own); the school layer (6000 units a minute) stays before it as a flood guard, since one person is held to 600 units a minute before it is charged and any member can spend it with permitted requests anyway; the AI budgets (`kb_ask` per person; the gateway's per-school minute limit and monthly budget) are reached only after the route's permission check. The 429 is unchanged. Proving tests: `tests/api/test_school_budgets_after_authz.py` (403 and 428 over the quota spend nothing; a permitted member then succeeds; permitted calls over the quota get 429), and `tests/security/test_rate_limit_routes.py::test_school_budgets_*`.
 
-## Hardening (no exploit path; not fixed here)
+## Hardening
 
-- Naive datetimes on the audit filters are read as UTC without saying so.
-- A client `X-Request-Id` is stored in audit records (bounded and pattern-checked, but caller-chosen).
-- Enrolment and academic-year dates are not bounded.
-- DQ resolve accepts a change request in any state.
-- Tally device-cap check races (two enrolments at once can exceed the cap by one).
-- Bidi control characters are accepted in tenant free text.
-- Exam names: the unique constraint is case-sensitive while the check is not, so two concurrent creates differing only in case both succeed (needs a `lower(name)` unique index, a migration).
+- Naive datetimes on the audit filters are read as UTC without saying so. **Fixed in 827b4c43:** time filters need an explicit offset. Test: `tests/api/test_audit_viewer.py::test_FR_AUD_005_time_filters_need_an_offset`.
+- A client `X-Request-Id` is stored in audit records (bounded and pattern-checked, but caller-chosen). **Fixed in 2fb20cc8:** the request id is always the API's own. Tests: `tests/core/test_middleware.py::test_NFR_OBS_001_client_request_id_is_never_used`, `tests/api/test_audit_viewer.py::test_FR_AUD_001_audit_events_store_the_apis_own_request_id`.
+- Enrolment and academic-year dates are not bounded. **Fixed in 8ba4457b:** both are bounded to the years 2000-2999. Tests: `tests/tenancy/test_schemas.py::test_academic_year_dates_are_bounded`, `::test_enrolment_dates_are_bounded`.
+- DQ resolve accepts a change request in any state. **Fixed in 1225cd79:** a finding resolves only with an approved change request for its field. Test: `tests/dq/test_engine.py::test_FR_DQ_020_resolve_and_waive_rules`.
+- Tally device-cap check races (two enrolments at once can exceed the cap by one). **Fixed in fbde22b8:** active agents are counted under a per-school advisory lock. Test: `tests/tally/test_api.py::test_FR_TALLY_001_agent_cap_is_counted_under_a_per_school_lock`.
+- Bidi control characters are accepted in tenant free text. **Fixed in 7526f1fb:** JSON request bodies with text-direction controls are refused (the signed machine routes are skipped). Tests: `tests/core/test_middleware.py::test_SEC_010_*`.
+- Exam names: the unique constraint is case-sensitive while the check is not, so two concurrent creates differing only in case both succeed (needs a `lower(name)` unique index, a migration). **Fixed in cb57a61a** (index in 1fd9b1bd, migration `0049_open_items`): exam names are unique per year whatever their case. Tests: `tests/academics/test_service.py::test_exam_names_differing_only_in_case_cannot_both_be_created_concurrently`, `::test_exam_name_index_is_skipped_not_failed_when_case_duplicates_exist`.
 - ~~The web has no message for the new `value_out_of_range` code~~: fixed in 7aff3f2.
 
 ## Appendix: route inventory
