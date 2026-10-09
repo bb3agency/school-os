@@ -442,7 +442,7 @@ def test_exam_name_index_is_skipped_not_failed_when_case_duplicates_exist(
                 )
             for statement in module.EXAM_NAMES_UP:
                 c.execute(text(statement))
-            created = c.execute(
+            created: bool = c.execute(
                 text("SELECT to_regclass('sis.exams_name_per_year_ci') IS NOT NULL")
             ).scalar_one()
             assert created is False

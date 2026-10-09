@@ -469,7 +469,7 @@ def test_SEC_010_bidi_check_skips_the_signed_machine_routes() -> None:
             "path": path,
             "headers": [(b"content-type", b"application/json")],
         }
-        asyncio.run(BidiControlMiddleware(inner)(scope, receive, send))
+        asyncio.run(BidiControlMiddleware(inner)(scope, receive, send))  # type: ignore[arg-type]
     assert seen == [body, body]
 
 

@@ -46,8 +46,7 @@ EVIDENCE_PIN_UP = (
     "REFERENCES kb.document_versions (tenant_id, document_id, id)",
 )
 EVIDENCE_PIN_DOWN = (
-    "ALTER TABLE sis.change_requests DROP CONSTRAINT IF EXISTS "
-    "change_requests_evidence_version_fk",
+    "ALTER TABLE sis.change_requests DROP CONSTRAINT IF EXISTS change_requests_evidence_version_fk",
     "ALTER TABLE sis.change_requests DROP COLUMN IF EXISTS evidence_version_id",
 )
 

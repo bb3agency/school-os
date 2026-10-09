@@ -1494,7 +1494,8 @@ def evidence_state(
     hardening "Change requests"): ``not_visible`` when the caller's ACL/scope does not reach the
     document, else the state of the pinned version (the latest version when ``version_id`` is
     ``None``, for requests submitted before versions were pinned): ``ready`` once its virus
-    scan is clean (also while it is being indexed), ``pending`` while it is queued or scanning, ``unusable`` otherwise."""
+    scan is clean (also while it is being indexed), ``pending`` while it is queued or
+    scanning, ``unusable`` otherwise."""
     if not is_visible(session, ctx, document_id):
         return "not_visible"
     version = repo.get_version(session, document_id, version_id=version_id)

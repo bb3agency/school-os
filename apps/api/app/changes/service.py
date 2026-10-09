@@ -817,7 +817,9 @@ def request_link(session: Session, request_id: uuid.UUID) -> RequestLink | None:
     row = repo.get_request(session, request_id)
     if row is None:
         return None
-    return RequestLink(student_id=row.student_id, attribute_key=row.attribute_key, status=row.status)
+    return RequestLink(
+        student_id=row.student_id, attribute_key=row.attribute_key, status=row.status
+    )
 
 
 def pending_attribute_keys(

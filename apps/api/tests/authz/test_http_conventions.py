@@ -120,13 +120,20 @@ def test_docs_09_replay_refused_after_the_callers_access_changed(
         "permission_removed": dataclasses.replace(
             ctx, permissions=frozenset({"student.read_basic"})
         ),
-        "scope_narrowed": dataclasses.replace(ctx, scopes=Scopes(section_ids=frozenset({section_a}))),
+        "scope_narrowed": dataclasses.replace(
+            ctx, scopes=Scopes(section_ids=frozenset({section_a}))
+        ),
         "now_scoped": dataclasses.replace(ctx, scoped_permissions=frozenset()),
     }[change]
     calls: list[int] = []
+
+    def op() -> Body:
+        calls.append(1)
+        return Body(code="X")
+
     again = Idempotency(_request({"Idempotency-Key": "key-00000011"}), later)
     with pytest.raises(Conflict) as exc:
-        again.run(Session(), Body(code="IX"), lambda: calls.append(1) or Body(code="X"))
+        again.run(Session(), Body(code="IX"), op)
     assert exc.value.code == "idempotency_access_changed"
     assert calls == [], "the operation is not run again either"
 

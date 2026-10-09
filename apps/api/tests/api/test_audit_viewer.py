@@ -81,7 +81,7 @@ def test_FR_AUD_001_audit_events_store_the_apis_own_request_id(
     )
     assert res.status_code == 200, res.text
     with admin_engine.connect() as c:
-        stored = c.execute(
+        stored: str = c.execute(
             text(
                 "SELECT request_id FROM audit.events WHERE tenant_id = :t "
                 "AND action = 'audit.exported' ORDER BY seq DESC LIMIT 1"
