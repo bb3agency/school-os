@@ -39,7 +39,7 @@ describe("sidebar: one current page, the most specific (FR-TEN-011 menu entry)",
   it("school menu: Promotions sits under School structure for structure managers only", () => {
     path.current = "/settings/structure/years/0192f3a4-0000-7000-8000-0000000000a1/promotions";
     const { unmount } = renderWithIntl(
-      <SchoolShell permissions={["tenant.structure.manage"]}>
+      <SchoolShell permissions={["student.read_basic", "tenant.structure.manage"]}>
         <p>x</p>
       </SchoolShell>,
     );

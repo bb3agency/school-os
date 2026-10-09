@@ -84,6 +84,7 @@ def build_payload(
                     "storage_bytes",
                     "documents",
                     "ai_queries",
+                    "ai_answers",
                     "ai_input_tokens",
                     "ai_output_tokens",
                 )

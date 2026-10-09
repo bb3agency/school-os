@@ -49,6 +49,10 @@ TENANCY_ALLOWED = frozenset(
         "verify_tenant_purged",
         "destroy_tenant_keys",
         "purge_expired_audit_chain",
+        # subscription: the AI answer bundle's included answers, the one number from which the
+        # school's AI budget is derived (owner decision 2026-10-03; ADR-0020 amendment B3). Opens
+        # the school's own tenant_session inside tenancy; takes a count in, returns a flag.
+        "set_ai_answer_allowance",
     }
 )
 
@@ -84,7 +88,7 @@ TENANT_SIDE_IMPORTS: dict[str, frozenset[str] | None] = {
 TENANT_SESSION_FILES = frozenset(
     {
         "tenant_audit.py",  # deliver school-chain copies (audit.record) + dedupe check
-        "usage.py",  # one aggregate count per school per day (distinct active users)
+        "usage.py",  # aggregate counts per school per day (active users, AI answers)
     }
 )
 
@@ -93,6 +97,8 @@ SQL_ALLOWED = frozenset(
     {
         ("tenant_audit.py", "audit.events"),  # does platform_event_id X exist? (dedupe)
         ("usage.py", "audit.events"),  # count(DISTINCT actor_id) for one day
+        # questions and billable AI answers for one day (counts only; ADR-0020 B2, ADR-0038)
+        ("usage.py", "kb.queries"),
         ("service.py", "core.current_subscription"),  # definer, own school's billing
         ("repository.py", "core.create_owner_invite"),  # definer, first owner invite
     }

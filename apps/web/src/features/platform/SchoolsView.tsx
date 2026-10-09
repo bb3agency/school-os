@@ -48,7 +48,7 @@ export function SchoolsView({
         <span className="flex min-w-48 flex-col gap-0.5">
           <Link
             href={`/platform/schools/${row.tenant_id}`}
-            className="font-medium text-primary underline-offset-4 hover:underline"
+            className="font-semibold text-primary underline-offset-4 hover:underline"
           >
             {row.school_name}
           </Link>
@@ -201,6 +201,7 @@ export function SchoolsView({
         </form>
       </Card>
       <DataTable
+        stacked
         caption={t("title")}
         captionHidden
         columns={columns}

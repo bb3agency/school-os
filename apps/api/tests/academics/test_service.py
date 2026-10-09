@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 from sqlalchemy import Engine, text
 
+from app.academics import repository as academics_repo
 from app.academics import service as academics
 from app.academics.schemas import (
     AttendanceEntryIn,
@@ -267,7 +268,9 @@ def test_invariant_4_a_sheet_with_an_aadhaar_number_is_refused_and_still_deleted
 ) -> None:
     number = "23456789012" + verhoeff_check_digit("23456789012")
     day = S.school_days(1)[0].strftime("%d/%m/%Y")
-    doc = S.sheet_document(admin_engine, school, f"Adm No,{day}\n{number},P\n".encode())
+    doc = S.sheet_document(
+        admin_engine, school, f"Adm No,{day}\n{number},P\n".encode(), uploader="principal"
+    )
     with pytest.raises(ValidationFailed) as err:
         academics.preview_attendance_sheet(
             S.principal_ctx(school), school.ids["section_9a"], SheetIn(document_id=doc)
@@ -277,10 +280,35 @@ def test_invariant_4_a_sheet_with_an_aadhaar_number_is_refused_and_still_deleted
     assert not S.document_exists(admin_engine, doc)
 
 
+def test_SEC_015_only_the_uploader_may_read_and_delete_a_sheet(
+    school: Any, admin_engine: Engine
+) -> None:
+    """Audit 2026-10-04, DL-04: a sheet preview reads the upload and deletes it at once. Any
+    ``import_file`` the caller could see was accepted, so a class teacher (or a school-wide
+    reader) could read and destroy another person's upload, e.g. a file waiting to be
+    imported, without delete rights. Someone else's upload is 404 and is left alone."""
+    day = S.school_days(1)[0].strftime("%d/%m/%Y")
+    doc = S.sheet_document(
+        admin_engine, school, f"Adm No,{day}\nSYN-A1,P\n".encode(), uploader="owner"
+    )
+    for actor in (S.ct_ctx(school), S.principal_ctx(school)):
+        with pytest.raises(NotFound):
+            academics.preview_attendance_sheet(
+                actor, school.ids["section_9a"], SheetIn(document_id=doc)
+            )
+    assert S.document_exists(admin_engine, doc)
+    assert not any(
+        e["summary"].get("document_id") == str(doc)
+        for e in _events(admin_engine, school.tenant_id, "attendance.sheet_read")
+    )
+
+
 def test_FR_ATT_004_the_upload_must_be_visible_and_scanned(
     school: Any, admin_engine: Engine
 ) -> None:
-    doc = S.sheet_document(admin_engine, school, b"Adm No\n", section_key="section_9c")
+    doc = S.sheet_document(
+        admin_engine, school, b"Adm No\n", section_key="section_9c", uploader="principal"
+    )
     with pytest.raises(NotFound):
         academics.preview_attendance_sheet(
             S.ct_ctx(school), school.ids["section_9a"], SheetIn(document_id=doc)
@@ -325,6 +353,105 @@ def test_FR_MRK_001_exams_belong_to_the_current_year(school: Any) -> None:
     with tenant_session(school.tenant_id, actor.user_id) as db:
         listed = academics.list_exams(db, actor)
     assert exam.id in {e.id for e in listed}
+
+
+def test_R_13_a_concurrent_duplicate_exam_is_a_422_not_a_500(
+    school: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two requests creating the same exam at once both pass the name check; the second insert
+    hit the unique constraint and was a 500 (audit 2026-10-06 R-13). The race is simulated by
+    letting the check miss the first exam."""
+    actor = S.principal_ctx(school)
+    today = min(academics.today_ist(), S.YEAR_END)
+    name = f"Synthetic race {uuid.uuid4().hex[:5]}"
+    with tenant_session(school.tenant_id, actor.user_id) as db:
+        academics.create_exam(db, actor, ExamCreate(name=name, held_on=today))
+    monkeypatch.setattr(academics_repo, "exam_name_taken", lambda *_a, **_k: False)
+    with (
+        pytest.raises(ValidationFailed) as err,
+        tenant_session(school.tenant_id, actor.user_id) as db,
+    ):
+        academics.create_exam(db, actor, ExamCreate(name=name, held_on=today))
+    assert "exam_name_taken" in _codes(err)
+
+
+def test_exam_names_differing_only_in_case_cannot_both_be_created_concurrently(
+    school: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The name check is case-insensitive but the unique constraint was not, so two concurrent
+    creates differing only in case both succeeded (audit 2026-10-06 hardening "Exam names").
+    The unique index on lower(name) (migration 0049) refuses the second one."""
+    actor = S.principal_ctx(school)
+    today = min(academics.today_ist(), S.YEAR_END)
+    name = f"Synthetic Case {uuid.uuid4().hex[:5]}"
+    with tenant_session(school.tenant_id, actor.user_id) as db:
+        academics.create_exam(db, actor, ExamCreate(name=name, held_on=today))
+    monkeypatch.setattr(academics_repo, "exam_name_taken", lambda *_a, **_k: False)
+    with (
+        pytest.raises(ValidationFailed) as err,
+        tenant_session(school.tenant_id, actor.user_id) as db,
+    ):
+        academics.create_exam(db, actor, ExamCreate(name=name.upper(), held_on=today))
+    assert "exam_name_taken" in _codes(err)
+
+
+def test_exam_name_index_is_skipped_not_failed_when_case_duplicates_exist(
+    school: Any, admin_engine: Engine
+) -> None:
+    """Migration 0049 is backward compatible: a school that already has two exams whose names
+    differ only in case keeps working; the index is simply not created (a warning)."""
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[2] / "migrations" / "versions" / "0049_open_items.py"
+    spec = importlib.util.spec_from_file_location("sos_test_migration_0049", path)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    actor = S.principal_ctx(school)
+    name = f"Synthetic Legacy {uuid.uuid4().hex[:5]}"
+    with admin_engine.connect() as c:
+        tx = c.begin()
+        try:
+            c.execute(text("DROP INDEX sis.exams_name_per_year_ci"))
+            year = c.execute(
+                text(
+                    "SELECT academic_year_id FROM sis.exams WHERE tenant_id = :t LIMIT 1"
+                ).bindparams(t=school.tenant_id)
+            ).scalar()
+            if year is None:
+                year = c.execute(
+                    text(
+                        "SELECT id FROM core.academic_years WHERE tenant_id = :t AND is_current"
+                    ).bindparams(t=school.tenant_id)
+                ).scalar_one()
+            for variant in (name, name.lower()):
+                c.execute(
+                    text(
+                        "INSERT INTO sis.exams (id, tenant_id, academic_year_id, name, held_on, "
+                        "created_by) VALUES (:i, :t, :y, :n, '2026-08-01', :u)"
+                    ),
+                    {
+                        "i": uuid.uuid4(),
+                        "t": school.tenant_id,
+                        "y": year,
+                        "n": variant,
+                        "u": actor.user_id,
+                    },
+                )
+            for statement in module.EXAM_NAMES_UP:
+                c.execute(text(statement))
+            created: bool = c.execute(
+                text("SELECT to_regclass('sis.exams_name_per_year_ci') IS NOT NULL")
+            ).scalar_one()
+            assert created is False
+        finally:
+            tx.rollback()
+    with admin_engine.connect() as c:
+        assert c.execute(
+            text("SELECT to_regclass('sis.exams_name_per_year_ci') IS NOT NULL")
+        ).scalar_one()
 
 
 def test_FR_MRK_002_marks_grid_with_percent_and_absent_papers(school: Any) -> None:
@@ -426,3 +553,99 @@ def test_FR_MRK_005_results_per_exam_for_the_rules(school: Any) -> None:
     mine = [r for r in results[school.ids["a2"]] if r.exam_id == exam_id]
     assert mine[0].percent == 30.0
     assert mine[0].papers == 1
+
+
+# --- records made in another section (audit 2026-10-05 A-04) --------------------------------------
+
+
+def _student_in_9c(school: Any) -> uuid.UUID:
+    """A new student enrolled in 9C (the fixture's students stay where they are)."""
+    sid: uuid.UUID = S.SW.create(
+        school,
+        name="Synthetica Moved Kumar",
+        section_key=None,
+        admission_no=f"SYN-MV-{uuid.uuid4().hex[:6]}",
+    )
+    with tenant_session(school.tenant_id, school.people["owner"].user_id) as db:
+        S.students.enrol(
+            db,
+            S.SW.admin_ctx(school),
+            sid,
+            S.EnrollmentIn(section_id=school.ids["section_9c"], roll_no="7"),
+        )
+    return sid
+
+
+def _move_to_9a(school: Any, admin_engine: Engine, sid: uuid.UUID) -> None:
+    with admin_engine.begin() as c:
+        c.execute(
+            text(
+                "UPDATE sis.enrollments SET section_id = :s WHERE tenant_id = :t "
+                "AND student_id = :st AND status = 'active'"
+            ),
+            {"s": school.ids["section_9a"], "t": school.tenant_id, "st": sid},
+        )
+
+
+def test_SEC_015_a_scoped_teacher_cannot_rewrite_another_sections_attendance(
+    school: Any, admin_engine: Engine
+) -> None:
+    sid = _student_in_9c(school)
+    day = S.school_days(1, end=S.school_days(30)[0])[0]
+    ct9c = S.ct_ctx(school, "ct9c", "section_9c")
+    S.record(school, "section_9c", {sid: ["present"]}, [day], who=ct9c)
+    _move_to_9a(school, admin_engine, sid)
+
+    ct = S.ct_ctx(school)
+    entry = AttendanceEntryIn(student_id=sid, on_date=day, status="absent")
+    with (
+        pytest.raises(ValidationFailed) as err,
+        tenant_session(school.tenant_id, ct.user_id) as db,
+    ):
+        academics.record_attendance(
+            db, ct, school.ids["section_9a"], AttendanceWrite(entries=[entry])
+        )
+    assert "recorded_in_another_section" in _codes(err)
+    with admin_engine.connect() as c:
+        row = c.execute(
+            text(
+                "SELECT section_id, status FROM sis.attendance_marks "
+                "WHERE tenant_id = :t AND student_id = :s AND on_date = :d"
+            ),
+            {"t": school.tenant_id, "s": sid, "d": day},
+        ).one()
+    assert (row.section_id, row.status) == (school.ids["section_9c"], "present")
+
+    # A day with no record yet, and a school-wide recorder's correction, still work.
+    later = S.school_days(1, end=S.school_days(29)[0])[0]
+    assert S.record(school, "section_9a", {sid: ["late"]}, [later], who=ct).written == 1
+    assert S.record(school, "section_9a", {sid: ["absent"]}, [day]).written == 1
+
+
+def test_SEC_015_a_scoped_teacher_cannot_rewrite_another_sections_marks(
+    school: Any, admin_engine: Engine
+) -> None:
+    sid = _student_in_9c(school)
+    exam_id = S.exam(school, f"Synthetic moved {uuid.uuid4().hex[:5]}", S.school_days(1)[0])
+    S.marks(school, "section_9c", exam_id, {sid: [("Maths", 20, 50)]})
+    _move_to_9a(school, admin_engine, sid)
+
+    ct = S.ct_ctx(school)
+    entry = MarkIn(student_id=sid, subject="Maths", marks=45, max_marks=50, absent=False)
+    with (
+        pytest.raises(ValidationFailed) as err,
+        tenant_session(school.tenant_id, ct.user_id) as db,
+    ):
+        academics.record_marks(
+            db, ct, school.ids["section_9a"], exam_id, MarksWrite(entries=[entry])
+        )
+    assert "recorded_in_another_section" in _codes(err)
+    with admin_engine.connect() as c:
+        row = c.execute(
+            text(
+                "SELECT section_id, marks FROM sis.exam_marks "
+                "WHERE tenant_id = :t AND student_id = :s AND exam_id = :e"
+            ),
+            {"t": school.tenant_id, "s": sid, "e": exam_id},
+        ).one()
+    assert (row.section_id, row.marks) == (school.ids["section_9c"], Decimal("20.00"))

@@ -8,20 +8,19 @@ are described by ID, code, public name, plan, status and counts only (BR-09). Mo
 from __future__ import annotations
 
 import datetime as dt
-import re
 import unicodedata
 import uuid
 from decimal import Decimal
 from typing import Annotated, Any, Literal, Self
 
 from pydantic import (
+    AfterValidator,
     AwareDatetime,
     BaseModel,
     BeforeValidator,
     ConfigDict,
     Field,
     StringConstraints,
-    field_validator,
     model_validator,
 )
 
@@ -33,6 +32,11 @@ def _nfc(value: Any) -> Any:
 
 
 _NO_CONTROL = r"^[^\x00-\x1f\x7f]+$"
+# Free text: no control characters except tab and line breaks; may be empty (min_length
+# decides). A NUL made PostgreSQL refuse the insert (500); others reached operators and the
+# banners of every school (audit 2026-10-06 R-12).
+_NO_CONTROL_LINES = r"^[^\x00-\x08\x0b\x0c\x0e-\x1f\x7f]*$"
+_NO_CONTROL_LINE = r"^[^\x00-\x1f\x7f]*$"
 
 Text200 = Annotated[
     str, BeforeValidator(_nfc), StringConstraints(min_length=1, max_length=200, pattern=_NO_CONTROL)
@@ -72,6 +76,26 @@ EmailStr = Annotated[
     StringConstraints(max_length=254, pattern=r"^[^@\s]{1,64}@[a-z0-9.-]+\.[a-z]{2,63}$"),
 ]
 Money = Annotated[Decimal, Field(ge=0, max_digits=14, decimal_places=2)]
+# Counts stored in or compared with int4 columns (R-13: a larger number was a 500).
+Count = Annotated[int, Field(ge=0, le=2_147_483_647)]
+# Billing calendar dates: periods are computed a month or more ahead, so a date at the edge of the
+# calendar (year 1 or 9999) overflowed (R-13). The bounds are far outside any real billing date.
+_BILLING_YEARS = (2000, 2999)
+
+
+def _billing_year(value: dt.date) -> dt.date:
+    if not _BILLING_YEARS[0] <= value.year <= _BILLING_YEARS[1]:
+        raise ValueError(f"must be between the years {_BILLING_YEARS[0]} and {_BILLING_YEARS[1]}")
+    return value
+
+
+BillingDate = Annotated[dt.date, AfterValidator(_billing_year)]
+BillingDatetime = Annotated[AwareDatetime, AfterValidator(_billing_year)]
+PlanDescription = Annotated[
+    str,
+    BeforeValidator(_nfc),
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=300, pattern=_NO_CONTROL),
+]
 Version = Annotated[str, StringConstraints(pattern=r"^[0-9A-Za-z][0-9A-Za-z.+-]{0,39}$")]
 Domain = Annotated[
     str,
@@ -145,11 +169,11 @@ class MeOut(Out):
 
 
 class PlanLimits(In):
-    students: int | None = Field(default=None, ge=0)
-    staff_users: int | None = Field(default=None, ge=0)
-    storage_gb: int | None = Field(default=None, ge=0)
-    documents: int | None = Field(default=None, ge=0)
-    ai_tokens_month: int | None = Field(default=None, ge=0)
+    students: Count | None = None
+    staff_users: Count | None = None
+    storage_gb: Count | None = None
+    documents: Count | None = None
+    ai_tokens_month: Count | None = None
     ai_budget_inr: Money | None = None
 
 
@@ -161,12 +185,15 @@ class PlanIn(In):
     pricing_model: Literal["flat", "per_student"] = "flat"
     base_price_inr: Money
     per_student_price_inr: Money | None = None
-    included_students: int | None = Field(default=None, ge=0)
+    included_students: Count | None = None
     gst_rate: Literal["0", "5", "12", "18", "28"] = "18"
     sac_code: Annotated[str, StringConstraints(pattern=r"^[0-9]{6}$")] | None = None
     trial_days: int = Field(default=30, ge=0, le=365)
     limits: PlanLimits = Field(default_factory=PlanLimits)
     features: dict[FlagKey, bool] = Field(default_factory=dict, max_length=50)
+    # "Implementation and data verification", ex-GST, on the subscription's first invoice.
+    one_time_fee_inr: Money | None = None  # None = 0 (no fee)
+    description: PlanDescription | None = None
 
     @model_validator(mode="after")
     def _pricing(self) -> Self:
@@ -179,10 +206,31 @@ class PlanPatch(In):
     name: Text100 | None = None
     base_price_inr: Money | None = None
     per_student_price_inr: Money | None = None
-    included_students: int | None = Field(default=None, ge=0)
+    included_students: Count | None = None
     trial_days: int | None = Field(default=None, ge=0, le=365)
     limits: PlanLimits | None = None
-    features: dict[FlagKey, bool] | None = None
+    features: dict[FlagKey, bool] | None = Field(default=None, max_length=50)
+    one_time_fee_inr: Money | None = None
+    description: PlanDescription | None = None
+
+    @model_validator(mode="after")
+    def _no_null_for_required(self) -> Self:
+        # R-13: these columns are NOT NULL; an explicit null was written as NULL (500).
+        nulls = [
+            k
+            for k in (
+                "name",
+                "base_price_inr",
+                "trial_days",
+                "limits",
+                "features",
+                "one_time_fee_inr",
+            )
+            if k in self.model_fields_set and getattr(self, k) is None
+        ]
+        if nulls:
+            raise ValueError(f"{', '.join(nulls)} cannot be empty")
+        return self
 
 
 class PlanOut(Out):
@@ -204,6 +252,44 @@ class PlanOut(Out):
     status: Literal["draft", "published", "retired"]
     published_at: dt.datetime | None
     created_at: dt.datetime | None
+    one_time_fee_inr: Decimal
+    description: str | None
+    # Edit counter of the draft, sent as the ETag; PATCH takes it back in If-Match (412 when
+    # stale). Not the catalogue ``version`` above.
+    row_version: int
+
+
+class AiBundleOut(Out):
+    """An AI answer bundle: a monthly add-on with an included answer quota (never unlimited)."""
+
+    id: uuid.UUID
+    code: str
+    version: int
+    name: str
+    included_answers: int
+    price_inr: Decimal
+    overage_rate_inr: Decimal
+    status: Literal["published", "retired"]
+    published_at: dt.datetime | None
+
+
+class SchoolAiBundle(Out):
+    """The school's own AI answer bundle on its "Plan and billing" page (FR-PLT-030, ADR-0038).
+
+    Prices are ex-GST INR from the catalogue row. ``month_start`` is the current calendar month
+    (IST). ``answers_used`` is the month's billable answers counted so far (whole IST days up to
+    ``answers_counted_to``, collected the next morning), or ``null`` while the month does not
+    count against the bundle (``counts_from`` is later). No tokens, no cost estimate."""
+
+    code: str
+    name: str
+    included_answers: int
+    price_inr: Decimal
+    overage_rate_inr: Decimal
+    counts_from: dt.date
+    month_start: dt.date
+    answers_used: int | None
+    answers_counted_to: dt.date | None
 
 
 # --- billing accounts -------------------------------------------------------------------------
@@ -268,15 +354,26 @@ class SubscriptionOut(Out):
     current_period_start: dt.date
     current_period_end: dt.date
     price_override_inr: Decimal | None
+    # Operator-written reason for the negotiated price (docs/16 §5.3); never student data. Set
+    # exactly when ``price_override_inr`` is (DB check). Operators only: the school's own
+    # billing page uses its own schema.
+    override_reason: str | None
     past_due_since: dt.date | None
     grace_ends_on: dt.date | None
     cancel_at_period_end: bool
     cancelled_at: dt.datetime | None
+    # AI answer bundle; answers count from the first day of ``ai_bundle_from`` (a month start).
+    ai_bundle_id: uuid.UUID | None = None
+    ai_bundle_from: dt.date | None = None
     version: int
 
 
+class AiBundleIn(In):
+    ai_bundle_id: uuid.UUID
+
+
 class ExtendTrialIn(In):
-    trial_ends_at: AwareDatetime
+    trial_ends_at: BillingDatetime
 
 
 class ChangePlanIn(In):
@@ -295,11 +392,38 @@ class SuspendSubscriptionIn(Reasoned):
 # --- invoices ---------------------------------------------------------------------------------
 
 
+InvoiceLineKind = Literal[
+    "subscription",
+    "per_student",
+    "one_time_fee",
+    "addon",
+    "usage_overage",
+    "discount",
+    "adjustment",
+]
+
+
 class InvoiceLineIn(In):
-    kind: Literal["subscription", "per_student", "addon", "usage_overage", "discount", "adjustment"]
+    kind: InvoiceLineKind
     description: Text200
     quantity: Annotated[Decimal, Field(gt=0, max_digits=12, decimal_places=3)] = Decimal("1")
     unit_price_inr: Annotated[Decimal, Field(max_digits=14, decimal_places=2)]
+    # The calendar month (its first day) an AI overage line bills; it stops a second charge.
+    usage_month: dt.date | None = None
+
+    @model_validator(mode="after")
+    def _usage_month(self) -> Self:
+        if self.usage_month is not None and (
+            self.kind != "usage_overage" or self.usage_month.day != 1
+        ):
+            raise ValueError("usage_month is the first day of a month, on overage lines only")
+        # Audit 2026-10-05 hardening: a negative price would hide a discount inside a charge
+        # line. Only an ``adjustment`` line may be negative (a credit; there are no credit
+        # notes); a ``discount`` is entered as a positive amount and stored as a deduction. The
+        # invoice total can still never go below zero (``negative_total``).
+        if self.unit_price_inr < 0 and self.kind != "adjustment":
+            raise ValueError("unit_price_inr may be negative on adjustment lines only")
+        return self
 
 
 class InvoiceLineOut(Out):
@@ -311,16 +435,24 @@ class InvoiceLineOut(Out):
     unit_price_inr: Decimal
     amount_inr: Decimal
     gst_rate: Decimal
+    usage_month: dt.date | None = None
 
 
 class InvoiceCreate(In):
     subscription_id: uuid.UUID
-    period_start: dt.date
+    period_start: BillingDate
 
 
 class InvoicePatch(In):
     lines: list[InvoiceLineIn] | None = Field(default=None, min_length=1, max_length=50)
-    notes: Annotated[str, BeforeValidator(_nfc), StringConstraints(max_length=1000)] | None = None
+    notes: (
+        Annotated[
+            str,
+            BeforeValidator(_nfc),
+            StringConstraints(max_length=1000, pattern=_NO_CONTROL_LINES),
+        ]
+        | None
+    ) = None
 
 
 class InvoiceOut(Out):
@@ -373,10 +505,18 @@ class PaymentIn(In):
     tds_inr: Money = Decimal("0")
     received_on: dt.date
     reference: Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9/_.-]{1,64}$")]
-    notes: Annotated[str, BeforeValidator(_nfc), StringConstraints(max_length=500)] | None = None
+    notes: (
+        Annotated[
+            str, BeforeValidator(_nfc), StringConstraints(max_length=500, pattern=_NO_CONTROL_LINES)
+        ]
+        | None
+    ) = None
 
 
 class PaymentOut(Out):
+    """One manual payment (docs/16 §5.9). ``reference`` and ``notes`` are operator-entered;
+    ``*_by_name`` is the operator's display name (control-plane staff, never school data)."""
+
     id: uuid.UUID
     invoice_id: uuid.UUID
     provider: str
@@ -385,8 +525,15 @@ class PaymentOut(Out):
     tds_inr: Decimal
     received_on: dt.date
     reference: str
+    notes: str | None = None
     status: Literal["recorded", "reversed"]
+    recorded_by: uuid.UUID
+    recorded_by_name: str | None = None
     recorded_at: dt.datetime | None
+    reversed_by: uuid.UUID | None = None
+    reversed_by_name: str | None = None
+    reversed_at: dt.datetime | None = None
+    reversal_reason: str | None = None
 
 
 class InvoiceRunIn(In):
@@ -586,7 +733,14 @@ class OffboardingOut(Out):
 class TenantDetailOut(TenantSummaryOut):
     boards: list[str]
     tenant_status_reason: str | None
+    # An operator security hold is on (audit 2026-10-06 R-18). It is independent of a billing
+    # suspension: the school is active only when neither is set (docs/16 §9).
+    security_hold: bool = False
     offboard_requested_at: dt.datetime | None
+    # The operator who asked, and when an unapproved request stops being approvable (audit
+    # 2026-10-05 A-13: two-person requests expire; roles.yaml two_person_request_ttl_hours).
+    offboard_requested_by: uuid.UUID | None = None
+    offboard_request_expires_at: dt.datetime | None = None
     offboard_approved_at: dt.datetime | None
     subscription: SubscriptionOut | None
     counts: UsageCountsOut | None
@@ -613,6 +767,7 @@ class UsageDailyOut(Out):
     ai_input_tokens: int
     ai_output_tokens: int
     ai_cost_inr: Decimal
+    ai_answers: int = 0
 
 
 # --- flags ------------------------------------------------------------------------------------
@@ -621,9 +776,12 @@ class UsageDailyOut(Out):
 class FlagIn(In):
     enabled: bool
     rollout_percent: int | None = Field(default=None, ge=0, le=100)
-    description: Annotated[str, BeforeValidator(_nfc), StringConstraints(max_length=300)] | None = (
-        None
-    )
+    description: (
+        Annotated[
+            str, BeforeValidator(_nfc), StringConstraints(max_length=300, pattern=_NO_CONTROL_LINE)
+        ]
+        | None
+    ) = None
 
 
 class FlagOverrideIn(In):
@@ -745,6 +903,8 @@ class HbUsage(_Strict):
     ai_input_tokens: int = Field(ge=0)
     ai_output_tokens: int = Field(ge=0)
     ai_cost_usd: Annotated[Decimal, Field(ge=0, max_digits=14, decimal_places=4)]
+    # Billable AI answers that day (docs/16 §11); absent from hosts older than 0041 (0).
+    ai_answers: int = Field(default=0, ge=0)
 
 
 class HeartbeatIn(_Strict):
@@ -793,10 +953,22 @@ class AnnouncementIn(In):
     empty, the English text is stored in their place (a new announcement) or the stored text is
     kept (an update). While Telugu is shown they are required (422)."""
 
-    title_en: Annotated[str, BeforeValidator(_nfc), StringConstraints(min_length=1, max_length=120)]
-    title_te: Annotated[str, BeforeValidator(_nfc), StringConstraints(max_length=120)] = ""
-    body_en: Annotated[str, BeforeValidator(_nfc), StringConstraints(min_length=1, max_length=1000)]
-    body_te: Annotated[str, BeforeValidator(_nfc), StringConstraints(max_length=1000)] = ""
+    title_en: Annotated[
+        str,
+        BeforeValidator(_nfc),
+        StringConstraints(min_length=1, max_length=120, pattern=_NO_CONTROL_LINE),
+    ]
+    title_te: Annotated[
+        str, BeforeValidator(_nfc), StringConstraints(max_length=120, pattern=_NO_CONTROL_LINE)
+    ] = ""
+    body_en: Annotated[
+        str,
+        BeforeValidator(_nfc),
+        StringConstraints(min_length=1, max_length=1000, pattern=_NO_CONTROL_LINES),
+    ]
+    body_te: Annotated[
+        str, BeforeValidator(_nfc), StringConstraints(max_length=1000, pattern=_NO_CONTROL_LINES)
+    ] = ""
     severity: Literal["info", "maintenance", "warning", "critical"] = "info"
     audience: Literal["all", "tier", "tenants"] = "all"
     audience_tier: Tier | None = None
@@ -828,8 +1000,17 @@ class AnnouncementOut(Out):
     audience_tenant_ids: list[uuid.UUID]
     starts_at: dt.datetime
     ends_at: dt.datetime
+    # draft, pending_approval (a critical announcement waiting for a second operator; schools
+    # do not see it), scheduled, cancelled.
     status: str
     version: int
+    created_by: uuid.UUID | None = None
+    submitted_by: uuid.UUID | None = None
+    submitted_at: dt.datetime | None = None
+    approved_by: uuid.UUID | None = None
+    approved_at: dt.datetime | None = None
+    # When a pending approval stops being approvable (roles.yaml two_person_request_ttl_hours).
+    approval_expires_at: dt.datetime | None = None
 
 
 # --- support ----------------------------------------------------------------------------------
@@ -840,7 +1021,9 @@ TicketCategory = Literal[
 TicketPriority = Literal["p1", "p2", "p3", "p4"]
 TicketStatus = Literal["open", "in_progress", "waiting_on_school", "resolved", "closed"]
 MessageBody = Annotated[
-    str, BeforeValidator(_nfc), StringConstraints(min_length=1, max_length=4000)
+    str,
+    BeforeValidator(_nfc),
+    StringConstraints(min_length=1, max_length=4000, pattern=_NO_CONTROL_LINES),
 ]
 
 
@@ -911,23 +1094,30 @@ class TicketOut(Out):
 # --- break-glass ------------------------------------------------------------------------------
 
 
+BreakGlassScopeKey = Literal["section_id", "class_id"]
+EMERGENCY_REASON_CODES = frozenset({"security_incident", "legal_obligation"})
+
+
 class BreakGlassIn(In):
     tenant_id: uuid.UUID
     reason_code: Literal["support_request", "security_incident", "legal_obligation"]
     reason: Reason
-    scope: dict[Annotated[str, StringConstraints(pattern=r"^[a-z_]{1,40}$")], uuid.UUID | str] = (
-        Field(max_length=10)
-    )
+    # Audit DL-10: only keys that really narrow the grant (they become membership scopes in the
+    # school, app.breakglass) are accepted; any other key (student, batch, document...) would look
+    # narrow to the approver but grant the whole school. Empty = the whole school, shown as such.
+    scope: dict[BreakGlassScopeKey, uuid.UUID] = Field(default_factory=dict, max_length=2)
     duration_minutes: int = Field(ge=15, le=480)
     emergency: bool = False
 
-    @field_validator("scope")
-    @classmethod
-    def _scope_values(cls, v: dict[str, uuid.UUID | str]) -> dict[str, uuid.UUID | str]:
-        for value in v.values():
-            if isinstance(value, str) and not re.fullmatch(r"[a-z_.]{1,60}", value):
-                raise ValueError("scope values are resource IDs or permission-like codes")
-        return v
+    @model_validator(mode="after")
+    def _emergency_reason(self) -> Self:
+        # Audit 2026-10-05 A-13: access without the school's approval is only for an active
+        # security incident or a legal obligation, never an ordinary support request.
+        if self.emergency and self.reason_code not in EMERGENCY_REASON_CODES:
+            raise ValueError(
+                "emergency access needs reason_code security_incident or legal_obligation"
+            )
+        return self
 
 
 class BreakGlassOut(Out):
@@ -943,6 +1133,9 @@ class BreakGlassOut(Out):
     emergency_confirmed_by_1: uuid.UUID | None
     emergency_confirmed_by_2: uuid.UUID | None
     created_at: dt.datetime | None
+    # When an emergency request still waiting for its two confirmations stops being
+    # confirmable (audit 2026-10-05 A-13); null otherwise.
+    confirm_by: dt.datetime | None = None
 
 
 # --- dashboard / audit ------------------------------------------------------------------------

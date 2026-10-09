@@ -94,6 +94,7 @@ log = get_logger(__name__)
 RUN: Final = "import.run"
 COMMIT: Final = "import.commit"
 SOURCE: Final = "admission_register"
+CREATE_STUDENT: Final = "student.create"
 
 BATCH_EVENT: Final = "extraction.batch.created"
 CONFIRMED_EVENT: Final = "extraction.confirmed"
@@ -701,14 +702,41 @@ def list_items(
     limit: int,
     after_id: uuid.UUID | None,
 ) -> Page[ItemOut]:
-    """The verification queue in page order (permission ``import.run``; FR-IMP-020)."""
-    rows = repo.list_items(
-        session, batch_id=batch_id, status=status, after_id=after_id, limit=limit + 1
-    )
+    """The verification queue in page order (permission ``import.run``; FR-IMP-020). Only rows
+    of register scans the caller can see (the document ACL; data-layer hardening note 10):
+    rows of other pages are skipped, so a page may need several reads of the table."""
+    rows: list[ExtractionItem] = []
+    cursor_id = after_id
+    chunk = max(limit + 1, _QUEUE_CHUNK)
+    while len(rows) <= limit:
+        found = repo.list_items(
+            session, batch_id=batch_id, status=status, after_id=cursor_id, limit=chunk
+        )
+        if not found:
+            break
+        visible = documents.visible_document_ids(
+            session, ctx, sorted({i.document_id for i in found})
+        )
+        rows += [i for i in found if i.document_id in visible]
+        cursor_id = found[-1].id
+        if len(found) < chunk:
+            break
     more = len(rows) > limit
     rows = rows[:limit]
     cursor = encode_cursor({"k": str(rows[-1].id)}) if more and rows else None
     return Page[ItemOut](data=[_item_out(i) for i in rows], next_cursor=cursor)
+
+
+_QUEUE_CHUNK: Final = 200
+
+
+def _visible_item(
+    session: Session, ctx: UserContext, item: ExtractionItem | None
+) -> ExtractionItem:
+    """404 unless the caller can see the item's register scan (note 10), like a missing row."""
+    if item is None or not documents.is_visible(session, ctx, item.document_id):
+        raise _item_not_found()
+    return item
 
 
 def _page_image(
@@ -741,9 +769,7 @@ def _possible_matches(
 
 def get_item(session: Session, ctx: UserContext, item_id: uuid.UUID) -> ItemDetail:
     """One row for review with a presigned link to its page image (US-402 AC1)."""
-    item = repo.get_item(session, item_id)
-    if item is None:
-        raise _item_not_found()
+    item = _visible_item(session, ctx, repo.get_item(session, item_id))
     page = repo.get_page(session, item.page_id)
     if page is None:  # pragma: no cover - composite FK
         raise _item_not_found()
@@ -756,10 +782,8 @@ def get_item(session: Session, ctx: UserContext, item_id: uuid.UUID) -> ItemDeta
     )
 
 
-def _pending_item(session: Session, item_id: uuid.UUID) -> ExtractionItem:
-    item = repo.get_item(session, item_id, for_update=True)
-    if item is None:
-        raise _item_not_found()
+def _pending_item(session: Session, ctx: UserContext, item_id: uuid.UUID) -> ExtractionItem:
+    item = _visible_item(session, ctx, repo.get_item(session, item_id, for_update=True))
     if item.status != "pending_review":
         raise Conflict("Someone already checked this row.", code="item_already_reviewed")
     return item
@@ -868,14 +892,15 @@ def confirm_item(
 ) -> ItemOut:
     """Record the reviewer's values (permission ``import.commit``; US-402 AC2, FR-IMP-023).
 
-    Creates the student (``student_id`` omitted) or adds the values to an existing one, with
+    Creates the student (``student_id`` omitted; needs ``student.create`` school-wide, else 403
+    ``student_create_required``) or adds the values to an existing one, with
     source ``admission_register`` and the page as evidence. Identity values are recorded
     unverified (students module rule: verifying them needs a change request); other values
     are recorded verified by you. An existing different register identity value answers 403
     ``identity_change_required``. Audit: ``extraction.item.confirmed``; outbox
     ``extraction.confirmed``.
     """
-    item = _pending_item(session, item_id)
+    item = _pending_item(session, ctx, item_id)
     cfg = extraction_config()
     values, corrected = _final_values(item, data, cfg.fields)
     if not documents.evidence_exists(session, item.document_id):
@@ -888,6 +913,14 @@ def confirm_item(
     value_ids: list[uuid.UUID] = []
     later = values
     if data.student_id is None:
+        # Creating a student needs ``student.create`` school-wide, as on POST /students and in
+        # an import (audit 2026-10-05 A-06): ``import.commit`` alone does not create students.
+        if not (ctx.has(CREATE_STUDENT) and ctx.scope_for(CREATE_STUDENT).school_wide):
+            raise Forbidden(
+                "You cannot add new students. Link the row to an existing student, or ask "
+                "someone who can add students to confirm it.",
+                code="student_create_required",
+            )
         # Identity values create the student (students records them unverified: provisional
         # until a change request verifies them, BR-01); the rest follow as verified values.
         student_id, value_ids = _create_student(
@@ -959,7 +992,7 @@ def reject_item(
 ) -> ItemOut:
     """Discard a row that is not a student entry (permission ``import.commit``); nothing is
     recorded. Audit: ``extraction.item.rejected``."""
-    item = _pending_item(session, item_id)
+    item = _pending_item(session, ctx, item_id)
     with _db_errors():
         updated = repo.review_item(
             session,

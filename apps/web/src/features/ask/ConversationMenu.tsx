@@ -87,7 +87,7 @@ export function useConversationActions(onDeleted?: () => void) {
           return true;
         }}
       >
-        <label htmlFor={fieldId} className="block pt-2 text-sm font-medium">
+        <label htmlFor={fieldId} className="block pt-2 text-sm font-semibold">
           {th("renameLabel")}
         </label>
         <input
@@ -102,7 +102,7 @@ export function useConversationActions(onDeleted?: () => void) {
           className="block min-h-10 w-full rounded-md border border-border-control bg-surface-muted px-3 text-base"
         />
         {titleError ? (
-          <p id={errorId} role="alert" className="text-sm font-medium text-danger">
+          <p id={errorId} role="alert" className="text-sm font-semibold text-danger">
             {titleError}
           </p>
         ) : null}
@@ -196,7 +196,7 @@ export function ConversationMenu({ conversation }: { conversation: ConversationS
         aria-label={t("chat.optionsLabel")}
         title={t("chat.optionsLabel")}
         onClick={() => setOpen((value) => !value)}
-        className="inline-flex size-9 items-center justify-center rounded-full border border-border-soft text-ink-muted hover:bg-surface-muted hover:text-ink"
+        className="inline-flex size-9 items-center justify-center rounded-full border border-border-soft text-ink-muted hover:bg-surface-muted hover:text-ink pointer-coarse:size-11"
       >
         <Icon name="more" className="size-5" />
       </button>

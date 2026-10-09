@@ -97,6 +97,10 @@ class EmbeddingsConfig(ConfigModel):
     """docs/06 §12: query embeddings are cached for 10 minutes."""
     query_cache_max_entries: int = Field(ge=0, le=100_000)
     """Per process; bounds memory (about 8 KiB per 1024-dim entry)."""
+    orphan_vector_grace_hours: int = Field(ge=1, le=168)
+    """Daily sweep (docs/08 §7 erasure chain): a cached document vector that no chunk uses is
+    deleted once it is older than this. The grace covers an ingestion between embedding and
+    writing its chunks."""
     batching: Batching
     retry: Retry
     voyage: VoyageHttp

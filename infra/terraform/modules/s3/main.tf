@@ -43,7 +43,10 @@ locals {
 
 data "aws_iam_policy_document" "logs_delivery" {
   # ALB access logs (regions launched after 2022 such as ap-south-2 use the service principal;
-  # ap-south-1 also accepts it).
+  # ap-south-1 also accepts it). Confused deputy (audit 2026-10-05 hardening): ELB writes under
+  # AWSLogs/<the load balancer's account>/, so the resource already pins this account; the
+  # IfExists condition also refuses a delivery that names another source account (ELB does not
+  # document the key for this principal, so a plain StringEquals could stop all access logs).
   statement {
     sid       = "AlbLogDelivery"
     actions   = ["s3:PutObject"]
@@ -51,6 +54,11 @@ data "aws_iam_policy_document" "logs_delivery" {
     principals {
       type        = "Service"
       identifiers = ["logdelivery.elasticloadbalancing.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEqualsIfExists"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
     }
   }
 
@@ -124,8 +132,9 @@ module "files" {
       expiration_days = 90
     },
     {
-      # PRV-016: images that showed a full Aadhaar number are tagged before the app deletes
-      # them (documents.storage discard), so no copy outlives the 90-day recovery window.
+      # PRV-016 images that showed a full Aadhaar number, and every automatic deletion
+      # (retention purges, offboarding; docs/08 §7), are tagged before the app deletes them
+      # (documents.storage discard), so no copy lives on for the 90-day recovery window.
       id                                 = "discarded-1d"
       tags                               = { "sos-lifecycle" = "discarded" }
       expiration_days                    = 1
@@ -166,11 +175,12 @@ module "audit_archive" {
 
 # --- Release artifacts (dedicated-tier bundles published by CI) ----------------
 
+# Own CMK: every dedicated host may decrypt bundles, so this is never the data key (audit 2026-10-05).
 module "artifacts" {
   source = "../s3_bucket"
 
   name                   = local.names.artifacts
-  kms_key_arn            = var.data_kms_key_arn
+  kms_key_arn            = var.artifacts_kms_key_arn
   access_logging_enabled = true
   access_log_bucket      = module.logs.id
   force_destroy          = var.force_destroy

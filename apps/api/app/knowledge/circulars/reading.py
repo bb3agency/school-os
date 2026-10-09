@@ -41,6 +41,12 @@ SCHEMA_TAG: Final = "sos:circular_reading.v1"
 
 _TELUGU: Final = re.compile(r"[ఀ-౿]")
 _WS: Final = re.compile(r"\s+")
+# SEC-019 for drafts (audit 2026-10-05 DP-02): the same rules as Ask answers
+# (``app.knowledge.answer.sanitise``). A circular can carry hidden text that makes the model write
+# a link; drafts are posted to parents, so no model-written link or tag survives.
+_HTML_TAG: Final = re.compile(r"<[^>\n]{0,500}>")
+_MD_LINK: Final = re.compile(r"\[([^\]\n]{0,500})\]\([^)\s]{0,2000}\)")
+_BARE_LINK: Final = re.compile(r"(?:\b(?:https?|ftp)://|\bwww\.)[^\s<>()\[\]]*", re.IGNORECASE)
 
 
 def _nullable_string(description: str) -> dict[str, Any]:
@@ -187,6 +193,14 @@ def _cut(text: str, limit: int) -> str:
     return (head.rstrip(" ,;:") or window[: limit - 1]) + "…"
 
 
+def strip_links(text: str) -> str:
+    """``text`` without HTML tags and links: a Markdown link keeps its label, a bare URL or
+    ``www.`` address is removed (SEC-019; LLM05 improper output handling)."""
+    text = _HTML_TAG.sub("", text)
+    text = _MD_LINK.sub(r"\1", text)
+    return _BARE_LINK.sub("", text)
+
+
 def _one_line(text: str) -> str:
     """A passage on one line (each ``[n]`` line is one passage; spacing is not significant for
     the quote check, which collapses whitespace)."""
@@ -252,7 +266,7 @@ def _grounded(value: str | None, corpus: str, limit: int, *, telugu: bool) -> st
 def _summary(value: str | None, *, telugu: bool, limit: int) -> str | None:
     if value is None or bool(_TELUGU.search(value)) != telugu:
         return None
-    return _cut(mask_aadhaar(value), limit)
+    return _cut(mask_aadhaar(strip_links(value)), limit)
 
 
 def _citation(passage: Passage, quote: str) -> PassageCitation:
@@ -367,5 +381,6 @@ __all__ = [
     "build_request",
     "normalise",
     "schema_for",
+    "strip_links",
     "validate_reading",
 ]

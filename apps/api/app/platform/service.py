@@ -4,12 +4,15 @@ School-side (tenant API) routes that the authz owner wires with ``require(...)``
 (docs/16 §8.3):
 
 - GET  /api/v1/tenant/billing (tenant.billing.read): ``current_subscription(tenant_session)``
+  and, for that subscription, ``school_ai_bundle(tenant_id, subscription_id)``
 - GET  /api/v1/tenant/billing/invoices (tenant.billing.read): its ``["invoices"]``
 - GET  /api/v1/announcements (any authenticated member): ``active_announcements(tenant, tier)``
 - POST /api/v1/support/tickets (support.ticket.create): ``open_ticket_from_tenant(...)``
-- GET  /api/v1/support/tickets (support.ticket.create): ``list_tenant_tickets(tenant_id)``
+- GET  /api/v1/support/tickets (support.ticket.create): ``list_tenant_tickets(tenant_id, viewer)``
 - GET  /api/v1/support/tickets/{id} (support.ticket.create): ``get_tenant_ticket(...)``
 - POST /api/v1/support/tickets/{id}/messages (support.ticket.create): ``reply_from_tenant``
+  (a member reads and answers only the tickets they opened; ``support.manage`` holders every
+  ticket of the school: ``viewer=None`` / ``manager=True``; audit 2026-10-06 R-17)
 
 Break-glass (school side, ``app.breakglass``; US-103, FR-OPS-004):
 ``breakglass_requests_for_school``,
@@ -28,10 +31,11 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.platform import announcements, breakglass, flags, repository, support
+from app.platform import announcements, billing, breakglass, flags, repository, support
 from app.platform.breakglass import SchoolBreakGlassRequest
 from app.platform.schemas import (
     AnnouncementBrief,
+    SchoolAiBundle,
     SchoolTicketMessageIn,
     TicketCreateSchool,
     TicketOut,
@@ -39,6 +43,7 @@ from app.platform.schemas import (
 
 __all__ = [
     "AnnouncementBrief",
+    "SchoolAiBundle",
     "SchoolBreakGlassRequest",
     "SchoolTicketMessageIn",
     "TicketCreateSchool",
@@ -55,6 +60,7 @@ __all__ = [
     "record_breakglass_outcome",
     "record_breakglass_session_started",
     "reply_from_tenant",
+    "school_ai_bundle",
 ]
 
 
@@ -68,6 +74,12 @@ def current_subscription(session: Session) -> dict[str, Any] | None:
         text("SELECT core.current_subscription()")
     ).scalar_one()
     return value
+
+
+def school_ai_bundle(tenant_id: uuid.UUID, subscription_id: uuid.UUID) -> SchoolAiBundle | None:
+    """The calling school's AI answer bundle and this month's answer count (platform data only;
+    ``None`` without a bundle). ``subscription_id`` comes from ``current_subscription``."""
+    return billing.school_ai_bundle(tenant_id, subscription_id)
 
 
 def active_announcements(tenant_id: uuid.UUID, tier: str) -> list[AnnouncementBrief]:
@@ -85,19 +97,30 @@ def open_ticket_from_tenant(
 
 
 def list_tenant_tickets(
-    tenant_id: uuid.UUID, *, limit: int = 50, cursor: str | None = None
+    tenant_id: uuid.UUID,
+    *,
+    viewer: uuid.UUID | None,
+    limit: int = 50,
+    cursor: str | None = None,
 ) -> tuple[list[TicketOut], str | None]:
-    return support.list_tenant_tickets(tenant_id, limit=limit, cursor=cursor)
+    return support.list_tenant_tickets(tenant_id, viewer=viewer, limit=limit, cursor=cursor)
 
 
-def get_tenant_ticket(tenant_id: uuid.UUID, ticket_id: uuid.UUID) -> TicketOut:
-    return support.get_tenant_ticket(tenant_id, ticket_id)
+def get_tenant_ticket(
+    tenant_id: uuid.UUID, ticket_id: uuid.UUID, *, viewer: uuid.UUID | None
+) -> TicketOut:
+    return support.get_tenant_ticket(tenant_id, ticket_id, viewer=viewer)
 
 
 def reply_from_tenant(
-    tenant_id: uuid.UUID, user_id: uuid.UUID, ticket_id: uuid.UUID, data: SchoolTicketMessageIn
+    tenant_id: uuid.UUID,
+    user_id: uuid.UUID,
+    ticket_id: uuid.UUID,
+    data: SchoolTicketMessageIn,
+    *,
+    manager: bool,
 ) -> TicketOut:
-    return support.reply_from_tenant(tenant_id, user_id, ticket_id, data.body)
+    return support.reply_from_tenant(tenant_id, user_id, ticket_id, data.body, manager=manager)
 
 
 def invite_school_owner(

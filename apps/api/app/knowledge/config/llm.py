@@ -187,6 +187,18 @@ class BudgetReservation(ConfigModel):
     the longest call (timeout x attempts plus backoff; checked at load)."""
 
 
+class BundleBudget(ConfigModel):
+    """The monthly budget of a school with an AI answer bundle (ADR-0038; owner decision
+    2026-10-03): included answers x ``cost_per_answer_usd`` x (1 + headroom), in INR at
+    ``usd_inr_rate``."""
+
+    cost_per_answer_usd: Decimal = Field(gt=0, le=10)
+    """Estimated list-price cost of one answered question (all its model calls)."""
+    overage_headroom_fraction: float = Field(ge=0, le=2)
+    """Extra budget above the bundle's quota, for billed overage answers and non-billable
+    questions and ingestion calls."""
+
+
 class Budget(ConfigModel):
     """Per-tenant monthly budget thresholds (FR-KB-011, NFR-CST-001)."""
 
@@ -195,6 +207,7 @@ class Budget(ConfigModel):
     """At this share of the budget, Ask degrades to search-only until reset or top-up."""
     usd_inr_rate: Decimal = Field(gt=0)
     """Converts metered USD spend to the school's INR budget (same rate as platform billing)."""
+    bundle: BundleBudget
     reservation: BudgetReservation
 
     @model_validator(mode="after")
@@ -209,11 +222,48 @@ class NotFoundText(ConfigModel):
     te: str = Field(min_length=10, max_length=300)
 
 
+class SentenceRules(ConfigModel):
+    """How an answer is cut into sentences and which sentences need a citation (docs/06 §9
+    rule 3 as built; ``app.knowledge.sentences``; FR-KB-005, FR-KB-007, invariant 8).
+
+    Script-neutral: a sentence ends at one of ``terminators`` followed by whitespace or the end
+    of the text, and at a line break (lists and tables are one unit per line); nothing assumes
+    ASCII letters, so Telugu text splits the same way. Every sentence is factual, and needs a
+    valid citation, unless one of the small non-factual rules below says otherwise; a sentence
+    with a digit is always factual."""
+
+    terminators: str = Field(min_length=1, max_length=20)
+    """Characters that end a sentence (``.``, ``?``, ``!``, the danda ``।`` ...)."""
+    abbreviations: tuple[str, ...] = Field(max_length=100)
+    """Casefolded words that a ``.`` follows without ending the sentence (``no`` in "Rc. No. 12",
+    ``rs`` in "Rs. 500"). Written without the final dot; inner dots stay (``e.g``)."""
+    class_words: tuple[str, ...] = Field(max_length=20)
+    """Casefolded words after which a single capital letter is a class numeral ("Class X.")
+    and may end a sentence; elsewhere a single capital letter with a dot is an initial."""
+    lead_in_max_words: int = Field(ge=0, le=30)
+    """A sentence without digits that ends with ``:`` and has at most this many words is a
+    lead-in ("Here is what the circular says:"), not a fact."""
+    connectives: tuple[str, ...] = Field(max_length=50)
+    """Casefolded sentences (without end punctuation) that state nothing ("In summary")."""
+    not_found_phrases: tuple[str, ...] = Field(min_length=1, max_length=50)
+    """Casefolded phrases of a sentence without digits that only says nothing was found."""
+
+    @model_validator(mode="after")
+    def _normalised(self) -> SentenceRules:
+        for word in (*self.abbreviations, *self.class_words, *self.connectives):
+            if word != word.casefold().strip() or not word or word.endswith("."):
+                raise ValueError(f"sentence rule {word!r} must be casefolded, without a final dot")
+        return self
+
+
 class AnswerChecks(ConfigModel):
     max_uncited_factual_fraction: float = Field(ge=0, le=1)
-    """docs/06 §9 rule 3: above this share of uncited factual sentences, answer search-only."""
+    """docs/06 §9 rule 3: above this share of uncited factual sentences, answer search-only;
+    at or below it, the uncited factual sentences are dropped from the answer."""
     not_found: NotFoundText
     """What the user reads when no valid citation supports an answer (FR-KB-007, invariant 8)."""
+    sentences: SentenceRules
+    """Per-sentence citation enforcement (docs/06 §9 rule 3 as built)."""
 
 
 class Streaming(ConfigModel):
@@ -447,6 +497,13 @@ class LlmConfig(ConfigModel):
         if provider == "gemini":
             return self.gemini.cache_price_multipliers
         return self.cache_price_multipliers
+
+    def anthropic_roles(self) -> tuple[str, ...]:
+        """Roles (sorted) whose calls go to Anthropic: written so, or on an applied fallback.
+        Every role counts, the offline eval judge too (Claude safety lock, fail closed)."""
+        return tuple(
+            sorted(name for name, role in self.roles.items() if role.provider == "anthropic")
+        )
 
     def use_fallback(self, roles: Iterable[ModelRole] | None = None) -> LlmConfig:
         """A copy with the named roles (default: every role that has one) on their evaluated

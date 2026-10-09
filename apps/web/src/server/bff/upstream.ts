@@ -3,6 +3,7 @@ import { enabledLocales } from "@/i18n/languages";
 import type { Locale } from "@/i18n/routing";
 import type { AuthRuntime } from "@/server/runtime";
 import type { Session } from "@/server/session/store";
+import { clientIp } from "@/server/auth/rate-limit";
 import { mintServiceToken, SERVICE_TOKEN_HEADER } from "./service-token";
 
 /**
@@ -66,6 +67,13 @@ export async function callApi(runtime: AuthRuntime, call: ApiCall): Promise<Resp
     await mintServiceToken(runtime.config.serviceTokenKey, runtime.now),
   );
   headers.set("x-request-id", call.requestId);
+  // The browser's address for the API's per-IP rate limit (P2-07): only the entry our own
+  // trusted proxy vouches for, never the browser's X-Forwarded-For as sent. The API trusts it
+  // only from SOS_TRUSTED_PROXIES. Server-side calls without a browser request send none.
+  if (call.incomingHeaders) {
+    const ip = clientIp(call.incomingHeaders, runtime.config.trustedProxyHops);
+    if (ip !== "unknown") headers.set("x-forwarded-for", ip);
+  }
   // Support sessions (ADR-0023) are pinned to the school of their grant.
   if (
     (call.session.kind === "staff" || call.session.kind === "support") &&

@@ -34,6 +34,10 @@ export const KNOWN_API_CODES = [
   "shared_tier",
   "already_requested",
   "not_requested",
+  // Two-person requests (audit 2026-10-05 A-13, A-14): expiry and re-checks.
+  "request_expired",
+  "requester_not_authorised",
+  "approver_not_eligible",
   "billing_suspension",
   "mfa_required",
   "tenant_suspended",
@@ -57,13 +61,26 @@ export const KNOWN_API_CODES = [
   "not_dedicated",
   "not_offboarding",
   "certificate_pending",
+  "value_out_of_range",
+  "rotation_pending",
+  "already_on_hold",
+  // Audit 2026-10-05/06 hardening: replay after an access change; hidden direction characters.
+  "idempotency_access_changed",
+  "invalid_characters",
 ] as const;
 export type KnownApiCode = (typeof KNOWN_API_CODES)[number];
 
 export type ApiErrorKind =
   | { kind: "redirecting" }
   | { kind: "unavailable" }
-  | { kind: "api"; key: KnownApiCode | "generic"; status: number; requestId: string | null };
+  | {
+      kind: "api";
+      key: KnownApiCode | "generic";
+      status: number;
+      requestId: string | null;
+      /** Seconds to wait from a 429 (`retry_after` in the problem, RFC 9110 Retry-After). */
+      retryAfter?: number;
+    };
 
 const STATUS_FALLBACK: Record<number, KnownApiCode> = {
   403: "forbidden",
@@ -90,11 +107,15 @@ export function describeApiError(error: unknown): ApiErrorKind {
   }
   if (error instanceof ApiError) {
     const key = isKnown(error.code) ? error.code : (STATUS_FALLBACK[error.status] ?? "generic");
+    const retry = (error.problem as { retry_after?: unknown }).retry_after;
     return {
       kind: "api",
       key,
       status: error.status,
       requestId: typeof error.problem.request_id === "string" ? error.problem.request_id : null,
+      ...(error.status === 429 && typeof retry === "number" && Number.isInteger(retry) && retry > 0
+        ? { retryAfter: retry }
+        : {}),
     };
   }
   // fetch() itself failed: offline or the server is down.

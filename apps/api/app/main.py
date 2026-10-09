@@ -11,6 +11,7 @@ from app.breakglass.api import router as breakglass_router
 from app.certificates.api import router as certificates_router
 from app.changes.api import router as changes_router
 from app.circulars.api import router as circulars_router
+from app.core import ratelimit
 from app.core.config import DeploymentMode, Settings, get_settings
 from app.core.errors import install_error_handlers
 from app.core.health import router as health_router
@@ -24,6 +25,7 @@ from app.extraction.api import router as extraction_router
 from app.identity.api import router as identity_router
 from app.imports.api import router as imports_router
 from app.insights.api import router as insights_router
+from app.knowledge import service as knowledge
 from app.knowledge.api import router as knowledge_router
 from app.notifications.api import invitations_router
 from app.notifications.api import router as notifications_router
@@ -41,6 +43,9 @@ API_PREFIX = "/api/v1"
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     setup_logging(settings)
+    # Claude safety lock: staging/prod refuse to start while a models.yaml role uses Anthropic
+    # without SOS_ANTHROPIC_ZDR_CONFIRMED (docs/10 §11).
+    knowledge.check_provider_agreements(settings)
     docs_enabled = not settings.is_production_like
     app = FastAPI(
         title="SchoolOS API",
@@ -48,6 +53,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url=f"{API_PREFIX}/openapi.json" if docs_enabled else None,
         docs_url=f"{API_PREFIX}/docs" if docs_enabled else None,
         redoc_url=None,
+        # Every route may answer 429 (docs/09 §2.7; only the health checks are exempt).
+        responses=ratelimit.OPENAPI_429,
     )
     install_error_handlers(app)
     install_middleware(app, settings)

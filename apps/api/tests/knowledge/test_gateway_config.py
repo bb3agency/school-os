@@ -57,7 +57,8 @@ def test_SEC_020_output_caps_per_role() -> None:
 
 
 def test_FR_KB_011_budget_is_converted_at_the_billing_rate() -> None:
-    assert llm.load_llm_config().budget.usd_inr_rate == Decimal("84.00")
+    # FBIL USD/INR reference rate of 28 Sep 2026 (docs/16 §11, §19 Q17; reviewed 2026-10-03).
+    assert llm.load_llm_config().budget.usd_inr_rate == Decimal("95.97")
 
 
 def test_opus_5_5_cannot_have_thinking_disabled() -> None:

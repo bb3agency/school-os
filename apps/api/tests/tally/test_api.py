@@ -21,6 +21,7 @@ from sqlalchemy import Engine, text
 
 from app.core.db import tenant_session
 from app.tally import agent_auth, service
+from app.tally.config import rules as tally_rules
 
 from .conftest import T
 
@@ -164,6 +165,118 @@ def test_FR_TALLY_001_enrolment_attempts_are_limited_per_school(
     assert codes[10] == 429
 
 
+# --- enrolment hardening (audit 2026-10-04 AA-15; docs/07 TB9) ------------------------------------
+
+
+@pytest.fixture
+def frozen_enrolment_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    """One fixed instant for the hour windows (the request timestamps stay within the skew)."""
+    fixed = dt.datetime.now(dt.UTC)
+    monkeypatch.setattr(agent_auth, "_utcnow", lambda: fixed)
+
+
+@pytest.fixture
+def client_address(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """The client address the enrolment guard sees (``[0]``; tests change it)."""
+    current = ["203.0.113.9"]
+    monkeypatch.setattr(agent_auth, "_client_ip", lambda _request: current[0])
+    return current
+
+
+def _code_used(admin: Engine, code_id: str) -> bool:
+    return (
+        _scalar(
+            admin,
+            "SELECT used_at FROM ops.tally_enrolment_codes WHERE id = :i",
+            i=uuid.UUID(code_id),
+        )
+        is not None
+    )
+
+
+def test_AA_15_a_school_that_is_not_active_cannot_enrol_and_learns_nothing(
+    api: Any, admin_engine: Engine
+) -> None:
+    school = T.fresh_school(admin_engine)
+    made = T.new_code(api, school)
+    wrong = T.enrol_with(api, school.tenant_id, "ZZZZ-ZZZZ-ZZZZ")
+    with admin_engine.begin() as c:
+        c.execute(
+            text("UPDATE core.tenants SET status = 'suspended' WHERE id = :t"),
+            {"t": school.tenant_id},
+        )
+    try:
+        refused = T.enrol_with(api, school.tenant_id, made["code"])
+        assert refused.status_code == wrong.status_code == 401
+        assert refused.json()["code"] == wrong.json()["code"] == "unauthenticated"
+        assert refused.json()["detail"] == wrong.json()["detail"]
+        assert not _code_used(admin_engine, made["id"])
+    finally:
+        with admin_engine.begin() as c:
+            c.execute(
+                text("UPDATE core.tenants SET status = 'active' WHERE id = :t"),
+                {"t": school.tenant_id},
+            )
+    assert T.enrol_with(api, school.tenant_id, made["code"]).status_code == 201
+
+
+@pytest.mark.usefixtures("frozen_enrolment_clock")
+def test_AA_15_an_outsider_cannot_use_up_a_schools_enrolment_attempts(
+    api: Any, admin_engine: Engine, client_address: list[str]
+) -> None:
+    """Failed codes are counted per school AND client address: someone who knows the tenant
+    id locks out only their own address, not the school's office PC."""
+    school = T.fresh_school(admin_engine)
+    code = T.new_code(api, school)["code"]
+    tries = [T.enrol_with(api, school.tenant_id, "ZZZZ-ZZZZ-ZZZZ").status_code for _ in range(11)]
+    assert tries == [401] * 10 + [429]
+    client_address[0] = "198.51.100.7"  # the school's office
+    assert T.enrol_with(api, school.tenant_id, code).status_code == 201
+
+
+@pytest.mark.usefixtures("frozen_enrolment_clock")
+def test_AA_15_a_successful_enrolment_does_not_spend_the_failure_budget(
+    api: Any, admin_engine: Engine, client_address: list[str]
+) -> None:
+    school = T.fresh_school(admin_engine)
+    for _ in range(9):
+        assert T.enrol_with(api, school.tenant_id, "ZZZZ-ZZZZ-ZZZZ").status_code == 401
+    assert T.enrol(api, school) is not None  # attempt 10 succeeds
+    assert T.enrol_with(api, school.tenant_id, "ZZZZ-ZZZZ-ZZZZ").status_code == 401  # 10th fail
+    assert T.enrol_with(api, school.tenant_id, "ZZZZ-ZZZZ-ZZZZ").status_code == 429
+
+
+@pytest.mark.usefixtures("frozen_enrolment_clock")
+def test_AA_15_one_address_is_capped_across_schools(
+    api: Any, admin_engine: Engine, client_address: list[str]
+) -> None:
+    """Every attempt from one address counts, any school and any outcome, before anything else
+    is checked (spraying tenant ids)."""
+    cap = tally_rules().enrolment.max_attempts_per_address_per_hour
+    codes = [T.enrol_with(api, uuid.uuid4(), "ZZZZ-ZZZZ-ZZZZ").status_code for _ in range(cap + 1)]
+    assert codes == [401] * cap + [429]
+    school = T.fresh_school(admin_engine)
+    code = T.new_code(api, school)["code"]
+    assert T.enrol_with(api, school.tenant_id, code).status_code == 429
+    client_address[0] = "198.51.100.7"
+    assert T.enrol_with(api, school.tenant_id, code).status_code == 201
+
+
+@pytest.mark.usefixtures("frozen_enrolment_clock")
+def test_AA_15_a_school_wide_cap_bounds_guessing_from_many_addresses(
+    api: Any, admin_engine: Engine, client_address: list[str]
+) -> None:
+    cfg = tally_rules().enrolment
+    school = T.fresh_school(admin_engine)
+    per_address = cfg.max_failures_per_address_per_hour
+    for n in range(cfg.max_failures_per_school_per_hour // per_address):
+        client_address[0] = f"203.0.113.{n + 10}"
+        for _ in range(per_address):
+            assert T.enrol_with(api, school.tenant_id, "ZZZZ-ZZZZ-ZZZZ").status_code == 401
+    client_address[0] = "198.51.100.7"
+    assert T.enrol_with(api, school.tenant_id, "ZZZZ-ZZZZ-ZZZZ").status_code == 429
+
+
 def test_FR_TALLY_001_at_most_two_active_agents(api: Any, admin_engine: Engine) -> None:
     school = T.fresh_school(admin_engine)
     T.enrol(api, school)
@@ -171,6 +284,36 @@ def test_FR_TALLY_001_at_most_two_active_agents(api: Any, admin_engine: Engine) 
     res = api.call(school.people["owner"], "POST", "/api/v1/tally/enrolment-codes", json={})
     assert res.status_code == 409
     assert res.json()["code"] == "too_many_devices"
+
+
+def test_FR_TALLY_001_agent_cap_is_counted_under_a_per_school_lock(
+    api: Any, admin_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two enrolments at once both counted the active agents before either was inserted, so the
+    cap could be exceeded by one (audit 2026-10-06 hardening). The count now runs while the
+    transaction holds the school's agent-slot advisory lock, so concurrent enrolments queue."""
+    from app.tally import repository
+
+    held: list[bool] = []
+    real = repository.count_active_devices
+
+    def count(session: Any) -> int:
+        held.append(
+            bool(
+                session.execute(
+                    text(
+                        "SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' "
+                        "AND pid = pg_backend_pid() AND granted"
+                    )
+                ).scalar_one()
+            )
+        )
+        return real(session)
+
+    monkeypatch.setattr(repository, "count_active_devices", count)
+    school = T.fresh_school(admin_engine)
+    T.enrol(api, school)  # the code (owner) and the enrolment (agent) both count
+    assert held == [True, True]
 
 
 # --- signed requests (FR-TALLY-002) ---------------------------------------------------------------
@@ -300,6 +443,34 @@ def test_FR_TALLY_002_key_rotation_retires_the_old_key_on_first_use(
     actions = [e["action"] for e in T.audit_actions(admin_engine, school.tenant_id)]
     assert "tally.device.key_rotated" in actions
     assert "tally.device.key_promoted" in actions
+
+
+def test_FR_TALLY_002_repeated_rotation_does_not_extend_the_old_keys_life(
+    api: Any, admin_engine: Engine
+) -> None:
+    """SEC-030: rotating again (with the old key, never using the new one) used to restart the
+    overlap, so a stolen key could be kept alive indefinitely. The overlap counts from the first
+    rotation that is still pending."""
+    school = T.fresh_school(admin_engine)
+    agent = T.enrol(api, school)
+
+    def shift(interval: str) -> None:
+        with admin_engine.begin() as c:
+            c.execute(
+                text(
+                    "UPDATE ops.tally_devices SET rotation_started_at = rotation_started_at "
+                    f"- interval '{interval}' WHERE tenant_id = :t"
+                ),
+                {"t": school.tenant_id},
+            )
+
+    assert agent.call(api, "POST", "/api/v1/edge/tally/key-rotation").status_code == 200
+    shift("6 days")
+    _new_window()
+    assert agent.call(api, "POST", "/api/v1/edge/tally/key-rotation").status_code == 200
+    shift("36 hours")  # 7.5 days after the first rotation
+    _new_window()
+    assert agent.call(api, "GET", "/api/v1/edge/tally/config").status_code == 401
 
 
 # --- catalog, selection and snapshots (FR-TALLY-004, FR-TALLY-005) ------------------------------
@@ -558,6 +729,24 @@ def test_FR_TALLY_007_status_totals_only_for_finance_readers(
     assert owner["groups_selected"] == 2
 
 
+def test_SEC_003_party_balances_only_for_finance_readers(api: Any, admin_engine: Engine) -> None:
+    """App-logic hardening (custom roles): a ``tally.configure`` holder without school-wide
+    ``finance.read`` links ledgers but does not see their balances (null)."""
+    import dataclasses
+
+    school, agent = _ready(api, admin_engine)
+    T.snapshot(api, agent, [T.party("Synthetic Party Balance", "125.00")])
+    person = school.people["accountant"]
+    full = T.SW.ctx_for(school.tenant_id, person, "accountant")
+    configure_only = dataclasses.replace(full, permissions=full.permissions - {service.READ})
+    with tenant_session(school.tenant_id, person.user_id) as db:
+        (hidden,) = service.list_parties(db, configure_only).data
+        (shown,) = service.list_parties(db, full).data
+        assert hidden.closing_balance is None
+        assert service.get_party(db, configure_only, hidden.id).closing_balance is None
+    assert str(shown.closing_balance) == "125.00"
+
+
 def test_FR_TALLY_006_links_only_to_students_in_this_school(
     api: Any, admin_engine: Engine, world: Any
 ) -> None:
@@ -669,3 +858,78 @@ def test_FR_TALLY_005_old_sync_records_are_deleted_unless_a_ledger_points_to_the
         )
         == 1
     )
+
+
+def _ledger_only_configurer(admin: Engine, school: Any) -> Any:
+    """A member with a custom role holding tally.configure but not student.read_basic, given a
+    school-wide scope (so the tally routes are open to them, ADR-0032 §5)."""
+    key = f"ledger_clerk_{uuid.uuid4().hex[:8]}"
+    role_id = uuid.uuid4()
+    with admin.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO core.roles (id, tenant_id, key, name_en, name_te) "
+                "VALUES (:r, :t, :k, 'Synthetic ledger clerk', 'కృత్రిమ గుమాస్తా')"
+            ),
+            {"r": role_id, "t": school.tenant_id, "k": key},
+        )
+        c.execute(
+            text(
+                "INSERT INTO core.role_permissions (tenant_id, role_id, permission_key) "
+                "VALUES (:t, :r, 'tally.configure')"
+            ),
+            {"t": school.tenant_id, "r": role_id},
+        )
+    return T.W.add_member(admin, school.tenant_id, [key], scopes=[("school", None)])
+
+
+def test_R_11_unlinking_needs_the_student_to_be_visible(api: Any, admin_engine: Engine) -> None:
+    """R-11 (API1, FR-TALLY-006): linking already needs a student the caller reads; unlinking
+    did not, so a ledger clerk without student.read_basic could remove any student's ledger
+    link (and with it that student's dues) by guessing or replaying student ids."""
+    school, agent = _ready(api, admin_engine)
+    sita = T.SW.create(
+        school, name="Synthetica Sita Devi", section_key="section_9c", admission_no="T-911"
+    )
+    T.snapshot(api, agent, [T.party("Synthetic Shared Ledger", "10.00")])
+    accountant = school.people["accountant"]
+    party_id = api.call(accountant, "GET", "/api/v1/tally/parties").json()["data"][0]["id"]
+    path = f"/api/v1/tally/parties/{party_id}/links"
+    res = api.call(accountant, "POST", path, json={"student_id": str(sita)})
+    assert res.status_code == 201, res.text
+    clerk = _ledger_only_configurer(admin_engine, school)
+    res = api.call(clerk, "POST", path, json={"student_id": str(sita)})
+    assert res.status_code == 422, "linking already needs a visible student"
+    res = api.call(clerk, "DELETE", f"{path}/{sita}")
+    assert res.status_code == 404, res.text
+    count = "SELECT count(*) FROM ops.tally_party_links WHERE tenant_id = :t"
+    assert _scalar(admin_engine, count, t=school.tenant_id) == 1
+    # A caller who reads the student still unlinks.
+    assert api.call(accountant, "DELETE", f"{path}/{sita}").status_code == 204
+    assert _scalar(admin_engine, count, t=school.tenant_id) == 0
+
+
+# --- device secrets bound to their row (data-protection audit 2026-10-05 H-03) ------------------
+
+
+def test_H_03_a_device_secret_copied_to_another_device_row_does_not_work(
+    api: Any, admin_engine: Engine
+) -> None:
+    """Someone with database write access copies device A's wrapped secret onto device B's row
+    and signs as B with A's secret: refused, because the secret is bound to A's row."""
+    school = T.fresh_school(admin_engine)
+    a = T.enrol(api, school)
+    b = T.enrol(api, school, name="Spare PC")
+    with admin_engine.begin() as c:
+        c.execute(
+            text(
+                "UPDATE ops.tally_devices SET key_ciphertext = "
+                "(SELECT key_ciphertext FROM ops.tally_devices WHERE id = :a) WHERE id = :b"
+            ),
+            {"a": a.device_id, "b": b.device_id},
+        )
+    forged = T.Agent(
+        tenant_id=school.tenant_id, device_id=b.device_id, key_id=b.key_id, secret=a.secret
+    )
+    assert forged.call(api, "GET", "/api/v1/edge/tally/config").status_code == 401
+    assert a.call(api, "GET", "/api/v1/edge/tally/config").status_code == 200

@@ -9,7 +9,9 @@ Provider mode guards (SEC-020, invariant 10), on top of the ``Settings`` start-u
 - ``live`` builds a transport only for the providers ``models.yaml`` actually uses: Gemini needs
   ``SOS_LLM_GCP_PROJECT`` and service-identity credentials (never a person's login), and in
   staging/prod an India location and ``SOS_LLM_ZDR_CONFIRMED``; Anthropic (fallback) needs an
-  organization API key. A missing requirement is a :class:`ProviderModeError` (fail closed).
+  organization API key and, in staging/prod, ``SOS_ANTHROPIC_ZDR_CONFIRMED`` (the Claude safety
+  lock, :func:`require_provider_agreements`, also run at API and worker start-up). A missing
+  requirement is a :class:`ProviderModeError` (fail closed).
 - ``SOS_KB_ENABLED`` is read on every call (kill switch): off means :class:`AiDisabled`.
 
 The per-school switch and budget come from ``policy`` (the composition root implements it with
@@ -55,7 +57,25 @@ def providers_in_use(config: LlmConfig) -> frozenset[Provider]:
     return frozenset(role.provider for role in config.roles.values())
 
 
+def require_provider_agreements(settings: Settings, config: LlmConfig | None = None) -> None:
+    """Claude safety lock (owner decision 2026-10-01; docs/08 §8, docs/10 §11): in staging/prod,
+    no role may use provider anthropic unless ``SOS_ANTHROPIC_ZDR_CONFIRMED`` says the Anthropic
+    Zero Data Retention agreement and DPA are in place. Local and CI are not checked (the fake
+    provider and synthetic data only). Run at start-up by the API and the worker."""
+    if not settings.is_production_like or settings.anthropic_zdr_confirmed:
+        return
+    roles = (config or load_llm_config()).anthropic_roles()
+    if roles:
+        raise ProviderModeError(
+            f"roles {', '.join(roles)} use provider anthropic, which needs "
+            f"SOS_ANTHROPIC_ZDR_CONFIRMED=true in {settings.env}. Set it only once the Anthropic "
+            "Zero Data Retention agreement and DPA are signed (docs/10 §11), or switch those roles "
+            "back to gemini in app/knowledge/config/models.yaml"
+        )
+
+
 def _anthropic(settings: Settings, config: LlmConfig) -> Transport:
+    require_provider_agreements(settings, config)
     key = settings.anthropic_api_key
     if key is None or not key.get_secret_value().strip():
         raise ProviderModeError(
@@ -181,4 +201,5 @@ __all__ = [
     "build_transport",
     "build_transports",
     "providers_in_use",
+    "require_provider_agreements",
 ]

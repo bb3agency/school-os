@@ -68,7 +68,7 @@ export function ConfirmDialog({
           }}
         >
           <div className="space-y-2 p-4 sm:p-6">
-            <h2 id={titleId} className="text-lg font-medium">
+            <h2 id={titleId} className="text-lg font-semibold">
               {title}
             </h2>
             {body ? (
@@ -78,7 +78,7 @@ export function ConfirmDialog({
             ) : null}
             {children}
           </div>
-          <div className="flex flex-wrap justify-end gap-2 rounded-b-xl border-t border-border bg-surface-muted px-4 py-3 max-sm:[&>*]:flex-1 sm:px-6 sm:py-4">
+          <div className="dialog-footer flex flex-wrap justify-end gap-2 rounded-b-xl border-t border-border bg-surface-muted px-4 py-3 max-sm:[&>*]:flex-1 sm:px-6 sm:py-4">
             <Button variant="secondary" onClick={() => ref.current?.close()}>
               {t("cancel")}
             </Button>

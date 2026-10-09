@@ -166,7 +166,7 @@ function QueueItem({ row, batch }: { row: ExtractionItem; batch: ExtractionBatch
         <dl className="min-w-0 space-y-2 text-sm">
           <div>
             <dt className="text-ink-muted">{t("colName")}</dt>
-            <dd className="font-medium break-words text-ink">
+            <dd className="font-semibold break-words text-ink">
               <Value>{fieldText(row, "full_name")}</Value>
             </dd>
           </div>

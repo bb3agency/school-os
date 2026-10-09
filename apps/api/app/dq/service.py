@@ -17,6 +17,10 @@ Other modules call only these functions.
   in their sections this year; anything else, including other schools' ids, is 404.
 - **Workflow (FR-DQ-020).** Resolve needs a note or a change request; waive needs
   ``dq.findings.waive`` (route) and a reason, and step-up MFA for blockers (428). Both audited.
+  A **blocker** is resolved by hand only by a ``dq.findings.waive`` holder with step-up, the same
+  as waiving it (403 ``blocker_needs_waive``, 428; audit DL-06, FR-CERT-002): otherwise a clerk
+  could note it away and print the mismatched record. The change request that corrects it closes
+  it on approval (below) without that.
 - **Change requests** are linked through outbox events (payload
   ``{change_request_id, student_id, attribute_key}``): ``submitted`` links the student's
   unresolved findings of that attribute, ``approved`` re-checks the student and resolves the
@@ -43,6 +47,7 @@ from app.core.config import get_settings
 from app.core.db import tenant_session
 from app.core.errors import (
     Conflict,
+    Forbidden,
     NotFound,
     PreconditionFailed,
     StepUpRequired,
@@ -153,7 +158,26 @@ def _reach(session: Session, ctx: UserContext) -> frozenset[uuid.UUID] | None:
         return None
     if not ctx.has(READ):
         return frozenset()
-    return frozenset(students.list_students_in_scope(session, ctx))
+    # Both grants' scopes apply (SEC-015): a school-wide read_basic from one role must not
+    # widen a scoped dq.findings.read from another.
+    return frozenset(students.list_students_in_scope(session, ctx, permissions=(READ,)))
+
+
+def _require_action_scope(
+    session: Session, ctx: UserContext, permission: str, row: RowMapping
+) -> None:
+    """Resolve and waive reach a finding through their OWN scope too (custom roles may grant
+    them narrower than ``dq.findings.read``): 403 ``out_of_scope`` for a finding the caller
+    may read but not act on."""
+    if not ctx.has(permission) or ctx.scope_for(permission).school_wide:
+        return  # the route checks the permission; other callers (change requests) as before
+    reach = frozenset(students.list_students_in_scope(session, ctx, permissions=(permission,)))
+    if row["student_id"] not in reach:
+        raise Forbidden(
+            "This finding is about a student outside your classes. Ask someone who looks "
+            "after that class.",
+            code="out_of_scope",
+        )
 
 
 def _visible(reach: frozenset[uuid.UUID] | None, student_id: uuid.UUID | None) -> bool:
@@ -263,6 +287,13 @@ def _display(session: Session, rows: Sequence[RowMapping], labels: _Labels) -> _
     return _Display(values=current, names=names)
 
 
+def _uuid_or_none(value: object) -> uuid.UUID | None:
+    try:
+        return uuid.UUID(str(value)) if value else None
+    except ValueError:
+        return None
+
+
 def _finding_out(
     row: RowMapping, labels: _Labels, display: _Display, reach: frozenset[uuid.UUID] | None
 ) -> FindingOut:
@@ -270,7 +301,9 @@ def _finding_out(
     raw_values = details.pop("values", [])
     match = details.get("match")
     related = row["related_student_id"]
-    related_visible = related is None or _visible(reach, related)
+    # DQ-021 names another student without pairing (ADR-0037): same masking as DQ-008.
+    named = related or _uuid_or_none(details.get("other_student_id"))
+    related_visible = named is None or _visible(reach, named)
     values = []
     for v in raw_values:
         value_id = uuid.UUID(str(v["value_id"]))
@@ -369,34 +402,45 @@ def _check_profile(profile_key: str | None) -> None:
         )
 
 
-def _check_structure(session: Session, scope: engine.Scope) -> None:
-    """Unknown (or other schools') sections and classes are a 422, like any bad reference."""
+def _not_found(field: str) -> ValidationFailed:
+    return ValidationFailed(
+        [{"field": field, "code": "not_found", "message_key": "errors.not_found"}]
+    )
+
+
+def _check_structure(session: Session, ctx: UserContext, scope: engine.Scope) -> None:
+    """Unknown (or other schools') sections and classes are a 422, like any bad reference.
+
+    So are existing ones outside the caller's scope (audit 2026-10-04 AA-18): the answer must
+    not show whether an id exists. A section is in reach when both ``dq.findings.read`` and
+    ``student.read_basic`` reach it (school-wide, the section, or its class); a class when both
+    reach the class or one of its sections (SEC-015)."""
+    grants = [ctx.scope_for(READ), ctx.scope_for(STUDENT_READ)]
+    scoped = [g for g in grants if not g.school_wide]
+    own_classes: dict[uuid.UUID, uuid.UUID] = {}
+    if scoped:
+        for section_id in {s for g in scoped for s in g.section_ids}:
+            try:
+                own_classes[section_id] = tenancy.get_section(session, section_id).class_id
+            except NotFound:  # pragma: no cover - a scope names a section of this school
+                continue
     for i, section_id in enumerate(scope.section_ids or ()):
         try:
-            tenancy.get_section(session, section_id)
+            section = tenancy.get_section(session, section_id)
         except NotFound:
-            raise ValidationFailed(
-                [
-                    {
-                        "field": f"scope.section_ids.{i}",
-                        "code": "not_found",
-                        "message_key": "errors.not_found",
-                    }
-                ]
-            ) from None
+            raise _not_found(f"scope.section_ids.{i}") from None
+        if not all(section_id in g.section_ids or section.class_id in g.class_ids for g in scoped):
+            raise _not_found(f"scope.section_ids.{i}")
     for i, class_id in enumerate(scope.class_ids or ()):
         try:
             tenancy.get_class(session, class_id)
         except NotFound:
-            raise ValidationFailed(
-                [
-                    {
-                        "field": f"scope.class_ids.{i}",
-                        "code": "not_found",
-                        "message_key": "errors.not_found",
-                    }
-                ]
-            ) from None
+            raise _not_found(f"scope.class_ids.{i}") from None
+        if not all(
+            class_id in g.class_ids or any(own_classes.get(s) == class_id for s in g.section_ids)
+            for g in scoped
+        ):
+            raise _not_found(f"scope.class_ids.{i}")
 
 
 def _scope_of(data: RunCreate) -> engine.Scope:
@@ -436,6 +480,7 @@ def _complete(
             "new": stats.new,
             "reopened": stats.reopened,
             "cleared": stats.cleared,
+            "needs_confirmation": stats.needs_confirmation,
             "blockers": stats.blockers,
             "warnings": stats.warnings,
         },
@@ -507,7 +552,7 @@ def request_run(session: Session, ctx: UserContext, data: RunCreate) -> RunOut:
     else queue it for the worker (status ``queued``; the requester is notified when done)."""
     _check_profile(data.profile_key)
     scope = _scope_of(data)
-    _check_structure(session, scope)
+    _check_structure(session, ctx, scope)
     ids = engine.resolve_students(session, ctx, scope)
     if len(ids) <= load_engine_config().sync_max_students:
         return _run_now(session, ctx, scope, ids, data.profile_key)
@@ -856,16 +901,31 @@ def _open_for_change(row: RowMapping, expected_version: int | None) -> None:
 
 
 def _check_change_request(
-    session: Session, change_request_id: uuid.UUID, students_of_finding: Collection[object]
+    session: Session,
+    change_request_id: uuid.UUID,
+    students_of_finding: Collection[object],
+    attribute_key: str | None,
 ) -> None:
-    """A finding is resolved only by a request of this school about one of its students."""
-    student = changes.request_student(session, change_request_id)
-    if student is None:
+    """A finding is resolved only by an APPROVED request of this school about one of its
+    students and, for a finding about one field, about that field (audit 2026-10-06: a
+    pending request may still be rejected, so it corrects nothing yet)."""
+    link = changes.request_link(session, change_request_id)
+    if link is None:
         code, detail = "not_found", "No change request with this id. Check the id and try again."
-    elif student not in students_of_finding:
+    elif link.student_id not in students_of_finding:
         code, detail = (
             "other_student",
             "This change request is about another student. Choose a request for this student.",
+        )
+    elif attribute_key is not None and link.attribute_key != attribute_key:
+        code, detail = (
+            "other_attribute",
+            "This change request corrects another field. Choose a request for this field.",
+        )
+    elif link.status != "approved":
+        code, detail = (
+            "not_approved",
+            "This change request is not approved yet. Resolve the finding once it is approved.",
         )
     else:
         return
@@ -884,14 +944,22 @@ def resolve_finding(
     expected_version: int | None = None,
 ) -> FindingOut:
     """Resolve with a note and/or a change request (US-502 AC1, FR-DQ-020). Permission
-    ``dq.findings.resolve``. A re-run reopens it if the conflict is still there (AC2).
-    Audit: ``dq.finding.resolved``."""
+    ``dq.findings.resolve``; a **blocker** also needs ``dq.findings.waive`` (403
+    ``blocker_needs_waive``) and step-up MFA (428), like waiving it (DL-06, FR-CERT-002). A
+    re-run reopens it if the conflict is still there (AC2). Audit: ``dq.finding.resolved``."""
     _reject_aadhaar("note", data.note)
     row, reach = _visible_finding(session, ctx, finding_id, lock=True)
+    _require_action_scope(session, ctx, RESOLVE, row)
     _open_for_change(row, expected_version)
+    blocker = row["severity"] == Severity.BLOCKER.value
+    if blocker:
+        _require_blocker_clearance(ctx)
     if data.change_request_id is not None:
         _check_change_request(
-            session, data.change_request_id, (row["student_id"], row["related_student_id"])
+            session,
+            data.change_request_id,
+            (row["student_id"], row["related_student_id"]),
+            row["attribute_key"],
         )
     note = data.note.strip() if data.note else None
     updated = repo.update_finding(
@@ -921,9 +989,22 @@ def resolve_finding(
             "resolution": updated["resolution"],
             "change_request_id": data.change_request_id,
             "has_note": note is not None,
+            "step_up": blocker,
         },
     )
     return _render(session, [updated], reach)[0]
+
+
+def _require_blocker_clearance(ctx: UserContext) -> None:
+    """DL-06: only a ``dq.findings.waive`` holder with a fresh MFA sign-in clears a blocker by
+    hand. The waive grant must reach the school (it is ``school_step_up`` in roles.yaml)."""
+    if not ctx.has(WAIVE) or not ctx.scope_for(WAIVE).school_wide:
+        raise Forbidden(
+            "Only someone who may waive findings can resolve a blocker, after signing in again. "
+            "Ask the office admin or the principal, or correct the record with a change request.",
+            code="blocker_needs_waive",
+        )
+    _require_step_up(ctx)
 
 
 def resolve_with_change_request(
@@ -955,6 +1036,7 @@ def waive_finding(
     conflict: a re-run with different values reopens it. Audit: ``dq.finding.waived``."""
     _reject_aadhaar("reason", data.reason)
     row, reach = _visible_finding(session, ctx, finding_id, lock=True)
+    _require_action_scope(session, ctx, WAIVE, row)
     _open_for_change(row, expected_version)
     if row["severity"] == Severity.BLOCKER.value:
         _require_step_up(ctx)

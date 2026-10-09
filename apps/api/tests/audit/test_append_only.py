@@ -68,11 +68,14 @@ def test_FR_AUD_002_readonly_role_cannot_mutate(seeded: uuid.UUID, readonly_engi
         "TRUNCATE audit.events",
         "INSERT INTO audit.chain_heads (tenant_id, last_seq, last_hash) VALUES (:t, 0, '')",
     ):
-        with (
-            pytest.raises(ProgrammingError, match="permission denied"),
-            readonly_engine.begin() as c,
-        ):
-            c.execute(text(sql), {"t": seeded})
+        # sos_readonly defaults to read-only transactions (bootstrap.sql); a session can switch
+        # that off, so the grants themselves must still refuse every write.
+        with readonly_engine.begin() as c:
+            c.execute(text("SET TRANSACTION READ WRITE"))
+            with pytest.raises(ProgrammingError, match="permission denied"):
+                c.execute(text(sql), {"t": seeded})
+    with readonly_engine.connect() as c:
+        assert c.execute(text("SHOW default_transaction_read_only")).scalar_one() == "on"
 
 
 @pytest.mark.parametrize(

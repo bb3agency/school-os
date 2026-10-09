@@ -584,6 +584,23 @@ def test_FR_KB_030_verified_answer_must_quote_a_current_visible_document(
     assert str(ok.json()["id"]) in {str(e["resource_id"]) for e in audits}
 
 
+def test_SEC_016_a_verified_answer_refuses_phone_numbers_and_emails(
+    world: Any, api: Any, docs: dict[str, uuid.UUID], fake: Any
+) -> None:
+    """App-logic hardening: verified answers are shown to everyone in the school, so the free
+    text is screened for personal numbers like notices and memories (422)."""
+    principal = world.person("principal")
+    res = _verified(
+        api,
+        principal,
+        docs["sports"],
+        "held on 28/11/2026",
+        answer_text="Held on 28/11/2026. Call 9876543210 or parent@example.test.",
+    )
+    assert res.status_code == 422, res.text
+    assert res.json()["errors"][0]["code"] == "answer_personal_data"
+
+
 def test_FR_KB_030_list_hides_answers_citing_documents_the_caller_cannot_read(
     world: Any, api: Any, docs: dict[str, uuid.UUID], fake: Any
 ) -> None:
@@ -782,6 +799,75 @@ def test_NFR_AVL_004_provider_failure_mid_answer_falls_back_to_search_only(
     assert _llm_outcomes(admin_engine, uuid.UUID(query_id)) == ["ok", "unavailable"]
 
 
+class UncitedSentenceTransport(FakeTransport):
+    """The fake model's cited answer followed by ``extra``: text no passage supports."""
+
+    def __init__(self, extra: str) -> None:
+        super().__init__(record=True)
+        self.extra = extra
+
+    def send(self, request: MessagesRequest) -> Mapping[str, Any]:
+        response = dict(super().send(request))
+        content = list(response["content"])
+        if any(b.get("citations") for b in content):
+            content.append({"type": "text", "text": self.extra})
+        response["content"] = content
+        return response
+
+
+def _ask_with(transport: FakeTransport, api: Any, who: Any) -> list[tuple[str, dict[str, Any]]]:
+    _install(transport=transport)
+    try:
+        res, events = K.ask(api, who, "When is sports day?")
+    finally:
+        composition.set_runtime(None)
+    assert res.status_code == 200, res.text
+    events_list: list[tuple[str, dict[str, Any]]] = events
+    return events_list
+
+
+def test_FR_KB_005_an_uncited_factual_sentence_is_trimmed_from_the_final_answer(
+    world: Any, api: Any, admin_engine: Engine, docs: dict[str, uuid.UUID]
+) -> None:
+    """Invariant 8: the preview may show it, the validated ``final`` and ``token`` events never
+    do; the rest of the answer stays, with its citations, flagged ``replaced``."""
+    extra = " The canteen serves free lunch to every visitor that day."
+    events = _ask_with(UncitedSentenceTransport(extra), api, world.person("office_staff"))
+    preview = "".join(d["text"] for e, d in events if e == "delta")
+    assert "canteen" in preview
+    final = next(d for e, d in events if e == "final")
+    assert (final["status"], final["mode"], final["replaced"]) == ("answered", "full", True)
+    assert "canteen" not in final["text"]
+    assert "28/11/2026" in final["text"]
+    assert final["text"] == _text(events)
+    assert any(str(docs["sports"]) in s for s in _sources(events))
+    query_id = events[0][1]["query_id"]
+    assert _query_row(admin_engine, query_id)["status"] == "answered"
+    (completed,) = _audits(admin_engine, world, "kb.query.completed", uuid.UUID(query_id))
+    assert completed["summary"]["sentences_dropped"] == 1
+    assert completed["summary"]["uncited_factual"] == 1
+
+
+def test_FR_KB_007_uncited_figures_that_outweigh_the_cited_ones_fall_back_to_search_only(
+    world: Any, api: Any, admin_engine: Engine, docs: dict[str, uuid.UUID]
+) -> None:
+    extra = " Gates open at 07:15. Buses leave at 16:45. Parents collect children by 17:30."
+    extra += " The prize ceremony starts at 15:00."
+    events = _ask_with(UncitedSentenceTransport(extra), api, world.person("office_staff"))
+    final = next(d for e, d in events if e == "final")
+    assert (final["status"], final["mode"], final["text"], final["replaced"]) == (
+        "search_only",
+        "search_only",
+        "",
+        True,
+    )
+    assert _text(events) == ""
+    shown = str([d for e, d in events if e in ("final", "token", "citation")])
+    assert not any(t in shown for t in ("07:15", "16:45", "17:30", "15:00"))
+    assert any(str(docs["sports"]) in s for s in _sources(events))
+    assert _query_row(admin_engine, events[0][1]["query_id"])["status"] == "search_only"
+
+
 # --- conversation (docs/06 §5 conversation rules; FR-KB-012) -----------------------------------
 
 
@@ -894,7 +980,10 @@ def test_FR_KB_030_review_confirms_a_flagged_answer_and_names_the_verifier(
     b_principal = W.add_member(admin_engine, world.b.tenant_id, ["principal"])
     other_school = _manage(api, b_principal, vid, "review", 2)
     assert other_school.status_code == 404
-    ok = _manage(api, principal, vid, "review", 2, answer_text="Sports day: 28/11/2026.")
+    # A different reviewer (the drafter may not review their own answer; owner decision
+    # 2026-10-09).
+    reviewer = world.person("office_admin")
+    ok = _manage(api, reviewer, vid, "review", 2, answer_text="Sports day: 28/11/2026.")
     assert ok.status_code == 200, ok.text
     body = ok.json()
     assert (body["status"], body["version"], body["answer_text"]) == (
@@ -902,8 +991,8 @@ def test_FR_KB_030_review_confirms_a_flagged_answer_and_names_the_verifier(
         3,
         "Sports day: 28/11/2026.",
     )
-    assert body["verified_by"] == str(principal.membership_id)
-    assert body["verified_by_name"] == principal.display_name
+    assert body["verified_by"] == str(reviewer.membership_id)
+    assert body["verified_by_name"] == reviewer.display_name
     assert ok.headers["ETag"] == 'W/"3"'
     audits = [
         e
@@ -915,6 +1004,79 @@ def test_FR_KB_030_review_confirms_a_flagged_answer_and_names_the_verifier(
     assert "28/11/2026" not in str(audits[0]["summary"])
 
 
+def _review_events(admin: Engine, tenant_id: uuid.UUID, answer_id: str) -> list[dict[str, Any]]:
+    return [
+        e
+        for e in W.audit_events(admin, tenant_id, "kb.verified_answer.reviewed")
+        if str(e["resource_id"]) == answer_id
+    ]
+
+
+def test_FR_KB_030_the_drafter_cannot_review_their_own_answer(
+    world: Any, api: Any, admin_engine: Engine, docs: dict[str, uuid.UUID], fake: Any
+) -> None:
+    """Owner decision 2026-10-09: the person who drafted a verified answer cannot also review
+    it while another active member holds ``kb.verified_answer.manage`` (409
+    ``reviewer_must_differ``). A reviewer who corrects the text becomes its drafter, so the
+    next review needs someone else again."""
+    principal, office_admin = world.person("principal"), world.person("office_admin")
+    vid = _vid(_verified(api, principal, docs["sports"], "held on 28/11/2026"))
+    _set_status(admin_engine, vid, "needs_review")
+    own = _manage(api, principal, vid, "review", 2)
+    assert own.status_code == 409, own.text
+    assert own.json()["code"] == "reviewer_must_differ"
+    assert "someone else" in own.json()["detail"]
+    with admin_engine.connect() as c:
+        stored: int = c.execute(
+            text("SELECT version FROM kb.verified_answers WHERE id = :i"), {"i": vid}
+        ).scalar_one()
+    assert stored == 2, "nothing changed"
+    corrected = _manage(api, office_admin, vid, "review", 2, answer_text="Sports day: 28/11.")
+    assert corrected.status_code == 200, corrected.text
+    again = _manage(api, office_admin, vid, "review", 3)
+    assert (again.status_code, again.json()["code"]) == (409, "reviewer_must_differ")
+    confirmed = _manage(api, principal, vid, "review", 3)
+    assert confirmed.status_code == 200, confirmed.text
+    events = _review_events(admin_engine, world.a.tenant_id, vid)
+    assert [e["summary"]["self_reviewed"] for e in events] == [False, False]
+
+
+def test_FR_KB_030_self_review_is_allowed_when_no_one_else_holds_the_permission(
+    api: Any, admin_engine: Engine, fake: Any
+) -> None:
+    """The exception: when no OTHER active member of the school holds
+    ``kb.verified_answer.manage`` (a suspended or expired holder does not count), the drafter
+    may review their own answer, and ``kb.verified_answer.reviewed`` carries
+    ``self_reviewed: true``."""
+    import datetime as dt
+
+    school = W.School(W.provision_school())
+    school.people["owner"] = W.add_member(admin_engine, school.tenant_id, ["owner"])
+    principal = W.add_member(admin_engine, school.tenant_id, ["principal"])
+    W.add_member(admin_engine, school.tenant_id, ["office_admin"], status="suspended")
+    expired = W.add_member(
+        admin_engine,
+        school.tenant_id,
+        ["office_admin"],
+        expires_at=dt.datetime.now(dt.UTC) + dt.timedelta(minutes=1),
+    )
+    with admin_engine.begin() as c:  # a time-bound membership that has ended
+        c.execute(
+            text(
+                "UPDATE core.memberships SET created_at = now() - interval '2 days', "
+                "expires_at = now() - interval '1 day' WHERE id = :m"
+            ),
+            {"m": expired.membership_id},
+        )
+    doc = K.text_document(admin_engine, school, SPORTS, title="Sports day", acl=ALL_ROLES)[0]
+    K.enable_ai(admin_engine, school.tenant_id)
+    vid = _vid(_verified(api, principal, doc, "held on 28/11/2026"))
+    _set_status(admin_engine, vid, "needs_review")
+    own = _manage(api, principal, vid, "review", 2)
+    assert own.status_code == 200, own.text
+    assert _review_events(admin_engine, school.tenant_id, vid)[0]["summary"]["self_reviewed"]
+
+
 def test_FR_KB_030_review_rechecks_citations_against_the_current_version(
     world: Any, api: Any, admin_engine: Engine, docs: dict[str, uuid.UUID], fake: Any
 ) -> None:
@@ -922,7 +1084,7 @@ def test_FR_KB_030_review_rechecks_citations_against_the_current_version(
     vid = _vid(_verified(api, principal, docs["sports"], "held on 28/11/2026"))
     bad = _manage(
         api,
-        principal,
+        world.person("office_admin"),  # not the drafter (owner decision 2026-10-09)
         vid,
         "review",
         1,
@@ -985,3 +1147,59 @@ def test_FR_KB_030_active_verified_answers_are_searched_first_and_only_where_vis
     fake.sent.clear()
     K.ask(api, world.b.people["owner"], question)
     assert source not in str(fake.sent)
+
+
+YAK = "The Yak committee meets on 05/12/2026 in room Y7 to plan the annual day."
+
+
+def test_invariant_8_an_unfinished_answer_is_withheld_once_its_sources_are_not_visible(
+    world: Any, api: Any, admin_engine: Engine, docs: dict[str, uuid.UUID]
+) -> None:
+    """A stream that ends early (the person left: ``cancelled``) keeps the unchecked preview
+    and no citations. History must still re-check what that preview was written from, so it
+    never shows a document the person can no longer see (invariant 8)."""
+    who = W.add_member(admin_engine, world.a.tenant_id, ["office_staff"])
+    doc, _ = K.text_document(
+        admin_engine,
+        world.a,
+        YAK,
+        title="Yak committee",
+        acl=[("membership", str(who.membership_id))],
+    )
+    _install(transport=LongAnswerTransport())
+    try:
+        stream = _start(
+            K.SW.ctx_for(world.a.tenant_id, who, "office_staff"),
+            "When does the Yak committee meet?",
+        )
+        event = next(stream)
+        while event.event != "delta":
+            event = next(stream)
+        for _ in range(3):  # a little more of the preview reaches the screen
+            next(stream)
+        stream.close()
+    finally:
+        composition.set_runtime(None)
+    row = _query_row(admin_engine, str(stream.query_id))
+    assert row["status"] == "cancelled"
+    assert any(str(doc) in r["source"] for r in row["retrieved"])
+    cid = str(row["conversation_id"])
+    before = api.call(who, "GET", f"/api/v1/knowledge/conversations/{cid}").json()
+    assert before["messages"][0]["answer_withheld"] is False  # still visible: kept as shown
+
+    with admin_engine.begin() as c:  # access withdrawn
+        c.execute(text("DELETE FROM kb.document_acl WHERE document_id = :d"), {"d": doc})
+        c.execute(
+            text(
+                "INSERT INTO kb.document_acl (tenant_id, document_id, principal_type, "
+                "principal_ref) VALUES (:t, :d, 'role', 'owner')"
+            ),
+            {"t": world.a.tenant_id, "d": doc},
+        )
+    K.pipeline().refresh_acl(world.a.tenant_id, doc)
+    message = api.call(who, "GET", f"/api/v1/knowledge/conversations/{cid}").json()["messages"][0]
+    assert message["answer"] is None
+    assert message["answer_withheld"] is True
+    assert message["followups"] == []
+    assert "Y7" not in str(message)
+    assert "05/12/2026" not in str(message)

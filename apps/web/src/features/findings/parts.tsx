@@ -14,6 +14,7 @@ export const severityTone: Record<Severity, BadgeTone> = {
 export const findingStatusTone: Record<FindingStatus, BadgeTone> = {
   open: "warning",
   reopened: "danger",
+  needs_confirmation: "warning",
   resolved: "success",
   waived: "neutral",
 };
@@ -57,7 +58,7 @@ export function FindingStatusBadge({ status }: { status: FindingStatus }) {
 export function SourceChip({ source }: { source: string }) {
   const t = useTranslations("findings.sources");
   return (
-    <span className="inline-flex items-center rounded-full border border-border-soft bg-surface-muted px-2 py-0.5 text-xs font-medium whitespace-nowrap text-ink">
+    <span className="inline-flex items-center rounded-full border border-border-soft bg-surface-muted px-2 py-0.5 text-xs font-semibold whitespace-nowrap text-ink">
       {isSourceKey(source) ? t(source) : source}
     </span>
   );

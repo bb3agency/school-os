@@ -77,6 +77,7 @@ Format: **US-ID · As a … I want … so that …** followed by acceptance crit
 - AC1: Given I hold `user.manage`, when I invite a user with role `class_teacher` scoped to sections 9A and 9B, then they can see only students enrolled in 9A/9B.
 - AC2: Given I lack `role.assign`, then role controls are hidden and the API returns 403.
 - AC3: Every invite, role change and deactivation creates an audit event showing who did what, when.
+- AC-DL09: An invitation to someone who already has a SchoolOS account is never accepted at sign-in: they accept or decline it themselves (both audited), and the inviting school sees no email until they accept and cannot activate it by hand (owner decision 2026-10-04, ADR-0023 amendment).
 
 **US-103** · As a principal, I want to approve temporary support access so that the vendor can help without standing access. [FR-OPS-004]
 - AC1: A support request shows reason, scope and duration (max 8 hours).
@@ -100,13 +101,16 @@ Format: **US-ID · As a … I want … so that …** followed by acceptance crit
 - AC1: A student's name shows the admission-register value, the Aadhaar-as-printed value, the UDISE+ value and the board value side by side, each with who recorded it, when, and evidence.
 - AC2: The canonical value for identity fields is the verified admission-register value (BR-01), visibly labelled.
 - AC3: Sensitive fields (health, category, income, guardian phone/address) are hidden unless I hold `student.read_sensitive`.
+- AC4: The APAAR ID and the UDISE+ PEN show with their source (UDISE+, parent form or entered by the office) and a verified/unverified badge; an APAAR ID counts only after someone verifies it against the portal or the APAAR card. A wrong one is corrected by recording the right value from its source and verifying it (history kept); they are not identity fields, so no change request is needed (ADR-0037). [FR-STU-013..015]
 
 **US-302** · As staff, I want to find a student by partial name, admission number, class or parent name in English or Telugu. [FR-STU-010]
 - AC1: "venkat sai 9b" finds "VENKATA SAI K." in 9B; Telugu script queries find transliterated matches.
-- AC2: Results respect my scope.
+- AC2: Results respect my scope. Class teachers and teachers find only students in their classes or sections this academic year, also when they look at an earlier year; last year's class is out of their reach (owner decision 2026-10-09). School-wide staff find students of every year.
+- AC3: I can find a student by the exact APAAR ID (12 digits, with or without spaces) using a separate "APAAR ID" search option. It matches only the student's recorded or verified APAAR ID (not a rejected or replaced one, not other fields), within my scope; the number is never written to logs. [FR-STU-016, ADR-0037]
 
 **US-303** · As staff, I never want to enter an Aadhaar number by mistake. [FR-STU-012, BR-02]
 - AC1: Aadhaar input accepts only the last 4 digits and as-printed fields; pasting 12 digits is rejected with an explanation.
+- AC2: The APAAR ID field is the one place a 12-digit number is accepted: it is stored only as the APAAR ID and never as, or compared with, an Aadhaar number. Everywhere else (including the free-text search box) 12 digits that look like an Aadhaar number are still refused; only the separate APAAR ID search option (US-302 AC3) takes 12 digits. [FR-STU-015, FR-STU-016, ADR-0037]
 
 ### C4 · Onboarding & import
 
@@ -134,6 +138,7 @@ Format: **US-ID · As a … I want … so that …** followed by acceptance crit
 
 **US-502** · As an office admin, I want to resolve or waive findings with a reason so that the list stays actionable. [FR-DQ-020..024]
 - AC1: Resolving requires linking a change request or a note; waiving requires `dq.findings.waive` and a reason; both are audited.
+- AC1a: A blocker (it stops certificates and submissions) closes when the change request that corrects the record is approved. Resolving or accepting it by hand needs `dq.findings.waive` and a fresh MFA sign-in (403 `blocker_needs_waive`, 428 otherwise); the app hides "Resolve" on a blocker from anyone else and says who can. So a clerk cannot resolve a blocker with a note and then print a certificate from the mismatched record (FR-CERT-002; owner decision 2026-10-04, audit DL-06).
 - AC2: Re-running the check reopens a finding if the underlying conflict returns.
 
 ### C6 · Change requests (maker-checker)
@@ -164,6 +169,7 @@ Format: **US-ID · As a … I want … so that …** followed by acceptance crit
 
 **US-802** · As a principal, I want to save a checked answer as a "verified answer" so that everyone gets the same reliable response. [FR-KB-030..032]
 - AC1: Verified answers show who verified them and when; they are re-reviewed when source documents change.
+- AC2: The person who wrote a verified answer cannot also confirm it on review; another staff member who manages verified answers must. If nobody else in the school can, the writer may, and the audit log marks it as self-reviewed (owner decision 2026-10-09).
 
 **US-803** · As a class teacher, I must not be able to learn about students outside my sections through the assistant. [FR-KB-010, BR-06]
 - AC1: Asking about a student in another section returns "not found in records you can access".
@@ -173,6 +179,7 @@ Format: **US-ID · As a … I want … so that …** followed by acceptance crit
 **US-901** · As an exam coordinator, I want export profiles per board/portal and year so that formats stay correct when they change. [FR-EXP-001..006]
 - AC1: Profiles (e.g., `cisce-registration-2026`, `udise-plus-2026-27`) define required fields, field order, formats and validation rules.
 - AC2: Exports record who generated them, when, and which students; they are watermarked "Generated by SchoolOS for internal checking".
+- AC3: The UDISE+ pre-check "ready to enter" sheet has PEN and APAAR ID columns (empty when unknown); the APAAR ID column is printed in full, every other cell still masks Aadhaar-like numbers. [FR-EXP-005]
 
 ### C10 · Audit
 
@@ -326,7 +333,7 @@ Operators are SchoolOS staff with platform roles (16 §2, §6). None of these st
 - AC2: A circular marked personal (C2) or restricted (C3) cannot be used for a notice; free text with phone numbers, email addresses or Aadhaar-like numbers is refused with a message saying what to remove.
 - AC3: If AI is unavailable, an empty draft opens so I can write the notice myself.
 
-**US-1606** · As a principal, I want to approve a notice and then copy its text or download it as a printable A4 page or an image. [FR-NOTICE-005, FR-NOTICE-006] *(Proposed from the roadmap scope; PO to confirm.)*
+**US-1606** · As a principal, I want to approve a notice and then copy its text or download it as a printable A4 page or an image. A principal may approve a notice they drafted themselves; the audit log marks it as self-approved. [FR-NOTICE-005, FR-NOTICE-006] *(Proposed from the roadmap scope; PO to confirm.)*
 - AC1: Only holders of `notice.approve` can approve; both languages must be filled; an approved notice cannot be edited.
 - AC2: After approval the A4 PDF and a PNG image are rendered (Telugu without clipped glyphs); download links last at most 5 minutes and every download is audited; the plain text can be copied for WhatsApp-style groups. *(Telugu part deferred: hidden while `SOS_TELUGU_ENABLED` is off, ADR-0036.)*
 - AC3: SchoolOS never sends the notice to parents itself (no parent logins or messaging in core, §9).
@@ -397,7 +404,7 @@ Purpose limit (08 §4): these features exist only for the school's educational a
 **US-1801** · As the owner, I want to connect the office PC that runs Tally with a one-time code, so that only that PC can send our Tally figures. [FR-TALLY-001, FR-TALLY-002, FR-TALLY-003] *(Proposed from the roadmap scope; PO to confirm.)*
 - AC1: Given I signed in with MFA recently, when I choose "Add an agent" and name the PC, then SchoolOS shows a one-time code once, with the command to run on the PC and the time it expires (30 minutes); only a hash of the code is kept.
 - AC2: When the agent is enrolled with the code, then the code cannot be used again, the PC appears in the agent list with its version and Tally product, and the event is in the audit log.
-- AC3: A wrong, used or expired code is refused without saying which; after 10 attempts in an hour further attempts are refused; a school has at most 2 active agents.
+- AC3: A wrong, used or expired code is refused without saying which; after 10 wrong codes in an hour from one address (or 50 from all addresses) further attempts are refused, so an outsider cannot lock the office PC out (AA-15); a school that is not active cannot enrol; a school has at most 2 active agents.
 - AC4: The agent only reads from Tally on the same PC and only sends to SchoolOS over HTTPS; nothing personal is written to the PC's disk.
 
 **US-1802** · As the owner, I want to see whether the agent is syncing and revoke it when the PC is replaced or lost. [FR-TALLY-002, FR-TALLY-009] *(Proposed from the roadmap scope; PO to confirm.)*
@@ -432,14 +439,16 @@ Purpose limit (08 §4): these features exist only for the school's educational a
 | DQ-006 | Name format invalid for export profile (length, characters) | blocker | "{profile} does not accept {issue}." |
 | DQ-007 | Age implausible for class (configurable bands) | medium | "Age {n} is unusual for class {c}. Check DOB." |
 | DQ-008 | Possible duplicate student (same name+DOB+parent) | high | "Possible duplicate of {student}." |
-| DQ-009 | Aadhaar last 4 digits / as-printed fields missing where APAAR is needed | medium | "Aadhaar details needed to generate APAAR." |
+| DQ-009 | Aadhaar last 4 digits / as-printed fields missing where APAAR is needed, for a student without a verified APAAR ID | medium | "Aadhaar details needed to generate APAAR." |
 | DQ-010 | Board registration value differs from register | high | "Board record differs from admission register." |
 | DQ-011 | UDISE+ value differs from register | medium | "UDISE+ differs from admission register." |
 | DQ-012 | Enrolment gaps (student active in two sections/years) | high | "Student is enrolled twice." |
+| DQ-021 | APAAR ID not 12 digits, or one APAAR ID on two students of the school (FR-DQ-021; the second case reads "Same APAAR ID as {student}. One of them is wrong.") | blocker | "The APAAR ID is not 12 digits." |
+| DQ-022 | UDISE+ name, date of birth or gender differs from Aadhaar-as-printed, for a student without a verified APAAR ID (FR-DQ-022) | high | "UDISE+ details differ from Aadhaar. APAAR generation will fail until these match." |
 
 Every finding stores: rule, severity, attribute, sources compared, masked values, match class, explanation (EN; TE deferred per ADR-0036), suggested route, status (`open`, `resolved`, `waived`, `reopened`), resolver, timestamps.
 
-**Suggested routes** (text shown to users): "Correct the school record (change request + evidence)", "Parent should correct Aadhaar with UIDAI", "Update UDISE+ after correcting the school record", "Raise a correction request on the board portal".
+**Suggested routes** (text shown to users): "Correct the school record (change request + evidence)", "Parent should correct Aadhaar with UIDAI", "Update UDISE+ after correcting the school record", "Raise a correction request on the board portal", "Check the APAAR ID on the UDISE+ portal or the APAAR card, then record and verify the right one".
 
 ## 6. Name-matching specification (AP naming conventions)
 

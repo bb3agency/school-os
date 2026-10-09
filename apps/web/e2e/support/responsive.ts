@@ -5,7 +5,7 @@
  * and no clipped content at 1366×768 and 375×812, touch targets of at least 24px (WCAG 2.2
  * 2.5.8), card gutters on phones. Synthetic data only (stand-in API + audit fixtures).
  */
-import type { Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 /** The two viewports every screen must pass: the office PC and a phone. */
 export const REQUIRED_VIEWPORTS: ReadonlyArray<readonly [number, number]> = [
@@ -17,6 +17,8 @@ export const LOCALES = ["en", "te"] as const;
 
 const T1 = "0192f3a4-0000-7000-8000-000000000001";
 const T3 = "0192f3a4-0000-7000-8000-000000000003";
+/** A paid invoice with two payments, one reversed (layout-fixtures `invoicePayments`). */
+const INVOICE = "0192f3a4-0000-7000-8000-0000000c2002";
 const STUDENT = "0192f3a4-0000-7000-8000-00000000e501";
 const FINDING = "0192f3a4-0000-7000-8000-0000000f1001";
 const YEAR = "0192f3a4-0000-7000-8000-0000000000a1";
@@ -128,6 +130,7 @@ export const SCREEN_GROUPS: Record<string, ScreenGroup> = {
       "/platform/plans",
       "/platform/subscriptions",
       "/platform/invoices",
+      `/platform/invoices/${INVOICE}`,
       "/platform/usage",
       "/platform/fleet",
       "/platform/flags",
@@ -254,8 +257,12 @@ export function detectLayout({ vw }: { vw: number }): LayoutReport {
         reportedVp.add(el);
       }
     }
-    let card: Element | null = el.parentElement;
-    while (card && !isCard(card)) card = card.parentElement;
+    // A modal dialog sits in the top layer, not in the card that holds its trigger: its own
+    // box is measured against the screen and its content against the dialog (or cards inside
+    // it), never against a card outside it (docs/17 §5.7: phone dialogs are full-width sheets).
+    let card: Element | null = el.tagName === "DIALOG" ? null : el.parentElement;
+    while (card && !isCard(card) && card.tagName !== "DIALOG") card = card.parentElement;
+    if (card?.tagName === "DIALOG" && !isCard(card)) card = null;
     // A framed scroll region (TableScroll) is its own card: what it scrolls may be wider.
     if (card && !/(auto|scroll)/.test(getComputedStyle(card).overflowX)) {
       const cr = card.getBoundingClientRect();
@@ -342,4 +349,63 @@ export function detectLayout({ vw }: { vw: number }): LayoutReport {
 export async function measure(page: Page): Promise<LayoutReport> {
   const width = page.viewportSize()?.width ?? 1366;
   return page.evaluate(detectLayout, { vw: width });
+}
+
+/**
+ * docs/17 §5.7: below 640px a dialog is a bottom sheet: the full width, on the bottom edge
+ * (after its short rise, which reduced motion skips), never taller than the screen, and every
+ * action in its footer on screen without scrolling.
+ */
+export async function expectBottomSheet(
+  dialog: Locator,
+  width: number,
+  height: number,
+): Promise<void> {
+  await expect
+    .poll(async () => {
+      const box = await dialog.boundingBox();
+      return box ? Math.round(box.y + box.height) : -1;
+    })
+    .toBe(height);
+  const box = await dialog.boundingBox();
+  expect(box).not.toBeNull();
+  expect(Math.round(box!.x)).toBe(0);
+  expect(Math.round(box!.width)).toBe(width);
+  expect(box!.y).toBeGreaterThanOrEqual(0);
+  const actions = dialog.locator(".dialog-footer button:visible");
+  const count = await actions.count();
+  expect(count, "the sheet keeps its actions in a footer").toBeGreaterThan(0);
+  for (let i = 0; i < count; i += 1) {
+    const action = await actions.nth(i).boundingBox();
+    expect(action).not.toBeNull();
+    expect(action!.y).toBeGreaterThanOrEqual(0);
+    expect(action!.y + action!.height).toBeLessThanOrEqual(height + 0.5);
+  }
+}
+
+/**
+ * Primary controls on a touch screen (docs/17 §5.7): buttons (`.pressable`), text fields,
+ * selects and tabs at least 44×44 CSS px under (pointer: coarse); checkboxes and radios count
+ * by their label. Runs in the browser (self-contained for page.evaluate).
+ */
+export function smallTouchTargets(): string[] {
+  const out: string[] = [];
+  const SELECTOR =
+    ".pressable, input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not(.sr-only), " +
+    "select, textarea, [role=tab], label:has(> input:is([type=checkbox], [type=radio]))";
+  for (const el of Array.from(document.querySelectorAll(SELECTOR))) {
+    if (el.closest("[hidden], dialog:not([open]), .sr-only, [aria-hidden='true'], nextjs-portal"))
+      continue;
+    const s = getComputedStyle(el);
+    if (s.display === "none" || s.visibility === "hidden") continue;
+    const r = el.getBoundingClientRect();
+    if (r.width <= 1 && r.height <= 1) continue;
+    if (r.height < 43.5 || r.width < 43.5) {
+      const text = (el.textContent || el.getAttribute("aria-label") || "").trim().slice(0, 40);
+      out.push(
+        `${Math.round(r.width)}x${Math.round(r.height)} ${el.tagName.toLowerCase()} "${text}"`,
+      );
+    }
+  }
+  return out;
 }

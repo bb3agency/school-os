@@ -38,7 +38,7 @@ export type Scope = Schemas["ScopeOut"];
 export type TenantRole = Schemas["RoleOut"];
 /** Audit event; `summary` is an object of IDs, field names, counts and codes (no PII). */
 export type AuditEvent = Schemas["AuditEventOut"];
-export type AuditVerify = Schemas["app__audit__viewer__AuditVerifyOut"];
+export type AuditVerify = Schemas["AuditVerificationOut"];
 export type Me = Schemas["app__identity__schemas__MeOut"];
 export type TenantProfile = Schemas["TenantOut"];
 export type SchoolChoice = Schemas["SchoolChoiceOut"];
@@ -46,6 +46,7 @@ export type SchoolChoices = Schemas["SchoolChoicesOut"];
 export type AcceptedInvitations = Schemas["AcceptedInvitationsOut"];
 /** GET /tenant/billing via core.current_subscription() (FR-PLT-030). */
 export type TenantBilling = Schemas["TenantBillingOut"];
+export type SchoolAiBundle = Schemas["SchoolAiBundle"];
 export type UsageAgainstLimit = Schemas["UsageAgainstLimit"];
 export type TenantInvoice = Schemas["TenantInvoice"];
 export type AnnouncementBrief = Schemas["AnnouncementBrief"];
@@ -81,6 +82,7 @@ export type PlanInput = Schemas["PlanIn"];
 export type PlanPatch = Schemas["PlanPatch"];
 export type PlanLimits = Schemas["PlanLimits"];
 export type PlanStatus = Plan["status"];
+export type AiBundle = Schemas["AiBundleOut"];
 export type Subscription = Schemas["SubscriptionOut"];
 export type SubscriptionStatus = Subscription["status"];
 export type Invoice = Schemas["InvoiceOut"];
@@ -107,12 +109,12 @@ export type OperatorInvite = Schemas["OperatorInvite"];
 export type PlatformRole = Operator["roles"][number];
 export type PersonStatus = Operator["status"];
 export type PlatformAuditEvent = Schemas["PlatformAuditEventOut"];
-export type PlatformAuditVerify = Schemas["app__platform__schemas__AuditVerifyOut"];
+export type PlatformAuditVerify = Schemas["AuditVerifyOut"];
 
 /* Status strings the API documents as `string` (values from the 0005_platform CHECKs). */
 export type DeploymentStatus =
   "provisioning" | "healthy" | "degraded" | "unreachable" | "decommissioned";
-export type AnnouncementStatus = "draft" | "scheduled" | "cancelled";
+export type AnnouncementStatus = "draft" | "pending_approval" | "scheduled" | "cancelled";
 export type BreakGlassStatus =
   "requested" | "approved" | "active" | "expired" | "revoked" | "denied";
 

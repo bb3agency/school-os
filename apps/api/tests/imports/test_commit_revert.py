@@ -387,6 +387,63 @@ def test_FR_IMP_005_revert_refreshes_the_profile_of_students_whose_values_are_wi
     }
 
 
+def _tally_support() -> Any:
+    import importlib.util
+    from pathlib import Path
+
+    name = "sos_test_tally_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "tally" / "support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+def test_FR_IMP_005_revert_refused_when_a_tally_party_is_linked_to_an_imported_student(
+    world: Any, admin_engine: Engine
+) -> None:
+    """A person linked a Tally ledger to a student the import created: the revert used to drop
+    the link silently (ON DELETE CASCADE). It is refused instead and the link stays (audit
+    2026-10-05 hardening "Tally"; migration 0049)."""
+    rows, numbers = S.class_list(1)
+    batch_id = S.imported(admin_engine, world.a, S.xlsx_bytes(rows))
+    sid = S.student_by_adm(admin_engine, world.a.tenant_id, numbers[0])
+    assert sid is not None
+    owner = world.a.people["owner"].user_id
+    tally = _tally_support()
+    party = tally.seed_party(
+        admin_engine, world.a.tenant_id, owner, ledger=f"Synthetic Revert Ledger {uuid.uuid4().hex}"
+    )
+    with admin_engine.begin() as c:
+        # The agent that synced the ledger is revoked so the school's agent cap is untouched.
+        c.execute(
+            text(
+                "UPDATE ops.tally_devices SET status = 'revoked', revoked_at = now(), "
+                "key_id = NULL, key_ciphertext = NULL WHERE id = (SELECT s.device_id FROM "
+                "ops.tally_syncs s JOIN ops.tally_parties p ON p.tenant_id = s.tenant_id "
+                "AND p.last_sync_id = s.id WHERE p.id = :p)"
+            ),
+            {"p": party},
+        )
+    tally.seed_link(admin_engine, world.a.tenant_id, party, sid, owner)
+    with pytest.raises(Conflict) as err:
+        _revert(world.a, batch_id)
+    assert err.value.code == "import_has_dependents"
+    assert _students_with(admin_engine, world.a.tenant_id, numbers) == 1
+    assert S.batch(admin_engine, batch_id)["status"] == "committed"
+    links = S.count(
+        admin_engine,
+        "SELECT count(*) FROM ops.tally_party_links WHERE tenant_id = :t AND student_id = :s",
+        t=world.a.tenant_id,
+        s=sid,
+    )
+    assert links == 1
+
+
 def test_FR_IMP_005_imports_never_write_student_record_tables_directly() -> None:
     """Module ownership (CLAUDE.md §4): the revert goes through students.service."""
     from pathlib import Path

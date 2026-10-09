@@ -283,6 +283,60 @@ variable "operator_secret_env" {
   }
 }
 
+variable "anthropic_zdr_confirmed" {
+  description = "SOS_ANTHROPIC_ZDR_CONFIRMED: true only once the Anthropic Zero Data Retention agreement and DPA are signed. Without it the api and workers refuse to start while a models.yaml role uses provider anthropic (docs/10 §11)."
+  type        = bool
+  default     = false
+}
+
+# --- Public marketing site (docs/17 §5.6; web task only, not secrets) -----------------------
+# Empty (the default) hides the part of the page that needs the value. The web app ignores an
+# invalid value too; these validations catch a typo at plan time instead.
+
+variable "public_contact_email" {
+  description = "SOS_PUBLIC_CONTACT_EMAIL: the \"Talk to us\" mailto address; empty = hidden."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.public_contact_email == "" || (length(var.public_contact_email) <= 254 && can(regex("^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)+$", var.public_contact_email)))
+    error_message = "public_contact_email must be a plain address (one @, no spaces, ? or ,), at most 254 characters, or empty."
+  }
+}
+
+variable "public_company_name" {
+  description = "SOS_PUBLIC_COMPANY_NAME: name in the footer and on the About page; empty = hidden."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = length(trimspace(var.public_company_name)) <= 200
+    error_message = "public_company_name must be at most 200 characters."
+  }
+}
+
+variable "public_company_address" {
+  description = "SOS_PUBLIC_COMPANY_ADDRESS: postal address on the About page, lines separated by |; empty = hidden."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = length(trimspace(var.public_company_address)) <= 200
+    error_message = "public_company_address must be at most 200 characters."
+  }
+}
+
+variable "public_whatsapp_number" {
+  description = "SOS_PUBLIC_WHATSAPP_NUMBER: the \"Ask on WhatsApp\" number, e.g. +91 then the number; empty = hidden."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.public_whatsapp_number == "" || can(regex("^\\+?[1-9][0-9]{7,14}$", var.public_whatsapp_number))
+    error_message = "public_whatsapp_number must be an international number: optional +, a country code not starting with 0, 8 to 15 digits in all, no spaces or dashes (or empty)."
+  }
+}
+
 variable "log_level" {
   description = "SOS_LOG_LEVEL."
   type        = string
@@ -487,9 +541,15 @@ variable "create_plan_role" {
 }
 
 variable "plan_can_read_secrets" {
-  description = "PR plan role may refresh secret versions (staging only)."
+  description = "Plan role may refresh secret versions (staging only, and only with github_plan_environment; audit W3-04)."
   type        = bool
   default     = false
+}
+
+variable "github_plan_environment" {
+  description = "GitHub Environment (required reviewers) that gates the plan role. Null = every same-repo pull request and main, without secrets."
+  type        = string
+  default     = null
 }
 
 variable "create_apply_role" {

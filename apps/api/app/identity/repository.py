@@ -101,20 +101,74 @@ def resolve_login(
 
 
 def accept_invitations(
-    session: Session, subject: str
+    session: Session, subject: str, *, issuer: str
 ) -> list[tuple[uuid.UUID, uuid.UUID, uuid.UUID]]:
-    """Activate the subject's own pending invitations (ADR-0019, ``core.accept_invitations``).
+    """Sign-in acceptance (ADR-0019, ``core.accept_invitations``): only a brand-new account's
+    only invitation, for the identity ``(issuer, subject)`` (DL-09, ADR-0023).
 
     Returns (tenant_id, membership_id, user_id) for each accepted membership.
     """
     rows = session.execute(
-        text("SELECT tenant_id, membership_id, user_id FROM core.accept_invitations(:s)"),
-        {"s": subject},
+        text("SELECT tenant_id, membership_id, user_id FROM core.accept_invitations(:s, :i)"),
+        {"s": subject, "i": _issuer(issuer)},
     ).all()
     return [
         (uuid.UUID(str(r.tenant_id)), uuid.UUID(str(r.membership_id)), uuid.UUID(str(r.user_id)))
         for r in rows
     ]
+
+
+@dataclass(frozen=True, slots=True)
+class PendingInvitation:
+    tenant_id: uuid.UUID
+    membership_id: uuid.UUID
+    school_name: str
+    role_keys: tuple[str, ...]
+    invited_at: dt.datetime
+    expires_at: dt.datetime
+
+
+def pending_invitations(session: Session, subject: str, *, issuer: str) -> list[PendingInvitation]:
+    """The identity's own open invitations (``core.pending_invitations``, DL-09)."""
+    rows = session.execute(
+        text(
+            "SELECT tenant_id, membership_id, school_name, role_keys, invited_at, expires_at "
+            "FROM core.pending_invitations(:s, :i)"
+        ),
+        {"s": subject, "i": _issuer(issuer)},
+    ).all()
+    return [
+        PendingInvitation(
+            tenant_id=uuid.UUID(str(r.tenant_id)),
+            membership_id=uuid.UUID(str(r.membership_id)),
+            school_name=str(r.school_name),
+            role_keys=tuple(str(k) for k in (r.role_keys or ())),
+            invited_at=r.invited_at,
+            expires_at=r.expires_at,
+        )
+        for r in rows
+    ]
+
+
+def respond_to_invitation(
+    session: Session, subject: str, *, issuer: str, membership_id: uuid.UUID, accept: bool
+) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID] | None:
+    """Accept or decline one of the identity's own open invitations
+    (``core.respond_to_invitation``, DL-09). ``None`` when there is no such open invitation."""
+    row = session.execute(
+        text(
+            "SELECT tenant_id, membership_id, user_id "
+            "FROM core.respond_to_invitation(:s, :i, :m, :a)"
+        ),
+        {"s": subject, "i": _issuer(issuer), "m": membership_id, "a": accept},
+    ).one_or_none()
+    if row is None:
+        return None
+    return (
+        uuid.UUID(str(row.tenant_id)),
+        uuid.UUID(str(row.membership_id)),
+        uuid.UUID(str(row.user_id)),
+    )
 
 
 def find_user_id_by_subject(session: Session, subject: str, *, issuer: str) -> uuid.UUID | None:
@@ -261,6 +315,7 @@ def create_membership(
     expires_at: dt.datetime | None = None,
     created_by: uuid.UUID | None = None,
     mfa_required: bool = False,
+    invited_display_name: str | None = None,
 ) -> Membership:
     """Link a user to the current tenant. Audit: ``membership.created``.
 
@@ -277,6 +332,7 @@ def create_membership(
             expires_at=expires_at,
             created_by=created_by,
             mfa_required=mfa_required,
+            invited_display_name=invited_display_name,
         )
         .returning(Membership),
         execution_options={"populate_existing": True},
@@ -318,6 +374,44 @@ def set_membership_window(
         execution_options={"populate_existing": True, "synchronize_session": False},
     ).one_or_none()
     if membership is None:
+        raise NotFound("Membership not found")
+    return membership
+
+
+def set_membership_expiry(
+    session: Session, membership_id: uuid.UUID, *, expires_at: dt.datetime
+) -> Membership:
+    """Set a membership's expiry (a time-bound role given later, docs/07 §6.2).
+
+    Audit: ``membership.expiry_set``.
+    """
+    membership = session.scalars(
+        update(Membership)
+        .where(Membership.id == membership_id)
+        .values(expires_at=expires_at, version=Membership.version + 1)
+        .returning(Membership),
+        execution_options={"populate_existing": True, "synchronize_session": False},
+    ).one_or_none()
+    if membership is None:
+        raise NotFound("Membership not found")
+    return membership
+
+
+def bump_membership_version(
+    session: Session, membership_id: uuid.UUID, *, expected_version: int | None
+) -> Membership:
+    """Lock the membership and move its version on before its roles or scopes are replaced, so
+    concurrent replacements serialise and a stale ``If-Match`` is refused (412)."""
+    stmt = update(Membership).where(Membership.id == membership_id)
+    if expected_version is not None:
+        stmt = stmt.where(Membership.version == expected_version)
+    membership = session.scalars(
+        stmt.values(version=Membership.version + 1).returning(Membership),
+        execution_options={"populate_existing": True, "synchronize_session": False},
+    ).one_or_none()
+    if membership is None:
+        if expected_version is not None:
+            raise PreconditionFailed("This user was changed by someone else. Reload and try again.")
         raise NotFound("Membership not found")
     return membership
 

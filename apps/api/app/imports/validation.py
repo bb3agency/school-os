@@ -47,6 +47,7 @@ MIN_DATE: Final = dt.date(1900, 1, 1)
 _EXPLICIT_PHONE_RE: Final = re.compile(r"\+91[ \u00a0-]?[6-9][0-9]{4}[ \u00a0-]?[0-9]{5}")
 _MASKED_LAST4_RE: Final = re.compile(r"^(?:[Xx*•]{4}[\s-]?){2}(\d{4})$")
 _TWELVE_DIGITS_RE: Final = re.compile(r"^\d{4}[\s-]?\d{4}[\s-]?\d{4}$")
+_DIGITS12_RE: Final = re.compile(r"[0-9]{4}[ -]?[0-9]{4}[ -]?[0-9]{4}")
 
 RowStatus = Literal["valid", "error"]
 Action = Literal["create", "update"]
@@ -118,6 +119,9 @@ class ValidationContext:
     existing: Mapping[str, ExistingStudent]  # key: admission_key(admission number)
     config: ImportConfig
     today: dt.date
+    # A-10: writing a C3 value to an EXISTING student needs student.read_sensitive (import.commit
+    # includes updates of non-sensitive values; docs/07 §6.2). Fails closed when not given.
+    can_update_sensitive: bool = False
 
     @property
     def creates(self) -> bool:
@@ -318,6 +322,13 @@ class _RowValidator:
             if re.fullmatch(r"[0-9]{4}", text) is None:
                 result.errors.append(issue(key, "digits4_required", AADHAAR_MESSAGE_KEY))
                 return None
+        if spec.data_type == "digits12":
+            # APAAR ID (ADR-0037, FR-STU-015): 12 ASCII digits, groups of 4 allowed. A number
+            # passing Verhoeff never gets here: the row scan refused the cell (invariant 4).
+            if _DIGITS12_RE.fullmatch(text) is None:
+                result.errors.append(issue(key, "digits12_required"))
+                return None
+            return re.sub(r"[ -]", "", text)
         pattern = self.patterns.get(key)
         if pattern is not None and pattern.fullmatch(text) is None:
             result.errors.append(issue(key, "invalid_format"))
@@ -438,6 +449,11 @@ class _RowValidator:
     def _update_row(self, existing: ExistingStudent, result: RowResult) -> None:
         result.action = "update"
         result.student_id = existing.id
+        if not self.ctx.can_update_sensitive:
+            for key in result.values:
+                spec = self.ctx.specs.get(key)
+                if spec is not None and spec.sensitive:
+                    result.errors.append(issue(key, "sensitive_update_not_permitted"))
         if self.ctx.source == ANCHOR_SOURCE:
             for key, value in result.values.items():
                 spec = self.ctx.specs[key]

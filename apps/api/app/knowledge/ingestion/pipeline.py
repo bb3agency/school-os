@@ -42,6 +42,7 @@ from app.knowledge.chunking import StructureChunker, count_tokens
 from app.knowledge.config.chunking import ChunkingConfig, load_chunking_config
 from app.knowledge.contextual import rules as contextual_rules
 from app.knowledge.domain import Chunk, DocumentContext
+from app.knowledge.embeddings import content_sha256, embedding_input
 from app.knowledge.ingestion.clean import clean_document
 from app.knowledge.ingestion.contextual import ChunkContextualizer, DocumentInput
 from app.knowledge.ingestion.extract import ExtractionFailed, extract_pages
@@ -55,6 +56,7 @@ from app.knowledge.ingestion.ports import (
     DocumentFacts,
     DocumentNotReady,
     DocumentSource,
+    EmbeddingEraser,
     IndexedChunk,
     StoredContext,
     VersionFacts,
@@ -100,10 +102,7 @@ def embedding_text(chunk: Chunk, context: str = "") -> str:
     """What is embedded: header, the chunk's model-written context (contextual retrieval, docs/06
     §4.11; empty when off or not made), blank line, content. Full text indexes the same parts
     (``content_tsv`` = header + content, ``context_tsv`` = context)."""
-    head = "\n".join(p for p in (chunk.context_header, context) if p)
-    if not head:
-        return chunk.content
-    return f"{head}\n\n{chunk.content}"
+    return embedding_input(chunk.context_header, context, chunk.content)
 
 
 def _session(tenant_id: uuid.UUID) -> AbstractContextManager[Session]:
@@ -199,6 +198,20 @@ class DocumentIngestionPipeline:
             return self._done(tenant_id, document_id, *written)
         return self._done(tenant_id, document_id, outcome, written)
 
+    def _forget(
+        self, session: Session, chunks: Sequence[Chunk], contexts: Sequence[ChunkContext]
+    ) -> None:
+        """The document was deleted, its version discarded or it may no longer be indexed
+        while this job embedded its chunks: the vectors cached for them in step 2 are deleted
+        too, so nothing derived from it remains (docs/08 §7 erasure chain)."""
+        store = self._store
+        if not chunks or not isinstance(store, EmbeddingEraser):
+            return
+        digests = {
+            content_sha256(embedding_text(c, x.text)) for c, x in zip(chunks, contexts, strict=True)
+        }
+        store.forget_embeddings(session, self._embedder.model, sorted(digests))
+
     def _read(
         self, tenant_id: uuid.UUID, document_id: uuid.UUID, version_id: uuid.UUID
     ) -> _Read | tuple[str, int]:
@@ -237,8 +250,10 @@ class DocumentIngestionPipeline:
             fresh = self._source.document(s, tenant_id, document_id)
             current = fresh.version(version_id) if fresh is not None else None
             if fresh is None or current is None or current.status != "ready":
+                self._forget(s, chunks, contexts)
                 return MISSING, 0
             if not self._eligible(fresh):
+                self._forget(s, chunks, contexts)
                 return EXCLUDED, self._store.delete_document(s, document_id)
             archived = fresh.status == "archived"
             is_latest = fresh.current_version_id == version_id and not archived

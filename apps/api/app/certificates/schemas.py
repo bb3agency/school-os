@@ -64,7 +64,16 @@ class DuplicateRequest(_In):
     reason: Note
 
 
+# SHA-256 (lowercase hex) of the draft the approver read (``CertificateOut.draft_sha256``).
+DraftSha256 = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
+
+
 class ApproveIn(_In):
+    """``draft_sha256``: the ``draft_sha256`` of the certificate as the approver read it (``GET
+    /certificates/{id}``). If what the certificate would print changed since, approval is
+    refused with 409 ``certificate_draft_changed`` (audit 2026-10-05 A-11)."""
+
+    draft_sha256: DraftSha256
     note: Note | None = None
 
 
@@ -127,6 +136,7 @@ class Blocker(_Out):
         "student_not_active",
         "no_current_year",
         "transfer_certificate_exists",
+        "change_request_pending",
     ]
     attribute_key: str | None = None
     finding_id: uuid.UUID | None = None
@@ -212,6 +222,10 @@ class CertificateOut(_Out):
     document_id: uuid.UUID | None
     pdf_status: PdfStatus
     version: int
+    # A pending request read alone (GET /certificates/{id}): SHA-256 of what it would print if
+    # approved now (serial number and issue date left out); the approval sends it back. ``null``
+    # otherwise (lists, decided certificates, no current academic year).
+    draft_sha256: str | None = None
     # For the screen: what the caller may do with it now.
     can_approve: bool
     can_withdraw: bool

@@ -143,6 +143,18 @@ def lock_intent(session: Session, intent_id: uuid.UUID) -> UploadIntent | None:
     ).one_or_none()
 
 
+def get_intent(session: Session, intent_id: uuid.UUID) -> UploadIntent | None:
+    return session.scalars(select(UploadIntent).where(UploadIntent.id == intent_id)).one_or_none()
+
+
+def object_key_in_use(session: Session, object_key: str) -> bool:
+    """Whether a version of the current school points at ``object_key``."""
+    found = session.scalar(
+        select(DocumentVersion.id).where(DocumentVersion.object_key == object_key).limit(1)
+    )
+    return found is not None
+
+
 def consume_intent(session: Session, intent_id: uuid.UUID, now: dt.datetime) -> None:
     session.execute(
         update(UploadIntent)
@@ -208,6 +220,18 @@ def get_document(
     if for_update:
         stmt = stmt.with_for_update()
     return session.scalars(stmt, execution_options={"populate_existing": True}).one_or_none()
+
+
+def visible_ids(
+    session: Session, document_ids: Sequence[uuid.UUID], visibility: Visibility
+) -> set[uuid.UUID]:
+    """The ids among ``document_ids`` that ``visibility`` reaches (one query)."""
+    if not document_ids:
+        return set()
+    stmt = select(Document.id).where(
+        Document.id.in_(sorted(set(document_ids))), visible_predicate(visibility)
+    )
+    return set(session.scalars(stmt))
 
 
 def list_documents(
@@ -428,11 +452,11 @@ def export_record_tables(session: Session) -> list[RecordTable]:
     ]
 
 
-def ready_versions(session: Session) -> list[tuple[DocumentVersion, str]]:
-    """Every version that passed the malware scan (``ready``) with its document's purpose,
-    ordered by document and version."""
+def ready_versions(session: Session) -> list[tuple[DocumentVersion, Document]]:
+    """Every version that passed the malware scan (``ready``) with its document, ordered by
+    document and version."""
     stmt = (
-        select(DocumentVersion, Document.purpose)
+        select(DocumentVersion, Document)
         .join(
             Document,
             and_(

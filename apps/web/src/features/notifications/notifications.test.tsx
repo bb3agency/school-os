@@ -66,8 +66,11 @@ describe("bell polling (FR-NOT-001)", () => {
     expect(notificationHref({ resource_type: "tally_device", resource_id: id })).toBe(
       "/settings/tally",
     );
-    // announcement.new stays unlinked (owner decision: the banner shows it).
+    // A resource type with no school screen stays unlinked. Announcements are banner-only and
+    // send no notification (owner decision 2026-10-04), so "announcement" is unknown too.
     expect(notificationHref({ resource_type: "announcement", resource_id: id })).toBeNull();
+    expect(notificationHref({ resource_type: "not_a_screen", resource_id: id })).toBeNull();
+    expect(notificationHref({ resource_type: null, resource_id: id })).toBeNull();
     expect(notificationHref({ resource_type: "change_request", resource_id: "../x" })).toBeNull();
     expect(notificationHref({ resource_type: "export", resource_id: "../x" })).toBeNull();
   });
@@ -147,10 +150,20 @@ describe("notification bell (FR-NOT-001)", () => {
       "origin-top-right",
     );
     const panelId = bell.getAttribute("aria-controls") ?? "";
+    const panel = document.getElementById(panelId);
+    expect(panel).not.toBeNull();
+    // While it fades out it takes no focus and no clicks (inert), then it is gone. Record the
+    // moment it turns inert: under a loaded run the 150 ms exit can finish (and the panel
+    // unmount) before the click resolves, so reading the attribute afterwards would race.
+    let inertDuringExit = false;
+    const observer = new MutationObserver(() => {
+      if (panel?.hasAttribute("inert")) inertDuringExit = true;
+    });
+    if (panel) observer.observe(panel, { attributes: true, attributeFilter: ["inert"] });
     await userEvent.click(screen.getByRole("button", { name: "Elsewhere" }));
     expect(bell).toHaveAttribute("aria-expanded", "false");
-    // While it fades out it takes no focus and no clicks (inert), then it is gone.
-    expect(document.getElementById(panelId)).toHaveAttribute("inert");
+    await waitFor(() => expect(inertDuringExit || panel?.hasAttribute("inert")).toBe(true));
+    observer.disconnect();
     // The 150 ms exit runs on Motion's frame loop; under a loaded full-suite run jsdom frames
     // can stall past waitFor's 1 s default, so allow more time (the assertion is unchanged).
     await waitFor(
@@ -193,10 +206,11 @@ describe("notifications page (FR-NOT-001)", () => {
         }),
         notification({
           id: "0192f3a4-0000-7000-8000-00000000c0e3",
-          template_key: "announcement.new",
-          resource_type: "announcement",
+          // A resource type this web build has no screen for (e.g. sent by a newer API).
+          template_key: "future.thing",
+          resource_type: "future_thing",
           resource_id: "0192f3a4-0000-7000-8000-00000000a001",
-          title: "New message from SchoolOS",
+          title: "Something new",
         }),
       ]);
     renderWithIntl(<NotificationsScreen />);
@@ -210,10 +224,9 @@ describe("notifications page (FR-NOT-001)", () => {
       "href",
       expect.stringContaining("/documents/0192f3a4-0000-7000-8000-00000000d001"),
     );
-    // Announcements have no school screen: no link, a plain "mark as read" button instead.
-    expect(
-      screen.getByRole("button", { name: "Mark as read: New message from SchoolOS" }),
-    ).toBeInTheDocument();
+    // A resource type with no screen: no link, a plain "mark as read" button instead.
+    expect(screen.getByRole("button", { name: "Mark as read: Something new" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Something new/ })).toBeNull();
     await userEvent.click(screen.getByRole("radio", { name: "Unread" }));
     await waitFor(() =>
       expect(

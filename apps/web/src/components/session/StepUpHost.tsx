@@ -156,7 +156,7 @@ export function StepUpHost({
         event.preventDefault();
         finish(false);
       }}
-      className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-lg border border-border bg-surface p-0 text-ink shadow-xl"
+      className="dialog-motion m-auto w-[min(32rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-0 text-ink shadow-popover"
     >
       {visible ? (
         <div className="space-y-4 p-5">

@@ -11,6 +11,10 @@ locals {
     ["repo:${local.repo}:environment:${var.deploy_environment}"],
     var.allow_main_branch ? ["repo:${local.repo}:ref:refs/heads/main"] : [],
   )
+  # Audit 2026-10-05 P2-08 (b): only these workflow files at these refs may use the deploy role.
+  # `environment:<name>` alone let any workflow on any branch that targets the environment assume it
+  # (workflow_dispatch runs from any ref); job_workflow_ref names the file and the ref it ran from.
+  deploy_workflow_refs = [for w in var.deploy_workflows : "${local.repo}/.github/workflows/${w}"]
 }
 
 resource "aws_iam_openid_connect_provider" "github" {
@@ -39,6 +43,12 @@ data "aws_iam_policy_document" "deploy_trust" {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
       values   = local.deploy_subjects
+    }
+    # GitHub provider-specific claim as an IAM condition key. StringLike: tag refs may use `*`.
+    condition {
+      test     = "StringLike"
+      variable = "token.actions.githubusercontent.com:job_workflow_ref"
+      values   = local.deploy_workflow_refs
     }
   }
 }
@@ -75,9 +85,23 @@ data "aws_iam_policy_document" "deploy" {
   }
 
   statement {
-    sid       = "EcsDeployAndOneOffTasks"
-    actions   = ["ecs:UpdateService", "ecs:DescribeServices", "ecs:RunTask", "ecs:DescribeTasks", "ecs:ListTasks", "ecs:StopTask"]
+    sid       = "EcsDeploy"
+    actions   = ["ecs:UpdateService", "ecs:DescribeServices", "ecs:DescribeTasks", "ecs:ListTasks", "ecs:StopTask"]
     resources = ["*"]
+    condition {
+      test     = "ArnEquals"
+      variable = "ecs:cluster"
+      values   = [var.ecs_cluster_arn]
+    }
+  }
+
+  # Only the listed one-off tasks (the migrate task). RunTask on any family would let a deploy start
+  # db-bootstrap, whose execution role injects the RDS master password, with a command override and
+  # read the output from the task logs (audit 2026-10-05 P2-04).
+  statement {
+    sid       = "EcsOneOffTasks"
+    actions   = ["ecs:RunTask"]
+    resources = [for f in var.one_off_task_families : "arn:${data.aws_partition.current.partition}:ecs:*:${data.aws_caller_identity.current.account_id}:task-definition/${f}:*"]
     condition {
       test     = "ArnEquals"
       variable = "ecs:cluster"
@@ -139,6 +163,12 @@ resource "aws_iam_role_policy" "deploy" {
 
 # --- Plan role (pull requests) ------------------------------------------------------------
 
+locals {
+  plan_subjects = var.plan_environment == null ? [
+    "repo:${local.repo}:pull_request", "repo:${local.repo}:ref:refs/heads/main",
+  ] : ["repo:${local.repo}:environment:${var.plan_environment}"]
+}
+
 data "aws_iam_policy_document" "plan_trust" {
   statement {
     actions = ["sts:AssumeRoleWithWebIdentity"]
@@ -151,10 +181,12 @@ data "aws_iam_policy_document" "plan_trust" {
       variable = "token.actions.githubusercontent.com:aud"
       values   = ["sts.amazonaws.com"]
     }
+    # Audit W3-04: every same-repo pull request and main, unless a GitHub Environment with required
+    # reviewers gates the role (plan_environment); only a gated role may read secrets.
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${local.repo}:pull_request", "repo:${local.repo}:ref:refs/heads/main"]
+      values   = local.plan_subjects
     }
   }
 }
@@ -180,9 +212,20 @@ data "aws_iam_policy_document" "plan" {
   dynamic "statement" {
     for_each = var.state_bucket_arn == null ? [] : [1]
     content {
-      sid       = "StateReadAndLock"
-      actions   = ["s3:GetObject", "s3:ListBucket", "s3:PutObject", "s3:DeleteObject"]
+      sid       = "StateRead"
+      actions   = ["s3:GetObject", "s3:ListBucket"]
       resources = [var.state_bucket_arn, "${var.state_bucket_arn}/*"]
+    }
+  }
+
+  # The plan role trusts every same-repo pull request, so it may write only the S3-native lock
+  # files (use_lockfile), never the state itself (SEC-009: a PR cannot rewrite the state that apply trusts).
+  dynamic "statement" {
+    for_each = var.state_bucket_arn == null ? [] : [1]
+    content {
+      sid       = "StateLockOnly"
+      actions   = ["s3:PutObject", "s3:DeleteObject"]
+      resources = ["${var.state_bucket_arn}/*.tflock"]
     }
   }
 
@@ -214,6 +257,18 @@ data "aws_iam_policy_document" "plan" {
       actions   = ["s3:GetObject", "s3:GetObjectVersion"]
       resources = [for b in var.denied_data_bucket_arns : "${b}/*"]
     }
+  }
+
+  # Audit 2026-10-05 P2-09: ReadOnlyAccess includes reading every log group (security events, WAF
+  # logs with client IPs, task logs). A refresh only describes log groups, so log data is denied.
+  statement {
+    sid    = "NeverReadLogData"
+    effect = "Deny"
+    actions = [
+      "logs:GetLogEvents", "logs:FilterLogEvents", "logs:StartQuery", "logs:GetQueryResults",
+      "logs:StartLiveTail", "logs:GetLogRecord", "logs:GetLogObject", "logs:Unmask",
+    ]
+    resources = ["*"]
   }
 }
 
@@ -299,9 +354,24 @@ output "deploy_role_arn" {
   value       = aws_iam_role.deploy.arn
 }
 
+output "plan_subjects" {
+  description = "OIDC subjects allowed to assume the plan role."
+  value       = local.plan_subjects
+}
+
+output "plan_reads_secrets" {
+  description = "Whether the plan role may read secret values (only when environment-gated)."
+  value       = var.create_plan_role && var.plan_can_read_secrets
+}
+
 output "plan_role_arn" {
   description = "Role for terraform plan on pull requests."
   value       = var.create_plan_role ? aws_iam_role.plan[0].arn : null
+}
+
+output "deploy_workflow_refs" {
+  description = "job_workflow_ref values allowed to assume the deploy role (P2-08)."
+  value       = local.deploy_workflow_refs
 }
 
 output "deploy_subjects" {

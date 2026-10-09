@@ -67,7 +67,22 @@ class StepUpRequired(DomainError):
 
 
 class RateLimited(DomainError):
+    """429 (RFC 6585). ``retry_after_s`` becomes the ``Retry-After`` header (RFC 9110 §10.2.3)
+    and the ``retry_after`` member of the problem body, so the UI can say how long to wait."""
+
     status, code, title = 429, "rate_limited", "Too many requests"
+    retry_after_s: int | None = None
+
+    def __init__(
+        self,
+        detail: str | None = None,
+        *,
+        code: str | None = None,
+        retry_after_s: int | None = None,
+    ) -> None:
+        super().__init__(detail, code=code)
+        if retry_after_s is not None:
+            self.retry_after_s = max(1, int(retry_after_s))
 
 
 class ServiceUnavailable(DomainError):
@@ -82,6 +97,7 @@ def problem(
     title: str,
     detail: str | None = None,
     extra: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
 ) -> JSONResponse:
     body: dict[str, Any] = {
         "type": ERROR_TYPE_BASE + code,
@@ -95,13 +111,19 @@ def problem(
         body["detail"] = detail
     if extra:
         body.update(extra)
-    return JSONResponse(body, status_code=status, media_type=PROBLEM_JSON)
+    return JSONResponse(body, status_code=status, media_type=PROBLEM_JSON, headers=headers)
 
 
 def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(DomainError)
     async def _domain(request: Request, exc: DomainError) -> JSONResponse:
-        extra = {"errors": exc.errors} if isinstance(exc, ValidationFailed) else None
+        extra: dict[str, Any] | None = (
+            {"errors": exc.errors} if isinstance(exc, ValidationFailed) else None
+        )
+        headers: dict[str, str] | None = None
+        if isinstance(exc, RateLimited) and exc.retry_after_s is not None:
+            headers = {"Retry-After": str(exc.retry_after_s)}
+            extra = {"retry_after": exc.retry_after_s}
         return problem(
             request,
             status=exc.status,
@@ -109,6 +131,7 @@ def install_error_handlers(app: FastAPI) -> None:
             title=exc.title,
             detail=exc.detail,
             extra=extra,
+            headers=headers,
         )
 
     @app.exception_handler(RequestValidationError)
@@ -138,4 +161,76 @@ def install_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
+        if _is_nul_refusal(exc):
+            return problem(
+                request,
+                status=422,
+                code="invalid_characters",
+                title="Validation failed",
+                detail="Remove the invisible NUL character from the text and try again.",
+                extra={
+                    "errors": [
+                        {
+                            "field": "body",
+                            "code": "invalid_characters",
+                            "message_key": "errors.invalid_characters",
+                        }
+                    ]
+                },
+            )
+        if _is_out_of_range(exc):
+            return problem(
+                request,
+                status=422,
+                code="value_out_of_range",
+                title="Validation failed",
+                detail="A number or date is too large. Use a smaller value and try again.",
+                extra={
+                    "errors": [
+                        {
+                            "field": "body",
+                            "code": "value_out_of_range",
+                            "message_key": "errors.value_out_of_range",
+                        }
+                    ]
+                },
+            )
         return problem(request, status=500, code="internal_error", title="Something went wrong")
+
+
+# SQLSTATE 22003 numeric_value_out_of_range, 22008 datetime_field_overflow.
+_OUT_OF_RANGE_STATES = frozenset({"22003", "22008"})
+
+
+def _is_out_of_range(exc: BaseException) -> bool:
+    """PostgreSQL's refusal of a number or date its column cannot hold (for example a computed
+    invoice amount past Numeric(14, 2)), raised directly or wrapped by SQLAlchemy. The request
+    asked for an impossible value, so it is a 422, not a 500 (audit 2026-10-06 R-13). The
+    transaction has already been rolled back by the session scope."""
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if getattr(current, "sqlstate", None) in _OUT_OF_RANGE_STATES:
+            return True
+        orig = getattr(current, "orig", None)
+        current = orig if isinstance(orig, BaseException) else current.__cause__
+    return False
+
+
+_NUL_MESSAGE = "cannot contain NUL"
+
+
+def _is_nul_refusal(exc: BaseException) -> bool:
+    """The driver's refusal of a NUL (U+0000) in text (psycopg ``DataError``), raised directly or
+    wrapped by SQLAlchemy. Free text in many request models may carry one; the database is the
+    last place it is refused, so it is answered as a 422, not a 500 (audit 2026-10-06 R-12)."""
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if type(current).__name__ == "DataError" and _NUL_MESSAGE in str(current):
+            return True
+        orig = getattr(current, "orig", None)
+        current = orig if isinstance(orig, BaseException) else current.__cause__
+    return False

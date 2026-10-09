@@ -5,6 +5,7 @@ import { RefreshBusyError, SessionEndedError } from "@/server/auth/refresh";
 import type { SessionKind } from "@/server/config";
 import { logEvent } from "@/server/log";
 import type { AuthRuntime } from "@/server/runtime";
+import { clearCookie, sessionCookieName } from "@/server/session/cookies";
 import { applySchoolSettingsFromMe } from "@/server/session/school-settings";
 import type { Session } from "@/server/session/store";
 import {
@@ -54,9 +55,8 @@ const FORWARDED_RESPONSE_HEADERS = [
   "last-modified",
   "location",
   "retry-after",
-  "ratelimit-limit",
-  "ratelimit-remaining",
-  "ratelimit-reset",
+  "ratelimit",
+  "ratelimit-policy",
   "deprecation",
   "sunset",
   "x-request-id",
@@ -155,6 +155,9 @@ async function problemCode(response: Response): Promise<string | null> {
     return null;
   }
 }
+
+/** API 403 codes that mean the person no longer has this access at all (session ends). */
+const MEMBERSHIP_GONE = new Set(["no_membership", "not_operator"]);
 
 function loginUrl(kind: SessionKind): string {
   if (kind === "operator") return "/bff/auth/platform/login";
@@ -306,6 +309,21 @@ export async function proxyToApi(request: Request, runtime: AuthRuntime): Promis
       await upstream.body?.cancel();
       staleAccessToken = accessToken;
       continue;
+    }
+
+    if (upstream.status === 403 && MEMBERSHIP_GONE.has((await problemCode(upstream)) ?? "")) {
+      // Suspended or removed (the API refuses at once): end this BFF session too, so the
+      // person is not left signed in until the idle timeout (audit 2026-10-05 hardening).
+      await upstream.body?.cancel();
+      await runtime.store.revoke(session.id);
+      logEvent("session_ended_membership_gone", { kind: session.kind });
+      const secure = runtime.config.secureCookies;
+      const ended = sessionEnded(requestId, session.kind);
+      ended.headers.append(
+        "set-cookie",
+        clearCookie(sessionCookieName(session.kind, secure), secure),
+      );
+      return ended;
     }
 
     if (upstream.status === 428) {

@@ -19,7 +19,13 @@ from app.authz.dependencies import TenantDB, require
 from app.authz.http import Cursor, IdempotencyDep, IfMatch, Limit, Page, etag, if_match_version
 from app.core.errors import ValidationFailed
 from app.students import service as students
-from app.students.definitions import AADHAAR_DETAIL, aadhaar_error, find_full_aadhaar
+from app.students.definitions import (
+    AADHAAR_DETAIL,
+    aadhaar_error,
+    digits12_value,
+    find_full_aadhaar,
+    typed_digits12_keys,
+)
 from app.students.schemas import (
     AttributeOut,
     EnrollmentEnd,
@@ -63,12 +69,34 @@ async def reject_full_aadhaar_body(request: Request) -> None:
         payload = await request.json()
     except (ValueError, UnicodeDecodeError):
         return  # malformed JSON: FastAPI's own validation answers 422
-    paths = find_full_aadhaar(payload)
+    # FR-STU-015 (ADR-0037): only the value of a typed APAAR ID entry is exempt.
+    paths = find_full_aadhaar(payload, typed_keys=typed_digits12_keys())
     if paths:
         raise ValidationFailed([aadhaar_error(p) for p in paths], detail=AADHAAR_DETAIL)
 
 
 AadhaarGuard = Annotated[None, Depends(reject_full_aadhaar_body)]
+
+
+async def reject_full_aadhaar_search(request: Request) -> None:
+    """SEC-013 for ``POST /students/search``: as :func:`reject_full_aadhaar_body`, except the
+    top-level ``apaar_id`` when it is exactly 12 digits (FR-STU-016, ADR-0037): the one search
+    field that names the typed APAAR ID. ``query``, ``admission_no`` and every other field still
+    refuse a full Aadhaar number."""
+    try:
+        payload = await request.json()
+    except (ValueError, UnicodeDecodeError):
+        return
+    if isinstance(payload, dict):
+        apaar = payload.get(students.APAAR_SEARCH_FIELD)
+        if isinstance(apaar, str) and digits12_value(apaar) is not None:
+            payload = {k: v for k, v in payload.items() if k != students.APAAR_SEARCH_FIELD}
+    paths = find_full_aadhaar(payload)
+    if paths:
+        raise ValidationFailed([aadhaar_error(p) for p in paths], detail=AADHAAR_DETAIL)
+
+
+SearchAadhaarGuard = Annotated[None, Depends(reject_full_aadhaar_search)]
 
 
 def optional_if_match(request: Request) -> int | None:
@@ -129,8 +157,9 @@ def search_students(
     academic_year_id: Annotated[
         uuid.UUID | None,
         Query(
-            description="Academic year whose enrolments are listed (class, section and scope); "
-            "the current year when left out. Unknown years answer 422."
+            description="Academic year whose enrolments give the class and section shown and "
+            "filtered on; the current year when left out. Scoped holders still see only "
+            "students of their sections/classes this year. Unknown years answer 422."
         ),
     ] = None,
     limit: Limit = 50,
@@ -162,7 +191,7 @@ def search_students(
 @router.post("/students/search", response_model=Page[StudentSummary])
 def search_students_by_body(
     ctx: Reader,
-    _aadhaar: AadhaarGuard,
+    _aadhaar: SearchAadhaarGuard,
     db: TenantDB,
     body: StudentSearchIn,
 ) -> Page[StudentSummary]:
@@ -171,8 +200,11 @@ def search_students_by_body(
     appears in a URL (SEC-008; permission ``student.read_basic``; class and subject teachers see
     only students in their sections/classes this year). Same results, page size and cursor as
     ``GET /students``; send ``next_cursor`` back as ``cursor`` with the same filters. Read-only:
-    nothing is written, so no ``Idempotency-Key``. A full Aadhaar number anywhere in the body is
-    refused (422 ``aadhaar_full_number_rejected``)."""
+    nothing is written, so no ``Idempotency-Key``. ``apaar_id`` finds a student by exact APAAR
+    ID (12 digits; current verified or recorded values of the typed ``apaar_id`` attribute only,
+    same scope; FR-STU-016, ADR-0037); it is the only field that accepts a 12-digit number. A
+    full Aadhaar number anywhere else in the body is refused (422
+    ``aadhaar_full_number_rejected``)."""
     return students.search(db, ctx, body.filters(), limit=body.limit, cursor=body.cursor)
 
 
@@ -311,6 +343,8 @@ def add_guardian(
         body,
         lambda: students.add_guardian(db, ctx, student_id, body),
         headers=lambda g: {"ETag": etag(g.version)},
+        # C3 phone and address: the replay record keeps no body (audit H-01).
+        refetch=lambda guardian_id: students.get_guardian(db, ctx, student_id, guardian_id),
     )
 
 

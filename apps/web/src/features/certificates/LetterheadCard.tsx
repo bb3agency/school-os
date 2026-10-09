@@ -98,7 +98,7 @@ export function LetterheadCard({
           {fields.map((field) => (
             <div key={field} className="grid gap-1 py-3 sm:grid-cols-[16rem_1fr] sm:gap-4">
               <dt className="text-sm text-ink-muted">{t(`fields.${field}`)}</dt>
-              <dd className="font-medium break-words">
+              <dd className="break-words">
                 <Value>{head?.[field] || null}</Value>
               </dd>
             </div>

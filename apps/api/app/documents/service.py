@@ -42,7 +42,7 @@ import uuid
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Final
+from typing import Any, Final, Literal
 
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
@@ -111,6 +111,7 @@ from app.documents.storage import (
     ObjectStoreError,
     ObjectWriter,
     derived_key,
+    derived_prefix,
     document_key,
     document_prefix,
     export_key,
@@ -124,6 +125,7 @@ from app.documents.storage import (
 )
 from app.identity import service as identity
 from app.identity.principal import STEP_UP_MAX_AGE
+from app.notifications import service as notifications
 from app.ops import service as ops
 from app.tenancy import service as tenancy
 
@@ -139,9 +141,15 @@ DISCARDED_EVENT: Final = "document.version.discarded"
 SCAN_TASK: Final = "documents.scan"
 PURGE_TASK: Final = "documents.purge_objects"
 DISCARD_TASK: Final = "documents.discard_object"
+# W3-06: objects the upload path no longer needs (rejected, duplicate or half-made uploads, the
+# staging copy after promotion). The api only queues them; its role cannot tag or delete under
+# ``t/*`` (infra/terraform), so only the worker discards (``documents.discard_unused_object``).
+OBJECT_DISCARD_EVENT: Final = "document.object.discard_requested"
+OBJECT_DISCARD_TASK: Final = "documents.discard_unused_object"
 ops.register_outbox_route(SCAN_EVENT, SCAN_TASK)
 ops.register_outbox_route(DELETED_EVENT, PURGE_TASK)
 ops.register_outbox_route(DISCARDED_EVENT, DISCARD_TASK)
+ops.register_outbox_route(OBJECT_DISCARD_EVENT, OBJECT_DISCARD_TASK)
 
 # An intent can be registered for a while after its presigned POST expired (slow uploads).
 INTENT_GRACE: Final = dt.timedelta(minutes=30)
@@ -171,12 +179,26 @@ QUARANTINE_HOOKS: list[VersionHook] = []
 READY_HOOKS: list[VersionHook] = []
 """Called when a version becomes ``ready`` (M2: text extraction, chunking, embeddings)."""
 
+VERSION_DISCARDED_HOOKS: list[VersionHook] = []
+"""``hook(session, document_id, version_id)`` after a version was discarded (PRV-016:
+``discard_version`` / ``replace_with_redacted``), in the same transaction as the status change
+and its ``document.version_discarded`` audit event (knowledge: remove the version's chunks and
+cached vectors at once, docs/08 §7 erasure chain). Not called for a version already
+discarded; a hook that raises rolls the discard back."""
+
 DeleteGuard = Callable[[Session, uuid.UUID], str | None]
 """``guard(session, document_id)`` returns an error code to refuse deletion (retention)."""
 
 DELETE_GUARDS: list[DeleteGuard] = []
 
 DeletedHook = Callable[[Session, uuid.UUID], None]
+DELETING_HOOKS: list[DeletedHook] = []
+"""``hook(session, document_id)`` right before a document's rows are deleted (by a user or a
+retention job), after every ``DELETE_GUARDS`` entry let it go, in the same transaction: for
+derived data that no foreign key reaches and that can only be found through the rows about to
+go (knowledge: the embedding-cache vectors of the document's chunks, keyed by text digest;
+docs/08 §7 erasure chain). A hook that raises rolls the delete back."""
+
 DELETED_HOOKS: list[DeletedHook] = []
 """``hook(session, document_id)`` after a document was deleted (by a user or a retention job):
 its rows are gone, ``document.deleted`` is audited and the object purge is queued, all in the
@@ -326,6 +348,34 @@ def _refuse_archived(doc: Document) -> None:
 
 def _not_found() -> NotFound:
     return NotFound("Document not found")
+
+
+def _raw_restricted(doc: Document) -> bool:
+    """Whether the stored file itself is opened only by ``student.read_sensitive`` holders and
+    its uploader: restricted (C3) documents, and raw import spreadsheets, whose restricted (C3)
+    columns only the import's own sheet and export hide (FR-IMP-008/009; audit DL-02)."""
+    return doc.sensitivity == "C3" or doc.purpose == "import_file"
+
+
+OWNER_ONLY_CODE: Final = "document_owner_only"
+
+
+def _may_write(ctx: UserContext, doc: Document) -> bool:
+    """Whether the caller may change a document they can see: they uploaded it, or they hold
+    ``document.manage_acl`` (audit 2026-10-04, AA-10). Seeing a document through its ACL is
+    not enough to replace its file or metadata for everyone else it is shared with."""
+    return doc.created_by == ctx.user_id or ctx.has(MANAGE)
+
+
+def _require_writer(ctx: UserContext, doc: Document) -> None:
+    """403 ``document_owner_only`` for a visible document the caller may not change (call
+    only after the visibility check, so invisible documents stay 404)."""
+    if not _may_write(ctx, doc):
+        raise Forbidden(
+            "Only the person who uploaded this document, or someone who manages documents, "
+            "can change it. Upload your own copy instead.",
+            code=OWNER_ONLY_CODE,
+        )
 
 
 def _visibility(session: Session, ctx: UserContext) -> repo.Visibility:
@@ -520,7 +570,9 @@ def create_upload(session: Session, ctx: UserContext, data: UploadCreate) -> Upl
 
     The declared kind must be allowlisted for the purpose and agree with the file extension;
     the size must be within the purpose's limit (FR-DOC-001: 25 MB, imports 10 MB).
-    ``document_id`` asks for a new version of a document the caller can see.
+    ``document_id`` asks for a new version of a document the caller can see (404 otherwise)
+    and uploaded themselves or manages (``document.manage_acl``; 403 ``document_owner_only``
+    otherwise, AA-10).
     """
     settings = get_settings()
     rule = purpose_rule(data.purpose, settings)
@@ -542,6 +594,7 @@ def create_upload(session: Session, ctx: UserContext, data: UploadCreate) -> Upl
         )
         if doc is None:
             raise _not_found()
+        _require_writer(ctx, doc)
         _refuse_archived(doc)
         if doc.purpose != data.purpose:
             raise _invalid("purpose", "purpose_mismatch")
@@ -619,15 +672,64 @@ class _Verified:
     etag: str
 
 
-def _discard(store: ObjectStore, key: str) -> None:
+def _discard_now(store: ObjectStore, key: str) -> None:
+    """Worker only: remove an object the system no longer needs. An automatic deletion, so it
+    is discarded: the bucket rule ``discarded-1d`` expires the bytes after a day (docs/08 §7)."""
     try:
-        store.delete(key)
+        store.discard(key)
     except ObjectStoreError:
         log.warning("documents.upload.discard_failed", error_code="delete_failed")
 
 
-def _reject(store: ObjectStore, intent: UploadIntent, code: str) -> UnsupportedFileType:
-    _discard(store, intent.object_key)
+_UUID_RE: Final = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+_TENANT_RE: Final = rf"^t/(?P<t>{_UUID_RE})/"
+_UPLOAD_KEY: Final = re.compile(rf"{_TENANT_RE}uploads/(?P<u>{_UUID_RE})/original\.[a-z]+$")
+_DOC_KEY: Final = re.compile(
+    rf"{_TENANT_RE}docs/(?P<d>{_UUID_RE})/v(?P<n>[1-9][0-9]{{0,5}})/original\.(?P<e>[a-z]+)$"
+)
+_IMPORT_KEY: Final = re.compile(rf"{_TENANT_RE}imports/(?P<b>{_UUID_RE})/raw\.(?P<e>[a-z]+)$")
+
+
+def _discard_payload(key: str) -> dict[str, Any] | None:
+    """The IDs-only payload of :data:`OBJECT_DISCARD_EVENT` for an upload-path key (object keys
+    never go into the outbox; the worker rebuilds the key from the IDs and checks it)."""
+    if m := _UPLOAD_KEY.match(key):
+        return {"upload_id": m["u"]}
+    requested_at = _now().isoformat()
+    if m := _DOC_KEY.match(key):
+        return {
+            "document_id": m["d"],
+            "version_no": int(m["n"]),
+            "ext": m["e"],
+            "requested_at": requested_at,
+        }
+    if m := _IMPORT_KEY.match(key):
+        return {"batch_id": m["b"], "ext": m["e"], "requested_at": requested_at}
+    return None
+
+
+def _request_discard(session: Session, key: str) -> None:
+    """Queue the discard of ``key`` in the caller's transaction (W3-06: the worker deletes)."""
+    payload = _discard_payload(key)
+    if payload is None:  # pragma: no cover - every upload-path key matches a layout
+        log.error("documents.discard.unknown_key", error_code="unknown_key_layout")
+        return
+    ops.enqueue_event(session, OBJECT_DISCARD_EVENT, payload)
+
+
+def _request_discard_committed(tenant_id: uuid.UUID, key: str) -> None:
+    """Queue the discard of ``key`` in its own short transaction: for refusals and errors, whose
+    request transaction rolls back (W3-06). A failure is logged, never raised: the daily
+    :func:`purge_expired_uploads` removes a forgotten staging object anyway."""
+    try:
+        with tenant_session(tenant_id) as s:
+            _request_discard(s, key)
+    except Exception:
+        log.warning("documents.discard.queue_failed", error_code="outbox_unavailable")
+
+
+def _reject(intent: UploadIntent, code: str) -> UnsupportedFileType:
+    _request_discard_committed(intent.tenant_id, intent.object_key)
     log.warning(
         "documents.upload.rejected",
         resource_type="upload_intent",
@@ -652,14 +754,14 @@ def _check_stored_head(store: ObjectStore, intent: UploadIntent) -> int:
     if head is None:
         raise Conflict("Upload the file before registering it.", code="upload_missing")
     if head.size > intent.max_bytes:
-        _discard(store, intent.object_key)
+        _request_discard_committed(intent.tenant_id, intent.object_key)
         raise FileTooLarge("The uploaded file is larger than allowed.")
     if head.size != intent.declared_size:
-        _discard(store, intent.object_key)
+        _request_discard_committed(intent.tenant_id, intent.object_key)
         raise _invalid("upload_id", "size_mismatch")
     kms = getattr(store, "kms_key_id", None)
     if kms and head.sse != "aws:kms":
-        _discard(store, intent.object_key)
+        _request_discard_committed(intent.tenant_id, intent.object_key)
         raise Conflict("The file was not stored encrypted. Upload it again.", code="not_encrypted")
     return head.size
 
@@ -681,7 +783,7 @@ def _verify_object(store: ObjectStore, intent: UploadIntent) -> _Verified:
         for chunk in opened.chunks:
             total += len(chunk)
             if total > intent.max_bytes:
-                _discard(store, intent.object_key)
+                _request_discard_committed(intent.tenant_id, intent.object_key)
                 raise FileTooLarge("The uploaded file is larger than allowed.")
             digest.update(chunk)
             if len(first) < filetypes.HEAD_BYTES:
@@ -692,7 +794,7 @@ def _verify_object(store: ObjectStore, intent: UploadIntent) -> _Verified:
     finally:
         opened.close()
     if total != size:
-        _discard(store, intent.object_key)
+        _request_discard_committed(intent.tenant_id, intent.object_key)
         raise _invalid("upload_id", "size_mismatch")
     code = filetypes.check_head(kind, bytes(first))
     if code is None and csv is None:
@@ -700,7 +802,7 @@ def _verify_object(store: ObjectStore, intent: UploadIntent) -> _Verified:
     if code is None and csv is not None:
         code = csv.finish()
     if code is not None:
-        raise _reject(store, intent, code)
+        raise _reject(intent, code)
     return _Verified(digest.digest(), total, kind, opened.etag)
 
 
@@ -710,15 +812,18 @@ def _final_key(intent: UploadIntent, kind: FileKind) -> str:
     return document_key(intent.tenant_id, intent.document_id, intent.version_no, kind.ext)
 
 
-def _promote(store: ObjectStore, intent: UploadIntent, verified: _Verified) -> str:
-    """Copy the verified bytes to the final key (only if unchanged) and drop the staging copy."""
+def _promote(
+    session: Session, store: ObjectStore, intent: UploadIntent, verified: _Verified
+) -> str:
+    """Copy the verified bytes to the final key (only if unchanged) and queue the staging copy's
+    discard in the caller's transaction (W3-06)."""
     final = _final_key(intent, verified.kind)
     try:
         store.copy(
             intent.object_key, final, if_match=verified.etag, content_type=verified.kind.mime
         )
     except ObjectChanged as exc:
-        _discard(store, intent.object_key)
+        _request_discard_committed(intent.tenant_id, intent.object_key)
         raise Conflict(
             "The file changed while it was being checked. Upload it again.", code="upload_changed"
         ) from exc
@@ -726,16 +831,19 @@ def _promote(store: ObjectStore, intent: UploadIntent, verified: _Verified) -> s
         raise Conflict(
             "The file could not be stored. Try again.", code="storage_unavailable"
         ) from exc
-    _discard(store, intent.object_key)
+    _request_discard(session, intent.object_key)
     return final
 
 
 @contextmanager
-def _undo_object_on_error(store: ObjectStore, key: str) -> Iterator[None]:
+def _undo_object_on_error(tenant_id: uuid.UUID, key: str) -> Iterator[None]:
+    """On any error, queue the discard of the object just written (its transaction rolls back,
+    so in a transaction of its own; W3-06: the worker deletes, after checking that no version
+    uses the key)."""
     try:
         yield
     except BaseException:
-        _discard(store, key)
+        _request_discard_committed(tenant_id, key)
         raise
 
 
@@ -750,7 +858,7 @@ def _check_duplicate(
     visibility = _visibility(session, ctx)
     for match in matches:
         if repo.get_document(session, match.document_id, visibility=visibility) is not None:
-            _discard(store, intent.object_key)
+            _request_discard_committed(intent.tenant_id, intent.object_key)
             raise Conflict(
                 f"This file is already in SchoolOS as document {match.document_id}.",
                 code="duplicate_document",
@@ -784,11 +892,11 @@ def register_document(session: Session, ctx: UserContext, data: DocumentCreate) 
     store = get_object_store()
     verified = _verify_object(store, intent)
     _check_duplicate(session, ctx, store, intent, verified.sha256)
-    final_key = _promote(store, intent, verified)
+    final_key = _promote(session, store, intent, verified)
 
     tenant_id = repo.current_tenant_id(session)
     version_id = new_id()
-    with _undo_object_on_error(store, final_key), _db_errors():
+    with _undo_object_on_error(intent.tenant_id, final_key), _db_errors():
         doc = repo.insert_document(
             session,
             id=intent.document_id,
@@ -862,7 +970,9 @@ def add_version(
     session: Session, ctx: UserContext, document_id: uuid.UUID, data: VersionCreate
 ) -> DocumentOut:
     """Register an uploaded object as the next version (permission ``document.upload``; the
-    document must be visible to the caller). History is kept (FR-DOC-006). An archived
+    document must be visible to the caller, 404 otherwise, and the caller must have uploaded it
+    or hold ``document.manage_acl``, 403 ``document_owner_only`` otherwise; AA-10). History is
+    kept (FR-DOC-006). An archived
     document answers 409 ``document_archived`` (the row lock orders this against a concurrent
     archive or unarchive)."""
     doc = repo.get_document(
@@ -870,6 +980,7 @@ def add_version(
     )
     if doc is None:
         raise _not_found()
+    _require_writer(ctx, doc)
     _refuse_archived(doc)
     intent = _claim_intent(session, ctx, data.upload_id, document_id=doc.id)
     if intent.version_no != repo.max_version_no(session, doc.id) + 1:
@@ -880,11 +991,11 @@ def add_version(
     verified = _verify_object(store, intent)
     latest = repo.get_version(session, doc.id)
     if latest is not None and latest.sha256 == verified.sha256:
-        _discard(store, intent.object_key)
+        _request_discard_committed(intent.tenant_id, intent.object_key)
         raise Conflict("This file is the same as the current version.", code="version_unchanged")
-    final_key = _promote(store, intent, verified)
+    final_key = _promote(session, store, intent, verified)
     version_id = new_id()
-    with _undo_object_on_error(store, final_key), _db_errors():
+    with _undo_object_on_error(intent.tenant_id, final_key), _db_errors():
         version = _insert_version(
             session,
             ctx=ctx,
@@ -966,11 +1077,13 @@ def get_download_url(
 ) -> DownloadUrlOut:
     """A presigned GET valid <= 5 minutes, forced to download as an attachment with the
     verified content type (FR-DOC-004). Only scanned (``ready``) versions are served; C3
-    documents also need ``student.read_sensitive`` unless the caller uploaded them."""
+    documents and raw import files (which may hold restricted columns that only the import's own
+    sheet hides, FR-IMP-008) also need ``student.read_sensitive`` unless the caller uploaded
+    them."""
     doc = repo.get_document(session, document_id, visibility=_visibility(session, ctx))
     if doc is None:
         raise _not_found()
-    if doc.sensitivity == "C3" and not (
+    if _raw_restricted(doc) and not (
         ctx.has("student.read_sensitive") or doc.created_by == ctx.user_id
     ):
         raise Forbidden(
@@ -1063,18 +1176,21 @@ def update_document(
     expected_version: int,
 ) -> DocumentOut:
     """Change title, type, language, issuer or date (permission ``document.upload``; the
-    document must be visible to the caller, like adding a version; ``If-Match``).
+    document must be visible to the caller and uploaded by them, or the caller holds
+    ``document.manage_acl``, like adding a version; ``If-Match``).
 
-    404 outside the caller's ACL/scope, 412 for a stale version, 409 ``document_archived`` for
-    an archived document, 422 ``doc_type_not_allowed_for_purpose``. Unchanged values are
-    ignored (no new version). Audit: ``document.metadata_updated`` with the changed field
-    NAMES only (titles and issuers may name people).
+    404 outside the caller's ACL/scope, 403 ``document_owner_only`` for a visible document the
+    caller neither uploaded nor manages (AA-10), 412 for a stale version, 409 ``document_archived``
+    for an archived document, 422 ``doc_type_not_allowed_for_purpose``. Unchanged values are ignored
+    (no new version). Audit: ``document.metadata_updated`` with the changed field NAMES only (titles
+    and issuers may name people).
     """
     doc = repo.get_document(
         session, document_id, visibility=_visibility(session, ctx), for_update=True
     )
     if doc is None:
         raise _not_found()
+    _require_writer(ctx, doc)
     if doc.version != expected_version:
         raise PreconditionFailed()
     _refuse_archived(doc)
@@ -1201,9 +1317,17 @@ def _delete(session: Session, doc: Document, *, reason: str | None) -> None:
     if reason is not None:
         summary["reason"] = reason
     with _db_errors():
+        for deleting in DELETING_HOOKS:
+            deleting(session, doc.id)
         repo.delete_document(session, doc.id)
         _audit(session, "document.deleted", doc.id, summary, system=reason is not None)
-        ops.enqueue_event(session, DELETED_EVENT, {"document_id": doc.id, "batch_ids": batch_ids})
+        # ``discard``: an automatic retention deletion tags the objects for the bucket's 1-day
+        # rule; a person's delete keeps the 90-day recovery window (docs/08 §7).
+        ops.enqueue_event(
+            session,
+            DELETED_EVENT,
+            {"document_id": doc.id, "batch_ids": batch_ids, "discard": reason is not None},
+        )
         for hook in DELETED_HOOKS:
             hook(session, doc.id)
 
@@ -1213,17 +1337,55 @@ def purge_document_objects(
     document_id: uuid.UUID,
     batch_ids: Sequence[uuid.UUID] = (),
     *,
+    discard: bool = False,
     store: ObjectStore | None = None,
 ) -> int:
-    """Worker: remove every stored object of a deleted document (FR-DOC-007 storage part)."""
+    """Worker: remove every stored object of a deleted document (FR-DOC-007 storage part).
+
+    ``discard`` (automatic retention deletions, :func:`delete_for_retention`): each object is
+    tagged ``sos-lifecycle=discarded`` before its delete, so the bucket rule ``discarded-1d``
+    expires the noncurrent bytes after one day. Otherwise (a person's delete) a plain delete
+    keeps them for the 90-day recovery window (docs/08 §7). Idempotent: a retry lists what is
+    left and removes only that."""
     store = store or get_object_store()
-    deleted = store.delete_prefix(document_prefix(tenant_id, document_id))
+    remove = store.purge_prefix if discard else store.delete_prefix
+    deleted = remove(document_prefix(tenant_id, document_id))
     for batch_id in batch_ids:
-        deleted += store.delete_prefix(f"{tenant_prefix(tenant_id)}imports/{batch_id}/")
+        deleted += remove(f"{tenant_prefix(tenant_id)}imports/{batch_id}/")
     return deleted
 
 
 # --- scanning (worker) ----------------------------------------------------------------------
+
+
+QUARANTINED_TEMPLATE: Final = "document.quarantined"
+
+
+def _notify_quarantined(
+    session: Session,
+    tenant_id: uuid.UUID,
+    document_id: uuid.UUID,
+    version_id: uuid.UUID,
+    uploader: uuid.UUID,
+) -> None:
+    """Tell the person who uploaded the version that the virus check blocked it (FR-DOC-002,
+    FR-NOT-001), in the scan's transaction: ids only, once per version (dedupe key). Nobody is
+    told when the uploader is no longer an active member of this school."""
+    try:
+        person = identity.get_user(session, uploader)
+    except NotFound:
+        return
+    if person.status != "active":
+        return
+    notifications.notify(
+        session,
+        tenant_id=tenant_id,
+        recipients=[person.membership_id],
+        template_key=QUARANTINED_TEMPLATE,
+        params={"document_id": str(document_id)},
+        resource_id=document_id,
+        dedupe_key=f"{QUARANTINED_TEMPLATE}:{version_id}",
+    )
 
 
 def scan_version(
@@ -1270,6 +1432,7 @@ def scan_version(
             )
             for hook in QUARANTINE_HOOKS:
                 hook(s, document_id, version_id)
+            _notify_quarantined(s, tenant_id, document_id, version_id, updated.created_by)
             log.warning(
                 "documents.scan.quarantined", resource_type="document", resource_id=document_id
             )
@@ -1312,13 +1475,13 @@ def purge_expired_uploads(tenant_id: uuid.UUID, *, store: ObjectStore | None = N
         stale = repo.expired_intents(s, now, limit=500)
         for intent in stale:
             if key_in_tenant(intent.object_key, tenant_id):
-                _discard(store, intent.object_key)
+                _discard_now(store, intent.object_key)
         # A presigned POST stays usable for a few minutes after registration: drop any staging
         # object re-created meanwhile, then the used intent rows.
         used = repo.consumed_intents_before(s, now - dt.timedelta(days=1), limit=500)
         for intent in used:
             if key_in_tenant(intent.object_key, tenant_id):
-                _discard(store, intent.object_key)
+                _discard_now(store, intent.object_key)
         repo.delete_intents(s, [i.id for i in (*stale, *used)])
         purged = len(stale)
     return purged
@@ -1340,9 +1503,59 @@ def evidence_exists(session: Session, document_id: uuid.UUID) -> bool:
     return usable is not None
 
 
+_EVIDENCE_USABLE: Final = ("queued", "scanning", "extracting", "chunking", "embedding", "ready")
+_EVIDENCE_PENDING: Final = frozenset({"queued", "scanning"})
+# Past the virus scan (text extraction and indexing come after it).
+_EVIDENCE_CLEAN: Final = frozenset({"extracting", "chunking", "embedding", "ready"})
+
+EvidenceState = Literal["ready", "pending", "unusable", "not_visible"]
+
+
+def evidence_version(session: Session, document_id: uuid.UUID) -> uuid.UUID | None:
+    """The latest usable version of evidence ``document_id`` (the one a change request pins at
+    submit), or ``None``; callers check :func:`evidence_exists` first."""
+    usable = repo.latest_version_with_status(session, document_id, _EVIDENCE_USABLE)
+    return usable.id if usable is not None else None
+
+
+def evidence_state(
+    session: Session, ctx: UserContext, document_id: uuid.UUID, version_id: uuid.UUID | None
+) -> EvidenceState:
+    """Whether the approver of a change request may rely on its evidence (audit 2026-10-05,
+    hardening "Change requests"): ``not_visible`` when the caller's ACL/scope does not reach the
+    document, else the state of the pinned version (the latest version when ``version_id`` is
+    ``None``, for requests submitted before versions were pinned): ``ready`` once its virus
+    scan is clean (also while it is being indexed), ``pending`` while it is queued or
+    scanning, ``unusable`` otherwise."""
+    if not is_visible(session, ctx, document_id):
+        return "not_visible"
+    version = repo.get_version(session, document_id, version_id=version_id)
+    if version is None:
+        return "unusable"
+    if version.status in _EVIDENCE_CLEAN:
+        return "ready"
+    return "pending" if version.status in _EVIDENCE_PENDING else "unusable"
+
+
 def is_visible(session: Session, ctx: UserContext, document_id: uuid.UUID) -> bool:
     """Whether the caller's ACL/scope reaches the document (for other modules' scoped reads)."""
     return repo.get_document(session, document_id, visibility=_visibility(session, ctx)) is not None
+
+
+def visible_document_ids(
+    session: Session, ctx: UserContext, document_ids: Sequence[uuid.UUID]
+) -> set[uuid.UUID]:
+    """The ids among ``document_ids`` whose ACL/scope reaches the caller, in one query (for
+    other modules' lists of rows derived from documents, e.g. the extraction queue: data-layer
+    hardening note 10)."""
+    return repo.visible_ids(session, document_ids, _visibility(session, ctx))
+
+
+def is_own_upload(session: Session, ctx: UserContext, document_id: uuid.UUID) -> bool:
+    """Whether the caller can see the document AND uploaded it themselves (for flows that read
+    an upload and then delete it, such as attendance and marks sheets: audit DL-04)."""
+    doc = repo.get_document(session, document_id, visibility=_visibility(session, ctx))
+    return doc is not None and doc.created_by == ctx.user_id
 
 
 @dataclass(frozen=True, slots=True)
@@ -1444,6 +1657,8 @@ def _discard_version(session: Session, version: DocumentVersion, reason_code: st
     ops.enqueue_event(
         session, DISCARDED_EVENT, {"document_id": version.document_id, "version_id": version.id}
     )
+    for hook in VERSION_DISCARDED_HOOKS:
+        hook(session, version.document_id, version.id)
     return True
 
 
@@ -1504,7 +1719,7 @@ def replace_with_redacted(
         raise Conflict(
             "The redacted copy could not be stored. Try again.", code="storage_unavailable"
         ) from exc
-    with _undo_object_on_error(store, key), _db_errors():
+    with _undo_object_on_error(tenant_id, key), _db_errors():
         version = repo.insert_version(
             session,
             id=new_id(),
@@ -1540,6 +1755,85 @@ def replace_with_redacted(
         ops.enqueue_event(session, SCAN_EVENT, {"document_id": doc.id, "version_id": version.id})
     log.info("documents.version.redacted", resource_type="document", resource_id=doc.id)
     return new_no
+
+
+def _payload_uuid(payload: Mapping[str, Any], name: str) -> uuid.UUID | None:
+    try:
+        return uuid.UUID(str(payload[name]))
+    except (KeyError, ValueError):
+        return None
+
+
+def _payload_time(payload: Mapping[str, Any]) -> dt.datetime | None:
+    try:
+        at = dt.datetime.fromisoformat(str(payload["requested_at"]))
+    except (KeyError, ValueError):
+        return None
+    return at if at.tzinfo is not None else None
+
+
+def _requested_final_key(tenant_id: uuid.UUID, payload: Mapping[str, Any]) -> str | None:
+    """The document or import key an :data:`OBJECT_DISCARD_EVENT` names, rebuilt from IDs."""
+    ext = payload.get("ext")
+    if not isinstance(ext, str) or ext not in {k.ext for k in filetypes.KINDS.values()}:
+        return None
+    if (document_id := _payload_uuid(payload, "document_id")) is not None:
+        version_no = payload.get("version_no")
+        if isinstance(version_no, bool) or not isinstance(version_no, int) or version_no < 1:
+            return None
+        return document_key(tenant_id, document_id, version_no, ext)
+    if (batch_id := _payload_uuid(payload, "batch_id")) is not None:
+        return import_key(tenant_id, batch_id, ext)
+    return None
+
+
+def discard_unused_object(
+    tenant_id: uuid.UUID, payload: Mapping[str, Any], *, store: ObjectStore | None = None
+) -> bool:
+    """Worker (outbox :data:`OBJECT_DISCARD_EVENT`, W3-06): discard an object the upload path
+    no longer needs. Only the worker role may tag or delete under ``t/*``.
+
+    The event carries IDs only, and the api's database role can write the outbox, so nothing in
+    it is trusted: the key is rebuilt under this school's prefix from the IDs.
+
+    - ``upload_id``: the staging object of that upload intent of this school (never the final
+      copy; a staging object is never the file of record).
+    - ``document_id`` + ``version_no`` + ``ext``, or ``batch_id`` + ``ext``: a document or
+      import key written by a request that then failed. Discarded only if no version of this
+      school points at it and the object is not newer than ``requested_at`` (a retry may have
+      copied it again meanwhile).
+
+    Idempotent (a key that is already gone is fine). Returns True when a key was discarded.
+    """
+    store = store or get_object_store()
+    with tenant_session(tenant_id) as s:
+        if (upload_id := _payload_uuid(payload, "upload_id")) is not None:
+            intent = repo.get_intent(s, upload_id)
+            key = intent.object_key if intent is not None else None
+            if key is not None and not _UPLOAD_KEY.match(key):
+                key = None
+        else:
+            key = _requested_final_key(tenant_id, payload)
+            if key is not None and repo.object_key_in_use(s, key):
+                log.warning(
+                    "documents.discard.refused", tenant_id=str(tenant_id), error_code="key_in_use"
+                )
+                return False
+    if key is None or not key_in_tenant(key, tenant_id):
+        log.warning("documents.discard.refused", tenant_id=str(tenant_id), error_code="bad_event")
+        return False
+    if upload_id is None:
+        requested_at = _payload_time(payload)
+        head = store.head(key)
+        if head is None:
+            return False  # gone already: nothing to do
+        modified = head.last_modified
+        if requested_at is None or (modified is not None and modified > requested_at):
+            log.info("documents.discard.skipped", tenant_id=str(tenant_id), error_code="newer")
+            return False
+    store.discard(key)
+    log.info("documents.object.discarded", tenant_id=str(tenant_id))
+    return True
 
 
 def discard_object(
@@ -1579,9 +1873,23 @@ def discard_object(
             key = None
     if key is None or not key_in_tenant(key, tenant_id) or not key.startswith(prefix):
         return False
-    (store or get_object_store()).discard(key)
+    store = store or get_object_store()
+    store.discard(key)
+    _discard_derived(store, tenant_id, document_id, key)
     log.info("documents.version.discarded", resource_type="document", resource_id=document_id)
     return True
+
+
+def _discard_derived(
+    store: ObjectStore, tenant_id: uuid.UUID, document_id: uuid.UUID, original_key: str
+) -> None:
+    """Discard the version's derived objects (page renders, text layer under ``v<n>/derived/``)
+    with the original: they show the same content (PRV-016; audit 2026-10-04 data-layer
+    hardening note 7). ``purge_prefix`` tags every stored version of each key (W3-07)."""
+    m = _DOC_KEY.match(original_key)
+    if m is None or m["t"] != str(tenant_id) or m["d"] != str(document_id):
+        return
+    store.purge_prefix(derived_prefix(tenant_id, document_id, int(m["n"])))
 
 
 def sweep_discarded_objects(tenant_id: uuid.UUID, *, store: ObjectStore | None = None) -> int:
@@ -1598,6 +1906,8 @@ def sweep_discarded_objects(tenant_id: uuid.UUID, *, store: ObjectStore | None =
         ]
     for key in keys:
         store.discard(key)
+        if m := _DOC_KEY.match(key):
+            _discard_derived(store, tenant_id, uuid.UUID(m["d"]), key)
     return len(keys)
 
 
@@ -1737,7 +2047,7 @@ def _sheet_read_only(ctx: UserContext, source: _SheetSource) -> SheetReadOnly | 
     the first rule that applies, in this order."""
     doc, grid = source.doc, source.grid
     rules: tuple[tuple[bool, SheetReadOnly], ...] = (
-        (not ctx.has(UPLOAD), "no_permission"),
+        (not ctx.has(UPLOAD) or not _may_write(ctx, doc), "no_permission"),
         (not purpose_rule(doc.purpose).versionable or grid.kind != "xlsx", "not_versionable"),
         (doc.status == "archived", "archived"),
         (grid.sheet_count > 1, "several_sheets"),
@@ -1884,14 +2194,15 @@ def save_sheet_version(
     expected_version: int,
     store: ObjectStore | None = None,
 ) -> DocumentOut:
-    """Save edited cells as the next version (permission ``document.upload``; ``If-Match``;
-    FR-DOC-010). The stored file is never changed: the edited sheet is written as a new XLSX
-    version (values only; Aadhaar-like numbers masked), stored SSE-KMS under the tenant prefix,
-    made current, and queued for the malware scan and indexing like any upload (FR-DOC-002,
-    FR-DOC-006). Refused (409) for import files and CSVs, archived documents, workbooks with
-    more than one sheet or with formulas, and when ``base_version_no`` is not the current
-    version. Audit ``document.version_added`` and ``document.sheet_edited`` (cell references and
-    counts, never values)."""
+    """Save edited cells as the next version (permission ``document.upload`` and, like any new
+    version, the uploader or a ``document.manage_acl`` holder: 403 ``document_owner_only``
+    otherwise, AA-10; ``If-Match``; FR-DOC-010). The stored file is never changed: the edited sheet
+    is written as a new XLSX version (values only; Aadhaar-like numbers masked), stored SSE-KMS
+    under the tenant prefix, made current, and queued for the malware scan and indexing like any
+    upload (FR-DOC-002, FR-DOC-006). Refused (409) for import files and CSVs, archived documents,
+    workbooks with more than one sheet or with formulas, and when ``base_version_no`` is not the
+    current version. Audit ``document.version_added`` and ``document.sheet_edited`` (cell references
+    and counts, never values)."""
     source = _sheet_source(
         session, ctx, document_id, version_no=data.base_version_no, for_update=True
     )
@@ -1902,6 +2213,8 @@ def save_sheet_version(
     if reason is not None:
         message, code = _SAVE_REFUSALS[reason]
         if reason == "no_permission":
+            if ctx.has(UPLOAD):  # AA-10: may upload, but not change this document
+                _require_writer(ctx, doc)
             raise Forbidden(message, code=code)
         raise Conflict(message, code=code)
     # Only cells whose value really changes count (a rebuilt workbook never has the same bytes
@@ -1925,7 +2238,7 @@ def save_sheet_version(
         raise Conflict(
             "The new version could not be stored. Try again.", code="storage_unavailable"
         ) from exc
-    with _undo_object_on_error(store, key), _db_errors():
+    with _undo_object_on_error(tenant_id, key), _db_errors():
         version = repo.insert_version(
             session,
             id=new_id(),
@@ -2063,7 +2376,7 @@ def store_generated_document(
     key = document_key(tenant_id, document_id, 1, filetypes.PDF.ext)
     store = store or get_object_store()
     store.put(key, content, filetypes.PDF.mime)
-    with _undo_object_on_error(store, key), _db_errors():
+    with _undo_object_on_error(tenant_id, key), _db_errors():
         repo.insert_document(
             session,
             id=document_id,
@@ -2209,9 +2522,10 @@ def export_download_url(
 def delete_export_files(
     session: Session, export_id: uuid.UUID, *, store: ObjectStore | None = None
 ) -> int:
-    """Delete every stored file of one export of the current school (retention, docs/05 §13)."""
+    """Delete every stored file of one export of the current school (retention, docs/05 §13).
+    An automatic deletion: the files are discarded (bucket rule ``discarded-1d``, docs/08 §7)."""
     prefix = export_prefix(repo.current_tenant_id(session), export_id)
-    return (store or get_object_store()).delete_prefix(prefix)
+    return (store or get_object_store()).purge_prefix(prefix)
 
 
 # --- the school's full data export (app.admin; FR-ADM-001, US-1201) -------------------------------
@@ -2226,18 +2540,25 @@ def export_records(session: Session) -> list[RecordTable]:
     return repo.export_record_tables(session)
 
 
-def export_files(session: Session) -> list[StoredObject]:
-    """Worker only (as :func:`export_records`): every version of every document that passed the
-    malware scan, oldest first. Quarantined, failed and discarded versions (PRV-016) are never
-    exported."""
-    out: list[StoredObject] = []
-    for v, purpose in repo.ready_versions(session):
-        out.append(
+WITHHELD_FILE_REASON: Final = "restricted, not included"
+WITHHELD_TABLE: Final = "documents_withheld"
+
+
+def _export_split(
+    session: Session, *, include_sensitive: bool
+) -> tuple[list[StoredObject], list[tuple[DocumentVersion, Document]]]:
+    shipped: list[StoredObject] = []
+    withheld: list[tuple[DocumentVersion, Document]] = []
+    for v, doc in repo.ready_versions(session):
+        if _raw_restricted(doc) and not include_sensitive:
+            withheld.append((v, doc))
+            continue
+        shipped.append(
             StoredObject(
                 document_id=v.document_id,
                 version_id=v.id,
                 version_no=v.version_no,
-                purpose=purpose,
+                purpose=doc.purpose,
                 object_key=v.object_key,
                 mime_type=v.mime_type,
                 size_bytes=v.size_bytes,
@@ -2245,7 +2566,53 @@ def export_files(session: Session) -> list[StoredObject]:
                 status=v.status,
             )
         )
-    return out
+    return shipped, withheld
+
+
+def export_files(session: Session, *, include_sensitive: bool = False) -> list[StoredObject]:
+    """Worker only (as :func:`export_records`): every version of every document that passed the
+    malware scan, oldest first. Quarantined, failed and discarded versions (PRV-016) are never
+    exported. Restricted files (C3 documents and raw import spreadsheets, whose stored file only
+    ``student.read_sensitive`` holders open) are left out unless ``include_sensitive`` (the
+    export was asked with restricted details; audit 2026-10-04, DL-07): they are listed in
+    :func:`export_withheld_files` instead."""
+    return _export_split(session, include_sensitive=include_sensitive)[0]
+
+
+def export_withheld_files(session: Session, *, include_sensitive: bool) -> list[RecordTable]:
+    """Worker only: the ``documents_withheld`` record table of the full export, one row per
+    ready version :func:`export_files` leaves out (document id, version, title, classification
+    and the reason ``restricted, not included``; no file bytes). Empty when
+    ``include_sensitive`` (DL-07). Titles are C2 at most."""
+    _, withheld = _export_split(session, include_sensitive=include_sensitive)
+    rows: list[tuple[object, ...]] = [
+        (
+            doc.id,
+            v.id,
+            v.version_no,
+            doc.title,
+            doc.purpose,
+            doc.sensitivity,
+            WITHHELD_FILE_REASON,
+        )
+        for v, doc in withheld
+    ]
+    return [
+        RecordTable(
+            name=WITHHELD_TABLE,
+            columns=(
+                "document_id",
+                "version_id",
+                "version_no",
+                "title",
+                "purpose",
+                "classification",
+                "reason",
+            ),
+            rows=rows,
+            notes=("restricted_files_withheld",) if rows else (),
+        )
+    ]
 
 
 def iter_export_file(
@@ -2307,24 +2674,32 @@ def delete_tenant_export(
     session: Session, export_id: uuid.UUID, object_key: str, *, store: ObjectStore | None = None
 ) -> None:
     """Delete the full export archive of the current school (retention: 24 hours after it was
-    ready; the bucket rule expires the noncurrent copy after a day)."""
+    ready, or an abandoned build). An automatic deletion: the archive is discarded, so the
+    bucket rule ``discarded-1d`` expires the noncurrent copy after a day (docs/08 §7)."""
     key = _tenant_export_key_checked(session, export_id, object_key)
-    (store or get_object_store()).delete(key)
+    (store or get_object_store()).discard(key)
 
 
 __all__ = [
     "ACL_CHANGED_HOOKS",
     "DELETED_HOOKS",
     "DELETE_GUARDS",
+    "DELETING_HOOKS",
     "DISCARDED_EVENT",
     "DISCARD_REASONS",
     "DISCARD_TASK",
     "GENERATED_PURPOSES",
+    "OBJECT_DISCARD_EVENT",
+    "OBJECT_DISCARD_TASK",
+    "OWNER_ONLY_CODE",
     "QUARANTINE_HOOKS",
     "READY_HOOKS",
     "RETENTION_REASONS",
     "STATUS_CHANGED_HOOKS",
     "TENANT_EXPORT_MIME",
+    "VERSION_DISCARDED_HOOKS",
+    "WITHHELD_FILE_REASON",
+    "WITHHELD_TABLE",
     "FileTooLarge",
     "ObjectStore",
     "ObjectWriter",
@@ -2340,13 +2715,17 @@ __all__ = [
     "delete_for_retention",
     "delete_tenant_export",
     "discard_object",
+    "discard_unused_object",
     "discard_version",
     "document_object",
     "evidence_exists",
+    "evidence_state",
+    "evidence_version",
     "export_download_url",
     "export_files",
     "export_records",
     "export_sheet",
+    "export_withheld_files",
     "generated_download_url",
     "get_document",
     "get_download_url",
@@ -2375,6 +2754,7 @@ __all__ = [
     "tenant_export_download_url",
     "update_document",
     "validate_acl",
+    "visible_document_ids",
 ]
 
 

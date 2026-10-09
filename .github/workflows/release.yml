@@ -1,0 +1,221 @@
+# Release (prod images + dedicated-tier bundle) on a CalVer tag — docs/10 §8, audit 2026-10-05 P2-08 (a).
+#
+# tag 2026.10.1 -> per image: build -> trivy gate -> SBOM (syft) -> push to the prod ECR by digest
+#   -> build-provenance and SBOM attestations (Sigstore, pushed to the registry too)
+# -> bundle: deploy/dedicated/scripts/package.sh with the pushed digests -> provenance attestation
+#   -> upload to the artifacts bucket (s3://.../dedicated/<tag>/) -> GitHub release with the bundle,
+#   its SHA-256 and the SBOMs (kept for good, not a 90-day workflow artifact).
+# deploy-dedicated.yml verifies the bundle's attestation and hands the hosts the SHA-256 from the
+# GitHub release, so a host never trusts a checksum that sits next to the bundle in S3.
+#
+# Only this file on a tag may assume the prod deploy role (job_workflow_ref; modules/ci_oidc), and
+# its jobs run in the `production` environment (required reviewers).
+#
+# Repository variables:
+#   PRODUCTION_AWS_ROLE_ARN        terraform output github_actions.deploy_role_arn (envs/prod)
+#   PRODUCTION_ECR_REGISTRY        <account>.dkr.ecr.ap-south-1.amazonaws.com
+#   PRODUCTION_BUNDLE_S3_PREFIX    s3://<artifacts bucket>/dedicated (hosts' SOS_BUNDLE_S3_PREFIX)
+# Optional:
+#   ECR_REPOSITORY_NAMESPACE       default "schoolos" (package.sh requires schoolos/<image>)
+name: release
+
+on:
+  push:
+    tags: ["20[0-9][0-9].*.*"]
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-south-1
+  VERSION: ${{ github.ref_name }}
+  ECR_REGISTRY: ${{ vars.PRODUCTION_ECR_REGISTRY }}
+  ECR_NAMESPACE: ${{ vars.ECR_REPOSITORY_NAMESPACE || 'schoolos' }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  preflight:
+    name: preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - name: Check tag and configuration
+        id: check
+        env:
+          PRODUCTION_AWS_ROLE_ARN: ${{ vars.PRODUCTION_AWS_ROLE_ARN }}
+          PRODUCTION_ECR_REGISTRY: ${{ vars.PRODUCTION_ECR_REGISTRY }}
+          PRODUCTION_BUNDLE_S3_PREFIX: ${{ vars.PRODUCTION_BUNDLE_S3_PREFIX }}
+        run: |
+          if ! [[ "$VERSION" =~ ^20[0-9]{2}\.(1[0-2]|[1-9])\.[0-9]{1,3}$ ]]; then
+            echo "::error::release tags are CalVer like 2026.10.1, got ${VERSION}"; exit 1
+          fi
+          missing=()
+          for v in PRODUCTION_AWS_ROLE_ARN PRODUCTION_ECR_REGISTRY PRODUCTION_BUNDLE_S3_PREFIX; do
+            [[ -n "${!v}" ]] || missing+=("$v")
+          done
+          if (( ${#missing[@]} )); then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Release skipped; missing repository variables: ${missing[*]}"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  images:
+    name: image (${{ matrix.image }})
+    needs: preflight
+    if: needs.preflight.outputs.enabled == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: production
+    permissions:
+      contents: read
+      id-token: write # GitHub OIDC -> AWS STS, and Sigstore signing of the attestations
+      attestations: write
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - image: api
+            dockerfile: apps/api/Dockerfile
+            target: api
+          - image: worker
+            dockerfile: apps/api/Dockerfile
+            target: worker
+          - image: web
+            dockerfile: apps/web/Dockerfile
+            target: ""
+    env:
+      NAME: ${{ matrix.image }}
+      DOCKERFILE: ${{ matrix.dockerfile }}
+      TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/install-tools
+        with:
+          tools: syft trivy
+      - name: docker build
+        run: |
+          repo="${ECR_REGISTRY}/${ECR_NAMESPACE}/${NAME}"
+          echo "REPO=${repo}" >> "$GITHUB_ENV"
+          docker build --pull --no-cache -f "$DOCKERFILE" ${TARGET:+--target "$TARGET"} -t "${repo}:${VERSION}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.version=${VERSION}" \
+            --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            .
+      - name: trivy image scan (gate before push)
+        run: trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --quiet "${REPO}:${VERSION}"
+      - name: SBOM (syft, SPDX JSON)
+        run: syft scan "docker:${REPO}:${VERSION}" -o "spdx-json=sbom-${NAME}.spdx.json" -q
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.PRODUCTION_AWS_ROLE_ARN }}
+          role-session-name: gha-release-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+          mask-aws-account-id: true
+      - name: Push to ECR (by digest)
+        id: push
+        run: |
+          aws ecr get-login-password --region "$AWS_REGION" \
+            | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+          docker push "${REPO}:${VERSION}"
+          ref=$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "${REPO}:${VERSION}" \
+                  | grep -m1 "^${REPO}@sha256:")
+          digest="${ref#*@}"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::no pushed digest for ${REPO}"; exit 1; }
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$digest" > "digest-${NAME}.txt"
+      - name: Attest build provenance (image)
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.REPO }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+      - name: Attest SBOM (image)
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-name: ${{ env.REPO }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          sbom-path: sbom-${{ matrix.image }}.spdx.json
+          push-to-registry: true
+      - name: Registry logout
+        if: always()
+        run: docker logout "$ECR_REGISTRY" || true
+      - name: Keep digest and SBOM for the bundle job
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-${{ matrix.image }}
+          path: |
+            digest-${{ matrix.image }}.txt
+            sbom-${{ matrix.image }}.spdx.json
+          retention-days: 7
+          if-no-files-found: error
+
+  bundle:
+    name: dedicated bundle + GitHub release
+    needs: [preflight, images]
+    if: needs.preflight.outputs.enabled == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: production
+    permissions:
+      contents: write # create the GitHub release
+      id-token: write # GitHub OIDC -> AWS STS, and Sigstore signing
+      attestations: write
+    env:
+      BUNDLE_S3_PREFIX: ${{ vars.PRODUCTION_BUNDLE_S3_PREFIX }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: release-*
+          path: release-inputs
+          merge-multiple: true
+      - name: Package (deploy/dedicated/scripts/package.sh)
+        run: |
+          for name in api web worker; do
+            digest="$(tr -d '[:space:]' < "release-inputs/digest-${name}.txt")"
+            [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::bad digest for ${name}"; exit 1; }
+            export "SOS_${name^^}_IMAGE=${ECR_NAMESPACE}/${name}:${VERSION}@${digest}"
+          done
+          ./deploy/dedicated/scripts/package.sh "$VERSION" dist
+      - name: Attest build provenance (bundle)
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/schoolos-dedicated.tar.gz
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.PRODUCTION_AWS_ROLE_ARN }}
+          role-session-name: gha-release-bundle-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+          mask-aws-account-id: true
+      - name: Upload the bundle to the artifacts bucket
+        run: |
+          dest="${BUNDLE_S3_PREFIX%/}/${VERSION}/"
+          aws s3 cp --only-show-errors dist/schoolos-dedicated.tar.gz "$dest"
+          aws s3 cp --only-show-errors dist/schoolos-dedicated.tar.gz.sha256 "$dest"
+      - name: GitHub release (bundle, SHA-256, SBOMs)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$VERSION" --verify-tag --title "SchoolOS ${VERSION}" \
+            --notes "Images pushed by digest with build-provenance and SBOM attestations; dedicated bundle attested (gh attestation verify)." \
+            dist/schoolos-dedicated.tar.gz dist/schoolos-dedicated.tar.gz.sha256 release-inputs/sbom-*.spdx.json
+          {
+            echo "### Release ${VERSION}"
+            echo "- bundle: \`$(cut -d' ' -f1 dist/schoolos-dedicated.tar.gz.sha256)\`"
+          } >> "$GITHUB_STEP_SUMMARY"

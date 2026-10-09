@@ -183,8 +183,9 @@ def test_US_402_AC1_item_shows_the_page_image_and_possible_matches(
 def test_US_402_AC1_image_needs_document_read_on_the_page(
     world: Any, api: Any, admin_engine: Engine
 ) -> None:
-    """A page shared only with a membership the reviewer is not: the row is shown, the image
-    is not (the document ACL still applies)."""
+    """A page shared only with a membership the reviewer is not: since data-layer hardening
+    note 10 neither the row nor the image is shown (404, the document ACL applies to the
+    extracted rows too)."""
     a = world.a
     owner = a.people["owner"].user_id
     doc = X.register_scan(
@@ -198,9 +199,7 @@ def test_US_402_AC1_image_needs_document_read_on_the_page(
     service.process_batch(a.tenant_id, batch_id)
     item_id = X.item_ids(admin_engine, batch_id)[0]
     staff = api.call(a.people["office_staff"], "GET", f"/api/v1/extraction-items/{item_id}")
-    assert staff.status_code == 200
-    assert staff.json()["image"] is None
-    assert staff.json()["image_unavailable"] == "not_visible"
+    assert staff.status_code == 404
     # document.manage_acl holders (office admin) see every document.
     admin = api.call(a.people["office_admin"], "GET", f"/api/v1/extraction-items/{item_id}")
     assert admin.json()["image"] is not None
@@ -317,9 +316,36 @@ def test_US_402_AC2_confirm_adds_to_an_existing_student(
     assert X.row_of(admin_engine, "sis.extraction_items", other_id)["status"] == "pending_review"
 
 
+def test_SEC_003_confirm_creates_a_student_only_with_student_create(
+    world: Any, api: Any, admin_engine: Engine, extraction_templates: None
+) -> None:
+    """Audit 2026-10-05 A-06: ``import.commit`` alone (the exam coordinator) created and enrolled
+    students from a register row; an import refuses the same rows without ``student.create``."""
+    a = world.a
+    coordinator = X.W.add_member(admin_engine, a.tenant_id, ["exam_coordinator"])
+    item_id, _ = _item(admin_engine, a, name="SYNTHETICA NO CREATE", admission_no="RG-NC-1")
+    body = {
+        "fields": {"admission_no": "RG-NC-1", "full_name": "Synthetica No Create"},
+        "section_id": str(a.ids["section_9a"]),
+    }
+    res = api.call(coordinator, "POST", f"/api/v1/extraction-items/{item_id}/confirm", json=body)
+    assert res.status_code == 403, res.text
+    assert X.row_of(admin_engine, "sis.extraction_items", item_id)["status"] == "pending_review"
+    with admin_engine.connect() as c:
+        made: int = c.execute(
+            text(
+                "SELECT count(*) FROM sis.attribute_values WHERE tenant_id = :t "
+                "AND attribute_key = 'admission_no' AND value_text = 'RG-NC-1'"
+            ),
+            {"t": a.tenant_id},
+        ).scalar_one()
+    assert made == 0
+
+
 def test_confirm_input_rules(world: Any, api: Any, admin_engine: Engine) -> None:
     a = world.a
-    who = a.people["exam_coordinator"]
+    # Creating students needs student.create (audit 2026-10-05 A-06): the office admin holds it.
+    who = a.people["office_admin"]
     item_id, _ = _item(admin_engine, a)
     url = f"/api/v1/extraction-items/{item_id}/confirm"
     cases = [
@@ -347,6 +373,38 @@ def test_confirm_input_rules(world: Any, api: Any, admin_engine: Engine) -> None
         json={"student_id": str(uuid.uuid4()), "fields": {"nationality": "Indian"}},
     )
     assert student.status_code == 404
+    assert X.row_of(admin_engine, "sis.extraction_items", item_id)["status"] == "pending_review"
+
+
+def test_SEC_013_confirm_refuses_a_full_aadhaar_roll_number(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """Audit 2026-10-04, DL-03: ``roll_no`` was the one confirm input never checked for a full
+    Aadhaar number (the route has no body guard and enrolment did not check it), so a
+    Verhoeff-valid 12-digit "roll number" was stored in sis.enrollments and shown on every
+    roster, timeline and export (invariant 4)."""
+    a = world.a
+    who = a.people["office_admin"]
+    item_id, _ = _item(admin_engine, a)
+    number = X.valid_aadhaar_like(78)
+    res = api.call(
+        who,
+        "POST",
+        f"/api/v1/extraction-items/{item_id}/confirm",
+        json={
+            "fields": {"full_name": "Synthetica Roll Check"},
+            "section_id": str(a.ids["section_9a"]),
+            "roll_no": number,
+        },
+    )
+    assert res.status_code == 422, res.text
+    assert res.json()["errors"][0]["code"] == "aadhaar_full_number_rejected"
+    assert number not in res.text
+    with admin_engine.connect() as c:
+        stored: int = c.execute(
+            text("SELECT count(*) FROM sis.enrollments WHERE roll_no = :n"), {"n": number}
+        ).scalar_one()
+    assert stored == 0
     assert X.row_of(admin_engine, "sis.extraction_items", item_id)["status"] == "pending_review"
 
 

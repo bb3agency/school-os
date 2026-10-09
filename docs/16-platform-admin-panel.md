@@ -2,11 +2,11 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.7 · 2026-09-29 |
-| Changes | 0.7: offboarding deletion (M1, ADR-0029): export gate, deletion job as `sos_purger` in the school's own session, crypto-shredding, dedicated teardown confirmation, 30-day deadline alerts, bilingual certificate of deletion, retained audit chain deleted after its retention, `platform.offboarding_runs` and `platform.deletion_certificates` (migration `0032_offboarding`), routes, audit events, Q14 (§5.3, §5.5, §7, §8.1, §16–§19; FR-PLT-005). 0.6: invoice PDFs (M1): template v0 **pending CA review**, render on the `pdf` queue, control-plane storage, download route, `platform.invoice_pdfs` (migration `0029_invoice_pdfs`), audit events, open questions Q11-Q13 (§1, §5.8, §5.8.1, §7, §8.1, §16, §18, §19; FR-PLT-016, FR-PLT-017). 0.5: provisioning is a persisted, resumable state machine (`platform.provisioning_runs`, migration `0020_provisioning_runs`): request fingerprint, lease, failed state, `provisioning:resume`, go-live refused until provisioning completed (§5.3, §5.4, §7, §8.1, §16, §18; FR-PLT-002). 0.4: product decisions of 2026-09-27: suspended schools keep an allowlist of routes for the owner and principal (§5.5); school-chain copies of platform actions go through `platform.tenant_audit_outbox` and are delivered exactly once (§5.4, §16, §17; ADR-0020). 0.3: matches the M0 implementation: provisioning steps (§5.4), catalog files and `is_platform` (§6), DDL from `0005_platform` incl. `usage_threshold_events`, `breakglass_requests`, `plans.trial_days`, `deployments.boards`/`heartbeat_rotation_started_at`, `subscriptions.cancel_at_period_end`, `job_runs.created_by` (§7), route catalog reconciled with `apps/api/openapi.json` (§8), heartbeat check order (§12.2), audit events and the school-chain limitation (§16), Q2/Q6/Q8 settled (§19). 0.2: new document |
+| Version | 0.10 · 2026-10-04 |
+| Changes | 0.10: reverse a payment end to end (owner request 2026-10-04): `GET /platform/invoices/{invoice_id}/payments`, `PaymentOut` reversal fields and operator names, the operator invoice page with its Payments table and "Reverse payment" (§5.8, §5.9, §8.1; FR-PLT-018). 0.9: owner decisions of 2026-10-03: a school's monthly AI budget is derived from its AI answer bundle (the included answers reach the school through `tenancy.set_ai_answer_allowance`, ADR-0020 amendment B3, ADR-0038 amendment C1), the 100 % AI budget alert, `usd_inr_rate` set to 95.97, ADR-0020 B2 approved; Q17 and Q18 closed, Q19 and Q20 added (§5.7, §5.10, §11, §19). 0.8: commercial catalogue (ADR-0038, migration `0041_billing_catalogue`): published Shared and Dedicated plans with a one-time implementation fee, AI answer bundles with an included monthly quota and overage per extra answer, `ai_answers` metering in the school's own session and in the heartbeat, invoice lines `one_time_fee`, `addon` and `usage_overage`, routes, audit events, `usd_inr_rate` review, Q15-Q17 (§5.6, §5.7, §7, §8.1, §10.2, §11, §12.3, §16, §18, §19; FR-PLT-010, FR-PLT-013, FR-PLT-015..017, FR-PLT-020). 0.7: offboarding deletion (M1, ADR-0029): export gate, deletion job as `sos_purger` in the school's own session, crypto-shredding, dedicated teardown confirmation, 30-day deadline alerts, bilingual certificate of deletion, retained audit chain deleted after its retention, `platform.offboarding_runs` and `platform.deletion_certificates` (migration `0032_offboarding`), routes, audit events, Q14 (§5.3, §5.5, §7, §8.1, §16–§19; FR-PLT-005). 0.6: invoice PDFs (M1): template v0 **pending CA review**, render on the `pdf` queue, control-plane storage, download route, `platform.invoice_pdfs` (migration `0029_invoice_pdfs`), audit events, open questions Q11-Q13 (§1, §5.8, §5.8.1, §7, §8.1, §16, §18, §19; FR-PLT-016, FR-PLT-017). 0.5: provisioning is a persisted, resumable state machine (`platform.provisioning_runs`, migration `0020_provisioning_runs`): request fingerprint, lease, failed state, `provisioning:resume`, go-live refused until provisioning completed (§5.3, §5.4, §7, §8.1, §16, §18; FR-PLT-002). 0.4: product decisions of 2026-09-27: suspended schools keep an allowlist of routes for the owner and principal (§5.5); school-chain copies of platform actions go through `platform.tenant_audit_outbox` and are delivered exactly once (§5.4, §16, §17; ADR-0020). 0.3: matches the M0 implementation: provisioning steps (§5.4), catalog files and `is_platform` (§6), DDL from `0005_platform` incl. `usage_threshold_events`, `breakglass_requests`, `plans.trial_days`, `deployments.boards`/`heartbeat_rotation_started_at`, `subscriptions.cancel_at_period_end`, `job_runs.created_by` (§7), route catalog reconciled with `apps/api/openapi.json` (§8), heartbeat check order (§12.2), audit events and the school-chain limitation (§16), Q2/Q6/Q8 settled (§19). 0.2: new document |
 | Capability | C14 · Milestone M0 (roadmap Task 11) |
 | Requirements | FR-PLT-001..030 (03-TRD §3.12) · stories US-1301..US-1310, US-1204 (02-PRD §4) |
-| Decisions | ADR-0013 (privilege separation), ADR-0029 (tenant data deletion at offboarding), ADR-0015 (tiers), ADR-0016 (payments, Proposed), ADR-0017 (architecture), ADR-0020 (control-plane boundaries, guaranteed audit copies), ADR-0023 (operator sign-in for break-glass, Proposed), ADR-0024 (resumable provisioning, Proposed) |
+| Decisions | ADR-0013 (privilege separation), ADR-0038 (commercial catalogue: one-time fee, AI answer bundles, overage), ADR-0029 (tenant data deletion at offboarding), ADR-0015 (tiers), ADR-0016 (payments, Proposed), ADR-0017 (architecture), ADR-0020 (control-plane boundaries, guaranteed audit copies), ADR-0023 (operator sign-in for break-glass, Proposed), ADR-0024 (resumable provisioning, Proposed) |
 | Related | 04 §16, 05 §3, 07 §6.5–6.6, 08 §14, 09 §4, 10 §15, 11 §11–12, 12 §4.8–4.13 |
 
 ---
@@ -48,7 +48,7 @@ Operators are SchoolOS staff, not school users. One person may hold several role
 2. **Narrow bridges only.** The control plane touches tenant data only through the allowlisted definer functions (05 §3.4). Adding a bridge needs an ADR.
 3. **Everything is audited** in the hash-chained platform log, in the same transaction as the action. Actions that change a school also appear in the school's own audit log.
 4. **Step-up for risk, two people for the irreversible.** ᴿ permissions need MFA within 5 minutes; offboarding and emergency break-glass need a second operator (SEC-027, SEC-029).
-5. **Nothing punitive happens automatically.** Suspension is always a human decision with a reason, never during board exam windows without `platform_owner` approval.
+5. **Nothing punitive happens automatically.** Suspension is always a human decision with a reason. A **billing** suspension never happens during a board exam window without `platform_owner` approval (§9.3). A **security** suspension (`platform.tenants.suspend`: incident, abuse, the school's request) is immediate, also inside an exam window, and needs no extra approval: delaying it would keep a compromised or abused school open (owner decision 2026-10-07, audit AA-16); it is audited (`tenant.suspended`) with its reason stored on the school.
 6. **Money is exact.** `numeric(14,2)` INR, issued invoices are immutable, invoice numbers are gapless per financial year.
 7. **Same codebase, same rules.** Same stack, i18n (`en`, `te`), accessibility, logging and error conventions as the school app.
 
@@ -135,8 +135,9 @@ The owner accepts the invite on first sign-in (`POST /api/v1/me/accept-invitatio
 Result for **dedicated**: the deployment row (`status = provisioning`), billing account, subscription, a new heartbeat key and a `completed` run are created in one control-plane transaction; the tenant row itself is created **on the host** by the provisioning runbook (§13) with the tenant ID chosen here. The heartbeat key is returned once in the `201` response (`heartbeat_key_id`, `heartbeat_key`) and never again: submitting the same request again replays the result without it (rotate the key if the first response was lost).
 
 ### 5.5 Suspend, reactivate, offboard
-- **Suspend (non-billing)** — `platform.tenants.suspend` (ᴿ): reason required (security incident, abuse, school's written request). Calls `core.set_tenant_status(tenant, 'suspended')` for shared; for dedicated, the engineer runs the fleet command (§13.3). Billing suspensions go through the subscription (§5.7).
-- **Reactivate** — same permission and step-up; reason required. A billing suspension is lifted from the subscription instead (`409 billing_suspension`).
+- **Suspend (security hold)** — `platform.tenants.suspend` (ᴿ): reason required (security incident, abuse, school's written request). Sets `deployments.security_hold` and calls `core.set_tenant_status(tenant, 'suspended')` for shared; for dedicated, the engineer runs the fleet command (§13.3). Billing suspensions go through the subscription (§5.7).
+- **The hold is independent of billing** (audit 2026-10-06 R-18, migration 0047). The school is active only when it has neither a security hold nor a billing suspension. An operator can place a hold on a school already suspended for billing (it stays suspended; event `tenant.security_hold_placed`); the hold is lifted only by its own release, never by paying or reactivating the subscription; `409 already_on_hold` when it is already held.
+- **Reactivate (lift the hold)** — same permission and step-up; reason required. When the school is also suspended for billing (shared tier), lifting the hold leaves it suspended with reason `billing` (event `tenant.security_hold_lifted`); the subscription lifts that. Without a hold, a billing suspension is lifted from the subscription instead (`409 billing_suspension`), also when a dedicated school was first held and its subscription was suspended meanwhile (audit 2026-10-05 A-08).
 - **Activate (go-live)** — `platform.tenants.provision` (ᴿ): `provisioning → active` through `core.set_tenant_status`, which refuses a tenant without an unretired data key.
 - **What suspension does** (decided 2026-09-27; BR-08, FR-PLT-004): while a school is `suspended` (and also while it is `offboarding`), the school's **owner and principal** may still use only these routes, and every other school route answers `403 tenant_suspended` for every role. The problem detail says in plain language that Plan & billing and the data export remain available to the owner and principal. The allowlist is one explicit list of (method, route template, roles), `SUSPENDED_SCHOOL_ALLOWLIST` in `apps/api/app/authz/resolver.py`, pinned by `tests/authz/test_suspended_allowlist.py` and an enumeration over every school route (`tests/api/test_suspended_school.py`). The route permission still applies on top (for example `tenant.billing.read`).
 
@@ -150,7 +151,7 @@ Result for **dedicated**: the deployment row (`status = provisioning`), billing 
   | GET | `/api/v1/admin/tenant-export`, `/api/v1/admin/tenant-export/{tenant_export_id}`, `…/{tenant_export_id}/download-url` | Follow it and download the archive while it exists (24 h; download always step-up). The worker builds exports of suspended and offboarding schools too |
 
   `GET /me/schools` and `POST /me/accept-invitations` never resolve a school and are not affected; `/me/schools` reports the school's `status`, which the web app uses to show the suspended banner. No data is deleted. Scheduled tenant jobs pause, except audit verification and retention purges.
-- **Offboard** — `platform.tenants.offboard` (ᴿ, **two-person**): operator A records the request (reason, reference to the school's written request); operator B (a different operator holding the permission) approves with step-up. Then: tenant status `offboarding` → school confirms it has its export (or the export is delivered by us per R8) → access disabled → deletion job removes tenant data **within 30 days** → wrapped keys destroyed (crypto-shredding; for dedicated, the host's KMS key is scheduled for deletion and the host destroyed) → certificate of deletion issued → status `deleted`. Invoices and the billing account stay in `platform` as business records (retention in 08 §14).
+- **Offboard** — `platform.tenants.offboard` (ᴿ, **two-person**): operator A records the request (reason, reference to the school's written request); operator B (a different operator holding the permission) approves with step-up. Then: tenant status `offboarding` → school confirms it has its export (or the export is delivered by us per R8) → access disabled → deletion job removes tenant data **within 30 days** → wrapped keys destroyed (crypto-shredding; for dedicated, the host's KMS key is scheduled for deletion and the host destroyed) → certificate of deletion issued → status `deleted`. Invoices and the billing account stay in `platform` as business records (retention in 08 §14). The request expires, can be withdrawn and is re-checked at approval (§5.19). **Approval ends the school's subscription at once** (`subscription.cancelled`, summary `school_closing`), and no draft invoice (monthly run or manual) is ever made for a school that is `offboarding` or `deleted` (audit 2026-10-05 hardening; issued invoices stay, open drafts are left for the billing admin to discard).
 
 #### 5.5.1 Offboarding deletion (M1, built; ADR-0029, FR-PLT-005)
 
@@ -184,17 +185,41 @@ keys_destroyed --(certificate, pdf queue)--> completed   (school status deleted)
 
 ### 5.6 Plans and pricing
 *Permission:* read with `platform.subscriptions.read`; change with `platform.plans.manage` (ᴿ).
-Fields: code, version, name, tier, billing period (monthly/annual), pricing model (flat or per student), base price (INR), per-student price, included students, GST rate (default 18%), SAC code, limits (students, staff users, storage GB, documents, AI tokens per month), included features (flag defaults). Plans are **versioned**: a published plan's prices and limits never change; editing creates a new draft version. Retiring a plan stops new subscriptions; existing ones continue.
+Fields: code, version, name, description (plain wording, up to 300 characters), tier, billing period (monthly/annual), pricing model (flat or per student), base price (INR), per-student price, included students, **one-time fee** (INR, default 0), GST rate (default 18%), SAC code, limits (students, staff users, storage GB, documents, AI tokens per month), included features (flag defaults). Plans are **versioned**: a published plan's prices and limits never change; editing creates a new draft version. Retiring a plan stops new subscriptions; existing ones continue.
+
+**Edit a draft (built, 2026-10-04).** The plans screen offers **Edit** on draft rows only (published and retired rows have none; "New version" is how a published plan changes) to operators holding `platform.plans.manage` (ᴿ; hidden from others, the API checks). The form, prefilled from the draft, changes only what `PATCH /platform/plans/{plan_id}` accepts: name, base price, per-student price (per-student plans only, required there), included students, trial days, one-time fee (empty means 0), description and limits (empty means no limit); code, tier, billing period, pricing model, GST rate and SAC code are listed read-only. Every editable field is sent, so what the form shows is what is saved. **Version check (owner decision 2026-10-04):** `GET` and `PATCH /platform/plans/{plan_id}` return `ETag: "<row_version>"`; `row_version` (migration `0043_plan_row_version`, default 1) counts draft edits and is separate from the catalogue `version`, and the freeze trigger keeps it fixed after publication. PATCH requires `If-Match` like every platform edit (audit 2026-10-04 AA-13: `400 if_match_required` without it): a stale one answers `412 precondition_failed` and changes nothing. The form sends `If-Match` with the version read when the dialog opened; on 412 it says someone else changed the draft first and reloads the plans, so a reopened form starts from the saved draft. The route takes no `Idempotency-Key` and is not two-person; other errors read in plain words: `409 plan_published` (published meanwhile, checked before the ETag: make a new version), 422 on the field, 403, and 428 step-up.
+
+**Catalogue (owner, 2026-10-01; ADR-0038).** Prices are ex-GST starting prices; GST is added on the invoice (§10.2). Seeded as published data by migration `0041_billing_catalogue` (`created_by` NULL) and pinned by `tests/platform/test_catalogue.py`:
+
+| Plan (code) | Monthly | One-time "Implementation and data verification" | Wording |
+|---|---|---|---|
+| Shared (`shared`) | ₹4,999 | ₹15,000 | Your school runs as a separate, isolated school on the managed SchoolOS platform in AWS Mumbai. |
+| Dedicated (`dedicated`) | ₹9,900 | ₹49,000 | A managed, isolated SchoolOS environment with your own domain, a dedicated database and a documented data export. (Never "your own server".) |
+
+| AI answer bundle (code) | Answers included a month | Monthly | Each extra answer |
+|---|---|---|---|
+| Lite (`ai-lite`) | 300 | ₹699 | ₹1.50 |
+| Standard (`ai-standard`) | 1,000 | ₹1,499 | ₹1.50 |
+| High (`ai-high`) | 3,000 | ₹3,499 | ₹1.50 |
+
+- **One-time fee:** charged once, on the subscription's first invoice (the draft made at activation, §10.1). A new draft gets the line when no live (non-void) invoice of the subscription carries one, so a voided first invoice moves it to the next new invoice and nothing charges it twice. To waive it, keep the line and add an equal discount line.
+- **AI answer bundles** (`GET /platform/ai-bundles`, read with the plans permission): a monthly add-on with an included number of AI answers a calendar month and a price per extra answer. Never "unlimited"; schools never see tokens. Rows are versioned and frozen like plans (a trigger allows only published → retired and refuses deletes); a new price is a new version from a catalogue migration. The plans screen lists them under the plans.
 
 ### 5.7 Subscriptions
 *Permission:* read `platform.subscriptions.read`; actions `platform.subscriptions.manage` (ᴿ).
-List with filters by status. Actions: activate (trial → active), extend trial, change plan (takes effect at the next period; no proration in M0), set or clear a negotiated price (reason required), **suspend** (only from `past_due` after the grace period, §9), reactivate, cancel. The screen shows whether today falls inside a protected board-exam window (§9.3).
+List with filters by status; each row shows the plan (and its one-time fee, "on the first invoice") and the AI answer bundle with the month it counts from. Actions: activate (trial → active), extend trial, change plan (takes effect at the next period; no proration in M0), **choose, change or remove the AI answer bundle** (monthly plans only, `409 ai_bundle_needs_monthly_plan`; a new bundle counts from the first full calendar month after today, a trial's from the month after activation, so trial answers are free; a change applies to the next invoice and to any month not yet billed, nothing is prorated; the school's **AI budget follows the bundle at once**, see below), set, change or remove a negotiated price (reason required; built in the operator UI, see below), **suspend** (only from `past_due` after the grace period, §9), reactivate, cancel. The screen shows whether today falls inside a protected board-exam window (§9.3).
+
+**Negotiated price (built, 2026-10-04; FR-PLT-013).** On the school's Plan & subscription tab and the subscriptions list, operators with `platform.subscriptions.manage` (ᴿ) see **Set negotiated price** (or **Change negotiated price** when one is set) and **Remove negotiated price** with a confirm dialog; operators without it see only the current amount. Set calls `PUT /platform/subscriptions/{sub_id}/price-override` with the amount and a reason (10 to 500 characters); remove calls `DELETE`. The amount is entered by the operator in rupees before GST for each billing period, zero or more (₹0 is allowed, for example a free pilot: owner decision 2026-10-04), at most two decimals. It replaces the plan's base price on the subscription line of invoices made from then on (§10.2); per-student lines and invoices already made do not change. Neither action is two-person or takes an `Idempotency-Key`; both require `If-Match` with the subscription's ETag (the version read when the dialog opened; `400 if_match_required` without it, `412` when stale; AA-13), as do the AI-bundle routes; there is no validity window (from/to). The audit event `subscription.price_override_set` records, on every set, change and clear, `change` (`set`, `changed`, `cleared`), the `plan_id`, the previous and new amounts (null when none) and a SHA-256 of the previous and new reasons (`previous_reason_sha256`, `reason_sha256`, hex written with the letters a-p), so each event is bound to the exact reason given then; the reason text itself stays on the subscription only (the chain holds ids, codes and amounts, never free text; api-auth audit 2026-10-04 hardening note). `SubscriptionOut` returns the reason as `override_reason` (operators only; the school's own billing page uses its own schema), and the Subscription tab shows it under the price (§5.3).
+
+**Suspend for non-payment (built, 2026-10-04; FR-PLT-014).** A **Suspend subscription** action appears only on a `past_due` subscription, for operators with `platform.subscriptions.manage` (ᴿ; hidden from others). It is a *billing* suspension and the wording keeps it apart from the school suspension on the Overview tab (`platform.tenants.suspend`, security or abuse; that dialog now points to the subscription for non-payment). The confirm dialog gives the date the grace period ended and a reason (10 to 500 characters), and states the effect: for a shared-tier school that is active, the school is suspended too (tenant status `suspended`, reason `billing`) and staff can't sign in until the subscription is reactivated; for a dedicated school only the subscription changes, and its environment is not switched off from here. A `platform_owner` also sees a checkbox to approve a suspension inside a protected board-exam window (`exam_window_override`, §9.3); the API ignores it for anyone else. `POST /platform/subscriptions/{sub_id}/suspend` is not two-person and takes no `If-Match` or `Idempotency-Key`; refusals read in plain words: `409 grace_not_over`, `409 exam_window`, `409 invalid_state`, and 428 step-up. **Reactivate** (`POST …/reactivate`, already on the screen) now says overdue invoices must be paid first (`409 overdue_invoices`); for a school suspended for billing it lifts the school suspension too.
+
+**The school's AI budget follows its bundle (owner decision 2026-10-03; ADR-0038 amendment C1, ADR-0020 amendment B3).** After a bundle is chosen, changed or removed, the control plane hands the bundle's included answers (one number, nothing else) to a shared-tier school with `tenancy.service.set_ai_answer_allowance`, which writes it in the school's own session and audits `tenant.ai_allowance_set` in the school's chain. Ask then caps the school's monthly AI spend at included answers × $0.06 × 1.5 at `usd_inr_rate` (`knowledge/config/models.yaml` → `budget.bundle`; about ₹2,591 / ₹8,637 / ₹25,912 for Lite / Standard / High) instead of the school's own `ai_monthly_budget_inr`, which applies only without a bundle. The write runs after the platform transaction; if it fails (`platform.ai_allowance.sync_failed`, ids only) the operator's action stands and the daily usage collector (§11) reconciles every live school. Dedicated hosts are not reached yet (Q19).
 
 ### 5.8 Invoices and billing accounts
 *Permission:* read `platform.invoices.read`; actions `platform.invoices.manage`.
 - **Invoice list:** number, school, period, issue date, due date, total, paid, status; filters by status, financial year, school.
 - **Invoice detail:** supplier and recipient blocks (legal names, GSTINs, addresses, place of supply), lines (description, SAC, quantity, unit price, amount), taxable value, CGST/SGST or IGST, total, payments, balance due.
-- **Actions:** edit draft lines; discard draft; **issue** (assigns the next number, freezes the invoice); **void** (issued, unpaid; reason required; number is kept); record payment (§5.9); **download PDF** of any numbered invoice (§5.8.1).
+- **Actions:** edit draft lines; discard draft; **issue** (assigns the next number, freezes the invoice); **void** (issued, unpaid; reason required; number is kept); record payment and reverse a payment (§5.9); **download PDF** of any numbered invoice (§5.8.1).
 - **Billing account** (edit with `platform.subscriptions.manage`, ᴿ): legal name, GSTIN (validated format; its first two digits must match the state code), PAN (optional), billing email, billing contact name and phone, address, district, PIN code, state code, PO reference. Changes apply to future invoices only; issued invoices keep their snapshot.
 
 ### 5.8.1 Invoice PDFs (M1)
@@ -209,11 +234,17 @@ List with filters by status. Actions: activate (trial → active), extend trial,
 
 ### 5.9 Payments
 *Permission:* `platform.invoices.manage`.
-M0 has one provider, `manual`: a billing admin records a payment against an issued invoice: method (bank transfer, UPI, cheque, other), amount, received date, reference (UTR, UPI reference or cheque number), TDS deducted by the school (if any), notes. Partial payments are allowed. The invoice becomes `paid` when payments plus TDS cover the total. A payment recorded in error is **reversed** with a reason, never deleted. Online collection (Razorpay candidate) is ADR-0016 and is not built.
+M0 has one provider, `manual`: a billing admin records a payment against an issued invoice: method (bank transfer, UPI, cheque, other), amount, received date, reference (UTR, UPI reference or cheque number), TDS deducted by the school (if any), notes. Partial payments are allowed. The invoice becomes `paid` when payments plus TDS cover the total.
+
+- **List:** `GET /platform/invoices/{invoice_id}/payments` (`platform.invoices.read`) returns the invoice's payments as a plain list (like `/tenants/{id}/usage`), newest received first, reversed ones included; 404 for an unknown invoice. Each `PaymentOut` has amount, TDS, method, received date, reference and notes (operator-entered), `status` (`recorded`/`reversed`), `recorded_by`/`recorded_at`, `reversed_by`/`reversed_at`/`reversal_reason`, and `recorded_by_name`/`reversed_by_name` (the operators' display names from `platform.operators`; no school data). Reads are not audited, like the other invoice reads.
+- **Reverse:** a payment recorded in error (or a bounced cheque) is **reversed** with a reason of 10–500 characters, never deleted: `POST /platform/payments/{payment_id}/reverse` (`platform.invoices.manage`; no step-up, not two-person); only a `recorded` payment, else `409 invalid_state`; audited as `payment.reversed`. The response is the updated `PaymentOut`. The invoice is re-settled in the same transaction: a payment is always more than ₹0 and payments can never exceed the balance, so the invoice is **`issued`** afterwards (a `paid` one goes back to `issued`) and its balance due rises by the payment's amount plus TDS. The subscription's status is not changed at once: if the due date has passed, the daily sweep (`billing.daily`) marks it `past_due` with the grace period (§9); nothing is suspended automatically. Nothing is sent to the school; its Plan & billing page shows the amount as due again.
+- **Operator UI:** the invoice number in every invoice table opens `/platform/invoices/{id}`: period, dates, total, amount received, TDS, balance due, the PDF and a **Payments** table (received date, amount and TDS, method, reference, recorded by, a Recorded/Reversed pill; reversed rows show who reversed them, when and why). **Reverse payment** is offered on recorded payments to operators with `platform.invoices.manage`; its dialog says the invoice goes back to Issued (unpaid) and by how much its balance rises, that the school is not told automatically, and when the subscription becomes past due. After a reversal (or a `409`/`404` that means the list is stale) the invoice and its payments are fetched again. Supplier/recipient blocks and lines are on the PDF; the page does not repeat them yet.
+
+Online collection (Razorpay candidate) is ADR-0016 and is not built.
 
 ### 5.10 Usage and quotas
 *Permission:* `platform.usage.read`.
-Daily aggregates per school: active users, staff users, active students, storage, documents, AI queries, AI tokens and AI cost. Each metric shows its plan limit and a bar at 80% and 100%. Crossing 80% or 100% (once per metric per billing period) notifies operators (dashboard + daily email digest) and emails the school's billing contact. **Limits never block school work** in M0; the only automatic limit is the existing AI budget, which degrades Ask to search-only (FR-KB-011).
+Daily aggregates per school: active users, staff users, active students, storage, documents, AI queries, AI tokens and AI cost. Each metric shows its plan limit and a bar at 80% and 100%. Crossing 80% or 100% (once per metric per billing period) notifies operators (dashboard + daily email digest) and emails the school's billing contact. **Limits never block school work** in M0; the only automatic limit is the existing AI budget, which degrades Ask to search-only (FR-KB-011); with an AI answer bundle that budget is derived from the bundle (§5.7). The AI budget's own 80 % and 100 % alerts are gateway log events `kb.budget.alert_crossed` (`action` `alert` or `exhausted`; docs/06 §12): 100 % is the first call refused for budget in the school's month (owner decision 2026-10-03).
 
 ### 5.11 Feature flags
 *Permission:* read `platform.flags.read`; change `platform.flags.manage` (ᴿ).
@@ -225,7 +256,11 @@ One row per deployment: school, mode, region, host (EC2 instance ID), hostname a
 
 ### 5.13 Announcements
 *Permission:* `platform.announcements.manage` (viewing needs any platform role).
+
+**Critical banners are two-person** (audit 2026-10-05 hardening, owner decision 2026-10-07). A `critical` announcement saved as scheduled (new or edited) is stored as `pending_approval` with `submitted_by`/`submitted_at`; schools do not see it. A different operator holding `platform.announcements.manage` approves it with `POST /platform/announcements/{id}/approve` (→ `scheduled`, `approved_by`/`approved_at`; audit `announcement.approved`), under the rules of §5.19 (`409 same_operator`, `request_expired`, `requester_not_authorised`, `approver_not_eligible`). Any later change sends it back for approval; cancelling withdraws it. The DB CHECK `announcements_critical_two_person` (migration `0049_open_items`, `NOT VALID` so older banners stay readable) refuses a scheduled critical banner without a second operator. Info, maintenance and warning banners stay single-operator. The list shows **Waiting for approval**, the approve-by time and an **Approve** button.
 Bilingual banners (English and Telugu title and body; **while Telugu is hidden (ADR-0036, `SOS_TELUGU_ENABLED` off) only the English title and body are required**: an empty Telugu text is stored as the English one on create (the columns are `NOT NULL`), an update keeps the stored one, and the operator list and the school-side feed return `title_te`/`body_te` empty), severity (info, maintenance, warning, critical), audience (all schools, one tier, or listed schools), start and end time (IST shown, UTC stored). Delivery in §14.
+
+**Edit** (built 2026-10-04). Every announcement that has not ended and is not cancelled shows **Edit** to holders of `platform.announcements.manage` (hidden from other operators). The dialog has the same fields and limits as a new announcement, filled from the stored one (times shown in IST), and sends `PATCH /platform/announcements/{id}` with `If-Match` (the version the operator opened). The API replaces the whole banner (the body is `AnnouncementIn`, not a partial update), so the web sends every field; while Telugu is hidden it sends the Telugu texts empty so the stored ones are kept. Draft, scheduled and live announcements can be edited. **An announcement that has ended is read-only** (owner decision 2026-10-04): once its end time has passed (`ends_at <= now`, server clock, UTC; the same rule that stops the school-side banner, which shows while `starts_at <= now < ends_at`) the API refuses the edit with 409 `invalid_state`, whatever its stored status (a draft whose window has passed has ended too), and a new window does not reopen it: create a new announcement instead. A cancelled one cannot be edited either (409 `invalid_state`). **Cancel** follows the same rule (owner decision 2026-10-04: an ended announcement is fully read-only): `POST /platform/announcements/{id}/cancel` on an ended announcement answers 409 `invalid_state` ("An announcement that has ended cannot change.", checked after the 404, nothing stored); cancelling one that is already cancelled still returns it unchanged (200), ended or not. If it ends while the cancel dialog is open, the 409 is explained in the dialog ("This announcement can't be changed any more") and the list refreshes, as for an edit. An edit may move the end to now or earlier ("end now"), as a new announcement may have any window whose end follows its start; from then on it is read-only. The operator list shows such an announcement as **Ended** (derived from its end time in the browser and re-read every minute) and offers neither **Edit** nor **Cancel**. No step-up (the permission has `step_up: false`) and no `Idempotency-Key` (the update is idempotent with `If-Match`). Someone else's change first (412 `precondition_failed`), or the announcement ending or being cancelled while the dialog is open (409), refreshes the list and says so in plain language (the dialog stays open with the explanation; the refreshed row shows its new status without **Edit**); 422 errors show on their fields. Pinned by `apps/web/src/features/platform/announcements.test.tsx`.
 
 ### 5.14 Support tickets
 *Permission:* read `platform.support.read`; act `platform.support.manage`.
@@ -233,18 +268,53 @@ Queue with SLA timers, filters by status, priority, school, assignee. Ticket vie
 
 ### 5.15 Break-glass requests
 *Permission:* `platform.breakglass.request` to create (M1); any platform role to view the list.
-M0 shows the list and status of requests (requested, approved, active, expired, revoked, denied) with school, reason, scope and times. The approval workflow lives in the school app (07 §6.4) and arrives in M1. Emergency access without school approval needs `platform.breakglass.emergency` (ᴿ, two-person) and is reported to the school within 24 hours. **Using an active grant** ([ADR-0023](adr/ADR-0023-operator-sign-in-for-break-glass-across-user-pools.md) option C): for an `active` request the list offers **Open the school (support sign-in)**, a link to `/bff/auth/support/login?request=<request id>&tenant=<school id>`. The operator signs in again (MFA, fresh sign-in) with the support app client of the operator pool; the school app shows a read-only "SchoolOS support" banner and a sign-out button. The session start is recorded as `breakglass.session_started` in both chains. A host without the support client (`SOS_SUPPORT_OIDC_AUDIENCE` / `SUPPORT_OIDC_CLIENT_ID` unset) keeps the grant unusable (fail closed).
+M0 shows the list and status of requests (requested, approved, active, expired, revoked, denied) with school, reason, scope and times. The approval workflow lives in the school app (07 §6.4) and arrives in M1. Emergency access without school approval needs `platform.breakglass.emergency` (ᴿ, two-person) and is reported to the school within 24 hours. **Using an active grant** ([ADR-0023](adr/ADR-0023-operator-sign-in-for-break-glass-across-user-pools.md) option C): for an `active` request the list offers **Open the school (support sign-in)**, a link to `/bff/auth/support/login?request=<request id>&tenant=<school id>`. The operator signs in again (MFA, fresh sign-in) with the support app client of the operator pool; the school app shows a read-only "SchoolOS support" banner and a sign-out button. The session start is recorded as `breakglass.session_started` in both chains. A host without the support client (`SOS_SUPPORT_OIDC_AUDIENCE` / `SUPPORT_OIDC_CLIENT_ID` unset) keeps the grant unusable (fail closed). **Emergency rules (audit 2026-10-05 A-13):** `emergency=true` needs `reason_code` `security_incident` or `legal_obligation` (422 otherwise); both confirmations must come within the request lifetime (`confirm_by` in the list), and the second re-checks the first confirmer and its own role age (§5.19). A request still `requested` can be **withdrawn** (`POST /platform/break-glass-requests/{id}/withdraw`, `platform.breakglass.request`; audit `breakglass.withdrawn`): it ends as `revoked`, the school stops seeing it and a school approval answers `409 request_withdrawn`.
 
 ### 5.16 Operators and roles
 *Permission:* `platform.operators.manage` (ᴿ).
-Invite (email, name, roles), resend invite, assign or remove roles, deactivate. An operator cannot change their own roles. At least one active `platform_owner` must remain. Operators must enrol MFA before first use.
+Invite (email, name, roles), resend invite, assign or remove roles, deactivate. An operator cannot change their own roles. At least one active `platform_owner` must remain. Operators must enrol MFA before first use. Changing roles keeps the original `granted_at`/`granted_by` of every role that stays (only added roles get new rows), because the two-person waiting period counts from the real grant (§5.19, audit 2026-10-05 A-14).
 
 ### 5.17 Platform audit log
 *Permission:* `platform.audit.read`.
 Filter by operator, action, school, date; export CSV; **Verify chain** runs the verification job and shows the result (first bad sequence number if any).
 
 ### 5.18 School-side "Plan & billing" page (FR-PLT-030)
-In the **school** app, for holders of `tenant.billing.read` (owner, principal, accountant): current plan, status, period, trial end; usage vs limits (latest daily aggregates); invoices list (number, period, total, status, amount due). Data comes from `core.current_subscription()`, which returns only the current tenant's own records. On a dedicated host the page shows the summary delivered in the heartbeat response (§12.4); until that lands (M1), it shows plan name and a note that invoices are sent by email.
+In the **school** app, for holders of `tenant.billing.read` (owner, principal, accountant): current plan, status, period, trial end; usage vs limits (latest daily aggregates); invoices list (number, period, total, status, amount due). Data comes from `core.current_subscription()`, which returns only the current tenant's own records.
+
+**AI answers card** (ADR-0038; built 2026-10-04). `GET /api/v1/tenant/billing` also returns `ai_bundle`: the bundle of that subscription (`code`, `name`, `included_answers` a month, `price_inr` a month and `overage_rate_inr` per extra answer, both ex-GST from the catalogue row), `counts_from` (`ai_bundle_from`), `month_start` (the current calendar month, IST), `answers_used` (billable answers of that month so far, summed from `platform.usage_daily.ai_answers`) and `answers_counted_to` (the last day collected; the collector adds each day the next morning), or `null` without a bundle. `answers_used` is `null` while the month is before `counts_from` (a newly chosen bundle counts from the next month). These are platform rows read by `platform.service.school_ai_bundle(tenant_id, subscription_id)` for the caller's own tenant and the subscription the definer returned (`platform_session`, the same path as announcements and tickets): no tenant-table read, no definer function, no migration. Same permission (`tenant.billing.read`) and suspended-school rules as the rest of the page. The card shows the bundle name, included answers, a usage meter (answers this month of the included number), the bundle price and the price per extra answer (both "plus GST"), and, without a bundle, "No AI answer bundle. Ask SchoolOS support to add one." It shows facts only: no estimate of the overage charge (open question §19 Q21), never tokens. Pinned by `apps/api/tests/platform/test_school_ai_bundle.py` and `apps/web/src/features/school/school.test.tsx`.
+
+On a dedicated host the page shows the summary delivered in the heartbeat response (§12.4); until that lands (M1), it shows plan name and a note that invoices are sent by email.
+
+### 5.19 Two-person requests: expiry, withdrawal, re-checks (audit 2026-10-05 A-13, A-14)
+
+Owner decision 2026-10-07 (the audit's recommendation). The three two-person flows (offboarding
+§5.5, emergency break-glass §5.15, critical announcements §5.13) share these rules, implemented
+once in `apps/api/app/platform/two_person.py`; the values live in
+`apps/api/app/platform/roles.yaml`:
+
+- **Expiry** (`two_person_request_ttl_hours`, 72): the second step must come within 72 hours of
+  the request (offboarding: `offboard_requested_at`; break-glass: the request's `created_at`;
+  announcement: `submitted_at`), else `409 request_expired`. The detail and list responses carry
+  the deadline (`offboard_request_expires_at`, `confirm_by`, `approval_expires_at`). An expired
+  offboarding request can be replaced by a new request.
+- **Withdrawal**: `POST /platform/tenants/{id}/offboarding:withdraw`
+  (`platform.tenants.offboard`; audit `tenant.offboard_withdrawn`), `POST
+  /platform/break-glass-requests/{id}/withdraw`, and cancelling a pending announcement. The web
+  shows a **Withdraw** button where the request is shown.
+- **Re-check of the first operator** at the second step: still `active` and still holding the
+  permission through a role, else `409 requester_not_authorised` (A leaves or is demoted; B can
+  no longer finish alone).
+- **Second operator's eligibility** (`two_person_min_role_age_days`, 7): B must have held a role
+  granting the permission for at least 7 days, and neither operator's qualifying role may have
+  been granted by the other, else `409 approver_not_eligible`. One owner can therefore not invite
+  a second account they control, make it an owner and approve their own request with it; nor can
+  that account ask and its inviter approve. Operator-pool administration and role administration
+  stay one permission (`platform.operators.manage`): splitting it needs a new catalog permission
+  and seed migration, and the grant-source rule above already closes the self-approval path.
+- All checks run under the row lock of the request; `same_operator` keeps its service check and
+  DB CHECK.
+- Tests: `apps/api/tests/platform/test_two_person_requests.py`,
+  `apps/web/src/features/platform/two-person.test.tsx`.
 
 ## 6. Permissions
 
@@ -388,6 +458,7 @@ CREATE TABLE platform.deployments (
   tenant_status             text NOT NULL CHECK (tenant_status IN
                               ('provisioning','active','suspended','offboarding','deleted')),
   tenant_status_reason      text,
+  security_hold             boolean NOT NULL DEFAULT false,  -- operator hold, independent of billing (0047, R-18)
   status                    text NOT NULL CHECK (status IN
                               ('provisioning','healthy','degraded','unreachable','decommissioned')),
   app_version               text,
@@ -427,7 +498,9 @@ CREATE TABLE platform.deployments (
     CHECK (offboard_approved_by IS NULL
            OR (offboard_requested_by IS NOT NULL AND offboard_approved_by <> offboard_requested_by)),
   CONSTRAINT deployments_suspension_reason
-    CHECK (tenant_status <> 'suspended' OR tenant_status_reason IS NOT NULL)
+    CHECK (tenant_status <> 'suspended' OR tenant_status_reason IS NOT NULL),
+  CONSTRAINT deployments_security_hold_not_active
+    CHECK (NOT security_hold OR tenant_status <> 'active')
 );
 
 CREATE TABLE platform.subscriptions (
@@ -635,14 +708,22 @@ CREATE TABLE platform.announcements (
   audience_tenant_ids  uuid[] NOT NULL DEFAULT '{}',
   starts_at            timestamptz NOT NULL,
   ends_at              timestamptz NOT NULL,
-  status               text NOT NULL CHECK (status IN ('draft','scheduled','cancelled')),
+  status               text NOT NULL CHECK (status IN ('draft','pending_approval','scheduled','cancelled')),
   created_by           uuid NOT NULL REFERENCES platform.operators(id),
+  -- 0049_open_items: a critical banner needs a second operator (§5.13, §5.19).
+  submitted_by         uuid REFERENCES platform.operators(id),
+  submitted_at         timestamptz,
+  approved_by          uuid REFERENCES platform.operators(id),
+  approved_at          timestamptz,
   created_at           timestamptz NOT NULL DEFAULT now(),
   updated_at           timestamptz NOT NULL DEFAULT now(),
   version              int NOT NULL DEFAULT 1 CHECK (version >= 1),
   CONSTRAINT announcements_window CHECK (ends_at > starts_at),
   CONSTRAINT announcements_tier CHECK ((audience = 'tier') = (audience_tier IS NOT NULL)),
-  CONSTRAINT announcements_tenants CHECK ((audience = 'tenants') = (cardinality(audience_tenant_ids) > 0))
+  CONSTRAINT announcements_tenants CHECK ((audience = 'tenants') = (cardinality(audience_tenant_ids) > 0)),
+  CONSTRAINT announcements_critical_two_person CHECK (severity <> 'critical' OR status <> 'scheduled'
+    OR (approved_by IS NOT NULL AND submitted_by IS NOT NULL AND approved_by <> submitted_by)) -- NOT VALID
+  -- plus announcements_submitted, announcements_approved, announcements_pending_submitted (pairs)
 );
 
 CREATE TABLE platform.support_tickets (
@@ -770,6 +851,8 @@ Platform chain write (inside the action's transaction, `audit.service.record_pla
 
 Notes on columns that are easy to miss:
 - `plans.trial_days` (default 30, 0–365): trial length for subscriptions started as `trial` on that plan (not a global config value).
+- Migration `0041_billing_catalogue` (ADR-0038): `plans.one_time_fee_inr` (`numeric(14,2) NOT NULL DEFAULT 0`, CHECK ≥ 0), `plans.description` (1–300 characters), `plans.created_by` nullable (NULL = seeded by a catalogue migration); `platform.ai_bundles` (`id`, `code` + `version` unique, `name`, `included_answers` > 0, `price_inr` ≥ 0, `overage_rate_inr` > 0, `status` `published`/`retired`, `published_at`, `created_at`, `updated_at`; trigger `ai_bundles_freeze`: only published → retired, no delete); `subscriptions.ai_bundle_id` (FK) and `ai_bundle_from` (first day of a month; both set or both NULL); `invoice_lines.kind` adds `one_time_fee`, `invoice_lines.usage_month` (first day of the month an `usage_overage` line bills; NULL on every other kind); `usage_daily.ai_answers` (int ≥ 0, default 0). Default privileges give `sos_platform` DML on `ai_bundles`; nothing new for `sos_app`, `sos_definer` or `sos_readonly`. The downgrade refuses while a subscription uses a seeded plan or any bundle, or an overage line records its month.
+- Migration `0043_plan_row_version` (owner decision 2026-10-04): `plans.row_version` (`int NOT NULL DEFAULT 1`, CHECK ≥ 1), the edit counter behind the plan ETag (`If-Match` on draft edits, §5.6); not the catalogue `version`. Bumped on each draft edit; the `plans_freeze` trigger keeps it fixed after publication. Expand-only; the downgrade drops it.
 - `deployments.boards` (copied from provisioning), `deployments.heartbeat_rotation_started_at` (set iff a next key exists; the old key stops working 7 days after it, `fleet.key_rotation_overlap_days`), `heartbeat_key_ciphertext`/`heartbeat_next_key_ciphertext`: the 32-byte keys **wrapped** with the KMS data key (local-dev wrapper outside AWS), not hashed, because the control plane must recompute each HMAC.
 - `subscriptions.cancel_at_period_end` (+ `cancel_reason`): `cancel` on a paid subscription ends it at period end; a trial is cancelled at once.
 - `usage_threshold_events`: one row per (school, metric, 80/100, billing period) records the first crossing (FR-PLT-021).
@@ -783,7 +866,7 @@ Notes on columns that are easy to miss:
 
 ## 8. API endpoint catalog
 
-Conventions from 09 §2 apply (problem+json, `Idempotency-Key` on creating POSTs, `ETag`/`If-Match`, cursor pagination). Base path `/api/v1`. The committed `apps/api/openapi.json` is the authoritative route list (a test fails when it is stale; `make openapi` regenerates it and the TypeScript client). "ᴿ" = step-up (`428 step_up_required` otherwise); step-up follows the permission's catalog flag, except `GET /platform/operators`, which is a read without step-up. Control-plane idempotency keys are kept for 24 hours in Valkey (operator ID + key → request hash, status and resource ID; no personal data), because `sos_platform` cannot use `ops.idempotency_keys`.
+Conventions from 09 §2 apply (problem+json, `Idempotency-Key` on creating POSTs, `ETag`/`If-Match`, cursor pagination). Base path `/api/v1`. The committed `apps/api/openapi.json` is the authoritative route list (a test fails when it is stale; `make openapi` regenerates it and the TypeScript client). "ᴿ" = step-up (`428 step_up_required` otherwise); step-up follows the permission's catalog flag, except `GET /platform/operators`, which is a read without step-up. Every control-plane update of an existing row (plan, billing account, invoice draft, deployment, announcement, ticket, price override, AI bundle, flag and school override) requires `If-Match` with the ETag it was read with: `400 if_match_required` without it (the school routes' answer), `412 precondition_failed` when stale; `GET` by id and every such update return the `ETag` (audit 2026-10-04 AA-13). A flag or school override that does not exist yet is created without `If-Match` (sent anyway, it answers 412). Control-plane idempotency keys are kept for 24 hours in Valkey (operator ID + key → request hash, status and resource ID; no personal data); the in-progress marker before that lives only 60 seconds, as on the school routes, so a request that died does not block retries (`409 idempotency_in_progress`) for a day (AA-14). They live in Valkey because `sos_platform` cannot use `ops.idempotency_keys`.
 
 "Any operator" means the guard `require_platform("platform.tenants.read")`, which every platform role holds (§6); the constant is `ANY_OPERATOR` in `app/platform/permissions.py`.
 
@@ -799,9 +882,10 @@ Conventions from 09 §2 apply (problem+json, `Idempotency-Key` on creating POSTs
 | POST | `/platform/tenants/{tenant_id}/provisioning:resume` | `platform.tenants.provision` ᴿ | 200 | Resume an unfinished or failed provisioning (§5.4) and return its result; a finished one is returned as it is; `409 provisioning_in_progress` while another request holds it; `409 resume_needs_request` for a run from before `0020` |
 | POST | `/platform/tenants/{tenant_id}/activate` | `platform.tenants.provision` ᴿ | 200 | Go-live `provisioning → active`; `409 provisioning_incomplete` until provisioning completed; the database refuses without a data key (`core.set_tenant_status`) |
 | POST | `/platform/tenants/{tenant_id}/owner-invite:resend` | `platform.tenants.provision` ᴿ | 202 | Only while `provisioning`; records `tenant.owner_invite_sent` (email delivery not built yet) |
-| POST | `/platform/tenants/{tenant_id}/suspend` · `/reactivate` | `platform.tenants.suspend` ᴿ | 200 | Reason required; non-billing; a billing suspension is lifted from the subscription (`409 billing_suspension`) |
+| POST | `/platform/tenants/{tenant_id}/suspend` · `/reactivate` | `platform.tenants.suspend` ᴿ | 200 | Reason required; place or lift the security hold, independent of billing (R-18: a billing-suspended school can be held; lifting keeps the billing suspension; `409 already_on_hold`); a billing suspension is lifted from the subscription (`409 billing_suspension`) |
 | POST | `/platform/tenants/{tenant_id}/offboarding` | `platform.tenants.offboard` ᴿ | 202 | Two-person step 1: request (`409 already_requested` on repeat) |
-| POST | `/platform/tenants/{tenant_id}/offboarding:approve` | `platform.tenants.offboard` ᴿ | 200 | Step 2 by a different operator (`409 same_operator`; DB CHECK too); tenant → `offboarding`; creates the offboarding run (deadline + 30 days) |
+| POST | `/platform/tenants/{tenant_id}/offboarding:approve` | `platform.tenants.offboard` ᴿ | 200 | Step 2 by a different operator (`409 same_operator`; DB CHECK too; `request_expired`, `requester_not_authorised`, `approver_not_eligible`, §5.19); tenant → `offboarding`; creates the offboarding run (deadline + 30 days); ends the subscription |
+| POST | `/platform/tenants/{tenant_id}/offboarding:withdraw` | `platform.tenants.offboard` ᴿ | 200 | Withdraw a pending request (`409 not_requested`; §5.19) |
 | GET | `/platform/tenants/{tenant_id}/offboarding` | `platform.tenants.read` | 200 | Offboarding progress (§5.5.1); `409 not_offboarding` if never approved |
 | POST | `/platform/tenants/{tenant_id}/offboarding:confirm-export` | `platform.tenants.offboard` ᴿ | 200 | Export gate: `{basis: school_confirmed \| delivered_by_us, reference}`; `409 export_already_confirmed` |
 | POST | `/platform/tenants/{tenant_id}/offboarding:confirm-teardown` | `platform.tenants.offboard` ᴿ | 200 | Dedicated: `{kms_deletion_reference, host_teardown_reference}`; `409 not_dedicated`, `409 invalid_state` before the export gate |
@@ -812,11 +896,13 @@ Conventions from 09 §2 apply (problem+json, `Idempotency-Key` on creating POSTs
 | PUT | `/platform/tenants/{tenant_id}/billing-account` | `platform.subscriptions.manage` ᴿ | 200 | Affects future invoices only |
 | GET | `/platform/plans` · `/platform/plans/{plan_id}` | `platform.subscriptions.read` or `platform.plans.manage` | 200 | |
 | POST | `/platform/plans` | `platform.plans.manage` ᴿ | 201 | Creates a draft (new code or new version) |
-| PATCH | `/platform/plans/{plan_id}` | `platform.plans.manage` ᴿ | 200 | Drafts only |
+| PATCH | `/platform/plans/{plan_id}` | `platform.plans.manage` ᴿ | 200 | Drafts only; `If-Match` = `row_version` ETag required (400 `if_match_required`; 412 when stale) |
 | POST | `/platform/plans/{plan_id}/publish` · `/retire` | `platform.plans.manage` ᴿ | 200 | |
+| GET | `/platform/ai-bundles` | `platform.subscriptions.read` or `platform.plans.manage` | 200 | AI answer bundles (§5.6); filter `status` (`published`, `retired`) |
 | GET | `/platform/subscriptions` · `/platform/subscriptions/{sub_id}` | `platform.subscriptions.read` | 200 | Filter by `status` |
 | POST | `/platform/subscriptions/{sub_id}/activate` · `/extend-trial` · `/change-plan` · `/cancel` | `platform.subscriptions.manage` ᴿ | 200 | Plan change at the next period (immediately for a trial); cancel at period end (a trial at once) |
 | PUT · DELETE | `/platform/subscriptions/{sub_id}/price-override` | `platform.subscriptions.manage` ᴿ | 200 | Amount + reason; DELETE clears |
+| PUT · DELETE | `/platform/subscriptions/{sub_id}/ai-bundle` | `platform.subscriptions.manage` ᴿ | 200 | Body `ai_bundle_id`; `422 ai_bundle_not_available` for an unknown or retired bundle, `409 ai_bundle_needs_monthly_plan`, `409 invalid_state` when cancelled; DELETE removes it (§5.7) |
 | POST | `/platform/subscriptions/{sub_id}/suspend` | `platform.subscriptions.manage` ᴿ | 200 | Only `past_due` after grace; exam-window rule (§9.3) |
 | POST | `/platform/subscriptions/{sub_id}/reactivate` | `platform.subscriptions.manage` ᴿ | 200 | |
 | GET | `/platform/invoices` · `/platform/invoices/{invoice_id}` | `platform.invoices.read` | 200 | Filters: `status`, `financial_year`, `tenant_id` |
@@ -826,34 +912,37 @@ Conventions from 09 §2 apply (problem+json, `Idempotency-Key` on creating POSTs
 | DELETE | `/platform/invoices/{invoice_id}` | `platform.invoices.manage` | 204 | Drafts only |
 | POST | `/platform/invoices/{invoice_id}/issue` | `platform.invoices.manage` | 200 | Assigns the number (§10.3) |
 | POST | `/platform/invoices/{invoice_id}/void` | `platform.invoices.manage` | 200 | Issued and unpaid; reason required |
+| GET | `/platform/invoices/{invoice_id}/payments` | `platform.invoices.read` | 200 | The invoice's payments, newest received first, incl. reversed (plain list; §5.9); 404 unknown invoice |
 | POST | `/platform/invoices/{invoice_id}/payments` | `platform.invoices.manage` | 201 | Record manual payment (§5.9) |
-| POST | `/platform/payments/{payment_id}/reverse` | `platform.invoices.manage` | 200 | Reason required |
+| POST | `/platform/payments/{payment_id}/reverse` | `platform.invoices.manage` | 200 | Reason 10–500 characters; `recorded` only (`409 invalid_state`); invoice back to `issued` (§5.9) |
 | POST | `/platform/invoice-runs` | `platform.invoices.manage` | 202 | Generate drafts for a month now (idempotent per month) |
 | GET | `/platform/flags` | `platform.flags.read` | 200 | Global rows and overrides |
 | PUT | `/platform/flags/{key}` | `platform.flags.manage` ᴿ | 200 | Global value and rollout % |
 | PUT · DELETE | `/platform/flags/{key}/tenants/{tenant_id}` | `platform.flags.manage` ᴿ | 200 · 204 | Per-school override |
-| GET | `/platform/deployments` · `/platform/deployments/{deployment_id}` | `platform.fleet.read` | 200 | |
+| GET | `/platform/deployments` · `/platform/deployments/{deployment_id}` | `platform.fleet.read` | 200 | List: newest first, cursor-paged (`limit` 1-200, default 50; `cursor`; `next_cursor`), optional `status` and `tenant_id` (audit 2026-10-06 R-14) |
 | PATCH | `/platform/deployments/{deployment_id}` | `platform.fleet.manage` ᴿ | 200 | `target_version`, `custom_domain`, `hostname`, `host_ref` (dedicated only; `If-Match`) |
-| POST | `/platform/deployments/{deployment_id}/heartbeat-key:rotate` | `platform.fleet.manage` ᴿ | 200 | Returns the new key **once** for the runbook |
+| POST | `/platform/deployments/{deployment_id}/heartbeat-key:rotate` | `platform.fleet.manage` ᴿ | 200 | Returns the new key **once** for the runbook; `409 rotation_pending` while an earlier rotation is inside its 7-day overlap (audit 2026-10-06 R-15) |
 | POST | `/platform/deployments/{deployment_id}/decommission` | `platform.fleet.manage` ᴿ | 200 | After an approved offboarding |
 | GET | `/platform/fleet/versions` | `platform.fleet.read` | 200 | Running versions across deployments (version skew) |
-| GET | `/platform/announcements` | any operator | 200 | |
+| GET | `/platform/announcements` | any operator | 200 | Newest first, cursor-paged (`limit` 1-200, default 50; `cursor`; `next_cursor`; audit 2026-10-06 R-14) |
 | POST | `/platform/announcements` | `platform.announcements.manage` | 201 | |
 | PATCH | `/platform/announcements/{announcement_id}` | `platform.announcements.manage` | 200 | |
+| POST | `/platform/announcements/{announcement_id}/approve` | `platform.announcements.manage` | 200 | Second operator approves a critical banner (§5.13, §5.19) |
 | POST | `/platform/announcements/{announcement_id}/cancel` | `platform.announcements.manage` | 200 | |
 | GET | `/platform/support/tickets` · `/{ticket_id}` | `platform.support.read` | 200 | |
 | POST | `/platform/support/tickets` | `platform.support.manage` | 201 | Operator-created (email/phone/WhatsApp) |
 | POST | `/platform/support/tickets/{ticket_id}/messages` | `platform.support.manage` | 201 | Reply or internal note |
 | PATCH | `/platform/support/tickets/{ticket_id}` | `platform.support.manage` | 200 | Status, priority, assignee, personal-data flag |
-| GET | `/platform/break-glass-requests` | any operator | 200 | Status list, optional `tenant_id` |
-| POST | `/platform/break-glass-requests` | `platform.breakglass.request` | 201 | Records the request (school approval workflow: M1) |
-| POST | `/platform/break-glass-requests/{request_id}/emergency-confirm` | `platform.breakglass.emergency` ᴿ | 200 | Two different operators (SEC-029) |
+| GET | `/platform/break-glass-requests` | any operator | 200 | Status list, newest first, cursor-paged (`limit` 1-200, default 50; `cursor`; `next_cursor`; audit 2026-10-06 R-14), optional `tenant_id` |
+| POST | `/platform/break-glass-requests` | `platform.breakglass.request` | 201 | Records the request (school approval workflow: M1). `scope` is `{}` (the whole school) or `section_id` and/or `class_id` (UUIDs); any other key is `422` (audit DL-10) |
+| POST | `/platform/break-glass-requests/{request_id}/emergency-confirm` | `platform.breakglass.emergency` ᴿ | 200 | Two different operators (SEC-029), within the request lifetime, with the re-checks of §5.19 |
+| POST | `/platform/break-glass-requests/{request_id}/withdraw` | `platform.breakglass.request` | 200 | Withdraw a waiting request (→ `revoked`; `409 invalid_state` otherwise) |
 | GET | `/platform/operators` | `platform.operators.manage` (no step-up) | 200 | |
 | POST | `/platform/operators` | `platform.operators.manage` ᴿ | 201 | Invite |
 | PUT | `/platform/operators/{operator_id}/roles` | `platform.operators.manage` ᴿ | 200 | Not own roles; keep ≥ 1 owner |
 | POST | `/platform/operators/{operator_id}/deactivate` | `platform.operators.manage` ᴿ | 200 | |
 | GET | `/platform/audit/events` | `platform.audit.read` | 200 | Filters: `actor`, `action`, `tenant_id`, `from`, `to`; CSV via `Accept: text/csv` |
-| POST | `/platform/audit/verify` | `platform.audit.read` | 202 | Runs verification; result in the job |
+| POST | `/platform/audit/verify` | `platform.audit.read` | 202 | Runs verification; result in the job. One per operator every 10 minutes (`platform_audit_verify`, `429 rate_limited`; audit 2026-10-06 R-19) |
 | GET | `/platform/jobs/{job_id}` | any operator | 200 | Visible to the job's creator or holders of `platform.audit.read`; otherwise 404 |
 
 ### 8.2 Fleet (machine to machine)
@@ -868,12 +957,12 @@ Served by `app/platform/tenant_api.py` in the caller's `tenant_session`.
 
 | Method | Path | Permission | Status | Notes |
 |---|---|---|---|---|
-| GET | `/tenant/billing` | `tenant.billing.read` | 200 | Plan, status, period, trial end, usage vs limits (via `core.current_subscription()`) |
+| GET | `/tenant/billing` | `tenant.billing.read` | 200 | Plan, status, period, trial end, usage vs limits (via `core.current_subscription()`); `ai_bundle` (bundle, included answers, ex-GST prices, this month's answers) or `null` (§5.18) |
 | GET | `/tenant/billing/invoices` | `tenant.billing.read` | 200 | Own issued invoices, newest first (last 24): number, period, total, amount due, status |
 | GET | `/announcements` | any active member (`session.authenticated`) | 200 | Active announcements for this school, EN and TE (§14) |
 | POST | `/support/tickets` | `support.ticket.create` | 201 | Opens a ticket via `platform.service.open_ticket_from_tenant`; text redacted before storage |
-| GET | `/support/tickets` · `/support/tickets/{ticket_id}` | `support.ticket.create` | 200 | The school's own tickets; internal notes never shown |
-| POST | `/support/tickets/{ticket_id}/messages` | `support.ticket.create` | 200 | Reply on the school's own ticket |
+| GET | `/support/tickets` · `/support/tickets/{ticket_id}` | `support.ticket.create` | 200 | The tickets the caller opened, or every ticket of the school with `support.manage` (owner, principal, office admin); others' tickets answer 404 (audit 2026-10-06 R-17); internal notes never shown |
+| POST | `/support/tickets/{ticket_id}/messages` | `support.ticket.create` | 200 | Reply on a ticket the caller opened, or on any ticket of the school with `support.manage` |
 
 ## 9. Billing lifecycle
 
@@ -903,7 +992,7 @@ stateDiagram-v2
 | Past due | The daily job (`billing.mark_past_due`, 06:00 IST) sets `past_due` when any issued invoice is unpaid after its due date; `past_due_since` = first such day; `grace_ends_on` = `past_due_since` + 15 days |
 | Grace | **15 days**. During grace nothing changes for the school except reminder emails and a banner on its Plan & billing page |
 | Suspension | **Never automatic.** Only a `billing_admin` (or `platform_owner`) with step-up, after `grace_ends_on`, with a reason. The service re-checks every condition |
-| Reactivation | Automatic back to `active` when a past-due school pays; from `suspended`, a billing admin reactivates after payment |
+| Reactivation | Automatic back to `active` when a past-due school pays; from `suspended`, a billing admin reactivates after payment. A school on a security hold stays suspended until an operator lifts the hold (§5.5, R-18) |
 | Trial end | Operators and the school's billing contact are reminded 14 and 3 days before; nothing happens automatically at the end; the dashboard lists expired trials for a decision |
 | Reminders | Billing email at issue, 3 days before due, on the due date, and 7 and 14 days after (EN/TE templates) |
 | Cancellation | Stops future invoices; issued invoices stay payable; offboarding is a separate, explicit flow (§5.5) |
@@ -911,7 +1000,7 @@ stateDiagram-v2
 
 ### 9.3 Protected board-exam windows
 
-Suspension must not cut off a school during board exams or registration deadlines. Windows are configured per year in `apps/api/app/platform/billing.yaml` (`protected_windows`: name, boards, start, end; empty in M0), maintained from the boards' published calendars. If today is inside a window that applies to the school's boards, suspension additionally requires `exam_window_override_by` = a `platform_owner` who approves with step-up; the event records both operators.
+Suspension for non-payment must not cut off a school during board exams or registration deadlines. This protects billing suspensions only: a security suspension (principle 5) is immediate inside a window too (AA-16). Windows are configured per year in `apps/api/app/platform/billing.yaml` (`protected_windows`: name, boards, start, end; empty in M0), maintained from the boards' published calendars. If today is inside a window that applies to the school's boards, suspension additionally requires `exam_window_override_by` = a `platform_owner` who approves with step-up; the event records both operators.
 
 ## 10. Invoice generation job
 
@@ -921,9 +1010,15 @@ Suspension must not cut off a school during board exams or registration deadline
 
 ### 10.2 What it creates
 - For each subscription in `active` or `past_due` whose next period starts in the run month (monthly: every month; annual: on the anniversary month): one **draft** invoice for the coming period (billing in advance). Trials and cancelled or suspended subscriptions are skipped.
-- Lines: plan base price (or the negotiated price override) with the plan's SAC code; for per-student plans, `max(students_active, included_students) − included_students` extra students at the per-student price, where `students_active` is taken from `usage_daily` on the last day of the previous month.
+- Lines, in this order (ADR-0038), all with the plan's SAC code and GST rate:
+  1. `subscription`: plan base price (or the negotiated price override) for the period;
+  2. `one_time_fee`: "Implementation and data verification (one-time)" at the plan's one-time fee, when it is above 0 and no live invoice of the subscription carries one (§5.6);
+  3. `per_student`: for per-student plans, `max(students_active, included_students) − included_students` extra students at the per-student price, where `students_active` is taken from `usage_daily` on the last day of the previous month;
+  4. `addon`: the AI answer bundle for the period, billed in advance ("AI answers: Standard bundle, 1,000 answers a month (start to end)");
+  5. `usage_overage`: the AI answers above the bundle's quota in the calendar month **before** the month the period starts in (M), billed in arrears: "AI answers above the Standard bundle, March 2027: 250 extra answers × ₹1.50" (quantity 250 at ₹1.50 = ₹375.00; `usage_month` = M). Only when M is on or after the bundle's `ai_bundle_from` and no live invoice of the subscription already bills M. Answers = the sum of `usage_daily.ai_answers` over M's IST days (§11); the draft run on the 1st at 02:00 IST follows the collector's 01:30 IST run for the month's last day.
 - Tax: place of supply = billing account state code. If it equals the supplier's state code (supplier legal name, GSTIN and state code from `SOS_BILLING_SUPPLIER_LEGAL_NAME`, `SOS_BILLING_SUPPLIER_GSTIN`, `SOS_BILLING_SUPPLIER_STATE_CODE`; AP = 37; the API refuses to start in staging/prod with the dev placeholders), CGST 9% + SGST 9%; otherwise IGST 18%. Line amounts are rounded half-up to paise; each tax is computed on the taxable value and rounded half-up to paise.
 - Drafts appear in the invoice list for review; a billing admin issues them (usually the same day).
+- **Guards (audit 2026-10-05 hardening):** no draft (run or manual) for a school that is `offboarding` or `deleted`; a draft whose period overlaps any live (not void) invoice of the subscription is not made (manual: `409 duplicate`, "An invoice already covers this period or part of it"); a line's `unit_price_inr` may be negative only on an `adjustment` line (a credit; there are no credit notes): a `discount` is entered positive and stored as a deduction, and the total can never go below zero (`negative_total`).
 
 ### 10.3 Numbering (on issue)
 - Financial year runs 1 April to 31 March (IST): an issue date in April 2026–March 2027 belongs to `2026-27`.
@@ -940,11 +1035,15 @@ Suspension must not cut off a school during board exams or registration deadline
 | `students_active` | Students with status `active` at end of day |
 | `storage_bytes` | Sum of stored document versions and retained import files |
 | `documents` | Active documents |
-| `ai_queries`, `ai_input_tokens`, `ai_output_tokens`, `ai_cost_usd` | From the LLM gateway's per-tenant meters (`kb.queries`) |
-| `ai_cost_inr` | `ai_cost_usd` × FX rate from config (`billing.usd_inr_rate`, reviewed monthly) |
+| `ai_queries` | Questions asked in Ask (`kb.queries` rows created that IST day) |
+| `ai_answers` | **Billable AI answers**: those rows with a status in `billing.yaml` → `ai_answers.billable_statuses` (`answered`; `not_found`, `refused`, `search_only` and `error` are free). Billed against the AI answer bundle (§10.2) |
+| `ai_input_tokens`, `ai_output_tokens`, `ai_cost_usd` | From the LLM gateway's per-tenant meters (operators only; never shown to schools) |
+| `ai_cost_inr` | `ai_cost_usd` × FX rate from config (`billing.usd_inr_rate`): an **estimate** of our AI spend, never a price a school pays |
 
 - **Shared tier:** beat task `usage.collect_daily` (01:30 IST) calls `core.list_tenant_ids(ARRAY['active','suspended'])` and, for each school, `core.tenant_usage_summary(tenant_id)`, which returns **counts only**, plus one aggregate count in the school's own `tenant_session` (distinct users with audited actions that IST day); results are upserted into `platform.usage_daily` with `source = 'shared_collector'`.
-- **M0 coverage:** `active_users` and `staff_users` (active memberships) are real; `students_active`, `storage_bytes`, `documents` and the AI meters are recorded as 0 until the `sis`/`kb` modules extend `core.tenant_usage_summary` (M1/M2).
+- **Coverage:** `active_users`, `staff_users` (active memberships), `ai_queries` and `ai_answers` are real. The two AI counts are taken in the school's own `tenant_session` like the active-user count (RLS applies; only `status`, `tenant_id` and `created_at` are read and only the numbers leave; ADR-0020 amendment B2, ADR-0038). `students_active`, `storage_bytes`, `documents` and the AI tokens and cost are recorded as 0 until the `sis`/`kb` modules extend `core.tenant_usage_summary`.
+- **`usd_inr_rate`** (`billing.yaml`, with `usd_inr_rate_reviewed_on`; equal to `knowledge/config/models.yaml` `budget.usd_inr_rate`, pinned by a test): reviewed on the first working day of each month against the RBI reference rate (published by FBIL) and changed by a normal PR when it differs by more than 2%. It only converts cost estimates (AI spend on the dashboard, the school AI budget); plans, bundles and overage are fixed INR prices. **95.97** since the 2026-10-03 review: the FBIL USD/INR reference rate of 28 Sep 2026 (95.968), the latest that could be confirmed that day; it replaced the stale 84.00 of September 2026 (§19 Q17).
+- **AI answer allowance:** after the counts, the collector calls `billing.sync_ai_allowance` for every live school, so the bundle's included answers in the school's session match its subscription (§5.7; ADR-0020 amendment B3). Idempotent; a failure is logged with ids only.
 - **Dedicated tier:** the host computes the same function locally and sends the numbers in its heartbeat `usage` block; the control plane upserts them with `source = 'heartbeat'`.
 - **Thresholds:** after each upsert, compare with plan limits; on first crossing of 80% and 100% per metric per billing period, record a row in `platform.usage_threshold_events` and `usage.limit_threshold_crossed` in the platform audit log. Operator notifications and the email to the school's billing contact (§5.10) are not built yet (no email delivery in M0).
 
@@ -953,6 +1052,8 @@ Suspension must not cut off a school during board exams or registration deadline
 ### 12.1 Sending
 - Every dedicated host's `beat` sends `POST https://<control-plane-host>/api/v1/fleet/heartbeat` every **5 minutes** (±30 s jitter), outbound only.
 - Shared-tier deployments do not send heartbeats; the shared stack is monitored directly (11).
+
+**Usage window (audit AA-09, owner decision 2026-10-04).** `usage.date` counts only for today or yesterday (IST): an older day is ignored (the heartbeat still counts; logged `fleet.heartbeat.usage_too_old` with IDs only) and a future day is refused (`422 usage_date_in_future`). Tests: `tests/platform/test_heartbeat.py` `test_AA_09_*`.
 
 ### 12.2 Authentication (SEC-028)
 
@@ -975,7 +1076,7 @@ The control plane (`require_fleet_signature()` in `app/platform/fleet.py`) check
 
 Rejections are logged as `fleet.heartbeat.rejected` with a reason code (not audited individually).
 
-Keys are 32 random bytes, one per deployment, generated at provisioning and on rotation, stored **wrapped** (KMS; the local-dev wrapper outside AWS) in `platform.deployments` — not hashed, because the control plane must recompute the HMAC — and on the host in AWS Secrets Manager (read at start-up by `deploy/dedicated/scripts/fetch-secrets.sh` into a 0600 env file). Rotation keeps the old and new keys valid together for 7 days.
+Keys are 32 random bytes, one per deployment, generated at provisioning and on rotation, stored **wrapped** (KMS; the local-dev wrapper outside AWS) in `platform.deployments` — not hashed, because the control plane must recompute the HMAC — and on the host in AWS Secrets Manager (read at start-up by `deploy/dedicated/scripts/fetch-secrets.sh` into a 0600 env file). Rotation keeps the old and new keys valid together for 7 days (`fleet.key_rotation_overlap_days` in `billing.yaml`). A second rotation inside that overlap answers `409 rotation_pending`: it would otherwise promote the pending key and drop the one the host may still sign with (double click or retry; the new key is shown once, so the request cannot be replayed). After the overlap the pending key is promoted first and the rotation proceeds (audit 2026-10-06 R-15).
 
 ### 12.3 Payload (schema version 1)
 
@@ -1002,11 +1103,12 @@ No personal data: no names, emails, phone numbers, free text from users, file na
   "audit": { "last_verified_at": "2026-09-26T00:10:00Z", "result": "ok" },
   "usage": { "date": "2026-09-25", "active_users": 23, "staff_users": 41, "students_active": 1984,
              "storage_bytes": 21474836480, "documents": 812, "ai_queries": 57,
+             "ai_answers": 49,
              "ai_input_tokens": 410000, "ai_output_tokens": 52000, "ai_cost_usd": 3.1200 }
 }
 ```
 
-`usage` is the latest complete IST day; the control plane upserts it once per day.
+`usage` is the latest complete IST day; the control plane upserts it once per day. `ai_answers` (billable AI answers, §11) is optional: hosts older than `0041_billing_catalogue` omit it and it is stored as 0. The control plane is upgraded before the hosts (the schema refuses unknown fields).
 
 ### 12.4 Response
 
@@ -1063,6 +1165,7 @@ After offboarding approval (§5.5): final export delivered → data deleted → 
 - **Delivery to shared-tier schools:** the `sos_app` role cannot read `platform.announcements`. A platform job (`announcements.publish`, every minute and on every change) writes the currently active announcements (no personal data) to a Valkey key; `GET /api/v1/announcements` in the school app reads that key and filters by the school's tier and ID.
 - **Delivery to dedicated hosts:** included in the heartbeat response (§12.4) and cached on the host.
 - The school app shows them as a dismissible banner (critical: not dismissible until it ends) in the user's language.
+- **Banner only** (owner decision 2026-10-04): an announcement creates no school notification (no bell item, no email). The control plane never writes school notifications (ADR-0020), so the `announcement.new` notification template, which nothing sent, was removed.
 - Cancelling removes it from the next publish (within one minute on shared; next heartbeat on dedicated).
 
 ## 15. Support tickets
@@ -1095,16 +1198,16 @@ Written with `audit.service.record_platform(...)` in `platform.audit_events`, in
 | Area | Actions |
 |---|---|
 | Operators | `operator.invited`, `operator.activated` (first MFA sign-in), `operator.bootstrapped` (system, bootstrap CLI), `operator.roles_changed`, `operator.deactivated` (`operator.login` and `operator.step_up` are not recorded yet) |
-| Schools | `tenant.provisioned` (+ T), `tenant.provisioning_failed` (step, error code, attempt), `tenant.provisioning_resumed` (from state, attempt), `tenant.owner_invite_created`, `tenant.owner_invite_sent`, `tenant.activated` (+ T), `tenant.suspended` (+ T), `tenant.reactivated` (+ T), `tenant.offboard_requested`, `tenant.offboard_approved` (+ T), `tenant.export_confirmed` (+ T), `tenant.deletion_started` (system), `tenant.data_deleted` (system), `tenant.keys_destroyed` (system), `tenant.teardown_confirmed`, `tenant.deletion_failed` (system; step, error code, attempt), `tenant.deletion_certified` (system), `tenant.deleted` (+ T, system), `tenant.deletion_overdue` (system), `tenant.deletion_certificate_downloaded`, `tenant.audit_chain_deleted` (system). The school chain also gets `tenant.data_purged` and `tenant.keys_destroyed` from the purge itself |
+| Schools | `tenant.provisioned` (+ T), `tenant.provisioning_failed` (step, error code, attempt), `tenant.provisioning_resumed` (from state, attempt), `tenant.owner_invite_created`, `tenant.owner_invite_sent`, `tenant.activated` (+ T), `tenant.suspended` (+ T), `tenant.reactivated` (+ T), `tenant.security_hold_placed` (+ T), `tenant.security_hold_lifted` (+ T), `tenant.offboard_requested`, `tenant.offboard_withdrawn`, `tenant.offboard_approved` (+ T), `tenant.export_confirmed` (+ T), `tenant.deletion_started` (system), `tenant.data_deleted` (system), `tenant.keys_destroyed` (system), `tenant.teardown_confirmed`, `tenant.deletion_failed` (system; step, error code, attempt), `tenant.deletion_certified` (system), `tenant.deleted` (+ T, system), `tenant.deletion_overdue` (system), `tenant.deletion_certificate_downloaded`, `tenant.audit_chain_deleted` (system). The school chain also gets `tenant.data_purged` and `tenant.keys_destroyed` from the purge itself |
 | Plans | `plan.created`, `plan.updated`, `plan.published`, `plan.retired` |
-| Subscriptions | `subscription.activated`, `subscription.trial_extended`, `subscription.plan_changed`, `subscription.price_override_set`, `subscription.past_due` (system), `subscription.suspended` (summary records `exam_window_override`), `subscription.reactivated`, `subscription.cancelled` |
+| Subscriptions | `subscription.activated`, `subscription.trial_extended`, `subscription.plan_changed`, `subscription.price_override_set`, `subscription.ai_bundle_set` (bundle code and version), `subscription.ai_bundle_removed`, `subscription.past_due` (system), `subscription.suspended` (summary records `exam_window_override`), `subscription.reactivated`, `subscription.cancelled` |
 | Billing | `billing_account.updated`, `invoice.created` (manual draft), `invoice.generated` (system), `invoice.updated`, `invoice.draft_discarded`, `invoice.issued`, `invoice.voided`, `payment.recorded`, `payment.reversed`, `invoice.paid` (system), `invoice.pdf_rendered` (system; number, template version, size), `invoice.pdf_downloaded` |
 | Usage | `usage.limit_threshold_crossed` (system) |
 | Flags | `flag.updated`, `flag.override_set`, `flag.override_removed` |
 | Fleet | `deployment.created`, `deployment.updated`, `deployment.first_heartbeat`, `deployment.status_changed` (system), `deployment.heartbeat_key_rotated`, `deployment.decommissioned` (rejected heartbeats are logged, not audited) |
-| Announcements | `announcement.created`, `announcement.updated`, `announcement.cancelled` |
+| Announcements | `announcement.created`, `announcement.updated`, `announcement.approved` (critical, second operator), `announcement.cancelled` |
 | Support | `support.ticket_opened`, `support.ticket_updated`, `support.personal_data_flagged`, `support.tickets_purged` (system) |
-| Break-glass | `breakglass.requested`, `breakglass.emergency_confirmed` (M1); outcomes reported by the school (`breakglass.active`, `.denied`, `.expired`, `.revoked`) and `breakglass.session_started` (ADR-0023; grant ID and a session reference only) |
+| Break-glass | `breakglass.requested`, `breakglass.emergency_confirmed` (M1), `breakglass.withdrawn`; outcomes reported by the school (`breakglass.active`, `.denied`, `.expired`, `.revoked`) and `breakglass.session_started` (ADR-0023; grant ID and a session reference only) |
 | Audit | `audit.verify_run` |
 
 Summaries hold IDs, field names and before/after values of non-personal fields (e.g., plan code, status, amounts). Never ticket text, emails or phone numbers.
@@ -1149,7 +1252,7 @@ In addition to the general suites (12 §4):
 | Privilege separation catalog | `sos_platform` has no privileges on any table in `core`/`sis`/`kb`/`audit`/`ops`; `sos_app`/`sos_readonly` have none on `platform` except `SELECT platform.feature_flags`; live query as `sos_platform` against `sis.students` fails with `permission denied` | 12 §4.8 |
 | Definer allowlist | Exactly the functions in 05 §3.4 are `SECURITY DEFINER`, owned by `sos_definer`, with `search_path` set; `definer_access` policies exist only on the allowlisted tables | 12 §4.9 |
 | Platform authz matrix | For every `/api/v1/platform/*` route and every platform role: allowed → 2xx, not allowed → 403, missing step-up → 428; tenant users' tokens → 401 | 12 §4.12 |
-| Two-person rules | Same operator cannot request and approve offboarding (API 409 and DB CHECK) | SEC-029 |
+| Two-person rules | Same operator cannot request and approve offboarding (API 409 and DB CHECK); requests expire, can be withdrawn, re-check the first operator, and the second operator's role must be 7 days old and not granted by the first; critical announcements are two-person (`test_two_person_requests.py`) | SEC-029, audit 2026-10-05 A-13, A-14 |
 | Offboarding deletion | Every tenant table populated for a school (`tests/tenancy/purge_support.py`); after the purge zero rows in every catalog table with `tenant_id` except the retained audit chain; other school untouched; files deleted; idempotent; a failing module rolls back everything and the run resumes; refused unless `offboarding` (also by the database for `sos_purger`); keys destroyed and decryption fails; audit chain deleted only when `deleted` and older than a year; `sos_purger` narrow (`tests/tenancy/test_offboarding_purge.py`). Control plane: export gate, lease and resume, failure codes, deadline alerts once, dedicated teardown, certificate content without personal data, hash, download audited (`tests/platform/test_offboarding.py`, `test_deletion_certificate.py`) | FR-PLT-005 |
 | Dedicated mode | With `SOS_DEPLOYMENT_MODE=dedicated`, every platform route returns 404 and platform beat tasks are absent | ADR-0017 |
 | Heartbeat | Valid signature accepted; wrong key, altered body, stale or future timestamp (> 300 s), replayed nonce, unknown field, oversized body, mismatched tenant all rejected | 12 §4.13 |
@@ -1163,6 +1266,7 @@ In addition to the general suites (12 §4):
 | Platform audit chain | Every mutating platform route writes exactly one event in the same transaction; tamper and gap detection | FR-PLT-029 |
 | Support redaction | Aadhaar-like and phone numbers in ticket messages are masked before storage | FR-PLT-027 |
 | School billing page | `core.current_subscription()` returns only the caller's tenant; other roles get 403 | FR-PLT-030 |
+| Commercial catalogue | Seeded plans and bundles match the owner's prices, Dedicated wording never says "server", bundles frozen; one-time fee on the first invoice only (a rerun or a later draft never repeats it; a voided first invoice moves it to the next new one); bundle line and overage maths (1,250 answers on Standard = 250 × ₹1.50 = ₹375.00), a month billed once, months before `ai_bundle_from` free; CGST + SGST and IGST totals; bundle routes 403 for other roles and 428 without step-up, 404 unknown subscription, 422 unknown bundle, 409 annual plan; AI answers counted per school and IST day in the school's own session, other statuses and schools excluded; heartbeat `ai_answers` optional (`tests/platform/test_catalogue.py`); boundary pin (`test_boundaries.py`) | ADR-0038, FR-PLT-010, FR-PLT-015..017, FR-PLT-020 |
 
 ## 19. Open questions
 
@@ -1173,7 +1277,7 @@ In addition to the general suites (12 §4):
 | Q3 | GST registration and SAC code. Below the registration threshold SchoolOS may not charge GST; the correct SAC for SaaS needs confirming; services to schools are generally taxable at 18% but check exemptions. TDS deducted by schools also needs handling. | Confirm with a CA; until registered, issue invoices with GST rate 0 and a note; keep `tds_inr` in payments | Founder + CA |
 | Q4 | Identity for dedicated hosts: per-deployment app client in the shared Cognito user pool, or a separate user pool per host? | Per-deployment app client (callback URLs per host); revisit for schools that require full separation | Engineering |
 | Q5 | Feature flags on dedicated hosts: the host's local `platform.feature_flags` cannot be written by the control plane. | The deploy pipeline writes the deployment's flag set on each release (`updated_by` NULL); M1: consider delivering flags in the heartbeat response | Engineering |
-| Q6 | Opening tickets from the school app needs a tenant permission. | **Settled:** `support.ticket.create` is in the catalog and granted to every staff role (07 §6.2); school routes in §8.3 | Product owner |
+| Q6 | Opening tickets from the school app needs a tenant permission. | **Settled:** `support.ticket.create` is in the catalog and granted to every staff role (07 §6.2); school routes in §8.3. A member reads only the tickets they opened; `support.manage` (owner, principal, office admin) reads every ticket of the school (audit 2026-10-06 R-17, migration 0047; existing schools get the grant from `python -m app.identity.sync_system_roles --apply`) | Product owner |
 | Q7 | Dedicated schools' Plan & billing page and in-app tickets need data from the control plane. | M1: billing summary in the heartbeat response; tickets via email/phone until an authenticated outbound ticket call is designed | Product owner |
 | Q8 | Default trial length and pilot terms. | **Implemented** per plan: `platform.plans.trial_days` (default 30), extendable by billing admin; design partner per signed pilot terms | Founder |
 | Q9 | Should `admin.<domain>` be restricted by IP allowlist in addition to MFA? | Not at Stage 0 (operators travel); WAF rate rules and geo-restriction to India; revisit at Stage 1 | Engineering |
@@ -1182,6 +1286,13 @@ In addition to the general suites (12 §4):
 | Q12 | Language of invoice PDFs. | English only in v0; add Telugu labels only if schools ask (needs reviewed tax terms) | Product owner |
 | Q13 | Sending invoice PDFs to schools (email at issue, FR-PLT-019) and a download on the school-side billing page (§5.18). | Not built (no email delivery in M0/M1); operators download and send manually | Product owner |
 | Q14 | Telugu wording of the certificate of deletion (§5.5.1) | **Implemented** with English and Telugu labels; Telugu marked for review (`billing.yaml` → `offboarding.certificate.telugu_review: pending`) | Product owner + reviewer |
+| Q15 | Which answers count against an AI bundle? A reused cached answer costs no model call; "not found in school records" does call the model. | **Implemented:** `answered` only, cached reuses included (the school got an answer); `not_found`, `refused`, `search_only`, `error` free. Change `ai_answers.billable_statuses` if the owner decides otherwise | Product owner |
+| Q16 | AI bundles on annual plans, and alerts before a school runs past its quota. | Refused on annual plans (`409 ai_bundle_needs_monthly_plan`) until a rule is set (12 × the monthly price in advance, overage monthly or yearly?); an 80%/100% quota alert like the plan limits (§5.10) is not built | Product owner |
+| Q17 | `usd_inr_rate` was 84.00 (September 2026) and stale; it only converts AI cost estimates. | **Closed 2026-10-03:** set to 95.97 in `billing.yaml` and `knowledge/config/models.yaml` from the FBIL USD/INR reference rate of 28 Sep 2026 (95.968; `usd_inr_rate_reviewed_on` 2026-10-03); the billing admin reviews it monthly (§11) | Founder |
+| Q18 | ADR-0020 amendment B2: may the usage collector count answered `kb.queries` rows inside the school's `tenant_session` (counts only)? | **Closed: approved by the product owner 2026-10-03** (recorded in ADR-0020); no code change | Product owner |
+| Q19 | Dedicated hosts: the school's AI answer allowance (the budget follows the bundle, §5.7) cannot be written from the shared control plane. | Until then a dedicated school keeps its own `ai_monthly_budget_inr`; deliver the allowance in the heartbeat response with the billing summary (Q7) | Engineering |
+| Q20 | Cost per AI answer: the budget estimate is $0.06 (≈ ₹5.76) per answered question, above the ₹1.50 overage price and the bundles' price per included answer (₹2.33 / ₹1.50 / ₹1.17). | Measure the real cost per answered question from `kb.llm_calls` after the live evaluation; then re-check `budget.bundle.cost_per_answer_usd` and the bundle and overage prices | Product owner |
+| Q21 | School-side AI answers card (§5.18): should a school see an estimate of this month's overage charge (extra answers × rate), and an alert near the quota? | Not shown: the card shows only the bundle, included answers, this month's answers, the price and the price per extra answer. The month's count is incomplete until the 1st of the next month, and overage is billed in arrears (ADR-0038 §3); decide with Q16's quota alerts | **Decided 2026-10-04 (product owner):** no overage estimate for now; the card shows only the facts. The school usage card no longer lists AI tokens (`ai_tokens_month`); operators still see tokens | Product owner |
 
 ## 20. Requirement map
 

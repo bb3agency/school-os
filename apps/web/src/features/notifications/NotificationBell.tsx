@@ -192,7 +192,7 @@ export function NotificationBell() {
           if (!open) void queryClient.invalidateQueries({ queryKey: NOTIFICATION_KEYS.latest });
           setOpen((value) => !value);
         }}
-        className="pressable relative inline-flex size-10 items-center justify-center rounded-full border border-border-soft bg-surface text-ink hover:bg-surface-muted"
+        className="pressable relative inline-flex size-10 items-center justify-center rounded-full border border-border-soft bg-surface text-ink hover:bg-surface-muted pointer-coarse:size-11"
       >
         <svg
           aria-hidden="true"
@@ -209,7 +209,7 @@ export function NotificationBell() {
         {count > 0 ? (
           <span
             aria-hidden="true"
-            className="absolute -top-1.5 -right-1.5 min-w-5 rounded-full bg-danger px-1 text-center text-xs leading-5 font-bold text-white tabular-nums"
+            className="absolute -top-1.5 -right-1.5 min-w-5 rounded-full bg-danger px-1 text-center text-xs leading-5 font-semibold text-white tabular-nums"
           >
             {count > 99 ? "99+" : count}
           </span>

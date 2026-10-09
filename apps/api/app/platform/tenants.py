@@ -25,11 +25,11 @@ from typing import Any
 from sqlalchemy import RowMapping, and_, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.core.crypto import KeyWrapper
+from app.core.crypto import KeyWrapper, wrap_bound
 from app.core.db import platform_session
 from app.core.errors import Conflict, NotFound
 from app.core.logging import get_logger
-from app.platform import billing, offboarding, tenant_audit
+from app.platform import billing, offboarding, tenant_audit, two_person
 from app.platform import models as m
 from app.platform import repository as repo
 from app.platform.common import (
@@ -56,12 +56,22 @@ HEARTBEAT_KEY_BYTES = 32
 _KEY_ID_ALPHABET = "abcdefghjkmnpqrstuvwxyz"
 
 
-def new_heartbeat_key(tenant_id: uuid.UUID, wrapper: KeyWrapper) -> tuple[str, bytes, str]:
-    """Return (key_id, wrapped key, plaintext key as base64url). Plaintext is shown once."""
+def heartbeat_key_resource(deployment_id: uuid.UUID) -> str:
+    """The row a heartbeat key is bound to in its KMS context (data-protection audit H-03)."""
+    return f"deployment/{deployment_id}"
+
+
+def new_heartbeat_key(
+    tenant_id: uuid.UUID, deployment_id: uuid.UUID, wrapper: KeyWrapper
+) -> tuple[str, bytes, str]:
+    """Return (key_id, wrapped key, plaintext key as base64url). Plaintext is shown once. The
+    key is wrapped bound to the school AND the deployment row (H-03)."""
     raw = secrets.token_bytes(HEARTBEAT_KEY_BYTES)
     # Letters only: key IDs appear in audit summaries, which reject long digit runs.
     key_id = "hb-" + "".join(secrets.choice(_KEY_ID_ALPHABET) for _ in range(16))
-    wrapped = wrapper.wrap(raw, tenant_id=tenant_id)
+    wrapped = wrap_bound(
+        wrapper, raw, tenant_id=tenant_id, resource=heartbeat_key_resource(deployment_id)
+    )
     return key_id, wrapped, base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
 
 
@@ -185,7 +195,14 @@ def get_tenant(tenant_id: uuid.UUID, *, with_counts: bool = True) -> TenantDetai
             **dict(row),
             "boards": list(dep["boards"]),
             "tenant_status_reason": dep["tenant_status_reason"],
+            "security_hold": bool(dep["security_hold"]),
             "offboard_requested_at": dep["offboard_requested_at"],
+            "offboard_requested_by": dep["offboard_requested_by"],
+            "offboard_request_expires_at": (
+                two_person.expires_at(dep["offboard_requested_at"])
+                if dep["offboard_approved_at"] is None
+                else None
+            ),
             "offboard_approved_at": dep["offboard_approved_at"],
             "subscription": SubscriptionOut.model_validate(dict(sub)) if sub else None,
             "counts": counts,
@@ -233,6 +250,7 @@ def _set_status(
     extra: dict[str, Any] | None = None,
     require_provisioned: bool = False,
     after: Callable[[Session, RowMapping], None] | None = None,
+    check: Callable[[Session, RowMapping], None] | None = None,
 ) -> TenantDetailOut:
     dep0 = _deployment(tenant_id)
     shared = dep0["mode"] == "shared"
@@ -244,6 +262,8 @@ def _set_status(
                 f"A school that is {dep['tenant_status']} cannot become {target}.",
                 code="invalid_state",
             )
+        if check is not None:  # under the deployment lock
+            check(s, dep)
         if require_provisioned:
             run = repo.get_by(s, m.provisioning_runs, m.provisioning_runs.c.tenant_id == tenant_id)
             if run is not None and run["state"] != "completed":
@@ -294,7 +314,16 @@ def activate(actor: Actor, tenant_id: uuid.UUID) -> TenantDetailOut:
 
 
 def suspend(actor: Actor, tenant_id: uuid.UUID, reason: str) -> TenantDetailOut:
-    """Non-billing suspension (security incident, abuse, school's request). Never automatic."""
+    """Security hold (security incident, abuse, school's request). Never automatic. Immediate,
+    also inside a protected board-exam window, which guards billing suspensions only (docs/16
+    principle 5 and §9.3; owner decision 2026-10-07, audit AA-16).
+
+    Independent of billing (audit 2026-10-06 R-18): an active school is suspended with the hold;
+    a school already suspended for billing stays suspended and gains the hold, so paying the
+    invoice cannot lift a block the operator wanted to keep. 409 ``already_on_hold`` twice."""
+    dep0 = _deployment(tenant_id)
+    if dep0["tenant_status"] == "suspended":
+        return _change_hold(actor, tenant_id, place=True, reason=reason)
     return _set_status(
         actor,
         tenant_id,
@@ -302,16 +331,82 @@ def suspend(actor: Actor, tenant_id: uuid.UUID, reason: str) -> TenantDetailOut:
         allowed_from=("active",),
         action="tenant.suspended",
         reason=reason,
+        extra={"security_hold": True},
     )
 
 
-def reactivate(actor: Actor, tenant_id: uuid.UUID, reason: str) -> TenantDetailOut:
-    dep = _deployment(tenant_id)
-    if dep["tenant_status_reason"] == "billing":
+def _billing_suspended(s: Session, dep: RowMapping) -> bool:
+    """The school is suspended for billing, or its subscription is (docs/16 §9)."""
+    sub = repo.live_subscription(s, dep["tenant_id"])
+    return dep["tenant_status_reason"] == "billing" or (
+        sub is not None and sub["status"] == "suspended"
+    )
+
+
+def _not_billing_suspended(s: Session, dep: RowMapping) -> None:
+    """A billing suspension is lifted only from the subscription (docs/16 §9). That covers a
+    school suspended for billing, and a school already held for another reason whose
+    subscription was suspended meanwhile (audit 2026-10-05 A-08: reactivating it made the
+    school live while its subscription stayed suspended and was no longer invoiced)."""
+    if _billing_suspended(s, dep):
         raise Conflict(
             "Billing suspensions are lifted from the subscription.", code="billing_suspension"
         )
+
+
+def _change_hold(
+    actor: Actor, tenant_id: uuid.UUID, *, place: bool, reason: str | None
+) -> TenantDetailOut:
+    """Place or lift the security hold of a school that stays suspended for billing (R-18).
+
+    Placing: the school must be suspended and not yet held. Lifting: it must be held, shared
+    (a billing suspension suspends only shared schools) and still billing-suspended; the reason
+    goes back to ``billing``. Both are checked under the deployment lock."""
+    action = "tenant.security_hold_placed" if place else "tenant.security_hold_lifted"
+    with platform_session() as s, db_errors():
+        dep = repo.get_by(s, m.deployments, m.deployments.c.tenant_id == tenant_id, for_update=True)
+        if dep is None:
+            raise NotFound("School not found")
+        if dep["tenant_status"] != "suspended":
+            raise Conflict("The school changed. Reload and try again.", code="invalid_state")
+        if place:
+            if dep["security_hold"]:
+                raise Conflict("The school is already on a security hold.", code="already_on_hold")
+            values: dict[str, Any] = {"security_hold": True, "tenant_status_reason": reason}
+        else:
+            if not dep["security_hold"] or not _billing_suspended(s, dep):
+                raise Conflict("The school changed. Reload and try again.", code="invalid_state")
+            values = {"security_hold": False, "tenant_status_reason": "billing"}
+        repo.update_row(s, m.deployments, dep["id"], values)
+        summary = {"from": "suspended", "to": "suspended"}
+        audit_platform(
+            s,
+            actor,
+            action,
+            "tenant",
+            tenant_id,
+            {**summary, "tier": dep["mode"]},
+            tenant_id=tenant_id,
+        )
+        shared = dep["mode"] == "shared"
+        if shared:  # dedicated schools' chains live on their host
+            tenant_audit.enqueue(s, tenant_id, actor, action, summary)
+    if shared:
+        tenant_audit.deliver_now(tenant_id)
+    return get_tenant(tenant_id, with_counts=False)
+
+
+def reactivate(actor: Actor, tenant_id: uuid.UUID, reason: str) -> TenantDetailOut:
+    """Lift the security hold. A school that is also suspended for billing stays suspended
+    (R-18): only the subscription lifts that. Without a hold, a billing suspension answers 409
+    ``billing_suspension`` (A-08)."""
     del reason  # recorded in the platform audit event action only (free text is not audited)
+    dep0 = _deployment(tenant_id)
+    if dep0["security_hold"] and dep0["mode"] == "shared" and dep0["tenant_status"] == "suspended":
+        with platform_session() as s:
+            billing_held = _billing_suspended(s, dep0)
+        if billing_held:
+            return _change_hold(actor, tenant_id, place=False, reason=None)
     return _set_status(
         actor,
         tenant_id,
@@ -319,11 +414,20 @@ def reactivate(actor: Actor, tenant_id: uuid.UUID, reason: str) -> TenantDetailO
         allowed_from=("suspended",),
         action="tenant.reactivated",
         reason=None,
+        extra={"security_hold": False},
+        check=_not_billing_suspended,
     )
 
 
+OFFBOARD_PERMISSION = "platform.tenants.offboard"
+
+
 def request_offboarding(actor: Actor, tenant_id: uuid.UUID, reason: str) -> TenantDetailOut:
-    """Two-person rule, step 1 (SEC-029): operator A records the request."""
+    """Two-person rule, step 1 (SEC-029): operator A records the request.
+
+    A request expires after ``two_person_request_ttl_hours`` (roles.yaml; audit 2026-10-05
+    A-13); an expired request is replaced by the new one. A live one answers 409
+    ``already_requested`` (withdraw it first)."""
     with platform_session() as s, db_errors():
         dep = repo.get_by(s, m.deployments, m.deployments.c.tenant_id == tenant_id, for_update=True)
         if dep is None:
@@ -332,7 +436,9 @@ def request_offboarding(actor: Actor, tenant_id: uuid.UUID, reason: str) -> Tena
             raise Conflict(
                 "Only an active or suspended school can be offboarded.", code="invalid_state"
             )
-        if dep["offboard_requested_by"] is not None:
+        if dep["offboard_requested_by"] is not None and not two_person.is_expired(
+            dep["offboard_requested_at"]
+        ):
             raise Conflict("Offboarding was already requested.", code="already_requested")
         repo.update_row(
             s,
@@ -350,14 +456,74 @@ def request_offboarding(actor: Actor, tenant_id: uuid.UUID, reason: str) -> Tena
     return get_tenant(tenant_id, with_counts=False)
 
 
+def withdraw_offboarding(actor: Actor, tenant_id: uuid.UUID) -> TenantDetailOut:
+    """Withdraw a pending offboarding request (audit 2026-10-05 A-13). Any operator holding
+    ``platform.tenants.offboard`` may withdraw it, expired or not; 409 ``not_requested`` when
+    there is none (or it was already approved). Audit ``tenant.offboard_withdrawn``."""
+    with platform_session() as s, db_errors():
+        dep = repo.get_by(s, m.deployments, m.deployments.c.tenant_id == tenant_id, for_update=True)
+        if dep is None:
+            raise NotFound("School not found")
+        if (
+            dep["offboard_requested_by"] is None
+            or dep["offboard_approved_by"] is not None
+            or dep["tenant_status"] not in ("active", "suspended")
+        ):
+            raise Conflict("There is no offboarding request to withdraw.", code="not_requested")
+        repo.update_row(
+            s,
+            m.deployments,
+            dep["id"],
+            {"offboard_requested_by": None, "offboard_requested_at": None, "offboard_reason": None},
+        )
+        audit_platform(
+            s,
+            actor,
+            "tenant.offboard_withdrawn",
+            "tenant",
+            tenant_id,
+            {"requested_by": str(dep["offboard_requested_by"])},
+            tenant_id=tenant_id,
+        )
+    return get_tenant(tenant_id, with_counts=False)
+
+
+def _second_operator_may_approve(actor: Actor) -> Callable[[Session, RowMapping], None]:
+    def check(s: Session, dep: RowMapping) -> None:
+        if dep["offboard_requested_by"] is None:
+            raise Conflict("No offboarding request to approve.", code="not_requested")
+        if dep["offboard_requested_by"] == actor.operator_id:
+            raise Conflict("A different operator must approve.", code="same_operator")
+        two_person.check_second_step(
+            s,
+            first_operator_id=dep["offboard_requested_by"],
+            approver_id=actor.operator_id,
+            permission=OFFBOARD_PERMISSION,
+            requested_at=dep["offboard_requested_at"],
+        )
+
+    return check
+
+
 def approve_offboarding(actor: Actor, tenant_id: uuid.UUID) -> TenantDetailOut:
-    """Two-person rule, step 2: a DIFFERENT operator approves (409 same_operator; DB CHECK)."""
+    """Two-person rule, step 2: a DIFFERENT operator approves (409 same_operator; DB CHECK).
+
+    Under the deployment lock (audit 2026-10-05 A-13, A-14): the request must be younger than
+    the configured lifetime (409 ``request_expired``), its operator still active and allowed
+    (409 ``requester_not_authorised``), and the approver's role old enough and not granted by
+    the requester (409 ``approver_not_eligible``). Approval ends the school's subscription at
+    once, so no more monthly drafts are made for a closing school."""
     dep0 = _deployment(tenant_id)
     if dep0["offboard_requested_by"] is None:
         raise Conflict("No offboarding request to approve.", code="not_requested")
     if dep0["offboard_requested_by"] == actor.operator_id:
         raise Conflict("A different operator must approve.", code="same_operator")
     approved_at = now()
+
+    def after(s: Session, row: RowMapping) -> None:
+        offboarding.create_run(s, row, approved_at)
+        billing.end_subscription_for_closure(s, actor, tenant_id, reason="offboarding")
+
     return _set_status(
         actor,
         tenant_id,
@@ -366,7 +532,8 @@ def approve_offboarding(actor: Actor, tenant_id: uuid.UUID) -> TenantDetailOut:
         action="tenant.offboard_approved",
         reason="offboarding",
         extra={"offboard_approved_by": actor.operator_id, "offboard_approved_at": approved_at},
-        after=lambda s, row: offboarding.create_run(s, row, approved_at),
+        check=_second_operator_may_approve(actor),
+        after=after,
     )
 
 

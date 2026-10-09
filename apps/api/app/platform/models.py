@@ -71,7 +71,29 @@ plans = Table(
     Column("features", JSONB, nullable=False),
     Column("status", Text, nullable=False),
     Column("published_at", DateTime(timezone=True)),
-    Column("created_by", Uuid, nullable=False),
+    # NULL = seeded by a catalogue migration (0041_billing_catalogue).
+    Column("created_by", Uuid),
+    Column("created_at", DateTime(timezone=True)),
+    Column("updated_at", DateTime(timezone=True)),
+    Column("one_time_fee_inr", Numeric(14, 2), nullable=False),
+    Column("description", Text),
+    # Edit counter for If-Match on draft edits (0043); not the catalogue ``version``.
+    Column("row_version", Integer, nullable=False, server_default="1"),
+)
+
+# AI answer bundles (0041_billing_catalogue): published or retired, prices never change.
+ai_bundles = Table(
+    "ai_bundles",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("code", Text, nullable=False),
+    Column("version", Integer, nullable=False),
+    Column("name", Text, nullable=False),
+    Column("included_answers", Integer, nullable=False),
+    Column("price_inr", Numeric(14, 2), nullable=False),
+    Column("overage_rate_inr", Numeric(14, 2), nullable=False),
+    Column("status", Text, nullable=False),
+    Column("published_at", DateTime(timezone=True)),
     Column("created_at", DateTime(timezone=True)),
     Column("updated_at", DateTime(timezone=True)),
 )
@@ -115,6 +137,8 @@ deployments = Table(
     Column("custom_domain", CITEXT),
     Column("tenant_status", Text, nullable=False),
     Column("tenant_status_reason", Text),
+    # Operator security hold, independent of a billing suspension (audit 2026-10-06 R-18).
+    Column("security_hold", Boolean, nullable=False, server_default="false"),
     Column("status", Text, nullable=False),
     Column("app_version", Text),
     Column("target_version", Text),
@@ -159,6 +183,8 @@ subscriptions = Table(
     Column("cancel_at_period_end", Boolean, nullable=False),
     Column("cancelled_at", DateTime(timezone=True)),
     Column("cancel_reason", Text),
+    Column("ai_bundle_id", Uuid),
+    Column("ai_bundle_from", Date),
     Column("created_at", DateTime(timezone=True)),
     Column("updated_at", DateTime(timezone=True)),
     Column("version", Integer),
@@ -228,6 +254,7 @@ invoice_lines = Table(
     Column("unit_price_inr", Numeric(14, 2), nullable=False),
     Column("amount_inr", Numeric(14, 2), nullable=False),
     Column("gst_rate", Numeric(5, 2), nullable=False),
+    Column("usage_month", Date),
 )
 
 payments = Table(
@@ -268,6 +295,7 @@ usage_daily = Table(
     Column("ai_output_tokens", BigInteger, nullable=False),
     Column("ai_cost_usd", Numeric(14, 4), nullable=False),
     Column("ai_cost_inr", Numeric(14, 2), nullable=False),
+    Column("ai_answers", Integer, nullable=False),
     Column("collected_at", DateTime(timezone=True)),
 )
 
@@ -313,6 +341,11 @@ announcements = Table(
     Column("ends_at", DateTime(timezone=True), nullable=False),
     Column("status", Text, nullable=False),
     Column("created_by", Uuid, nullable=False),
+    # A critical announcement needs a second operator (0049_open_items; audit 2026-10-05).
+    Column("submitted_by", Uuid),
+    Column("submitted_at", DateTime(timezone=True)),
+    Column("approved_by", Uuid),
+    Column("approved_at", DateTime(timezone=True)),
     Column("created_at", DateTime(timezone=True)),
     Column("updated_at", DateTime(timezone=True)),
     Column("version", Integer),

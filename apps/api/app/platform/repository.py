@@ -40,6 +40,7 @@ from app.platform import models as m
 _CONSTRAINT_MESSAGES: dict[str, tuple[str, str]] = {
     "deployments_offboard_two_person": ("same_operator", "A different operator must approve."),
     "breakglass_two_person": ("same_operator", "A different operator must confirm."),
+    "announcements_critical_two_person": ("same_operator", "A different operator must approve."),
     "operator_roles_no_self_grant": ("own_roles", "You cannot change your own roles."),
     "one_live_subscription": ("duplicate", "This school already has a live subscription."),
     "one_invoice_per_period": ("duplicate", "An invoice already exists for this period."),
@@ -96,6 +97,18 @@ def translate_db_error(exc: DBAPIError) -> DomainError | None:  # noqa: PLR0911
         )
     if state == "42501":
         return Forbidden()
+    if state in ("22003", "22008"):
+        # R-13: a computed amount or date the column cannot hold (e.g. quantity x unit price
+        # past Numeric(14, 2)) is a request for an impossible value, not a server fault.
+        return ValidationFailed(
+            [
+                {
+                    "field": "body",
+                    "code": "value_out_of_range",
+                    "message_key": "errors.value_out_of_range",
+                }
+            ]
+        )
     return None
 
 
@@ -193,13 +206,38 @@ def roles_by_operator(
 def set_operator_roles(
     session: Session, operator_id: uuid.UUID, roles: Sequence[str], granted_by: uuid.UUID | None
 ) -> None:
-    session.execute(delete(m.operator_roles).where(m.operator_roles.c.operator_id == operator_id))
-    for role in roles:
+    """Replace the operator's roles. Roles kept keep their original ``granted_at`` and
+    ``granted_by`` (audit 2026-10-05 A-14: the two-person waiting period counts from the real
+    grant, so an unrelated role change neither restarts nor launders it)."""
+    wanted = set(roles)
+    current = operator_roles(session, operator_id)
+    removed = current - wanted
+    if removed:
+        session.execute(
+            delete(m.operator_roles).where(
+                m.operator_roles.c.operator_id == operator_id,
+                m.operator_roles.c.role_key.in_(sorted(removed)),
+            )
+        )
+    for role in sorted(wanted - current):
         session.execute(
             insert(m.operator_roles).values(
                 operator_id=operator_id, role_key=role, granted_by=granted_by
             )
         )
+
+
+def operator_role_grants(session: Session, operator_id: uuid.UUID) -> list[RowMapping]:
+    """``role_key``, ``granted_by`` and ``granted_at`` of each role the operator holds."""
+    return list(
+        session.execute(
+            select(
+                m.operator_roles.c.role_key,
+                m.operator_roles.c.granted_by,
+                m.operator_roles.c.granted_at,
+            ).where(m.operator_roles.c.operator_id == operator_id)
+        ).mappings()
+    )
 
 
 def active_owner_ids(session: Session, *, lock: bool = False) -> list[uuid.UUID]:
@@ -316,6 +354,39 @@ def payments_total(session: Session, invoice_id: uuid.UUID) -> tuple[Decimal, De
     return Decimal(row[0]), Decimal(row[1])
 
 
+def payments_with_names(
+    session: Session,
+    *,
+    invoice_id: uuid.UUID | None = None,
+    payment_id: uuid.UUID | None = None,
+) -> list[RowMapping]:
+    """Payments of one invoice (newest received first) or one payment, with the recording and
+    reversing operators' display names (``platform.operators``; no tenant data)."""
+    if invoice_id is None and payment_id is None:
+        raise ValueError("payments_with_names needs an invoice_id or a payment_id")
+    recorder = m.operators.alias("recorder")
+    reverser = m.operators.alias("reverser")
+    stmt = (
+        select(
+            m.payments,
+            recorder.c.display_name.label("recorded_by_name"),
+            reverser.c.display_name.label("reversed_by_name"),
+        )
+        .outerjoin(recorder, recorder.c.id == m.payments.c.recorded_by)
+        .outerjoin(reverser, reverser.c.id == m.payments.c.reversed_by)
+        .order_by(
+            m.payments.c.received_on.desc(),
+            m.payments.c.recorded_at.desc().nulls_last(),
+            m.payments.c.id.desc(),
+        )
+    )
+    if invoice_id is not None:
+        stmt = stmt.where(m.payments.c.invoice_id == invoice_id)
+    if payment_id is not None:
+        stmt = stmt.where(m.payments.c.id == payment_id)
+    return list(session.execute(stmt).mappings())
+
+
 def overdue_invoices(session: Session, subscription_id: uuid.UUID, today: dt.date) -> int:
     return int(
         session.execute(
@@ -400,6 +471,60 @@ def usage_on_or_before(session: Session, tenant_id: uuid.UUID, day: dt.date) -> 
         .mappings()
         .first()
     )
+
+
+def ai_answers_between(session: Session, tenant_id: uuid.UUID, start: dt.date, end: dt.date) -> int:
+    """Sum of the daily billable AI answer counts in [start, end) (counts only)."""
+    total: Any = session.execute(
+        select(func.coalesce(func.sum(m.usage_daily.c.ai_answers), 0)).where(
+            m.usage_daily.c.tenant_id == tenant_id,
+            m.usage_daily.c.usage_date >= start,
+            m.usage_daily.c.usage_date < end,
+        )
+    ).scalar_one()
+    return int(total)
+
+
+def ai_answers_to_date(
+    session: Session, tenant_id: uuid.UUID, start: dt.date, end: dt.date
+) -> tuple[int, dt.date | None]:
+    """Sum of the daily billable AI answer counts in [start, end) and the last day counted."""
+    row = session.execute(
+        select(
+            func.coalesce(func.sum(m.usage_daily.c.ai_answers), 0),
+            func.max(m.usage_daily.c.usage_date),
+        ).where(
+            m.usage_daily.c.tenant_id == tenant_id,
+            m.usage_daily.c.usage_date >= start,
+            m.usage_daily.c.usage_date < end,
+        )
+    ).one()
+    return int(row[0]), row[1]
+
+
+def subscription_has_line(
+    session: Session,
+    subscription_id: uuid.UUID,
+    *,
+    kind: str,
+    usage_month: dt.date | None = None,
+) -> bool:
+    """Does a live (not void) invoice of the subscription carry a line of ``kind`` (for that
+    ``usage_month`` when given)? Callers hold the subscription row lock."""
+    conds: list[ColumnElement[bool]] = [
+        m.invoices.c.subscription_id == subscription_id,
+        m.invoices.c.status != "void",
+        m.invoice_lines.c.kind == kind,
+    ]
+    if usage_month is not None:
+        conds.append(m.invoice_lines.c.usage_month == usage_month)
+    stmt = select(
+        select(m.invoice_lines.c.id)
+        .join(m.invoices, m.invoices.c.id == m.invoice_lines.c.invoice_id)
+        .where(and_(*conds))
+        .exists()
+    )
+    return bool(session.execute(stmt).scalar_one())
 
 
 def upsert_usage(session: Session, values: Mapping[str, Any]) -> None:

@@ -66,6 +66,9 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("PUT", "/api/v1/users/{user_id}/roles"): {"roles": ["teacher"]},
     ("PUT", "/api/v1/users/{user_id}/scopes"): {"scopes": []},
     ("POST", "/api/v1/users/{user_id}/invitation-email"): None,
+    # DL-09: answering an invitation that is not the caller's own.
+    ("POST", "/api/v1/me/invitations/{membership_id}/accept"): None,
+    ("POST", "/api/v1/me/invitations/{membership_id}/decline"): None,
     ("PATCH", "/api/v1/academic-years/{year_id}"): {},
     ("PATCH", "/api/v1/classes/{class_id}"): {},
     ("PATCH", "/api/v1/sections/{section_id}"): {},
@@ -151,7 +154,8 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
         "certificate_type": "bonafide",
         "inputs": {"purpose": "bus_pass"},
     },
-    ("POST", "/api/v1/certificates/{certificate_id}/approve"): None,
+    # A-11: the approval carries the draft fingerprint it was read with.
+    ("POST", "/api/v1/certificates/{certificate_id}/approve"): {"draft_sha256": "0" * 64},
     ("POST", "/api/v1/certificates/{certificate_id}/reject"): {
         "reason": "Synthetic BOLA rejection"
     },
@@ -692,8 +696,19 @@ def _tally_flag(path: str, w: Any) -> contextlib.AbstractContextManager[None]:
     return contextlib.nullcontext()
 
 
+def _b_invitation(w: Any) -> uuid.UUID:
+    """An open invitation in school B (one per session)."""
+    if "bola_invitation" not in w.b.ids:
+        invitee = W.add_member(_ADMIN[0], w.b.tenant_id, ["teacher"], status="invited")
+        w.b.ids["bola_invitation"] = invitee.membership_id
+    value: uuid.UUID = w.b.ids["bola_invitation"]
+    return value
+
+
 PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "user_id": lambda w: w.b.people["target"].user_id,
+    # DL-09: an open invitation of school B (to someone else).
+    "membership_id": _b_invitation,
     "year_id": lambda w: w.b.ids["year"],
     "class_id": lambda w: w.b.ids["class_ix"],
     "section_id": lambda w: w.b.ids["section_9a"],

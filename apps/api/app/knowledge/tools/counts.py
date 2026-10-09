@@ -7,8 +7,10 @@ breakdown by class, section or gender (gender through ``students.service.canonic
 never a C3 attribute). A breakdown by gender is a sensitive breakdown: a cell below
 ``small_cell_min`` (``tools.yaml``) is not shown, and when only one is, the next smallest is
 hidden too so the total cannot reveal it (docs/06 §7 small-cell suppression).
-One ``search_result`` block with source ``sos://count/{id}`` (the id is derived from the
-school, breakdown and date, docs/06 §8): the numbers only, never names or ids. Read-only.
+One ``search_result`` block with source ``sos://count/{id}#s{scope}`` (the id is derived from
+the school, breakdown and date, docs/06 §8; ``scope`` fingerprints the caller's
+``student.read_basic`` reach, re-checked when the answer is shown again, audit W3-09): the
+numbers only, never names or ids. Read-only.
 """
 
 from __future__ import annotations
@@ -85,9 +87,10 @@ class CountStudentsTool:
         except (ValidationError, DomainError):
             return error
         today = dt.datetime.now(IST).date()
+        scope = sources.scope_fingerprint(ctx.scope_for(self._spec.permission))
         return ToolOutcome(
             call_id=call_id,
-            blocks=(self._block(ctx.tenant_id, args.group_by, counts, year, today),),
+            blocks=(self._block(ctx.tenant_id, args.group_by, counts, year, today, scope=scope),),
         )
 
     def _counts(
@@ -143,13 +146,16 @@ class CountStudentsTool:
         counts: Mapping[str, int],
         year: str | None,
         today: dt.date,
+        *,
+        scope: str,
     ) -> SearchResultBlock:
         as_of = today.strftime("%d/%m/%Y")
         key = uuid.uuid5(_NAMESPACE, f"{tenant_id}|{group_by}|{today.isoformat()}")
+        source = sources.student_count(key, scope=scope)
         title = f"Student count · current academic year · by {group_by}"
         if year is None:
             text = f"No current academic year is set, so there is nothing to count. As of {as_of}."
-            return SearchResultBlock(source=sources.student_count(key), title=title, text=text)
+            return SearchResultBlock(source=source, title=title, text=text)
         total = sum(counts.values())
         hidden = self._suppressed(counts) if group_by in SENSITIVE_GROUPS else set()
         parts: list[str] = []
@@ -161,7 +167,7 @@ class CountStudentsTool:
         text = (
             f"Students enrolled in {year} that you can access: {body}Total: {total}. As of {as_of}."
         )
-        return SearchResultBlock(source=sources.student_count(key), title=title, text=text)
+        return SearchResultBlock(source=source, title=title, text=text)
 
 
 __all__ = ["GROUPS", "NAME", "CountStudentsTool"]

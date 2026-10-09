@@ -181,9 +181,11 @@ function LinkPanel({ partyId, onClose }: { partyId: string; onClose: () => void 
         {(detail) => (
           <div className="space-y-4">
             <p className="break-words">
-              <span className="font-medium">{detail.ledger_name}</span>{" "}
+              <span className="font-semibold">{detail.ledger_name}</span>{" "}
               <span className="text-ink-muted">({detail.group_name})</span>{" "}
-              <Amount value={detail.closing_balance} withKind />
+              {detail.closing_balance === null ? null : (
+                <Amount value={detail.closing_balance} withKind />
+              )}
             </p>
             <p className="text-sm text-ink-muted">{t("personDecides")}</p>
             {linked ? (
@@ -192,7 +194,7 @@ function LinkPanel({ partyId, onClose }: { partyId: string; onClose: () => void 
               </Alert>
             ) : null}
             <div className="space-y-2">
-              <h3 className="font-medium text-ink">{t("candidates")}</h3>
+              <h3 className="font-semibold text-ink">{t("candidates")}</h3>
               {detail.candidates.length === 0 ? (
                 <p className="text-sm text-ink-muted">{t("noCandidates")}</p>
               ) : (
@@ -352,14 +354,18 @@ export function TallyLedgersScreen() {
                           {page.data.map((party) => (
                             <Tr key={party.id}>
                               <Td className="break-words">
-                                <span className="font-medium">{party.ledger_name}</span>
+                                <span className="font-semibold">{party.ledger_name}</span>
                                 <span className="block text-xs text-ink-muted">
                                   {t("asOf", { date: formatDate(party.as_of) ?? "" })}
                                 </span>
                               </Td>
                               <Td>{party.group_name}</Td>
                               <Td className="text-right">
-                                <Amount value={party.closing_balance} withKind />
+                                {party.closing_balance === null ? (
+                                  <span className="text-ink-muted">—</span>
+                                ) : (
+                                  <Amount value={party.closing_balance} withKind />
+                                )}
                               </Td>
                               <Td>
                                 <LinkedList party={party} />

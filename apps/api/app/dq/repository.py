@@ -179,7 +179,8 @@ def link_change_request(
 ) -> list[uuid.UUID]:
     """Link the student's unresolved findings (of ``attribute_key``, if given) to the request."""
     stmt = update(F).where(
-        F.c.student_id == student_id, F.c.status.in_(("open", "reopened", "waived"))
+        F.c.student_id == student_id,
+        F.c.status.in_(("open", "reopened", "needs_confirmation", "waived")),
     )
     if attribute_key is not None:
         stmt = stmt.where(F.c.attribute_key == attribute_key)

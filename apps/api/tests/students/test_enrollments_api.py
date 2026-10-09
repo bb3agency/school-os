@@ -45,6 +45,122 @@ def test_FR_TEN_010_list_enrolments_is_scoped(world: Any, api: Any) -> None:
     assert api.call(b_owner, "GET", f"{BASE}/{in_9a}/enrollments").status_code == 404
 
 
+def _scoped_editor(
+    world: Any,
+    admin_engine: Engine,
+    permissions: tuple[str, ...] = ("student.read_basic", "student.update_nonidentity"),
+) -> Any:
+    """A member of school A with a custom role (always scoped) limited to section 9A."""
+    tid = world.a.tenant_id
+    key = f"scoped_editor_{uuid.uuid4().hex[:8]}"
+    role_id = uuid.uuid4()
+    with admin_engine.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO core.roles (id, tenant_id, key, name_en, name_te) "
+                "VALUES (:r, :t, :k, 'Synthetic scoped editor', 'కృత్రిమ సంపాదకుడు')"
+            ),
+            {"r": role_id, "t": tid, "k": key},
+        )
+        for perm in permissions:
+            c.execute(
+                text(
+                    "INSERT INTO core.role_permissions (tenant_id, role_id, permission_key) "
+                    "VALUES (:t, :r, :p)"
+                ),
+                {"t": tid, "r": role_id, "p": perm},
+            )
+    return W.add_member(admin_engine, tid, [key], scopes=[("section", world.a.ids["section_9a"])])
+
+
+def test_SEC_015_scoped_editor_cannot_link_a_guardian_of_a_student_outside_scope(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """Linking an existing guardian (siblings, FR-STU-008) needs that guardian to belong to a
+    student the caller reaches; before, a 9A editor with read_sensitive could link a 9C
+    student's guardian to a 9A student and then reveal its C3 phone and address."""
+    editor = _scoped_editor(
+        world,
+        admin_engine,
+        ("student.read_basic", "student.update_nonidentity", "student.read_sensitive"),
+    )
+    in_9a, in_9c, sibling = _student(world), _student(world, "section_9c"), _student(world)
+    foreign = SW.add_guardian(world.a, in_9c, full_name="Synthetica Other Parent")
+    res = api.call(
+        editor,
+        "POST",
+        f"{BASE}/{in_9a}/guardians",
+        json={"relationship": "mother", "guardian_id": str(foreign)},
+    )
+    assert res.status_code == 422, res.text
+    assert res.json()["errors"][0]["code"] == "not_found"
+    reachable = SW.add_guardian(world.a, sibling, full_name="Synthetica Reachable Parent")
+    res = api.call(
+        editor,
+        "POST",
+        f"{BASE}/{in_9a}/guardians",
+        json={"relationship": "father", "guardian_id": str(reachable)},
+    )
+    assert res.status_code == 201, res.text
+
+
+def test_SEC_015_scoped_editor_cannot_edit_a_guardian_shared_with_a_student_outside_scope(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """App-logic hardening (custom roles): a guardian's name, phone and address are shared by
+    every student it is linked to, so a 9A editor changes them only when every linked student
+    is in reach (403 ``guardian_shared_out_of_scope``). Their own link (relationship) still
+    changes."""
+    editor = _scoped_editor(world, admin_engine)
+    in_9a, in_9c = _student(world), _student(world, "section_9c")
+    gid = SW.add_guardian(world.a, in_9a, full_name="Synthetica Shared Parent")
+    linked = api.call(
+        world.person("office_admin"),
+        "POST",
+        f"{BASE}/{in_9c}/guardians",
+        json={"relationship": "father", "guardian_id": str(gid)},
+    )
+    assert linked.status_code == 201, linked.text
+    path = f"{BASE}/{in_9a}/guardians/{gid}"
+    res = api.call(editor, "PATCH", path, json={"full_name": "Changed"}, headers=_if_match(1))
+    assert (res.status_code, res.json()["code"]) == (403, "guardian_shared_out_of_scope")
+    ok = api.call(editor, "PATCH", path, json={"relationship": "mother"}, headers=_if_match(1))
+    assert ok.status_code == 200, ok.text
+
+
+def test_SEC_015_scoped_editor_cannot_enrol_into_a_section_outside_scope(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """A scoped ``student.update_nonidentity`` holder (custom roles are always scoped) may move
+    a student only between sections they reach, as ``PATCH .../enrollments/{id}`` already
+    requires; before, ``POST .../enrollments`` checked only the student, so a 9A editor could
+    move a 9A student into 9C (or any year)."""
+    editor = _scoped_editor(world, admin_engine)
+    sid = _student(world)
+    res = api.call(
+        editor,
+        "POST",
+        f"{BASE}/{sid}/enrollments",
+        json={"section_id": str(world.a.ids["section_9c"])},
+    )
+    assert res.status_code == 422, res.text
+    assert res.json()["errors"][0] == {
+        "field": "section_id",
+        "code": "not_found",
+        "message_key": "errors.not_found",
+    }
+    assert _only_enrolment(api, world, sid)["section_id"] == str(world.a.ids["section_9a"])
+    # Within scope the request passes the scope check (and meets the ordinary state rule).
+    res = api.call(
+        editor,
+        "POST",
+        f"{BASE}/{sid}/enrollments",
+        json={"section_id": str(world.a.ids["section_9a"]), "roll_no": "41"},
+    )
+    assert res.status_code == 409, res.text
+    assert res.json()["code"] == "already_enrolled"
+
+
 def test_FR_TEN_010_patch_roll_number_and_section_with_if_match(
     world: Any, api: Any, admin_engine: Engine
 ) -> None:
@@ -200,3 +316,46 @@ def test_FR_STU_008_unlink_guardian(world: Any, api: Any, admin_engine: Engine) 
     assert ("guardian.deleted", shared) not in actions
     assert ("guardian.unlinked", own) in actions
     assert ("guardian.deleted", own) in actions
+
+
+def test_R_10_scoped_editor_cannot_change_an_enrolment_outside_scope(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """R-10 (API1, SEC-015): a 9A editor reaches a student now in 9A, but not that student's
+    closed 9C enrolment: correcting its roll number or ending it is checked against the
+    enrolment's own section, not only the student's current one."""
+    admin = world.person("office_admin")
+    sid = _student(world, "section_9c")
+    old = _only_enrolment(api, world, sid)
+    res = api.call(
+        admin,
+        "POST",
+        f"{BASE}/{sid}/enrollments/{old['id']}/end",
+        json={"status": "completed"},
+        headers=_if_match(old["version"]),
+    )
+    assert res.status_code == 200, res.text
+    old_version = res.json()["version"]
+    res = api.call(
+        admin,
+        "POST",
+        f"{BASE}/{sid}/enrollments",
+        json={"section_id": str(world.a.ids["section_9a"])},
+    )
+    assert res.status_code == 201, res.text
+    current = res.json()
+    editor = _scoped_editor(world, admin_engine)
+    old_path = f"{BASE}/{sid}/enrollments/{old['id']}"
+    res = api.call(
+        editor, "PATCH", old_path, json={"roll_no": "99"}, headers=_if_match(old_version)
+    )
+    assert res.status_code == 404, res.text
+    # Within scope the editor still corrects the current enrolment.
+    res = api.call(
+        editor,
+        "PATCH",
+        f"{BASE}/{sid}/enrollments/{current['id']}",
+        json={"roll_no": "12"},
+        headers=_if_match(current["version"]),
+    )
+    assert res.status_code == 200, res.text

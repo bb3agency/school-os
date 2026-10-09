@@ -11,6 +11,7 @@
           "match": "*",
           "claims": {
             "aud": ["schoolos-web"],
+            "token_use": "access",
             "amr": ["pwd", "mfa"],
             "sos:mfa": "true"
           }
@@ -37,6 +38,7 @@
           "match": "*",
           "claims": {
             "aud": ["schoolos-platform"],
+            "token_use": "access",
             "amr": ["pwd", "mfa"],
             "sos:mfa": "true"
           }

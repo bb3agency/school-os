@@ -82,6 +82,7 @@ def _ctx(**changes: Any) -> ValidationContext:
         has_current_year=True,
         allowed_sections=None,
         can_create=True,
+        can_update_sensitive=True,  # a full importer (office admin); A-10 tests narrow it
         existing={},
         config=CFG,
         today=dt.date(2026, 9, 27),
@@ -189,6 +190,38 @@ def test_FR_IMP_003_existing_students_are_updates_and_register_identity_is_prote
     assert "admission_no" not in other.values
 
 
+def test_A_10_updating_a_sensitive_value_needs_read_sensitive() -> None:
+    """A-10 (owner decision 2026-10-07): ``import.commit`` includes updates of existing
+    students, but writing a C3 value to an existing student needs ``student.read_sensitive``
+    (an exam coordinator cannot overwrite caste or health notes they cannot read)."""
+    existing = {"a-1": ExistingStudent("sid-1", "s9a", {})}
+    header = ["Admission no", "Caste", "Mother tongue"]
+    sheet = read_sheet(
+        S.csv_bytes([header, ["A-1", "Synthetic Caste", "Telugu"]]), "csv", CFG.limits
+    )
+    mapping = {"0": "admission_no", "1": "caste", "2": "mother_tongue"}
+    blocked = validate_sheet(
+        sheet,
+        mapping,
+        _ctx(existing=existing, source="parent_form", can_update_sensitive=False),
+    )
+    assert _codes(blocked) == [{"caste:sensitive_update_not_permitted"}]
+    allowed = validate_sheet(
+        sheet,
+        mapping,
+        _ctx(existing=existing, source="parent_form", can_update_sensitive=True),
+    )
+    assert allowed.rows[0].status == "valid"
+    assert allowed.rows[0].action == "update"
+    # Non-sensitive updates stay part of import.commit.
+    plain = validate_sheet(
+        sheet,
+        {"0": "admission_no", "2": "mother_tongue"},
+        _ctx(existing=existing, source="parent_form", can_update_sensitive=False),
+    )
+    assert plain.rows[0].status == "valid"
+
+
 def test_FR_IMP_003_sources_that_cannot_create_only_match() -> None:
     sheet = _rows(["A-9", "Synthetica Nine", "", "14/03/2012", "M", "IX", "A"])
     result = validate_sheet(sheet, MAPPING, _ctx(source="udise_plus"))
@@ -275,6 +308,50 @@ def test_SEC_013_aadhaar_column_keeps_last_four_digits_only() -> None:
         "class_label": None,
         "roll_no": None,
     }
+
+
+def test_FR_STU_015_apaar_column_takes_twelve_digits_and_never_an_aadhaar_number() -> None:
+    """ADR-0037: an APAAR ID column imports 12 digits (groups allowed). The import's row scan is
+    unchanged: a 12-digit value passing Verhoeff is still refused there, as in every column
+    (invariant 4); such an APAAR ID is typed in on the student page instead."""
+    from app.core.redaction import verhoeff_check_digit
+
+    body = "78912345678"
+    verhoeff = body + verhoeff_check_digit(body)
+    spec = AttributeSpec(
+        "apaar_id", "digits12", "C2", False, ("udise_plus", "parent_form", "manual_entry"), None
+    )
+    sheet = read_sheet(
+        S.csv_bytes(
+            [
+                ["Adm No", "APAAR", "Name"],
+                ["A-1", "123456789011", "x"],
+                ["A-2", "1234 5678 9011", "x"],
+                ["A-3", "12345678901", "x"],
+                ["A-4", verhoeff, "x"],
+            ]
+        ),
+        "csv",
+        CFG.limits,
+    )
+    existing = {f"a-{i}": ExistingStudent(f"sid-{i}", None, {}) for i in range(1, 5)}
+    result = validate_sheet(
+        sheet,
+        {"0": "admission_no", "1": "apaar_id"},
+        _ctx(source="udise_plus", existing=existing, specs={**SPECS, "apaar_id": spec}),
+    )
+    assert [r.values.get("apaar_id") for r in result.rows] == [
+        "123456789011",
+        "123456789011",
+        None,
+        None,
+    ]
+    assert [sorted(e["code"] for e in r.errors) for r in result.rows] == [
+        [],
+        [],
+        ["digits12_required"],
+        ["aadhaar_full_number_rejected"],
+    ]
 
 
 def test_SEC_017_mapped_formula_cells_are_errors_unmapped_ones_warnings() -> None:

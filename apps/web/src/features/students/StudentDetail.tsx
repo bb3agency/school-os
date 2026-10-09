@@ -10,6 +10,7 @@ import { Badge, Pill } from "@/components/ui/Badge";
 import { Button, ButtonLink, type ButtonSize, type ButtonVariant } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { TextField } from "@/components/ui/Input";
 import { SelectField } from "@/components/ui/Select";
 import {
   DataTable,
@@ -155,7 +156,7 @@ function AttributeRow({
         canReveal={canReveal}
       />
     ) : (
-      <span className="font-mono font-medium">
+      <span className="font-mono">
         <Value>{format(value, attribute)}</Value>
       </span>
     );
@@ -166,7 +167,7 @@ function AttributeRow({
     <tr className="align-top">
       <th
         scope="row"
-        className="min-w-40 px-4 py-4 text-left font-medium whitespace-normal text-ink"
+        className="min-w-40 px-4 py-4 text-left font-semibold whitespace-normal text-ink"
       >
         {label}
         {attribute?.is_identity ? (
@@ -201,6 +202,10 @@ function AttributeRow({
                 </Pill>
               ) : null}
             </div>
+            {attribute?.data_type === "digits12" && !canonical.verified ? (
+              // ADR-0037: an APAAR ID counts only once a person checked it.
+              <p className="text-xs text-ink-muted">{t("apaarNotVerified")}</p>
+            ) : null}
           </div>
         ) : (
           <Value>{null}</Value>
@@ -260,7 +265,20 @@ function AttributeRow({
 
 /* ------------------------------------------------------------------ record a value */
 
+/** FR-STU-015: 12 digits, optionally grouped 4-4-4 by a space or hyphen (same rule as the API). */
+const DIGITS12 = /^\d{4}[ -]?\d{4}[ -]?\d{4}$/;
+
 function valueSchema(attribute: Attribute | undefined) {
+  if (attribute?.data_type === "digits12") {
+    // The typed APAAR ID (ADR-0037) is the one field where 12 digits are expected, so the
+    // Aadhaar look-alike refusal does not apply to it; the API checks the same rule.
+    return z
+      .string()
+      .trim()
+      .min(1, { error: "required" })
+      .refine((value) => DIGITS12.test(value), { error: "invalid" })
+      .transform((value) => value.replace(/[ -]/g, ""));
+  }
   const base = z
     .string()
     .trim()
@@ -318,6 +336,7 @@ function RecordValueDialog({
 
   const valueError = (error: string | undefined) => {
     if (!error) return undefined;
+    if (attribute?.data_type === "digits12") return t("digits12Invalid");
     if (containsFullAadhaar(raw)) return ts("aadhaarNotAllowed");
     if (attribute?.data_type === "date") return ts("dateInvalid", dates.hint("2012-03-14"));
     if (attribute?.data_type === "digits4") return t("digits4Invalid");
@@ -399,6 +418,19 @@ function RecordValueDialog({
                 value,
                 label: format(value, attribute) ?? value,
               }))}
+            />
+          ) : attribute?.data_type === "digits12" ? (
+            // The APAAR ID (ADR-0037): 12 digits are expected here, so no Aadhaar paste guard.
+            <TextField
+              name="value"
+              label={t("value")}
+              hint={t("digits12Hint")}
+              error={valueError(errors.value)}
+              value={raw}
+              onChange={(event) => setRaw(event.currentTarget.value)}
+              autoComplete="off"
+              maxLength={14}
+              inputMode="numeric"
             />
           ) : (
             <GuardedTextField
@@ -649,7 +681,7 @@ export function StudentDetailView({
           <p className="text-sm text-ink-muted">{t("noValues")}</p>
         ) : (
           <TableScroll label={t("valuesTable")}>
-            <Table stickyFirstColumn>
+            <Table stickyFirstColumn reflow>
               <caption className="sr-only">{t("valuesTable")}</caption>
               <THead>
                 <Tr>

@@ -4,6 +4,7 @@ import { MinimalShell } from "@/components/shell/MinimalShell";
 import { Alert } from "@/components/ui/Alert";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { CheckInvitationsButton } from "@/features/auth/CheckInvitationsButton";
+import { PendingInvitations } from "@/features/auth/PendingInvitations";
 import { pageMetadata } from "@/lib/metadata";
 import { getSession } from "@/server/session/rsc";
 
@@ -19,6 +20,7 @@ function NoAccessBody({ signedIn }: { signedIn: boolean }) {
       <Alert tone="info" title={t("expiredTitle")}>
         {t("expiredBody")}
       </Alert>
+      {signedIn ? <PendingInvitations /> : null}
       {signedIn ? (
         <CheckInvitationsButton />
       ) : (

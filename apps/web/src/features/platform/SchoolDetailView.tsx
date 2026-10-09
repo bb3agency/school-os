@@ -20,7 +20,7 @@ import { deploymentTone, known, subscriptionTone } from "@/features/status";
 import { ApiError, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { formatCount, formatDate, formatDateTime, formatInr } from "@/lib/format";
 import { ready, type Loadable } from "@/lib/loadable";
-import { reason } from "@/lib/validation";
+import { optionalInt, reason } from "@/lib/validation";
 import { billingAccountSchema } from "./billing-account";
 import { BillingAccountFields } from "./BillingAccountFields";
 import { PK, ifMatch, useCan, usePlanDirectory } from "./data";
@@ -47,6 +47,16 @@ const reasonSchema = z.object({ reason });
  * While the school is `provisioning` it shows where setup stands and offers "Resume
  * provisioning" (FR-PLT-002, docs/16 §5.4); go-live is refused until setup has finished.
  */
+
+/** A-13: an offboarding request not approved before ``offboard_request_expires_at`` expired. */
+export function offboardRequestExpired(
+  school: Pick<TenantDetail, "offboard_request_expires_at">,
+  at: number = Date.now(),
+): boolean {
+  const expires = school.offboard_request_expires_at;
+  return expires != null && Date.parse(expires) <= at;
+}
+
 export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: SchoolTab }) {
   const t = useTranslations("platform.schoolDetail");
   const tn = useTranslations("platform.nav");
@@ -72,8 +82,14 @@ export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: S
 
   function actions(data: TenantDetail) {
     const status = data.tenant_status;
+    // R-18: a security hold is independent of a billing suspension. A school suspended only
+    // for billing is reactivated from its subscription; it can still be put on hold.
+    const held = data.security_hold === true;
+    const billingSuspended = data.subscription?.status === "suspended";
     const offboardPending =
       data.offboard_requested_at !== null && data.offboard_approved_at === null;
+    // A-13: an unapproved request expires; it can then be withdrawn or replaced.
+    const offboardExpired = offboardPending && offboardRequestExpired(data);
     return (
       <>
         {status === "provisioning" && can("platform.tenants.provision") ? (
@@ -115,12 +131,13 @@ export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: S
             />
           </>
         ) : null}
-        {status === "active" && can("platform.tenants.suspend") ? (
+        {(status === "active" || (status === "suspended" && !held)) &&
+        can("platform.tenants.suspend") ? (
           <ActionDialog
-            triggerLabel={t("suspend")}
-            title={t("suspendDialogTitle")}
-            description={t("suspendDialogBody")}
-            confirmLabel={t("suspendConfirm")}
+            triggerLabel={status === "active" ? t("suspend") : t("placeHold")}
+            title={status === "active" ? t("suspendDialogTitle") : t("placeHoldTitle")}
+            description={status === "active" ? t("suspendDialogBody") : t("placeHoldBody")}
+            confirmLabel={status === "active" ? t("suspendConfirm") : t("placeHold")}
             confirmVariant="danger"
             stepUp
             schema={reasonSchema}
@@ -137,12 +154,12 @@ export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: S
             {(errors) => <ReasonField error={errors.reason} />}
           </ActionDialog>
         ) : null}
-        {status === "suspended" && can("platform.tenants.suspend") ? (
+        {status === "suspended" && held && can("platform.tenants.suspend") ? (
           <ActionDialog
-            triggerLabel={t("reactivate")}
-            title={t("reactivateTitle")}
-            description={t("reactivateBody")}
-            confirmLabel={t("reactivate")}
+            triggerLabel={billingSuspended ? t("liftHold") : t("reactivate")}
+            title={billingSuspended ? t("liftHoldTitle") : t("reactivateTitle")}
+            description={billingSuspended ? t("liftHoldBillingBody") : t("reactivateBody")}
+            confirmLabel={billingSuspended ? t("liftHold") : t("reactivate")}
             stepUp
             schema={reasonSchema}
             invalidate={invalidate}
@@ -159,7 +176,7 @@ export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: S
           </ActionDialog>
         ) : null}
         {can("platform.tenants.offboard") &&
-        data.offboard_requested_at === null &&
+        (data.offboard_requested_at === null || offboardExpired) &&
         (status === "active" || status === "suspended") ? (
           <ActionDialog
             triggerLabel={t("offboard")}
@@ -185,6 +202,24 @@ export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: S
           </ActionDialog>
         ) : null}
         {can("platform.tenants.offboard") && offboardPending ? (
+          <ActionDialog
+            triggerLabel={t("withdrawOffboard")}
+            triggerVariant="secondary"
+            title={t("withdrawOffboardTitle")}
+            description={t("withdrawOffboardBody")}
+            confirmLabel={t("withdrawOffboard")}
+            schema={z.object({})}
+            invalidate={invalidate}
+            submit={() =>
+              unwrap(
+                api.POST("/api/v1/platform/tenants/{tenant_id}/offboarding:withdraw", {
+                  params: { path },
+                }),
+              )
+            }
+          />
+        ) : null}
+        {can("platform.tenants.offboard") && offboardPending && !offboardExpired ? (
           <ActionDialog
             triggerLabel={t("approveOffboard")}
             triggerVariant="danger"
@@ -294,13 +329,33 @@ export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: S
         }
         actions={school ? actions(school) : undefined}
       />
-      {school?.offboard_requested_at && !school.offboard_approved_at ? (
+      {school?.offboard_requested_at &&
+      !school.offboard_approved_at &&
+      offboardRequestExpired(school) ? (
+        <Alert tone="warning" title={t("offboardExpiredTitle")}>
+          <p>
+            {t("offboardExpiredBody", {
+              date: formatDateTime(school.offboard_requested_at) ?? "",
+            })}
+          </p>
+        </Alert>
+      ) : null}
+      {school?.offboard_requested_at &&
+      !school.offboard_approved_at &&
+      !offboardRequestExpired(school) ? (
         <Alert tone="warning" title={t("offboardPendingTitle")}>
           <p>
             {t("offboardPendingBody", {
               date: formatDateTime(school.offboard_requested_at) ?? "",
             })}
           </p>
+          {school.offboard_request_expires_at ? (
+            <p>
+              {t("offboardExpires", {
+                date: formatDateTime(school.offboard_request_expires_at) ?? "",
+              })}
+            </p>
+          ) : null}
           {offboardSteps ? (
             <Timeline items={offboardSteps} label={t("offboardStepsTitle")} className="mt-4" />
           ) : null}
@@ -377,6 +432,7 @@ function OverviewTab({ school }: { school: TenantDetail }) {
             <dd>
               {tschool(school.tenant_status)}
               {school.tenant_status_reason ? ` · ${school.tenant_status_reason}` : ""}
+              {school.security_hold ? ` · ${t("securityHold")}` : ""}
             </dd>
             {school.provisioning ? (
               <>
@@ -534,6 +590,12 @@ function SubscriptionTab({ school }: { school: TenantDetail }) {
         <dd>
           <Value>{formatInr(sub.price_override_inr, locale)}</Value>
         </dd>
+        {sub.override_reason ? (
+          <>
+            <dt className="text-ink-muted">{t("overrideReason")}</dt>
+            <dd className="max-w-prose break-words">{sub.override_reason}</dd>
+          </>
+        ) : null}
       </dl>
       <SubscriptionActions subscription={sub} label={school.school_name} />
     </div>
@@ -563,9 +625,17 @@ function DeploymentTab({ schoolId }: { schoolId: string }) {
   const tdep = useTranslations("status.deployment");
   const tmode = useTranslations("deploymentMode");
   const api = useBffClient("operator");
+  // One deployment per school: ask for this school's row only (the list is paged, R-14).
   const deployments = useApiQuery(
-    [...PK.deployments, "list", {}],
-    async () => (await unwrap(api.GET("/api/v1/platform/deployments"))).data,
+    [...PK.deployments, "list", { tenant_id: schoolId }],
+    async () =>
+      (
+        await unwrap(
+          api.GET("/api/v1/platform/deployments", {
+            params: { query: { tenant_id: schoolId, limit: 1 } },
+          }),
+        )
+      ).data,
   );
   if (deployments.status !== "ready") {
     return <FleetTableState state={deployments} />;
@@ -675,6 +745,13 @@ function FlagsTab({ school }: { school: TenantDetail }) {
             cell: (row: FeatureFlag) => {
               const path = { key: row.key, tenant_id: school.tenant_id };
               const has = school.flag_overrides[row.key] !== undefined;
+              // This school's override row, whose version goes in If-Match (AA-13).
+              const existing =
+                flags.status === "ready"
+                  ? flags.data.find(
+                      (flag) => flag.key === row.key && flag.tenant_id === school.tenant_id,
+                    )
+                  : undefined;
               return (
                 <div className="relative flex flex-wrap gap-2">
                   <ActionDialog
@@ -684,12 +761,20 @@ function FlagsTab({ school }: { school: TenantDetail }) {
                     title={t("setOverrideTitle", { key: row.key })}
                     confirmLabel={tc("save")}
                     stepUp
-                    schema={z.object({ enabled: z.enum(["on", "off"]) })}
+                    schema={z.object({
+                      enabled: z.enum(["on", "off"]),
+                      version: optionalInt(2_147_483_647),
+                    })}
                     invalidate={invalidate}
                     submit={(input) =>
                       unwrap(
                         api.PUT("/api/v1/platform/flags/{key}/tenants/{tenant_id}", {
-                          params: { path },
+                          params: {
+                            path,
+                            ...(input.version === null
+                              ? {}
+                              : { header: { "If-Match": ifMatch(input.version) } }),
+                          },
                           body: { enabled: input.enabled === "on" },
                         }),
                       )
@@ -697,6 +782,12 @@ function FlagsTab({ school }: { school: TenantDetail }) {
                   >
                     {() => (
                       <fieldset className="space-y-2">
+                        {/* Read when the dialog opens; empty: no override yet (AA-13). */}
+                        <input
+                          type="hidden"
+                          name="version"
+                          defaultValue={existing?.version ?? ""}
+                        />
                         <legend className="text-sm font-semibold">{t("overrideValue")}</legend>
                         {(["on", "off"] as const).map((value) => (
                           <label key={value} className="flex items-center gap-2 text-sm">

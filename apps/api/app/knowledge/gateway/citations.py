@@ -14,6 +14,9 @@ Stricter than a bare marker (FR-KB-005, FR-KB-007):
 
 - a marker that names no passage of this request is dropped (it cannot point at anything the
   caller may not see: only the caller's own blocks are numbered);
+- with ``sentences`` (``answer_checks.sentences``; the Gemini codec passes it) a marker cites
+  only the sentence it ends: earlier sentences written before it without a marker of their own
+  become uncited segments (``knowledge.answer`` then drops them or falls back);
 - with ``require_numbers_in_passage`` every number the statement writes (dates, amounts, counts,
   class numbers) must appear in the passages it cites (title or text; Roman class numerals in a
   passage count as their number), else all its markers are dropped and the
@@ -35,6 +38,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final
 
+from app.knowledge.config.llm import SentenceRules
 from app.knowledge.domain import (
     AnswerSegment,
     Citation,
@@ -42,6 +46,7 @@ from app.knowledge.domain import (
     SearchResultBlock,
     ToolResultsMessage,
 )
+from app.knowledge.sentences import body, split_sentences
 
 MARKER: Final = re.compile(r"\[\s*(\d{1,3}(?:\s*[,;]\s*\d{1,3})*)\s*\]")
 """``[3]``, ``[2, 5]``; consecutive markers (``[2][5]``) are read together."""
@@ -175,9 +180,26 @@ def _split(text: str) -> list[tuple[str, list[int]]]:
     return fixed
 
 
+def _last_sentence(claim: str, rules: SentenceRules) -> tuple[str, str, str]:
+    """``claim`` as (earlier sentences, the last sentence, its words for the number check).
+    The whitespace between them goes with the last sentence."""
+    found = split_sentences(claim, rules)
+    if not found:
+        return "", claim, claim
+    earlier = claim[: found[-1].start].rstrip()
+    return earlier, claim[len(earlier) :], body(found[-1])
+
+
 def segments_from_markers(
-    text: str, passages: Sequence[Passage], *, require_numbers: bool
+    text: str,
+    passages: Sequence[Passage],
+    *,
+    require_numbers: bool,
+    sentences: SentenceRules | None = None,
 ) -> MarkedText:
+    """With ``sentences`` (``answer_checks.sentences``), a marker cites only the sentence it
+    ends: earlier sentences of the same piece become uncited segments, and the number rule reads
+    the marked sentence alone, without its list marker (docs/06 §9 rule 3 as built)."""
     by_number = {p.number: p for p in passages}
     segments: list[AnswerSegment] = []
     dropped = 0
@@ -187,13 +209,18 @@ def segments_from_markers(
             if claim.strip():
                 segments.append(AnswerSegment(claim))
             continue
+        stated = claim
+        if sentences is not None:
+            earlier, claim, stated = _last_sentence(claim, sentences)
+            if earlier.strip():
+                segments.append(AnswerSegment(earlier))
         cited = [by_number[n] for n in dict.fromkeys(numbers) if n in by_number]
         dropped += len(numbers) - len(cited)
         if require_numbers and cited:
             available = frozenset().union(
                 *(numbers_in(f"{p.block.title}\n{p.block.text}", roman=True) for p in cited)
             )
-            if not numbers_in(claim) <= available:
+            if not numbers_in(stated) <= available:
                 dropped += len(cited)
                 cited = []
         citations: list[Citation] = []

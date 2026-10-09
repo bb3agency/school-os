@@ -7,9 +7,11 @@
  * (apps/web/README.md).
  */
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import type { components } from "@schoolos/api-client";
 import { createFakeIdp, type FakeIdp } from "../../src/test/fake-idp";
 import { askAnswer, askEvents, resetAsk } from "./ask-api";
 import { FILES_PREFIX, journeyAnswer, resetJourney } from "./journey-api";
+import { resetSheets, sheetAnswer } from "./sheet-api";
 
 export const IDP_PORT = Number(process.env.E2E_IDP_PORT ?? 8089);
 export const API_PORT = Number(process.env.E2E_API_PORT ?? 8099);
@@ -137,7 +139,8 @@ const TENANT_SUMMARY = {
   created_at: "2026-06-01T04:30:00Z",
 };
 
-const PLAN = {
+/** Typed against the generated schemas so a new API field fails typecheck here. */
+const PLAN: components["schemas"]["PlanOut"] = {
   id: "0192f3a4-0000-7000-8000-00000000a001",
   code: "standard",
   name: "Standard",
@@ -156,9 +159,12 @@ const PLAN = {
   features: {},
   published_at: "2026-06-01T00:00:00Z",
   created_at: "2026-06-01T00:00:00Z",
+  one_time_fee_inr: "15000.00",
+  description: "Synthetic shared plan wording.",
+  row_version: 1,
 };
 
-const INVOICE = {
+const INVOICE: components["schemas"]["InvoiceOut"] = {
   id: "0192f3a4-0000-7000-8000-00000000c001",
   tenant_id: T1,
   subscription_id: SUB,
@@ -523,6 +529,7 @@ const PROVISIONING_DETAIL = {
   ...provisioningSummary(),
   boards: ["CBSE"],
   tenant_status_reason: null,
+  security_hold: false,
   offboard_requested_at: null,
   offboard_approved_at: null,
   subscription: null,
@@ -571,6 +578,32 @@ const OPERATOR_PERMISSIONS = [
   "platform.announcements.manage",
   "platform.audit.read",
 ];
+
+const AUDIT_NOT_VERIFIED = {
+  ok: null,
+  checked: 0,
+  first_bad_seq: null,
+  reason: null,
+  verified_at: null,
+  mode: null,
+  source: null,
+  checkpoint_seq: 0,
+  checkpoint_at: null,
+  last_full_at: null,
+  pending: false,
+  requested_at: null,
+};
+const AUDIT_VERIFIED = {
+  ...AUDIT_NOT_VERIFIED,
+  ok: true,
+  checked: 1234,
+  verified_at: "2026-10-06T05:00:00Z",
+  mode: "full",
+  source: "on_demand",
+  checkpoint_seq: 1234,
+  checkpoint_at: "2026-10-06T05:00:00Z",
+  last_full_at: "2026-10-06T05:00:00Z",
+};
 
 function apiAnswer(method: string, path: string, subject: string): [number, unknown] {
   const multi = subject === "multi";
@@ -713,8 +746,10 @@ function apiAnswer(method: string, path: string, subject: string): [number, unkn
         ],
       },
     ];
-  if (path === "/api/v1/audit/verify")
-    return [200, { ok: true, checked: 1234, first_bad_seq: null, reason: null }];
+  // R-19: GET serves the stored check (none yet here); POST queues one. The stand-in's
+  // "worker" is instant, so the POST answers with the finished result.
+  if (path === "/api/v1/audit/verify" && method === "GET") return [200, AUDIT_NOT_VERIFIED];
+  if (path === "/api/v1/audit/verify" && method === "POST") return [202, AUDIT_VERIFIED];
   if (path === `/api/v1/platform/tenants/${T3}`) return [200, PROVISIONING_DETAIL];
   if (path === "/api/v1/platform/me")
     return [
@@ -770,6 +805,7 @@ async function startApi(): Promise<Server> {
     if (url.pathname === "/__e2e/reset" && method === "POST") {
       resetJourney();
       resetAsk();
+      resetSheets();
       return send(response, 204, "");
     }
     if (url.pathname.startsWith(FILES_PREFIX)) {
@@ -796,6 +832,27 @@ async function startApi(): Promise<Server> {
         return send(response, 404, problem, "application/problem+json");
       }
       return streamAnswer(response, answer.events, question.includes("slowly"), answer.commit);
+    }
+    // Sheet editor (sheet-api.ts): ETags, If-Match and file downloads.
+    const ifMatch = request.headers["if-match"];
+    const sheet = sheetAnswer(method, url, body, typeof ifMatch === "string" ? ifMatch : undefined);
+    if (sheet?.kind === "file") {
+      response.writeHead(200, {
+        "content-type": sheet.type,
+        "content-disposition": `attachment; filename="${sheet.name}"`,
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
+      });
+      return response.end(sheet.content);
+    }
+    if (sheet) {
+      if (sheet.etag) response.setHeader("ETag", sheet.etag);
+      return send(
+        response,
+        sheet.status,
+        sheet.body,
+        sheet.status >= 400 ? "application/problem+json" : "application/json",
+      );
     }
     const subject = subjectOf(request);
     const [status, answer] =

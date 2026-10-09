@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import datetime as dt
 import hashlib
+import hmac
 import json
 import re
 import uuid
@@ -72,6 +73,7 @@ from app.certificates.schemas import (
     PrintedField,
     ReasonIn,
 )
+from app.changes import service as changes
 from app.core import purge as purging
 from app.core.db import tenant_session
 from app.core.errors import (
@@ -110,6 +112,9 @@ DOCUMENT_PURPOSE: Final = "certificate"
 AADHAAR_CODE: Final = "aadhaar_full_number_rejected"
 AADHAAR_DETAIL: Final = "Don't enter Aadhaar numbers. Enter only the last 4 digits."
 IST: Final = ZoneInfo("Asia/Kolkata")
+# Hashed in place of the issue date and serial number, which a draft does not have yet (A-11).
+DRAFT_DAY: Final = dt.date(2000, 1, 1)
+DRAFT_SERIAL: Final = "—"
 LIVE_ENROLMENT: Final = "active"
 ISSUABLE_STATUSES: Final = frozenset({"active", "provisional"})
 _FILENAME_RE: Final = re.compile(r"[^A-Za-z0-9._-]+")
@@ -150,6 +155,36 @@ class CertificateBlocked(Conflict):
         super().__init__(
             "This certificate cannot be issued yet. Open the preview to see what needs fixing "
             "(a finding to resolve or a field to correct through a change request)."
+        )
+
+
+class ChangeRequestPending(Conflict):
+    code = "change_request_pending"
+
+    def __init__(self) -> None:
+        super().__init__(
+            "A correction to a detail this certificate prints is waiting for approval. Decide "
+            "the correction request first, then issue the certificate."
+        )
+
+
+class DraftChanged(Conflict):
+    code = "certificate_draft_changed"
+
+    def __init__(self) -> None:
+        super().__init__(
+            "What this certificate prints changed after you opened it. Reload the page, check "
+            "the draft again and then approve."
+        )
+
+
+class RequesterInactive(Conflict):
+    code = "requester_inactive"
+
+    def __init__(self) -> None:
+        super().__init__(
+            "The person who prepared this certificate is no longer an active member of the "
+            "school. Reject it; someone active must prepare it again."
         )
 
 
@@ -468,6 +503,11 @@ def _record(
         )
         for b in dq.open_blockers(session, student_id, spec.printed)
     )
+    # A correction waiting for approval would change a printed value (audit 2026-10-05).
+    blockers.extend(
+        Blocker(code="change_request_pending", attribute_key=key)
+        for key in sorted(changes.pending_attribute_keys(session, student_id, keys))
+    )
     structure = _Structure.load(session)
     enrolments = students.enrolment_histories(session, [student_id]).get(student_id, [])
     record = _Record(
@@ -492,6 +532,18 @@ def _record(
     elif certificate_type in ("study", "conduct") and not enrolments:
         blockers.append(Blocker(code="no_enrolment"))
     return record
+
+
+def _refuse_blocked(record: _Record) -> None:
+    """409 when anything stops issuing: the most specific reason first."""
+    if not record.blockers:
+        return
+    codes = {b.code for b in record.blockers}
+    if "no_current_year" in codes:
+        raise NoCurrentYear()
+    if codes == {"change_request_pending"}:
+        raise ChangeRequestPending()
+    raise CertificateBlocked()
 
 
 def _preview_out(record: _Record) -> CertificatePreview:
@@ -763,6 +815,42 @@ def _content_of(row: Certificate) -> CertificateContent | None:
     return CertificateContent.model_validate(row.content) if row.content is not None else None
 
 
+def _draft_digest(
+    session: Session,
+    row: Certificate,
+    *,
+    record: _Record | None,
+    original: Certificate | None,
+) -> str | None:
+    """SHA-256 (hex) of what the pending ``row`` would print if approved now, with the serial
+    number and issue date left out (A-11): a duplicate prints its original's frozen content; an
+    original is built from ``record``. ``None`` when it cannot be built (no current year)."""
+    if original is not None:
+        return original.content_sha256.hex() if original.content_sha256 is not None else None
+    if record is None or record.structure.current is None:
+        return None
+    content = _build_content(
+        session,
+        record,
+        {str(k): str(v) for k, v in (row.inputs or {}).items()},
+        serial=DRAFT_SERIAL,
+        year=record.structure.current,
+        issued_on=DRAFT_DAY,
+    )
+    return _content_json(content)[1].hex()
+
+
+def _draft_sha256(session: Session, ctx: UserContext, row: Certificate) -> str | None:
+    """The draft fingerprint of a pending request, for ``GET /certificates/{id}``."""
+    if row.status != "pending":
+        return None
+    if row.original_certificate_id is not None:
+        original = repo.get_certificate(session, row.original_certificate_id)
+        return _draft_digest(session, row, record=None, original=original)
+    record = _record(session, ctx, row.student_id, row.certificate_type)
+    return _draft_digest(session, row, record=record, original=None)
+
+
 # --- outputs -------------------------------------------------------------------------------------
 
 
@@ -786,6 +874,8 @@ def _out(
     ctx: UserContext,
     row: Certificate,
     names: Mapping[uuid.UUID, tuple[str | None, str | None]],
+    *,
+    draft_sha256: str | None = None,
 ) -> CertificateOut:
     spec = settings().spec(row.certificate_type)
     content = _content_of(row)
@@ -826,6 +916,7 @@ def _out(
         document_id=row.document_id,
         pdf_status=row.pdf_status,
         version=row.version,
+        draft_sha256=draft_sha256,
         can_approve=pending and spec.requires_approval and ctx.has(APPROVE) and not mine,
         can_withdraw=pending and mine and ctx.has(ISSUE),
         can_cancel=row.status == "issued" and ctx.has(APPROVE),
@@ -939,10 +1030,7 @@ def request_certificate(
     record = _record(session, ctx, student_id, data.certificate_type)
     spec = record.spec
     inputs = _clean_inputs(session, spec, data.inputs, record)
-    if record.blockers:
-        if any(b.code == "no_current_year" for b in record.blockers):
-            raise NoCurrentYear()
-        raise CertificateBlocked()
+    _refuse_blocked(record)
     with _db_errors():
         row = repo.insert_certificate(
             session,
@@ -1045,8 +1133,11 @@ def approve(
 ) -> CertificateOut:
     """Approve and issue a certificate that needs approval (US-1102 AC2-AC3; permission
     ``certificate.approve``, MFA within 5 minutes, not the requester, ``If-Match``). Blockers
-    are checked again. Errors: 404; 403 ``self_approval_forbidden``; 428; 412; 409
-    ``certificate_not_pending`` / ``certificate_blocked``."""
+    are checked again, the requester must still be an active member, and ``data.draft_sha256``
+    must match what the certificate would print now (A-11). Errors: 404; 403
+    ``self_approval_forbidden``; 428; 412; 409 ``certificate_not_pending`` /
+    ``certificate_blocked`` / ``change_request_pending`` / ``requester_inactive`` /
+    ``certificate_draft_changed``."""
     row = _load(session, ctx, certificate_id, permissions=[APPROVE], lock=True)
     if row.requested_by == ctx.membership_id:
         raise SelfApprovalForbidden()
@@ -1054,6 +1145,8 @@ def approve(
     _check_version(row, expected_version)
     _pending(row)
     note = _clean_reason("note", data.note, required=False)
+    if not identity.is_active_member(session, row.requested_by):
+        raise RequesterInactive()
     original: Certificate | None = None
     record: _Record | None = None
     if row.original_certificate_id is not None:
@@ -1062,12 +1155,14 @@ def approve(
             raise CertificateNotIssued()
     else:
         record = _record(session, ctx, row.student_id, row.certificate_type)
-        if record.blockers:
-            if any(b.code == "no_current_year" for b in record.blockers):
-                raise NoCurrentYear()
-            raise CertificateBlocked()
+        _refuse_blocked(record)
         # The student may have left or been re-enrolled since the request: check again.
         _clean_inputs(session, record.spec, dict(row.inputs or {}), record)
+    # A-11: approve what the approver read. The fingerprint is taken from the same read of the
+    # record that _issue freezes below, so a later edit cannot slip in between.
+    expected = _draft_digest(session, row, record=record, original=original)
+    if expected is None or not hmac.compare_digest(expected, data.draft_sha256):
+        raise DraftChanged()
     issued = _issue(session, ctx, row, record=record, original=original, note=note)
     _notify(session, issued, "certificate.approved", [issued.requested_by])
     return _one(session, ctx, issued)
@@ -1237,8 +1332,10 @@ def list_certificates(
 def get_certificate(
     session: Session, ctx: UserContext, certificate_id: uuid.UUID
 ) -> CertificateOut:
-    """One certificate (read, issue or approve permission; 404 outside scope or school)."""
-    return _one(session, ctx, _load(session, ctx, certificate_id, permissions=_READERS))
+    """One certificate (read, issue or approve permission; 404 outside scope or school). A
+    pending request carries ``draft_sha256``, which its approval sends back (A-11)."""
+    row = _load(session, ctx, certificate_id, permissions=_READERS)
+    return _out(ctx, row, _names(session, [row]), draft_sha256=_draft_sha256(session, ctx, row))
 
 
 def _reference(row: Certificate) -> str:
@@ -1255,13 +1352,24 @@ def _duplicate_mark(row: Certificate) -> templates.DuplicateMark | None:
     )
 
 
+def _void(session: Session, row: Certificate) -> bool:
+    """Cancelled, or a duplicate whose original was cancelled (its copies are void with it;
+    audit 2026-10-05 A-07)."""
+    if row.status == "cancelled":
+        return True
+    if row.original_certificate_id is None:
+        return False
+    original = repo.get_certificate(session, row.original_certificate_id)
+    return original is not None and original.status == "cancelled"
+
+
 def _page(session: Session, ctx: UserContext, row: Certificate, *, for_pdf: bool) -> str:
     """The certificate page: frozen content once issued; a DRAFT built from the record now
     while the request waits for approval."""
     if row.status in ("rejected", "withdrawn"):
         raise Conflict("This request was closed and has nothing to print.", code="not_printable")
     mark: templates.Mark = None
-    if row.status == "cancelled":
+    if _void(session, row):
         mark = "cancelled"
     elif row.status == "pending":
         mark = "draft"
@@ -1308,8 +1416,15 @@ def print_page(session: Session, ctx: UserContext, certificate_id: uuid.UUID) ->
 def download_url(session: Session, ctx: UserContext, certificate_id: uuid.UUID) -> DownloadUrlOut:
     """A presigned PDF download (≤ 5 minutes, attachment) once the PDF is stored and scanned
     (FR-CERT-011; permission ``certificate.read``). 409 ``pdf_not_ready`` before; audit
-    ``certificate.downloaded``."""
+    ``certificate.downloaded``. A cancelled certificate (or a duplicate of a cancelled original)
+    answers 409 ``certificate_cancelled``: its stored PDF was made before the cancellation and
+    carries no mark; the print view shows it marked CANCELLED (audit 2026-10-05 A-07)."""
     row = _load(session, ctx, certificate_id, permissions=[READ])
+    if _void(session, row):
+        raise Conflict(
+            "This certificate was cancelled. Open it to print it marked CANCELLED.",
+            code="certificate_cancelled",
+        )
     if row.document_id is None:
         raise Conflict("The PDF is still being made. Try again in a moment.", code="pdf_not_ready")
     name = _FILENAME_RE.sub("-", f"{row.certificate_type}-{row.serial or row.id.hex[:8]}")

@@ -5,7 +5,8 @@ import "server-only";
  * Callers pass a constant event name and only allowlisted fields: codes, kinds, statuses,
  * request ids. Never names, subjects, tokens, cookies or request bodies.
  */
-export type LogField = "kind" | "code" | "status" | "request_id" | "reason" | "method";
+export type LogField =
+  "kind" | "code" | "status" | "request_id" | "reason" | "method" | "ip_hash" | "retry_after_s";
 
 export function logEvent(
   event: string,

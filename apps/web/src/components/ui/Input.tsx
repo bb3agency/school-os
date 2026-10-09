@@ -14,7 +14,12 @@ export const controlClasses =
   "disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:bg-surface-muted";
 
 export function Input({ className, ...props }: ComponentProps<"input">) {
-  return <input className={cn(controlClasses, "min-h-10", className)} {...props} />;
+  return (
+    <input
+      className={cn(controlClasses, "min-h-10 pointer-coarse:min-h-11", className)}
+      {...props}
+    />
+  );
 }
 
 export interface SearchInputProps extends Omit<ComponentProps<"input">, "type"> {
@@ -55,7 +60,7 @@ export function SearchInput({
         <input
           id={inputId}
           type="search"
-          className={cn(controlClasses, "min-h-10 pl-10", className)}
+          className={cn(controlClasses, "min-h-10 pl-10 pointer-coarse:min-h-11", className)}
           {...props}
         />
       </div>

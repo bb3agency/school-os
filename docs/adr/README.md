@@ -90,12 +90,12 @@ FR-…, NFR-…, SEC-…, PRV-…; docs sections affected.
 | [ADR-0012](ADR-0012-managed-oidc-identity.md) | Managed OIDC identity provider | Accepted (recorded retroactively 2026-09-26) · Amended by ADR-0013, ADR-0018, ADR-0023 |
 | [ADR-0013](ADR-0013-cross-tenant-access-and-platform-privilege-separation.md) | Cross-tenant access paths, platform privilege separation and platform identity | Accepted · Amended by ADR-0018, ADR-0019, ADR-0020, ADR-0023, ADR-0028 · implementation amendments 2026-09-26, 2026-09-27 |
 | [ADR-0014](ADR-0014-local-ci-service-images.md) | Local and CI service images: SeaweedFS and Valkey | Accepted |
-| [ADR-0015](ADR-0015-deployment-and-commercial-model.md) | Deployment and commercial model: managed SaaS, shared and dedicated tiers | Accepted |
+| [ADR-0015](ADR-0015-deployment-and-commercial-model.md) | Deployment and commercial model: managed SaaS, shared and dedicated tiers | Accepted · Amended by ADR-0038 |
 | [ADR-0016](ADR-0016-payments-provider.md) | Payments provider | Proposed |
 | [ADR-0017](ADR-0017-platform-admin-panel-architecture.md) | Platform admin panel (control plane) architecture | Accepted · Amended by ADR-0020 |
 | [ADR-0018](ADR-0018-mfa-and-step-up-with-cognito.md) | MFA enforcement and step-up with Amazon Cognito | Accepted · Amended by ADR-0023 |
 | [ADR-0019](ADR-0019-invitation-acceptance-on-first-sign-in.md) | Invitation acceptance on first sign-in | Accepted |
-| [ADR-0020](ADR-0020-control-plane-boundaries-and-guaranteed-audit-copies.md) | Control-plane boundaries and guaranteed audit copies | Accepted |
+| [ADR-0020](ADR-0020-control-plane-boundaries-and-guaranteed-audit-copies.md) | Control-plane boundaries and guaranteed audit copies | Accepted · implementation amendments 2026-09-29, 2026-10-01 (ADR-0038) |
 | [ADR-0021](ADR-0021-export-access-and-step-up.md) | Export access and step-up | Accepted |
 | [ADR-0022](ADR-0022-system-role-sync-for-existing-schools.md) | System-role sync for existing schools | Accepted · Amended by ADR-0026 |
 | [ADR-0023](ADR-0023-operator-sign-in-for-break-glass-across-user-pools.md) | Operator sign-in for break-glass across the two user pools | Accepted · implementation amendments 2026-09-27 |
@@ -111,4 +111,5 @@ FR-…, NFR-…, SEC-…, PRV-…; docs sections affected.
 | [ADR-0034](ADR-0034-ask-conversations-and-memory.md) | Ask conversations, context and per-user memory (amends FR-KB-012 and ADR-0008) | Accepted |
 | [ADR-0035](ADR-0035-contextual-retrieval-and-reranking.md) | Contextual chunk headers and a reranker for "Ask the school" (behind switches, off) | Proposed |
 | [ADR-0036](ADR-0036-english-first-telugu-hidden.md) | English first; Telugu hidden behind one switch (`SOS_TELUGU_ENABLED`, off) | Accepted |
-| [ADR-0037](ADR-0037-apaar-id.md) | Store the APAAR ID (and UDISE+ PEN) as student attributes with provenance | Proposed |
+| [ADR-0037](ADR-0037-apaar-id.md) | Store the APAAR ID (and UDISE+ PEN) as student attributes with provenance | Accepted |
+| [ADR-0038](ADR-0038-commercial-catalogue-one-time-fee-and-ai-answer-bundles.md) | Commercial catalogue: one-time fee and AI answer bundles with overage (amends ADR-0015) | Accepted |

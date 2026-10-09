@@ -16,6 +16,9 @@
 - ``knowledge.tidy_conversations`` (daily, queue ``maintenance``; ADR-0034): per school, the
   memory retention (unconfirmed suggestions after 24 hours, people who left the school) and a
   conversation for questions asked before conversations existed (``adopt_conversations``).
+- ``knowledge.purge_orphan_vectors`` (daily, queue ``maintenance``): per school, delete cached
+  document vectors (``kb.embedding_cache``) that no chunk uses and that are older than
+  ``orphan_vector_grace_hours`` (docs/08 §7 erasure chain). Counts only.
 - ``knowledge.summarise_conversation`` (queue ``ingest``, explicit route): consumer of the outbox
   event ``kb.conversation.summary_requested`` queued with an answer; the rolling summary of a
   conversation's older turns through the gateway (docs/06 §5). Ids only in the payload.
@@ -41,11 +44,13 @@ from typing import Any, Final
 from celery import Task, shared_task
 from celery.schedules import crontab
 
+from app.authz.kv import KVUnavailable
 from app.core.db import context_free_session, tenant_session
 from app.core.logging import get_logger
-from app.knowledge import composition, contextual_backfill, service
+from app.knowledge import composition, contextual_backfill, policy, service
 from app.knowledge.config.contextual import load_contextual_config
 from app.knowledge.ingestion import hooks, runtime
+from app.ops.service import TenantTask
 from app.tenancy import service as tenancy
 
 log = get_logger(__name__)
@@ -54,7 +59,10 @@ MAX_RETRIES: Final = 5
 PURGE_QUERIES_TASK: Final = "knowledge.purge_queries"
 CONTEXT_BACKFILL_TASK: Final = "knowledge.contextualize_backfill"
 SUMMARY_TASK: Final = service.SUMMARY_TASK
+SETTLE_TASK: Final = policy.SETTLE_TASK
+SETTLE_MAX_RETRIES: Final = 10
 TIDY_CONVERSATIONS_TASK: Final = "knowledge.tidy_conversations"
+PURGE_ORPHAN_VECTORS_TASK: Final = "knowledge.purge_orphan_vectors"
 # Schools whose query log is still kept (an offboarded school's rows go with the whole purge).
 PURGE_TENANT_STATUSES: Final = ("active", "suspended", "offboarding")
 
@@ -87,6 +95,7 @@ def _run(task: Task[Any, Any], name: str, document_id: uuid.UUID, work: Callable
 
 @shared_task(
     name=hooks.INGEST_TASK,
+    base=TenantTask,
     bind=True,
     queue="ingest",
     acks_late=True,
@@ -108,6 +117,7 @@ def ingest_version(
 
 @shared_task(
     name=hooks.ACL_TASK,
+    base=TenantTask,
     bind=True,
     queue="ingest",
     acks_late=True,
@@ -128,6 +138,7 @@ def refresh_acl(
 
 @shared_task(
     name=hooks.REMOVE_TASK,
+    base=TenantTask,
     bind=True,
     queue="ingest",
     acks_late=True,
@@ -168,6 +179,27 @@ def purge_queries_all() -> dict[str, int]:
     return {"tenants": len(tenant_ids), "purged": purged, "failed": failed}
 
 
+def purge_orphan_vectors_all() -> dict[str, int]:
+    """Per school (one ``tenant_session`` each; a failing school is logged and retried on the
+    next run): delete cached document vectors no chunk uses (docs/08 §7 erasure chain)."""
+    with context_free_session() as session:
+        tenant_ids = tenancy.list_tenant_ids(session, PURGE_TENANT_STATUSES)
+    purged = failed = 0
+    for tenant_id in tenant_ids:
+        try:
+            with tenant_session(tenant_id) as session:
+                purged += service.purge_orphan_vectors(session)
+        except Exception as exc:  # database: this school only, retried next run
+            failed += 1
+            log.warning(
+                "knowledge.vectors.purge_failed",
+                tenant_id=tenant_id,
+                error_type=type(exc).__name__,
+            )
+    log.info("knowledge.vectors.purged", count=purged, failed=failed)
+    return {"tenants": len(tenant_ids), "purged": purged, "failed": failed}
+
+
 def tidy_conversations_all() -> dict[str, int]:
     """Per school (one ``tenant_session`` each; a failing school is logged and retried on the
     next run): the memory retention (expired suggestions, people who left the school) and a
@@ -198,6 +230,7 @@ def tidy_conversations_all() -> dict[str, int]:
 
 @shared_task(
     name=SUMMARY_TASK,
+    base=TenantTask,
     bind=True,
     queue="ingest",
     acks_late=True,
@@ -219,6 +252,36 @@ def summarise_conversation(
                 error_code="retries_exhausted",
                 error_type=type(exc).__name__,
                 action=SUMMARY_TASK,
+            )
+            return "failed"
+        raise self.retry(exc=exc, countdown=min(30 * 2**self.request.retries, 900)) from exc
+
+
+@shared_task(
+    name=SETTLE_TASK,
+    base=TenantTask,
+    bind=True,
+    queue="maintenance",
+    acks_late=True,
+    max_retries=SETTLE_MAX_RETRIES,
+    ignore_result=True,
+)
+def settle_spend(
+    self: Task[Any, Any], tenant_id: str, event_id: str, payload: dict[str, Any]
+) -> str:
+    """Add a billed call's cost to the school's month after the spend store refused it on the
+    call's path (audit W3-10; outbox ``kb.budget.settle_requested``). Retried with backoff
+    (30 s doubling, at most 15 min apart) while the store is down; idempotent per reservation."""
+    del event_id
+    try:
+        return service.settle_spend(_uuid(tenant_id), payload)
+    except KVUnavailable as exc:
+        if self.request.retries >= SETTLE_MAX_RETRIES:
+            log.error(
+                "knowledge.task.gave_up",
+                error_code="retries_exhausted",
+                error_type=type(exc).__name__,
+                action=SETTLE_TASK,
             )
             return "failed"
         raise self.retry(exc=exc, countdown=min(30 * 2**self.request.retries, 900)) from exc
@@ -247,6 +310,11 @@ def tidy_conversations() -> dict[str, int]:
     return tidy_conversations_all()
 
 
+@shared_task(name=PURGE_ORPHAN_VECTORS_TASK, queue="maintenance", acks_late=True)
+def purge_orphan_vectors() -> dict[str, int]:
+    return purge_orphan_vectors_all()
+
+
 def beat_schedule() -> dict[str, dict[str, Any]]:
     """Beat entries for knowledge (both deployment modes)."""
     every = load_contextual_config().backfill.every_minutes
@@ -263,5 +331,9 @@ def beat_schedule() -> dict[str, dict[str, Any]]:
         "knowledge-tidy-conversations": {
             "task": TIDY_CONVERSATIONS_TASK,
             "schedule": crontab(minute=40, hour=21),  # 03:10 IST
+        },
+        "knowledge-purge-orphan-vectors": {
+            "task": PURGE_ORPHAN_VECTORS_TASK,
+            "schedule": crontab(minute=55, hour=21),  # 03:25 IST
         },
     }

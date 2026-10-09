@@ -5,11 +5,12 @@ import { useId, useRef, useState } from "react";
 import { Pill } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Icon } from "@/components/ui/Icon";
+import { DialogCloseButton } from "@/components/ui/DialogCloseButton";
 import { Table, TableScroll, TBody, THead, Th, Tr } from "@/components/ui/Table";
 import { Timeline } from "@/components/ui/Timeline";
 import { Value } from "@/components/ui/Value";
 import { asList, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
+import { useDialogClose } from "@/lib/dialog-motion";
 import { formatDate } from "@/lib/format";
 import type { Loadable } from "@/lib/loadable";
 import { LoadGate, SourceChip, useValueFormatter } from "./parts";
@@ -108,7 +109,8 @@ function HistoryDialog({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
   const [open, setOpen] = useState(false);
-  const close = () => dialogRef.current?.close();
+  // Same exit as every other dialog (instant under reduced motion; docs/17 §5.5).
+  const close = useDialogClose(dialogRef, "modal");
 
   return (
     <>
@@ -132,24 +134,17 @@ function HistoryDialog({
           setOpen(false);
           triggerRef.current?.focus();
         }}
-        className="m-auto w-[min(40rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-0 text-ink shadow-popover"
+        className="dialog-motion m-auto w-[min(40rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-0 text-ink shadow-popover"
       >
         {open ? (
           <>
-            <div className="flex items-start justify-between gap-4 border-b border-border p-5">
-              <h2 id={titleId} className="text-lg font-semibold">
+            <div className="flex items-start justify-between gap-4 p-4 pb-2 sm:p-6 sm:pb-2">
+              <h2 id={titleId} className="min-w-0 text-lg font-semibold">
                 {t("historyTitle", { field: label })}
               </h2>
-              <button
-                type="button"
-                onClick={close}
-                aria-label={tc("close")}
-                className="rounded-full p-1.5 text-ink-muted hover:bg-surface-muted hover:text-ink"
-              >
-                <Icon name="close" />
-              </button>
+              <DialogCloseButton label={tc("close")} onClick={close} />
             </div>
-            <ol className="max-h-[60vh] space-y-3 overflow-y-auto p-5 text-sm">
+            <ol className="max-h-[60vh] space-y-3 overflow-y-auto overscroll-contain px-4 py-4 text-sm max-sm:max-h-none sm:px-6">
               {values.map((value) => (
                 <li key={value.id} className="space-y-1 border-b border-border pb-3 last:border-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -170,7 +165,7 @@ function HistoryDialog({
                 </li>
               ))}
             </ol>
-            <div className="flex justify-end border-t border-border p-5">
+            <div className="dialog-footer flex justify-end rounded-b-xl border-t border-border bg-surface-muted px-4 py-3 max-sm:[&>*]:flex-1 sm:px-6 sm:py-4">
               <Button variant="secondary" onClick={close}>
                 {tc("close")}
               </Button>
@@ -250,7 +245,7 @@ export function ValuesBySourceView({
                           verification={value.verification_status}
                         />
                       ) : null}
-                      <span className="font-mono font-medium">
+                      <span className="font-mono">
                         <ShownValue
                           value={value}
                           attribute={attribute}
@@ -278,7 +273,7 @@ export function ValuesBySourceView({
                   <tr key={key} className="align-top">
                     <th
                       scope="row"
-                      className="px-4 py-4 text-left font-medium whitespace-normal text-ink"
+                      className="px-4 py-4 text-left font-semibold whitespace-normal text-ink"
                     >
                       <span className="block">{label}</span>
                       <span data-print="hide">

@@ -1,6 +1,11 @@
 "use client";
 
-import type { TenantBilling, TenantInvoice, UsageAgainstLimit } from "@schoolos/api-client";
+import type {
+  SchoolAiBundle,
+  TenantBilling,
+  TenantInvoice,
+  UsageAgainstLimit,
+} from "@schoolos/api-client";
 import { useLocale, useTranslations } from "next-intl";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
@@ -25,7 +30,8 @@ const METRICS = [
   "staff_users",
   "documents",
   "storage_gb",
-  "ai_tokens_month",
+  // No "ai_tokens_month": schools never see tokens; the AI answers card shows their AI use
+  // (ADR-0038; owner decision 2026-10-04).
   "ai_budget_inr",
 ] as const;
 type Metric = (typeof METRICS)[number];
@@ -34,7 +40,76 @@ function isMetric(value: string): value is Metric {
   return (METRICS as readonly string[]).includes(value);
 }
 
-/** FR-PLT-030 / US-1204 (docs/16 §5.18): plan, usage vs limits and invoices. */
+/**
+ * The school's AI answer bundle (ADR-0038, docs/16 §5.18): name, included answers, this
+ * month's answers against them, and the ex-GST prices. Facts from the API only: no cost
+ * estimate, no tokens.
+ */
+function AiAnswersCard({ bundle }: { bundle: SchoolAiBundle | null }) {
+  const t = useTranslations("school.billing.ai");
+  const locale = useLocale();
+  if (bundle === null) {
+    return (
+      <Card title={t("title")}>
+        <p className="text-sm text-ink-muted">{t("none")}</p>
+      </Card>
+    );
+  }
+  const included = formatCount(bundle.included_answers, locale) ?? "";
+  return (
+    <Card title={t("title")} description={t("description")}>
+      <div className="space-y-5">
+        <p className="text-2xl font-semibold text-ink">
+          <span className="sr-only">{t("bundle")}: </span>
+          {t("bundleName", { name: bundle.name })}
+        </p>
+        <dl className="grid gap-4 sm:grid-cols-3">
+          <div className="rounded-lg bg-surface-muted p-4">
+            <dt className="text-sm text-ink-muted">{t("included")}</dt>
+            <dd className="mt-1 text-ink tabular-nums">{t("perMonth", { value: included })}</dd>
+          </div>
+          <div className="rounded-lg bg-surface-muted p-4">
+            <dt className="text-sm text-ink-muted">{t("price")}</dt>
+            <dd className="mt-1 text-ink tabular-nums">
+              {t("pricePerMonth", { amount: formatInr(bundle.price_inr, locale) ?? "" })}
+            </dd>
+          </div>
+          <div className="rounded-lg bg-surface-muted p-4">
+            <dt className="text-sm text-ink-muted">{t("overage")}</dt>
+            <dd className="mt-1 text-ink tabular-nums">
+              {t("overageRate", { amount: formatInr(bundle.overage_rate_inr, locale) ?? "" })}
+            </dd>
+          </div>
+        </dl>
+        {bundle.answers_used !== null ? (
+          <div className="space-y-2">
+            <UsageMeter
+              label={t("thisMonth")}
+              used={bundle.answers_used}
+              limit={bundle.included_answers}
+              valueText={t("usedOf", {
+                used: formatCount(bundle.answers_used, locale) ?? "0",
+                included,
+              })}
+            />
+            <p className="text-xs text-ink-muted">
+              {bundle.answers_counted_to
+                ? t("countedTo", { date: formatDate(bundle.answers_counted_to) ?? "" })
+                : t("notCountedYet")}
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-ink-muted">
+            {t("countsFrom", { date: formatDate(bundle.counts_from) ?? "" })}
+          </p>
+        )}
+        <p className="text-xs text-ink-muted">{t("overageNote")}</p>
+      </div>
+    </Card>
+  );
+}
+
+/** FR-PLT-030 / US-1204 (docs/16 §5.18): plan, usage vs limits, AI answers and invoices. */
 export function BillingView({ billing, invoices }: BillingViewProps) {
   const t = useTranslations("school.billing");
   const tc = useTranslations("common");
@@ -135,7 +210,7 @@ export function BillingView({ billing, invoices }: BillingViewProps) {
           {plan && plan.available ? (
             <div className="space-y-5">
               <div className="flex flex-wrap items-center gap-3">
-                <p className="text-2xl font-medium text-ink">
+                <p className="text-2xl font-semibold text-ink">
                   <span className="sr-only">{t("plan")}: </span>
                   <Value>{plan.plan_name}</Value>
                 </p>
@@ -207,6 +282,7 @@ export function BillingView({ billing, invoices }: BillingViewProps) {
           ) : null}
         </Card>
       </div>
+      {plan && plan.available ? <AiAnswersCard bundle={plan.ai_bundle ?? null} /> : null}
       <Card title={t("invoicesTitle")}>
         <DataTable
           caption={t("invoicesTitle")}

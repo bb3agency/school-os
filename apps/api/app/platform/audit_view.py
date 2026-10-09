@@ -13,6 +13,7 @@ from sqlalchemy import select
 from app.audit import service as audit
 from app.core.db import platform_session
 from app.core.errors import NotFound
+from app.core.spreadsheet import safe_cell
 from app.platform import models as m
 from app.platform import repository as repo
 from app.platform.common import Actor, audit_platform, clamp_limit, now
@@ -69,15 +70,9 @@ def to_csv(events: list[PlatformAuditEventOut]) -> str:
     for e in events:
         row = e.model_dump(mode="json")
         row["summary"] = json.dumps(row["summary"], sort_keys=True)
-        # Neutralise spreadsheet formulas (CSV injection).
-        writer.writerow(
-            [
-                ("'" + str(v))
-                if isinstance(v, str) and v[:1] in "=+-@"
-                else ("" if v is None else v)
-                for v in (row[c] for c in CSV_COLUMNS)
-            ]
-        )
+        # Every cell through safe_cell: formulas neutralised, also behind leading whitespace or
+        # a full-width sign (SEC-017, CSV injection).
+        writer.writerow([safe_cell(row[c]) for c in CSV_COLUMNS])
     return buf.getvalue()
 
 

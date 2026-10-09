@@ -1,7 +1,7 @@
 # Dedicated-tier deploy (one isolated host per school) — docs/10 §8 step 2, CONTRACT §1.
 #
 # Manually dispatched with a CalVer release tag. After approval on the `production`
-# environment, AWS SSM Run Command executes `deploy/dedicated/upgrade.sh <version>` on the
+# environment, AWS SSM Run Command executes `deploy/dedicated/scripts/upgrade.sh <version>` on the
 # selected host(s), one host at a time, stopping at the first failure. No inbound SSH.
 #
 # Hosts are selected by EC2 tags that the Terraform `dedicated_host` module must set:
@@ -52,9 +52,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
-      contents: read # read the release tag through the API
+      contents: read # read the release tag and its assets through the API
+      attestations: read # verify the bundle's build provenance
     outputs:
       enabled: ${{ steps.config.outputs.enabled }}
+      bundle_sha256: ${{ steps.bundle.outputs.sha256 }}
     steps:
       - name: Check deploy configuration
         id: config
@@ -90,6 +92,28 @@ jobs:
             echo "::error::Release tag ${VERSION} does not exist in ${GITHUB_REPOSITORY}"; exit 1
           fi
 
+      - name: Verify the release bundle (provenance + checksum from the GitHub release)
+        # Audit 2026-10-05 P2-08 (a): the bundle must have been built by release.yml on this tag
+        # (Sigstore-signed build provenance), and the hosts get its SHA-256 from here, never from
+        # the S3 prefix the bundle itself sits in (upgrade.sh --sha256).
+        id: bundle
+        if: steps.config.outputs.enabled == 'true'
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          dir="$RUNNER_TEMP/release"
+          mkdir -p "$dir"
+          gh release download "$VERSION" --repo "$GITHUB_REPOSITORY" --dir "$dir" \
+            --pattern schoolos-dedicated.tar.gz --pattern schoolos-dedicated.tar.gz.sha256
+          gh attestation verify "$dir/schoolos-dedicated.tar.gz" --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/release.yml" \
+            --source-ref "refs/tags/${VERSION}" --deny-self-hosted-runners
+          sha="$(sha256sum "$dir/schoolos-dedicated.tar.gz" | cut -d' ' -f1)"
+          [[ "$sha" == "$(cut -d' ' -f1 "$dir/schoolos-dedicated.tar.gz.sha256")" ]] || {
+            echo "::error::the release's checksum file does not match its bundle"; exit 1; }
+          echo "sha256=${sha}" >> "$GITHUB_OUTPUT"
+
       - name: Check maintenance window
         if: steps.config.outputs.enabled == 'true'
         env:
@@ -123,6 +147,7 @@ jobs:
       INSTALL_DIR: ${{ vars.DEDICATED_INSTALL_DIR || '/opt/schoolos' }}
       LOG_GROUP: ${{ vars.DEDICATED_SSM_LOG_GROUP || '/schoolos/dedicated/deploy' }}
       MAX_CONCURRENCY: ${{ vars.DEDICATED_MAX_CONCURRENCY || '1' }}
+      BUNDLE_SHA256: ${{ needs.preflight.outputs.bundle_sha256 }}
     steps:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
@@ -143,8 +168,9 @@ jobs:
           # Inputs were validated in preflight; build the parameters as JSON with shell quoting,
           # never by string eval. AWS-RunShellScript runs /bin/sh (dash on Debian/Ubuntu), so
           # only POSIX `set -eu` here; upgrade.sh carries its own bash shebang.
-          params=$(jq -n --arg dir "$INSTALL_DIR" --arg v "$VERSION" '{
-            commands: ["set -eu", ("cd " + ($dir | @sh)), ("./deploy/dedicated/upgrade.sh " + ($v | @sh))],
+          [[ "$BUNDLE_SHA256" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::no verified bundle checksum"; exit 1; }
+          params=$(jq -n --arg dir "$INSTALL_DIR" --arg v "$VERSION" --arg sha "$BUNDLE_SHA256" '{
+            commands: ["set -eu", ("cd " + ($dir | @sh)), ("./deploy/dedicated/scripts/upgrade.sh " + ($v | @sh) + " --sha256 " + ($sha | @sh))],
             executionTimeout: ["3600"]
           }')
           cmd=$(aws ssm send-command \

@@ -66,8 +66,12 @@ def _settings(env: Environment = Environment.CI, level: str = "INFO") -> Setting
             log_level=level,
             version="2026.10.1",
             key_wrapper="kms",
-            database_url=SecretStr("postgresql+psycopg://sos_app:x@db/schoolos"),
-            platform_database_url=SecretStr("postgresql+psycopg://sos_platform:x@db/schoolos"),
+            database_url=SecretStr(
+                "postgresql+psycopg://sos_app:x@db/schoolos?sslmode=verify-full"
+            ),
+            platform_database_url=SecretStr(
+                "postgresql+psycopg://sos_platform:x@db/schoolos?sslmode=verify-full"
+            ),
             service_token_key=SecretStr("k" * 48),
         )
     return Settings(env=env, log_level=level, version="2026.10.1")
@@ -175,6 +179,28 @@ def test_SEC_008_unknown_fields_are_dropped_and_counted(capture: Captured) -> No
     assert "student_name" not in line
     assert "dob" not in line
     assert line["dropped_fields"] == 2
+    _assert_no_pii(capture.text)
+
+
+def test_SEC_008_sheet_editor_fields_are_dropped(capture: Captured) -> None:
+    """FR-IMP-008, FR-DOC-010: cell values, headers and edit lists of the sheet editor never
+    reach a log line, even if a caller passes them by mistake; only the counts stay."""
+    get_logger("app.imports").info(
+        "imports.sheet.edited",
+        value=SYNTHETIC_NAME,
+        old_value=SYNTHETIC_TELUGU_NAME,
+        new_value=SYNTHETIC_AADHAAR,
+        header="Student name",
+        cells=[{"column": 1, "value": SYNTHETIC_NAME}],
+        edits={"B3": SYNTHETIC_PHONE},
+        resource_type="import_batch",
+        count=1,
+    )
+    line = capture.one()
+    for field in ("value", "old_value", "new_value", "header", "cells", "edits"):
+        assert field not in line
+    assert line["count"] == 1
+    assert line["dropped_fields"] == 6
     _assert_no_pii(capture.text)
 
 

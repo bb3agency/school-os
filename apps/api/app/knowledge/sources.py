@@ -10,12 +10,27 @@ Pure: no I/O.
 
 from __future__ import annotations
 
+import hashlib
 import re
 import uuid
+from collections.abc import Set
 from dataclasses import dataclass
-from typing import Final
+from typing import Final, Protocol
 
 from app.knowledge.domain import SourceKind
+
+
+class Reach(Protocol):
+    """How far one permission reaches (``app.authz.context.ScopeGrant`` fits; read structurally
+    so this pure module imports nothing outside knowledge)."""
+
+    @property
+    def school_wide(self) -> bool: ...
+    @property
+    def class_ids(self) -> Set[uuid.UUID]: ...
+    @property
+    def section_ids(self) -> Set[uuid.UUID]: ...
+
 
 _KEY: Final = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _UUID: Final = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
@@ -24,7 +39,13 @@ _FIELD: Final = re.compile(
     rf"^sos://student/(?P<id>{_UUID})/field/(?P<attr>[a-z][a-z0-9_]{{0,63}})"
     r"\?src=(?P<src>[a-z][a-z0-9_]{0,63})$"
 )
-_SIMPLE: Final = re.compile(rf"^sos://(?P<kind>finding|change|verified|count|fee)/(?P<id>{_UUID})$")
+_SIMPLE: Final = re.compile(rf"^sos://(?P<kind>finding|change|verified)/(?P<id>{_UUID})$")
+_AGGREGATE: Final = re.compile(
+    rf"^sos://(?P<kind>count|fee)/(?P<id>{_UUID})(?:#s(?P<scope>[0-9a-f]{{16}}))?$"
+)
+"""A tool aggregate with the fingerprint of the scope it was computed over (W3-09); keys
+stored before the fingerprint have none (visible only school-wide, see ``visibility``)."""
+_SCOPE: Final = re.compile(r"^[0-9a-f]{16}$")
 _CONVERSATION: Final = re.compile(rf"^sos://conversation/(?P<id>{_UUID})#q(?P<q>{_UUID})$")
 
 
@@ -38,6 +59,9 @@ class SourceRef:
     source: str | None = None
     query_id: uuid.UUID | None = None
     """``conversation`` sources: the earlier question within the conversation."""
+    scope: str | None = None
+    """``count`` / ``fee`` sources: :func:`scope_fingerprint` of the scope it was computed over
+    (``None`` for keys stored before audit W3-09)."""
 
 
 def _key(value: str, what: str) -> str:
@@ -77,17 +101,39 @@ def verified_answer(verified_answer_id: uuid.UUID) -> str:
     return f"sos://verified/{verified_answer_id}"
 
 
-def student_count(count_id: uuid.UUID) -> str:
+def scope_fingerprint(grant: Reach) -> str:
+    """16 hex characters naming the reach of one permission (school-wide, or the sorted class
+    and section ids): ids only, hashed, so a source carries no list of sections. Equal grants
+    give equal fingerprints; any change of scope gives another one (audit W3-09)."""
+    if grant.school_wide:
+        canonical = "school"
+    else:
+        classes = ",".join(sorted(str(c) for c in grant.class_ids))
+        sections = ",".join(sorted(str(s) for s in grant.section_ids))
+        canonical = f"classes={classes}|sections={sections}"
+    return hashlib.sha256(canonical.encode("ascii")).hexdigest()[:16]
+
+
+def _scope(scope: str) -> str:
+    if not _SCOPE.fullmatch(scope):
+        raise ValueError("scope must be a scope fingerprint")
+    return scope
+
+
+def student_count(count_id: uuid.UUID, *, scope: str) -> str:
     """A student count the ``count_students`` tool computed (numbers only; docs/06 §8). The id
-    is derived from the school, breakdown and day, so it names no student."""
-    return f"sos://count/{count_id}"
+    is derived from the school, breakdown and day, so it names no student; ``scope`` is the
+    :func:`scope_fingerprint` of the caller's reach the count was computed over, compared when
+    the source is re-checked (a school-wide total is not shown again after the person's scope
+    narrows; audit W3-09)."""
+    return f"sos://count/{count_id}#s{_scope(scope)}"
 
 
-def fee_dues(fee_id: uuid.UUID) -> str:
+def fee_dues(fee_id: uuid.UUID, *, scope: str) -> str:
     """Fee dues the ``get_fee_dues`` tool read from synced Tally ledgers (M6, ADR-0032). The id
     is derived from the school, the student (or the summary) and the snapshot, so it names no
-    person and no ledger."""
-    return f"sos://fee/{fee_id}"
+    person and no ledger; ``scope`` as for :func:`student_count`."""
+    return f"sos://fee/{fee_id}#s{_scope(scope)}"
 
 
 def conversation_question(conversation_id: uuid.UUID, query_id: uuid.UUID) -> str:
@@ -118,10 +164,14 @@ def parse(uri: str) -> SourceRef:
     elif m := _SIMPLE.fullmatch(uri):
         kind: SourceKind = m["kind"]  # type: ignore[assignment]
         return SourceRef(kind=kind, object_id=uuid.UUID(m["id"]))
+    elif m := _AGGREGATE.fullmatch(uri):
+        aggregate: SourceKind = m["kind"]  # type: ignore[assignment]
+        return SourceRef(kind=aggregate, object_id=uuid.UUID(m["id"]), scope=m["scope"])
     raise ValueError("not a valid sos:// source URI")
 
 
 __all__ = [
+    "Reach",
     "SourceRef",
     "change_request",
     "conversation_question",
@@ -129,6 +179,7 @@ __all__ = [
     "fee_dues",
     "finding",
     "parse",
+    "scope_fingerprint",
     "student_count",
     "student_field",
     "verified_answer",

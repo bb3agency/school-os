@@ -94,6 +94,7 @@ class StoredObj:
     data: bytes
     content_type: str
     lifecycle: str | None = None
+    modified: dt.datetime = field(default_factory=lambda: dt.datetime.now(dt.UTC))
 
 
 class MemoryWriter:
@@ -202,7 +203,12 @@ class MemoryStore:
         obj = self.objects.get(key)
         if obj is None:
             return None
-        return ObjectHead(len(obj.data), obj.content_type, "aws:kms" if self.kms_key_id else None)
+        return ObjectHead(
+            len(obj.data),
+            obj.content_type,
+            "aws:kms" if self.kms_key_id else None,
+            last_modified=obj.modified,
+        )
 
     def read_range(self, key: str, start: int, length: int) -> bytes:
         return self.objects[key].data[start : start + length]
@@ -426,6 +432,17 @@ def outbox_events(admin: Engine, tenant_id: uuid.UUID, event_type: str) -> list[
             {"t": tenant_id, "e": event_type},
         )
         return [dict(r[0]) for r in rows]
+
+
+def run_object_discards(admin: Engine, tenant_id: uuid.UUID) -> int:
+    """Deliver every queued ``document.object.discard_requested`` event of ``tenant_id`` as the
+    worker would (W3-06: the api only queues discards). Idempotent; returns how many keys were
+    discarded."""
+    from app.documents import service
+
+    events = outbox_events(admin, tenant_id, service.OBJECT_DISCARD_EVENT)
+    store = memory_store()
+    return sum(service.discard_unused_object(tenant_id, p, store=store) for p in events)
 
 
 def service_document(tenant_id: uuid.UUID, person: Any) -> uuid.UUID:

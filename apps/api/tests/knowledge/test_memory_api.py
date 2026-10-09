@@ -173,6 +173,22 @@ def test_ADR_0034_an_explicit_item_is_saved_listed_edited_and_deleted(
     assert "short" not in str(W.audit_events(admin_engine, world.a.tenant_id, "kb.memory.created"))
 
 
+def test_R_05_a_retried_memory_item_is_saved_once(
+    world: Any, api: Any, admin_engine: Engine, fake: Any
+) -> None:
+    """Audit 2026-10-06 R-05 (docs/09 §2): a retried POST with the same Idempotency-Key replays
+    the first answer instead of saving a second item and running the screen again."""
+    who = _person(admin_engine, world)
+    key = {"Idempotency-Key": f"mem-{uuid.uuid4().hex}"}
+    body = {"text": "Keep answers short"}
+    one = api.call(who, "POST", "/api/v1/knowledge/memories", json=body, headers=key)
+    two = api.call(who, "POST", "/api/v1/knowledge/memories", json=body, headers=key)
+    assert one.status_code == two.status_code == 201, two.text
+    assert one.json()["id"] == two.json()["id"]
+    assert two.headers.get("Idempotent-Replayed") == "true"
+    assert len(_items(api, who)) == 1
+
+
 @pytest.mark.parametrize(
     ("note", "code"),
     [
@@ -470,3 +486,30 @@ def test_invariant_5_memory_text_is_never_logged(
         _ask(api, who, "I prefer Kalyanisynthetic summaries. When does the Owl club meet?")
         _items(api, who)
     assert "Kalyanisynthetic" not in str(logs)
+
+
+def test_SEC_020_memory_items_count_against_the_per_user_question_rate(
+    world: Any, api: Any, admin_engine: Engine, docs: dict[str, uuid.UUID]
+) -> None:
+    """Every memory item (add or edit) is screened by a model call metered as Ask, so one
+    person looping on the memory routes must not drain the school's shared Ask rate limit and
+    budget: the per-user question rate applies (docs/06 §5 step 1, SEC-020)."""
+    llm = load_llm_config()
+    limited = llm.model_copy(
+        update={
+            "rate_limit": llm.rate_limit.model_copy(update={"questions_per_minute_per_user": 2})
+        }
+    )
+    _rt, transport = K.install_runtime(llm_config=limited)
+    try:
+        who = _person(admin_engine, world)
+        first = _add(api, who, "Keep answers in bullet lists for rate test one")
+        second = _add(api, who, "Keep answers in bullet lists for rate test two")
+        calls = len(transport.sent)
+        third = _add(api, who, "Keep answers in bullet lists for rate test three")
+        assert len(transport.sent) == calls  # refused before any model call
+    finally:
+        composition.set_runtime(None)
+    assert {first.status_code, second.status_code} <= {201}
+    assert third.status_code == 429
+    assert third.json()["code"] == "ai_rate_limited"

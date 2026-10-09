@@ -19,11 +19,14 @@ import { known, priorityTone, ticketTone } from "@/features/status";
 import { TicketThread } from "@/features/support/TicketThread";
 import { Link } from "@/i18n/navigation";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
+import { useStaffCan } from "@/lib/bff/staff-me";
 import { formatDateTime } from "@/lib/format";
 import { useApiForm } from "@/lib/forms";
 import { text } from "@/lib/validation";
 
 const KEY = ["staff", "support-tickets"] as const;
+/** Every ticket of the school; without it a member sees the tickets they opened (R-17). */
+const SUPPORT_MANAGE = "support.manage";
 
 function StudentDataWarning() {
   const t = useTranslations("support");
@@ -51,6 +54,10 @@ export function SupportScreen() {
   const tcat = useTranslations("support.categories");
   const api = useBffClient("staff");
   const [opened, setOpened] = useState<SupportTicket | null>(null);
+  const can = useStaffCan();
+  // The API returns only what the caller may read; this changes the wording only.
+  const allTickets = can(SUPPORT_MANAGE);
+  const listTitle = allTickets ? t("listTitle") : t("listTitleOwn");
   const tickets = useApiQuery(
     [...KEY, "list"],
     async () =>
@@ -81,7 +88,7 @@ export function SupportScreen() {
       cell: (row) => (
         <Link
           href={`/support/${row.id}`}
-          className="font-mono text-xs font-medium text-primary underline underline-offset-4 hover:no-underline"
+          className="font-mono text-xs text-primary underline underline-offset-4 hover:no-underline"
         >
           {row.number}
         </Link>
@@ -113,9 +120,9 @@ export function SupportScreen() {
       />
       <StudentDataWarning />
       <div className="grid gap-6 xl:grid-cols-[3fr_2fr]">
-        <Card title={t("listTitle")}>
+        <Card title={listTitle} {...(allTickets ? {} : { description: t("ownOnlyNote") })}>
           <DataTable
-            caption={t("listTitle")}
+            caption={listTitle}
             captionHidden
             columns={columns}
             state={tickets}

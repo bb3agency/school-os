@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChooseSchoolView } from "@/features/auth/ChooseSchoolView";
 import { CheckInvitationsButton } from "@/features/auth/CheckInvitationsButton";
+import { PendingInvitations } from "@/features/auth/PendingInvitations";
 import {
   CSRF,
   installBffStub,
@@ -171,6 +172,123 @@ describe("Plan and billing (FR-PLT-030)", () => {
     expect(await screen.findByText("SOS/2026-27/000123")).toBeInTheDocument();
   });
 
+  it("never shows AI tokens to the school; the AI answers card replaces them (ADR-0038)", async () => {
+    stub.routes["GET /bff/api/v1/tenant/billing"] = () =>
+      Response.json({
+        available: true,
+        plan_code: "standard",
+        plan_name: "Standard",
+        tier: "shared",
+        billing_period: "monthly",
+        status: "active",
+        current_period_start: "2026-09-01",
+        current_period_end: "2026-09-30",
+        trial_ends_at: null,
+        past_due_since: null,
+        grace_ends_on: null,
+        cancel_at_period_end: false,
+        usage_date: "2026-09-25",
+        usage: [
+          { metric: "students", used: "1210", limit: "1500", percent: 80 },
+          { metric: "ai_tokens_month", used: "420000", limit: "1000000", percent: 42 },
+        ],
+        amount_due_inr: "0.00",
+      });
+    stub.routes["GET /bff/api/v1/tenant/billing/invoices"] = () => page([]);
+    renderWithIntl(<BillingScreen />);
+    expect(await screen.findByText("1,210 of 1,500", { selector: "span" })).toBeInTheDocument();
+    expect(screen.queryByText(/AI tokens/)).toBeNull();
+    expect(screen.queryByText(/420,000/)).toBeNull();
+    expect(screen.getAllByRole("meter")).toHaveLength(1);
+  });
+
+  describe("AI answers card (ADR-0038)", () => {
+    const base = {
+      available: true,
+      plan_code: "shared",
+      plan_name: "Shared",
+      tier: "shared",
+      billing_period: "monthly",
+      status: "active",
+      current_period_start: "2026-10-01",
+      current_period_end: "2026-10-31",
+      trial_ends_at: null,
+      past_due_since: null,
+      grace_ends_on: null,
+      cancel_at_period_end: false,
+      usage_date: null,
+      usage: [],
+      amount_due_inr: "0.00",
+    };
+    const bundle = {
+      code: "ai-standard",
+      name: "Standard",
+      included_answers: 1000,
+      price_inr: "1499.00",
+      overage_rate_inr: "1.50",
+      counts_from: "2026-10-01",
+      month_start: "2026-10-01",
+      answers_used: 412,
+      answers_counted_to: "2026-10-03",
+    };
+    const ai = sm.billing.ai;
+
+    function serve(body: unknown) {
+      stub.routes["GET /bff/api/v1/tenant/billing"] = () => Response.json(body);
+      stub.routes["GET /bff/api/v1/tenant/billing/invoices"] = () => page([]);
+    }
+
+    it("shows the bundle, included answers, this month's meter and the prices", async () => {
+      serve({ ...base, ai_bundle: bundle });
+      renderWithIntl(<BillingScreen />);
+      const card = (await screen.findByRole("heading", { name: ai.title })).closest("section");
+      expect(card).not.toBeNull();
+      const scope = within(card as HTMLElement);
+      expect(scope.getByText("Standard bundle")).toBeInTheDocument();
+      expect(scope.getByText("1,000 a month")).toBeInTheDocument();
+      expect(scope.getByText("₹1,499.00 a month plus GST")).toBeInTheDocument();
+      expect(scope.getByText("₹1.50 plus GST")).toBeInTheDocument();
+      const meter = scope.getByRole("meter", { name: ai.thisMonth });
+      expect(meter).toHaveAttribute("value", "412");
+      expect(meter).toHaveAttribute("max", "1000");
+      expect(scope.getByText("412 of 1,000", { selector: "span" })).toBeInTheDocument();
+      expect(scope.getByText(/^Counted up to/)).toBeInTheDocument();
+      expect(scope.queryByText(ai.none)).toBeNull();
+    });
+
+    it("before the bundle counts: no meter, says when counting starts", async () => {
+      serve({
+        ...base,
+        ai_bundle: {
+          ...bundle,
+          counts_from: "2026-11-01",
+          answers_used: null,
+          answers_counted_to: null,
+        },
+      });
+      renderWithIntl(<BillingScreen />);
+      const card = (await screen.findByRole("heading", { name: ai.title })).closest("section");
+      const scope = within(card as HTMLElement);
+      expect(scope.queryByRole("meter")).toBeNull();
+      expect(scope.getByText(/^Answers count against this bundle from/)).toBeInTheDocument();
+    });
+
+    it("no bundle: plain text telling the school how to get one", async () => {
+      serve({ ...base, ai_bundle: null });
+      renderWithIntl(<BillingScreen />);
+      expect(await screen.findByText(ai.none)).toBeInTheDocument();
+      expect(ai.none).toBe("No AI answer bundle. Ask SchoolOS support to add one.");
+      expect(screen.queryByRole("meter")).toBeNull();
+    });
+
+    it("dedicated hosts (no billing data): no AI answers card", async () => {
+      serve({ available: false });
+      renderWithIntl(<BillingScreen />);
+      expect(await screen.findByText(sm.billing.planUnavailable)).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: ai.title })).toBeNull();
+    });
+  });
+
   it("dedicated hosts: says invoices come by email", async () => {
     stub.routes["GET /bff/api/v1/tenant/billing"] = () => Response.json({ available: false });
     stub.routes["GET /bff/api/v1/tenant/billing/invoices"] = () => page([]);
@@ -253,6 +371,23 @@ describe("support (FR-PLT-027)", () => {
       body: "Batch 3 does not finish.",
     });
     expect(screen.getByLabelText(sm.support.subject)).toHaveValue("");
+  });
+
+  it("names the list after what the caller may read (R-17: own tickets, or every ticket with support.manage)", async () => {
+    stub.routes["GET /bff/api/v1/support/tickets"] = () => page([]);
+    stub.routes["GET /bff/api/v1/me"] = () => Response.json(me(["support.ticket.create"]));
+    const { unmount } = renderWithIntl(<SupportScreen />);
+    expect(
+      await screen.findByRole("heading", { name: sm.support.listTitleOwn }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(sm.support.ownOnlyNote)).toBeInTheDocument();
+    unmount();
+
+    stub.routes["GET /bff/api/v1/me"] = () =>
+      Response.json(me(["support.ticket.create", "support.manage"]));
+    renderWithIntl(<SupportScreen />);
+    expect(await screen.findByRole("heading", { name: sm.support.listTitle })).toBeInTheDocument();
+    expect(screen.queryByText(sm.support.ownOnlyNote)).not.toBeInTheDocument();
   });
 
   it("shows the thread and posts a reply", async () => {
@@ -366,6 +501,60 @@ describe("school picker (FR-IAM-013)", () => {
     expect(
       stub.callsTo("POST /bff/api/v1/me/accept-invitations")[0]?.headers.get("x-csrf-token"),
     ).toBe(CSRF);
+  });
+
+  it("invitations to an existing account: accept goes to the picker, decline removes it (DL-09)", async () => {
+    const A = "0192f3a4-0000-7000-8000-00000000c001";
+    const B = "0192f3a4-0000-7000-8000-00000000c002";
+    stub.routes["GET /bff/api/v1/me/invitations"] = () =>
+      Response.json({
+        data: [
+          {
+            membership_id: A,
+            tenant_id: T,
+            school_name: "Synthetic Hill School",
+            roles: ["teacher"],
+            invited_at: "2026-10-01T04:30:00Z",
+            expires_at: "2026-10-31T04:30:00Z",
+          },
+          {
+            membership_id: B,
+            tenant_id: T,
+            school_name: "Synthetic Lake School",
+            roles: ["teacher"],
+            invited_at: "2026-10-01T04:30:00Z",
+            expires_at: "2026-10-31T04:30:00Z",
+          },
+        ],
+      });
+    stub.routes[`POST /bff/api/v1/me/invitations/${B}/decline`] = () =>
+      Response.json({ tenant_id: T, membership_id: B, status: "removed" });
+    stub.routes[`POST /bff/api/v1/me/invitations/${A}/accept`] = () =>
+      Response.json({ tenant_id: T, membership_id: A, status: "active" });
+    const navigate = vi.fn();
+    const user = userEvent.setup();
+    renderWithIntl(<PendingInvitations navigate={navigate} />);
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Decline the invitation from Synthetic Lake School",
+      }),
+    );
+    await waitFor(() => expect(screen.queryByText("Synthetic Lake School")).toBeNull());
+    expect(navigate).not.toHaveBeenCalled();
+    await user.click(
+      screen.getByRole("button", { name: "Accept the invitation from Synthetic Hill School" }),
+    );
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/choose-school"));
+    expect(
+      stub.callsTo(`POST /bff/api/v1/me/invitations/${A}/accept`)[0]?.headers.get("x-csrf-token"),
+    ).toBe(CSRF);
+  });
+
+  it("no open invitations: nothing is shown (DL-09)", async () => {
+    stub.routes["GET /bff/api/v1/me/invitations"] = () => Response.json({ data: [] });
+    const { container } = renderWithIntl(<PendingInvitations navigate={vi.fn()} />);
+    await waitFor(() => expect(stub.callsTo("GET /bff/api/v1/me/invitations")).toHaveLength(1));
+    expect(container).toBeEmptyDOMElement();
   });
 
   it("'no access yet': still nothing", async () => {

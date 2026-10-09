@@ -24,7 +24,9 @@ from app.core.errors import NotFound, install_error_handlers
 from app.core.logging import bind_context, setup_logging
 from app.core.middleware import (
     REQUEST_ID_HEADER,
+    BidiControlMiddleware,
     BodySizeLimitMiddleware,
+    RateLimitMiddleware,
     RequestContextMiddleware,
     SecurityHeadersMiddleware,
     install_middleware,
@@ -154,10 +156,13 @@ def test_NFR_OBS_001_generated_ids_are_unique() -> None:
     assert len({new_request_id() for _ in range(100)}) == 100
 
 
-def test_NFR_OBS_001_valid_incoming_request_id_is_kept(client: TestClient) -> None:
+def test_NFR_OBS_001_client_request_id_is_never_used(client: TestClient) -> None:
+    """The request id is always the API's own: it is what audit events store, so a caller must
+    not choose it, even a well-formed one (audit 2026-10-06 hardening). The response returns
+    the API's id for correlation."""
     res = client.get("/api/v1/items/abc", headers={REQUEST_ID_HEADER: "bff_01J8ZQ-abc_123"})
-    assert res.headers[REQUEST_ID_HEADER] == "bff_01J8ZQ-abc_123"
-    assert res.json()["request_id"] == "bff_01J8ZQ-abc_123"
+    assert GENERATED_ID.match(res.headers[REQUEST_ID_HEADER])
+    assert res.json()["request_id"] == res.headers[REQUEST_ID_HEADER]
 
 
 @pytest.mark.parametrize(
@@ -243,8 +248,8 @@ def test_SEC_010_problem_json_errors_carry_request_id(client: TestClient) -> Non
     res = client.get("/api/v1/missing", headers={REQUEST_ID_HEADER: "req_from_bff_0001"})
     assert res.status_code == 404
     assert res.headers["content-type"].startswith("application/problem+json")
-    assert res.json()["request_id"] == "req_from_bff_0001"
-    assert res.headers[REQUEST_ID_HEADER] == "req_from_bff_0001"
+    assert GENERATED_ID.match(res.json()["request_id"])
+    assert res.headers[REQUEST_ID_HEADER] == res.json()["request_id"]
 
 
 def test_SEC_010_unhandled_errors_are_problem_json_with_request_id(
@@ -336,8 +341,9 @@ def test_SEC_010_declared_oversized_body_is_413_problem_json(client: TestClient)
     assert res.headers["content-type"].startswith("application/problem+json")
     body = res.json()
     assert body["code"] == "payload_too_large"
-    assert body["request_id"] == "req_upload_00001"
-    assert res.headers[REQUEST_ID_HEADER] == "req_upload_00001"
+    # The API's own id, never the one the client sent (audit 2026-10-06 hardening).
+    assert GENERATED_ID.match(body["request_id"])
+    assert res.headers[REQUEST_ID_HEADER] == body["request_id"]
     assert res.headers["X-Content-Type-Options"] == "nosniff"
 
 
@@ -365,11 +371,119 @@ def test_SEC_010_multipart_has_its_own_limit(client: TestClient) -> None:
     assert client.post("/api/v1/raw", files=big).status_code == 413
 
 
+@pytest.mark.parametrize(
+    "path", ["/api/v1/fleet/heartbeat", "/api/v1/edge/tally/enrol", "/api/v1/students/search"]
+)
+def test_SEC_010_a_multipart_content_type_does_not_raise_the_limit_on_the_real_app(
+    path: str,
+) -> None:
+    """No route takes multipart (files go to presigned S3 URLs), so claiming
+    ``multipart/form-data`` must not let an unauthenticated client make the API buffer 10 MB
+    before the machine guards (fleet heartbeat, Tally edge) or authentication run."""
+    client = TestClient(create_app(), raise_server_exceptions=False)
+    body = b"z" * (2 * 1024 * 1024)
+    res = client.post(
+        path,
+        content=body,
+        headers={"Content-Type": "multipart/form-data; boundary=x"},
+    )
+    assert res.status_code == 413, res.text
+
+
+# --- Text-direction controls (audit 2026-10-06 hardening) ----------------------------------
+
+BIDI = ["\u202e", "\u202a", "\u2066", "\u2069", "\u200f", "\u061c"]
+
+
+@pytest.mark.parametrize("char", BIDI)
+@pytest.mark.parametrize("escaped", [False, True])
+def test_SEC_010_bidi_controls_in_json_text_are_refused(
+    client: TestClient, char: str, escaped: bool
+) -> None:
+    """Trojan-Source style direction overrides (CVE-2021-42574) make a name or note read
+    differently on screen than it is stored: refused with 422 ``invalid_characters`` on every
+    school-side JSON body, whether sent raw or as a JSON escape."""
+    data = {"name": f"Synthetic {char}Name", "dob": SYNTHETIC_DOB, "phone": SYNTHETIC_PHONE}
+    body = json.dumps(data, ensure_ascii=escaped).encode()
+    res = client.post(
+        "/api/v1/students", content=body, headers={"Content-Type": "application/json"}
+    )
+    assert res.status_code == 422, res.text
+    problem = res.json()
+    assert problem["code"] == "invalid_characters"
+    assert problem["errors"] == [
+        {
+            "field": "body",
+            "code": "invalid_characters",
+            "message_key": "errors.invalid_characters",
+        }
+    ]
+    assert GENERATED_ID.match(problem["request_id"])
+
+
+def test_SEC_010_bidi_check_also_covers_keys_and_nested_values(client: TestClient) -> None:
+    for payload in ({"x\u202e": 1}, {"a": [{"b": "ok \u2067 text"}]}):
+        res = client.post("/api/v1/students", json=payload)
+        assert res.status_code == 422
+        assert res.json()["code"] == "invalid_characters"
+
+
+def test_SEC_010_plain_text_telugu_and_escaped_backslashes_pass(client: TestClient) -> None:
+    for name in (SYNTHETIC_NAME, SYNTHETIC_TELUGU_NAME, "Path C:\\u202e literally", "a\u200dz"):
+        res = client.post(
+            "/api/v1/students",
+            json={"name": name, "dob": SYNTHETIC_DOB, "phone": SYNTHETIC_PHONE},
+        )
+        assert res.status_code == 200, (name, res.text)
+    # Not JSON: left to the route (here the raw body is just counted).
+    raw = client.post(
+        "/api/v1/raw", content="x\u202ey".encode(), headers={"Content-Type": "text/plain"}
+    )
+    assert raw.status_code == 200
+    assert raw.json() == {"size": len("x\u202ey".encode())}
+
+
+def test_SEC_010_bidi_check_skips_the_signed_machine_routes() -> None:
+    """Edge agents and fleet heartbeats sign their bodies and clean their own text; a request
+    there is passed through untouched."""
+    import asyncio
+
+    seen: list[bytes] = []
+
+    async def inner(scope: dict[str, Any], receive: Any, send: Any) -> None:
+        message = await receive()
+        seen.append(message.get("body", b""))
+
+    body = json.dumps({"ledger": "A\u202eB"}, ensure_ascii=False).encode()
+
+    async def receive() -> dict[str, Any]:
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    async def send(message: dict[str, Any]) -> None:
+        raise AssertionError("the middleware must not answer")
+
+    for path in ("/api/v1/edge/tally/snapshots", "/api/v1/fleet/heartbeat"):
+        scope = {
+            "type": "http",
+            "method": "POST",
+            "path": path,
+            "headers": [(b"content-type", b"application/json")],
+        }
+        asyncio.run(BidiControlMiddleware(inner)(scope, receive, send))  # type: ignore[arg-type]
+    assert seen == [body, body]
+
+
 # --- ASGI hygiene ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
-    "middleware_cls", [RequestContextMiddleware, SecurityHeadersMiddleware, BodySizeLimitMiddleware]
+    "middleware_cls",
+    [
+        RequestContextMiddleware,
+        SecurityHeadersMiddleware,
+        BodySizeLimitMiddleware,
+        BidiControlMiddleware,
+    ],
 )
 def test_NFR_OBS_001_non_http_scopes_pass_through(middleware_cls: type[Any]) -> None:
     import asyncio
@@ -392,5 +506,13 @@ def test_NFR_OBS_001_non_http_scopes_pass_through(middleware_cls: type[Any]) -> 
 def test_NFR_OBS_001_middleware_is_installed_by_create_app() -> None:
     app = create_app()
     classes: list[object] = [m.cls for m in app.user_middleware]
-    # Outermost first: headers wrap request context, which wraps the body limit.
-    assert classes == [SecurityHeadersMiddleware, RequestContextMiddleware, BodySizeLimitMiddleware]
+    # Outermost first: headers wrap request context, which wraps the rate limiter (P2-07; a 429
+    # still carries the request id and security headers), which wraps the body limit, which
+    # wraps the text-direction check (it reads the body only once the size is known to be OK).
+    assert classes == [
+        SecurityHeadersMiddleware,
+        RequestContextMiddleware,
+        RateLimitMiddleware,
+        BodySizeLimitMiddleware,
+        BidiControlMiddleware,
+    ]

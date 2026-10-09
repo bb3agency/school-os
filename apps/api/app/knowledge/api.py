@@ -38,7 +38,7 @@ from dataclasses import asdict
 from typing import Annotated, Any
 
 import anyio
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
@@ -149,7 +149,7 @@ async def _sse_stream(stream: service.AskStream) -> AsyncGenerator[str, None]:
     response_class=StreamingResponse,
     responses=_SSE_DOC,
 )
-def ask(ctx: Asker, db: TenantDB, body: AskIn) -> StreamingResponse:
+def ask(ctx: Asker, db: TenantDB, body: AskIn, request: Request) -> StreamingResponse:
     """Ask a question of the school's records and documents (permission ``kb.ask``).
 
     Answers cite their sources (``sos://`` URIs) or say the answer was not found in the school
@@ -168,7 +168,7 @@ def ask(ctx: Asker, db: TenantDB, body: AskIn) -> StreamingResponse:
     in English (``meta.language`` is ``en``) unless Telugu is switched on for the deployment.
     """
     svc = service.get_service()
-    svc.admit(ctx)
+    svc.admit(ctx, scope=request.scope)
     stream = svc.start_stream(
         db,
         ctx,
@@ -266,7 +266,9 @@ def review_verified_answer(
     ``needs_review`` after a cited document changed. Its citations (new ones if you send them)
     must quote the current version of documents you can read (422 as on create); it becomes
     ``active`` and you become its verifier. 404 when you cannot read a document it cites; 409
-    ``verified_answer_retired``; 412 when it changed since you read it."""
+    ``verified_answer_retired``; 409 ``reviewer_must_differ`` when you drafted it and someone
+    else in the school can review it (owner decision 2026-10-09); 412 when it changed since you
+    read it."""
     out = service.get_service().review_verified_answer(
         db, ctx, answer_id, body, expected_version=version
     )
@@ -373,13 +375,15 @@ def list_memories(ctx: Asker, db: TenantDB) -> Page[MemoryOut]:
 
 
 @router.post("/knowledge/memories", response_model=MemoryOut, status_code=201)
-def create_memory(ctx: Asker, db: TenantDB, body: MemoryIn) -> MemoryOut:
+def create_memory(ctx: Asker, db: TenantDB, body: MemoryIn, idem: IdempotencyDep) -> Response:
     """Add a memory item: your own preference or work context (e.g. "Keep answers short").
     Never details about students, parents or other staff: refused with 422
     (``memory_personal_number``, ``memory_date``, ``memory_long_number``, ``memory_others``,
     ``memory_unsure``, ``memory_too_long``); 503 ``memory_check_unavailable`` when the check
-    cannot run; 409 ``memory_off`` or ``memory_full``."""
-    return service.get_service().create_memory(db, ctx, body)
+    cannot run; 409 ``memory_off`` or ``memory_full``; 429 ``ai_rate_limited`` (the item check
+    counts against your per-minute question limit). Accepts ``Idempotency-Key``: a retry with
+    the same key replays the first answer without running the check again."""
+    return idem.run(db, body, lambda: service.get_service().create_memory(db, ctx, body))
 
 
 @router.delete("/knowledge/memories", status_code=204)
@@ -399,7 +403,8 @@ def update_memory(
     version: IfMatch,
     response: Response,
 ) -> MemoryOut:
-    """Edit one of your memory items (``If-Match``; checked again like a new item)."""
+    """Edit one of your memory items (``If-Match``; checked again like a new item, 429
+    ``ai_rate_limited`` included)."""
     out = service.get_service().update_memory(db, ctx, memory_id, body, expected_version=version)
     response.headers["ETag"] = etag(out.version)
     return out

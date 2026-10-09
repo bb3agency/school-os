@@ -55,6 +55,54 @@ variables {
   oidc_client_id         = "exampleclientid"
   oidc_client_secret_arn = "arn:aws:secretsmanager:ap-south-1:111122223333:secret:sos/dedicated/demo-school/oidc-AbCdEf"
   control_plane_url      = "https://app.example.test"
+
+  security_alarm_topic_arn = "arn:aws:sns:ap-south-1:111122223333:sos-prod-alarms"
+}
+
+# Audit 2026-10-05 hardening: dedicated hosts had no security alarms. The P2-02 / P2-07 metric filters
+# run on the host's log group (every container logs there), in a namespace the host role cannot
+# write, and alarm the prod on-call topic.
+run "security_alarms_on_the_host_log_group" {
+  command = plan
+
+  assert {
+    condition = length(setsubtract(
+      ["audit_chain_broken", "audit_chain_checked", "api_auth_failures", "api_auth_failed", "refresh_token_reuse", "breakglass_session", "api_rate_limited", "rate_limiter_unavailable", "sign_in_failed", "bff_auth_rate_limited"],
+      keys(aws_cloudwatch_log_metric_filter.security),
+    )) == 0
+    error_message = "The host log group feeds the audit-chain, auth, session-theft, break-glass and rate-limit filters."
+  }
+
+  assert {
+    condition = alltrue([
+      for f in aws_cloudwatch_log_metric_filter.security :
+      f.log_group_name == "/schoolos/dedicated/demo-school" && one(f.metric_transformation).namespace == "SchoolOS/Security/dedicated/demo-school"
+    ])
+    error_message = "Filters read the host log group and write SchoolOS/Security/dedicated/<code>, which the host role (SchoolOS/Dedicated only) cannot write."
+  }
+
+  assert {
+    condition = alltrue([
+      for a in concat(values(aws_cloudwatch_metric_alarm.security), [aws_cloudwatch_metric_alarm.audit_chain_failure, aws_cloudwatch_metric_alarm.audit_chain_not_run]) :
+      a.alarm_actions == toset(["arn:aws:sns:ap-south-1:111122223333:sos-prod-alarms"]) && a.namespace == "SchoolOS/Security/dedicated/demo-school"
+    ])
+    error_message = "Every host security alarm notifies the on-call topic."
+  }
+
+  assert {
+    condition     = aws_cloudwatch_metric_alarm.audit_chain_not_run.treat_missing_data == "breaching" && aws_cloudwatch_metric_alarm.audit_chain_failure.threshold == 1
+    error_message = "A broken chain alarms at once; no verification in a day alarms too."
+  }
+}
+
+run "security_alarm_topic_required" {
+  command = plan
+
+  variables {
+    security_alarm_topic_arn = "not-an-arn"
+  }
+
+  expect_failures = [var.security_alarm_topic_arn]
 }
 
 run "imdsv2_required" {
@@ -177,10 +225,10 @@ run "audit_signing_key_for_the_host" {
 
   assert {
     condition = anytrue([
-      for s in data.aws_iam_policy_document.host.statement :
+      for s in data.aws_iam_policy_document.worker.statement :
       s.sid == "AuditSigning" && toset(s.actions) == toset(["kms:Sign", "kms:GetPublicKey"]) && length(s.resources) == 1
     ])
-    error_message = "The instance role may kms:Sign and kms:GetPublicKey with the signing key only."
+    error_message = "The worker role (which runs audit.archive_daily; W3-06 moved it off the instance role) may kms:Sign and kms:GetPublicKey with the signing key only."
   }
 }
 
@@ -325,4 +373,79 @@ run "support_issuer_is_never_the_staff_pool" {
   }
 
   expect_failures = [var.support_oidc_issuer]
+}
+
+# Audit W3-06: the api and the worker have separate roles; the internet-facing api can never tag or
+# delete a school file, and no container reaches the instance role (IMDS hop limit 1).
+run "api_role_cannot_tag_or_delete_school_files" {
+  command = plan
+
+  assert {
+    condition     = one(aws_instance.host.metadata_options).http_put_response_hop_limit == 1
+    error_message = "IMDS hop limit 1: containers on the Docker bridges cannot reach the instance role."
+  }
+
+  assert {
+    condition     = toset(keys(aws_iam_role.app)) == toset(["api", "worker"]) && alltrue([for r in aws_iam_role.app : r.max_session_duration == 3600])
+    error_message = "One role per app container (api, worker), sessions of at most an hour."
+  }
+
+  assert {
+    condition = alltrue([
+      for s in data.aws_iam_policy_document.api.statement : length(setintersection(toset(s.actions), toset([
+        "s3:DeleteObject", "s3:DeleteObjectVersion", "s3:PutObjectTagging", "s3:PutObjectVersionTagging",
+        "s3:DeleteObjectTagging", "s3:*", "s3:Delete*", "s3:Put*", "*", "kms:Sign",
+      ]))) == 0
+    ])
+    error_message = "The api role must not tag or delete files, nor sign audit archives (W3-06)."
+  }
+
+  assert {
+    condition = anytrue([
+      for s in data.aws_iam_policy_document.worker.statement :
+      s.sid == "FilesBucketObjects" && length(setsubtract(toset(["s3:DeleteObject", "s3:PutObjectTagging", "s3:PutObjectVersionTagging"]), toset(s.actions))) == 0
+    ])
+    error_message = "Only the worker role discards (tag + delete)."
+  }
+
+  assert {
+    condition = alltrue([
+      for s in data.aws_iam_policy_document.host.statement :
+      !contains(s.actions, "s3:PutObjectTagging") && !contains(s.actions, "s3:PutObjectVersionTagging") && !contains(s.actions, "kms:Sign")
+      && (!contains(s.actions, "s3:DeleteObject") || s.sid == "WalgRetention")
+    ])
+    error_message = "The instance role no longer reaches the files (only WAL-G's own retention deletes)."
+  }
+
+  assert {
+    condition = (
+      length(data.aws_iam_policy_document.app_assume.statement) == 1
+      && alltrue([for s in data.aws_iam_policy_document.app_assume.statement : s.actions == toset(["sts:AssumeRole"]) && length(s.principals) == 1 && alltrue([for p in s.principals : p.type == "AWS"])])
+    )
+    error_message = "The app roles trust only the host role (assumed by scripts/app-credentials.sh on the host)."
+  }
+}
+
+run "imds_hop_limit_is_one_or_two" {
+  command = plan
+
+  variables {
+    imds_hop_limit = 3
+  }
+
+  expect_failures = [var.imds_hop_limit]
+}
+
+# Audit 2026-10-05 hardening (confused deputy): Data Lifecycle Manager assumes the snapshot role
+# only on behalf of this account.
+run "dlm_role_trusts_only_this_account" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for s in data.aws_iam_policy_document.dlm_assume.statement :
+      anytrue([for c in s.condition : c.test == "StringEquals" && c.variable == "aws:SourceAccount" && toset(c.values) == toset([data.aws_caller_identity.current.account_id])])
+    ])
+    error_message = "The DLM trust policy pins aws:SourceAccount (confused deputy)."
+  }
 }

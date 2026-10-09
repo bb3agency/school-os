@@ -144,6 +144,72 @@ def test_FR_DQ_004_conflict_gone_is_auto_cleared_and_returns_reopened(
     assert back.stats["reopened"] == 1
 
 
+def test_A_01_a_blocker_cleared_by_a_verified_value_resolves_and_an_unbacked_one_waits(
+    world: Any, admin_engine: Engine
+) -> None:
+    """A-01: a verified (or evidence-backed) correction resolves a blocker as before; a plain
+    write leaves it ``needs_confirmation`` (unresolved), and the conflict coming back reopens it."""
+    plain = DS.student(world.a, extra=DS.aadhaar(dob="2012-05-14"))
+    backed = DS.student(world.a, extra=DS.aadhaar(dob="2012-05-14"))
+    DS.run(world.a, plain, backed)
+    for sid, verification in ((plain, "unverified"), (backed, "verified")):
+        DS.call(
+            world.a,
+            students.record_value,
+            sid,
+            "aadhaar_dob_as_printed",
+            "aadhaar_as_printed",
+            "2012-03-14",
+            verification=verification,
+        )
+    out = DS.run(world.a, plain, backed)
+    assert (out.stats["cleared"], out.stats["needs_confirmation"]) == (1, 1)
+    row = DS.one(admin_engine, backed, "DQ-002")
+    assert (row["status"], row["resolution"]) == ("resolved", "auto_cleared")
+    waiting = DS.one(admin_engine, plain, "DQ-002")
+    assert (waiting["status"], waiting["resolution"]) == ("needs_confirmation", None)
+    unresolved = DS.call(world.a, dq.list_findings, FindingFilters(student_id=plain))
+    assert [(f.rule_id, f.status) for f in unresolved.data if f.rule_id == "DQ-002"] == [
+        ("DQ-002", "needs_confirmation")
+    ]
+    DS.call(
+        world.a,
+        students.record_value,
+        plain,
+        "aadhaar_dob_as_printed",
+        "aadhaar_as_printed",
+        "2012-05-14",
+    )
+    DS.run(world.a, plain)
+    assert DS.one(admin_engine, plain, "DQ-002")["status"] == "reopened"
+
+
+def test_SEC_015_resolve_and_waive_follow_their_own_scope_for_custom_roles(world: Any) -> None:
+    """App-logic hardening (custom roles): a school-wide reader whose ``dq.findings.resolve`` and
+    ``dq.findings.waive`` are scoped to 9A reads a 9C finding but cannot resolve or waive it."""
+    import dataclasses
+
+    from app.authz.context import Scopes
+    from app.core.errors import Forbidden
+
+    base = DS.ctx(world.a, "office_admin")
+    custom = dataclasses.replace(
+        base,
+        permissions=base.permissions | {dq.RESOLVE, dq.WAIVE},
+        scoped_permissions=frozenset({dq.RESOLVE, dq.WAIVE}),
+        scopes=Scopes(section_ids=frozenset({world.a.ids["section_9a"]})),
+    )
+    outside = DS.high_finding(world.a, section_key="section_9c")
+    inside = DS.high_finding(world.a)
+    assert DS.call(world.a, dq.get_finding, outside, as_ctx=custom).status == "open"
+    with pytest.raises(Forbidden):
+        DS.call(world.a, dq.resolve_finding, outside, ResolveIn(note="Not mine"), as_ctx=custom)
+    with pytest.raises(Forbidden):
+        DS.call(world.a, dq.waive_finding, outside, WaiveIn(reason="Not mine"), as_ctx=custom)
+    out = DS.call(world.a, dq.resolve_finding, inside, ResolveIn(note="Mine"), as_ctx=custom)
+    assert out.status == "resolved"
+
+
 def test_US_502_resolved_with_note_reopens_when_the_conflict_is_still_there(
     world: Any, admin_engine: Engine
 ) -> None:
@@ -202,8 +268,22 @@ def test_FR_DQ_020_resolve_and_waive_rules(world: Any, admin_engine: Engine) -> 
             "change_request_id",
             code,
         )
-    finding_student = DS.one_by_id(admin_engine, fid)["student_id"]
-    cr = DS.change_request(admin_engine, world.a, finding_student)
+    finding = DS.one_by_id(admin_engine, fid)
+    finding_student, field = finding["student_id"], finding["attribute_key"]
+    # Hardening (audit 2026-10-06): only an APPROVED request about the finding's field resolves
+    # it; a pending one (it may still be rejected) or one about another field does not.
+    other_field = "dob" if field != "dob" else "gender"
+    cr = DS.change_request(admin_engine, world.a, finding_student, field)
+    other = DS.change_request(admin_engine, world.a, finding_student, other_field)
+    DS.approve_change_request(world.a, other)
+    for cr_id, code in ((cr, "not_approved"), (other, "other_attribute")):
+        with pytest.raises(ValidationFailed) as err:
+            DS.call(world.a, dq.resolve_finding, fid, ResolveIn(change_request_id=cr_id))
+        assert (err.value.errors[0]["field"], err.value.errors[0]["code"]) == (
+            "change_request_id",
+            code,
+        )
+    DS.approve_change_request(world.a, cr)
     out = DS.call(world.a, dq.resolve_finding, fid, ResolveIn(change_request_id=cr))
     assert (out.resolution, out.change_request_id) == ("change_request", cr)
     with pytest.raises(Conflict):
@@ -391,6 +471,32 @@ def test_SEC_015_class_teacher_runs_and_reads_only_own_sections(
     with pytest.raises(NotFound):
         DS.call(world.a, dq.get_run, DS.run(world.a, c9).id, as_ctx=teacher)
     assert DS.call(world.a, dq.get_run, run.id, as_ctx=teacher).id == run.id
+
+
+def test_SEC_015_school_wide_read_basic_does_not_widen_scoped_findings(
+    world: Any, admin_engine: Engine
+) -> None:
+    """One membership, two roles: student.read_basic school-wide (e.g. accountant) and
+    dq.findings.read scoped to 9A (class teacher). Findings and runs follow the dq.findings.read
+    scope; before, the read_basic scope alone decided and every finding was visible."""
+    import dataclasses
+
+    a9 = DS.conflict_student(world.a)
+    c9 = DS.conflict_student(world.a, section_key="section_9c")
+    DS.run(world.a, a9, c9)
+    teacher = DS.ctx(world.a, "class_teacher")
+    mixed = dataclasses.replace(
+        teacher, scoped_permissions=teacher.scoped_permissions - {"student.read_basic"}
+    )
+    assert mixed.scope_for("student.read_basic").school_wide
+    assert not mixed.scope_for("dq.findings.read").school_wide
+    listed = DS.call(world.a, dq.list_findings, FindingFilters(), as_ctx=mixed, limit=200)
+    assert c9 not in {f.student.id for f in listed.data}
+    (hidden,) = DS.findings(admin_engine, c9, "DQ-003")
+    with pytest.raises(NotFound):
+        DS.call(world.a, dq.get_finding, hidden["id"], as_ctx=mixed)
+    run = DS.call(world.a, dq.run_checks, student_ids=[a9, c9], as_ctx=mixed)
+    assert run.stats["students"] == 1
 
 
 def test_SEC_001_other_school_findings_are_invisible(world: Any, admin_engine: Engine) -> None:

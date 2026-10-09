@@ -82,10 +82,12 @@ def test_FR_AUD_004_verify_task_runs_per_tenant(
     tenant: uuid.UUID,
     record_events: Any,
     platform_engine: Any,
+    fake_s3: Any,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     record_events(tenant, 2)
     monkeypatch.setattr(audit_tasks, "_tenant_ids", lambda: [tenant])
+    monkeypatch.setattr(audit_tasks, "build_s3_client", lambda _s: fake_s3)  # no archive yet
     out = audit_tasks.verify_all_chains.apply().get()
     assert out["tenants"] == 1
     assert out["broken"] == []
@@ -113,6 +115,36 @@ def test_FR_AUD_004_archive_task_exports_each_tenant(
         "events": 3,
     }
     assert len(fake_s3.objects) == 2
+
+
+def test_SEC_007_every_school_that_can_hold_a_chain_is_verified_and_archived(
+    admin_engine: Any, app_engine: Any
+) -> None:
+    """Audit 2026-10-05 DP-03: the daily verification and the signed archive listed only active
+    and suspended schools. The events written while a school is provisioning, and above all
+    while it is offboarding (``tenant.data_purged``, ``tenant.keys_destroyed``: the evidence of
+    the deletion, kept a year), were never verified and never reached the Object Lock archive.
+    A ``deleted`` school's chain stays until its retention ends, so it is verified too."""
+    made: dict[str, uuid.UUID] = {}
+    with admin_engine.begin() as c:
+        for status in ("provisioning", "active", "suspended", "offboarding", "deleted"):
+            tenant_id = uuid.uuid4()
+            c.execute(
+                text(
+                    "INSERT INTO core.tenants (id, code, name, status) "
+                    "VALUES (:i, :c, 'Synthetic School', :s)"
+                ),
+                {"i": tenant_id, "c": f"dp03-{tenant_id.hex[:12]}", "s": status},
+            )
+            made[status] = tenant_id
+    try:
+        listed = set(list_tenant_ids())
+        assert set(made.values()) <= listed
+    finally:
+        with admin_engine.begin() as c:
+            c.execute(
+                text("DELETE FROM core.tenants WHERE id = ANY(:ids)"), {"ids": list(made.values())}
+            )
 
 
 def test_FR_AUD_004_signer_selection_fails_closed() -> None:

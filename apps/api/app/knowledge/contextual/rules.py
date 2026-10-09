@@ -80,6 +80,17 @@ _DOCUMENT: Final = re.compile(
 )
 
 
+_BLOCK_TAG: Final = re.compile(r"<(\s*/?\s*(?:document|passage)\b)", re.IGNORECASE)
+"""A ``<document>`` / ``<passage>`` tag (opening or closing, any case or spacing) in text."""
+
+
+def escape_tags(text: str) -> str:
+    """Text placed inside the prompt's ``<document>`` or ``<passage>`` blocks, with any such tag
+    it writes escaped (``<`` becomes ``&lt;``), so the text cannot close its block and add words
+    that read as instructions outside it (audit 2026-10-04 hardening)."""
+    return _BLOCK_TAG.sub(r"&lt;\1", text)
+
+
 @dataclass(frozen=True, slots=True)
 class Passage:
     number: int
@@ -130,7 +141,7 @@ def clip_document(text: str, max_chars: int) -> str:
 def passages_message(passages: Sequence[Passage]) -> str:
     """The user text of one call: the passages only, numbered, one line each."""
     body = "\n\n".join(
-        f'<passage n="{p.number}">\n{_one_line(p.text)}\n</passage>' for p in passages
+        f'<passage n="{p.number}">\n{escape_tags(_one_line(p.text))}\n</passage>' for p in passages
     )
     return f"Write one context for each passage below.\n\n{body}"
 
@@ -228,6 +239,7 @@ __all__ = [
     "clip_document",
     "contexts_from_output",
     "document_text",
+    "escape_tags",
     "parse_document",
     "parse_passages",
     "passages_message",

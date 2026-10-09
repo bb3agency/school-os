@@ -7,6 +7,10 @@ requires-python = ">=3.12,<3.13"
 [tool.uv]
 package = false
 required-version = "==0.12.19"
+# Supply-chain cooldown (semgrep uv-missing-dependency-cooldown, SEC-009): resolve only releases at
+# least 7 days old, like the Dependabot cooldown. Security fixes newer than that need an explicit
+# exclude-newer-package override with a reason.
+exclude-newer = "7 days"
 
 [tool.uv.workspace]
 members = ["apps/api", "apps/worker", "evals", "apps/edge-agent"]
@@ -85,6 +89,7 @@ markers = [
   "db: needs a PostgreSQL test database (testcontainers or SOS_TEST_DATABASE_URL)",
   "redis: needs Valkey/Redis",
   "s3: needs an S3-compatible endpoint",
+  "recall_sweep: heavy authorised-recall sweep (docs/06 §6); runs only with SOS_RECALL_SWEEP=1",
 ]
 
 [tool.coverage.run]

@@ -9,10 +9,15 @@ so the route-enumeration test can check every route against the catalog; ``requi
 ``step_up=True`` when every listed permission is a step-up permission. Unknown or platform
 permissions fail when the route module is imported.
 
-Order of checks per request: authenticate (401) -> resolve membership (403/409) -> permission
-(403) -> scope (403) -> step-up (428). The route then opens exactly one transaction with
-``TenantDB`` (``tenant_session(ctx.tenant_id, ctx.user_id)``), which commits before the response
-is sent (dependency scope ``"function"``) and rolls back on any error.
+Order of checks per request: authenticate (401) -> resolve membership (403/409) -> rate limits
+per person, school and per-person route budgets (429, ``app.core.ratelimit.enforce``; the per-IP
+layer ran in the middleware) -> permission (403) -> scope (403) -> step-up (428) -> break-glass
+read-only -> the route's per-school budgets (429, ``ratelimit.charge_school_routes``). Refused
+calls count against the caller's own budgets, never against a budget the whole school shares
+(owner decision 2026-10-07).
+The route then opens exactly one transaction with ``TenantDB``
+(``tenant_session(ctx.tenant_id, ctx.user_id)``), which commits before the response is sent
+(dependency scope ``"function"``) and rolls back on any error.
 """
 
 from __future__ import annotations
@@ -30,6 +35,7 @@ from app.authz import breakglass_guard
 from app.authz.catalog import AUTHENTICATED, CatalogError, tenant_permission
 from app.authz.context import UserContext
 from app.authz.resolver import AuthzResolver, RouteKey
+from app.core import ratelimit
 from app.core.db import tenant_session
 from app.core.errors import BadRequest, Forbidden
 from app.core.logging import bind_context
@@ -59,6 +65,20 @@ def tenant_hint(request: Request) -> uuid.UUID | None:
 def request_id_of(request: Request) -> str | None:
     value = getattr(request.state, "request_id", None)
     return value if isinstance(value, str) else None
+
+
+def limit(
+    request: Request, principal: Principal, tenant_id: uuid.UUID | None, *, sign_in: bool = False
+) -> None:
+    """Rate-limit layers 2-4 for this caller (docs/09 §2.7). ``sign_in`` also refuses while the
+    person is in sign-in backoff from this address (ASVS 2.2.1)."""
+    ratelimit.enforce(
+        request,
+        principal=ratelimit.principal_key(principal.kind, principal.issuer, principal.subject),
+        tenant_id=tenant_id,
+        layer="user",
+        subject_ip_block=sign_in,
+    )
 
 
 def route_of(request: Request) -> RouteKey | None:
@@ -114,6 +134,7 @@ class Requirement:
         ctx: Annotated[UserContext, Depends(get_user_context)],
         principal: Annotated[Principal, Depends(get_principal)],
     ) -> UserContext:
+        limit(request, principal, ctx.tenant_id)
         if not ctx.has(self.sos_permission):
             raise Forbidden()
         if self.sos_scope == "school" and not ctx.scope_for(self.sos_permission).school_wide:
@@ -122,6 +143,9 @@ class Requirement:
             require_recent_auth(principal)
         # Break-glass sessions: read-only and every call recorded for the school (07 §6.4).
         breakglass_guard.enforce(ctx, request, self.sos_permission)
+        # Per-school route budgets only once the caller is authorized (refused members cannot
+        # spend them for the people allowed to use the route).
+        ratelimit.charge_school_routes(request, ctx.tenant_id)
         return ctx
 
 
@@ -166,6 +190,7 @@ class AnyOfRequirement(Requirement):
         ctx: Annotated[UserContext, Depends(get_user_context)],
         principal: Annotated[Principal, Depends(get_principal)],
     ) -> UserContext:
+        limit(request, principal, ctx.tenant_id)
         held = next((p for p in (self.sos_permission, *self.sos_any_of) if ctx.has(p)), None)
         if held is None:
             raise Forbidden()
@@ -173,6 +198,7 @@ class AnyOfRequirement(Requirement):
             require_recent_auth(principal)
         # Break-glass: read-only, recorded under the first listed permission the caller holds.
         breakglass_guard.enforce(ctx, request, held)
+        ratelimit.charge_school_routes(request, ctx.tenant_id)  # after authorization
         return ctx
 
 
@@ -203,7 +229,11 @@ class PrincipalRequirement:
     def __repr__(self) -> str:
         return "require_principal()"
 
-    def __call__(self, principal: Annotated[Principal, Depends(get_principal)]) -> Principal:
+    def __call__(
+        self, request: Request, principal: Annotated[Principal, Depends(get_principal)]
+    ) -> Principal:
+        # No school yet: per person and per route (the sign-in budgets), plus sign-in backoff.
+        limit(request, principal, None, sign_in=True)
         return principal
 
 

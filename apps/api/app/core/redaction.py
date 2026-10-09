@@ -18,7 +18,10 @@ Public API
 Detection rules (defined and tested in ``tests/core/test_redaction.py``)
 -----------------------------------------------------------------------
 Text is NFC-normalised. A *run* is a sequence of digit *groups* joined by a short separator
-(1-2 spaces/NBSP, or a hyphen/dash with optional surrounding spaces). Digits in any script
+(1-3 whitespace or zero-width characters of any kind, or a hyphen/dash/minus with up to 2 of
+them on each side; dots, slashes and commas are not separators, so structured numbers such
+as invoice numbers ``SOS/2026-27/000123`` and dates stay intact). Input checks also collapse every
+whitespace run first, as stored text is (``contains_full_aadhaar``). Digits in any script
 (ASCII, Telugu, Devanagari, ...) count via ``unicodedata.digit``. Candidates are windows of
 consecutive whole groups inside a run, so:
 
@@ -31,6 +34,10 @@ consecutive whole groups inside a run, so:
 2. Mobile (``redact`` only): a 10-digit window starting 6-9, optionally with ``0``/``91``/``+91``
    prefix, masked as ``XXXXXX1234``.
 3. Email (``redact`` only): replaced by ``[redacted-email]``.
+4. Punctuated Aadhaar (separate check, audit 2026-10-04 data-layer note 11): exactly three
+   4-digit groups joined by the same one of ``.`` ``/`` ``,`` (``1234.5678.9012``), not part of
+   a longer run of digits and those characters, and Verhoeff-valid. Refused by
+   ``contains_full_aadhaar``, masked like rule 1, located by ``find_aadhaar``.
 
 Masking repeats until nothing changes, so ``redact(redact(x)) == redact(x)``.
 """
@@ -114,7 +121,15 @@ def verhoeff_check_digit(digits: str) -> str:
 
 # --- Candidate runs -----------------------------------------------------------------------
 
-_SEP = r"(?:[ \u00a0]{1,2}|[ \u00a0]?[-\u2010-\u2013][ \u00a0]?)"
+# A gap is any Unicode whitespace (tab, line break, NBSP, thin/em/narrow spaces...) or an
+# invisible zero-width character; up to 3 of them, or a dash with up to 2 on each side.
+# Input checks run on raw text that is later stored with its whitespace collapsed (NFC, single
+# spaces), so every gap that collapses into a space must already join the groups here, or a
+# number typed as "1234<TAB>5678<TAB>9012" would pass the check and be stored as a full Aadhaar
+# number (invariant 4).
+_GAP = r"[\s\u200b-\u200d\u2060\ufeff]"
+_DASH = r"[-\u2010-\u2015\u2212\ufe58\ufe63\uff0d]"
+_SEP = rf"(?:{_GAP}{{1,3}}|{_GAP}{{0,2}}{_DASH}{_GAP}{{0,2}})"
 _RUN_RE = re.compile(rf"\+?\d+(?:{_SEP}\d+)*")
 _GROUP_RE = re.compile(r"\+?\d+")
 # UUIDs are identifiers, never Aadhaar candidates: their decimal digits across hyphens pass
@@ -258,8 +273,45 @@ def _mobile_regions(groups: list[_Group], taken: set[int]) -> list[tuple[int, in
     return regions
 
 
+# Dot, slash or comma separated form (audit 2026-10-04 data-layer note 11): exactly three
+# 4-digit groups joined by the SAME one of ``.`` ``/`` ``,``, not part of a longer run of digits
+# and those separators (so ``SOS/2026-27/000123``, dates and amounts never match), and only when
+# the 12 digits pass Verhoeff (no keyword rule here: these characters are too common).
+_PUNCT_RE = re.compile(r"(?<!\d)(?<!\d[./,])(\d{4})([./,])(\d{4})\2(\d{4})(?![./,]?\d)")
+
+
+def _punctuated(view: str) -> list[tuple[int, int, str]]:
+    """``(start, end, digits)`` of every Verhoeff-valid punctuated 12-digit number."""
+    found: list[tuple[int, int, str]] = []
+    for m in _PUNCT_RE.finditer(view):
+        digits = "".join(str(unicodedata.digit(c)) for c in m.group(1) + m.group(3) + m.group(4))
+        if verhoeff_valid(digits):
+            found.append((m.start(), m.end(), digits))
+    return found
+
+
+def _mask_punctuated(text: str) -> tuple[str, bool]:
+    found = _punctuated(_scan_view(text))
+    if not found:
+        return text, False
+    pieces: list[str] = []
+    cursor = 0
+    for start, end, digits in found:
+        pieces.append(text[cursor:start])
+        pieces.append(f"XXXX XXXX {digits[-4:]}")
+        cursor = end
+    pieces.append(text[cursor:])
+    return "".join(pieces), True
+
+
 def _mask_runs(text: str, *, mobiles: bool) -> tuple[str, bool]:
     """One masking pass. Returns (new_text, changed)."""
+    text, changed_punct = _mask_punctuated(text)
+    text, changed = _mask_runs_whitespace(text, mobiles=mobiles)
+    return text, changed or changed_punct
+
+
+def _mask_runs_whitespace(text: str, *, mobiles: bool) -> tuple[str, bool]:
     spans = _context_spans(text)
     view = _scan_view(text)
     pieces: list[str] = []
@@ -308,8 +360,22 @@ def redact(text: str) -> str:
 
 
 def contains_full_aadhaar(text: str) -> bool:
-    """True if ``text`` contains a 12-digit number passing the Verhoeff check (input rejection)."""
-    normalised = _scan_view(unicodedata.normalize("NFC", text))
+    """True if ``text`` contains a 12-digit number passing the Verhoeff check (input rejection).
+
+    Also checked with every whitespace run collapsed to one space: stored text is cleaned that
+    way (NFC, single spaces), so however many spaces, tabs or line breaks separate the groups,
+    the number that would be stored is refused (invariant 4; audit 2026-10-04, DL-01)."""
+    nfc = unicodedata.normalize("NFC", text)
+    return _has_valid_window(nfc) or _has_valid_window(_COLLAPSE_RE.sub(" ", nfc))
+
+
+_COLLAPSE_RE = re.compile(r"[\s\u200b-\u200d\u2060\ufeff]+")
+
+
+def _has_valid_window(text: str) -> bool:
+    normalised = _scan_view(text)
+    if _punctuated(normalised):
+        return True
     for run in _RUN_RE.finditer(normalised):
         groups = _groups(normalised, run)
         for _i, _j, digits in _windows(groups, _AADHAAR_LEN):
@@ -345,4 +411,5 @@ def find_aadhaar(text: str) -> list[AadhaarMatch]:
         groups = _groups(view, run)
         for i, j, digits, valid in _aadhaar_windows(groups, spans):
             found.append(AadhaarMatch(groups[i].start, groups[j].end, digits, valid))
-    return found
+    found.extend(AadhaarMatch(s, e, digits, True) for s, e, digits in _punctuated(view))
+    return sorted(found, key=lambda m: (m.start, m.end))

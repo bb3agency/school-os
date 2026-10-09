@@ -6,11 +6,12 @@ Secrets arrive via environment variables injected from AWS Secrets Manager (or a
 
 from __future__ import annotations
 
+import ipaddress
 import json
 from enum import StrEnum
 from functools import lru_cache
 from typing import Literal
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlsplit
 
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -149,6 +150,37 @@ def _is_public_https(url: str) -> bool:
     )
 
 
+def _tls_without_certificate_check(url: str) -> bool:
+    """A ``rediss://`` URL whose TLS would not verify the server certificate.
+
+    The Celery broker (kombu) reads ``ssl_cert_reqs`` from the URL and uses CERT_NONE when it
+    is missing; the result backend refuses such a URL. Only an explicit, single
+    ``ssl_cert_reqs=required`` (or ``CERT_REQUIRED``) counts as verified. Plain ``redis://``
+    (dedicated hosts, internal compose network) is not TLS and is not judged here.
+    """
+    parts = urlsplit(url)
+    if parts.scheme.lower() != "rediss":
+        return False
+    values = [
+        value.strip().lower()
+        for key, value in parse_qsl(parts.query, keep_blank_values=True)
+        if key == "ssl_cert_reqs"
+    ]
+    return values not in (["required"], ["cert_required"])
+
+
+def _postgres_tls_verified(url: str) -> bool:
+    """A database URL whose TLS checks the server certificate AND host name: exactly one
+    ``sslmode=verify-full`` (libpq keywords are lower-case; anything else means no TLS, TLS
+    without checks, or an ambiguous URL)."""
+    values = [
+        value.strip()
+        for key, value in parse_qsl(urlsplit(url).query, keep_blank_values=True)
+        if key == "sslmode"
+    ]
+    return values == ["verify-full"]
+
+
 # Placeholder supplier identity for local/CI invoices; refused in staging/prod (FR-PLT-016).
 DEV_SUPPLIER_NAME = "SchoolOS Synthetic Supplier (dev)"
 DEV_SUPPLIER_GSTIN = "37AAAAA0000A1Z5"
@@ -228,6 +260,12 @@ class Settings(BaseSettings):
     # Anthropic (fallback provider since ADR-0033): needed only while a role in models.yaml uses
     # provider anthropic.
     anthropic_api_key: SecretStr | None = None
+    # Claude safety lock (owner decision 2026-10-01): in staging/prod the API and the worker refuse
+    # to start while any models.yaml role uses provider anthropic, unless this confirms that the
+    # Anthropic Zero Data Retention agreement and DPA are signed (docs/08 §8, docs/10 §11). The
+    # check reads models.yaml, so it lives in the knowledge module (core imports no feature module):
+    # knowledge.gateway.factory.require_provider_agreements, run by create_app and the worker.
+    anthropic_zdr_confirmed: bool = False
     embeddings_api_key: SecretStr | None = None
     # Google Gemini on Vertex AI (ADR-0033; the default LLM provider). Project and location of the
     # Vertex endpoint (product traffic only in India: asia-south1 or asia-south2 in staging/prod),
@@ -288,6 +326,36 @@ class Settings(BaseSettings):
 
     otel_exporter_otlp_endpoint: str | None = None
 
+    # API rate limiting (app/core/ratelimit.py, budgets in app/core/rate_limits.yaml; docs/09
+    # §2.7, audit 2026-10-05 P2-07). Must stay on in staging/prod. Trusted proxies: comma-separated
+    # CIDRs (or addresses) whose X-Forwarded-For names the client: the ALB and web/BFF subnets on
+    # the shared tier (the VPC CIDR), Caddy and web on a dedicated host (its container network).
+    # Unset: X-Forwarded-For is ignored and the TCP peer is the client.
+    rate_limit_enabled: bool = True
+    trusted_proxies: str | None = None
+
+    @field_validator("trusted_proxies")
+    @classmethod
+    def _valid_proxies(cls, value: str | None) -> str | None:
+        for item in (v.strip() for v in (value or "").split(",")):
+            if not item:
+                continue
+            try:
+                net = ipaddress.ip_network(item, strict=False)
+            except ValueError as exc:
+                raise ValueError("SOS_TRUSTED_PROXIES must list CIDRs or IP addresses") from exc
+            if net.prefixlen == 0:
+                raise ValueError("SOS_TRUSTED_PROXIES must not trust every address")
+        return value
+
+    @property
+    def trusted_proxy_networks(self) -> tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...]:
+        return tuple(
+            ipaddress.ip_network(v.strip(), strict=False)
+            for v in (self.trusted_proxies or "").split(",")
+            if v.strip()
+        )
+
     # Email (invitations; app/notifications/email.py). Off by default. ``email_from`` is the
     # verified SES sender ("SchoolOS <no-reply@example.org>"); ``email_app_url`` is the web app
     # address put in links (each dedicated host has its own). Never logged with recipients.
@@ -317,6 +385,17 @@ class Settings(BaseSettings):
     @property
     def is_production_like(self) -> bool:
         return self.env in (Environment.STAGING, Environment.PROD)
+
+    def checked_migrator_url(self) -> str:
+        """The migrator URL for the migrate entrypoint (Alembic, audit partitions).
+
+        Not a start-up guard: the api and worker never set SOS_MIGRATOR_DATABASE_URL in
+        staging/prod, so only the migrate task refuses the dev-only default (audit 2026-10-04).
+        """
+        url = self.migrator_database_url.get_secret_value()
+        if self.is_production_like and "dev-only" in url:
+            raise ValueError(f"SOS_MIGRATOR_DATABASE_URL uses a dev-only default in {self.env}")
+        return url
 
     @property
     def support_enabled(self) -> bool:
@@ -430,6 +509,21 @@ class Settings(BaseSettings):
         if self.is_production_like and not _is_public_https(self.email_app_url or ""):
             raise ValueError(f"SOS_EMAIL_APP_URL must be a public https URL in {self.env}")
 
+    def _guard_postgres_tls(self) -> None:
+        """Shared tier, staging/prod: the database is RDS across the VPC, so TLS must check the
+        server's certificate and host name (audit 2026-10-05; Terraform writes
+        ``sslmode=verify-full``, modules/secrets). The migrator URL is set only in the migrate
+        task (the api keeps the dev-only default it never uses). Dedicated hosts reach their
+        database on the host's own compose network."""
+        if self.deployment_mode is not DeploymentMode.SHARED:
+            return
+        for name in ("database_url", "platform_database_url", "migrator_database_url"):
+            url = getattr(self, name).get_secret_value()
+            if name == "migrator_database_url" and "dev-only" in url:
+                continue
+            if not _postgres_tls_verified(url):
+                raise ValueError(f"SOS_{name.upper()} must set sslmode=verify-full in {self.env}")
+
     @model_validator(mode="after")
     def _guard_production(self) -> Settings:
         """Fail closed: dev-only conveniences can never run in staging or production."""
@@ -437,12 +531,26 @@ class Settings(BaseSettings):
         self._guard_email()
         self._guard_llm_credentials()
         if self.is_production_like:
+            # Anti-automation is a production control (OWASP API4:2023, ASVS 2.2.1).
+            if not self.rate_limit_enabled:
+                raise ValueError(f"SOS_RATE_LIMIT_ENABLED must stay true in {self.env}")
             if self.key_wrapper is KeyWrapperKind.LOCAL_DEV:
                 raise ValueError("SOS_KEY_WRAPPER=local-dev is not allowed in staging/prod")
             for name in ("database_url", "platform_database_url", "service_token_key"):
                 value: SecretStr = getattr(self, name)
                 if "dev-only" in value.get_secret_value():
                     raise ValueError(f"{name} uses a dev-only default in {self.env}")
+            self._guard_postgres_tls()
+            # TLS to Valkey must check the certificate: the Celery broker would otherwise
+            # accept anyone's (SEC-011, ASVS 9.2.1).
+            if _tls_without_certificate_check(self.redis_url.get_secret_value()):
+                raise ValueError(
+                    f"SOS_REDIS_URL must set ssl_cert_reqs=required for rediss:// in {self.env}"
+                )
+            # The heartbeat answer (announcements shown to school users) is not signed: only TLS
+            # authenticates the control plane to a dedicated host (SEC-009).
+            if self.control_plane_url is not None and not _is_public_https(self.control_plane_url):
+                raise ValueError(f"SOS_CONTROL_PLANE_URL must be a public https URL in {self.env}")
             # Invoices are tax documents: never issue them with the placeholder supplier. Only the
             # shared tier runs the control plane (billing); dedicated hosts never invoice.
             invoicing = self.deployment_mode is DeploymentMode.SHARED

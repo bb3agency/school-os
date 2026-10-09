@@ -68,6 +68,7 @@ class EngineConfig(BaseModel):
     sync_max_students: int = Field(ge=0)
     source_attributes: dict[str, dict[str, str]]
     apaar_attributes: tuple[str, ...] = Field(min_length=1)
+    apaar_attribute: str = Field(pattern=r"^[a-z][a-z0-9_]*$")
     duplicate: DuplicatePolicy
     age_bands: dict[str, tuple[int, int]]
     format_issues: dict[str, Label]

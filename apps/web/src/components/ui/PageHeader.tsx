@@ -27,7 +27,7 @@ export function Breadcrumb({ items, label }: { items: readonly Crumb[]; label?: 
               {item.href && !last ? (
                 <Link
                   href={item.href}
-                  className="inline-flex min-h-6 items-center rounded-sm underline-offset-4 hover:text-ink hover:underline"
+                  className="inline-flex min-h-6 items-center rounded-sm underline-offset-4 hover:text-ink hover:underline pointer-coarse:min-h-11"
                 >
                   {item.label}
                 </Link>

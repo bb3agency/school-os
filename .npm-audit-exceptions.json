@@ -1,0 +1,13 @@
+{
+  "$comment": "Reviewed npm audit exceptions for the FULL tree (dev included). Production dependencies are always audited with no exceptions (npm audit --omit=dev --audit-level=high). Each entry names one advisory, why it is accepted, and a review date; scripts/npm-audit-check.mjs fails once review_by has passed. See docs/13 (dependencies). SEC-009.",
+  "exceptions": [
+    {
+      "id": "GHSA-vfj7-8cjw-p6xm",
+      "package": "braces",
+      "scope": "dev",
+      "added": "2026-10-05",
+      "review_by": "2027-01-03",
+      "reason": "Stack-exhaustion DoS in braces <=3.0.3, the latest release, so no patched version exists to pin. Reached only through lint tooling (eslint-config-next, @next/eslint-plugin-next, eslint-import-resolver-typescript via fast-glob and micromatch), which parses our own repository globs and never ships; npm's only offered fix downgrades eslint-config-next to 14."
+    }
+  ]
+}

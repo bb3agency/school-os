@@ -339,17 +339,50 @@ budget:
   # The amount is the school's setting ai_monthly_budget_inr (tenant settings, FR-TEN-012), read
   # by the composition root through tenancy.service. Spend is metered in USD at list price and
   # converted at this rate; keep it equal to app/platform/billing.yaml usd_inr_rate (a test pins it).
-  usd_inr_rate: "84.00"
+  # FBIL USD/INR reference rate of 28 Sep 2026 (95.968), reviewed 2026-10-03; source and review
+  # rule next to billing.yaml usd_inr_rate (docs/16 §11, §19 Q17).
+  usd_inr_rate: "95.97"
   # Budget months are calendar months in IST (Asia/Kolkata).
   # Before each call the gateway reserves its worst case (input_tokens at the model's input price
   # plus the role's max_output_tokens at its output price) atomically against the month, and
   # settles it to the real cost afterwards, so concurrent calls cannot overshoot (FR-KB-011).
+  # A school with an AI answer bundle (ADR-0038; owner decision 2026-10-03) gets a monthly budget
+  # DERIVED from it instead of its own ai_monthly_budget_inr setting:
+  #   budget_inr = included_answers x cost_per_answer_usd x (1 + overage_headroom_fraction)
+  #                x usd_inr_rate, rounded to a rupee.
+  # The budget stays a cost cap (above it Ask answers search-only); the bundle's quota and the
+  # overage are billed from answer counts (billing.yaml), never from this.
+  # cost_per_answer_usd is an ESTIMATE for one answered question at list price: ~2 answer-role
+  # calls on gemini-3.5-flash (~10k input incl. <=12k tool results, ~800 output incl. thinking:
+  # 2 x $0.024) plus the small conversation roles (~$0.004), about $0.053, rounded up. Re-check
+  # it against kb.llm_calls once real usage exists. The headroom also covers questions that are
+  # not billable answers (not found, refused) and ingestion calls charged to the same budget.
+  # Lite 300 -> ~Rs 2,591; Standard 1,000 -> ~Rs 8,637; High 3,000 -> ~Rs 25,912 at 95.97.
+  bundle:
+    cost_per_answer_usd: "0.06"
+    overage_headroom_fraction: 0.5
   reservation:
-    input_tokens: 16000               # 12k tool results + system prompt, tools, question, history
+    input_tokens: 16000              # 12k tool results + system prompt, tools, question, history
     ttl_s: 600                        # abandoned reservations lapse; > timeout x 3 attempts + backoff
 
 answer_checks:
-  max_uncited_factual_fraction: 0.30  # §9 rule 3
+  # §9 rule 3, per sentence: every factual sentence of the final answer needs a valid citation of
+  # a passage given in THIS request. Uncited factual sentences are dropped; above this share of
+  # the factual sentences the answer lost its core and is replaced by the search-only view.
+  max_uncited_factual_fraction: 0.30
+  sentences:
+    terminators: ".?!।॥…"
+    # A "." after these words does not end a sentence ("Rc. No. 12", "Rs. 500", "Smt. Devi").
+    abbreviations: ["no", "nos", "rc", "rs", "dr", "mr", "mrs", "ms", "smt", "sri", "shri", "st",
+      "std", "govt", "dept", "dt", "vol", "pg", "pp", "ref", "sl", "approx", "vs", "e.g", "i.e",
+      "ch", "sec", "cl"]
+    # "Class X." may end a sentence; any other single capital with a dot is an initial ("K. Rao").
+    class_words: [class, std, standard, grade, section]
+    lead_in_max_words: 12
+    connectives: [in summary, in short, to summarise, to summarize, however, also, note, please note,
+      for example, here are the details, here is what i found, here is what the records say]
+    not_found_phrases: [not found in school records, could not find, couldn't find, cannot find,
+      can't find, no record of this in the school records]
   # Shown instead of an answer that no valid citation supports (FR-KB-007, invariant 8). English
   # first (ADR-0036): always `en` while SOS_TELUGU_ENABLED is off; with it on, `te` when the
   # question uses Telugu script (alone or code-mixed), otherwise `en` (FR-KB-006).

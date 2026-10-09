@@ -11,16 +11,24 @@ Rules (docs/16 §5.6-5.9, §9, §10):
   next gapless number of the Indian financial year under a row lock; issued invoices are frozen.
 - GST 18% by default: CGST + SGST when the place of supply equals the supplier's state (AP = 37),
   IGST otherwise; half-up rounding to paise.
+- Commercial catalogue (ADR-0038): a plan's one-time "Implementation and data verification" fee
+  is charged once, on the subscription's first invoice (the next new invoice if that one is
+  voided). An AI answer bundle is a monthly add-on billed in advance with the plan; answers above
+  its quota in a calendar month are billed on the next invoice (``usage_month`` stops a second
+  charge). Answers are counts from ``platform.usage_daily``, never tenant data.
 """
 
 from __future__ import annotations
 
+import calendar
 import datetime as dt
+import hashlib
+import unicodedata
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Any
+from typing import Any, Final
 
 from sqlalchemy import RowMapping, and_, func, select
 from sqlalchemy.orm import Session
@@ -48,6 +56,7 @@ from app.platform.common import (
 )
 from app.platform.payments import get_provider
 from app.platform.schemas import (
+    AiBundleOut,
     BillingAccountIn,
     BillingAccountOut,
     InvoiceLineIn,
@@ -58,6 +67,7 @@ from app.platform.schemas import (
     PlanIn,
     PlanOut,
     PlanPatch,
+    SchoolAiBundle,
     SubscriptionOut,
 )
 from app.tenancy import service as tenancy
@@ -137,6 +147,40 @@ def _period_months(plan: Mapping[Any, Any]) -> int:
     return 12 if plan["billing_period"] == "annual" else 1
 
 
+# --- one-time fee, AI bundles and overage (pure) ----------------------------------------------
+
+ONE_TIME_FEE_TEXT = "Implementation and data verification (one-time)"
+
+
+def next_month(day: dt.date) -> dt.date:
+    """The first day of the calendar month after ``day``."""
+    return add_months(day.replace(day=1), 1)
+
+
+def ai_overage(answers: int, included: int, rate: Decimal) -> tuple[int, Decimal]:
+    """(extra answers, amount) for one calendar month: answers above the bundle's quota."""
+    extra = max(int(answers) - int(included), 0)
+    return extra, round_paise(Decimal(extra) * Decimal(rate))
+
+
+def _rupees(amount: Decimal) -> str:
+    return f"₹{Decimal(amount):,.2f}"
+
+
+def overage_description(bundle_name: str, month: dt.date, extra: int, rate: Decimal) -> str:
+    return (
+        f"AI answers above the {bundle_name} bundle, {calendar.month_name[month.month]} "
+        f"{month.year}: {extra:,} extra answers \N{MULTIPLICATION SIGN} {_rupees(rate)}"
+    )
+
+
+def bundle_description(bundle: Mapping[Any, Any], start: dt.date, last_day: dt.date) -> str:
+    return (
+        f"AI answers: {bundle['name']} bundle, {int(bundle['included_answers']):,} answers a "
+        f"month ({start.isoformat()} to {last_day.isoformat()})"
+    )
+
+
 # --- plans ------------------------------------------------------------------------------------
 
 
@@ -150,6 +194,8 @@ def _plan_values(data: PlanIn | PlanPatch) -> dict[str, Any]:
         }
     if "gst_rate" in values:
         values["gst_rate"] = Decimal(values["gst_rate"])
+    if values.get("one_time_fee_inr", 0) is None:  # omitted or null: the default 0, or keep
+        del values["one_time_fee_inr"]
     return values
 
 
@@ -194,7 +240,11 @@ def get_plan(plan_id: uuid.UUID) -> PlanOut:
     return PlanOut.model_validate(dict(row))
 
 
-def update_plan(actor: Actor, plan_id: uuid.UUID, data: PlanPatch) -> PlanOut:
+def update_plan(
+    actor: Actor, plan_id: uuid.UUID, data: PlanPatch, *, expected_version: int | None = None
+) -> PlanOut:
+    """Edit a draft. ``expected_version`` is the If-Match ``row_version`` (412 when stale); a
+    published plan answers 409 ``plan_published`` whatever the ETag."""
     with platform_session() as s, db_errors():
         row = repo.get(s, m.plans, plan_id, for_update=True)
         if row is None:
@@ -203,6 +253,8 @@ def update_plan(actor: Actor, plan_id: uuid.UUID, data: PlanPatch) -> PlanOut:
             raise Conflict(
                 "Published plans cannot change; create a new version.", code="plan_published"
             )
+        if expected_version is not None and row["row_version"] != expected_version:
+            raise PreconditionFailed()
         values = _plan_values(data)
         merged = {**dict(row), **values}
         if (merged["pricing_model"] == "per_student") != (
@@ -217,7 +269,14 @@ def update_plan(actor: Actor, plan_id: uuid.UUID, data: PlanPatch) -> PlanOut:
                     }
                 ]
             )
-        row = repo.update_row(s, m.plans, plan_id, values, bump_version=False)
+        # ``version`` is the catalogue version and never moves; the edit counter does.
+        row = repo.update_row(
+            s,
+            m.plans,
+            plan_id,
+            {**values, "row_version": m.plans.c.row_version + 1},
+            bump_version=False,
+        )
         audit_platform(s, actor, "plan.updated", "plan", plan_id, {"fields": sorted(values)})
         return PlanOut.model_validate(dict(row))
 
@@ -373,18 +432,17 @@ def activate_subscription(
             raise Conflict("Only a trial can be activated.", code="invalid_state")
         plan = repo.get(s, m.plans, sub["pending_plan_id"] or sub["plan_id"])
         plan = must(plan)
-        sub = repo.update_row(
-            s,
-            m.subscriptions,
-            sub_id,
-            {
-                "status": "active",
-                "plan_id": plan["id"],
-                "pending_plan_id": None,
-                "current_period_start": today,
-                "current_period_end": add_months(today, _period_months(plan)),
-            },
-        )
+        values: dict[str, Any] = {
+            "status": "active",
+            "plan_id": plan["id"],
+            "pending_plan_id": None,
+            "current_period_start": today,
+            "current_period_end": add_months(today, _period_months(plan)),
+        }
+        if sub["ai_bundle_id"] is not None:
+            # Trial answers are free: the bundle counts from the month after activation.
+            values["ai_bundle_from"] = max(sub["ai_bundle_from"], next_month(today))
+        sub = repo.update_row(s, m.subscriptions, sub_id, values)
         audit_platform(
             s,
             actor,
@@ -442,6 +500,8 @@ def change_plan(actor: Actor, sub_id: uuid.UUID, plan_id: uuid.UUID) -> Subscrip
         current = must(current)
         if new_plan["tier"] != current["tier"]:
             raise Conflict("Moving between tiers needs a migration project.", code="tier_change")
+        if sub["ai_bundle_id"] is not None:
+            _monthly_only([new_plan])
         if sub["status"] == "trial":
             values: dict[str, Any] = {"plan_id": plan_id, "pending_plan_id": None}
         else:
@@ -459,24 +519,183 @@ def change_plan(actor: Actor, sub_id: uuid.UUID, plan_id: uuid.UUID) -> Subscrip
         return SubscriptionOut.model_validate(dict(sub))
 
 
+def _check_sub_version(sub: Mapping[Any, Any], expected_version: int | None) -> None:
+    """The optional If-Match of a subscription update (412 when stale; audit 2026-10-06 R-04)."""
+    if expected_version is not None and sub["version"] != expected_version:
+        raise PreconditionFailed()
+
+
 def set_price_override(
-    actor: Actor, sub_id: uuid.UUID, amount: Decimal | None, reason: str | None
+    actor: Actor,
+    sub_id: uuid.UUID,
+    amount: Decimal | None,
+    reason: str | None,
+    *,
+    expected_version: int | None = None,
 ) -> SubscriptionOut:
     with platform_session() as s, db_errors():
-        sub = _sub_or_404(s, sub_id)
+        before = _sub_or_404(s, sub_id)
+        _check_sub_version(before, expected_version)
         sub = repo.update_row(
             s, m.subscriptions, sub_id, {"price_override_inr": amount, "override_reason": reason}
         )
+        was = before["price_override_inr"]
         audit_platform(
             s,
             actor,
             "subscription.price_override_set",
             "subscription",
             sub_id,
-            {"price_override_inr": str(amount) if amount is not None else None},
+            {
+                "change": "cleared" if amount is None else "set" if was is None else "changed",
+                "plan_id": before["plan_id"],
+                "previous_price_override_inr": _money_text(was),
+                "price_override_inr": _money_text(amount),
+                "previous_reason_sha256": _reason_digest(before["override_reason"]),
+                "reason_sha256": _reason_digest(reason),
+            },
             tenant_id=sub["tenant_id"],
         )
         return SubscriptionOut.model_validate(dict(sub))
+
+
+def _money_text(value: Decimal | None) -> str | None:
+    return None if value is None else f"{Decimal(value):.2f}"
+
+
+def _reason_digest(reason: str | None) -> str | None:
+    """SHA-256 of an operator's free-text reason, for the audit chain (api-auth audit 2026-10-04
+    hardening note): every event is bound to the exact reason given then, while the chain keeps
+    ids, codes and amounts only (docs/05 §5, docs/16 §16). The 64 hex digits are written with
+    the letters a-p (0 -> a ... f -> p), so the summary's personal-data check (digit runs, phone
+    numbers) never meets a digest."""
+    if reason is None:
+        return None
+    raw = hashlib.sha256(unicodedata.normalize("NFC", reason).encode()).hexdigest()
+    return raw.translate(_HEX_AS_LETTERS)
+
+
+_HEX_AS_LETTERS = str.maketrans("0123456789abcdef", "abcdefghijklmnop")
+
+
+def list_ai_bundles(status: str | None = None) -> list[AiBundleOut]:
+    with platform_session() as s:
+        stmt = select(m.ai_bundles).order_by(
+            m.ai_bundles.c.included_answers, m.ai_bundles.c.version.desc()
+        )
+        if status:
+            stmt = stmt.where(m.ai_bundles.c.status == status)
+        return [AiBundleOut.model_validate(dict(r)) for r in s.execute(stmt).mappings()]
+
+
+def _monthly_only(plans: Iterable[Mapping[Any, Any] | None]) -> None:
+    if any(p is not None and p["billing_period"] != "monthly" for p in plans):
+        raise Conflict(
+            "AI answer bundles are monthly; they need a monthly plan.",
+            code="ai_bundle_needs_monthly_plan",
+        )
+
+
+def set_ai_bundle(
+    actor: Actor,
+    sub_id: uuid.UUID,
+    bundle_id: uuid.UUID | None,
+    *,
+    today: dt.date | None = None,
+    expected_version: int | None = None,
+) -> SubscriptionOut:
+    """Choose, change or remove the AI answer bundle (docs/16 §5.7).
+
+    A new bundle counts from the first full calendar month after today (a trial's from the month
+    after activation). A change keeps that month and applies to the next invoice and to the quota
+    of any month not yet billed; nothing already invoiced is prorated.
+    """
+    today = today or today_ist()
+    with platform_session() as s, db_errors():
+        sub = _sub_or_404(s, sub_id)
+        _check_sub_version(sub, expected_version)
+        if sub["status"] == "cancelled":
+            raise Conflict("The subscription is cancelled.", code="invalid_state")
+        if bundle_id is None:
+            values: dict[str, Any] = {"ai_bundle_id": None, "ai_bundle_from": None}
+            action, summary = "subscription.ai_bundle_removed", {}
+        else:
+            bundle = repo.get(s, m.ai_bundles, bundle_id)
+            if bundle is None or bundle["status"] != "published":
+                raise ValidationFailed(
+                    [
+                        {
+                            "field": "ai_bundle_id",
+                            "code": "ai_bundle_not_available",
+                            "message_key": "errors.ai_bundle",
+                        }
+                    ]
+                )
+            plan_ids = (sub["plan_id"], sub["pending_plan_id"])
+            _monthly_only(repo.get(s, m.plans, p) for p in plan_ids if p is not None)
+            values = {
+                "ai_bundle_id": bundle_id,
+                "ai_bundle_from": sub["ai_bundle_from"] or next_month(today),
+            }
+            action = "subscription.ai_bundle_set"
+            summary = {"ai_bundle_code": bundle["code"], "ai_bundle_version": bundle["version"]}
+        sub = repo.update_row(s, m.subscriptions, sub_id, values)
+        audit_platform(
+            s, actor, action, "subscription", sub_id, summary, tenant_id=sub["tenant_id"]
+        )
+        out = SubscriptionOut.model_validate(dict(sub))
+    _sync_ai_allowance_now(out.tenant_id)
+    return out
+
+
+# --- the school's AI budget follows its bundle (owner decision 2026-10-03; ADR-0020 B3) -------
+
+
+def ai_allowance_for(s: Session, tenant_id: uuid.UUID) -> int | None:
+    """Included answers a month of the school's live subscription's bundle (platform data
+    only), or ``None`` without a bundle or a live subscription."""
+    stmt = (
+        select(m.ai_bundles.c.included_answers)
+        .select_from(
+            m.subscriptions.join(m.ai_bundles, m.ai_bundles.c.id == m.subscriptions.c.ai_bundle_id)
+        )
+        .where(m.subscriptions.c.tenant_id == tenant_id, m.subscriptions.c.status != "cancelled")
+        .order_by(m.subscriptions.c.created_at.desc())
+        .limit(1)
+    )
+    value = s.execute(stmt).scalar_one_or_none()
+    return None if value is None else int(value)
+
+
+def sync_ai_allowance(tenant_id: uuid.UUID) -> bool:
+    """Hand the bundle's included answers to a shared-tier school (``True`` if it changed).
+
+    The school derives its monthly AI budget from this number (``knowledge.policy``). The only
+    tenant-side step is the lifecycle-style ``tenancy.set_ai_answer_allowance`` (ADR-0020
+    amendment B3): one count in, a flag out, in the school's own session. Idempotent; called
+    after a bundle change and by the daily collector, which repairs a missed or failed write.
+    Dedicated-tier schools live on their own host and are not reached from here (docs/16 §19
+    Q18).
+    """
+    with platform_session() as s:
+        dep = repo.get_by(s, m.deployments, m.deployments.c.tenant_id == tenant_id)
+        if dep is None or dep["mode"] != "shared":
+            return False
+        answers = ai_allowance_for(s, tenant_id)
+    return tenancy.set_ai_answer_allowance(tenant_id, answers)
+
+
+def _sync_ai_allowance_now(tenant_id: uuid.UUID) -> None:
+    """Best effort after the platform change has committed: a failure is logged (ids only) and
+    the daily collector catches up; the operator's action stands."""
+    try:
+        sync_ai_allowance(tenant_id)
+    except Exception as exc:
+        log.warning(
+            "platform.ai_allowance.sync_failed",
+            tenant_id=str(tenant_id),
+            error_type=type(exc).__name__,
+        )
 
 
 def cancel_subscription(actor: Actor, sub_id: uuid.UUID, reason: str) -> SubscriptionOut:
@@ -503,6 +722,36 @@ def cancel_subscription(actor: Actor, sub_id: uuid.UUID, reason: str) -> Subscri
             tenant_id=sub["tenant_id"],
         )
         return SubscriptionOut.model_validate(dict(sub))
+
+
+def end_subscription_for_closure(
+    s: Session, actor: Actor, tenant_id: uuid.UUID, *, reason: str
+) -> None:
+    """End the school's live subscription at once because the school is closing (offboarding
+    approved; audit 2026-10-05 hardening "invoices for closed schools"). Called in the
+    offboarding transaction. Issued invoices stay as they are; open drafts are left for the
+    billing admin to discard. No-op without a live subscription."""
+    sub = repo.live_subscription(s, tenant_id, for_update=True)
+    if sub is None:
+        return
+    repo.update_row(
+        s,
+        m.subscriptions,
+        sub["id"],
+        {"status": "cancelled", "cancelled_at": now(), "cancel_reason": reason},
+    )
+    audit_platform(
+        s,
+        actor,
+        "subscription.cancelled",
+        "subscription",
+        sub["id"],
+        {"at_period_end": False, "school_closing": True},
+        tenant_id=tenant_id,
+    )
+
+
+CLOSED_SCHOOL_STATUSES: Final = ("offboarding", "deleted")
 
 
 def in_protected_window(boards: Sequence[str], day: dt.date) -> str | None:
@@ -602,13 +851,17 @@ def reactivate_subscription(
         )
     if sub0 is None or dep is None:
         raise NotFound("Subscription not found")
-    resume_tenant = (
-        dep["mode"] == "shared"
-        and dep["tenant_status"] == "suspended"
-        and dep["tenant_status_reason"] == "billing"
-    )
     with platform_session() as s, db_errors():
         sub = _sub_or_404(s, sub_id)
+        # Under the deployment lock: a security hold placed meanwhile keeps the school
+        # suspended; paying never lifts a hold (audit 2026-10-06 R-18).
+        dep = must(repo.get(s, m.deployments, dep["id"], for_update=True))
+        resume_tenant = (
+            dep["mode"] == "shared"
+            and dep["tenant_status"] == "suspended"
+            and dep["tenant_status_reason"] == "billing"
+            and not dep["security_hold"]
+        )
         if sub["status"] != "suspended":
             raise Conflict(
                 "Only a suspended subscription can be reactivated.", code="invalid_state"
@@ -755,6 +1008,7 @@ def _line_rows(lines: Sequence[InvoiceLineIn], plan: Mapping[Any, Any]) -> list[
                 "unit_price_inr": line.unit_price_inr,
                 "amount_inr": amount,
                 "gst_rate": plan["gst_rate"],
+                "usage_month": line.usage_month,
             }
         )
     return rows
@@ -783,6 +1037,11 @@ def _default_lines(
             unit_price_inr=Decimal(price),
         )
     ]
+    fee = Decimal(plan["one_time_fee_inr"] or 0)
+    if fee > 0 and not repo.subscription_has_line(s, sub["id"], kind="one_time_fee"):
+        lines.append(
+            InvoiceLineIn(kind="one_time_fee", description=ONE_TIME_FEE_TEXT, unit_price_inr=fee)
+        )
     if plan["pricing_model"] == "per_student":
         usage = repo.usage_on_or_before(s, sub["tenant_id"], period_start - dt.timedelta(days=1))
         students = int(usage["students_active"]) if usage else 0
@@ -797,7 +1056,107 @@ def _default_lines(
                     unit_price_inr=Decimal(plan["per_student_price_inr"]),
                 )
             )
+    if sub["ai_bundle_id"] is not None:
+        lines.extend(_ai_lines(s, sub, period_start, last_day))
     return lines
+
+
+def _ai_lines(
+    s: Session, sub: Mapping[Any, Any], period_start: dt.date, last_day: dt.date
+) -> list[InvoiceLineIn]:
+    """The bundle (in advance, for this period) and last calendar month's overage (in arrears).
+
+    Overage for month M goes on an invoice whose period starts in M + 1, only from the month the
+    bundle counts from, and only when no live invoice of the subscription already bills M.
+    """
+    bundle = must(repo.get(s, m.ai_bundles, sub["ai_bundle_id"]))
+    lines = [
+        InvoiceLineIn(
+            kind="addon",
+            description=bundle_description(bundle, period_start, last_day),
+            unit_price_inr=Decimal(bundle["price_inr"]),
+        )
+    ]
+    month = add_months(period_start.replace(day=1), -1)
+    if month < sub["ai_bundle_from"] or repo.subscription_has_line(
+        s, sub["id"], kind="usage_overage", usage_month=month
+    ):
+        return lines
+    answers = repo.ai_answers_between(s, sub["tenant_id"], month, next_month(month))
+    rate = Decimal(bundle["overage_rate_inr"])
+    extra, _ = ai_overage(answers, int(bundle["included_answers"]), rate)
+    if extra > 0:
+        lines.append(
+            InvoiceLineIn(
+                kind="usage_overage",
+                description=overage_description(bundle["name"], month, extra, rate),
+                quantity=Decimal(extra),
+                unit_price_inr=rate,
+                usage_month=month,
+            )
+        )
+    return lines
+
+
+def ai_answers_in_month(tenant_id: uuid.UUID, month: dt.date) -> int:
+    """Billable AI answers of one school in one calendar month (counts from usage_daily)."""
+    start = month.replace(day=1)
+    with platform_session() as s:
+        return repo.ai_answers_between(s, tenant_id, start, next_month(start))
+
+
+def school_ai_bundle(
+    tenant_id: uuid.UUID, subscription_id: uuid.UUID, *, today: dt.date | None = None
+) -> SchoolAiBundle | None:
+    """The calling school's AI answer bundle for its "Plan and billing" page (FR-PLT-030).
+
+    Platform data only (``platform.subscriptions``, ``ai_bundles``, ``usage_daily``), read for
+    the subscription that ``core.current_subscription()`` returned to the school's own session
+    and pinned to the caller's ``tenant_id``; ``None`` without a bundle. This month's answer
+    count is shown only once the month counts against the bundle (``ai_bundle_from``).
+    """
+    month = (today or today_ist()).replace(day=1)
+    with platform_session() as s:
+        row = (
+            s.execute(
+                select(
+                    m.ai_bundles.c.code,
+                    m.ai_bundles.c.name,
+                    m.ai_bundles.c.included_answers,
+                    m.ai_bundles.c.price_inr,
+                    m.ai_bundles.c.overage_rate_inr,
+                    m.subscriptions.c.ai_bundle_from,
+                )
+                .select_from(
+                    m.subscriptions.join(
+                        m.ai_bundles, m.ai_bundles.c.id == m.subscriptions.c.ai_bundle_id
+                    )
+                )
+                .where(
+                    m.subscriptions.c.id == subscription_id,
+                    m.subscriptions.c.tenant_id == tenant_id,
+                )
+            )
+            .mappings()
+            .first()
+        )
+        if row is None:
+            return None
+        used: int | None = None
+        counted_to: dt.date | None = None
+        if row["ai_bundle_from"] <= month:
+            used, counted_to = repo.ai_answers_to_date(s, tenant_id, month, next_month(month))
+    return SchoolAiBundle(
+        code=row["code"],
+        name=row["name"],
+        included_answers=row["included_answers"],
+        price_inr=row["price_inr"],
+        overage_rate_inr=row["overage_rate_inr"],
+        counts_from=row["ai_bundle_from"],
+        month_start=month,
+        answers_used=used,
+        answers_counted_to=counted_to,
+    )
 
 
 def _totals(s: Session, invoice: Mapping[Any, Any]) -> dict[str, Any]:
@@ -825,15 +1184,14 @@ def create_draft(
     *,
     lines: Sequence[InvoiceLineIn] | None = None,
 ) -> RowMapping | None:
-    """Create a draft for (subscription, period) unless a live invoice exists. Returns the draft."""
-    existing = repo.get_by(
-        s,
-        m.invoices,
-        m.invoices.c.subscription_id == sub["id"],
-        m.invoices.c.period_start == period_start,
-        m.invoices.c.status != "void",
-    )
-    if existing is not None:
+    """Create a draft for (subscription, period) unless a live invoice already covers any part
+    of that period, or the school is closing. Returns the draft, or None.
+
+    Audit 2026-10-05 hardening: a live (not void) invoice whose period overlaps the new one
+    blocks it, not only one with the same start, so a manual draft cannot bill days twice; a
+    school that is offboarding or deleted is never invoiced again."""
+    dep = repo.get_by(s, m.deployments, m.deployments.c.tenant_id == sub["tenant_id"])
+    if dep is not None and dep["tenant_status"] in CLOSED_SCHOOL_STATUSES:
         return None
     account = repo.get(s, m.billing_accounts, sub["billing_account_id"])
     use_pending = sub["pending_plan_id"] is not None and period_start >= sub["current_period_end"]
@@ -841,6 +1199,16 @@ def create_draft(
     account = must(account)
     plan = must(plan)
     period_end = add_months(period_start, _period_months(plan))
+    existing = repo.get_by(
+        s,
+        m.invoices,
+        m.invoices.c.subscription_id == sub["id"],
+        m.invoices.c.period_start < period_end,
+        m.invoices.c.period_end > period_start,
+        m.invoices.c.status != "void",
+    )
+    if existing is not None:
+        return None
     settings = get_settings()
     supplier_state = settings.billing_supplier_state_code
     place = account["state_code"]
@@ -928,9 +1296,12 @@ def create_manual_draft(actor: Actor, sub_id: uuid.UUID, period_start: dt.date) 
             raise Conflict(
                 "Trials and cancelled subscriptions are not invoiced.", code="invalid_state"
             )
+        dep = repo.get_by(s, m.deployments, m.deployments.c.tenant_id == sub["tenant_id"])
+        if dep is not None and dep["tenant_status"] in CLOSED_SCHOOL_STATUSES:
+            raise Conflict("A closing school is not invoiced.", code="invalid_state")
         row = create_draft(s, actor, sub, period_start)
         if row is None:
-            raise Conflict("An invoice already exists for this period.", code="duplicate")
+            raise Conflict("An invoice already covers this period or part of it.", code="duplicate")
         return _invoice_out(s, row)
 
 
@@ -1159,20 +1530,39 @@ def record_payment(
             },
             tenant_id=invoice["tenant_id"],
         )
-        return PaymentOut.model_validate(dict(payment))
+        return _payment_out(s, payment["id"])
+
+
+def _payment_out(s: Session, payment_id: uuid.UUID) -> PaymentOut:
+    rows = repo.payments_with_names(s, payment_id=payment_id)
+    if not rows:
+        raise NotFound("Payment not found")
+    return PaymentOut.model_validate(dict(rows[0]))
 
 
 def get_payment(payment_id: uuid.UUID) -> PaymentOut:
     with platform_session() as s:
-        row = repo.get(s, m.payments, payment_id)
-    if row is None:
-        raise NotFound("Payment not found")
-    return PaymentOut.model_validate(dict(row))
+        return _payment_out(s, payment_id)
+
+
+def list_payments(invoice_id: uuid.UUID) -> list[PaymentOut]:
+    """An invoice's payments, newest received first, incl. reversed ones (FR-PLT-018)."""
+    with platform_session() as s:
+        if repo.get(s, m.invoices, invoice_id) is None:
+            raise NotFound("Invoice not found")
+        return [
+            PaymentOut.model_validate(dict(row))
+            for row in repo.payments_with_names(s, invoice_id=invoice_id)
+        ]
 
 
 def reverse_payment(
     actor: Actor, payment_id: uuid.UUID, reason: str, *, today: dt.date | None = None
 ) -> PaymentOut:
+    """Reverse a recorded payment with a reason, never delete it (FR-PLT-018). The invoice is
+    re-settled: with less than its total covered it is ``issued`` again (balance due grows by
+    the payment's amount and TDS); the daily sweep later marks the subscription past due if the
+    due date has passed."""
     today = today or today_ist()
     with platform_session() as s, db_errors():
         payment = repo.get(s, m.payments, payment_id, for_update=True)
@@ -1182,7 +1572,7 @@ def reverse_payment(
             raise Conflict("The payment is already reversed.", code="invalid_state")
         invoice = repo.get(s, m.invoices, payment["invoice_id"], for_update=True)
         invoice = must(invoice)
-        payment = repo.update_row(
+        repo.update_row(
             s,
             m.payments,
             payment_id,
@@ -1204,7 +1594,7 @@ def reverse_payment(
             {"invoice_id": str(invoice["id"])},
             tenant_id=invoice["tenant_id"],
         )
-        return PaymentOut.model_validate(dict(payment))
+        return _payment_out(s, payment_id)
 
 
 def generate_invoices(month: str, actor: Actor = SYSTEM) -> JobOut:

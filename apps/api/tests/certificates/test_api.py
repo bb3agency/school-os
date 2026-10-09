@@ -65,6 +65,98 @@ def test_US_1101_blocked_issue_is_409(school: Any, api: Any) -> None:
     assert res.json()["code"] == "certificate_blocked"
 
 
+def _dq_support() -> Any:
+    name = "sos_test_dq_support"
+    if name not in sys.modules:
+        import importlib.util
+        from pathlib import Path
+
+        path = Path(__file__).resolve().parents[1] / "dq" / "dq_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+def test_DL_06_a_clerk_cannot_note_away_a_blocker_and_issue(school: Any, api: Any) -> None:
+    """DL-06: office staff (certificate.issue, dq.findings.resolve, no waive) cannot resolve a
+    blocker with a note and then print the mismatched record; the certificate stays blocked."""
+    dq = _dq_support()
+    sid = C.student(school, extra=dq.aadhaar(dob="2012-05-14"))
+    dq.run(school, sid)  # DQ-002 blocker on the printed date of birth
+    clerk = school.people["office_staff"]
+    listed = api.call(
+        clerk, "GET", "/api/v1/dq/findings", params={"student_id": str(sid), "limit": 50}
+    )
+    assert listed.status_code == 200, listed.text
+    blocker = next(f for f in listed.json()["data"] if f["rule_id"] == "DQ-002")
+    resolved = api.call(
+        clerk,
+        "POST",
+        f"/api/v1/dq/findings/{blocker['id']}/resolve",
+        json={"note": "Looks fine to me"},
+    )
+    assert (resolved.status_code, resolved.json()["code"]) == (403, "blocker_needs_waive")
+    body = {"certificate_type": "bonafide", "inputs": {"purpose": "passport"}}
+    res = _issue(api, school, sid, body, role="office_staff")
+    assert (res.status_code, res.json()["code"]) == (409, "certificate_blocked")
+
+
+def test_A_01_a_blocker_cleared_by_a_write_without_evidence_needs_confirmation(
+    school: Any, api: Any, admin_engine: Engine
+) -> None:
+    """A-01 (owner decision 2026-10-07, option b): office staff overwrite the Aadhaar-as-printed
+    date of birth with the register date (a non-identity write, no evidence). The DQ-002 blocker
+    is not resolved by that write: it waits for a waive holder's confirmation (step-up), and the
+    certificate stays blocked until then. A real typo fix still works, with one confirmation."""
+    dq = _dq_support()
+    sid = C.student(school, extra=dq.aadhaar(dob="2012-05-14"))
+    dq.run(school, sid)  # DQ-002 blocker: register 2012-03-14 vs Aadhaar 2012-05-14
+    clerk = school.people["office_staff"]
+    wrote = api.call(
+        clerk,
+        "POST",
+        f"/api/v1/students/{sid}/values",
+        json={
+            "attribute_key": "aadhaar_dob_as_printed",
+            "source": "aadhaar_as_printed",
+            "value": "2012-03-14",
+        },
+    )
+    assert wrote.status_code == 201, wrote.text
+    dq.run(school, sid)
+    row = dq.one(admin_engine, sid, "DQ-002")
+    assert (row["status"], row["resolved_at"]) == ("needs_confirmation", None)
+    body = {"certificate_type": "bonafide", "inputs": {"purpose": "passport"}}
+    res = _issue(api, school, sid, body, role="office_staff")
+    assert (res.status_code, res.json()["code"]) == (409, "certificate_blocked")
+    # A re-run does not clear it on its own.
+    dq.run(school, sid)
+    assert dq.one(admin_engine, sid, "DQ-002")["status"] == "needs_confirmation"
+    # The clerk cannot confirm it.
+    path = f"/api/v1/dq/findings/{row['id']}/resolve"
+    denied = api.call(clerk, "POST", path, json={"note": "Typo fixed"})
+    assert (denied.status_code, denied.json()["code"]) == (403, "blocker_needs_waive")
+    admin = school.people["office_admin"]
+    stale = api.call(admin, "POST", path, json={"note": "Typo fixed"}, auth_age_s=301)
+    assert (stale.status_code, stale.json()["code"]) == (428, "step_up_required")
+    confirmed = api.call(admin, "POST", path, json={"note": "Checked the Aadhaar card: typo"})
+    assert confirmed.status_code == 200, confirmed.text
+    assert confirmed.json()["status"] == "resolved"
+    events = [
+        e
+        for e in C.W.audit_events(admin_engine, school.tenant_id, "dq.finding.resolved")
+        if e["resource_id"] == row["id"]
+    ]
+    assert len(events) == 1
+    assert events[0]["summary"]["step_up"] is True
+    res = _issue(api, school, sid, body, role="office_staff")
+    assert res.status_code == 201, res.text
+
+
 def test_SEC_005_approve_needs_if_match_and_recent_mfa(school: Any, api: Any) -> None:
     tc = C.pending_tc(school)
     principal = school.people["principal"]
@@ -75,9 +167,17 @@ def test_SEC_005_approve_needs_if_match_and_recent_mfa(school: Any, api: Any) ->
     missing = api.call(principal, "POST", path)
     assert missing.status_code == 400
     assert missing.json()["code"] == "if_match_required"
-    wrong = api.call(principal, "POST", path, headers={"If-Match": 'W/"9"'})
+    wrong = api.call(
+        principal, "POST", path, headers={"If-Match": 'W/"9"'}, json={"draft_sha256": "0" * 64}
+    )
     assert wrong.status_code == 412
-    ok = api.call(principal, "POST", path, headers={"If-Match": f'W/"{tc.version}"'})
+    ok = api.call(
+        principal,
+        "POST",
+        path,
+        headers={"If-Match": f'W/"{tc.version}"'},
+        json={"draft_sha256": C.draft_hash(school, tc.id)},
+    )
     assert ok.status_code == 200, ok.text
     assert ok.json()["status"] == "issued"
     self_try = api.call(

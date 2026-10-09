@@ -70,10 +70,26 @@ output "posture" {
       for b in aws_s3_account_public_access_block.this : b.block_public_acls && b.block_public_policy && b.ignore_public_acls && b.restrict_public_buckets
     ])
     ebs_encryption_by_default = length(aws_ebs_encryption_by_default.primary) == 1 && length(aws_ebs_encryption_by_default.dr) == 1
-    alert_topic_kms_key       = aws_sns_topic.alerts.kms_master_key_id
-    alert_subscriptions       = sort([for s in aws_sns_topic_subscription.alerts_email : s.endpoint])
-    alert_rules               = { for k, r in aws_cloudwatch_event_rule.alert : k => jsondecode(r.event_pattern) }
-    alert_targets             = { for k, t in aws_cloudwatch_event_target.alert : k => t.arn }
-    tamper_event_names        = local.tamper_event_names
+    access_analyzers          = { for r, a in aws_accessanalyzer_analyzer.this : r => a.type }
+    password_policy = one([for p in aws_iam_account_password_policy.this : {
+      minimum_password_length      = p.minimum_password_length
+      password_reuse_prevention    = p.password_reuse_prevention
+      require_lowercase_characters = p.require_lowercase_characters
+      require_uppercase_characters = p.require_uppercase_characters
+      require_numbers              = p.require_numbers
+      require_symbols              = p.require_symbols
+    }])
+    ebs_snapshot_public_access = { for r, b in aws_ebs_snapshot_block_public_access.this : r => b.state }
+    ami_public_access          = { for r, b in aws_ec2_image_block_public_access.this : r => b.state }
+    global_forward = one([for i, r in aws_cloudwatch_event_rule.global_forward : {
+      region  = r.region
+      pattern = jsondecode(r.event_pattern)
+      target  = aws_cloudwatch_event_target.global_forward[i].arn
+    }])
+    alert_topic_kms_key = aws_sns_topic.alerts.kms_master_key_id
+    alert_subscriptions = sort([for s in aws_sns_topic_subscription.alerts_email : s.endpoint])
+    alert_rules         = { for k, r in aws_cloudwatch_event_rule.alert : k => jsondecode(r.event_pattern) }
+    alert_targets       = { for k, t in aws_cloudwatch_event_target.alert : k => t.arn }
+    tamper_event_names  = local.tamper_event_names
   }
 }

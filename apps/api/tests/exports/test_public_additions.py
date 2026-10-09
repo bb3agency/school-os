@@ -103,3 +103,5 @@ def test_export_files_are_stored_under_the_school_prefix(school: Any, world: Any
     with tenant_session(school.tenant_id) as db:
         assert documents.delete_export_files(db, export_id) == 1
     assert key not in store.objects
+    # docs/08 §7: the retention purge discards (tag for the 1-day bucket rule).
+    assert key in store.discarded

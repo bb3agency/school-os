@@ -311,7 +311,9 @@ const DOC = new RegExp(`^sos://doc/(${UUID})/v(\\d{1,6})(?:#p(\\d{1,6}))?$`);
 const STUDENT = new RegExp(
   `^sos://student/(${UUID})(?:/field/([a-z0-9_]{1,64}))?(?:\\?[a-z0-9_=&-]*)?$`,
 );
-const OTHER = new RegExp(`^sos://(finding|change|verified|count|fee)/(${UUID})$`);
+const OTHER = new RegExp(`^sos://(finding|change|verified)/(${UUID})$`);
+/** A tool aggregate; `#s<16 hex>` fingerprints the scope it was computed over (audit W3-09). */
+const AGGREGATE = new RegExp(`^sos://(count|fee)/(${UUID})(?:#s[0-9a-f]{16})?$`);
 
 export type SourceRef =
   | { kind: "doc"; id: string; version: number; page: number | null }
@@ -344,7 +346,7 @@ export function parseSource(source: string): SourceRef | null {
   }
   const student = STUDENT.exec(source);
   if (student) return { kind: "student", id: student[1] as string, field: student[2] ?? null };
-  const other = OTHER.exec(source);
+  const other = OTHER.exec(source) ?? AGGREGATE.exec(source);
   if (other) {
     return {
       kind: other[1] as "finding" | "change" | "verified" | "count" | "fee",

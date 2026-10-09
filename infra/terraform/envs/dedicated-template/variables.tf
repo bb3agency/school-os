@@ -111,7 +111,7 @@ variable "artifacts_bucket" {
 }
 
 variable "artifacts_kms_key_arn" {
-  description = "KMS key of the artifacts bucket (shared prod stack output kms_key_arns.data)."
+  description = "KMS key of the artifacts bucket (shared prod stack output kms_key_arns.artifacts; its own key since audit 2026-10-05, never the data key)."
   type        = string
 }
 
@@ -123,6 +123,11 @@ variable "ecr_account_id" {
 
 variable "control_plane_url" {
   description = "Control-plane URL for heartbeats, e.g. https://app.schoolos.in."
+  type        = string
+}
+
+variable "security_alarm_topic_arn" {
+  description = "The prod stack's alarm topic (prod output alarm_topic_arn): receives this host's security alarms (audit 2026-10-05)."
   type        = string
 }
 
@@ -141,6 +146,12 @@ variable "route53_zone_id" {
   description = "Hosted zone of the platform domain (null = create the A record manually)."
   type        = string
   default     = null
+}
+
+variable "imds_hop_limit" {
+  description = "IMDSv2 hop limit of the host: 1 (default, audit W3-06). 2 only for the apply before upgrading a host from a release older than the per-container credentials (deploy/dedicated/README.md: Upgrading)."
+  type        = number
+  default     = 1
 }
 
 variable "walg_enabled" {
@@ -171,4 +182,10 @@ variable "termination_protection" {
   description = "EC2 termination protection (disable only for decommissioning)."
   type        = bool
   default     = true
+}
+
+variable "files_replica_retention_days" {
+  description = "Object Lock (GOVERNANCE) retention of the files bucket's locked copy in ap-south-2, in days (audit W3-06; >= the 90-day recovery window)."
+  type        = number
+  default     = 90
 }

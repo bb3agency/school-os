@@ -60,29 +60,74 @@ set_version() {
   SOS_VERSION="$version"
 }
 
+# The user the Caddy service of <release dir> runs as (compose.yaml `user:`; none = root).
+caddy_uid_of() {
+  local uid
+  uid="$(awk '/^  caddy:/ {c = 1; next} c && /^  [a-z]/ {exit}
+    c && /^    user:/ {gsub(/[^0-9:]/, "", $2); split($2, a, ":"); print a[1]; exit}' "$1/compose.yaml")"
+  echo "${uid:-0}"
+}
+
+# Caddy's ACME account, certificates and autosaved config belong to the user its release runs it
+# as: 10001 since the 2026-10-05 audit hardening (root before). Caddy has no capability, so root
+# without DAC_OVERRIDE cannot read files owned by 10001 and vice versa: upgrade.sh re-owns the store
+# right before restarting Caddy, and its rollback re-owns it for the previous release. Idempotent.
+prepare_caddy_dirs() {
+  local release_dir="${1:-$(active_release_dir)}" uid
+  uid="$(caddy_uid_of "$release_dir")"
+  [[ $uid =~ ^[0-9]+$ ]] || {
+    log ERR "cannot read the Caddy user of $release_dir"
+    return 1
+  }
+  install -d -m 0700 -o "$uid" -g "$uid" \
+    "$SOS_DATA_DIR/caddy" "$SOS_DATA_DIR/caddy/data" "$SOS_DATA_DIR/caddy/config" || return 1
+  chown -R "$uid:$uid" "$SOS_DATA_DIR/caddy"
+}
+
+# Valkey ACL passwords (audit 2026-10-05 P2-06): one per user (web, api, worker, beat, health),
+# each SHA-256(VALKEY_PASSWORD | "schoolos-valkey-acl-v1" | user) from the generated secret, so a
+# container holding one password learns nothing about another, and existing hosts need no new
+# secret. Deterministic: rotating VALKEY_PASSWORD (generated_secret_version) rotates all of them.
+# printf is a builtin, so the secret never appears on a command line. Prints compose env lines.
+valkey_user_passwords() {
+  local master user
+  master="$(sed -n "s/^VALKEY_PASSWORD='\(.*\)'\$/\1/p; s/^VALKEY_PASSWORD=\([^']*\)\$/\1/p" "$SOS_SECRETS_ENV" | head -n 1)"
+  [[ -n $master ]] || die "$SOS_SECRETS_ENV has no VALKEY_PASSWORD; run scripts/fetch-secrets.sh"
+  for user in web api worker beat health; do
+    printf "VALKEY_%s_PASSWORD='%s'\n" "${user^^}" \
+      "$(printf '%s|schoolos-valkey-acl-v1|%s' "$master" "$user" | sha256sum | cut -d' ' -f1)"
+  done
+}
+
 # Compose env = host config + release image pins + secrets (0600, root only).
 render_compose_env() {
   local release_dir="${1:-$(active_release_dir)}"
   [[ -r $SOS_SECRETS_ENV ]] || die "missing $SOS_SECRETS_ENV; run scripts/fetch-secrets.sh"
-  local tmp
+  # Images only by digest from the release's release.env (written by package.sh). A bare tag
+  # would let Docker resolve the image elsewhere (Docker Hub for schoolos/...) or a moved tag.
+  [[ -r $release_dir/release.env ]] || die "missing $release_dir/release.env (images pinned by digest)"
+  local pins name line
+  pins="$(grep -E '^SOS_(API|WEB|WORKER)_IMAGE=' "$release_dir/release.env" || true)"
+  for name in SOS_API_IMAGE SOS_WEB_IMAGE SOS_WORKER_IMAGE; do
+    line="$(grep -E "^${name}=" <<<"$pins" || true)"
+    [[ $(grep -c . <<<"$line") -eq 1 ]] || die "release.env must set $name exactly once"
+    [[ $line =~ ^${name}=[^[:space:]@]+@sha256:[0-9a-f]{64}$ ]] || die "$name must be pinned by digest (@sha256:...)"
+  done
+  local tmp valkey_users
+  valkey_users="$(valkey_user_passwords)" || die "cannot derive the Valkey ACL passwords"
   tmp="$(mktemp "$SOS_ETC/.compose.env.XXXXXX")"
   chmod 0600 "$tmp"
   {
     echo "# Rendered by scripts/lib.sh render_compose_env; do not edit (contains secrets)."
     grep -Ev '^\s*(#|$)' "$SOS_HOST_ENV"
     echo "SOS_VERSION=$SOS_VERSION"
-    if [[ -r $release_dir/release.env ]]; then
-      # CI pins images by digest: SOS_API_IMAGE=schoolos/api:<version>@sha256:...
-      grep -E '^SOS_(API|WEB|WORKER)_IMAGE=' "$release_dir/release.env"
-    else
-      echo "SOS_API_IMAGE=schoolos/api:$SOS_VERSION"
-      echo "SOS_WEB_IMAGE=schoolos/web:$SOS_VERSION"
-      echo "SOS_WORKER_IMAGE=schoolos/api:$SOS_VERSION"
-    fi
+    # CI pins images by digest: SOS_API_IMAGE=<registry>/schoolos/api:<version>@sha256:...
+    echo "$pins"
     if [[ ${SOS_WALG_ENABLED:-false} == "true" ]]; then
       echo "SOS_PG_ARCHIVE_MODE=on"
     fi
     cat "$SOS_SECRETS_ENV"
+    echo "$valkey_users"
   } >"$tmp"
   mv -f "$tmp" "$SOS_COMPOSE_ENV"
 }
@@ -206,6 +251,104 @@ install_host_profiles() {
     return 1
   fi
   info "worker sandbox profiles installed (seccomp $SOS_SECCOMP_DIR/seccomp-worker.json, AppArmor schoolos-worker)"
+}
+
+# Per-container AWS credentials (audit W3-06; docs/10 §15). The host's IMDS hop limit is 1, so no
+# container reaches the instance role. Root on the host hands each app container its own role's
+# short-lived credentials as files the AWS SDKs read, mounted read-only at /run/aws:
+#   $SOS_AWS_DIR/api/     role sos-ded-<school>-api: files read/write, never tag or delete
+#   $SOS_AWS_DIR/worker/  role sos-ded-<school>-worker: files incl. discard, audit archive, signing key
+#   $SOS_AWS_DIR/walg/    the instance role's own credentials, for WAL-G in the db container (if on)
+# api and worker: `config` (credential_process = /bin/cat /run/aws/credentials.json) and
+# `credentials.json` in credential_process format, which botocore re-reads before expiry; walg: an INI
+# `credentials` file that wal-g reads on every archive_command run. Files are 0640 root:<container gid>
+# and written atomically (rename). Values are never printed.
+SOS_AWS_DIR="${SOS_AWS_DIR:-$SOS_DATA_DIR/aws}"
+SOS_APP_GID="${SOS_APP_GID:-10001}"
+SOS_DB_GID="${SOS_DB_GID:-999}"
+SOS_AWS_OWNER="${SOS_AWS_OWNER:-root}"
+SOS_APP_SESSION_SECONDS="${SOS_APP_SESSION_SECONDS:-3600}"
+
+# The app container role <api|worker> of this school (created by Terraform, modules/dedicated_host).
+app_role_arn() {
+  local name="$1" account
+  account="$(aws sts get-caller-identity --region "$AWS_REGION" --query Account --output text)" || return 1
+  [[ $account =~ ^[0-9]{12}$ ]] || return 1
+  [[ ${SCHOOL_CODE:-} =~ ^[a-z0-9][a-z0-9-]*$ ]] || return 1
+  printf 'arn:aws:iam::%s:role/sos-ded-%s-%s\n' "$account" "$SCHOOL_CODE" "$name"
+}
+
+# write_private <path> <gid> <content>: atomic, mode 0640, owner $SOS_AWS_OWNER (root):<gid>.
+write_private() {
+  local path="$1" gid="$2" content="$3" tmp
+  tmp="$(mktemp "$(dirname "$path")/.$(basename "$path").XXXXXX")" || return 1
+  if ! { printf '%s\n' "$content" >"$tmp" && chown "$SOS_AWS_OWNER:$gid" "$tmp" && chmod 0640 "$tmp"; }; then
+    rm -f "$tmp"
+    return 1
+  fi
+  mv -f "$tmp" "$path"
+}
+
+# private_dir <dir> <gid>: mode 0750, owner $SOS_AWS_OWNER (root):<gid>.
+private_dir() {
+  mkdir -p "$1" && chown "$SOS_AWS_OWNER:$2" "$1" && chmod 0750 "$1"
+}
+
+refresh_app_credentials() {
+  local name role out json ini
+  private_dir "$SOS_AWS_DIR" "$SOS_APP_GID" || return 1
+  for name in api worker; do
+    role="$(app_role_arn "$name")" || {
+      log ERR "cannot resolve the $name role (aws sts get-caller-identity, SCHOOL_CODE)"
+      return 1
+    }
+    out="$(aws sts assume-role --region "$AWS_REGION" --role-arn "$role" \
+      --role-session-name "schoolos-$name" --duration-seconds "$SOS_APP_SESSION_SECONDS" --output json)" || {
+      log ERR "cannot assume the $name role $role (terraform apply of modules/dedicated_host?)"
+      return 1
+    }
+    json="$(jq -ce '.Credentials | {Version: 1, AccessKeyId, SecretAccessKey, SessionToken, Expiration}
+      | select(.AccessKeyId and .SecretAccessKey and .SessionToken and .Expiration)' <<<"$out")" || {
+      log ERR "incomplete credentials for the $name role"
+      return 1
+    }
+    private_dir "$SOS_AWS_DIR/$name" "$SOS_APP_GID" || return 1
+    write_private "$SOS_AWS_DIR/$name/credentials.json" "$SOS_APP_GID" "$json" || return 1
+    write_private "$SOS_AWS_DIR/$name/config" "$SOS_APP_GID" \
+      "$(printf '[default]\ncredential_process = /bin/cat /run/aws/credentials.json')" || return 1
+  done
+  if [[ ${SOS_WALG_ENABLED:-false} == "true" ]]; then
+    out="$(aws configure export-credentials --format process)" || {
+      log ERR "cannot export the instance role's credentials for WAL-G"
+      return 1
+    }
+    ini="$(jq -er 'select(.AccessKeyId and .SecretAccessKey and .SessionToken)
+      | "[default]\naws_access_key_id = \(.AccessKeyId)\naws_secret_access_key = \(.SecretAccessKey)\naws_session_token = \(.SessionToken)"' <<<"$out")" || {
+      log ERR "incomplete instance role credentials for WAL-G"
+      return 1
+    }
+    private_dir "$SOS_AWS_DIR/walg" "$SOS_DB_GID" || return 1
+    write_private "$SOS_AWS_DIR/walg/credentials" "$SOS_DB_GID" "$ini" || return 1
+  fi
+  info "app container credentials refreshed (api, worker$([[ ${SOS_WALG_ENABLED:-false} == "true" ]] && echo ", walg"))"
+}
+
+# Install (or refresh) the systemd units of <release dir> and enable the timers.
+install_units() {
+  local release_dir="$1" unit
+  for unit in "$release_dir"/systemd/*.service "$release_dir"/systemd/*.timer; do
+    sed "s#@INSTALL_DIR@#$SOS_INSTALL_DIR#g" "$unit" >"/etc/systemd/system/$(basename "$unit")"
+  done
+  install -d -m 0755 /etc/systemd/system/apt-daily-upgrade.timer.d
+  install -m 0644 "$release_dir/systemd/apt-daily-upgrade.timer.d/schoolos.conf" \
+    /etc/systemd/system/apt-daily-upgrade.timer.d/schoolos.conf
+  systemctl daemon-reload
+  systemctl enable schoolos.service schoolos-backup.timer schoolos-monthly-reboot.timer
+  systemctl start schoolos-backup.timer schoolos-monthly-reboot.timer
+  if [[ -f $release_dir/systemd/schoolos-app-credentials.timer ]]; then
+    systemctl enable --now schoolos-app-credentials.timer
+  fi
+  systemctl restart apt-daily-upgrade.timer
 }
 
 activate_release() {

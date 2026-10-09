@@ -200,7 +200,13 @@ export function SchoolShell({
       id: "admin",
       items: [
         { href: "/settings/school", label: t("schoolSettings.nav"), icon: "building" },
-        { href: "/settings/structure", label: t("school.nav.structure"), icon: "layers" },
+        {
+          // GET /academic-years, /classes and /sections need student.read_basic.
+          href: "/settings/structure",
+          label: t("school.nav.structure"),
+          permission: "student.read_basic",
+          icon: "layers",
+        },
         {
           // FR-TEN-011, US-202 AC2: year-end promotion, under the structure it changes.
           href: "/settings/structure/promotions",
@@ -308,7 +314,7 @@ export function SchoolShell({
           <Link
             href="/choose-school"
             data-tooltip={t("school.switchSchool")}
-            className="-mx-1 mt-1 inline-flex min-h-8 items-center gap-1.5 rounded-md px-1 text-sm font-medium text-primary hover:underline collapsed:mx-0 collapsed:mt-0 collapsed:flex collapsed:size-10 collapsed:justify-center collapsed:px-0 collapsed:hover:bg-surface-muted"
+            className="-mx-1 mt-1 inline-flex min-h-8 items-center gap-1.5 pointer-coarse:min-h-11 rounded-md px-1 text-sm font-semibold text-primary hover:underline collapsed:mx-0 collapsed:mt-0 collapsed:flex collapsed:size-10 collapsed:justify-center collapsed:px-0 collapsed:hover:bg-surface-muted"
           >
             <Icon name="swap" className="size-4" />
             <span className="collapsed:sr-only">{t("school.switchSchool")}</span>

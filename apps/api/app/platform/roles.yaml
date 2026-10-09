@@ -11,6 +11,15 @@ two_person:
   - platform.tenants.offboard
   - platform.breakglass.emergency
 
+# Audit 2026-10-05 A-13 / A-14 (owner decision 2026-10-07). A two-person request (offboarding,
+# emergency break-glass, a critical announcement) expires when the second operator has not acted
+# within this many hours; it can be withdrawn before that.
+two_person_request_ttl_hours: 72
+# The second operator must have held the role that grants the permission for at least this many
+# days, and that role must not have been granted by the first operator (or the other way round),
+# so one operator cannot invite a second account they control and use it as the second person.
+two_person_min_role_age_days: 7
+
 roles:
   platform_owner: ["*"]
   platform_engineer:

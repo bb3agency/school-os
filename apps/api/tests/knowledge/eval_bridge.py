@@ -192,6 +192,10 @@ CHATS: Final = "search_my_conversations"
 CHAT_WORDS: Final = ("did i ask", "i asked", "నేను అడిగిన")
 """Questions about the caller's own earlier chats (ADR-0034)."""
 FEES: Final = "get_fee_dues"
+RECALL_CHUNKS: Final = 4000
+RECALL_OTHER_SCHOOLS: Final = 4
+RECALL_OTHER_CHUNKS: Final = 500
+"""Authorised-recall corpus (the CI size of ``test_retrieval_recall.py``; docs/06 §6)."""
 FEE_WORDS: Final = ("fee", "dues", "owe", "ఫీజు", "బకాయి", "బాకీ", "kattali")
 """Fee questions the stand-in recognises (only when the application offers get_fee_dues)."""
 _STUDENT_ID: Final = re.compile(r"Student ID: ([0-9a-f-]{36})\.")
@@ -1455,6 +1459,50 @@ class AppFakeAdapter:
             ),
             reranked_documents=tuple(self._ctx_owner(p) for p in sent),
             latency_ms=latency,
+        )
+
+    # --- Authorised retrieval recall (sos_evals.authorised_recall; docs/06 §6) ----------------
+
+    def prepare_authorised_recall(self, levels: Sequence[Any], queries: int) -> None:
+        """A synthetic clustered vector corpus: one school of ``RECALL_CHUNKS`` chunks with
+        section ACLs spread over 100 buckets, and ``RECALL_OTHER_SCHOOLS`` more schools in the
+        same HNSW graph (``tests/knowledge/recall_support.py``, shared with the pytest suite)."""
+        support = _load(
+            "sos_test_kb_retrieval_support", TESTS / "knowledge" / "retrieval_support.py"
+        )
+        self._RS = _load("sos_test_kb_recall_support", TESTS / "knowledge" / "recall_support.py")
+        self._recall = self._RS.build(
+            self._admin,
+            support,
+            chunks=RECALL_CHUNKS,
+            other_schools=RECALL_OTHER_SCHOOLS,
+            other_chunks=RECALL_OTHER_CHUNKS,
+        )
+        self._recall_vectors = self._RS.queries(self._recall.seed, queries)
+
+    def retrieve_authorised(self, level: Any, query: int, k: int) -> Any:
+        """The oracle (exact, same RLS session and ACL predicate) and the production vector
+        path (settings, route and statement as ``HybridRetriever.search`` runs them) for a
+        caller who sees ``level.selectivity`` of the school; distances from the oracle."""
+        from app.core.db import tenant_session
+        from app.knowledge.config.retrieval import load_retrieval_config
+        from sos_evals.authorised_recall import RecallHit, RecallRetrieved
+
+        rs = self._RS
+        acl = rs.keys(level.selectivity)
+        vector = self._recall_vectors[query]
+        with tenant_session(self._recall.tenant) as s:
+            exact = rs.exact_neighbours(s, acl, vector)
+        with tenant_session(self._recall.tenant) as s:
+            route, returned = rs.production_neighbours(s, load_retrieval_config(), acl, vector)
+        distances = dict(exact)
+        return RecallRetrieved(
+            exact=tuple(RecallHit(chunk=str(i), distance=d) for i, d in exact[:k]),
+            returned=tuple(
+                RecallHit(chunk=str(i), distance=distances.get(i)) for i in returned[:k]
+            ),
+            authorised=len(exact),
+            route=route,
         )
 
     # --- Ask conversations (sos_evals.conversations; ADR-0034) --------------------------------

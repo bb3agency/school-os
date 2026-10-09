@@ -197,3 +197,22 @@ def change_request(
     )
     value: uuid.UUID = out.id
     return value
+
+
+def approve_change_request(school: Any, request_id: uuid.UUID) -> None:
+    """Approve a pending request as the principal (or the owner) through the real service."""
+    import dataclasses
+    import datetime as dt
+
+    from app.changes import service as changes
+    from app.changes.schemas import ApproveIn
+
+    objects = sys.modules["sos_test_changes_objects"]
+    who = "principal" if "principal" in school.people else "owner"
+    person = school.people[who]
+    ctx = dataclasses.replace(
+        objects.SW.ctx_for(school.tenant_id, person, who), auth_time=dt.datetime.now(dt.UTC)
+    )
+    with tenant_session(school.tenant_id, person.user_id) as s:
+        current = changes.get_request(s, ctx, request_id)
+        changes.approve(s, ctx, request_id, ApproveIn(), expected_version=current.version)

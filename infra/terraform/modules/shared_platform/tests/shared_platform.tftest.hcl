@@ -202,6 +202,7 @@ run "worker_image_and_upload_encryption" {
         data          = "arn:aws:kms:ap-south-1:444455556666:key/00000000-0000-0000-0000-00000000da7a"
         audit         = "arn:aws:kms:ap-south-1:444455556666:key/00000000-0000-0000-0000-0000000a0d17"
         backup        = "arn:aws:kms:ap-south-1:444455556666:key/00000000-0000-0000-0000-00000000bac0"
+        artifacts     = "arn:aws:kms:ap-south-1:444455556666:key/00000000-0000-0000-0000-0000000a7f00"
         logs          = "arn:aws:kms:ap-south-1:444455556666:key/00000000-0000-0000-0000-000000000109"
         audit-signing = "arn:aws:kms:ap-south-1:444455556666:key/00000000-0000-0000-0000-00000000519e"
       }
@@ -209,6 +210,13 @@ run "worker_image_and_upload_encryption" {
         audit-signing = { key_spec = "ECC_NIST_P256", key_usage = "SIGN_VERIFY", rotation = false }
       }
     }
+  }
+
+  # Audit 2026-10-05 key separation: every dedicated host may decrypt release bundles, so the
+  # artifacts bucket has its own key, never the data key.
+  assert {
+    condition     = module.s3.artifacts_kms_key_arn == "arn:aws:kms:ap-south-1:444455556666:key/00000000-0000-0000-0000-0000000a7f00"
+    error_message = "The artifacts bucket uses its own CMK (kms_key_arns.artifacts), not the data key."
   }
 
   assert {
@@ -228,6 +236,11 @@ run "worker_image_and_upload_encryption" {
       [for e in c.environment : e.value if e.name == "SOS_S3_KMS_KEY_ID"] == ["arn:aws:kms:ap-south-1:444455556666:key/00000000-0000-0000-0000-00000000da7a"]
     ])
     error_message = "api and worker encrypt uploads with the data CMK, the files bucket's key (SOS_S3_KMS_KEY_ID)."
+  }
+
+  assert {
+    condition     = module.redis.slow_log_kms_key_arn == "arn:aws:kms:ap-south-1:444455556666:key/00000000-0000-0000-0000-000000000109"
+    error_message = "The Valkey slow-log group uses the logs CMK: the data key does not grant CloudWatch Logs, so CreateLogGroup would fail."
   }
 }
 
@@ -523,4 +536,141 @@ run "graviton_pdf_capacity_needs_arm64_everywhere" {
   }
 
   expect_failures = [var.pdf_worker]
+}
+
+# Claude safety lock (docs/10 §11): every app container gets SOS_ANTHROPIC_ZDR_CONFIRMED, false
+# unless the operator confirms the Anthropic ZDR agreement and DPA.
+run "anthropic_zdr_confirmation_defaults_to_false" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for c in [module.api.container_definition, module.worker.container_definition, module.worker_pdf.container_definition, module.beat.container_definition, module.migrate.container_definition] :
+      [for e in c.environment : e.value if e.name == "SOS_ANTHROPIC_ZDR_CONFIRMED"] == ["false"]
+    ])
+    error_message = "Every app container gets SOS_ANTHROPIC_ZDR_CONFIRMED=false by default."
+  }
+}
+
+run "anthropic_zdr_confirmation_when_set" {
+  command = plan
+
+  variables {
+    anthropic_zdr_confirmed = true
+  }
+
+  assert {
+    condition     = [for e in module.api.container_definition.environment : e.value if e.name == "SOS_ANTHROPIC_ZDR_CONFIRMED"] == ["true"]
+    error_message = "anthropic_zdr_confirmed = true reaches the api."
+  }
+}
+
+# Public marketing site (docs/17 §5.6): web task only, empty (hidden) by default, not secrets.
+run "public_site_settings_reach_only_the_web_task" {
+  command = plan
+
+  variables {
+    public_contact_email   = "hello@example.test"
+    public_company_name    = "Synthetic Company Private Limited"
+    public_company_address = "1 Synthetic Road|Vijayawada 520001"
+    public_whatsapp_number = "+919000000000"
+  }
+
+  assert {
+    condition = (
+      [for e in module.web.container_definition.environment : e.value if e.name == "SOS_PUBLIC_CONTACT_EMAIL"] == ["hello@example.test"]
+      && [for e in module.web.container_definition.environment : e.value if e.name == "SOS_PUBLIC_WHATSAPP_NUMBER"] == ["+919000000000"]
+      && [for e in module.web.container_definition.environment : e.value if e.name == "SOS_PUBLIC_COMPANY_ADDRESS"] == ["1 Synthetic Road|Vijayawada 520001"]
+    )
+    error_message = "The web task gets the public site settings."
+  }
+
+  assert {
+    condition = alltrue([
+      for c in [module.api.container_definition, module.worker.container_definition, module.beat.container_definition, module.migrate.container_definition] :
+      length([for e in c.environment : e.name if startswith(e.name, "SOS_PUBLIC_")]) == 0
+    ])
+    error_message = "Only the web task gets SOS_PUBLIC_* settings."
+  }
+}
+
+run "public_site_settings_are_empty_by_default" {
+  command = plan
+
+  assert {
+    condition     = [for e in module.web.container_definition.environment : e.value if e.name == "SOS_PUBLIC_WHATSAPP_NUMBER"] == [""]
+    error_message = "Unset public site settings are empty (hidden)."
+  }
+}
+
+run "whatsapp_number_with_spaces_refused" {
+  command = plan
+
+  variables {
+    public_whatsapp_number = "+91 90000 00000"
+  }
+
+  expect_failures = [var.public_whatsapp_number]
+}
+
+run "whatsapp_number_with_leading_zero_refused" {
+  command = plan
+
+  variables {
+    public_whatsapp_number = "09000000000"
+  }
+
+  expect_failures = [var.public_whatsapp_number]
+}
+
+run "contact_email_with_query_refused" {
+  command = plan
+
+  variables {
+    public_contact_email = "hello@example.test?subject=hi"
+  }
+
+  expect_failures = [var.public_contact_email]
+}
+
+# Audit W3-06: the internet-facing api cannot tag (sos-lifecycle=discarded / export-7d) or delete any
+# school file; only the worker discards. worker-pdf may only tag its own exports export-7d.
+run "api_role_cannot_tag_or_delete_school_files" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for s in data.aws_iam_policy_document.api.statement : length(setintersection(toset(s.actions), toset([
+        "s3:DeleteObject", "s3:DeleteObjectVersion", "s3:PutObjectTagging", "s3:PutObjectVersionTagging",
+        "s3:DeleteObjectTagging", "s3:*", "s3:Delete*", "s3:Put*", "*",
+      ]))) == 0 || alltrue([for r in s.resources : !strcontains(r, "/t/")])
+    ])
+    error_message = "The api task role must not tag or delete under files/t/* (W3-06)."
+  }
+
+  assert {
+    condition = anytrue([
+      for s in data.aws_iam_policy_document.worker.statement :
+      s.sid == "FilesDiscard" && toset(s.actions) == toset(["s3:DeleteObject", "s3:PutObjectTagging", "s3:PutObjectVersionTagging"]) && toset(s.resources) == toset(["arn:aws:s3:::sos-staging-files-444455556666/t/*"])
+    ])
+    error_message = "The worker task role discards (tag + delete) under files/t/*."
+  }
+
+  assert {
+    condition = alltrue([
+      for s in data.aws_iam_policy_document.worker_pdf.statement :
+      !contains(s.actions, "s3:DeleteObject") && !contains(s.actions, "s3:PutObjectVersionTagging")
+    ])
+    error_message = "worker-pdf never deletes school files nor tags older versions."
+  }
+
+  assert {
+    condition = anytrue([
+      for s in data.aws_iam_policy_document.worker_pdf.statement :
+      s.sid == "ExportLifecycleTag" && toset(s.actions) == toset(["s3:PutObjectTagging"])
+      && toset(s.resources) == toset(["arn:aws:s3:::sos-staging-files-444455556666/t/*/exports/*"])
+      && anytrue([for c in s.condition : c.test == "StringEquals" && c.variable == "s3:RequestObjectTag/sos-lifecycle" && toset(c.values) == toset(["export-7d"])])
+    ])
+    error_message = "worker-pdf may set only sos-lifecycle=export-7d, only on t/*/exports/*."
+  }
 }

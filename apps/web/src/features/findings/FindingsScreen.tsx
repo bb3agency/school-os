@@ -126,19 +126,21 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
   const columns: Column<Finding>[] = [
     {
       key: "severity",
+      stack: "field",
       header: t("colSeverity"),
       cell: (row) => <SeverityBadge severity={row.severity} />,
     },
     {
       key: "student",
+      stack: "title",
       header: t("colStudent"),
       cell: (row) => (
         <span className="block min-w-36">
-          <span className="block font-medium">
+          <span className="block font-semibold">
             <Value>{row.student.display_name}</Value>
           </span>
           {row.student.admission_no ? (
-            <span className="block font-mono text-xs whitespace-nowrap text-ink-muted">
+            <span className="block max-w-56 font-mono text-xs break-all text-ink-muted">
               {t("admissionNo", { number: row.student.admission_no })}
             </span>
           ) : null}
@@ -156,7 +158,12 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
         </span>
       ),
     },
-    { key: "values", header: t("colValues"), cell: (row) => <FindingValues values={row.values} /> },
+    {
+      key: "values",
+      header: t("colValues"),
+      className: "min-w-44",
+      cell: (row) => <FindingValues values={row.values} />,
+    },
     {
       key: "explanation",
       header: t("colExplanation"),
@@ -182,12 +189,13 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
     },
     {
       key: "open",
+      stack: "actions",
       header: tc("actions"),
       className: "print:hidden",
       cell: (row) => (
         <Link
           href={`/findings/${row.id}`}
-          className="inline-flex items-center gap-1 font-medium whitespace-nowrap text-primary underline-offset-4 hover:underline"
+          className="inline-flex items-center gap-1 font-semibold whitespace-nowrap text-primary underline-offset-4 hover:underline"
         >
           {t("openFinding")}
           <span className="sr-only">
@@ -225,7 +233,7 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
         breadcrumb={[{ label: t("crumbHome"), href: "/" }, { label: t("title") }]}
         actions={
           <>
-            {can("dq.findings.read") ? (
+            {can("dq.findings.resolve") ? (
               <RunChecksDialog defaultProfile={filters.profileKey} />
             ) : null}
             <Button variant="secondary" onClick={() => window.print()}>
@@ -311,7 +319,7 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
               ]}
             />
             <fieldset className="space-y-1">
-              <legend className="mb-1 text-sm font-medium text-ink">{t("filterStatus")}</legend>
+              <legend className="mb-1 text-sm font-semibold text-ink">{t("filterStatus")}</legend>
               <div className="flex min-h-10 flex-wrap items-center gap-x-4">
                 {FINDING_STATUSES.map((status) => (
                   <Checkbox
@@ -374,6 +382,7 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
 
       {state.status !== "ready" ? (
         <DataTable
+          stacked
           caption={t("title")}
           captionHidden
           columns={columns}
@@ -391,6 +400,7 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
           >
             {blockers.length > 0 ? (
               <DataTable
+                stacked
                 caption={t("blockersCaption")}
                 captionHidden
                 columns={columns}
@@ -405,6 +415,7 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
           <Card title={t("warningsTitle", { count: others.length })}>
             {others.length > 0 ? (
               <DataTable
+                stacked
                 caption={t("warningsCaption")}
                 captionHidden
                 columns={columns}

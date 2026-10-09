@@ -11,6 +11,7 @@ import uuid
 from typing import Annotated, Any, Literal, Self
 
 from pydantic import (
+    AfterValidator,
     BaseModel,
     BeforeValidator,
     ConfigDict,
@@ -49,6 +50,21 @@ ClassCode = Annotated[
     str, BeforeValidator(nfc), StringConstraints(pattern=r"^[A-Z0-9][A-Z0-9_-]{0,15}$")
 ]
 YearLabel = Annotated[str, BeforeValidator(nfc), StringConstraints(pattern=r"^\d{4}-\d{2}$")]
+
+# School calendar dates (academic years, enrolments): years 2000-2999 only. A date at the edge
+# of the calendar (year 1 or 9999) reached the date maths and the database unchecked (audit
+# 2026-10-06 hardening; the same bounds as the billing dates of R-13).
+_SCHOOL_YEARS = (2000, 2999)
+
+
+def _school_year(value: dt.date) -> dt.date:
+    if not _SCHOOL_YEARS[0] <= value.year <= _SCHOOL_YEARS[1]:
+        raise ValueError(f"must be between the years {_SCHOOL_YEARS[0]} and {_SCHOOL_YEARS[1]}")
+    return value
+
+
+SchoolDate = Annotated[dt.date, AfterValidator(_school_year)]
+
 SortOrder = Annotated[int, Field(ge=0, le=10000)]
 
 TenantStatus = Literal["provisioning", "active", "suspended", "offboarding", "deleted"]
@@ -153,8 +169,8 @@ def _check_year(label: str | None, starts_on: dt.date | None, ends_on: dt.date |
 
 class AcademicYearCreate(_In):
     label: YearLabel
-    starts_on: dt.date
-    ends_on: dt.date
+    starts_on: SchoolDate
+    ends_on: SchoolDate
     is_current: bool = False
 
     @model_validator(mode="after")
@@ -165,8 +181,8 @@ class AcademicYearCreate(_In):
 
 class AcademicYearUpdate(_In):
     label: YearLabel | None = None
-    starts_on: dt.date | None = None
-    ends_on: dt.date | None = None
+    starts_on: SchoolDate | None = None
+    ends_on: SchoolDate | None = None
 
     @model_validator(mode="after")
     def _consistent(self) -> Self:

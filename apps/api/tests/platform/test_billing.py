@@ -6,9 +6,11 @@ Invoice numbering is exercised in far-future financial years so each test owns i
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import threading
+import unicodedata
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from decimal import Decimal
 from typing import Any
 
@@ -18,7 +20,7 @@ from sqlalchemy import Engine, text
 from app.core.db import platform_session
 from app.core.errors import Conflict
 from app.platform import billing
-from app.platform.common import config
+from app.platform.common import config, today_ist
 from app.platform.schemas import InvoiceLineIn, PaymentIn
 
 from .conftest import (
@@ -142,14 +144,24 @@ def test_FR_PLT_010_plans_are_versioned_and_frozen(api: Api, billing_admin: Oper
     v1 = api.call("POST", "/plans", billing_admin, json=body).json()
     assert (v1["version"], v1["status"], v1["sac_code"]) == (1, "draft", "998314")
     patched = api.call(
-        "PATCH", f"/plans/{v1['id']}", billing_admin, json={"base_price_inr": "4200.00"}
+        "PATCH",
+        f"/plans/{v1['id']}",
+        billing_admin,
+        json={"base_price_inr": "4200.00"},
+        headers={"If-Match": f'"{v1["row_version"]}"'},
     )
     assert patched.json()["base_price_inr"] == "4200.00"
     assert (
         api.call("POST", f"/plans/{v1['id']}/publish", billing_admin).json()["status"]
         == "published"
     )
-    frozen = api.call("PATCH", f"/plans/{v1['id']}", billing_admin, json={"base_price_inr": "1.00"})
+    frozen = api.call(
+        "PATCH",
+        f"/plans/{v1['id']}",
+        billing_admin,
+        json={"base_price_inr": "1.00"},
+        headers={"If-Match": patched.headers["ETag"]},
+    )
     assert (frozen.status_code, frozen.json()["code"]) == (409, "plan_published")
     v2 = api.call("POST", "/plans", billing_admin, json=body).json()
     assert v2["version"] == 2
@@ -160,6 +172,53 @@ def test_FR_PLT_010_plans_are_versioned_and_frozen(api: Api, billing_admin: Oper
     assert (
         api.call("POST", "/plans", billing_admin, json=per_student_missing_price).status_code == 422
     )
+
+
+def test_FR_PLT_010_draft_edit_checks_the_row_version(api: Api, billing_admin: Operator) -> None:
+    """Owner decision 2026-10-04: PATCH a draft plan takes If-Match (required since AA-13, like
+    every platform edit); a stale ETag gets 412 and changes nothing. ``row_version`` is the edit
+    counter, separate from the catalogue ``version`` (code + version)."""
+    body = {"code": f"etag-{uuid.uuid4().hex[:8]}", "name": "Synthetic", "base_price_inr": "10.00"}
+    created = api.call("POST", "/plans", billing_admin, json=body)
+    plan = created.json()
+    assert (plan["version"], plan["row_version"]) == (1, 1)
+    path = f"/plans/{plan['id']}"
+    read = api.call("GET", path, billing_admin)
+    assert read.headers["ETag"] == '"1"'
+
+    first = api.call(
+        "PATCH", path, billing_admin, json={"name": "First"}, headers={"If-Match": '"1"'}
+    )
+    assert first.status_code == 200, first.text
+    assert (first.json()["row_version"], first.json()["version"]) == (2, 1)
+    assert first.headers["ETag"] == '"2"'
+
+    stale = api.call(
+        "PATCH", path, billing_admin, json={"name": "Stale"}, headers={"If-Match": '"1"'}
+    )
+    assert (stale.status_code, stale.json()["code"]) == (412, "precondition_failed")
+    assert api.call("GET", path, billing_admin).json()["name"] == "First"
+
+    weak = api.call(
+        "PATCH", path, billing_admin, json={"name": "Second"}, headers={"If-Match": 'W/"2"'}
+    )
+    assert weak.json()["row_version"] == 3
+    # Without If-Match the edit is refused and nothing changes (audit 2026-10-04 AA-13).
+    blind = api.call("PATCH", path, billing_admin, json={"name": "Third"})
+    assert (blind.status_code, blind.json()["code"]) == (400, "if_match_required")
+    assert api.call("GET", path, billing_admin).json()["row_version"] == 3
+    third = api.call(
+        "PATCH", path, billing_admin, json={"name": "Third"}, headers={"If-Match": '"3"'}
+    )
+    assert (third.status_code, third.json()["row_version"]) == (200, 4)
+    bad = api.call("PATCH", path, billing_admin, json={"name": "X"}, headers={"If-Match": "abc"})
+    assert (bad.status_code, bad.json()["code"]) == (400, "bad_if_match")
+    # Publishing freezes the plan; a stale or current ETag cannot reopen it.
+    assert api.call("POST", f"{path}/publish", billing_admin).status_code == 200
+    frozen = api.call(
+        "PATCH", path, billing_admin, json={"name": "Late"}, headers={"If-Match": '"4"'}
+    )
+    assert (frozen.status_code, frozen.json()["code"]) == (409, "plan_published")
 
 
 # --- invoices ---------------------------------------------------------------------------------
@@ -251,13 +310,25 @@ def test_FR_PLT_015_draft_edit_issue_and_immutability(
             {"kind": "discount", "description": "Pilot discount", "unit_price_inr": "100.00"},
         ]
     }
-    res = api.call("PATCH", f"/invoices/{draft['id']}", billing_admin, json=lines)
+    res = api.call(
+        "PATCH",
+        f"/invoices/{draft['id']}",
+        billing_admin,
+        json=lines,
+        headers={"If-Match": f'"{draft["version"]}"'},
+    )
     assert res.status_code == 200, res.text
     assert (res.json()["taxable_value_inr"], res.json()["total_inr"]) == ("900.00", "1062.00")
     issued = api.call("POST", f"/invoices/{draft['id']}/issue", billing_admin)
     assert issued.status_code == 200, issued.text
     assert issued.json()["status"] == "issued"
-    again = api.call("PATCH", f"/invoices/{draft['id']}", billing_admin, json=lines)
+    again = api.call(
+        "PATCH",
+        f"/invoices/{draft['id']}",
+        billing_admin,
+        json=lines,
+        headers={"If-Match": issued.headers.get("ETag", f'"{issued.json()["version"]}"')},
+    )
     assert (again.status_code, again.json()["code"]) == (409, "invoice_issued")
     assert api.call("DELETE", f"/invoices/{draft['id']}", billing_admin).status_code == 409
 
@@ -311,6 +382,104 @@ def test_FR_PLT_018_partial_payments_tds_and_reversal(
     assert void.status_code == 409  # partly paid invoices are not voided
 
 
+def test_FR_PLT_018_invoice_payments_list_newest_first_with_reversal_fields(
+    api: Api,
+    billing_admin: Operator,
+    owner: Operator,
+    make_operator: MakeOperator,
+    make_plan: Callable[..., uuid.UUID],
+) -> None:
+    sub = _school(api, owner, make_plan(base_price_inr="5000.00"))["subscription_id"]
+    inv_id = _drafts(sub)[0]["id"]
+    api.call("POST", f"/invoices/{inv_id}/issue", billing_admin)
+    empty = api.call("GET", f"/invoices/{inv_id}/payments", billing_admin)
+    assert (empty.status_code, empty.json()) == (200, [])
+
+    early = {
+        "method": "cheque",
+        "amount_inr": "1000.00",
+        "received_on": "2026-09-10",
+        "reference": f"CHQ-{letters(8)}",
+    }
+    late = {
+        "method": "upi",
+        "amount_inr": "2000.00",
+        "tds_inr": "100.00",
+        "received_on": "2026-09-20",
+        "reference": f"UPI-{letters(10)}",
+        "notes": "Second instalment",
+    }
+    first = api.call("POST", f"/invoices/{inv_id}/payments", billing_admin, json=early)
+    second = api.call("POST", f"/invoices/{inv_id}/payments", billing_admin, json=late)
+    assert (first.status_code, second.status_code) == (201, 201), first.text + second.text
+    rev = api.call(
+        "POST",
+        f"/payments/{first.json()['id']}/reverse",
+        billing_admin,
+        json={"reason": "Cheque bounced at the bank"},
+    )
+    assert rev.status_code == 200, rev.text
+    reversed_out = rev.json()
+    assert reversed_out["status"] == "reversed"
+    assert reversed_out["reversed_by"] == str(billing_admin.id)
+    assert reversed_out["reversed_by_name"] == "Synthetic Operator"
+    assert reversed_out["reversal_reason"] == "Cheque bounced at the bank"
+    assert reversed_out["reversed_at"] is not None
+    again = api.call(
+        "POST",
+        f"/payments/{first.json()['id']}/reverse",
+        billing_admin,
+        json={"reason": "Cheque bounced at the bank"},
+    )
+    assert (again.status_code, again.json()["code"]) == (409, "invalid_state")
+
+    viewer = make_operator("platform_viewer")
+    res = api.call("GET", f"/invoices/{inv_id}/payments", viewer)
+    assert res.status_code == 200, res.text
+    rows = res.json()
+    assert [r["id"] for r in rows] == [second.json()["id"], first.json()["id"]]
+    newest, oldest = rows
+    assert newest["status"] == "recorded"
+    assert (newest["amount_inr"], newest["tds_inr"], newest["method"]) == (
+        "2000.00",
+        "100.00",
+        "upi",
+    )
+    assert (newest["received_on"], newest["reference"]) == ("2026-09-20", late["reference"])
+    assert newest["notes"] == "Second instalment"
+    assert newest["recorded_by"] == str(billing_admin.id)
+    assert newest["recorded_by_name"] == "Synthetic Operator"
+    assert newest["recorded_at"] is not None
+    assert (newest["reversed_at"], newest["reversed_by"], newest["reversal_reason"]) == (
+        None,
+        None,
+        None,
+    )
+    assert newest["reversed_by_name"] is None
+    assert oldest["status"] == "reversed"
+    assert oldest["reversed_by"] == str(billing_admin.id)
+    assert oldest["reversed_by_name"] == "Synthetic Operator"
+    assert oldest["reversal_reason"] == "Cheque bounced at the bank"
+    assert oldest["reversed_at"] is not None
+
+    inv = api.call("GET", f"/invoices/{inv_id}", viewer).json()
+    assert (inv["status"], inv["amount_paid_inr"], inv["balance_due_inr"]) == (
+        "issued",
+        "2000.00",
+        "3800.00",
+    )
+
+
+def test_FR_PLT_018_invoice_payments_unknown_invoice_and_forbidden_role(
+    api: Api, billing_admin: Operator, make_operator: MakeOperator
+) -> None:
+    missing = api.call("GET", f"/invoices/{uuid.uuid4()}/payments", billing_admin)
+    assert (missing.status_code, missing.json()["code"]) == (404, "not_found")
+    support = make_operator("support_agent")  # no platform.invoices.read
+    denied = api.call("GET", f"/invoices/{uuid.uuid4()}/payments", support)
+    assert denied.status_code == 403
+
+
 def test_FR_PLT_019_void_keeps_number(
     api: Api, billing_admin: Operator, owner: Operator, make_plan: Callable[..., uuid.UUID]
 ) -> None:
@@ -353,6 +522,176 @@ def _issue_overdue(owner: Operator, sub: str, issue_day: dt.date) -> str:
     inv_id = _drafts(sub)[0]["id"]
     billing.issue_invoice(owner.actor, inv_id, today=issue_day)
     return str(inv_id)
+
+
+def test_FR_PLT_004_lifting_a_security_hold_does_not_lift_a_billing_suspension(
+    api: Api,
+    owner: Operator,
+    make_operator: MakeOperator,
+    make_plan: Callable[..., uuid.UUID],
+    admin_engine: Engine,
+) -> None:
+    """Audit 2026-10-05 A-08: a school already suspended for security keeps its reason when its
+    subscription is suspended for non-payment later; an engineer's reactivate then made it live
+    while the subscription stayed suspended (no new invoices, nothing past due)."""
+    engineer, billing_admin = make_operator("platform_engineer"), make_operator("billing_admin")
+    school = _school(api, owner, make_plan())
+    sub, tid = school["subscription_id"], school["tenant_id"]
+    api.call("POST", f"/tenants/{tid}/activate", owner)
+    _issue_overdue(owner, sub, dt.date(2026, 1, 5))
+    billing.mark_past_due(today=dt.date(2026, 2, 1))
+    hold = {"reason": "Security incident reported by the school"}
+    assert api.call("POST", f"/tenants/{tid}/suspend", engineer, json=hold).status_code == 200
+    billing.suspend_subscription(
+        billing_admin.actor,
+        uuid.UUID(sub),
+        "Unpaid for two months",
+        actor_is_owner=False,
+        exam_window_override=False,
+        today=dt.date(2026, 2, 16),
+    )
+    # Audit 2026-10-06 R-18: lifting the hold succeeds but leaves the billing suspension.
+    res = api.call("POST", f"/tenants/{tid}/reactivate", engineer, json=hold)
+    assert res.status_code == 200, res.text
+    assert (res.json()["tenant_status"], res.json()["security_hold"]) == ("suspended", False)
+    assert res.json()["tenant_status_reason"] == "billing"
+    assert _core_status(admin_engine, tid) == "suspended"
+    # With only the billing suspension left, reactivation is refused (A-08).
+    again = api.call("POST", f"/tenants/{tid}/reactivate", engineer, json=hold)
+    assert (again.status_code, again.json()["code"]) == (409, "billing_suspension")
+    assert _core_status(admin_engine, tid) == "suspended"
+
+
+def _core_status(admin: Engine, tid: str) -> Any:
+    with admin.connect() as c:
+        return c.execute(text("SELECT status FROM core.tenants WHERE id = :t"), {"t": tid}).scalar()
+
+
+def _platform_actions(tid: str) -> list[str]:
+    with platform_session() as s:
+        return list(
+            s.execute(
+                text(
+                    "SELECT action FROM platform.audit_events "
+                    "WHERE subject_tenant_id = :t ORDER BY seq"
+                ),
+                {"t": tid},
+            ).scalars()
+        )
+
+
+def _billing_suspended_school(api: Api, owner: Operator, plan: uuid.UUID) -> tuple[str, str, str]:
+    """A live school with an overdue invoice, past due since 2026-02-01 (grace ends 02-16)."""
+    school = _school(api, owner, plan)
+    sub, tid = school["subscription_id"], school["tenant_id"]
+    api.call("POST", f"/tenants/{tid}/activate", owner)
+    inv = _issue_overdue(owner, sub, dt.date(2026, 1, 5))
+    billing.mark_past_due(today=dt.date(2026, 2, 1))
+    return sub, tid, inv
+
+
+def _suspend_for_billing(billing_admin: Operator, sub: str) -> None:
+    billing.suspend_subscription(
+        billing_admin.actor,
+        uuid.UUID(sub),
+        "Unpaid for two months",
+        actor_is_owner=False,
+        exam_window_override=False,
+        today=dt.date(2026, 2, 16),
+    )
+
+
+def _pay_and_reactivate(api: Api, billing_admin: Operator, sub: str, inv: str) -> None:
+    due = api.call("GET", f"/invoices/{inv}", billing_admin).json()["balance_due_inr"]
+    billing.record_payment(
+        billing_admin.actor,
+        uuid.UUID(inv),
+        PaymentIn(
+            method="cheque",
+            amount_inr=D(due),
+            received_on=dt.date(2026, 2, 19),
+            reference="CHQ-R18-0001",
+        ),
+        today=dt.date(2026, 2, 20),
+    )
+    back = billing.reactivate_subscription(
+        billing_admin.actor, uuid.UUID(sub), today=dt.date(2026, 2, 20)
+    )
+    assert back.status == "active"
+
+
+def test_R_18_security_hold_on_a_billing_suspended_school_is_independent(
+    api: Api,
+    owner: Operator,
+    make_operator: MakeOperator,
+    make_plan: Callable[..., uuid.UUID],
+    admin_engine: Engine,
+) -> None:
+    """Audit 2026-10-06 R-18: an operator can hold a school that is already suspended for
+    billing; lifting the hold keeps the billing suspension, and paying keeps nothing else."""
+    engineer, billing_admin = make_operator("platform_engineer"), make_operator("billing_admin")
+    sub, tid, inv = _billing_suspended_school(api, owner, make_plan())
+    _suspend_for_billing(billing_admin, sub)
+    assert _core_status(admin_engine, tid) == "suspended"
+
+    hold = {"reason": "Security incident reported by the school"}
+    placed = api.call("POST", f"/tenants/{tid}/suspend", engineer, json=hold)
+    assert placed.status_code == 200, placed.text
+    body = placed.json()
+    assert (body["tenant_status"], body["security_hold"]) == ("suspended", True)
+    twice = api.call("POST", f"/tenants/{tid}/suspend", engineer, json=hold)
+    assert (twice.status_code, twice.json()["code"]) == (409, "already_on_hold")
+
+    lifted = api.call("POST", f"/tenants/{tid}/reactivate", engineer, json=hold)
+    assert lifted.status_code == 200, lifted.text
+    assert (lifted.json()["tenant_status"], lifted.json()["security_hold"]) == (
+        "suspended",
+        False,
+    )
+    assert lifted.json()["tenant_status_reason"] == "billing"
+    assert _core_status(admin_engine, tid) == "suspended"
+
+    _pay_and_reactivate(api, billing_admin, sub, inv)
+    assert _core_status(admin_engine, tid) == "active"
+    actions = _platform_actions(tid)
+    assert "tenant.security_hold_placed" in actions
+    assert "tenant.security_hold_lifted" in actions
+    with admin_engine.connect() as c:
+        school_chain: set[str] = set(
+            c.execute(
+                text("SELECT action FROM audit.events WHERE tenant_id = :t"), {"t": tid}
+            ).scalars()
+        )
+    assert {"tenant.security_hold_placed", "tenant.security_hold_lifted"} <= school_chain
+
+
+def test_R_18_paying_the_bill_while_held_keeps_the_hold(
+    api: Api,
+    owner: Operator,
+    make_operator: MakeOperator,
+    make_plan: Callable[..., uuid.UUID],
+    admin_engine: Engine,
+) -> None:
+    engineer, billing_admin = make_operator("platform_engineer"), make_operator("billing_admin")
+    sub, tid, inv = _billing_suspended_school(api, owner, make_plan())
+    hold = {"reason": "Abuse report under investigation"}
+    placed = api.call("POST", f"/tenants/{tid}/suspend", engineer, json=hold)
+    assert placed.status_code == 200, placed.text
+    assert placed.json()["security_hold"] is True
+    _suspend_for_billing(billing_admin, sub)
+
+    _pay_and_reactivate(api, billing_admin, sub, inv)
+    detail = api.call("GET", f"/tenants/{tid}", engineer).json()
+    assert (detail["tenant_status"], detail["security_hold"]) == ("suspended", True)
+    assert _core_status(admin_engine, tid) == "suspended"
+
+    lifted = api.call("POST", f"/tenants/{tid}/reactivate", engineer, json=hold)
+    assert lifted.status_code == 200, lifted.text
+    assert (lifted.json()["tenant_status"], lifted.json()["security_hold"]) == ("active", False)
+    assert _core_status(admin_engine, tid) == "active"
+    actions = _platform_actions(tid)
+    assert actions.index("tenant.suspended") < actions.index("subscription.suspended")
+    assert actions[-1] == "tenant.reactivated"
 
 
 def test_FR_PLT_014_overdue_sweep_marks_past_due_and_never_suspends(
@@ -490,6 +829,58 @@ def test_FR_PLT_014_exam_window_needs_platform_owner(
     assert out.status == "suspended"
 
 
+def test_AA_16_a_security_suspension_is_immediate_inside_an_exam_window(
+    api: Api,
+    owner: Operator,
+    make_operator: MakeOperator,
+    make_plan: Callable[..., uuid.UUID],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Owner decision 2026-10-07 (audit 2026-10-04 AA-16): the exam-window protection covers
+    billing suspensions only. A security hold (incident, abuse, the school's request) is never
+    delayed by a window and needs no platform_owner approval; it is audited with its reason
+    stored on the school."""
+    engineer = make_operator("platform_engineer")
+    tid = _school(api, owner, make_plan())["tenant_id"]
+    assert api.call("POST", f"/tenants/{tid}/activate", owner).status_code == 200
+    today = dt.datetime.now(dt.UTC).date()
+    monkeypatch.setitem(
+        config()["billing"],
+        "protected_windows",
+        [
+            {
+                "name": "SSC public exams",
+                "boards": ["SSC"],
+                "start": (today - dt.timedelta(days=3)).isoformat(),
+                "end": (today + dt.timedelta(days=3)).isoformat(),
+            }
+        ],
+    )
+    assert billing.in_protected_window(["SSC"], today_ist()) == "SSC public exams"
+    reason = "Security incident reported by the school"
+    res = api.call("POST", f"/tenants/{tid}/suspend", engineer, json={"reason": reason})
+    assert res.status_code == 200, res.text
+    assert res.json()["tenant_status"] == "suspended"
+    with platform_session() as s:
+        stored = s.execute(
+            text(
+                "SELECT tenant_status_reason, security_hold FROM platform.deployments "
+                "WHERE tenant_id = :t"
+            ),
+            {"t": uuid.UUID(tid)},
+        ).one()
+        event = s.execute(
+            text(
+                "SELECT actor_id, summary FROM platform.audit_events WHERE resource_id = :t "
+                "AND action = 'tenant.suspended' ORDER BY seq DESC LIMIT 1"
+            ),
+            {"t": uuid.UUID(tid)},
+        ).one()
+    assert (stored.tenant_status_reason, stored.security_hold) == (reason, True)
+    assert event.actor_id == engineer.id
+    assert (event.summary["from"], event.summary["to"]) == ("active", "suspended")
+
+
 def test_FR_PLT_012_plan_change_applies_next_period_and_cancel_at_period_end(
     api: Api, owner: Operator, billing_admin: Operator, make_plan: Callable[..., uuid.UUID]
 ) -> None:
@@ -532,6 +923,116 @@ def test_FR_PLT_011_trial_activate_and_extend(
     assert act.json()["status"] == "active"
     assert len(_drafts(sub)) == 1
     assert api.call("POST", f"/subscriptions/{sub}/activate", billing_admin).status_code == 409
+
+
+def test_FR_PLT_013_negotiated_price_returns_its_reason(
+    api: Api,
+    owner: Operator,
+    billing_admin: Operator,
+    make_operator: MakeOperator,
+    make_plan: Callable[..., uuid.UUID],
+) -> None:
+    """docs/16 §5.3: the subscription shows the negotiated price and its reason (operators)."""
+    sub = _school(api, owner, make_plan())["subscription_id"]
+    assert api.call("GET", f"/subscriptions/{sub}", billing_admin).json()["override_reason"] is None
+    reason = "Pilot school, price agreed in writing (ref SS/2026/3)"
+    etag = api.call("GET", f"/subscriptions/{sub}", billing_admin).headers["ETag"]
+    res = api.call(
+        "PUT",
+        f"/subscriptions/{sub}/price-override",
+        billing_admin,
+        json={"price_override_inr": "3999.00", "reason": reason},
+        headers={"If-Match": etag},
+    )
+    assert res.status_code == 200, res.text
+    assert (res.json()["price_override_inr"], res.json()["override_reason"]) == ("3999.00", reason)
+    viewer = make_operator("platform_viewer")
+    read = api.call("GET", f"/subscriptions/{sub}", viewer).json()
+    assert (read["price_override_inr"], read["override_reason"]) == ("3999.00", reason)
+    listed = api.call("GET", "/subscriptions", viewer).json()["data"]
+    assert next(row for row in listed if row["id"] == sub)["override_reason"] == reason
+    cleared = api.call(
+        "DELETE",
+        f"/subscriptions/{sub}/price-override",
+        billing_admin,
+        headers={"If-Match": res.headers["ETag"]},
+    ).json()
+    assert (cleared["price_override_inr"], cleared["override_reason"]) == (None, None)
+
+
+def _reason_digest(reason: str) -> str:
+    raw = hashlib.sha256(unicodedata.normalize("NFC", reason).encode()).hexdigest()
+    return raw.translate(str.maketrans("0123456789abcdef", "abcdefghijklmnop"))
+
+
+def test_AA_hardening_every_price_override_event_keeps_amounts_and_binds_its_reason(
+    api: Api, owner: Operator, billing_admin: Operator, make_plan: Callable[..., uuid.UUID]
+) -> None:
+    """Api-auth audit 2026-10-04, hardening note: the reason lived only on the subscription row,
+    so a change lost the earlier one. Each set, change and clear now records the plan, the
+    previous and new amounts and a SHA-256 of the previous and new reasons (the chain holds ids,
+    codes and amounts only, never free text: docs/05 §5, docs/16 §16)."""
+    plan_id = make_plan()
+    plan = str(plan_id)
+    sub = _school(api, owner, plan_id)["subscription_id"]
+    path = f"/subscriptions/{sub}/price-override"
+    first, second = "Pilot school, agreed in writing (SS/1)", "Second year discount (SS/2)"
+    one = api.call(
+        "PUT",
+        path,
+        billing_admin,
+        json={"price_override_inr": "3999.00", "reason": first},
+        headers=api.if_match(f"/subscriptions/{sub}", billing_admin),
+    )
+    two = api.call(
+        "PUT",
+        path,
+        billing_admin,
+        json={"price_override_inr": "3500.00", "reason": second},
+        headers={"If-Match": one.headers["ETag"]},
+    )
+    three = api.call("DELETE", path, billing_admin, headers={"If-Match": two.headers["ETag"]})
+    assert one.status_code == two.status_code == three.status_code == 200
+    with platform_session() as s:
+        rows: Sequence[Any] = (
+            s.execute(
+                text(
+                    "SELECT summary FROM platform.audit_events WHERE resource_id = :s "
+                    "AND action = 'subscription.price_override_set' ORDER BY seq"
+                ),
+                {"s": uuid.UUID(sub)},
+            )
+            .scalars()
+            .all()
+        )
+    assert [dict(r) for r in rows] == [
+        {
+            "change": "set",
+            "plan_id": plan,
+            "previous_price_override_inr": None,
+            "price_override_inr": "3999.00",
+            "previous_reason_sha256": None,
+            "reason_sha256": _reason_digest(first),
+        },
+        {
+            "change": "changed",
+            "plan_id": plan,
+            "previous_price_override_inr": "3999.00",
+            "price_override_inr": "3500.00",
+            "previous_reason_sha256": _reason_digest(first),
+            "reason_sha256": _reason_digest(second),
+        },
+        {
+            "change": "cleared",
+            "plan_id": plan,
+            "previous_price_override_inr": "3500.00",
+            "price_override_inr": None,
+            "previous_reason_sha256": _reason_digest(second),
+            "reason_sha256": None,
+        },
+    ]
+    assert first not in str(rows)
+    assert second not in str(rows)
 
 
 def test_FR_PLT_013_billing_account_gstin_validation_and_etag(
@@ -578,3 +1079,89 @@ def test_FR_PLT_015_invoice_lines_use_plan_sac_and_rate() -> None:
         {"sac_code": "998314", "gst_rate": D("18.00")},
     )
     assert (rows[0]["amount_inr"], rows[0]["sac_code"]) == (D("249.98"), "998314")
+
+
+# --- out-of-range input is a clean 4xx (audit 2026-10-06 R-13, API8) ----------------------------
+
+
+@pytest.mark.parametrize(
+    "field", ["name", "base_price_inr", "trial_days", "limits", "features", "one_time_fee_inr"]
+)
+def test_R_13_plan_patch_refuses_null_for_a_required_field(
+    api: Api, billing_admin: Operator, field: str
+) -> None:
+    """An explicit null for a field the plan always has was written as NULL (500)."""
+    body = {"code": f"nul-{uuid.uuid4().hex[:8]}", "name": "Synthetic", "base_price_inr": "10.00"}
+    plan = api.call("POST", "/plans", billing_admin, json=body).json()
+    res = api.call("PATCH", f"/plans/{plan['id']}", billing_admin, json={field: None})
+    assert res.status_code == 422, res.text
+    assert res.json()["code"] == "validation_error"
+
+
+def test_R_13_plan_student_counts_are_bounded(api: Api, billing_admin: Operator) -> None:
+    """``included_students`` and the plan limits are int4 columns or compared with them: a
+    number past 2**31 was a 500 (numeric value out of range)."""
+    body = {"code": f"big-{uuid.uuid4().hex[:8]}", "name": "Synthetic", "base_price_inr": "10.00"}
+    huge = 2**40
+    res = api.call("POST", "/plans", billing_admin, json=dict(body, included_students=huge))
+    assert res.status_code == 422, res.text
+    plan = api.call("POST", "/plans", billing_admin, json=body).json()
+    res = api.call("PATCH", f"/plans/{plan['id']}", billing_admin, json={"included_students": huge})
+    assert res.status_code == 422, res.text
+    for key in ("students", "staff_users", "storage_gb", "documents", "ai_tokens_month"):
+        res = api.call(
+            "PATCH", f"/plans/{plan['id']}", billing_admin, json={"limits": {key: 2**70}}
+        )
+        assert res.status_code == 422, (key, res.text)
+
+
+def test_R_13_invoice_line_overflow_is_a_422(
+    api: Api, billing_admin: Operator, owner: Operator, make_plan: Callable[..., uuid.UUID]
+) -> None:
+    """quantity x unit price (or the invoice total) past the Numeric(14, 2) columns was a 500."""
+    sub = _school(api, owner, make_plan())["subscription_id"]
+    draft = _drafts(sub)[0]
+    big = {
+        "kind": "subscription",
+        "description": "Synthetic",
+        "quantity": "999999999.000",
+        "unit_price_inr": "999999999999.99",
+    }
+    etag = {"If-Match": f'"{draft["version"]}"'}
+    res = api.call(
+        "PATCH", f"/invoices/{draft['id']}", billing_admin, json={"lines": [big]}, headers=etag
+    )
+    assert res.status_code == 422, res.text
+    many = [dict(big, quantity="1") for _ in range(50)]
+    res = api.call(
+        "PATCH", f"/invoices/{draft['id']}", billing_admin, json={"lines": many}, headers=etag
+    )
+    assert res.status_code == 422, res.text
+
+
+@pytest.mark.parametrize("day", ["9999-12-01", "0001-01-01"])
+def test_R_13_invoice_period_at_the_calendar_edge_is_a_422(
+    api: Api,
+    billing_admin: Operator,
+    owner: Operator,
+    make_plan: Callable[..., uuid.UUID],
+    day: str,
+) -> None:
+    sub = _school(api, owner, make_plan())["subscription_id"]
+    res = api.call(
+        "POST", "/invoices", billing_admin, json={"subscription_id": sub, "period_start": day}
+    )
+    assert res.status_code in (409, 422), res.text
+
+
+def test_R_13_trial_extension_at_the_calendar_edge_is_a_4xx(
+    api: Api, owner: Operator, make_plan: Callable[..., uuid.UUID]
+) -> None:
+    sub = _school(api, owner, make_plan(), start_as="trial")["subscription_id"]
+    res = api.call(
+        "POST",
+        f"/subscriptions/{sub}/extend-trial",
+        owner,
+        json={"trial_ends_at": "9999-12-31T23:00:00Z"},
+    )
+    assert 400 <= res.status_code < 500, res.text

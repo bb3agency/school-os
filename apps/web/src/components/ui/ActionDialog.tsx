@@ -31,6 +31,11 @@ export interface ActionDialogProps<TSchema extends z.ZodType, TResult> {
   triggerVariant?: ButtonVariant;
   triggerSize?: ButtonSize;
   triggerDisabled?: boolean;
+  /**
+   * Hide the trigger but keep the dialog mounted, so a dialog that is open stays open (with its
+   * error) when the thing it acts on becomes read-only behind it.
+   */
+  triggerHidden?: boolean;
   /** Extra accessible description for the trigger (e.g. which row it acts on). */
   triggerDescription?: string;
   title: ReactNode;
@@ -72,6 +77,7 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
   triggerVariant = "secondary",
   triggerSize = "md",
   triggerDisabled = false,
+  triggerHidden = false,
   triggerDescription,
   title,
   description,
@@ -131,12 +137,13 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
         size={triggerSize}
         onClick={show}
         disabled={triggerDisabled}
+        hidden={triggerHidden}
         aria-haspopup="dialog"
-        aria-describedby={triggerDescription ? triggerHintId : undefined}
+        aria-describedby={triggerDescription && !triggerHidden ? triggerHintId : undefined}
       >
         {triggerLabel}
       </Button>
-      {triggerDescription ? (
+      {triggerDescription && !triggerHidden ? (
         <span id={triggerHintId} className="sr-only">
           {triggerDescription}
         </span>
@@ -175,39 +182,43 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
               </div>
             ) : (
               <form noValidate onSubmit={form.onSubmit}>
-                <div className="max-h-[60vh] space-y-4 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">
+                <div className="max-h-[60vh] space-y-4 overflow-y-auto overscroll-contain px-4 py-4 max-sm:max-h-none sm:px-6">
                   {note ? <Alert tone="info">{note}</Alert> : null}
                   {children?.(form.errors)}
                   {stepUp ? <p className="text-sm text-ink-muted">{t("stepUpNote")}</p> : null}
                   <ApiErrorAlert error={form.error} namespace={errorNamespace} />
                 </div>
-                {consequence ? (
-                  <p
-                    id={consequenceId}
-                    className="border-t border-border bg-surface-muted px-4 pt-3 text-sm text-ink sm:px-6 sm:pt-4 sm:text-end"
+                {/* The consequence and the buttons stay together at the bottom while the
+                    body scrolls (docs/17 §5.7). */}
+                <div className="dialog-footer rounded-b-xl border-t border-border bg-surface-muted">
+                  {consequence ? (
+                    <p
+                      id={consequenceId}
+                      className="px-4 pt-3 text-sm text-ink sm:px-6 sm:pt-4 sm:text-end"
+                    >
+                      {consequence}
+                    </p>
+                  ) : null}
+                  <div
+                    className={cn(
+                      "flex flex-wrap justify-end gap-2 px-4 py-3 max-sm:pb-0 max-sm:[&>*]:flex-1 sm:px-6 sm:py-4",
+                      consequence ? "pt-2 sm:pt-3" : undefined,
+                    )}
                   >
-                    {consequence}
-                  </p>
-                ) : null}
-                <div
-                  className={cn(
-                    "flex flex-wrap justify-end gap-2 rounded-b-xl bg-surface-muted px-4 py-3 max-sm:[&>*]:flex-1 sm:px-6 sm:py-4",
-                    consequence ? "pt-2 sm:pt-3" : "border-t border-border",
-                  )}
-                >
-                  <Button variant="secondary" onClick={close}>
-                    {t("cancel")}
-                  </Button>
-                  <Button
-                    type="submit"
-                    variant={confirmVariant}
-                    aria-describedby={consequence ? consequenceId : undefined}
-                    disabled={form.pending}
-                    aria-disabled={form.pending || undefined}
-                    loading={form.pending}
-                  >
-                    {form.pending ? t("working") : confirmLabel}
-                  </Button>
+                    <Button variant="secondary" onClick={close}>
+                      {t("cancel")}
+                    </Button>
+                    <Button
+                      type="submit"
+                      variant={confirmVariant}
+                      aria-describedby={consequence ? consequenceId : undefined}
+                      disabled={form.pending}
+                      aria-disabled={form.pending || undefined}
+                      loading={form.pending}
+                    >
+                      {form.pending ? t("working") : confirmLabel}
+                    </Button>
+                  </div>
                 </div>
               </form>
             )}

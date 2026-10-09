@@ -75,6 +75,9 @@ class Membership(Base):
     status: Mapped[str] = mapped_column(Text, server_default=text("'invited'"))
     expires_at: Mapped[dt.datetime | None]
     mfa_required: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    # The name this school typed when it invited the person (audit A-18). Shown instead of the
+    # account's own name while an invitation to an account shared with another school is open.
+    invited_display_name: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("core.users.id", ondelete="SET NULL")
     )

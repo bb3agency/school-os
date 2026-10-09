@@ -79,12 +79,20 @@ resource "aws_db_parameter_group" "this" {
   }
 }
 
+data "aws_caller_identity" "current" {}
+
+# Confused deputy (audit 2026-10-05 hardening): only for this account's instances.
 data "aws_iam_policy_document" "monitoring_assume" {
   statement {
     actions = ["sts:AssumeRole"]
     principals {
       type        = "Service"
       identifiers = ["monitoring.rds.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
     }
   }
 }

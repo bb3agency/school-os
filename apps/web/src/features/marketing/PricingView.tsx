@@ -156,7 +156,7 @@ export function PricingView({ settings }: { settings: MarketingSettings }) {
               <tbody className="divide-y divide-border">
                 {ROWS.map((row) => (
                   <tr key={row.key}>
-                    <th scope="row" className="px-3 py-4 sm:px-5 text-start font-medium text-ink">
+                    <th scope="row" className="px-3 py-4 sm:px-5 text-start font-semibold text-ink">
                       {t(`pricing.compare.${row.key}`)}
                     </th>
                     <td className="px-3 py-4 sm:px-5">{cell(row.shared)}</td>

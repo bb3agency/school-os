@@ -46,7 +46,9 @@ definer_functions:
   - core.tenant_usage_summary
   - core.current_subscription
   - core.create_owner_invite
-  - core.accept_invitations
+  - core.accept_invitations  # ADR-0019; narrowed and issuer-qualified by 0045 (DL-09)
+  - core.pending_invitations  # ADR-0023 amendment (DL-09): the caller's own open invitations
+  - core.respond_to_invitation  # ADR-0023 amendment (DL-09): accept or decline one of them
   - core.user_membership_count  # ADR-0028: a count for one member of the current school
   - ops.claim_outbox
 

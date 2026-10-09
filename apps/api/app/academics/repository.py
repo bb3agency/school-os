@@ -13,6 +13,7 @@ from typing import Any
 
 from sqlalchemy import func, literal_column, or_, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.academics.models import AttendanceMark, Exam, ExamMark
@@ -62,6 +63,27 @@ def upsert_attendance(session: Session, rows: Sequence[Mapping[str, Any]]) -> tu
     return _written(session, stmt)
 
 
+def marks_in_other_sections(
+    session: Session,
+    section_id: uuid.UUID,
+    student_ids: Collection[uuid.UUID],
+    first: dt.date,
+    last: dt.date,
+) -> set[tuple[uuid.UUID, dt.date]]:
+    """(student, date) pairs between ``first`` and ``last`` already recorded under a section
+    other than ``section_id`` (the section the student was in that day)."""
+    if not student_ids:
+        return set()
+    rows = session.execute(
+        select(AttendanceMark.student_id, AttendanceMark.on_date).where(
+            AttendanceMark.student_id.in_(list(student_ids)),
+            AttendanceMark.on_date.between(first, last),
+            AttendanceMark.section_id != section_id,
+        )
+    ).all()
+    return {(r.student_id, r.on_date) for r in rows}
+
+
 def section_marks(
     session: Session, section_id: uuid.UUID, first: dt.date, last: dt.date
 ) -> list[AttendanceMark]:
@@ -96,10 +118,24 @@ def student_marks(
 # --- exams ----------------------------------------------------------------------------------------
 
 
-def insert_exam(session: Session, values: Mapping[str, Any]) -> Exam:
+# Same name in the same year: exact (0035) or differing only in case (0049, audit 2026-10-06).
+_EXAM_NAME_CONSTRAINTS = frozenset({"exams_name_per_year", "exams_name_per_year_ci"})
+
+
+def insert_exam(session: Session, values: Mapping[str, Any]) -> Exam | None:
+    """The new exam, or ``None`` when a concurrent request created one with the same name
+    (whatever its case) in the same year first (``exams_name_per_year`` /
+    ``exams_name_per_year_ci``; the savepoint keeps the transaction usable)."""
     exam = Exam(tenant_id=current_tenant_id(session), **values)
-    session.add(exam)
-    session.flush()
+    try:
+        with session.begin_nested():
+            session.add(exam)
+            session.flush()
+    except IntegrityError as exc:
+        diag = getattr(exc.orig, "diag", None)
+        if getattr(diag, "constraint_name", None) in _EXAM_NAME_CONSTRAINTS:
+            return None
+        raise
     session.refresh(exam)
     return exam
 

@@ -8,12 +8,15 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-FindingStatus = Literal["open", "resolved", "waived", "reopened"]
+# needs_confirmation (A-01): a blocker a write without evidence removed; unresolved until a
+# dq.findings.waive holder confirms it (POST /dq/findings/{id}/resolve, step-up).
+FindingStatus = Literal["open", "resolved", "waived", "reopened", "needs_confirmation"]
 SeverityName = Literal["blocker", "high", "medium", "low", "info"]
 PROFILE_PATTERN = r"^[a-z0-9][a-z0-9-]{0,63}$"
 RuleId = Literal[
     "DQ-001", "DQ-002", "DQ-003", "DQ-004", "DQ-005", "DQ-006",
     "DQ-007", "DQ-008", "DQ-009", "DQ-010", "DQ-011", "DQ-012",
+    "DQ-021", "DQ-022",
 ]  # fmt: skip
 
 

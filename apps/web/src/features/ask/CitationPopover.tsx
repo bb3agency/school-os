@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useLayoutEffect, useRef, type RefObject } from "react";
+import { useLayoutEffect, useRef, type PointerEvent, type RefObject } from "react";
 import { Pill } from "@/components/ui/Badge";
 import { Link } from "@/i18n/navigation";
 import { parseSource, sourceHref, type AskCitation } from "./answer";
@@ -28,7 +28,7 @@ export default function CitationPopover({
   anchor: RefObject<HTMLElement | null>;
   id: string;
   onPointerEnter: () => void;
-  onPointerLeave: () => void;
+  onPointerLeave: (event: PointerEvent<HTMLSpanElement>) => void;
 }) {
   const t = useTranslations("ask.answer");
   const tt = useTranslations("tally");
@@ -70,7 +70,7 @@ export default function CitationPopover({
           {citation.index}
         </Pill>
         <span className="min-w-0 flex-1 space-y-1">
-          <span className="block font-medium break-anywhere">{name}</span>
+          <span className="block font-semibold break-anywhere">{name}</span>
           {ref?.kind === "doc" && ref.page !== null ? (
             <span className="block text-xs text-ink-muted">{t("page", { page: ref.page })}</span>
           ) : null}
@@ -92,7 +92,7 @@ export default function CitationPopover({
       {ref && href && ref.kind !== "count" ? (
         <Link
           href={href}
-          className="mt-2 inline-flex min-h-6 items-center font-medium text-primary underline underline-offset-4 hover:no-underline"
+          className="mt-2 inline-flex min-h-6 items-center font-semibold text-primary underline underline-offset-4 hover:no-underline"
           aria-label={`${t("openSource")}: ${name} (${ref.kind === "fee" ? tt("sourceOpen") : openLabel(ref, t)})`}
         >
           {t("openSource")}

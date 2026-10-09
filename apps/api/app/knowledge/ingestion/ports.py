@@ -192,6 +192,18 @@ class ContextStore(Protocol):
         ...
 
 
+@runtime_checkable
+class EmbeddingEraser(Protocol):
+    """Optional capability of a :class:`ChunkStore`: delete cached document vectors by text
+    digest. The pipeline calls it when the document was deleted, lost its ready version or may
+    no longer be indexed while the job was embedding, so the vectors it just cached for that
+    text do not outlive the document (docs/08 §7 erasure chain)."""
+
+    def forget_embeddings(self, session: Session, model: str, digests: Sequence[bytes]) -> int:
+        """Delete the cached vectors of ``model`` under ``digests``; returns how many."""
+        ...
+
+
 # --- document source --------------------------------------------------------------------------
 
 
@@ -256,6 +268,7 @@ __all__ = [
     "DocumentFacts",
     "DocumentNotReady",
     "DocumentSource",
+    "EmbeddingEraser",
     "IndexedChunk",
     "StoredContext",
     "VersionFacts",

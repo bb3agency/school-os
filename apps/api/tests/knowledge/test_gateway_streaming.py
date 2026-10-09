@@ -171,6 +171,27 @@ def test_FR_KB_009_closing_the_stream_early_cancels_and_meters_it() -> None:
     assert [e.outcome for e in r.sink.events] == ["cancelled"]
 
 
+def test_FR_KB_011_closing_the_stream_on_its_last_delta_still_records_the_spend() -> None:
+    # The text ends in digits, so the masker holds them until the stream ends: the last delta
+    # comes after the provider call has finished. A client that leaves right then must not
+    # make a fully billed call disappear from the month's spend.
+    text = "The synthetic picnic buses leave from gate 12"
+    r = streaming_rig(G.text_response(text, usage={"input_tokens": 1000, "output_tokens": 200}))
+    it = r.gateway.stream_turn(
+        METERING, "answer", "system", [UserMessage(G.QUESTION)], [G.SEARCH_TOOL]
+    )
+    shown = ""
+    while shown != text:
+        item = next(it)
+        assert isinstance(item, TextDelta)
+        shown += item.text
+    it.close()  # the client went away before the complete turn was sent
+    assert [(e.outcome, e.input_tokens, e.output_tokens) for e in r.sink.events] == [
+        ("ok", 1000, 200)
+    ]
+    assert r.ledger.spent_usd(TENANT, "2026-09") == r.sink.events[0].cost_usd > 0
+
+
 def test_FR_KB_011_budget_refuses_before_any_provider_call() -> None:
     r = streaming_rig(budget_inr=0)
     with pytest.raises(BudgetExhausted):

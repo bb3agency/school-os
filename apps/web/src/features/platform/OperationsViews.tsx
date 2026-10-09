@@ -27,23 +27,25 @@ import { breakGlassTone, deploymentTone, known } from "@/features/status";
 import { Link } from "@/i18n/navigation";
 import { createBffFetch } from "@/lib/bff/fetch";
 import { ApiError, unwrap, useApiQuery, useApiMutation, useBffClient } from "@/lib/bff/query";
-import { formatCount } from "@/lib/format";
+import { formatCount, formatDateTime } from "@/lib/format";
 import { ready, type Loadable } from "@/lib/loadable";
 import {
   FLAG_KEY_PATTERN,
   UUID_PATTERN,
   checkbox,
+  optionalInt,
   optionalText,
   reason,
   requiredInt,
   uuid,
 } from "@/lib/validation";
-import { PK, useCan, useSchoolDirectory } from "./data";
+import { LIST_PAGE_SIZE, PK, ifMatch, useCan, usePagedList, useSchoolDirectory } from "./data";
 import { DeploymentActions } from "./DeploymentActions";
 import { FilterCard } from "./FilterCard";
 import { FlagSwitch } from "./FlagSwitch";
 import { HeartbeatPill } from "./HeartbeatPill";
 import { Mono, MonoTime, TierTag } from "./pills";
+import { ShowMore } from "./ShowMore";
 import { UsageTable } from "./UsageTable";
 
 /* ------------------------------------------------------------------ usage */
@@ -131,6 +133,8 @@ const flagSchema = z.object({
       error: "invalidPercent",
     })
     .transform((value) => (value === "" ? null : Number(value))),
+  /** The flag's `version` when the dialog opened, for If-Match; empty for a new flag (AA-13). */
+  version: optionalInt(2_147_483_647),
 });
 
 const overrideSchema = z.object({ tenant_id: uuid, enabled: z.enum(["on", "off"]) });
@@ -139,6 +143,8 @@ function FlagForm({ errors, flag }: { errors: Record<string, string>; flag?: Fea
   const t = useTranslations("platform.flags");
   return (
     <>
+      {/* Read once, when the dialog opens: a background reload must not move it (If-Match). */}
+      <input type="hidden" name="version" defaultValue={flag?.version ?? ""} />
       <TextField
         name="key"
         label={t("colKey")}
@@ -193,7 +199,10 @@ export function FlagsScreen() {
   const save = (data: z.output<typeof flagSchema>) =>
     unwrap(
       api.PUT("/api/v1/platform/flags/{key}", {
-        params: { path: { key: data.key } },
+        params: {
+          path: { key: data.key },
+          ...(data.version === null ? {} : { header: { "If-Match": ifMatch(data.version) } }),
+        },
         body: {
           enabled: data.enabled,
           description: data.description,
@@ -272,14 +281,21 @@ export function FlagsScreen() {
                   stepUp
                   schema={overrideSchema}
                   invalidate={[PK.flags, PK.tenants]}
-                  submit={(data) =>
-                    unwrap(
+                  submit={(data) => {
+                    // An existing override is replaced only with its ETag (AA-13).
+                    const current = all.find(
+                      (flag) => flag.key === row.key && flag.tenant_id === data.tenant_id,
+                    );
+                    return unwrap(
                       api.PUT("/api/v1/platform/flags/{key}/tenants/{tenant_id}", {
-                        params: { path: { key: row.key, tenant_id: data.tenant_id } },
+                        params: {
+                          path: { key: row.key, tenant_id: data.tenant_id },
+                          ...(current ? { header: { "If-Match": ifMatch(current.version) } } : {}),
+                        },
                         body: { enabled: data.enabled === "on" },
                       }),
-                    )
-                  }
+                    );
+                  }}
                 >
                   {(errors) => (
                     <>
@@ -419,10 +435,14 @@ export function FleetScreen({ status = "" }: { status?: string }) {
   const locale = useLocale();
   const api = useBffClient("operator");
   const query = status ? { status } : {};
-  const deployments = useApiQuery(
-    [...PK.deployments, "list", query],
-    async () => (await unwrap(api.GET("/api/v1/platform/deployments", { params: { query } }))).data,
+  const deploymentList = usePagedList([...PK.deployments, "list", query], (cursor) =>
+    unwrap(
+      api.GET("/api/v1/platform/deployments", {
+        params: { query: { ...query, limit: LIST_PAGE_SIZE, ...(cursor ? { cursor } : {}) } },
+      }),
+    ),
   );
+  const deployments = deploymentList.state;
   const versions = useApiQuery(PK.versions, () =>
     unwrap(api.GET("/api/v1/platform/fleet/versions")),
   );
@@ -434,7 +454,7 @@ export function FleetScreen({ status = "" }: { status?: string }) {
         <span className="flex min-w-40 flex-col gap-0.5">
           <Link
             href={`/platform/schools/${row.tenant_id}?tab=deployment`}
-            className="font-medium text-primary underline-offset-4 hover:underline"
+            className="font-semibold text-primary underline-offset-4 hover:underline"
           >
             {row.school_name}
           </Link>
@@ -554,6 +574,7 @@ export function FleetScreen({ status = "" }: { status?: string }) {
           emptyTitle={t("emptyTitle")}
           emptyBody={t("emptyBody")}
         />
+        <ShowMore list={deploymentList} />
       </Card>
       <Card title={t("versionsTitle")}>
         <DataTable
@@ -578,15 +599,21 @@ export function supportSignInUrl(row: Pick<BreakGlassRequest, "id" | "tenant_id"
   return `/bff/auth/support/login?${params.toString()}`;
 }
 
-const breakGlassSchema = z.object({
-  tenant_id: uuid,
-  reason_code: z.enum(["support_request", "security_incident", "legal_obligation"], {
-    error: "chooseOption",
-  }),
-  reason,
-  duration_minutes: requiredInt(15, 480),
-  emergency: checkbox,
-});
+const breakGlassSchema = z
+  .object({
+    tenant_id: uuid,
+    reason_code: z.enum(["support_request", "security_incident", "legal_obligation"], {
+      error: "chooseOption",
+    }),
+    reason,
+    duration_minutes: requiredInt(15, 480),
+    emergency: checkbox,
+  })
+  // A-13: emergency access (no school approval) only for an incident or a legal obligation.
+  .refine((data) => !data.emergency || data.reason_code !== "support_request", {
+    path: ["reason_code"],
+    error: "emergencyReason",
+  });
 
 /**
  * Break-glass requests (docs/16 §5.15; 07 §6.4): status list for every operator, request
@@ -604,10 +631,14 @@ export function BreakGlassScreen() {
   const can = useCan();
   const hintId = useId();
   const { nameOf, schools } = useSchoolDirectory();
-  const requests = useApiQuery(
-    [...PK.breakGlass, "list"],
-    async () => (await unwrap(api.GET("/api/v1/platform/break-glass-requests"))).data,
+  const requestList = usePagedList([...PK.breakGlass, "list"], (cursor) =>
+    unwrap(
+      api.GET("/api/v1/platform/break-glass-requests", {
+        params: { query: { limit: LIST_PAGE_SIZE, ...(cursor ? { cursor } : {}) } },
+      }),
+    ),
   );
+  const requests = requestList.state;
   const columns: Column<BreakGlassRequest>[] = [
     { key: "school", header: t("colSchool"), cell: (row) => nameOf(row.tenant_id) },
     {
@@ -652,48 +683,74 @@ export function BreakGlassScreen() {
     {
       key: "actions",
       header: tc("actions"),
-      cell: (row) =>
-        row.status === "active" ? (
-          <span className="flex flex-col gap-1">
-            <a
-              href={supportSignInUrl(row)}
-              className={buttonClasses("secondary", "sm")}
-              aria-describedby={`${hintId}-${row.id}`}
-            >
-              {t("openSchool")}
-            </a>
-            <span id={`${hintId}-${row.id}`} className="text-xs text-ink-muted">
-              {t("openSchoolHint")}
-            </span>
-          </span>
-        ) : row.emergency &&
-          row.status === "requested" &&
-          row.emergency_confirmed_by_2 === null &&
-          can("platform.breakglass.emergency") ? (
-          <ActionDialog
-            triggerLabel={t("confirmEmergency")}
-            triggerSize="sm"
-            triggerVariant="danger"
-            triggerDescription={nameOf(row.tenant_id)}
-            title={t("confirmEmergencyTitle")}
-            description={t("confirmEmergencyBody")}
-            note={t("twoPersonNote")}
-            confirmLabel={t("confirmEmergency")}
-            confirmVariant="danger"
-            stepUp
-            schema={z.object({})}
-            invalidate={[PK.breakGlass]}
-            submit={() =>
-              unwrap(
-                api.POST("/api/v1/platform/break-glass-requests/{request_id}/emergency-confirm", {
-                  params: { path: { request_id: row.id } },
-                }),
-              )
-            }
-          />
-        ) : null,
+      cell: (row) => (
+        <span className="flex flex-wrap items-start gap-2">
+          {breakGlassAction(row)}
+          {row.status === "requested" && can("platform.breakglass.request") ? (
+            <ActionDialog
+              triggerLabel={t("withdraw")}
+              triggerSize="sm"
+              triggerVariant="ghost"
+              triggerDescription={nameOf(row.tenant_id)}
+              title={t("withdrawTitle")}
+              description={t("withdrawBody")}
+              confirmLabel={t("withdraw")}
+              schema={z.object({})}
+              invalidate={[PK.breakGlass]}
+              submit={() =>
+                unwrap(
+                  api.POST("/api/v1/platform/break-glass-requests/{request_id}/withdraw", {
+                    params: { path: { request_id: row.id } },
+                  }),
+                )
+              }
+            />
+          ) : null}
+        </span>
+      ),
     },
   ];
+  function breakGlassAction(row: BreakGlassRequest) {
+    return row.status === "active" ? (
+      <span className="flex flex-col gap-1">
+        <a
+          href={supportSignInUrl(row)}
+          className={buttonClasses("secondary", "sm")}
+          aria-describedby={`${hintId}-${row.id}`}
+        >
+          {t("openSchool")}
+        </a>
+        <span id={`${hintId}-${row.id}`} className="text-xs text-ink-muted">
+          {t("openSchoolHint")}
+        </span>
+      </span>
+    ) : row.emergency &&
+      row.status === "requested" &&
+      row.emergency_confirmed_by_2 === null &&
+      can("platform.breakglass.emergency") ? (
+      <ActionDialog
+        triggerLabel={t("confirmEmergency")}
+        triggerSize="sm"
+        triggerVariant="danger"
+        triggerDescription={nameOf(row.tenant_id)}
+        title={t("confirmEmergencyTitle")}
+        description={t("confirmEmergencyBody")}
+        note={t("twoPersonNote")}
+        confirmLabel={t("confirmEmergency")}
+        confirmVariant="danger"
+        stepUp
+        schema={z.object({})}
+        invalidate={[PK.breakGlass]}
+        submit={() =>
+          unwrap(
+            api.POST("/api/v1/platform/break-glass-requests/{request_id}/emergency-confirm", {
+              params: { path: { request_id: row.id } },
+            }),
+          )
+        }
+      />
+    ) : null;
+  }
   return (
     <div className="space-y-6">
       <PageHeader
@@ -713,7 +770,9 @@ export function BreakGlassScreen() {
               submit={(data) =>
                 unwrap(
                   api.POST("/api/v1/platform/break-glass-requests", {
-                    body: { ...data, scope: { access: "read" } },
+                    // DL-10: only section_id/class_id narrow a grant; the panel asks for the
+                    // whole school and says so (requestBody).
+                    body: { ...data, scope: {} },
                   }),
                 )
               }
@@ -780,6 +839,7 @@ export function BreakGlassScreen() {
         emptyTitle={t("emptyTitle")}
         emptyBody={t("emptyBody")}
       />
+      <ShowMore list={requestList} />
     </div>
   );
 }
@@ -1024,6 +1084,11 @@ function EmergencyConfirmations({ request }: { request: BreakGlassRequest }) {
       </Pill>
       {confirmed < 2 ? (
         <span className="text-xs text-ink-muted">{t("needsSecondOperator")}</span>
+      ) : null}
+      {request.confirm_by ? (
+        <span className="text-xs text-ink-muted">
+          {t("confirmBy", { date: formatDateTime(request.confirm_by) ?? "" })}
+        </span>
       ) : null}
     </span>
   );

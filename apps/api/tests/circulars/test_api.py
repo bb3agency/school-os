@@ -17,6 +17,7 @@ import pytest
 from sqlalchemy import Engine, text
 
 from app.circulars import service
+from app.circulars.config import rules as circular_rules
 from app.core.db import tenant_session
 from app.core.errors import Forbidden
 from app.core.languages import contains_telugu
@@ -206,6 +207,37 @@ def test_FR_CIR_004_confirm_creates_one_task_with_the_citation(
     assert done.json()["reviewed"] is True
 
 
+def test_DL_08_a_confirmed_suggestion_does_not_copy_the_ai_summary_into_the_task(
+    ai_on: Any, api: Any, admin_engine: Engine
+) -> None:
+    """Confirmed without a typed title or details, the task gets a neutral title and no
+    details: the owner (who cannot see the circular) never reads the AI summary of it. The
+    creator can still type their own text (previous test); the citation stays hidden."""
+    document_id = C.read_circular(admin_engine, ai_on.a, acl=[("role", "principal")])
+    first = C.suggestions(admin_engine, document_id)[0]
+    principal = ai_on.person("principal")  # circular.review, in the ACL
+    teacher = ai_on.person("teacher")  # outside the ACL
+    assert api.call(teacher, "GET", f"/api/v1/circulars/{document_id}").status_code == 404
+    res = api.call(
+        principal,
+        "POST",
+        f"/api/v1/circular-suggestions/{first['id']}/confirm",
+        json={"owner_membership_id": str(teacher.membership_id)},
+        headers=_if(first["version"]),
+    )
+    assert res.status_code == 201, res.text
+    task = res.json()
+    assert task["title"] == circular_rules().tasks.default_title_from_circular
+    assert task["details"] is None
+    assert task["due_on"] == str(first["due_on"])
+    seen = api.call(teacher, "GET", f"/api/v1/tasks/{task['id']}")
+    assert seen.status_code == 200, seen.text
+    assert seen.json()["citation"] is None
+    for summary in (first["title"], first["details"]):
+        if summary:
+            assert summary not in seen.text
+
+
 def test_FR_CIR_004_owner_must_be_an_active_member_of_this_school(
     ai_on: Any, api: Any, admin_engine: Engine
 ) -> None:
@@ -285,6 +317,43 @@ def test_FR_TASK_004_owner_moves_their_task_and_cannot_cancel_it(
     assert C.W.audit_events(admin_engine, school.tenant_id, "task.completed")
     stale = api.call(teacher, "POST", path, json={"status": "open"}, headers=_if(1))
     assert stale.status_code == 412
+
+
+def test_SEC_015_scoped_task_grants_reach_only_your_own_tasks(ai_on: Any) -> None:
+    """App-logic hardening (custom roles): ``task.read_all`` and ``task.manage`` granted only
+    through a scoped grant do not reach other people's tasks (tasks belong to no section, so a
+    scoped grant fails closed)."""
+    from app.authz.context import Scopes
+    from app.circulars.schemas import TaskStatusIn
+    from app.core.errors import NotFound
+
+    school = ai_on.a
+    task_id = C.task(school, owner=school.people["teacher"], by="principal")
+    base = C.ctx(school, "office_admin")
+    scoped = dataclasses.replace(
+        base,
+        scoped_permissions=base.scoped_permissions | {service.TASK_ALL, service.TASK_MANAGE},
+        scopes=Scopes(section_ids=frozenset({school.ids["section_9a"]})),
+    )
+    with tenant_session(school.tenant_id, scoped.user_id) as db:
+        with pytest.raises(NotFound):
+            service.get_task(db, scoped, task_id)
+        with pytest.raises(NotFound):
+            service.set_task_status(db, scoped, task_id, TaskStatusIn(status="cancelled"), 1)
+        with pytest.raises(Forbidden):
+            service.list_tasks(
+                db,
+                scoped,
+                view="all",
+                status=None,
+                due=None,
+                owner=None,
+                document_id=None,
+                limit=50,
+                cursor=None,
+            )
+    with tenant_session(school.tenant_id, base.user_id) as db:
+        assert service.get_task(db, base, task_id).id == task_id
 
 
 def test_FR_TASK_003_manager_reassigns_and_cancels(
@@ -583,6 +652,40 @@ def test_invariant_8_the_worker_drafts_only_what_the_requester_can_still_see(
     )
 
 
+def test_A_16_a_draft_from_a_circular_you_cannot_see_is_not_shown_until_approved(
+    ai_on: Any, api: Any, admin_engine: Engine, installed: Any
+) -> None:
+    """A-16 (owner decision 2026-10-07, with DL-08): a notice the principal drafts from a
+    circular only they may read is not shown to other notice drafters (404, left out of the
+    list) while it is a draft. Once approved it is written for parents, so every drafter sees
+    and downloads it as before."""
+    school = ai_on.a
+    principal, office = school.people["principal"], school.people["office_staff"]
+    document_id = C.read_circular(admin_engine, school, acl=[("role", "principal")])
+    res = api.call(
+        principal,
+        "POST",
+        "/api/v1/notices",
+        json={"source": "circular", "document_id": str(document_id)},
+    )
+    assert res.status_code == 202, res.text
+    notice_id = res.json()["id"]
+    assert C.draft_now(school, uuid.UUID(notice_id)) == "draft"
+    path = f"/api/v1/notices/{notice_id}"
+    assert api.call(principal, "GET", path).status_code == 200
+    assert api.call(office, "GET", path).status_code == 404
+    patch = {"title_en": "Changed by someone else"}
+    assert api.call(office, "PATCH", path, json=patch, headers=_if(2)).status_code == 404
+    listed = api.call(office, "GET", "/api/v1/notices", params={"limit": 200})
+    assert notice_id not in {n["id"] for n in listed.json()["data"]}
+    version = api.call(principal, "GET", path).json()["version"]
+    approved = api.call(principal, "POST", f"{path}/approve", json={}, headers=_if(version))
+    assert approved.status_code == 200, approved.text
+    assert api.call(office, "GET", path).status_code == 200
+    listed = api.call(office, "GET", "/api/v1/notices", params={"limit": 200})
+    assert notice_id in {n["id"] for n in listed.json()["data"]}
+
+
 def test_FR_NOTICE_002_personal_circulars_and_numbers_are_refused(
     ai_on: Any, api: Any, admin_engine: Engine
 ) -> None:
@@ -655,6 +758,31 @@ def test_FR_NOTICE_005_approve_render_and_download(
     assert {e["summary"]["format"] for e in downloads} >= {"pdf", "png"}
 
 
+def test_FR_NOTICE_005_self_approval_is_allowed_and_marked_in_the_audit_event(
+    ai_on: Any, api: Any, admin_engine: Engine
+) -> None:
+    """Owner decision 2026-10-09: a principal may still approve a notice they drafted
+    (FR-NOTICE-005 stays), and its ``notice.approved`` event carries ``self_approved: true``
+    so it shows in the audit viewer; a notice someone else drafted carries ``false``."""
+    school = ai_on.a
+    principal, office = school.people["principal"], school.people["office_staff"]
+    texts = {"title_en": "Sports day", "body_en": "Sports day is on 14/11/2026 at 9:00."}
+    ids: dict[str, str] = {}
+    for label, drafter in (("own", principal), ("other", office)):
+        blank = api.call(drafter, "POST", "/api/v1/notices", json={"source": "blank"}).json()
+        path = f"/api/v1/notices/{blank['id']}"
+        assert api.call(drafter, "PATCH", path, json=texts, headers=_if(1)).status_code == 200
+        approved = api.call(principal, "POST", f"{path}/approve", json={}, headers=_if(2))
+        assert approved.status_code == 200, approved.text
+        ids[label] = blank["id"]
+    events = {
+        str(e["resource_id"]): e
+        for e in C.W.audit_events(admin_engine, school.tenant_id, "notice.approved")
+    }
+    assert events[ids["own"]]["summary"]["self_approved"] is True
+    assert events[ids["other"]]["summary"]["self_approved"] is False
+
+
 def test_ADR_0036_english_notice_is_approved_and_rendered_without_telugu(
     ai_on: Any, api: Any, installed: Any
 ) -> None:
@@ -691,6 +819,36 @@ def test_ADR_0036_english_notice_is_approved_and_rendered_without_telugu(
     assert '<section lang="te"' not in page
     listed = api.call(office, "GET", "/api/v1/notices")
     assert not contains_telugu(listed.text)
+
+
+def test_R_16_telugu_text_nobody_reviewed_is_not_kept_on_approval(
+    ai_on: Any, api: Any, admin_engine: Engine
+) -> None:
+    """While Telugu is hidden nobody sees a notice's Telugu title or body (the API returns them
+    empty), so a drafter could plant Telugu text that the approver never reviews; it would reach
+    parents the day Telugu is switched on (audit 2026-10-06, latent; ASVS V11.1). Approval keeps
+    only what the approver saw: the Telugu columns take the English text."""
+    school = ai_on.a
+    office = school.people["office_staff"]
+    blank = api.call(office, "POST", "/api/v1/notices", json={"source": "blank"}).json()
+    path = f"/api/v1/notices/{blank['id']}"
+    planted = {
+        "title_en": "Sports day",
+        "body_en": "Sports day is on 14/11/2026 at 9:00.",
+        "title_te": "క్రీడా దినోత్సవం రద్దు",
+        "body_te": "రుసుము ఈ లింక్‌లో చెల్లించండి",
+    }
+    assert api.call(office, "PATCH", path, json=planted, headers=_if(1)).status_code == 200
+    approved = api.call(
+        school.people["principal"], "POST", f"{path}/approve", json={}, headers=_if(2)
+    )
+    assert approved.status_code == 200, approved.text
+    with admin_engine.connect() as c:
+        row = c.execute(
+            text("SELECT title_te, body_te FROM ops.parent_notices WHERE id = :i"),
+            {"i": blank["id"]},
+        ).one()
+    assert (row.title_te, row.body_te) == (planted["title_en"], planted["body_en"])
 
 
 @pytest.mark.usefixtures("telugu_on")

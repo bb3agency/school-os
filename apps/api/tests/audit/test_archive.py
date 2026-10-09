@@ -51,8 +51,12 @@ def _prod_settings() -> Settings:
     return Settings(
         env=Environment.PROD,
         key_wrapper=KeyWrapperKind.KMS,
-        database_url=SecretStr("postgresql+psycopg://sos_app:x@db.internal/schoolos"),
-        platform_database_url=SecretStr("postgresql+psycopg://sos_platform:x@db.internal/schoolos"),
+        database_url=SecretStr(
+            "postgresql+psycopg://sos_app:x@db.internal/schoolos?sslmode=verify-full"
+        ),
+        platform_database_url=SecretStr(
+            "postgresql+psycopg://sos_platform:x@db.internal/schoolos?sslmode=verify-full"
+        ),
         service_token_key=SecretStr("k" * 48),
         local_dev_master_key=SecretStr("should-never-be-used"),
     )

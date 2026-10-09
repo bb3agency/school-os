@@ -36,14 +36,16 @@ import json
 import re
 import time
 import uuid
-from collections.abc import Generator, Iterator
+from collections.abc import Generator, Iterator, Mapping, MutableMapping
 from contextlib import closing
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Final
+from decimal import Decimal
+from typing import TYPE_CHECKING, Any, Final
+
+from sqlalchemy.exc import IntegrityError
 
 from app.audit import service as audit
-from app.authz.kv import KVUnavailable, kv_store
-from app.core import languages, retention
+from app.core import languages, ratelimit, retention
 from app.core import purge as purging
 from app.core.db import tenant_session
 from app.core.errors import (
@@ -68,6 +70,7 @@ from app.knowledge import (
     conversations,
     keys,
     memory,
+    policy,
     sources,
 )
 from app.knowledge import repository as repo
@@ -105,6 +108,7 @@ from app.knowledge.circulars.reading import (
     PassageCitation,
 )
 from app.knowledge.config.circulars import CircularsConfig
+from app.knowledge.config.embeddings import load_embeddings_config
 from app.knowledge.config.llm import load_llm_config
 from app.knowledge.domain import (
     AclKeys,
@@ -131,6 +135,7 @@ from app.knowledge.domain import (
     TokenEvent,
 )
 from app.knowledge.gateway.errors import AiRateLimited
+from app.knowledge.gateway.factory import require_provider_agreements
 from app.knowledge.ingestion.pipeline import INDEXED_HOOKS, IndexedHook
 from app.knowledge.interfaces import IngestionPipeline, KnowledgeService
 from app.knowledge.keys import (
@@ -173,6 +178,7 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
     from app.authz.context import UserContext
+    from app.core.config import Settings
 
 log = get_logger(__name__)
 
@@ -188,6 +194,13 @@ INTERNAL_ERROR_KEY: Final = "kb.errors.internal"
 
 def _error(field: str, code: str) -> dict[str, str]:
     return {"field": field, "code": code, "message_key": f"errors.{code}"}
+
+
+def _refuse_answer_personal(text: str) -> None:
+    """Verified answers are shown to the whole school: no phone numbers, emails or
+    Aadhaar-like numbers in the free text (as for notices and memories; 422)."""
+    if has_personal_numbers(text):
+        raise ValidationFailed([_error("answer_text", "answer_personal_data")])
 
 
 def _result_out(chunk: RankedChunk) -> SearchResultOut:
@@ -243,19 +256,39 @@ class SchoolKnowledgeService:
 
     # --- ask ------------------------------------------------------------------------------------
 
-    def admit(self, ctx: UserContext) -> None:
+    def admit(self, ctx: UserContext, *, scope: MutableMapping[str, Any] | None = None) -> None:
         """Before streaming: permission and the per-user question rate (docs/06 §5 step 1)."""
         if not ctx.has(ASK):
             raise Forbidden()
+        self.admit_ai(ctx, scope=scope)
+
+    def admit_ai(self, ctx: UserContext, *, scope: MutableMapping[str, Any] | None = None) -> None:
+        """The per-user AI admission (SEC-020): one unit of the person's question budget for
+        any model call a person asks for (a question, a memory check, a notice draft, a
+        circular reading; audit 2026-10-06 R-20), so one person cannot drain the school's
+        shared rate limit or budget. ``scope``: the request scope, so the 429 and the success
+        carry the RateLimit headers. 429 ``ai_rate_limited`` with ``Retry-After``."""
         limit = self.runtime.llm_config.rate_limit.questions_per_minute_per_user
-        minute = dt.datetime.now(dt.UTC).strftime("%Y%m%d%H%M")
-        key = f"sos:rl:kb:ask:{ctx.tenant_id}:{ctx.user_id}:{minute}"
-        try:
-            count = kv_store().incr(key, ttl_s=120)
-        except KVUnavailable:
-            return  # fail open: the school's budget and the gateway's rate limit still apply
-        if count > limit:
-            raise AiRateLimited("Too many questions. Wait a minute and try again.")
+        # The shared API limiter (GCRA, app/core/ratelimit.py); the number stays in models.yaml.
+        # Fails open: the school's budget and the gateway's rate limit still apply.
+        policy = ratelimit.Policy(
+            name="kb_ask",
+            quota=limit,
+            window_s=60,
+            per="user",
+            fail="open",
+            report=True,
+            weighted=False,
+        )
+        partition = f"{ctx.tenant_id}:{ctx.user_id}"
+        decision = ratelimit.get_rate_limiter().check([ratelimit.Bucket(policy, partition)])
+        if scope is not None:
+            ratelimit.remember(scope, decision)
+        if not decision.allowed:
+            raise AiRateLimited(
+                "Too many questions. Wait a minute and try again.",
+                retry_after_s=decision.retry_after_s,
+            )
 
     def ask(self, session: Session, ctx: UserContext, request: AskRequest) -> Iterator[AskEvent]:
         """All events of one question; the query row and audit event are written first."""
@@ -342,12 +375,17 @@ class SchoolKnowledgeService:
             if found is not None and found.deleted_at is None:
                 return found, False
             if found is None and repo.conversation_owner(session, request.session_id) is None:
-                return (
-                    self._new_conversation(
-                        session, ctx, question, conversation_id=request.session_id, now=now
-                    ),
-                    True,
-                )
+                # The id may belong to another school's conversation (RLS hides it): the insert
+                # then fails in its savepoint and a fresh conversation starts, exactly as for an
+                # unknown id, so nothing tells the caller it exists.
+                try:
+                    with session.begin_nested():
+                        created = self._new_conversation(
+                            session, ctx, question, conversation_id=request.session_id, now=now
+                        )
+                except IntegrityError:
+                    created = self._new_conversation(session, ctx, question, now=now)
+                return created, True
         return self._new_conversation(session, ctx, question, now=now), True
 
     def _revision(
@@ -652,6 +690,7 @@ class SchoolKnowledgeService:
             "citations": len(result.cited),
             "citations_dropped": result.citations_dropped,
             "uncited_factual": result.uncited_factual,
+            "sentences_dropped": result.sentences_dropped,
         }
 
     @staticmethod
@@ -819,6 +858,15 @@ class SchoolKnowledgeService:
                     withheld=not shown or c.title is None,
                 )
             )
+        if row.status not in repo.EARLIER_STATUSES:
+            # A cancelled or failed answer keeps the UNCHECKED preview and has no citations: it
+            # may quote any passage or record the model was given, so every one of them must
+            # still be visible (invariant 8).
+            withheld_any |= not all(
+                visibility.visible(str(item.get("source", "")))
+                for item in (row.retrieved or [])
+                if isinstance(item, dict)
+            )
         answer = None if withheld_any else conversations.answer_of(session, row)
         return MessageOut(
             query_id=row.id,
@@ -979,7 +1027,10 @@ class SchoolKnowledgeService:
         return [self._memory_out(i) for i in memory.items(session, ctx.user_id, now)]
 
     def _screened(self, session: Session, ctx: UserContext, text: str) -> str:
-        """The item text after every screen, or the refusal (422 / 503)."""
+        """The item text after every screen, or the refusal (422 / 503). The screen is a model
+        call metered as Ask, so it counts against the per-user question rate first (429): one
+        person cannot drain the school's shared rate limit or budget (SEC-020)."""
+        self.admit(ctx)
         note = conversations.tidy(nfc(text))
         verdict = memory.screen(
             self.runtime.gateway, Metering(tenant_id=ctx.tenant_id, feature="ask"), note, set()
@@ -1292,6 +1343,7 @@ class SchoolKnowledgeService:
         the current version of a document the caller can read (docs/06 §8-9)."""
         if not ctx.has(MANAGE_VERIFIED):
             raise Forbidden()
+        _refuse_answer_personal(data.answer_text)
         citations = self._checked_citations(session, ctx, [c.model_dump() for c in data.citations])
         now = dt.datetime.now(dt.UTC)
         row = repo.insert_verified_answer(
@@ -1303,6 +1355,7 @@ class SchoolKnowledgeService:
                 "answer_text": mask_aadhaar(nfc(data.answer_text)),
                 "citations": citations,
                 "verified_by": ctx.membership_id,
+                "drafted_by": ctx.membership_id,
                 "verified_at": now,
                 "review_due": data.review_due,
             },
@@ -1333,6 +1386,12 @@ class SchoolKnowledgeService:
             raise Conflict("This verified answer is retired.", code="verified_answer_retired")
         return row
 
+    @staticmethod
+    def _drafter_of(row: VerifiedAnswer) -> uuid.UUID:
+        """Who wrote the answer's current text: ``drafted_by``, or for an answer stored before
+        0050_verified_answer_drafter, the person who stands behind it now."""
+        return row.drafted_by if row.drafted_by is not None else row.verified_by
+
     def review_verified_answer(
         self,
         session: Session,
@@ -1346,8 +1405,22 @@ class SchoolKnowledgeService:
         cited document changed (FR-KB-030, docs/06 §4.8). Its citations (the new ones, else the
         stored ones) must again quote the CURRENT version of documents the caller can read;
         it becomes ``active``, verified by the caller now. Audited
-        ``kb.verified_answer.reviewed`` with the changed field names only."""
+        ``kb.verified_answer.reviewed`` with the changed field names only.
+
+        The reviewer must not be the answer's drafter (owner decision 2026-10-09): 409
+        ``reviewer_must_differ`` while another active member holds
+        ``kb.verified_answer.manage``. With no one else to ask, the drafter may review it and
+        the event carries ``self_reviewed: true``. A reviewer who changes the text or citations
+        becomes the drafter."""
         row = self._managed_answer(session, ctx, answer_id, expected_version)
+        self_reviewed = self._drafter_of(row) == ctx.membership_id
+        if self_reviewed and any(
+            m != ctx.membership_id for m in identity.active_holders(session, MANAGE_VERIFIED)
+        ):
+            raise Conflict(
+                "You drafted this answer, so someone else must review it.",
+                code="reviewer_must_differ",
+            )
         citations = self._checked_citations(
             session,
             ctx,
@@ -1366,10 +1439,13 @@ class SchoolKnowledgeService:
         }
         changed = []
         if data.answer_text is not None:
+            _refuse_answer_personal(data.answer_text)
             values["answer_text"] = mask_aadhaar(nfc(data.answer_text))
             changed.append("answer_text")
         if data.citations is not None:
             changed.append("citations")
+        if data.answer_text is not None or data.citations is not None:
+            values["drafted_by"] = ctx.membership_id
         if "review_due" in data.model_fields_set:
             values["review_due"] = data.review_due
             changed.append("review_due")
@@ -1387,6 +1463,7 @@ class SchoolKnowledgeService:
                 "previous_status": row.status,
                 "changed": changed,
                 "citations": len(citations),
+                "self_reviewed": self_reviewed,
             },
             request_id=ctx.request_id,
         )
@@ -1878,9 +1955,23 @@ def get_service() -> SchoolKnowledgeService:
     return _service
 
 
+def admit_ai_request(ctx: UserContext, *, scope: MutableMapping[str, Any] | None = None) -> None:
+    """For other modules: admit one model call a person asked for (notice drafts, circular
+    readings) against the same per-user budget as Ask (SEC-020; audit 2026-10-06 R-20). Raises
+    429 ``ai_rate_limited``; pass the request ``scope`` for the RateLimit headers."""
+    get_service().admit_ai(ctx, scope=scope)
+
+
 def circulars_config() -> CircularsConfig:
     """Limits for circular reading and notice drafting (``knowledge/config/circulars.yaml``)."""
     return circular_ai.config()
+
+
+def check_provider_agreements(settings: Settings) -> None:
+    """Start-up check of the API and the worker (Claude safety lock, owner decision 2026-10-01):
+    in staging/prod, refuse to start while a models.yaml role uses provider anthropic without
+    ``SOS_ANTHROPIC_ZDR_CONFIRMED`` (raises ``ProviderModeError``; docs/10 §11)."""
+    require_provider_agreements(settings, load_llm_config())
 
 
 __all__ = [
@@ -1925,7 +2016,9 @@ __all__ = [
     "SearchFilters",
     "StatusEvent",
     "TokenEvent",
+    "admit_ai_request",
     "adopt_conversations",
+    "check_provider_agreements",
     "circular_passages",
     "circulars_config",
     "draft_notice",
@@ -1934,9 +2027,11 @@ __all__ = [
     "has_personal_numbers",
     "purge_memories",
     "purge_old_queries",
+    "purge_orphan_vectors",
     "purge_tenant_data",
     "read_circular",
     "reencrypt_queries",
+    "settle_spend",
     "summarise_conversation",
     "tenant_data_counts",
 ]
@@ -1954,6 +2049,8 @@ key_rotation.register_reencryptor("kb_memories", keys.reencrypt_memories_batch)
 SUMMARY_TASK: Final = conversations.SUMMARY_TASK
 # The rolling summary job consumes this outbox event (queue ingest; ADR-0034).
 ops.register_outbox_route(conversations.SUMMARY_EVENT, SUMMARY_TASK)
+# Deferred budget settlements (audit W3-10): the spend store refused a billed call's settlement.
+ops.register_outbox_route(policy.SETTLE_EVENT, policy.SETTLE_TASK)
 
 QUERY_RETENTION_CATEGORY: Final = "kb_queries"
 """The ``app/admin/retention.yaml`` category of the query log (fixed: not school-configurable)."""
@@ -1978,6 +2075,17 @@ def purge_old_queries(session: Session, *, now: dt.datetime | None = None) -> in
     repo.clear_summaries_before(session, cutoff)
     repo.delete_empty_conversations(session)
     return deleted
+
+
+def purge_orphan_vectors(session: Session, *, now: dt.datetime | None = None) -> int:
+    """Delete the current school's cached document vectors that no chunk uses any more and that
+    are older than ``orphan_vector_grace_hours`` (embeddings.yaml; docs/08 §7 erasure chain).
+    Deleting a document or version already removes its vectors in the same transaction; this
+    daily sweep catches vectors cached before that existed and ones left by a job that stopped
+    between embedding and writing. Call inside the school's ``tenant_session``."""
+    grace = load_embeddings_config().orphan_vector_grace_hours
+    cutoff = (now or dt.datetime.now(dt.UTC)) - dt.timedelta(hours=grace)
+    return repo.purge_orphan_embeddings(session, older_than=cutoff)
 
 
 def purge_memories(session: Session, *, now: dt.datetime | None = None) -> int:
@@ -2042,6 +2150,43 @@ def summarise_conversation(tenant_id: uuid.UUID, payload: dict[str, object]) -> 
         composition.runtime().gateway,
         session_factory=tenant_session,
     )
+
+
+_MONTH = re.compile(r"^[0-9]{4}-(0[1-9]|1[0-2])$")
+_MAX_DEFERRED_MICRO_USD: Final = 10**9 - 1
+
+
+def settle_spend(tenant_id: uuid.UUID, payload: Mapping[str, object]) -> str:
+    """Worker job ``knowledge.settle_spend`` (outbox event ``kb.budget.settle_requested``):
+    add a billed call's cost to the school's month after the spend store refused it on the
+    call's path (audit W3-10). The same reservation id, so it counts once. Raises
+    ``KVUnavailable`` while the store is still down (the task retries). Returns ``settled``,
+    ``duplicate``, ``invalid`` (a payload this code never writes) or ``unavailable``."""
+    reservation = payload.get("reservation_id")
+    month = payload.get("month")
+    micro = payload.get("cost_micro_usd")
+    try:
+        reservation_id = uuid.UUID(str(reservation))
+    except ValueError:
+        reservation_id = None
+    if (
+        reservation_id is None
+        or not isinstance(month, str)
+        or not _MONTH.fullmatch(month)
+        or not isinstance(micro, int)
+        or isinstance(micro, bool)
+        or not 0 < micro <= _MAX_DEFERRED_MICRO_USD
+    ):
+        log.error("kb.budget.settle_invalid", tenant_id=tenant_id, action=policy.SETTLE_TASK)
+        return "invalid"
+    guard = composition.runtime().budget
+    if guard is None:
+        log.error("kb.budget.settle_unavailable", tenant_id=tenant_id, resource_id=reservation_id)
+        return "unavailable"
+    after = guard.settle_deferred(
+        tenant_id, reservation_id, month, Decimal(micro) / Decimal(1_000_000)
+    )
+    return "settled" if after.applied else "duplicate"
 
 
 # --- full data export (FR-ADM-001; ADR-0034) --------------------------------------------------

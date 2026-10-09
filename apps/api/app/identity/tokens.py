@@ -12,6 +12,9 @@ token (docs/09 §1, TB2). This module verifies the access token:
 * audience: standard ``aud`` **or** Amazon Cognito access tokens, which carry ``client_id`` and
   ``token_use == "access"`` instead of ``aud``; Cognito ID tokens (``token_use == "id"``) are
   refused even though their ``aud`` equals the app client id;
+* the token must say it is an access token: header ``typ`` ``at+jwt`` (RFC 9068) or the claim
+  ``token_use == "access"`` (Cognito, the dev stub); an ID token of an IdP that puts the client
+  id in ``aud`` and sets no ``token_use`` is refused (audit 2026-10-05, platform hardening);
 * 30 s clock leeway; a token whose ``exp - iat`` exceeds 15 min is refused as an IdP
   misconfiguration (FR-IAM-004 requires ≤ 10 min);
 * IdP/JWKS failures surface as ``ServiceUnavailable`` (503), never as 401 and never with
@@ -58,6 +61,8 @@ MAX_TOKEN_BYTES: Final = 8 * 1024
 MAX_DOCUMENT_BYTES: Final = 64 * 1024
 MIN_RSA_BITS: Final = 2048
 ACCEPTED_TYP: Final[frozenset[str]] = frozenset({"jwt", "at+jwt", "application/at+jwt"})
+# RFC 9068: these mark an access token by themselves; plain ``JWT`` (or none) needs token_use.
+ACCESS_TOKEN_TYP: Final[frozenset[str]] = frozenset({"at+jwt", "application/at+jwt"})
 DEV_ISSUER_HOSTS: Final[frozenset[str]] = frozenset(
     {"localhost", "127.0.0.1", "::1", "0.0.0.0", "mock-oauth2-server", "oidc"}  # noqa: S104
 )
@@ -365,6 +370,10 @@ class TokenVerifier:
             raise Unauthenticated(_GENERIC_REJECTION, code="token_expired") from None
         except (PyJWTError, ValueError, TypeError):
             raise Unauthenticated(_GENERIC_REJECTION) from None
+        if not (isinstance(typ, str) and typ.lower() in ACCESS_TOKEN_TYP) and (
+            claims.get("token_use") != ACCESS_TOKEN_USE
+        ):
+            raise Unauthenticated(_GENERIC_REJECTION)  # not marked as an access token
         return self._build(claims)
 
     def _check_audience(self, claims: Mapping[str, Any]) -> None:
@@ -506,6 +515,8 @@ def unverified_issuer(token: str) -> str | None:
     if not isinstance(token, str) or not token or len(token) > MAX_TOKEN_BYTES:
         return None
     try:
+        # Only picks the verifier, which re-checks signature and issuer (see docstring).
+        # nosemgrep: python.jwt.security.unverified-jwt-decode.unverified-jwt-decode
         claims = jwt.decode(token, options={"verify_signature": False})
     except (PyJWTError, ValueError, TypeError):
         return None

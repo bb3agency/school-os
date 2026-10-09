@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
+from typing import Any
 
 import pytest
 from sqlalchemy import text
@@ -43,8 +44,18 @@ def test_FR_PLT_028_invite_assign_roles_and_deactivate(
     assert (own.status_code, own.json()["code"]) == (409, "own_roles")
     gone = api.call("POST", f"/operators/{op_id}/deactivate", owner)
     assert gone.json()["status"] == "deactivated"
-    listing = api.call("GET", "/operators?limit=200", owner).json()["data"]
-    assert any(o["id"] == op_id for o in listing)
+    # The shared test database can hold more than one page of operators in a full run: follow
+    # the cursor so the deactivated operator is found wherever its UUIDv7 id sorts.
+    listed: list[str] = []
+    cursor: str | None = None
+    while True:
+        query = "/operators?limit=200" + (f"&cursor={cursor}" if cursor else "")
+        page = api.call("GET", query, owner).json()
+        listed += [o["id"] for o in page["data"]]
+        cursor = page.get("next_cursor")
+        if not cursor:
+            break
+    assert op_id in listed
     stale = api.call("POST", "/operators", owner, json=body, fresh=False)
     assert stale.status_code == 428
 
@@ -124,7 +135,7 @@ def test_SEC_029_emergency_breakglass_needs_two_different_operators(
             "tenant_id": tid,
             "reason_code": "security_incident",
             "reason": "Suspected account takeover under investigation",
-            "scope": {"resource": "audit.read"},
+            "scope": {},  # the whole school (DL-10: only section_id/class_id narrow)
             "duration_minutes": 60,
             "emergency": True,
         },
@@ -157,3 +168,49 @@ def test_SEC_029_emergency_breakglass_needs_two_different_operators(
         },
     )
     assert too_long.status_code == 422
+
+
+def test_DL_10_breakglass_scope_must_really_narrow_the_grant(
+    api: Api, make_operator: MakeOperator, owner: Operator, make_plan: Callable[..., uuid.UUID]
+) -> None:
+    """Only ``section_id`` and ``class_id`` narrow a grant (they become membership scopes);
+    any other key would read as narrow on the approval screen but grant the whole school, so
+    it is refused (422). An empty scope is the whole school, said as such."""
+    agent = make_operator("support_agent")
+    tid = api.call("POST", "/tenants", owner, json=provision_payload(make_plan())).json()[
+        "tenant_id"
+    ]
+
+    def ask(scope: dict[str, object]) -> Any:
+        return api.call(
+            "POST",
+            "/break-glass-requests",
+            agent,
+            json={
+                "tenant_id": tid,
+                "reason_code": "support_request",
+                "reason": "The school asked for help with an import that failed",
+                "scope": scope,
+                "duration_minutes": 60,
+            },
+        )
+
+    wide_scopes: tuple[dict[str, object], ...] = (
+        {"student_id": str(uuid.uuid4())},
+        {"import_batch_id": str(uuid.uuid4())},
+        {"document_id": str(uuid.uuid4())},
+        {"access": "read"},
+        {"area": "imports"},
+        {"section_id": "not-a-uuid"},
+        {"section_id": str(uuid.uuid4()), "student_id": str(uuid.uuid4())},
+    )
+    for wide in wide_scopes:
+        res = ask(wide)
+        assert res.status_code == 422, (wide, res.text)
+    whole = ask({})
+    assert whole.status_code == 201, whole.text
+    assert whole.json()["scope"] == {}
+    section = str(uuid.uuid4())
+    narrow = ask({"section_id": section})
+    assert narrow.status_code == 201, narrow.text
+    assert narrow.json()["scope"] == {"section_id": section}

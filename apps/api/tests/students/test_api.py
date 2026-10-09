@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import sys
 import uuid
 from typing import Any
@@ -9,6 +10,7 @@ from typing import Any
 import pytest
 from sqlalchemy import Engine, text
 
+from app.authz.kv import kv_store
 from app.core.redaction import verhoeff_check_digit
 
 pytestmark = pytest.mark.db
@@ -248,6 +250,106 @@ def test_BR_01_identity_change_required_over_http(
     assert res.json()["code"] == "identity_change_required"
 
 
+def test_BR_01_a_verified_identity_value_is_not_replaced_without_a_change_request(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """Audit 2026-10-05 A-05 (invariant 6): a value verified through an approved change request
+    (any source, e.g. ``birth_certificate``) is replaced only by another change request; a
+    direct unverified write used to supersede it and drop it from the canonical view."""
+    admin, staff = world.person("office_admin"), world.person("office_staff")
+    sid = api.call(admin, "POST", BASE, json=new_body("Synthetica Verified Dob")).json()["id"]
+    first = api.call(
+        staff,
+        "POST",
+        f"{BASE}/{sid}/values",
+        json={"attribute_key": "dob", "source": "birth_certificate", "value": "2012-03-14"},
+    )
+    assert first.status_code == 201, first.text
+    value_id = first.json()["id"]
+    with admin_engine.begin() as c:  # as record_verified_identity_value leaves it
+        c.execute(
+            text(
+                "UPDATE sis.attribute_values SET verification_status = 'verified', "
+                "verified_at = now() WHERE id = :v"
+            ),
+            {"v": value_id},
+        )
+    res = api.call(
+        staff,
+        "POST",
+        f"{BASE}/{sid}/values",
+        json={"attribute_key": "dob", "source": "birth_certificate", "value": "2011-01-01"},
+    )
+    assert res.status_code == 403, res.text
+    assert res.json()["code"] == "identity_change_required"
+    with admin_engine.connect() as c:
+        current: uuid.UUID = c.execute(
+            text(
+                "SELECT id FROM sis.attribute_values WHERE student_id = :s "
+                "AND attribute_key = 'dob' AND source = 'birth_certificate' "
+                "AND superseded_by IS NULL"
+            ),
+            {"s": sid},
+        ).scalar_one()
+    assert str(current) == value_id
+
+
+def test_SEC_015_evidence_must_be_a_document_the_caller_can_see(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """Audit 2026-10-05 A-09: ``evidence_document_id`` was stored as given."""
+    admin, staff = world.person("office_admin"), world.person("office_staff")
+    sid = api.call(admin, "POST", BASE, json=new_body("Synthetica Evidence Check")).json()["id"]
+    hidden, version = uuid.uuid4(), uuid.uuid4()
+    tid = world.a.tenant_id
+    with admin_engine.begin() as c:  # a ready document only the principal role may open
+        c.execute(
+            text(
+                "INSERT INTO kb.documents (id, tenant_id, purpose, doc_type, title, sensitivity, "
+                "current_version_id, created_by) VALUES (:d, :t, 'circular', 'circular', "
+                "'Synthetic restricted', 'C2', :v, :u)"
+            ),
+            {"d": hidden, "t": tid, "v": version, "u": admin.user_id},
+        )
+        c.execute(
+            text(
+                "INSERT INTO kb.document_versions (id, tenant_id, document_id, version_no, "
+                "object_key, sha256, mime_type, size_bytes, status, created_by) VALUES "
+                "(:v, :t, :d, 1, :k, :h, 'application/pdf', 10, 'ready', :u)"
+            ),
+            {
+                "v": version,
+                "t": tid,
+                "d": hidden,
+                "k": f"t/{tid}/docs/{hidden}/v1/original.pdf",
+                "h": b"\x00" * 32,
+                "u": admin.user_id,
+            },
+        )
+        c.execute(
+            text(
+                "INSERT INTO kb.document_acl (tenant_id, document_id, principal_type, "
+                "principal_ref) VALUES (:t, :d, 'role', 'principal')"
+            ),
+            {"t": tid, "d": hidden},
+        )
+    for evidence in (hidden, uuid.uuid4()):
+        res = api.call(
+            staff,
+            "POST",
+            f"{BASE}/{sid}/values",
+            json={
+                "attribute_key": "mother_tongue",
+                "source": "parent_form",
+                "value": "Telugu",
+                "evidence_document_id": str(evidence),
+            },
+        )
+        assert res.status_code == 422, res.text
+        assert res.json()["errors"][0]["field"] == "evidence_document_id"
+        assert res.json()["errors"][0]["code"] == "not_found"
+
+
 def test_values_etag_verify_and_status_patch(world: Any, api: Any, admin_engine: Engine) -> None:
     admin = world.person("office_admin")
     sid = api.call(admin, "POST", BASE, json=new_body("Synthetica Etag Case")).json()["id"]
@@ -374,3 +476,39 @@ def test_SEC_015_student_scope_over_http(
         assert {k: hidden[k] for k in ("status", "code", "detail")} == {
             k: random[k] for k in ("status", "code", "detail")
         }
+
+
+def _idem_record(tenant_id: Any, user_id: Any, path: str, key: str) -> bytes:
+    """The stored Idempotency-Key record of a POST (app/authz/http.py)."""
+    scope = hashlib.sha256(f"POST {path} {key}".encode()).hexdigest()
+    raw = kv_store().get(f"sos:idem:{tenant_id}:{user_id}:{scope}")
+    assert raw is not None
+    return raw
+
+
+def test_H_01_guardian_create_replay_keeps_no_phone_or_address_in_valkey(
+    world: Any, api: Any
+) -> None:
+    """Data-protection H-01: the replay record of POST /guardians holds status, the id and
+    headers, never the decrypted C3 phone and address; the replay re-reads the guardian."""
+    admin = world.person("office_admin")
+    sid = api.call(admin, "POST", BASE, json=new_body("Synthetica Replay Case")).json()["id"]
+    path = f"{BASE}/{sid}/guardians"
+    key = f"guardian-{uuid.uuid4().hex}"
+    body = {
+        "relationship": "father",
+        "full_name": "Synthetic Father Replay",
+        "phone": "9876544321",
+        "address": "Synthetic Lane 7, Replay Nagar",
+    }
+    first = api.call(admin, "POST", path, json=body, headers={"Idempotency-Key": key})
+    assert first.status_code == 201, first.text
+    raw = _idem_record(world.a.tenant_id, admin.user_id, path, key)
+    for plaintext in ("9876544321", "Synthetic Lane 7", "Replay Nagar"):
+        assert plaintext.encode() not in raw
+    assert b'"body"' not in raw
+    again = api.call(admin, "POST", path, json=body, headers={"Idempotency-Key": key})
+    assert again.status_code == 201
+    assert again.headers.get("Idempotent-Replayed") == "true"
+    assert again.headers["ETag"] == first.headers["ETag"]
+    assert again.json() == first.json()

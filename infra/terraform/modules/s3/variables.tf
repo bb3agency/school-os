@@ -10,8 +10,18 @@ variable "bucket_suffix" {
 }
 
 variable "data_kms_key_arn" {
-  description = "CMK for the files and artifacts buckets."
+  description = "CMK for the files bucket."
   type        = string
+}
+
+variable "artifacts_kms_key_arn" {
+  description = "Own CMK for the release artifacts bucket. Every dedicated host may decrypt it, so it is never the data key (audit 2026-10-05 key separation)."
+  type        = string
+
+  validation {
+    condition     = var.artifacts_kms_key_arn != var.data_kms_key_arn
+    error_message = "The artifacts bucket needs its own CMK, never the data key: every dedicated host may decrypt it."
+  }
 }
 
 variable "audit_kms_key_arn" {

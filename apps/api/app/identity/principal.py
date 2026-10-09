@@ -27,6 +27,7 @@ from uuid import UUID
 
 from fastapi import Depends, Request
 
+from app.core import ratelimit
 from app.core.errors import Forbidden, StepUpRequired, Unauthenticated
 from app.identity.service_token import (
     SERVICE_TOKEN_HEADER,
@@ -102,6 +103,14 @@ def _authenticate(
     return tokens.verify(_checked_bearer(request, service))
 
 
+def _failed(request: Request, refused: Unauthenticated) -> None:
+    """A rejected service or access token (``security.auth.failed``; counted per client IP for
+    the backoff in the rate-limit middleware). An expired access token is routine (the BFF
+    refreshes it) and does not count."""
+    if refused.code != "token_expired":
+        ratelimit.record_auth_failure(request, reason="token_rejected")
+
+
 def _principal(token: VerifiedToken, kind: PrincipalKind) -> Principal:
     return Principal(
         subject=token.subject,
@@ -126,17 +135,22 @@ def get_principal(
     The unverified ``iss`` only picks the verifier; that verifier checks signature, issuer,
     audience/client and lifetime. Support principals must carry the MFA claim (the operator
     pool enforces MFA; the API checks it again)."""
-    access_token = _checked_bearer(request, service)
-    if (
-        support is not None
-        and support.issuer != tokens.issuer
-        and unverified_issuer(access_token) == support.issuer
-    ):
-        principal = _principal(support.verify(access_token), "support")
-        if not principal.mfa:
-            raise Forbidden("SchoolOS support must sign in with MFA", code="mfa_required")
-        return principal
-    return _principal(tokens.verify(access_token), "user")
+    try:
+        access_token = _checked_bearer(request, service)
+        if (
+            support is not None
+            and support.issuer != tokens.issuer
+            and unverified_issuer(access_token) == support.issuer
+        ):
+            principal = _principal(support.verify(access_token), "support")
+        else:
+            return _principal(tokens.verify(access_token), "user")
+    except Unauthenticated as refused:
+        _failed(request, refused)
+        raise
+    if not principal.mfa:
+        raise Forbidden("SchoolOS support must sign in with MFA", code="mfa_required")
+    return principal
 
 
 def get_operator_principal(
@@ -146,7 +160,11 @@ def get_operator_principal(
 ) -> Principal:
     """Platform operators (separate pool/app client). MFA is mandatory for every operator
     (FR-IAM-002, contract §5), so a token without an MFA signal is refused outright."""
-    principal = _principal(_authenticate(request, tokens, service), "operator")
+    try:
+        principal = _principal(_authenticate(request, tokens, service), "operator")
+    except Unauthenticated as refused:
+        _failed(request, refused)
+        raise
     if not principal.mfa:
         raise Forbidden("Operators must sign in with MFA", code="mfa_required")
     return principal

@@ -17,16 +17,22 @@ from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.orm import Session
 
-from app.audit import repository
+from app.audit import repository, verification
+from app.audit.archive import ArchiveCheck, check_head, latest_manifest
 from app.audit.partitions import RUNWAY_WARN_DAYS, partition_upper_bound
 from app.audit.schemas import VerifyResult
-from app.audit.service import verify_chain, verify_platform_chain
+from app.audit.service import verify_platform_chain
 from app.core.db import context_free_session, platform_session, tenant_session
 
 logger = logging.getLogger("app.audit.verify")
 
-TENANT_STATUSES = ("active", "suspended")
+TENANT_STATUSES = ("provisioning", "active", "suspended", "offboarding", "deleted")
+"""Every status whose school can hold an audit chain (audit 2026-10-05 DP-03). Offboarding and
+deleted schools keep their chain, including the evidence of the deletion, until the audit
+retention ends (ADR-0029), so the daily verification and the signed archive cover them too. A
+school whose chain was purged verifies as empty and archives nothing."""
 
 
 class TenantListingUnavailable(RuntimeError):
@@ -34,7 +40,8 @@ class TenantListingUnavailable(RuntimeError):
 
 
 def list_tenant_ids(*, engine: Engine | None = None) -> list[uuid.UUID]:
-    """Active and suspended tenant IDs via the allowlisted definer function."""
+    """IDs of every school that can hold a chain (:data:`TENANT_STATUSES`), via the
+    allowlisted definer function."""
     try:
         with context_free_session(engine=engine) as session:
             rows: Iterable[object] = session.execute(
@@ -66,20 +73,55 @@ def _log_result(result: VerifyResult, **ids: str) -> None:
         )
 
 
+def _against_archive(
+    session: Session, tenant_id: uuid.UUID, archive: ArchiveCheck
+) -> tuple[str, int] | None:
+    """The chain compared with the school's last signed manifest (H-04). The bucket being
+    unreachable is a warning, not a broken chain."""
+    try:
+        document = latest_manifest(
+            archive.s3, archive.bucket, tenant_id, today=datetime.now(UTC).date()
+        )
+    except Exception:
+        logger.warning("audit.archive.check_unavailable", extra={"tenant_id": str(tenant_id)})
+        return None
+    if document is None:
+        return None
+    return check_head(session, tenant_id, document, archive.signer)
+
+
 def verify_all(
     tenant_ids: Iterable[uuid.UUID],
     *,
     engine: Engine | None = None,
     statement_timeout_ms: int | None = None,
+    archive: ArchiveCheck | None = None,
 ) -> dict[uuid.UUID, VerifyResult]:
-    """Verify each tenant's chain in its own transaction; one failure never stops the rest."""
+    """Verify each tenant's chain in its own transaction; one failure never stops the rest.
+
+    With ``archive``, a chain that is consistent in itself is also compared with the school's
+    last signed archive manifest (``last_seq``, ``last_hash``): a database head behind it
+    (``head_behind_archive``), a different event at that seq (``archive_hash_mismatch``) or a
+    manifest whose signature does not verify (``archive_signature_invalid``) is a broken chain
+    (data-protection audit 2026-10-05 H-04). The platform chain is not archived, so it has no
+    such reference."""
     results: dict[uuid.UUID, VerifyResult] = {}
     for tenant_id in tenant_ids:
         try:
             with tenant_session(
                 tenant_id, statement_timeout_ms=statement_timeout_ms, engine=engine
             ) as session:
-                result = verify_chain(session, tenant_id)
+                # Always the whole chain; the result and checkpoint are stored for
+                # GET /audit/verify (audit 2026-10-06 R-19).
+                out = verification.run(session, tenant_id, full=True, source="daily")
+                behind = (
+                    _against_archive(session, tenant_id, archive)
+                    if archive is not None and out.ok
+                    else None
+                )
+            result = VerifyResult(bool(out.ok), out.checked, out.first_bad_seq, out.reason)
+            if behind is not None:
+                result = VerifyResult(False, out.checked, behind[1], behind[0])
         except Exception:
             logger.exception("audit.chain.verify_error", extra={"tenant_id": str(tenant_id)})
             result = VerifyResult(False, 0, None, "verify_error")

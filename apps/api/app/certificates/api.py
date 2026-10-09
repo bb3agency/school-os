@@ -175,14 +175,16 @@ def approve_certificate(
     certificate_id: uuid.UUID,
     expected: IfMatch,
     response: Response,
-    body: ApproveIn | None = None,
+    body: ApproveIn,
 ) -> CertificateOut:
     """Approve and issue a transfer certificate (or a TC duplicate): serial number, register
     entry and, for a TC, the student leaves the rolls (permission ``certificate.approve``, MFA
-    within 5 minutes, not the person who prepared it, ``If-Match``). Errors:
+    within 5 minutes, not the person who prepared it, ``If-Match``). The body carries the
+    ``draft_sha256`` read from ``GET /certificates/{id}``. Errors:
     ``self_approval_forbidden`` (403), ``step_up_required`` (428), ``certificate_not_pending``
-    / ``certificate_blocked`` (409)."""
-    out = service.approve(db, ctx, certificate_id, body or ApproveIn(), expected_version=expected)
+    / ``certificate_blocked`` / ``change_request_pending`` / ``requester_inactive`` /
+    ``certificate_draft_changed`` (409: what it prints changed since it was read)."""
+    out = service.approve(db, ctx, certificate_id, body, expected_version=expected)
     return _with_etag(response, out)
 
 
@@ -282,7 +284,8 @@ def certificate_download_url(
 ) -> DownloadUrlOut:
     """A link to download the certificate PDF, valid for at most 5 minutes (permission
     ``certificate.read``). Error ``pdf_not_ready`` / ``document_not_ready`` (409) while it is
-    being made or checked. Audited."""
+    being made or checked; ``certificate_cancelled`` (409) once it, or the original it copies,
+    was cancelled (print it from the print view, marked CANCELLED). Audited."""
     return service.download_url(db, ctx, certificate_id)
 
 

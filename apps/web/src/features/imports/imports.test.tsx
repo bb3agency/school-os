@@ -209,6 +209,31 @@ describe("US-401 AC1..AC3: one import", () => {
     expect(screen.queryByRole("link", { name: messages.en.sheets.import.open })).toBeNull();
   });
 
+  it("offers the sheet from the 'Check rows' step when rows have problems (FR-IMP-008)", () => {
+    const fix = messages.en.sheets.import.fixInSheet;
+    const view = renderWithIntl(
+      <ImportDetailView
+        batch={ready(importBatch({ status: "validated", error_count: 3 }))}
+        attributes={ready(ATTRIBUTES)}
+        permissions={perms}
+      />,
+    );
+    expect(screen.getByRole("link", { name: fix })).toHaveAttribute(
+      "href",
+      `/imports/${ID.import}/sheet`,
+    );
+    view.unmount();
+    // Added rows are official records: never corrected through the sheet (invariant 6).
+    renderWithIntl(
+      <ImportDetailView
+        batch={ready(importBatch({ status: "committed", error_count: 3 }))}
+        attributes={ready(ATTRIBUTES)}
+        permissions={perms}
+      />,
+    );
+    expect(screen.queryByRole("link", { name: fix })).toBeNull();
+  });
+
   it("suggests columns from English and Telugu headings, checks duplicates, then maps and checks", async () => {
     expect(
       initialTarget({ index: 0, header: "A", suggested: "dob", score: 90, target: null }),

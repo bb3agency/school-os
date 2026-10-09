@@ -35,29 +35,108 @@ afterEach(() => {
   expect(intlErrors).toEqual([]);
 });
 
+const QUEUE = "POST /bff/api/v1/audit/verify";
+
+/** A stored check (GET /audit/verify; audit 2026-10-06 R-19). */
+function stored(overrides: Record<string, unknown> = {}) {
+  return {
+    ok: true,
+    checked: 1234,
+    first_bad_seq: null,
+    reason: null,
+    verified_at: "2026-10-05T20:45:00Z",
+    mode: "full",
+    source: "daily",
+    checkpoint_seq: 1234,
+    checkpoint_at: "2026-10-05T20:45:00Z",
+    last_full_at: "2026-10-05T20:45:00Z",
+    pending: false,
+    requested_at: null,
+    ...overrides,
+  };
+}
+
 describe("audit chain check (US-1001 AC2, FR-AUD-003, FR-AUD-005)", () => {
-  it("runs only when asked and says how far the chain is verified", async () => {
-    stub.routes[VERIFY] = () =>
-      Response.json({ ok: true, checked: 1234, first_bad_seq: null, reason: null });
+  it("shows the stored result and when it was verified, without re-checking", async () => {
+    stub.routes[VERIFY] = () => Response.json(stored());
     renderWithIntl(<AuditVerifyScreen />);
-    const button = await screen.findByRole("button", { name: "Check integrity" });
-    expect(stub.callsTo(VERIFY)).toHaveLength(0);
-    await userEvent.click(button);
     expect(await screen.findByText("The audit log is intact")).toBeInTheDocument();
     expect(
       screen.getByText(
         "Verified up to event 1,234: 1,234 events were checked and none was changed.",
       ),
     ).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Check again" }));
-    await waitFor(() => expect(stub.callsTo(VERIFY)).toHaveLength(2));
+    expect(screen.getByText(/^Last verified on /)).toBeInTheDocument();
+    expect(stub.callsTo(VERIFY)).toHaveLength(1);
+    expect(stub.callsTo(QUEUE)).toHaveLength(0);
+  });
+
+  it("says how many new events an incremental check covered", async () => {
+    stub.routes[VERIFY] = () =>
+      Response.json(stored({ mode: "incremental", source: "on_demand", checked: 3 }));
+    renderWithIntl(<AuditVerifyScreen />);
+    expect(
+      await screen.findByText(
+        "Verified up to event 1,234: 3 new events were checked and none was changed.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("check again queues a check, shows it queued and the result when it is done", async () => {
+    let done = false;
+    stub.routes[VERIFY] = () =>
+      Response.json(done ? stored({ checkpoint_seq: 1240, checked: 6 }) : stored());
+    stub.routes[QUEUE] = () =>
+      Response.json(stored({ pending: true, requested_at: "2026-10-06T05:00:00Z" }), {
+        status: 202,
+      });
+    const user = userEvent.setup();
+    renderWithIntl(<AuditVerifyScreen />);
+    await user.click(await screen.findByRole("button", { name: "Check again" }));
+    await waitFor(() => expect(stub.callsTo(QUEUE)).toHaveLength(1));
+    expect(JSON.parse(stub.callsTo(QUEUE)[0]?.body ?? "null")).toEqual({ full: false });
+    expect(await screen.findByText("Check queued")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Check again" })).toBeDisabled();
+    done = true;
+  });
+
+  it("explains the 10-minute cool-down when the school asked a moment ago (429)", async () => {
+    stub.routes[VERIFY] = () => Response.json(stored());
+    stub.routes[QUEUE] = () => problem(429, "rate_limited", { retry_after: 420 });
+    const user = userEvent.setup();
+    renderWithIntl(<AuditVerifyScreen />);
+    await user.click(await screen.findByRole("button", { name: "Check again" }));
+    expect(await screen.findByText("The log was checked a moment ago")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "You can ask for another check in 7 minutes. SchoolOS also checks the whole log every night.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("before the first check: says so and offers to check now", async () => {
+    stub.routes[VERIFY] = () =>
+      Response.json(
+        stored({
+          ok: null,
+          checked: 0,
+          verified_at: null,
+          mode: null,
+          source: null,
+          checkpoint_seq: 0,
+          checkpoint_at: null,
+          last_full_at: null,
+        }),
+      );
+    renderWithIntl(<AuditVerifyScreen />);
+    expect(await screen.findByText("Not checked yet")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Check integrity" })).toBeEnabled();
   });
 
   it("says where the chain is broken, why, and what to do", async () => {
     stub.routes[VERIFY] = () =>
-      Response.json({ ok: false, checked: 6, first_bad_seq: 7, reason: "hash_mismatch" });
+      Response.json(stored({ ok: false, checked: 6, first_bad_seq: 7, reason: "hash_mismatch" }));
     renderWithIntl(<AuditVerifyScreen />);
-    await userEvent.click(await screen.findByRole("button", { name: "Check integrity" }));
     expect(await screen.findByText("The audit log is broken at event 7")).toBeInTheDocument();
     expect(
       screen.getByText("Events before it are intact (6 events, up to event 6)."),
@@ -66,13 +145,10 @@ describe("audit chain check (US-1001 AC2, FR-AUD-003, FR-AUD-005)", () => {
     expect(screen.getByText(/Contact SchoolOS support now/)).toBeInTheDocument();
   });
 
-  it("explains an unknown reason and an empty log plainly", async () => {
+  it("explains an unknown reason and a break at the first event plainly", async () => {
     stub.routes[VERIFY] = () =>
-      Response.json({ ok: false, checked: 0, first_bad_seq: 1, reason: "new_reason" });
+      Response.json(stored({ ok: false, checked: 0, first_bad_seq: 1, reason: "new_reason" }));
     renderWithIntl(<AuditVerifyScreen />, "te");
-    await userEvent.click(
-      await screen.findByRole("button", { name: messages.te.school.audit.verify }),
-    );
     expect(
       await screen.findByText(messages.te.school.audit.integrity.reason.other),
     ).toBeInTheDocument();
@@ -81,10 +157,9 @@ describe("audit chain check (US-1001 AC2, FR-AUD-003, FR-AUD-005)", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows a plain error when the check fails", async () => {
+  it("shows a plain error when the result cannot be read", async () => {
     stub.routes[VERIFY] = () => problem(503, "service_unavailable");
     renderWithIntl(<AuditVerifyScreen />);
-    await userEvent.click(await screen.findByRole("button", { name: "Check integrity" }));
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(screen.queryByText("The audit log is intact")).toBeNull();
   });
@@ -160,7 +235,7 @@ describe("audit log CSV download (FR-AUD-005, US-1001, SEC-005)", () => {
     const [call] = stub.callsTo(EXPORT);
     expect(call?.url.searchParams.get("actor")).toBe(USER);
     expect(call?.url.searchParams.get("action")).toBe("student.update");
-    expect(call?.url.searchParams.get("from")).toBe("2026-06-01");
+    expect(call?.url.searchParams.get("from")).toBe("2026-06-01T00:00:00+05:30");
     // A date that is not real is left out, as in the table; no page size on a file.
     expect(call?.url.searchParams.has("to")).toBe(false);
     expect(call?.url.searchParams.has("limit")).toBe(false);

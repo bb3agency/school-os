@@ -25,6 +25,7 @@ from app.documents.tasks import beat_schedule as documents_beat_schedule
 from app.exports.tasks import beat_schedule as exports_beat_schedule
 from app.imports.tasks import beat_schedule as imports_beat_schedule
 from app.insights.tasks import beat_schedule as insights_beat_schedule
+from app.knowledge.service import check_provider_agreements
 from app.knowledge.tasks import beat_schedule as knowledge_beat_schedule
 from app.notifications.tasks import beat_schedule as notifications_beat_schedule
 from app.ops.tasks import beat_schedule as ops_beat_schedule
@@ -82,6 +83,8 @@ TASK_MODULES: list[str] = [
 
 def create_celery() -> Celery:
     settings = get_settings()
+    # Claude safety lock (docs/10 §11): the worker refuses to start like the API does.
+    check_provider_agreements(settings)
     broker = settings.redis_url.get_secret_value()
     app = Celery("schoolos", broker=broker, backend=broker, include=TASK_MODULES)
     app.conf.update(
@@ -96,15 +99,23 @@ def create_celery() -> Celery:
         result_serializer="json",
         accept_content=["json"],
         result_expires=24 * 3600,
+        # Nothing reads task results. Do not keep return values or failure messages and
+        # tracebacks (which can quote database row values) in Valkey (invariant 5; audit
+        # 2026-10-05 H-02).
+        task_ignore_result=True,
+        task_store_errors_even_if_ignored=False,
         timezone="UTC",
         enable_utc=True,
         broker_connection_retry_on_startup=True,
         task_routes={
             "maintenance.*": {"queue": "maintenance"},
+            # R-19: an on-demand audit-chain check (outbox consumer of POST /audit/verify).
+            "audit.verify_chain": {"queue": "maintenance"},
             # FR-DOC-002: AV scans run on the ingest queue (send_task honours routes only).
             "documents.scan": {"queue": "ingest"},
             # PRV-016: deleting the files of discarded versions (outbox consumer + daily sweep).
             "documents.discard_object": {"queue": "maintenance"},
+            "documents.discard_unused_object": {"queue": "maintenance"},
             "documents.sweep_discarded_objects": {"queue": "maintenance"},
             # FR-IMP-001..004: spreadsheet parsing, checking and commit (outbox consumers).
             "imports.parse": {"queue": "ingest"},
@@ -140,6 +151,10 @@ def create_celery() -> Celery:
             # ADR-0034: the rolling summary of an Ask conversation, after the answer.
             "knowledge.summarise_conversation": {"queue": "ingest"},
             "knowledge.tidy_conversations": {"queue": "maintenance"},
+            # docs/08 §7 erasure chain: the daily sweep of cached vectors no chunk uses.
+            "knowledge.purge_orphan_vectors": {"queue": "maintenance"},
+            # Audit W3-10: a budget settlement the spend store refused, retried from the outbox.
+            "knowledge.settle_spend": {"queue": "maintenance"},
             "knowledge.*": {"queue": "ingest"},
             # M4 (FR-CIR-002): circular reading through the knowledge gateway, next to the
             # ingestion that triggers it; notice PDFs/PNGs on the Chromium workers

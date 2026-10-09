@@ -76,6 +76,11 @@ class KmsSigner:
         )
         return response["Signature"]
 
+    def public_key(self) -> PublicKeyTypes:
+        """The signing key's public half (``kms:GetPublicKey``), to check archived manifests."""
+        der = self._client.get_public_key(KeyId=self._key_arn)["PublicKey"]
+        return serialization.load_der_public_key(der)
+
 
 class LocalDevSigner:
     """Ed25519 signer for local/CI only; the key is derived from the local dev master key."""

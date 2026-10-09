@@ -49,6 +49,9 @@ from app.core.logging import get_context
 from app.identity import repository as repo
 from app.identity.models import Membership, Role
 from app.identity.schemas import (
+    InvitationAnswerOut,
+    InvitationOut,
+    InvitationsOut,
     InviteIn,
     LoginChoice,
     MembershipAccess,
@@ -148,24 +151,55 @@ def _scope_out(scopes: Iterable[Any]) -> list[ScopeOut]:
     return [ScopeOut(type=s.scope_type, ref=s.scope_ref) for s in scopes]
 
 
+def _contact_hidden(membership: Membership, shared: bool) -> bool:
+    """Audit DL-09: a school sees the email and the last sign-in time (audit 2026-10-05 A-03) of
+    a person who also belongs to another school only while they are its member (active or
+    suspended), i.e. after they accepted. An open or declined invitation, or a removed
+    membership, shows neither."""
+    return shared and membership.status not in ("active", "suspended")
+
+
+def _guard_consent(session: Session, membership: Membership, previous: str, status: str) -> None:
+    """Audit DL-09: an invitation to a person who already has a SchoolOS account (they belong to
+    another school) is accepted only by that person (``/me/invitations``), never activated by the
+    inviting school (409 ``invitation_needs_consent``). A brand-new account's invitation may still
+    be activated by hand (ADR-0019)."""
+    if (
+        previous == "invited"
+        and status == "active"
+        and (repo.user_membership_count(session, membership.user_id) or 0) > 1
+    ):
+        raise Conflict(
+            "This person already has a SchoolOS account, so only they can accept the "
+            "invitation. They will see it when they sign in.",
+            code="invitation_needs_consent",
+        )
+
+
 def _user_out(session: Session, membership: Membership) -> UserOut:
     user = repo.get_user(session, membership.user_id)
     if user is None:  # pragma: no cover - RLS shows users with a membership here
         raise NotFound("User not found")
+    shared = (repo.user_membership_count(session, user.id) or 0) > 1
+    hidden = _contact_hidden(membership, shared)
+    # Audit A-18: while hidden, show the name this school typed (older invitations without one
+    # keep the account's name) and do not say the profile is shared with another school.
+    name = (membership.invited_display_name or user.display_name) if hidden else user.display_name
     return UserOut(
         id=user.id,
         membership_id=membership.id,
-        display_name=user.display_name,
-        email=user.email,
+        display_name=name,
+        email=None if hidden else user.email,
+        contact_hidden=hidden,
         preferred_language=output_language(user.preferred_language),  # ADR-0036
         status=membership.status,
         expires_at=membership.expires_at,
         roles=[r.key for r in repo.list_roles_for_membership(session, membership.id)],
         scopes=_scope_out(repo.list_membership_scopes(session, membership.id)),
-        last_login_at=user.last_login_at,
+        last_login_at=None if hidden else user.last_login_at,
         created_at=membership.created_at,
         version=membership.version,
-        profile_shared=(repo.user_membership_count(session, user.id) or 0) > 1,
+        profile_shared=shared and not hidden,
     )
 
 
@@ -222,6 +256,28 @@ def _guard_invite_roles(session: Session, ctx: UserContext, roles: Iterable[Role
     if not ctx.has("role.assign"):
         raise _not_grantable()
     _guard_grantable(session, ctx, sensitive)
+
+
+def _guard_invite_school_scope(
+    ctx: UserContext, data: InviteIn, templates: Mapping[str, RoleDef]
+) -> None:
+    """A-19: a ``school`` scope on a role whose grants are scoped (class teacher, teacher) gives
+    school-wide reach; it needs ``role.assign``, as changing scopes later does (403
+    ``role_not_grantable``). Section and class scopes stay with ``user.manage``."""
+    if not any(s.type == "school" for s in data.scopes) or ctx.has("role.assign"):
+        return
+    if ctx.roles & assign_any_roles():
+        return
+    if any(g.scoped for k in data.roles if k in templates for g in templates[k].grants):
+        raise _not_grantable()
+
+
+def _guard_status_reach(session: Session, ctx: UserContext, membership: Membership) -> None:
+    """Suspending, removing or reactivating a member takes away or gives back every role they
+    hold, so it follows the invite rule (SEC-003): a member with a privileged or custom role is
+    reached only with ``role.assign`` and roles whose permissions the caller holds (the owner
+    reaches everyone). 403 ``role_not_grantable``."""
+    _guard_invite_roles(session, ctx, repo.list_roles_for_membership(session, membership.id))
 
 
 def _guard_not_breakglass(session: Session, membership: Membership) -> None:
@@ -361,41 +417,127 @@ def record_login_event(
             repo.record_login(session, user_id)
 
 
-def accept_invitations(subject: str, *, request_id: str | None = None) -> list[uuid.UUID]:
-    """Accept the signed-in user's pending invitations on first sign-in (ADR-0019).
+def _audit_in_school(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    membership_id: uuid.UUID,
+    user_id: uuid.UUID,
+    action: str,
+    request_id: str | None,
+) -> None:
+    """Audit an invitee's own answer in the inviting school's chain: the tenant context is
+    switched with transaction-local ``set_config`` (invariant 7)."""
+    session.execute(
+        text("SELECT set_config('app.tenant_id', :t, true), set_config('app.user_id', :u, true)"),
+        {"t": str(tenant_id), "u": str(user_id)},
+    )
+    audit.record(
+        session,
+        action=action,
+        resource_type="membership",
+        resource_id=membership_id,
+        summary={"membership_id": membership_id},
+        actor_type="user",
+        actor_id=user_id,
+        request_id=request_id or _request_id(),
+    )
 
-    ``subject`` MUST come from a verified access token. Activation and the
-    ``membership.invitation_accepted`` audit events share one transaction: the tenant context is
-    switched per accepted school (transaction-local ``set_config``) so each event lands in that
-    school's own chain. Only the caller's own memberships are involved. Returns the school IDs.
+
+def _clear_school_context(session: Session) -> None:
+    session.execute(
+        text("SELECT set_config('app.tenant_id', '', true), set_config('app.user_id', '', true)")
+    )
+
+
+def accept_invitations(
+    subject: str, *, issuer: str, request_id: str | None = None
+) -> list[uuid.UUID]:
+    """Sign-in acceptance (ADR-0019), narrowed by audit DL-09 (owner decision 2026-10-04).
+
+    Only a **brand-new account's only invitation** is accepted here (the account was made by that
+    invitation, e.g. a new school's owner); an invitation to an existing account waits for the
+    person's explicit answer (:func:`respond_to_invitation`). ``subject`` and ``issuer`` MUST come
+    from a verified access token; only the identity ``(issuer, subject)`` is involved (ADR-0023).
+    Activation and the ``membership.invitation_accepted`` events share one transaction, each event
+    in that school's own chain. Returns the school IDs.
     """
     accepted: list[uuid.UUID] = []
     with context_free_session() as session:
-        for tenant_id, membership_id, user_id in repo.accept_invitations(session, subject):
-            session.execute(
-                text(
-                    "SELECT set_config('app.tenant_id', :t, true), "
-                    "set_config('app.user_id', :u, true)"
-                ),
-                {"t": str(tenant_id), "u": str(user_id)},
-            )
-            audit.record(
+        for tenant_id, membership_id, user_id in repo.accept_invitations(
+            session, subject, issuer=issuer
+        ):
+            _audit_in_school(
                 session,
+                tenant_id=tenant_id,
+                membership_id=membership_id,
+                user_id=user_id,
                 action="membership.invitation_accepted",
-                resource_type="membership",
-                resource_id=membership_id,
-                summary={"membership_id": membership_id},
-                actor_type="user",
-                actor_id=user_id,
-                request_id=request_id or _request_id(),
+                request_id=request_id,
             )
             accepted.append(tenant_id)
-        session.execute(
-            text(
-                "SELECT set_config('app.tenant_id', '', true), set_config('app.user_id', '', true)"
-            )
-        )
+        _clear_school_context(session)
     return accepted
+
+
+def list_invitations(subject: str, *, issuer: str) -> InvitationsOut:
+    """The signed-in person's own open invitations, to accept or decline (DL-09). Only the
+    school's name and the invited roles are shown; no audit event (a read of their own data)."""
+    with context_free_session() as session:
+        rows = repo.pending_invitations(session, subject, issuer=issuer)
+    return InvitationsOut(
+        data=[
+            InvitationOut(
+                membership_id=r.membership_id,
+                tenant_id=r.tenant_id,
+                school_name=r.school_name,
+                roles=list(r.role_keys),
+                invited_at=r.invited_at,
+                expires_at=r.expires_at,
+            )
+            for r in rows
+        ]
+    )
+
+
+def respond_to_invitation(
+    subject: str,
+    *,
+    issuer: str,
+    membership_id: uuid.UUID,
+    accept: bool,
+    request_id: str | None = None,
+) -> InvitationAnswerOut:
+    """Accept or decline one of the signed-in person's own open invitations (DL-09, ADR-0023
+    amendment). Anything else (someone else's, already answered, expired, school not active) is
+    404 ``invitation_not_found``. Audit, in the inviting school's chain and the same transaction:
+    ``membership.invitation_accepted`` or ``membership.invitation_declined``."""
+    with context_free_session() as session:
+        row = repo.respond_to_invitation(
+            session, subject, issuer=issuer, membership_id=membership_id, accept=accept
+        )
+        if row is None:
+            raise NotFound(
+                "This invitation is no longer open. Ask the school to invite you again.",
+                code="invitation_not_found",
+            )
+        tenant_id, answered, user_id = row
+        _audit_in_school(
+            session,
+            tenant_id=tenant_id,
+            membership_id=answered,
+            user_id=user_id,
+            action=(
+                "membership.invitation_accepted" if accept else "membership.invitation_declined"
+            ),
+            request_id=request_id,
+        )
+        _clear_school_context(session)
+    return InvitationAnswerOut(
+        tenant_id=tenant_id,
+        membership_id=answered,
+        status="active" if accept else "removed",
+    )
 
 
 # --- me ---------------------------------------------------------------------------------------
@@ -483,6 +625,16 @@ def member_display_names(
     return repo.display_names(session, sorted(set(membership_ids)))
 
 
+def is_active_member(session: Session, membership_id: uuid.UUID) -> bool:
+    """Whether ``membership_id`` is an active, unexpired member of this school (e.g. the maker of
+    a request waiting for approval, who may have left since; audit 2026-10-05). No permission
+    check: IDs in, a yes or no out."""
+    membership = repo.get_membership(session, membership_id)
+    if membership is None or membership.status != "active":
+        return False
+    return membership.expires_at is None or membership.expires_at > dt.datetime.now(dt.UTC)
+
+
 def members_for_users(
     session: Session, user_ids: Collection[uuid.UUID]
 ) -> dict[uuid.UUID, tuple[uuid.UUID, str]]:
@@ -508,6 +660,7 @@ def invite_user(session: Session, ctx: UserContext, data: InviteIn) -> UserOut:
     roles = _roles_by_key(session, data.roles)
     _guard_invite_roles(session, ctx, roles.values())
     templates: Mapping[str, RoleDef] = system_roles()
+    _guard_invite_school_scope(ctx, data, templates)
     defs = [templates[k] for k in data.roles if k in templates and roles[k].is_system]
     ttls = [d.membership_ttl for d in defs if d.membership_ttl is not None]
     expires_at = dt.datetime.now(dt.UTC) + min(ttls) if ttls else None
@@ -529,6 +682,7 @@ def invite_user(session: Session, ctx: UserContext, data: InviteIn) -> UserOut:
             expires_at=expires_at,
             created_by=ctx.user_id,
             mfa_required=any(d.mfa_required for d in defs),
+            invited_display_name=data.display_name,
         )
     _record(
         session,
@@ -576,9 +730,11 @@ def set_membership_status(
         return _user_out(session, membership)
     if status not in _TRANSITIONS[previous]:
         raise Conflict(f"A {previous} user cannot be made {status}.", code="invalid_state")
+    _guard_consent(session, membership, previous, status)
     if previous == "active":
         _guard_last_owner(session, membership)
     _guard_not_own(ctx, user_id)
+    _guard_status_reach(session, ctx, membership)
     updated = repo.set_membership_status(
         session, membership.id, status=status, expected_version=expected_version
     )
@@ -616,7 +772,8 @@ def update_user(
     (409 ``invalid_state``), and a profile shared with another school is not edited either
     (409 ``profile_shared``, ADR-0028; the whole request is refused). Nobody changes the status
     of their own membership (409 ``own_account``). Unchanged values are ignored; with nothing
-    to change the member is returned as is. Otherwise the membership version is bumped once
+    to change the member is returned as is. Editing another member's profile follows the status
+    reach rule (403 ``role_not_grantable``, R-07). Otherwise the membership version is bumped once
     (the ETag changes).
     Audit: ``user.profile_updated`` with the changed field NAMES only (never values) and
     ``membership.status_changed`` {from, to}.
@@ -643,10 +800,16 @@ def update_user(
     if status != previous:
         if status not in _TRANSITIONS[previous]:
             raise Conflict(f"A {previous} user cannot be made {status}.", code="invalid_state")
+        _guard_consent(session, membership, previous, status)
         if previous == "active":
             _guard_last_owner(session, membership)
         _guard_not_own(ctx, user_id)
+        _guard_status_reach(session, ctx, membership)
     if profile:
+        if user_id != ctx.user_id:
+            # R-07 (SEC-003): the email and name of a member outside the caller's reach
+            # (owner, principal, office admin, custom roles) follow the status rule.
+            _guard_status_reach(session, ctx, membership)
         _guard_profile_not_shared(session, user_id)
         with _db_errors():
             repo.update_user_profile(
@@ -677,11 +840,18 @@ def update_user(
 
 
 def set_roles(
-    session: Session, ctx: UserContext, user_id: uuid.UUID, role_keys: Sequence[str]
+    session: Session,
+    ctx: UserContext,
+    user_id: uuid.UUID,
+    role_keys: Sequence[str],
+    *,
+    expected_version: int | None = None,
 ) -> UserOut:
     """Replace a member's roles (``role.assign``, step-up). Audit per granted/revoked role.
 
     An empty list is refused (422 ``roles_required``): suspend or remove the member instead.
+    ``expected_version`` is the optional ``If-Match`` (412 when stale); the membership row is
+    locked and its version moves on, so a stale list cannot restore a revoked role (A-17).
     """
     if not role_keys:
         raise RolesRequired(
@@ -693,6 +863,9 @@ def set_roles(
     _guard_not_breakglass(session, membership)
     if membership.status == "removed":
         raise Conflict("This user has been removed.", code="invalid_state")
+    membership = repo.bump_membership_version(
+        session, membership.id, expected_version=expected_version
+    )
     wanted = _roles_by_key(session, role_keys)
     current = {r.key: r for r in repo.list_roles_for_membership(session, membership.id)}
     added = [wanted[k] for k in wanted if k not in current]
@@ -720,9 +893,39 @@ def set_roles(
             resource_id=membership.id,
             summary={"user_id": user_id, "role_key": role.key, "role_id": role.id},
         )
+    membership = _start_time_bound_window(session, ctx, membership, added)
     if added or revoked:
         cache.invalidate_on_commit(session, ctx.tenant_id, membership.id)
     return _user_out(session, membership)
+
+
+def _start_time_bound_window(
+    session: Session, ctx: UserContext, membership: Membership, added: Sequence[Role]
+) -> Membership:
+    """A role with a membership TTL (``auditor_readonly``, docs/07 §6.2) is time-bound however it
+    is given: adding it caps the membership's expiry at now + TTL, as an invitation does. An
+    earlier expiry is kept; nothing is ever extended (audit 2026-10-05 A-02)."""
+    templates = system_roles()
+    ttls = [
+        d.membership_ttl
+        for r in added
+        if r.is_system and (d := templates.get(r.key)) is not None and d.membership_ttl
+    ]
+    if not ttls:
+        return membership
+    ends = dt.datetime.now(dt.UTC) + min(ttls)
+    if membership.expires_at is not None and membership.expires_at <= ends:
+        return membership
+    updated = repo.set_membership_expiry(session, membership.id, expires_at=ends)
+    _record(
+        session,
+        ctx,
+        action="membership.expiry_set",
+        resource_type="membership",
+        resource_id=membership.id,
+        summary={"user_id": membership.user_id, "expires_at": ends.isoformat()},
+    )
+    return updated
 
 
 def _add_scopes(
@@ -742,13 +945,22 @@ def _add_scopes(
 
 
 def set_scopes(
-    session: Session, ctx: UserContext, user_id: uuid.UUID, scopes: Sequence[ScopeIn]
+    session: Session,
+    ctx: UserContext,
+    user_id: uuid.UUID,
+    scopes: Sequence[ScopeIn],
+    *,
+    expected_version: int | None = None,
 ) -> UserOut:
-    """Replace a member's class/section scopes (``role.assign``, step-up; FR-IAM-012)."""
+    """Replace a member's class/section scopes (``role.assign``, step-up; FR-IAM-012).
+    ``expected_version`` is the optional ``If-Match``, as for :func:`set_roles`."""
     membership = _membership_for_user(session, user_id)
     _guard_not_breakglass(session, membership)
     if membership.status == "removed":
         raise Conflict("This user has been removed.", code="invalid_state")
+    membership = repo.bump_membership_version(
+        session, membership.id, expected_version=expected_version
+    )
     current = {
         (s.scope_type, s.scope_ref): s for s in repo.list_membership_scopes(session, membership.id)
     }
@@ -875,6 +1087,30 @@ def active_members(session: Session) -> list[StaffMemberOut]:
         )
         for m in members
         if m.id in names and BREAKGLASS_ROLE not in roles.get(m.id, ())
+    ]
+
+
+def active_holders(session: Session, permission: str) -> list[uuid.UUID]:
+    """Membership ids of this school's active, unexpired members whose roles grant
+    ``permission`` (any scope), without break-glass support memberships: the people who could
+    do a piece of work instead of the caller (e.g. a second reviewer of a verified answer,
+    FR-KB-030). No permission check: a permission key in, membership ids out."""
+    now = dt.datetime.now(dt.UTC)
+    roles = repo.list_roles(session)
+    perms = repo.role_permission_keys(session, [r.id for r in roles])
+    granting = {r.key for r in roles if r.key != BREAKGLASS_ROLE and permission in perms[r.id]}
+    if not granting:
+        return []
+    members = [
+        m
+        for m in repo.list_memberships(session, status="active")
+        if m.expires_at is None or m.expires_at > now
+    ]
+    keys = repo.role_keys_by_membership(session, [m.id for m in members])
+    return [
+        m.id
+        for m in members
+        if BREAKGLASS_ROLE not in keys.get(m.id, set()) and granting & keys.get(m.id, set())
     ]
 
 

@@ -158,7 +158,9 @@ def test_FR_DOC_001_uploads_outside_the_allowlist_are_refused(
     assert res.headers["content-type"].startswith("application/problem+json")
 
 
-def test_FR_IMP_import_files_use_the_imports_layout(world: Any, api: Any) -> None:
+def test_FR_IMP_import_files_use_the_imports_layout(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
     who = world.person("office_staff")
     data = S.csv_text()
     out = upload(
@@ -169,6 +171,7 @@ def test_FR_IMP_import_files_use_the_imports_layout(world: Any, api: Any) -> Non
     assert res.status_code == 202, res.text
     objects = S.memory_store().objects
     assert f"t/{world.a.tenant_id}/imports/{out['batch_id']}/raw.csv" in objects
+    S.run_object_discards(admin_engine, world.a.tenant_id)  # W3-06: the worker discards
     assert out["fields"]["key"] not in objects, "staging copy removed"
     body = res.json()
     assert (body["purpose"], body["doc_type"], body["sensitivity"]) == (
@@ -258,6 +261,7 @@ def test_FR_DOC_001_png_renamed_to_pdf_is_415_and_object_deleted(
     res = register(api, who, up["upload_id"])
     assert res.status_code == 415
     assert res.json()["code"] == "unsupported_file_type"
+    S.run_object_discards(admin_engine, world.a.tenant_id)  # W3-06: the worker discards
     assert up["fields"]["key"] not in S.memory_store().objects
     assert W.audit_events(admin_engine, world.a.tenant_id, "document.registered") == before
 
@@ -277,7 +281,7 @@ def test_FR_DOC_001_png_renamed_to_pdf_is_415_and_object_deleted(
     ids=["html-as-jpeg", "jpeg-html-polyglot"],
 )
 def test_SEC_016_html_and_polyglots_declared_as_images_are_rejected(
-    world: Any, api: Any, data: bytes, code: str
+    world: Any, api: Any, admin_engine: Engine, data: bytes, code: str
 ) -> None:
     who = world.person("office_admin")
     up = upload(
@@ -286,6 +290,7 @@ def test_SEC_016_html_and_polyglots_declared_as_images_are_rejected(
     res = register(api, who, up["upload_id"], title="Register page 4")
     assert res.status_code == 415, res.text
     assert res.json()["code"] == code
+    S.run_object_discards(admin_engine, world.a.tenant_id)  # W3-06: the worker discards
     assert up["fields"]["key"] not in S.memory_store().objects
 
 
@@ -303,6 +308,7 @@ def test_SEC_016_stored_object_bigger_than_declared_is_rejected(
     res = register(api, who, str(intent))
     assert res.status_code == 422
     assert res.json()["errors"][0]["code"] == "size_mismatch"
+    S.run_object_discards(admin_engine, world.a.tenant_id)  # W3-06: the worker discards
     assert key not in S.memory_store().objects
 
     intent = S.make_intent(admin_engine, world.a.tenant_id, who.user_id, data)
@@ -358,7 +364,9 @@ def test_SEC_016_intent_of_another_user_or_school_is_404(
     }
 
 
-def test_FR_DOC_001_duplicate_file_is_reported_only_when_visible(world: Any, api: Any) -> None:
+def test_FR_DOC_001_duplicate_file_is_reported_only_when_visible(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
     admin = world.person("office_admin")
     data = S.pdf()
     first = new_document(api, admin, data)
@@ -367,6 +375,7 @@ def test_FR_DOC_001_duplicate_file_is_reported_only_when_visible(world: Any, api
     assert res.status_code == 409
     assert res.json()["code"] == "duplicate_document"
     assert first["id"] in res.json()["detail"]
+    S.run_object_discards(admin_engine, world.a.tenant_id)  # W3-06: the worker discards
     assert up["fields"]["key"] not in S.memory_store().objects
 
     # A duplicate the caller cannot see is not revealed: the upload proceeds.
@@ -707,7 +716,9 @@ def test_SEC_016_reposting_after_registration_cannot_replace_the_checked_file(
     assert up["fields"]["key"] not in store.objects
 
 
-def test_SEC_016_file_swapped_during_checks_is_refused(world: Any, api: Any) -> None:
+def test_SEC_016_file_swapped_during_checks_is_refused(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
     who = world.person("office_admin")
     store = S.memory_store()
     data = S.pdf()
@@ -723,6 +734,7 @@ def test_SEC_016_file_swapped_during_checks_is_refused(world: Any, api: Any) -> 
         store.before_copy = None
     assert res.status_code == 409
     assert res.json()["code"] == "upload_changed"
+    S.run_object_discards(admin_engine, world.a.tenant_id)  # W3-06: the worker discards
     assert up["fields"]["key"] not in store.objects
 
 
@@ -766,6 +778,34 @@ def test_FR_DOC_002_infected_file_is_quarantined_audited_and_never_served(
     assert res.json()["code"] == "document_not_ready"
     with tenant_session(world.a.tenant_id) as s:
         assert service.evidence_exists(s, uuid.UUID(doc["id"])) is False
+
+
+def test_FR_DOC_002_FR_NOT_001_the_uploader_is_told_their_file_was_blocked(
+    world: Any, api: Any
+) -> None:
+    """The ``document.quarantined`` template had no producer: the uploader gets one in-app
+    notification linked to the document (ids only), once, however often the scan runs."""
+    who = world.person("office_admin")
+    other = world.person("owner")
+    doc = new_document(api, who, S.pdf(S.EICAR.decode()))
+    assert scan(world.a.tenant_id, doc) == "quarantined"
+    assert scan(world.a.tenant_id, doc) == "quarantined", "idempotent"
+
+    def blocked(person: Any) -> list[dict[str, Any]]:
+        items = api.call(person, "GET", "/api/v1/notifications", params={"limit": 200}).json()[
+            "data"
+        ]
+        return [n for n in items if n["template_key"] == "document.quarantined"]
+
+    (note,) = [n for n in blocked(who) if n["resource_id"] == doc["id"]]
+    assert note["resource_type"] == "document"
+    assert note["params"] == {"document_id": doc["id"]}
+    assert [n for n in blocked(other) if n["resource_id"] == doc["id"]] == []
+    # A clean file tells nobody anything.
+    before = len(blocked(who))
+    clean = new_document(api, who)
+    assert scan(world.a.tenant_id, clean) == "ready"
+    assert len(blocked(who)) == before
 
 
 def test_FR_DOC_008_scanner_outage_retries_then_fails(world: Any, api: Any) -> None:
@@ -834,6 +874,38 @@ def test_FR_DOC_004_restricted_c3_files_need_sensitive_read(world: Any, api: Any
     assert api.call(world.person("principal"), "GET", path).status_code == 200
 
 
+def test_SEC_015_raw_import_files_download_only_like_restricted_files(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """Audit 2026-10-04, DL-02: a raw import spreadsheet holds every column of the file,
+    including restricted (C3) ones (religion, caste, the Aadhaar-as-printed name) that the
+    import's own sheet and export hide from staff without ``student.read_sensitive``
+    (FR-IMP-008/009). Its ``download-url`` must not hand the raw file to a school-wide
+    document reader who lacks that permission (accountant, read-only auditor, other office
+    staff); the uploader and sensitive readers keep it."""
+    maker = world.person("office_staff")
+    up = upload(
+        api,
+        maker,
+        S.csv_text(),
+        purpose="import_file",
+        filename="students.csv",
+        content_type="text/csv",
+    )
+    doc = register(api, maker, up["upload_id"], title="Admissions list").json()
+    scan(world.a.tenant_id, doc)
+    path = f"/api/v1/documents/{doc['id']}/download-url"
+    assert api.call(maker, "GET", path).status_code == 200, "the uploader may open it"
+    for role in ("accountant", "auditor_readonly", "exam_coordinator"):
+        res = api.call(world.person(role), "GET", path)
+        assert res.status_code == 403, (role, res.text)
+        assert res.json()["code"] == "sensitive_document"
+    for role in ("principal", "office_admin"):
+        assert api.call(world.person(role), "GET", path).status_code == 200, role
+    issued = W.audit_events(admin_engine, world.a.tenant_id, "document.download_url_issued")
+    assert sum(str(e["resource_id"]) == doc["id"] for e in issued) == 3
+
+
 # --- ACL changes and delete -----------------------------------------------------------------
 
 
@@ -897,11 +969,19 @@ def test_FR_DOC_007_delete_removes_rows_audits_and_purges_objects(
     assert any(str(e["resource_id"]) == doc["id"] for e in events)
     jobs = S.outbox_events(admin_engine, world.a.tenant_id, "document.deleted")
     payload = next(p for p in jobs if p["document_id"] == doc["id"])
+    # A person's delete keeps the bucket's 90-day recovery window: not discarded (docs/08 §7).
+    assert payload["discard"] is False
+    keys = [k for k in store.objects if k.startswith(key_prefix)]
     removed = service.purge_document_objects(
-        world.a.tenant_id, uuid.UUID(payload["document_id"]), payload["batch_ids"], store=store
+        world.a.tenant_id,
+        uuid.UUID(payload["document_id"]),
+        payload["batch_ids"],
+        discard=payload["discard"],
+        store=store,
     )
     assert removed >= 1
     assert not any(k.startswith(key_prefix) for k in store.objects)
+    assert not set(keys) & set(store.discarded)
 
 
 def test_FR_DOC_007_retention_guard_blocks_delete(
@@ -1034,8 +1114,19 @@ def test_FR_DOC_007_system_retention_delete_removes_rows_audits_and_purges_objec
         if p["document_id"] == str(doc)
     )
     assert payload["batch_ids"] == []
-    assert service.purge_document_objects(world.a.tenant_id, doc, [], store=store) >= 1
+    # Automatic retention deletions discard (tag ``sos-lifecycle=discarded``): the bucket rule
+    # ``discarded-1d`` expires the bytes after a day, not the 90-day recovery window.
+    assert payload["discard"] is True
+    keys = [k for k in store.objects if k.startswith(prefix)]
+    assert service.purge_document_objects(
+        world.a.tenant_id, doc, [], discard=payload["discard"], store=store
+    ) == len(keys)
     assert not any(k.startswith(prefix) for k in store.objects)
+    assert set(keys) <= set(store.discarded)
+    # Idempotent: a retried purge finds nothing left and fails nothing.
+    assert (
+        service.purge_document_objects(world.a.tenant_id, doc, [], discard=True, store=store) == 0
+    )
 
 
 def test_FR_DOC_007_system_retention_delete_keeps_guards_reasons_and_tenant(
@@ -1107,6 +1198,8 @@ def test_purge_expired_uploads(world: Any, admin_engine: Engine) -> None:
         ).scalar_one()
     assert service.purge_expired_uploads(world.a.tenant_id, store=S.memory_store()) >= 1
     assert key not in S.memory_store().objects
+    # An automatic purge discards (docs/08 §7): the staging bytes expire after a day.
+    assert key in S.memory_store().discarded
     with admin_engine.connect() as c:
         n: Any = c.execute(
             text("SELECT count(*) FROM kb.upload_intents WHERE id = :i"), {"i": intent}
@@ -1388,6 +1481,49 @@ def test_PRV_016_daily_sweep_discards_what_the_task_missed(
     assert key in store.objects  # the outbox task never ran (e.g. retries exhausted)
     assert service.sweep_discarded_objects(tenant, store=store) >= 1
     assert key not in store.objects
+
+
+def _derived_pages(tenant: uuid.UUID, doc_id: uuid.UUID, version_no: int) -> list[str]:
+    with tenant_session(tenant) as s:
+        return [
+            service.store_page_image(s, doc_id, version_no, page, S.png(), store=S.memory_store())
+            for page in (1, 2)
+        ]
+
+
+def test_DL_hardening_7_discard_also_clears_the_versions_derived_renders(
+    world: Any, api: Any, admin_engine: Engine, store: Any
+) -> None:
+    """Audit 2026-10-04 data-layer hardening note 7: page renders under ``v<n>/derived/`` show
+    the same Aadhaar number as the original, so the discard removes them too (PRV-016)."""
+    who = world.person("office_admin")
+    tenant = world.a.tenant_id
+    doc_id = uuid.UUID(_page_document(api, who, tenant)["id"])
+    pages = _derived_pages(tenant, doc_id, 1)
+    assert all(k in store.objects for k in pages)
+    with tenant_session(tenant) as s:
+        assert service.discard_version(s, doc_id, 1, "aadhaar_unredactable") is True
+    assert _run_discard(tenant, _discard_payload(admin_engine, tenant, doc_id)) is True
+    assert f"t/{tenant}/docs/{doc_id}/v1/original.png" not in store.objects
+    for key in pages:
+        assert key not in store.objects
+        assert key in store.discarded  # discarded (1-day rule), not a plain delete
+
+
+def test_DL_hardening_7_daily_sweep_clears_derived_renders_too(
+    world: Any, api: Any, admin_engine: Engine, store: Any
+) -> None:
+    who = world.person("office_admin")
+    tenant = world.a.tenant_id
+    doc_id = uuid.UUID(_page_document(api, who, tenant)["id"])
+    pages = _derived_pages(tenant, doc_id, 1)
+    other = f"t/{tenant}/docs/{doc_id}/v2/derived/pages/1.png"
+    store.put(other, S.png(), PNG_CT)  # another version's render stays
+    with tenant_session(tenant) as s:
+        service.discard_version(s, doc_id, 1, "aadhaar_unredactable")
+    assert service.sweep_discarded_objects(tenant, store=store) >= 1
+    assert not any(k in store.objects for k in pages)
+    assert other in store.objects
 
 
 def test_PRV_016_discard_task_never_deletes_a_usable_version(

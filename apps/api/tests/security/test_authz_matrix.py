@@ -364,7 +364,8 @@ def _m5_marks(w: Any, suffix: str = "") -> str:
 
 
 def _m5_sheet(kind: str) -> Builder:
-    """A fresh scanned import file visible to 9A's staff (the preview deletes it)."""
+    """A fresh scanned import file visible to 9A's staff, uploaded by the caller (the preview
+    reads and deletes only the caller's own upload, audit DL-04)."""
 
     def build(w: Any, r: str, a: Engine) -> Request:
         if kind == "attendance":
@@ -376,7 +377,7 @@ def _m5_sheet(kind: str) -> Builder:
         doc = D.make_document(
             a,
             w.a.tenant_id,
-            w.a.people["owner"].user_id,
+            w.a.people[r].user_id,
             acl=[("section", str(w.a.ids["section_9a"]))],
             purpose="import_file",
             doc_type="import_file",
@@ -624,6 +625,20 @@ def _shared_doc(w: Any, admin: Engine, slot: str) -> uuid.UUID:
     return value
 
 
+def _own_doc(w: Any, admin: Engine, role: str) -> uuid.UUID:
+    """A ready document uploaded by ``role`` itself: since AA-10 only the uploader (or a
+    ``document.manage_acl`` holder) may add versions or edit metadata, so the matrix proves the
+    route guard with the caller's own document (the 403 for others' documents is proved in
+    tests/documents/test_document_writers.py). Scoped uploaders share with their section."""
+    doc: uuid.UUID = D.make_document(
+        admin,
+        w.a.tenant_id,
+        w.person(role).user_id,
+        acl=[(e["principal_type"], e["principal_ref"]) for e in _doc_acl(w)[:1]],
+    )
+    return doc
+
+
 def _doc_register(w: Any, r: str, a: Engine) -> Request:
     intent = D.make_intent(a, w.a.tenant_id, w.person(r).user_id, D.pdf())
     # Scoped uploaders (class teacher) may only share with their own sections.
@@ -632,7 +647,7 @@ def _doc_register(w: Any, r: str, a: Engine) -> Request:
 
 
 def _doc_version(w: Any, r: str, a: Engine) -> Request:
-    doc = _shared_doc(w, a, "versions")
+    doc = _own_doc(w, a, r)
     intent = D.make_intent(a, w.a.tenant_id, w.person(r).user_id, D.pdf(), document_id=doc)
     return f"/api/v1/documents/{doc}/versions", {"upload_id": str(intent)}, {}
 
@@ -647,7 +662,7 @@ def _doc_acl_put(w: Any, r: str, a: Engine) -> Request:
 
 
 def _doc_patch(w: Any, r: str, a: Engine) -> Request:
-    doc = _shared_doc(w, a, "patch")
+    doc = _own_doc(w, a, r)
     return (
         f"/api/v1/documents/{doc}",
         {"title": "Matrix circular"},
@@ -681,15 +696,17 @@ def _doc_delete(w: Any, r: str, a: Engine) -> Request:
 _XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
-def _sheet_doc(w: Any, admin: Engine) -> uuid.UUID:
+def _sheet_doc(w: Any, admin: Engine, uploader: Any = None) -> uuid.UUID:
     """A ready single-sheet XLSX document (C2) of school A that every reader role sees
-    (FR-DOC-009..011)."""
+    (FR-DOC-009..011); ``uploader`` (default the owner) uploaded it."""
     rows = [["Receipt", "Name", "Amount"], ["R-001", "Synthetica Matrix", 1200]]
+    who = uploader or w.a.people["owner"]
+    acl = [(e["principal_type"], e["principal_ref"]) for e in _doc_acl(w)]
     doc: uuid.UUID = D.make_document(
         admin,
         w.a.tenant_id,
-        w.a.people["owner"].user_id,
-        acl=[(e["principal_type"], e["principal_ref"]) for e in _doc_acl(w)],
+        who.user_id,
+        acl=acl if uploader is None else acl[:1],
         data=IM.xlsx_bytes(rows),
         mime_type=_XLSX_MIME,
         ext="xlsx",
@@ -705,7 +722,8 @@ def _shared_sheet_doc(w: Any, admin: Engine) -> uuid.UUID:
 
 
 def _doc_sheet_save(w: Any, r: str, a: Engine) -> Request:
-    doc = _sheet_doc(w, a)  # a fresh one per call: each save adds a version
+    # A fresh one per call (each save adds a version), uploaded by the caller (AA-10).
+    doc = _sheet_doc(w, a, w.person(r))
     body = {"base_version_no": 1, "edits": [{"row_no": 2, "column": 1, "value": "Matrix edit"}]}
     return f"/api/v1/documents/{doc}/sheet/versions", body, _if_match(D.document_version(a, doc))
 
@@ -1020,11 +1038,14 @@ def _cert_pending(w: Any, role: str | None = None) -> Any:
 def _cert_decide(action: str) -> Builder:
     def build(w: Any, r: str, a: Engine) -> Request:
         tc = _cert_pending(w, r if action == "withdraw" else None)
-        body = (
-            None
-            if action in ("approve", "withdraw")
-            else {"reason": "Synthetic matrix reason for this decision"}
-        )
+        body: dict[str, Any] | None
+        if action == "approve":
+            # A-11: the approval carries the draft fingerprint it was read with.
+            body = {"draft_sha256": _cert().draft_hash(w.a, tc.id)}
+        elif action == "withdraw":
+            body = None
+        else:
+            body = {"reason": "Synthetic matrix reason for this decision"}
         return (
             f"/api/v1/certificates/{tc.id}/{action}",
             body,
@@ -1055,6 +1076,18 @@ SPECS: dict[tuple[str, str], Builder] = {
     ("GET", "/api/v1/me/schools"): lambda w, r, a: ("/api/v1/me/schools", None, {}),
     ("POST", "/api/v1/me/accept-invitations"): lambda w, r, a: (
         "/api/v1/me/accept-invitations",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/me/invitations"): lambda w, r, a: ("/api/v1/me/invitations", None, {}),
+    # DL-09: an invitation that is not the caller's own is 404 for every role (guard passed).
+    ("POST", "/api/v1/me/invitations/{membership_id}/accept"): lambda w, r, a: (
+        f"/api/v1/me/invitations/{uuid.uuid4()}/accept",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/me/invitations/{membership_id}/decline"): lambda w, r, a: (
+        f"/api/v1/me/invitations/{uuid.uuid4()}/decline",
         None,
         {},
     ),
@@ -1212,6 +1245,7 @@ SPECS: dict[tuple[str, str], Builder] = {
         {},
     ),
     ("GET", "/api/v1/audit/verify"): lambda w, r, a: ("/api/v1/audit/verify", None, {}),
+    ("POST", "/api/v1/audit/verify"): lambda w, r, a: ("/api/v1/audit/verify", {}, {}),
     # Invitation email (US-102): the target member is active and email is off in tests, so a
     # permitted caller reaches the service and gets 409 (see _success); others get 403.
     ("POST", "/api/v1/users/{user_id}/invitation-email"): lambda w, r, a: (
@@ -1307,12 +1341,12 @@ SPECS: dict[tuple[str, str], Builder] = {
     ),
     ("GET", "/api/v1/academic-years/{year_id}/promotions"): _promotion_list,
     ("GET", "/api/v1/support/tickets/{ticket_id}"): lambda w, r, a: (
-        f"/api/v1/support/tickets/{_ticket(w)}",
+        f"/api/v1/support/tickets/{_ticket(w, r)}",
         None,
         {},
     ),
     ("POST", "/api/v1/support/tickets/{ticket_id}/messages"): lambda w, r, a: (
-        f"/api/v1/support/tickets/{_ticket(w)}/messages",
+        f"/api/v1/support/tickets/{_ticket(w, r)}/messages",
         {"body": "Synthetic follow-up"},
         {},
     ),
@@ -1787,13 +1821,14 @@ def _notification(tenant_id: uuid.UUID, membership_id: uuid.UUID) -> uuid.UUID:
     return uuid.UUID(str(value))
 
 
-def _ticket(w: Any) -> uuid.UUID:
-    """A ticket of school A (opened through the platform service, as the owner)."""
+def _ticket(w: Any, role: str) -> uuid.UUID:
+    """A ticket of school A opened by the caller (through the platform service): a member reads
+    and answers only the tickets they opened, unless they hold support.manage (R-17)."""
     from app.platform import service as platform_service
 
     ticket = platform_service.open_ticket_from_tenant(
         w.a.tenant_id,
-        w.a.people["owner"].user_id,
+        w.a.people[role].user_id,
         platform_service.TicketCreateSchool(
             category="other", subject="Matrix ticket", body="Synthetic question"
         ),
@@ -1963,11 +1998,15 @@ def _success(method: str, path: str) -> int:
         "/api/v1/notices",
         "/api/v1/notices/{notice_id}/draft",
         "/api/v1/notices/{notice_id}/render",
+        # R-19: a chain check is queued; the result is read with GET /audit/verify.
+        "/api/v1/audit/verify",
     }
     if method == "POST" and path in accepted:
         return 202
     if (method, path) == ("POST", "/api/v1/users/{user_id}/invitation-email"):
         return 409  # guard passed; the service refuses (email off in tests)
+    if method == "POST" and path.startswith("/api/v1/me/invitations/"):
+        return 404  # guard passed; not the caller's own open invitation (DL-09)
     if method == "DELETE" and path in (
         "/api/v1/knowledge/conversations/{conversation_id}",
         "/api/v1/knowledge/memories",
@@ -2005,7 +2044,18 @@ def test_SEC_003_role_route_matrix(
     granted = AUTHENTICATED in permissions or any(p in held for p in permissions)
     res = _call(api, world, admin_engine, role, key)
     expected = _success(*key) if granted and key not in SUPPORT_ONLY else 403
+    # Guard passed; the service refuses: confirming a register row as a *new* student also needs
+    # student.create (audit A-06). The exact code proves the route guard itself let the role in.
+    needs_create = (
+        key == ("POST", "/api/v1/extraction-items/{item_id}/confirm")
+        and granted
+        and "student.create" not in held
+    )
+    if needs_create:
+        expected = 403
     assert res.status_code == expected, f"{role} {key}: {res.status_code} {res.text}"
+    if needs_create:
+        assert res.json()["code"] == "student_create_required"
     if key in SUPPORT_ONLY:
         assert res.json()["code"] == "breakglass_only"
 

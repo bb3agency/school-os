@@ -1,4 +1,5 @@
-"""SQLAlchemy Core tables for the audit schema (DDL lives in migration 0002_audit)."""
+"""SQLAlchemy Core tables for the audit schema (DDL in migrations 0002_audit and, for
+``chain_verifications``, 0047_security_decisions)."""
 
 from __future__ import annotations
 
@@ -43,6 +44,29 @@ chain_heads = Table(
     Column("tenant_id", Uuid, primary_key=True),
     Column("last_seq", BigInteger, nullable=False),
     Column("last_hash", LargeBinary, nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    schema="audit",
+)
+
+# Latest stored verification result and checkpoint per school (audit 2026-10-06 R-19).
+chain_verifications = Table(
+    "chain_verifications",
+    metadata,
+    Column("tenant_id", Uuid, primary_key=True),
+    Column("verified_at", DateTime(timezone=True)),
+    Column("mode", Text),
+    Column("source", Text),
+    Column("ok", Boolean),
+    Column("checked", BigInteger, nullable=False),
+    Column("first_bad_seq", BigInteger),
+    Column("reason", Text),
+    Column("checkpoint_seq", BigInteger, nullable=False),
+    Column("checkpoint_hash", LargeBinary),
+    Column("checkpoint_at", DateTime(timezone=True)),
+    Column("last_full_at", DateTime(timezone=True)),
+    Column("requested_at", DateTime(timezone=True)),
+    Column("requested_by", Uuid),
+    Column("requested_full", Boolean, nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False),
     schema="audit",
 )

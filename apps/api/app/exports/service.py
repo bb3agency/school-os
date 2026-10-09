@@ -94,7 +94,15 @@ from app.exports.schemas import (
     RequestedBy,
     StudentListCreate,
 )
-from app.exports.tables import CSV_MIME, PDF_MIME, XLSX_MIME, Table, write_csv, write_xlsx
+from app.exports.tables import (
+    CSV_MIME,
+    PDF_MIME,
+    XLSX_MIME,
+    Table,
+    typed_digits12,
+    write_csv,
+    write_xlsx,
+)
 from app.identity import service as identity
 from app.identity.principal import STEP_UP_MAX_AGE
 from app.notifications import service as notifications
@@ -310,12 +318,24 @@ def _check_structure(session: Session, scope: ExportScopeIn) -> None:
             raise _invalid(f"scope.class_ids.{i}", "not_found", "errors.not_found") from None
 
 
-def _students_for(session: Session, ctx: UserContext, scope: ExportScopeIn) -> list[uuid.UUID]:
+def _students_for(
+    session: Session,
+    ctx: UserContext,
+    scope: ExportScopeIn,
+    *,
+    permissions: Sequence[str] = (),
+) -> list[uuid.UUID]:
     """The students of ``scope`` the caller may read (current academic year), frozen for the
-    export. 422 when there are none or too many."""
+    export. ``permissions``: further grants whose scope must also reach each student (findings,
+    restricted values; SEC-015: one role's school-wide read must not widen another role's
+    scoped grant). 422 when there are none or too many."""
     _check_structure(session, scope)
     ids = students.list_students_in_scope(
-        session, ctx, section_ids=scope.section_ids, class_ids=scope.class_ids
+        session,
+        ctx,
+        section_ids=scope.section_ids,
+        class_ids=scope.class_ids,
+        permissions=permissions,
     )
     if not ids:
         raise _invalid("scope", "no_students")
@@ -423,7 +443,8 @@ def request_precheck(session: Session, ctx: UserContext, data: PrecheckCreate) -
             detail="Restricted details can be included only by staff allowed to see them.",
         )
     _require_step_up(ctx)
-    ids = _students_for(session, ctx, data.scope)
+    reach = (DQ_READ, SENSITIVE) if data.include_sensitive else (DQ_READ,)
+    ids = _students_for(session, ctx, data.scope, permissions=reach)
     sensitive: list[str] = []
     if data.include_sensitive:
         classes = _exportable_columns(session, load_config())
@@ -482,7 +503,7 @@ def request_student_list(session: Session, ctx: UserContext, data: StudentListCr
             code="sensitive_not_allowed",
             detail="Restricted details can be exported only by staff allowed to see them.",
         )
-    ids = _students_for(session, ctx, data.scope)
+    ids = _students_for(session, ctx, data.scope, permissions=(SENSITIVE,) if sensitive else ())
     return _create(
         session,
         ctx,
@@ -514,11 +535,43 @@ def _download_problem(ctx: UserContext, row: Export) -> Forbidden | None:
 def _own_problem(ctx: UserContext, row: Export) -> Forbidden | None:
     if not ctx.has(PERMISSION_OF_KIND[row.kind]):
         return Forbidden("You can no longer download this export.")
+    # AA-12: the files hold student records; reading them still needs read_basic.
+    if not ctx.has(STUDENT_READ):
+        return Forbidden(
+            "You can no longer see student records, so you cannot download this export.",
+            code="student_read_required",
+        )
     if row.include_sensitive and not ctx.has(SENSITIVE):
         return Forbidden(
             "You can no longer download restricted details.", code="sensitive_not_allowed"
         )
     return None
+
+
+def _reach_of(row: Export) -> tuple[str, ...]:
+    """The grants whose scope had to reach every frozen student when ``row`` was requested
+    (besides ``student.read_basic``), as :func:`request_precheck` and
+    :func:`request_student_list` check them."""
+    reach: list[str] = [DQ_READ] if row.kind != "student_list" else []
+    if row.include_sensitive:
+        reach.append(SENSITIVE)
+    return tuple(reach)
+
+
+def _frozen_out_of_scope(session: Session, ctx: UserContext, row: Export) -> Forbidden | None:
+    """AA-12: the requester's student scope may have shrunk since the export was frozen.
+    Every frozen student must still be within their current reach (``student.read_basic`` and
+    the grants of :func:`_reach_of`), or the download is refused."""
+    frozen = set(row.student_ids or ())
+    if not frozen:
+        return None
+    reach = set(students.list_students_in_scope(session, ctx, permissions=_reach_of(row)))
+    if frozen <= reach:
+        return None
+    return Forbidden(
+        "Some students in this export are no longer in your classes or reach. Make a new export.",
+        code="students_out_of_scope",
+    )
 
 
 def _others_problem(ctx: UserContext, row: Export) -> Forbidden | None:
@@ -648,13 +701,18 @@ def download_url(
 ) -> ExportDownloadOut:
     """A presigned GET (<= 5 minutes, attachment) for one file of a ready export.
 
-    Your own: you must still hold the export's permission; student lists and exports with
-    sensitive values need step-up (FR-EXP-004). Someone else's (ADR-0021): needs
+    Your own: you must still hold the export's permission and ``student.read_basic`` (403
+    ``student_read_required``), and every frozen student must still be within your reach
+    (with the findings and restricted-value grants the request needed; 403
+    ``students_out_of_scope``, AA-12); student lists and exports with sensitive values need
+    step-up (FR-EXP-004). Someone else's (ADR-0021): needs
     ``export.download_any`` with school-wide reach, always with step-up (403 ``not_own_export``
     for holders of ``export.read_all`` only; 404 for everyone else). Audit:
     ``export.downloaded`` with ``own_export`` and the requester's membership id."""
     row = _visible(session, ctx, export_id, others=(READ_ALL, DOWNLOAD_ANY))
     problem = _download_problem(ctx, row)
+    if problem is None and _own(ctx, row):
+        problem = _frozen_out_of_scope(session, ctx, row)
     if problem is not None:
         raise problem
     if _needs_step_up(ctx, row):
@@ -851,6 +909,9 @@ def _format_value(
         return None
     if key == "aadhaar_last4":
         return cfg.aadhaar_last4_display.format(last4=value[-4:])
+    if data_type == "digits12":
+        # ADR-0037 option (a): the typed APAAR ID is written unmasked; free text never is.
+        return typed_digits12(value)
     if data_type == "date":
         try:
             return dt.date.fromisoformat(value).strftime(date_format)

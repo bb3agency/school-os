@@ -57,7 +57,7 @@ function Item({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
     <div className="min-w-0 space-y-1 rounded-lg border border-border bg-surface-muted px-4 py-3">
       <dt className="text-sm text-ink-muted">{label}</dt>
-      <dd className="font-medium break-words text-ink">{children}</dd>
+      <dd className="font-semibold break-words text-ink">{children}</dd>
     </div>
   );
 }
@@ -111,6 +111,48 @@ function StatusActions({ user }: { user: StaffUser }) {
         );
       })}
     </>
+  );
+}
+
+/**
+ * Send the invitation email again to someone who has not signed in yet
+ * (POST /users/{id}/invitation-email; `user.manage`, step-up, 202). The API refuses with 409
+ * when email is off, the invitation expired or ended, or there is no address, and with 429
+ * within 10 minutes of the last one; each is explained in plain words.
+ */
+function ResendInvitation({ user }: { user: StaffUser & { email: string } }) {
+  const t = useTranslations("school.users.detail.resend");
+  const tc = useTranslations("common");
+  const api = useBffClient("staff");
+  return (
+    <ActionDialog
+      triggerLabel={t("button")}
+      title={t("title")}
+      description={t("body", { email: user.email })}
+      confirmLabel={t("button")}
+      stepUp
+      schema={z.object({})}
+      errorNamespace="school.users"
+      submit={() =>
+        unwrap(
+          api.POST("/api/v1/users/{user_id}/invitation-email", {
+            params: { path: { user_id: user.id } },
+          }),
+        )
+      }
+      renderResult={(result, close) => (
+        <>
+          <Alert tone="success" live title={t("sentTitle")}>
+            {t("sentBody", {
+              date: formatDateTime(result.expires_at) ?? result.expires_at,
+            })}
+          </Alert>
+          <div className="flex justify-end">
+            <Button onClick={close}>{tc("done")}</Button>
+          </div>
+        </>
+      )}
+    />
   );
 }
 
@@ -419,7 +461,19 @@ export function UserDetailScreen({ userId }: { userId: string }) {
       ) : null}
       {user.status === "invited" ? (
         <Alert tone="info" title={td("invitedTitle")}>
-          {td("invitedBody")}
+          <p>{td("invitedBody")}</p>
+          {canManage && user.email ? (
+            <div className="mt-3">
+              <ResendInvitation user={{ ...user, email: user.email }} />
+            </div>
+          ) : null}
+          {user.contact_hidden ? (
+            <p className="mt-2" data-testid="contact-hidden">
+              {td("contactHidden")}
+            </p>
+          ) : canManage && !user.email ? (
+            <p className="mt-2">{td("resend.noEmail")}</p>
+          ) : null}
         </Alert>
       ) : null}
       {removed ? (
@@ -431,7 +485,9 @@ export function UserDetailScreen({ userId }: { userId: string }) {
       <Card
         title={td("aboutTitle")}
         actions={
-          canManage && !removed && !profileShared ? (
+          // A-18: an open invitation to an account of another school is not edited either; the
+          // contact-hidden note says the person accepts it themselves.
+          canManage && !removed && !profileShared && !user.contact_hidden ? (
             <EditProfile user={user} isSelf={isSelf} />
           ) : null
         }

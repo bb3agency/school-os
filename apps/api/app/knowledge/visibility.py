@@ -6,16 +6,23 @@ the earlier answer cited, under the caller's CURRENT permissions and scopes, thr
 modules' services (the same rules as the UI and the record tools):
 
 - ``doc``: the documents service's visibility (ACL and scope) and, for a restricted (C3)
-  document, ``student.read_sensitive`` (the retrieval rule, docs/06 §6). :meth:`current`
-  additionally needs the cited version to be the document's current, active version.
+  document, ``student.read_sensitive`` (the retrieval rule, docs/06 §6); the cited version must
+  still exist and be ``ready`` (a version discarded since, PRV-016, is withheld: docs/08 §7).
+  :meth:`current` additionally needs the cited version to be the document's current, active
+  version.
 - ``student``: ``students.get_profile`` under the caller's scope, and the field not masked for
   the caller now (a restricted value they may no longer read is withheld).
 - ``finding`` / ``change``: the dq / changes services' scoped reads.
 - ``verified``: an answer of this school that is not retired and whose every citation is a
-  document the caller can read.
+  document the caller can read, at a version that still exists and is ``ready``.
 - ``count`` / ``fee``: aggregates of a tool; visible while the caller may still use that tool
-  (fail closed when the caller's tools are not known).
-- ``conversation``: one of the caller's own conversations that is not deleted.
+  (fail closed when the caller's tools are not known) AND the scope fingerprint in the source
+  equals the fingerprint of the caller's current reach for the tool's permission, so a total
+  computed over a wider scope is not shown or sent again after the scope narrows (audit
+  2026-10-04 W3-09). A key stored before the fingerprint existed is visible only to a caller
+  whose reach is school-wide.
+- ``conversation``: one of the caller's own conversations that is not deleted, the cited question
+  in it, and every source that question's answer cited (the passage repeats that answer).
 
 Anything that does not parse is not visible (fail closed). Results are cached per instance
 (one request or job). Nothing here logs source text.
@@ -33,6 +40,8 @@ from app.documents import service as documents
 from app.dq import service as dq
 from app.knowledge import repository as repo
 from app.knowledge import sources
+from app.knowledge.config.tools import load_tools_config
+from app.knowledge.sealed import cited_sources_of
 from app.knowledge.tools.students import ROW_FIELDS
 from app.students import service as students
 
@@ -103,7 +112,9 @@ class SourceVisibility:
         try:
             match ref.kind:
                 case "doc":
-                    return self._doc_visible(ref.object_id)
+                    return self._doc_visible(ref.object_id) and self._version_kept(
+                        ref.object_id, ref.version_no
+                    )
                 case "student":
                     return self._field_visible(ref.object_id, ref.attribute)
                 case "finding":
@@ -115,17 +126,22 @@ class SourceVisibility:
                 case "verified":
                     return self._verified_visible(ref.object_id)
                 case "count":
-                    return COUNT_TOOL in self._tool_names()
+                    return COUNT_TOOL in self._tool_names() and self._same_scope(COUNT_TOOL, ref)
                 case "fee":
-                    return FEE_TOOL in self._tool_names()
+                    return FEE_TOOL in self._tool_names() and self._same_scope(FEE_TOOL, ref)
                 case "conversation":
-                    return (
-                        repo.get_conversation(self._session, ref.object_id, self._ctx.user_id)
-                        is not None
-                    )
+                    return self._chat_visible(ref.object_id, ref.query_id)
         except DomainError:
             return False
         return False  # pragma: no cover - every SourceKind is matched above
+
+    def _same_scope(self, tool: str, ref: sources.SourceRef) -> bool:
+        """The aggregate was computed over the caller's CURRENT reach for the tool's permission
+        (an old key without a fingerprint: only when that reach is school-wide)."""
+        grant = self._ctx.scope_for(load_tools_config().tools[tool].permission)
+        if ref.scope is None:
+            return grant.school_wide
+        return ref.scope == sources.scope_fingerprint(grant)
 
     def _document(self, document_id: uuid.UUID) -> object | None:
         if document_id not in self._docs:
@@ -142,6 +158,16 @@ class SourceVisibility:
         if doc is None:
             return False
         return getattr(doc, "sensitivity", "C3") != "C3" or self._ctx.has(READ_SENSITIVE)
+
+    def _version_kept(self, document_id: uuid.UUID, version_no: int | None) -> bool:
+        """The cited version still exists and is usable: a version discarded since (PRV-016,
+        ``quarantined``) or gone is withheld like a deleted document (docs/08 §7 erasure)."""
+        doc = self._document(document_id)
+        versions = getattr(doc, "versions", None) or []
+        return any(
+            getattr(v, "version_no", None) == version_no and getattr(v, "status", None) == "ready"
+            for v in versions
+        )
 
     def _field_visible(self, student_id: uuid.UUID, attribute: str | None) -> bool:
         profile = students.get_profile(self._session, self._ctx, student_id)
@@ -163,7 +189,23 @@ class SourceVisibility:
                 return False
             if ref.kind != "doc" or not self._doc_visible(ref.object_id):
                 return False
+            if not self._version_kept(ref.object_id, ref.version_no):
+                return False
         return True
+
+    def _chat_visible(self, conversation_id: uuid.UUID, query_id: uuid.UUID | None) -> bool:
+        """The caller's own live conversation, the cited question in it, and every source that
+        question's answer cited (the passage repeats that answer; as for ``verified``)."""
+        if repo.get_conversation(self._session, conversation_id, self._ctx.user_id) is None:
+            return False
+        if query_id is None:
+            return False
+        row = repo.get_query_of_user(self._session, query_id, self._ctx.user_id)
+        if row is None or row.conversation_id != conversation_id:
+            return False
+        own = sources.conversation_question(conversation_id, query_id)
+        self._cache[own] = False  # an answer citing itself (or a cycle) is never visible
+        return self.all_visible(cited_sources_of(self._session, row))
 
     def _tool_names(self) -> frozenset[str]:
         if self._tools is None:

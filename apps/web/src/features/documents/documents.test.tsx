@@ -368,9 +368,33 @@ describe("document detail (US-701 AC3..AC4, FR-DOC-002, FR-DOC-004, FR-DOC-006)"
     const xlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     stub.routes[`GET /bff/api/v1/documents/${DOC}`] = () =>
       Response.json(detail({ versions: [version({ mime_type: xlsx })] }));
+    stub.routes[`GET /bff/api/v1/documents/${DOC}/sheet`] = () =>
+      Response.json({
+        document_id: DOC,
+        version_no: 1,
+        version: 3,
+        kind: "xlsx",
+        sheet_count: 2,
+        editable: false,
+        read_only_reason: "no_permission",
+        total_rows: 40,
+        offset: 0,
+        columns: [{ index: 0, letter: "A", header: "Receipt" }],
+        data: [{ row_no: 2, cells: [{ value: "R-001", formula: false }] }],
+        next_cursor: "next",
+      });
     const { unmount } = renderWithIntl(<DocumentDetailScreen documentId={DOC} />);
     const link = await screen.findByRole("link", { name: messages.en.sheets.document.open });
     expect(link).toHaveAttribute("href", `/documents/${DOC}/sheet`);
+    // The first rows show on the document page, read-only (FR-DOC-009).
+    const preview = await screen.findByRole("grid", {
+      name: messages.en.sheets.document.previewCaption,
+    });
+    expect(preview).toHaveAttribute("aria-readonly", "true");
+    expect(within(preview).getByText("R-001")).toBeInTheDocument();
+    expect(screen.getByText(/1 more sheet that is not shown here/)).toBeInTheDocument();
+    const [previewCall] = stub.callsTo(`GET /bff/api/v1/documents/${DOC}/sheet`);
+    expect(previewCall?.url.searchParams.get("limit")).toBe("10");
     unmount();
     stub.routes[`GET /bff/api/v1/documents/${DOC}`] = () =>
       Response.json(

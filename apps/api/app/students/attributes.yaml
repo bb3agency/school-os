@@ -1,12 +1,14 @@
 # Global student attribute catalog (docs/05 §5 sis.attribute_definitions, §8 classification,
 # §10 canonical resolution; FR-STU-002, FR-STU-004, FR-STU-006, FR-STU-012, CLAUDE.md §6.13).
 #
-# Seeded as global rows (tenant_id NULL) by migration 0008_sis_students. Schools can add their
+# Seeded as global rows (tenant_id NULL) by migration 0008_sis_students (its keys) and later
+# migrations for the keys they add (0042_apaar_id: udise_pen, apaar_id). Schools can add their
 # own attributes later (tenant rows); global rows are read-only for the app (policy attrdef_*).
 # Change this file only together with a migration that re-seeds it.
 #
 # Per attribute
-#   data_type        text | date | enum | digits4
+#   data_type        text | date | enum | digits4 | digits12 (exactly 12 ASCII digits; only the
+#                    typed APAAR ID, which is exempt from the full-Aadhaar refusal: ADR-0037)
 #   classification   C2 (personal: projection, search) | C3 (restricted: encrypted with the tenant
 #                    DEK, never in value_text/value_norm/profile/logs, revealed only with
 #                    student.read_sensitive and an audit event)
@@ -149,6 +151,35 @@ attributes:
       show_conflicts_from: []
     label_en: Nationality
     label_te: జాతీయత
+  # --- national student IDs (ADR-0037, FR-STU-013..015, PRV-020): C2, not identity fields -----
+  # A value counts only once a person verified it against the portal or the card. Corrections
+  # are a new value from a source (history kept), verified again.
+  udise_pen:
+    data_type: text
+    classification: C2
+    is_identity: false
+    sort_order: 92
+    # TODO(portal format): confirm the PEN format from the UDISE+ portal (ADR-0037 follow-up).
+    validation: {max_length: 20, pattern: '^[A-Za-z0-9]{1,20}$',
+                 sources: [udise_plus, manual_entry]}
+    canonical_policy:
+      precedence: [udise_plus, manual_entry]
+      require_verified: true
+      show_conflicts_from: []
+    label_en: UDISE+ PEN
+    label_te: UDISE+ PEN
+  apaar_id:
+    data_type: digits12
+    classification: C2
+    is_identity: false
+    sort_order: 94
+    validation: {max_length: 14, sources: [udise_plus, parent_form, manual_entry]}
+    canonical_policy:
+      precedence: [udise_plus, parent_form, manual_entry]
+      require_verified: true
+      show_conflicts_from: []
+    label_en: APAAR ID
+    label_te: APAAR ఐడి
   # --- Aadhaar (ADR-0007, PRV-013..014, FR-STU-012): last 4 digits and as-printed fields only ---
   aadhaar_last4:
     data_type: digits4

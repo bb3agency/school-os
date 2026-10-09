@@ -98,7 +98,7 @@ export function CircularsScreen() {
                             <Td>
                               <Link
                                 href={`/circulars/${row.document_id}`}
-                                className="font-medium text-primary underline underline-offset-4 hover:no-underline"
+                                className="font-semibold text-primary underline underline-offset-4 hover:no-underline"
                               >
                                 {row.title}
                               </Link>

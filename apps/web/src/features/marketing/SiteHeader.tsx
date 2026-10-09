@@ -41,7 +41,10 @@ export function SiteHeader({
 }: {
   current: MarketingPage;
   contactEmail: string | null;
-  /** "Ask on WhatsApp": in the bar from xl (room beside the page links), always in the menu. */
+  /**
+   * "Ask on WhatsApp": in the bar from lg (an icon button with the full accessible name below
+   * xl, where the label would crowd the page links; labelled from xl), in the menu below lg.
+   */
   whatsappNumber?: string | null;
 }) {
   const t = useTranslations("marketing");
@@ -95,7 +98,7 @@ export function SiteHeader({
       aria-current={current === page ? "page" : undefined}
       onClick={big ? () => close(false) : undefined}
       className={cn(
-        "inline-flex items-center rounded-md font-medium motion-safe:transition-colors",
+        "inline-flex items-center rounded-md font-semibold motion-safe:transition-colors",
         big
           ? "min-h-12 w-full px-3 text-base hover:bg-surface-muted"
           : "min-h-10 px-3 text-sm hover:bg-surface-muted/70",
@@ -139,14 +142,19 @@ export function SiteHeader({
             <div className="flex items-center gap-2" data-print="hide">
               <a
                 href={SIGN_IN_HREF}
-                className="mk-press hidden min-h-10 items-center rounded-md px-4 text-sm font-medium text-ink hover:bg-surface-muted motion-safe:transition-colors sm:inline-flex"
+                className="mk-press hidden min-h-10 items-center rounded-md px-4 text-sm font-semibold text-ink hover:bg-surface-muted motion-safe:transition-colors sm:inline-flex"
               >
                 {t("cta.signIn")}
               </a>
               {whatsappNumber ? (
-                <span className="hidden xl:contents">
-                  <WhatsAppLink number={whatsappNumber} size="md" />
-                </span>
+                <>
+                  <span className="hidden xl:contents">
+                    <WhatsAppLink number={whatsappNumber} size="md" />
+                  </span>
+                  <span className="hidden lg:contents xl:hidden">
+                    <WhatsAppLink number={whatsappNumber} size="md" iconOnly />
+                  </span>
+                </>
               ) : null}
               {contactEmail ? (
                 <span className="hidden sm:contents">
@@ -161,7 +169,7 @@ export function SiteHeader({
               <button
                 ref={buttonRef}
                 type="button"
-                className="mk-press inline-flex min-h-11 items-center gap-2 rounded-full border border-border-soft bg-surface px-4 text-sm font-medium text-ink lg:hidden"
+                className="mk-press inline-flex min-h-11 items-center gap-2 rounded-full border border-border-soft bg-surface px-4 text-sm font-semibold text-ink lg:hidden"
                 aria-expanded={open}
                 aria-controls={panelId}
                 onClick={() => (open ? close(true) : setOpen(true))}

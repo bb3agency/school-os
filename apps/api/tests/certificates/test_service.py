@@ -304,7 +304,7 @@ def test_FR_CERT_004_requester_cannot_approve_even_with_both_roles(
             "principal",
             certificates.approve,
             tc.id,
-            ApproveIn(),
+            ApproveIn(draft_sha256="0" * 64),
             expected_version=tc.version,
             as_ctx=both,
         )
@@ -342,7 +342,7 @@ def test_FR_CERT_004_approval_needs_recent_mfa(school: Any) -> None:
             "principal",
             certificates.approve,
             tc.id,
-            ApproveIn(),
+            ApproveIn(draft_sha256="0" * 64),
             expected_version=tc.version,
             as_ctx=stale,
         )
@@ -732,6 +732,57 @@ def test_FR_CERT_008_cancel_archives_the_document(school: Any, admin_engine: Eng
     assert status == "archived"
 
 
+def test_SEC_015_a_cancelled_certificates_clean_pdf_is_not_handed_out(
+    school: Any, admin_engine: Engine
+) -> None:
+    """Audit 2026-10-05 A-07: the PDF stored at issue carries no CANCELLED mark, so after a
+    cancellation its download would look like a valid certificate."""
+    cert = C.issue(school, C.student(school), "conduct")
+    C.render(school, cert)
+    C.mark_document_ready(admin_engine, C.row(admin_engine, cert.id)["document_id"])
+    reader = school.people["office_staff"]
+    assert C.call(school, reader, "office_staff", certificates.download_url, cert.id).url
+    C.cancel(
+        school,
+        C.call(
+            school, school.people["principal"], "principal", certificates.get_certificate, cert.id
+        ),
+    )
+    with pytest.raises(Conflict) as exc:
+        C.call(school, reader, "office_staff", certificates.download_url, cert.id)
+    assert exc.value.code == "certificate_cancelled"
+
+
+def test_SEC_015_a_duplicate_of_a_cancelled_original_is_marked_and_not_handed_out(
+    school: Any, admin_engine: Engine
+) -> None:
+    """Audit 2026-10-05 A-07: cancelling the original left its issued duplicates printable and
+    downloadable with no mark (only the register said "Original cancelled")."""
+    original = C.issue(school, C.student(school), "bonafide")
+    copy = C.duplicate(school, original.id)
+    assert copy.status == "issued"
+    C.render(school, copy)
+    C.mark_document_ready(admin_engine, C.row(admin_engine, copy.id)["document_id"])
+    reader = school.people["office_staff"]
+    assert "CANCELLED" not in C.call(
+        school, reader, "office_staff", certificates.print_page, copy.id
+    )
+    C.cancel(
+        school,
+        C.call(
+            school,
+            school.people["principal"],
+            "principal",
+            certificates.get_certificate,
+            original.id,
+        ),
+    )
+    assert "CANCELLED" in C.call(school, reader, "office_staff", certificates.print_page, copy.id)
+    with pytest.raises(Conflict) as exc:
+        C.call(school, reader, "office_staff", certificates.download_url, copy.id)
+    assert exc.value.code == "certificate_cancelled"
+
+
 def test_FR_CERT_010_failed_render_is_marked_and_can_be_retried(
     school: Any, admin_engine: Engine
 ) -> None:
@@ -745,6 +796,165 @@ def test_FR_CERT_010_failed_render_is_marked_and_can_be_retried(
     assert (
         C.outbox(admin_engine, school.tenant_id, cert.id).count("certificate.render_requested") == 2
     )
+
+
+def _changes_objects() -> Any:
+    name = "sos_test_changes_objects"
+    if name not in sys.modules:
+        import importlib.util
+        from pathlib import Path
+
+        path = Path(__file__).resolve().parents[1] / "changes" / "objects.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+def _approve_with(school: Any, tc: Any, digest: str) -> Any:
+    return C.call(
+        school,
+        school.people["principal"],
+        "principal",
+        certificates.approve,
+        tc.id,
+        ApproveIn(draft_sha256=digest),
+        expected_version=tc.version,
+    )
+
+
+def test_A_11_approval_refuses_a_draft_edited_after_the_principal_read_it(
+    school: Any, admin_engine: Engine
+) -> None:
+    """The principal reads the draft; the clerk then changes a printed value. Approving with
+    the fingerprint that was read is refused (409), so the edit is never frozen unseen
+    (audit 2026-10-05 A-11)."""
+    sid = C.student(school)
+    tc = C.pending_tc(school, sid)
+    read = C.draft_hash(school, tc.id)
+    assert read == C.draft_hash(school, tc.id), "the fingerprint is stable between reads"
+    admin = school.people["office_admin"]
+    with tenant_session(school.tenant_id, admin.user_id) as s:
+        students.record_value(
+            s, C.ctx(school, admin, "office_admin"), sid, "mother_tongue", "parent_form", "Hindi"
+        )
+    changed = C.draft_hash(school, tc.id)
+    assert changed != read
+    with pytest.raises(Conflict) as exc:
+        _approve_with(school, tc, read)
+    assert exc.value.code == "certificate_draft_changed"
+    assert C.row(admin_engine, tc.id)["status"] == "pending"
+    assert "certificate.issued" not in C.actions(admin_engine, school.tenant_id, tc.id)
+    out = _approve_with(school, tc, changed)
+    assert out.status == "issued"
+    assert out.draft_sha256 is None
+    printed = {line.key: line.value for line in (out.content.fields if out.content else [])}
+    assert printed["mother_tongue"] == "Hindi"
+
+
+def test_A_11_draft_fingerprint_only_on_a_pending_certificate_read_alone(
+    school: Any, admin_engine: Engine
+) -> None:
+    tc = C.pending_tc(school)
+    principal = school.people["principal"]
+    listed = C.call(
+        school, principal, "principal", certificates.list_certificates, student_id=tc.student_id
+    )
+    assert [c.draft_sha256 for c in listed.data] == [None]
+    issued = C.approve(school, tc)
+    again = C.call(school, principal, "principal", certificates.get_certificate, issued.id)
+    assert again.draft_sha256 is None
+    # A pending TC duplicate prints its original's frozen content: that is its fingerprint.
+    copy = C.duplicate(school, issued.id)
+    original = C.row(admin_engine, issued.id)["content_sha256"].hex()
+    assert C.draft_hash(school, copy.id) == original
+    assert C.approve(school, copy).status == "issued"
+
+
+def test_pending_change_request_on_a_printed_field_blocks_issuing(
+    school: Any, admin_engine: Engine
+) -> None:
+    """A correction waiting for approval would change what the certificate prints: preview shows
+    it, issuing and approving wait for the decision (audit 2026-10-05 hardening)."""
+    sid = C.student(school)
+    tc = C.pending_tc(school, sid)
+    digest = C.draft_hash(school, tc.id)
+    cr = _changes_objects()
+    cr.submit(
+        admin_engine,
+        school,
+        school.people["office_admin"],
+        "office_admin",
+        student_id=sid,
+        attribute_key="dob",
+        new_value="2012-03-15",
+    )
+    preview = C.call(
+        school,
+        school.people["office_admin"],
+        "office_admin",
+        certificates.preview,
+        sid,
+        "bonafide",
+    )
+    assert [(b.code, b.attribute_key) for b in preview.blockers] == [
+        ("change_request_pending", "dob")
+    ]
+    assert preview.can_issue is False
+    with pytest.raises(Conflict) as exc:
+        C.issue(school, sid, "bonafide")
+    assert exc.value.code == "change_request_pending"
+    with pytest.raises(Conflict) as exc:
+        _approve_with(school, tc, digest)
+    assert exc.value.code == "change_request_pending"
+    # A field the certificate does not print does not block it.
+    other = C.student(school)
+    cr.submit(
+        admin_engine,
+        school,
+        school.people["office_admin"],
+        "office_admin",
+        student_id=other,
+        attribute_key="gender",
+        new_value="female",
+    )
+    assert C.issue(school, other, "bonafide").status == "issued"
+
+
+def test_tc_approval_needs_the_preparer_to_still_be_an_active_member(
+    school: Any, admin_engine: Engine
+) -> None:
+    maker = C.W.add_member(admin_engine, school.tenant_id, ["office_admin"])
+    tc = C.call(
+        school,
+        maker,
+        "office_admin",
+        certificates.request_certificate,
+        C.student(school),
+        CertificateRequest(certificate_type="transfer", inputs=C.tc_inputs()),
+    )
+    digest = C.draft_hash(school, tc.id)
+    with admin_engine.begin() as c:
+        c.execute(
+            text("UPDATE core.memberships SET status = 'suspended' WHERE id = :m"),
+            {"m": maker.membership_id},
+        )
+    with pytest.raises(Conflict) as exc:
+        _approve_with(school, tc, digest)
+    assert exc.value.code == "requester_inactive"
+    rejected = C.call(
+        school,
+        school.people["principal"],
+        "principal",
+        certificates.reject,
+        tc.id,
+        ReasonIn(reason="The person who prepared it has left the school"),
+        expected_version=tc.version,
+    )
+    assert rejected.status == "rejected"
 
 
 def test_US_1104_duplicate_reason_is_required(school: Any) -> None:

@@ -4,9 +4,14 @@
 -- the postgres user on a dedicated host), connected to the target database:
 --
 --   psql -v ON_ERROR_STOP=1 \
---        -v app_password=... -v migrator_password=... \
---        -v platform_password=... -v readonly_password=... \
+--        -c '\getenv app_password SOS_APP_DB_PASSWORD' \
+--        -c '\getenv migrator_password SOS_MIGRATOR_DB_PASSWORD' \
+--        -c '\getenv platform_password SOS_PLATFORM_DB_PASSWORD' \
+--        -c '\getenv readonly_password SOS_READONLY_DB_PASSWORD' \
 --        -d schoolos -f infra/db/bootstrap.sql
+--
+-- (deployments read the passwords from the environment with \getenv so they never appear on a
+-- command line; `-v name=value` works too, for local tools and tests).
 --
 -- The same file is used by docker compose, testcontainers, the ECS one-off task and
 -- dedicated hosts. It never contains secrets. No role here has SUPERUSER or BYPASSRLS.
@@ -63,6 +68,17 @@ ALTER ROLE sos_platform SET search_path = pg_catalog, public;
 ALTER ROLE sos_readonly SET search_path = pg_catalog, public;
 ALTER ROLE sos_app      SET idle_in_transaction_session_timeout = '30s';
 ALTER ROLE sos_platform SET idle_in_transaction_session_timeout = '30s';
+-- Role timeouts (audit 2026-10-05 hardening; SEC-002). The app sets statement_timeout per
+-- transaction (core.db); the role default is the backstop for anything outside that path.
+-- sos_readonly (people, reporting tools) gets short limits and read-only transactions.
+-- sos_migrator is exempt from the dedicated host's server-wide statement_timeout (index builds).
+ALTER ROLE sos_app      SET statement_timeout = '5min';
+ALTER ROLE sos_platform SET statement_timeout = '5min';
+ALTER ROLE sos_readonly SET statement_timeout = '60s';
+ALTER ROLE sos_readonly SET idle_in_transaction_session_timeout = '60s';
+ALTER ROLE sos_readonly SET idle_session_timeout = '30min';
+ALTER ROLE sos_readonly SET default_transaction_read_only = on;
+ALTER ROLE sos_migrator SET statement_timeout = 0;
 
 -- 2. Extensions (need admin rights; created in public) ----------------------------------
 CREATE EXTENSION IF NOT EXISTS vector;

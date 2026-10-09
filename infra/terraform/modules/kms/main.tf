@@ -88,6 +88,8 @@ data "aws_iam_policy_document" "key" {
   }
 }
 
+# Symmetric keys rotate; AWS KMS cannot rotate asymmetric (audit signing) keys automatically.
+# nosemgrep: terraform.aws.security.aws-kms-no-rotation.aws-kms-no-rotation
 resource "aws_kms_key" "this" {
   for_each = var.keys
 

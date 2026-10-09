@@ -128,7 +128,9 @@ class PlatformOwnerBootstrap:
             )
         with platform_session() as pdb:
             tenancy.activate_tenant(pdb, tenant_id)
-        identity.accept_invitations(spec.subject, request_id=REQUEST_ID)
+        identity.accept_invitations(
+            spec.subject, issuer=identity.staff_issuer(), request_id=REQUEST_ID
+        )
 
 
 class AdminOwnerBootstrap:

@@ -127,11 +127,53 @@ resource "aws_route_table_association" "data" {
 
 # --- Endpoints ---------------------------------------------------------------
 
+# Audit 2026-10-05 detection gap: every route table uses the gateway endpoint, so without a policy a
+# compromised task could copy data to any bucket in the world. It now reaches this account's buckets
+# (any action) and, read-only, the AWS-owned buckets behind ECR image layers, dnf repositories and
+# the SSM, ECS and CloudWatch agents (plus s3_endpoint_extra_read_bucket_arns).
+locals {
+  region = data.aws_region.current.region
+  s3_endpoint_aws_read_buckets = concat([
+    "arn:aws:s3:::prod-${local.region}-starport-layer-bucket",
+    "arn:aws:s3:::al2023-repos-${local.region}-de612dc2",
+    "arn:aws:s3:::amazonlinux-2-repos-${local.region}",
+    "arn:aws:s3:::amazon-ssm-${local.region}",
+    "arn:aws:s3:::aws-ssm-${local.region}",
+    "arn:aws:s3:::amazon-ssm-packages-${local.region}",
+    "arn:aws:s3:::${local.region}-birdwatcher-prod",
+    "arn:aws:s3:::patch-baseline-snapshot-${local.region}",
+    "arn:aws:s3:::amazon-ecs-agent-${local.region}",
+    "arn:aws:s3:::amazoncloudwatch-agent-${local.region}",
+  ], var.s3_endpoint_extra_read_bucket_arns)
+
+  s3_endpoint_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "ThisAccountsBuckets"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:*"
+        Resource  = "*"
+        Condition = { StringEquals = { "aws:ResourceAccount" = data.aws_caller_identity.current.account_id } }
+      },
+      {
+        Sid       = "AwsOwnedReadOnly"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = ["s3:GetObject"]
+        Resource  = [for b in local.s3_endpoint_aws_read_buckets : "${b}/*"]
+      },
+    ]
+  })
+}
+
 resource "aws_vpc_endpoint" "s3" {
   vpc_id            = aws_vpc.this.id
   service_name      = "com.amazonaws.${data.aws_region.current.region}.s3"
   vpc_endpoint_type = "Gateway"
   route_table_ids   = concat([aws_route_table.public.id, aws_route_table.data.id], aws_route_table.app[*].id)
+  policy            = local.s3_endpoint_policy
   tags              = merge(var.tags, { Name = "${var.name}-s3" })
 }
 
@@ -178,12 +220,25 @@ resource "aws_cloudwatch_log_group" "flow" {
   tags              = var.tags
 }
 
+data "aws_caller_identity" "current" {}
+
+# Confused deputy (audit 2026-10-05 hardening): only this account's flow logs.
 data "aws_iam_policy_document" "flow_assume" {
   statement {
     actions = ["sts:AssumeRole"]
     principals {
       type        = "Service"
       identifiers = ["vpc-flow-logs.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = ["arn:aws:ec2:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:vpc-flow-log/*"]
     }
   }
 }

@@ -17,6 +17,7 @@ import { useTeluguEnabled } from "@/i18n/LanguagesProvider";
 import { Link, useRouter } from "@/i18n/navigation";
 import { newIdempotencyKey, unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan } from "@/lib/bff/staff-me";
+import { useDateInput } from "@/lib/date-format";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { zodErrorKeys } from "@/lib/forms";
 import { translateOr } from "@/lib/i18n-dynamic";
@@ -41,7 +42,7 @@ function Fact({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
     <div className="min-w-0 space-y-1 rounded-lg border border-border bg-surface-muted px-4 py-3">
       <dt className="text-sm text-ink-muted">{label}</dt>
-      <dd className="font-medium break-words text-ink">{children}</dd>
+      <dd className="font-semibold break-words text-ink">{children}</dd>
     </div>
   );
 }
@@ -63,7 +64,11 @@ function Chips({ citations, title }: { citations: readonly Citation[]; title: st
   );
 }
 
-/** Confirm one suggestion as a task: owner (required), title and due date (editable). */
+/**
+ * Confirm one suggestion as a task: owner (required), title and due date (editable). The title
+ * starts as a neutral text, never the AI summary (audit DL-08). The due date is shown and typed
+ * in the school's format and sent as `YYYY-MM-DD`.
+ */
 function ConfirmForm({
   suggestion,
   assignees,
@@ -76,6 +81,7 @@ function ConfirmForm({
   const t = useTranslations("circulars.suggestion");
   const tv = useTranslations("validation");
   const api = useBffClient("staff");
+  const dates = useDateInput();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<unknown>(undefined);
   const [pending, setPending] = useState(false);
@@ -128,6 +134,7 @@ function ConfirmForm({
 
   const fieldError = (name: string) =>
     errors[name] ? translateOr(tv, errors[name] ?? "invalid", "invalid") : undefined;
+  const hint = dates.hint(suggestion.due_on);
 
   return (
     <form onSubmit={(event) => void confirm(event)} noValidate className="space-y-3">
@@ -143,16 +150,22 @@ function ConfirmForm({
         <TextField
           name="title"
           label={t("taskTitle")}
-          defaultValue={suggestion.title.slice(0, 200)}
+          // DL-08: never the AI summary; whoever holds the task may not see the circular.
+          defaultValue={t("defaultTaskTitle")}
           maxLength={200}
           error={fieldError("title")}
         />
         <TextField
+          // Remounts with the suggested date in the school's format once GET /me brings it.
+          key={dates.format}
           name="due_on"
-          type="date"
           label={t("dueOn")}
-          defaultValue={suggestion.due_on}
-          error={fieldError("due_on")}
+          hint={t("dueHint", hint)}
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder={dates.placeholder}
+          defaultValue={dates.fromIso(suggestion.due_on)}
+          error={errors.due_on ? t("dueInvalid", hint) : undefined}
         />
       </div>
       <div className="flex flex-wrap gap-3">
@@ -192,7 +205,7 @@ function SuggestionItem({
     <li className="space-y-3 rounded-lg border border-border bg-surface p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 space-y-1">
-          <p className="font-medium break-words text-ink">{suggestion.title}</p>
+          <p className="font-semibold break-words text-ink">{suggestion.title}</p>
           <p className="text-sm text-ink-muted">
             {t("due", { date: formatDate(suggestion.due_on) ?? suggestion.due_on })}
           </p>

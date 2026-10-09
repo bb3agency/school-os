@@ -5,10 +5,12 @@ route declares. It
 
 1. authenticates the operator token (separate OIDC client, MFA mandatory) through
    ``app.identity.principal.get_operator_principal`` (401 / 403 ``mfa_required``);
-2. maps the token subject to an active ``platform.operators`` row (an invited operator is
-   activated on first MFA sign-in; unknown or deactivated -> 403);
-3. checks the permission against the role matrix in ``permissions.yaml`` (403);
-4. requires step-up (MFA within 5 minutes) for permissions marked step_up (428).
+2. applies the per-operator and per-route rate limits (429, ``app.core.ratelimit``), and refuses
+   while this operator subject is in sign-in backoff from this address;
+3. maps the token subject to an active ``platform.operators`` row (an invited operator is
+   activated on first MFA sign-in; unknown or deactivated -> 403, counted as a failed sign-in);
+4. checks the permission against the role matrix in ``permissions.yaml`` (403);
+5. requires step-up (MFA within 5 minutes) for permissions marked step_up (428).
 
 The dependency object carries ``sos_permission`` so the route-enumeration test recognises it.
 """
@@ -23,6 +25,7 @@ from typing import Annotated
 from fastapi import Depends, Request
 
 from app.audit import service as audit
+from app.core import ratelimit
 from app.core.db import platform_session
 from app.core.errors import Forbidden
 from app.core.logging import get_logger
@@ -122,7 +125,15 @@ class RequirePlatform:
         request: Request,
         principal: Annotated[Principal, Depends(get_operator_principal)],
     ) -> OperatorContext:
-        ctx = load_operator(principal, _request_id(request))
+        key = ratelimit.principal_key(principal.kind, principal.issuer, principal.subject)
+        ratelimit.enforce(
+            request, principal=key, tenant_id=None, layer="operator", subject_ip_block=True
+        )
+        try:
+            ctx = load_operator(principal, _request_id(request))
+        except Forbidden as refused:
+            ratelimit.record_auth_failure(request, reason=refused.code, principal=key)
+            raise
         if not ctx.permissions.intersection(self.permissions):
             log.info("platform.authz.denied", action=self.permissions[0], outcome="forbidden")
             raise Forbidden()

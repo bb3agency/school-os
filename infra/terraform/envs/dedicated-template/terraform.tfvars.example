@@ -16,8 +16,10 @@ bundle_sha256   = "<sha256 from the release notes>"
 
 # From the shared prod stack outputs:
 artifacts_bucket      = "sos-prod-artifacts-<PROD_ACCOUNT_ID>"
-artifacts_kms_key_arn = "arn:aws:kms:ap-south-1:<PROD_ACCOUNT_ID>:key/<DATA_KEY_ID>"
+artifacts_kms_key_arn = "arn:aws:kms:ap-south-1:<PROD_ACCOUNT_ID>:key/<ARTIFACTS_KEY_ID>" # prod output kms_key_arns.artifacts
 control_plane_url     = "https://app.<your-domain>"
+# Prod output alarm_topic_arn: receives this host's security alarms (audit 2026-10-05).
+security_alarm_topic_arn = "arn:aws:sns:ap-south-1:<PROD_ACCOUNT_ID>:sos-prod-alarms"
 
 # Break-glass support sign-in (ADR-0023): prod output oidc.platform_user_pool_id; null = off.
 operator_user_pool_id = null

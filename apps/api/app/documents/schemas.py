@@ -12,6 +12,7 @@ import uuid
 from typing import Annotated, Any, Final, Literal, Self
 
 from pydantic import (
+    AfterValidator,
     BaseModel,
     BeforeValidator,
     ConfigDict,
@@ -19,6 +20,8 @@ from pydantic import (
     StringConstraints,
     model_validator,
 )
+
+from app.core.redaction import contains_full_aadhaar
 
 # Purposes a client may upload for; ``certificate`` documents are generated (FR-CERT-010).
 UploadPurpose = Literal["evidence", "register_scan", "circular", "policy", "other", "import_file"]
@@ -66,11 +69,27 @@ def nfc(value: Any) -> Any:
 
 
 _NO_CONTROL = r"^[^\x00-\x1f\x7f]+$"
+
+
+def _no_full_aadhaar(value: str) -> str:
+    """Titles, issuers and file names are shown to every reader and exported: never a full
+    Aadhaar number (invariant 4; audit 2026-10-06 R-09)."""
+    if contains_full_aadhaar(value):
+        raise ValueError("aadhaar_full_number_rejected: keep only the last 4 digits")
+    return value
+
+
 Title = Annotated[
-    str, BeforeValidator(nfc), StringConstraints(min_length=1, max_length=200, pattern=_NO_CONTROL)
+    str,
+    BeforeValidator(nfc),
+    StringConstraints(min_length=1, max_length=200, pattern=_NO_CONTROL),
+    AfterValidator(_no_full_aadhaar),
 ]
 FileName = Annotated[
-    str, BeforeValidator(nfc), StringConstraints(min_length=1, max_length=255, pattern=_NO_CONTROL)
+    str,
+    BeforeValidator(nfc),
+    StringConstraints(min_length=1, max_length=255, pattern=_NO_CONTROL),
+    AfterValidator(_no_full_aadhaar),
 ]
 ContentType = Annotated[
     str,

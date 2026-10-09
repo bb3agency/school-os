@@ -17,7 +17,9 @@ Writing the index (the ``ChunkStore`` functions ingestion calls, docs/06 §4.7):
    facets) on all chunks of a document when its ACL or metadata changes (docs/05 §6).
 4. :func:`delete_document_chunks` / :func:`delete_version_chunks`: removal (deleting the
    ``kb.documents`` / ``kb.document_versions`` row also cascades). :func:`demote_document`
-   hides a document (e.g. archived) without deleting its chunks.
+   hides a document (e.g. archived) without deleting its chunks. Before chunks are removed,
+   :func:`forget_chunk_embeddings` deletes their cached vectors (the cache has no foreign key
+   to them; docs/08 §7 erasure chain).
 
 ACL copies must be built exactly like the documents service's ``kb.document_acl`` rows: role
 keys, section/class/membership UUIDs. An empty :class:`ChunkAcl` means "school-wide readers
@@ -32,13 +34,26 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import column, delete, func, insert, select, text, tuple_, update
+from sqlalchemy import (
+    Text,
+    case,
+    column,
+    delete,
+    func,
+    insert,
+    or_,
+    select,
+    text,
+    tuple_,
+    update,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.core.ids import new_id
 from app.knowledge.domain import Chunk, InputType
+from app.knowledge.embeddings.embedder import content_sha256, embedding_input
 from app.knowledge.models import (
     EMBEDDING_DIMENSIONS,
     Conversation,
@@ -350,6 +365,88 @@ def put_cached_embeddings(
         .returning(EmbeddingCacheEntry.content_sha256)
     )
     return len(session.execute(stmt).all())
+
+
+def forget_cached_embeddings(session: Session, *, model: str, digests: Iterable[bytes]) -> int:
+    """Delete the document vectors cached under these text digests for ``model`` (erasure:
+    docs/08 §7). A text another document shares is embedded again on its next ingestion."""
+    wanted = sorted(set(digests))
+    if not wanted:
+        return 0
+    result = session.execute(
+        delete(EmbeddingCacheEntry).where(
+            EmbeddingCacheEntry.input_type == "document",
+            EmbeddingCacheEntry.model == model,
+            EmbeddingCacheEntry.content_sha256.in_(wanted),
+        )
+    )
+    return _rowcount(result)
+
+
+def forget_chunk_embeddings(
+    session: Session,
+    *,
+    document_id: uuid.UUID,
+    version_ids: Sequence[uuid.UUID] | None = None,
+) -> int:
+    """Delete the ``kb.embedding_cache`` entries of the document's chunks (only of
+    ``version_ids`` when given), BEFORE the chunks themselves go: the cache is keyed by the
+    digest of the embedded text (:func:`~app.knowledge.embeddings.embedding_input`), so no
+    foreign key reaches it and the chunk rows are the only way to find it (docs/08 §7 erasure
+    chain). Returns the number of cache entries deleted."""
+    stmt = select(
+        DocumentChunk.embedding_model,
+        DocumentChunk.context_header,
+        DocumentChunk.chunk_context,
+        DocumentChunk.content,
+    ).where(DocumentChunk.document_id == document_id)
+    if version_ids is not None:
+        if not version_ids:
+            return 0
+        stmt = stmt.where(DocumentChunk.version_id.in_(list(version_ids)))
+    by_model: dict[str, set[bytes]] = {}
+    for model, header, context, content in session.execute(stmt).all():
+        by_model.setdefault(model, set()).add(
+            content_sha256(embedding_input(header, context, content))
+        )
+    return sum(
+        forget_cached_embeddings(session, model=model, digests=digests)
+        for model, digests in sorted(by_model.items())
+    )
+
+
+def purge_orphan_embeddings(session: Session, *, older_than: dt.datetime) -> int:
+    """Delete cached document vectors created before ``older_than`` that no chunk of this
+    school uses (docs/08 §7 erasure chain: vectors cached before deletions removed them, or by a
+    job that stopped between embedding and writing). The chunk's digest is computed in SQL
+    exactly like :func:`~app.knowledge.embeddings.embedding_input`: header and context joined
+    by a newline (empty parts left out), a blank line, then the content."""
+    head = func.concat_ws(
+        "\n",
+        func.nullif(DocumentChunk.context_header, ""),
+        func.nullif(DocumentChunk.chunk_context, ""),
+        type_=Text,
+    )
+    embedded = case(
+        (head == "", DocumentChunk.content),
+        else_=head.concat("\n\n").concat(DocumentChunk.content),
+    )
+    used = (
+        select(1)
+        .where(
+            DocumentChunk.embedding_model == EmbeddingCacheEntry.model,
+            func.sha256(func.convert_to(embedded, "UTF8")) == EmbeddingCacheEntry.content_sha256,
+        )
+        .exists()
+    )
+    result = session.execute(
+        delete(EmbeddingCacheEntry).where(
+            EmbeddingCacheEntry.input_type == "document",
+            EmbeddingCacheEntry.created_at < older_than,
+            ~used,
+        )
+    )
+    return _rowcount(result)
 
 
 def purge_embedding_cache(
@@ -816,6 +913,86 @@ def clear_summaries_before(session: Session, cutoff: dt.datetime) -> int:
         )
     )
     return _rowcount(result)
+
+
+def _jsonb_sources_start_with(column_: Any, prefixes: Sequence[str]) -> Any:
+    """EXISTS an element of the jsonb array ``column_`` whose ``source`` (objects) or value
+    (strings) starts with one of ``prefixes``."""
+    elements = func.jsonb_array_elements(column_).table_valued(column("value", JSONB)).alias("e")
+    as_text = func.jsonb_build_array(elements.c.value).op("->>", return_type=Text)(0)
+    source = func.coalesce(elements.c.value["source"].astext, as_text)
+    return (
+        select(1)
+        .select_from(elements)
+        .where(or_(*(func.starts_with(source, p) for p in prefixes)))
+        .exists()
+    )
+
+
+def erase_answers_quoting(session: Session, prefixes: Sequence[str]) -> list[uuid.UUID]:
+    """Owner decision 2026-10-01 (docs/08 §7 erasure chain): HARD-delete the stored answer text,
+    citation details (titles and snippets) and follow-ups of every question whose answer was
+    given or cited a source starting with one of ``prefixes``; the row keeps ids, codes and
+    counts only and is never reused by the answer cache. Returns the questions changed."""
+    if not prefixes:
+        return []
+    result = session.execute(
+        update(Query)
+        .where(
+            or_(
+                Query.answer_ciphertext.is_not(None),
+                Query.citations_ciphertext.is_not(None),
+                Query.followups_ciphertext.is_not(None),
+            ),
+            or_(
+                _jsonb_sources_start_with(Query.retrieved, prefixes),
+                _jsonb_sources_start_with(Query.citations, prefixes),
+            ),
+        )
+        .values(
+            answer_ciphertext=None,
+            citations_ciphertext=None,
+            followups_ciphertext=None,
+            cache_invalidated_at=func.coalesce(Query.cache_invalidated_at, func.now()),
+        )
+        .returning(Query.id)
+    )
+    return sorted(result.scalars())
+
+
+def erase_summaries_quoting(session: Session, prefixes: Sequence[str]) -> list[uuid.UUID]:
+    """Owner decision 2026-10-01: delete every rolling conversation summary that rests on a
+    source starting with one of ``prefixes`` (rebuilt from the questions kept). Returns the
+    conversations changed."""
+    if not prefixes:
+        return []
+    result = session.execute(
+        update(Conversation)
+        .where(
+            Conversation.summary_ciphertext.is_not(None),
+            _jsonb_sources_start_with(Conversation.summary_sources, prefixes),
+        )
+        .values(
+            summary_ciphertext=None,
+            summary_oldest_at=None,
+            summary_through=None,
+            summary_sources=[],
+        )
+        .returning(Conversation.id)
+    )
+    return sorted(result.scalars())
+
+
+def verified_answers_citing(session: Session, document_id: uuid.UUID) -> list[uuid.UUID]:
+    """Verified answers (any status) citing a page of the document."""
+    prefix = f"{_DOC_SOURCE_PREFIX}{document_id}/"
+    return sorted(
+        session.execute(
+            select(VerifiedAnswer.id).where(
+                _jsonb_sources_start_with(VerifiedAnswer.citations, [prefix])
+            )
+        ).scalars()
+    )
 
 
 def query_by_id(session: Session, query_id: uuid.UUID) -> Query | None:

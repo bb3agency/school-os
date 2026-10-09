@@ -39,7 +39,7 @@ export function DevSignInView({ schools }: { schools: DevSchool[] }) {
             aria-labelledby={`school-${school.code}`}
             className={cn(cardClasses(), "space-y-3")}
           >
-            <h2 id={`school-${school.code}`} className="text-lg font-medium">
+            <h2 id={`school-${school.code}`} className="text-lg font-semibold">
               {t("school", { code: school.code })}
             </h2>
             <div className="overflow-x-auto rounded-lg border border-border">
@@ -90,14 +90,14 @@ export function DevSignInView({ schools }: { schools: DevSchool[] }) {
           </section>
         ))}
         <section aria-labelledby="dev-step-up" className={cn(cardClasses(), "space-y-2")}>
-          <h2 id="dev-step-up" className="text-lg font-medium">
+          <h2 id="dev-step-up" className="text-lg font-semibold">
             {t("stepUp.title")}
           </h2>
           <p className="text-ink">{t("stepUp.body")}</p>
           <CopyButton stepUpClaims label={t("stepUp.copy")} />
         </section>
         <section aria-labelledby="dev-operators" className={cn(cardClasses(), "space-y-2")}>
-          <h2 id="dev-operators" className="text-lg font-medium">
+          <h2 id="dev-operators" className="text-lg font-semibold">
             {t("operators.title")}
           </h2>
           <p className="text-ink">{t("operators.body")}</p>

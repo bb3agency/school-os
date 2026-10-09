@@ -171,3 +171,21 @@ export async function signOut(kind: SessionKind, navigate: Navigate = defaultNav
   forgetSessionInfo(kind);
   navigate(redirectTo);
 }
+
+/**
+ * "Sign out everywhere" (audit 2026-10-05 hardening): ends every session of this person and
+ * kind on the server and at the IdP, then leaves the page like Sign out.
+ */
+export async function signOutEverywhere(kind: SessionKind, navigate: Navigate = defaultNavigate) {
+  const token = await csrfToken(kind).catch(() => null);
+  const response = await fetch(`/bff/auth/sessions?kind=${kind}&all=1`, {
+    method: "DELETE",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: { accept: "application/json", ...(token ? { "x-csrf-token": token } : {}) },
+  });
+  if (!response.ok) throw new Error(`sign out everywhere ${response.status}`);
+  const { redirect_to: redirectTo } = (await response.json()) as { redirect_to: string };
+  forgetSessionInfo(kind);
+  navigate(redirectTo);
+}

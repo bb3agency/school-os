@@ -1,18 +1,47 @@
 "use client";
 
 import type { Subscription } from "@schoolos/api-client";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { z } from "zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { TextAreaField, TextField } from "@/components/ui/Input";
 import { SelectField } from "@/components/ui/Select";
 import { unwrap, useBffClient } from "@/lib/bff/query";
-import { localDateTime, reason, uuid } from "@/lib/validation";
-import { PK, planLabel, useCan, usePlanDirectory } from "./data";
+import { formatCount, formatDate, formatInr } from "@/lib/format";
+import { checkbox, localDateTime, money, reason, requiredInt, uuid } from "@/lib/validation";
+import {
+  PK,
+  ifMatch,
+  planLabel,
+  readyOr,
+  useAiBundles,
+  useCan,
+  useOperatorMe,
+  usePlanDirectory,
+} from "./data";
 
 const reasonSchema = z.object({ reason });
 const changePlanSchema = z.object({ plan_id: uuid });
+/**
+ * The subscription's `version` when the dialog opened, sent as If-Match on the price-override
+ * and AI-bundle changes (AA-13): a change saved by someone else meanwhile answers 412.
+ */
+const version = requiredInt(1, 2_147_483_647);
+const versionSchema = z.object({ version });
+const bundleSchema = z.object({ ai_bundle_id: uuid, version });
 const extendSchema = z.object({ trial_ends_at: localDateTime });
+/**
+ * Negotiated price (FR-PLT-013, docs/16 §5.7): rupees before GST for each billing period, two
+ * decimals at most, zero or more (₹0 is allowed, e.g. a free pilot: owner decision
+ * 2026-10-04; `money` refuses a minus sign). It replaces the plan's base price on invoices
+ * made from now on; the reason (10–500 characters) is required with it, as on the API.
+ */
+const overrideSchema = z.object({ price_override_inr: money, reason, version });
+/**
+ * Billing suspension (FR-PLT-014, docs/16 §9): past-due only, after the grace period, with a
+ * reason; inside a protected board-exam window only a platform owner may approve it.
+ */
+const suspendSchema = z.object({ reason, exam_window_override: checkbox });
 const INVALIDATE = [PK.subscriptions, PK.tenants, PK.dashboard] as const;
 
 /**
@@ -33,14 +62,21 @@ export function SubscriptionActions({
   const api = useBffClient("operator");
   const can = useCan();
   const { plans } = usePlanDirectory();
+  const bundles = readyOr(useAiBundles(), []);
+  const locale = useLocale();
+  // Only a platform owner can approve a suspension inside a board-exam window (§9.3).
+  const owner = useOperatorMe()?.roles.includes("platform_owner") ?? false;
   if (!can("platform.subscriptions.manage")) return null;
 
   const path = { sub_id: subscription.id };
+  // Read once, when a dialog opens: a background reload must not move it (If-Match).
+  const versionField = <input type="hidden" name="version" defaultValue={subscription.version} />;
   const current = plans.find((plan) => plan.id === subscription.plan_id);
   const choices = plans.filter(
     (plan) => plan.status === "published" && (!current || plan.tier === current.tier),
   );
   const status = subscription.status;
+  const monthly = !current || current.billing_period === "monthly";
 
   return (
     <div className="relative flex flex-wrap gap-2">
@@ -132,12 +168,193 @@ export function SubscriptionActions({
           )}
         </ActionDialog>
       ) : null}
+      {status !== "cancelled" && monthly ? (
+        <ActionDialog
+          triggerLabel={t("chooseAiBundle")}
+          triggerSize="sm"
+          triggerDescription={label}
+          title={t("chooseAiBundleTitle")}
+          description={t("chooseAiBundleBody")}
+          confirmLabel={t("chooseAiBundle")}
+          stepUp
+          schema={bundleSchema}
+          invalidate={INVALIDATE}
+          submit={(data) =>
+            unwrap(
+              api.PUT("/api/v1/platform/subscriptions/{sub_id}/ai-bundle", {
+                params: { path, header: { "If-Match": ifMatch(data.version) } },
+                body: { ai_bundle_id: data.ai_bundle_id },
+              }),
+            )
+          }
+        >
+          {(errors) => (
+            <>
+              {versionField}
+              <SelectField
+                name="ai_bundle_id"
+                label={t("aiBundle")}
+                placeholder={tv("chooseOne")}
+                error={errors.ai_bundle_id}
+                defaultValue={subscription.ai_bundle_id ?? ""}
+                options={bundles
+                  .filter((bundle) => bundle.status === "published")
+                  .map((bundle) => ({
+                    value: bundle.id,
+                    label: t("aiBundleOption", {
+                      name: bundle.name,
+                      answers: formatCount(bundle.included_answers, locale) ?? "",
+                      price: formatInr(bundle.price_inr, locale) ?? "",
+                      rate: formatInr(bundle.overage_rate_inr, locale) ?? "",
+                    }),
+                  }))}
+              />
+            </>
+          )}
+        </ActionDialog>
+      ) : null}
+      {status !== "cancelled" && subscription.ai_bundle_id ? (
+        <ActionDialog
+          triggerLabel={t("removeAiBundle")}
+          triggerVariant="ghost"
+          triggerSize="sm"
+          triggerDescription={label}
+          title={t("removeAiBundleTitle")}
+          description={t("removeAiBundleBody")}
+          confirmLabel={t("removeAiBundle")}
+          stepUp
+          schema={versionSchema}
+          invalidate={INVALIDATE}
+          submit={(data) =>
+            unwrap(
+              api.DELETE("/api/v1/platform/subscriptions/{sub_id}/ai-bundle", {
+                params: { path, header: { "If-Match": ifMatch(data.version) } },
+              }),
+            )
+          }
+        >
+          {() => versionField}
+        </ActionDialog>
+      ) : null}
+      {status !== "cancelled" ? (
+        <ActionDialog
+          triggerLabel={
+            subscription.price_override_inr === null ? t("setOverride") : t("changeOverride")
+          }
+          triggerSize="sm"
+          triggerDescription={label}
+          title={t("setOverrideTitle")}
+          description={t("overrideBody")}
+          confirmLabel={t("setOverride")}
+          consequence={t("overrideConsequence")}
+          stepUp
+          schema={overrideSchema}
+          invalidate={INVALIDATE}
+          submit={({ version: seen, ...body }) =>
+            unwrap(
+              api.PUT("/api/v1/platform/subscriptions/{sub_id}/price-override", {
+                params: { path, header: { "If-Match": ifMatch(seen) } },
+                body,
+              }),
+            )
+          }
+        >
+          {(errors) => (
+            <>
+              {versionField}
+              <TextField
+                name="price_override_inr"
+                label={t("overrideAmount")}
+                hint={t("overrideAmountHint")}
+                inputMode="decimal"
+                error={errors.price_override_inr}
+                defaultValue={subscription.price_override_inr ?? ""}
+                required
+              />
+              <ReasonField error={errors.reason} />
+            </>
+          )}
+        </ActionDialog>
+      ) : null}
+      {status !== "cancelled" && subscription.price_override_inr !== null ? (
+        <ActionDialog
+          triggerLabel={t("removeOverride")}
+          triggerVariant="ghost"
+          triggerSize="sm"
+          triggerDescription={label}
+          title={t("removeOverrideTitle")}
+          description={t("removeOverrideBody")}
+          confirmLabel={t("removeOverride")}
+          confirmVariant="danger"
+          stepUp
+          schema={versionSchema}
+          invalidate={INVALIDATE}
+          submit={(data) =>
+            unwrap(
+              api.DELETE("/api/v1/platform/subscriptions/{sub_id}/price-override", {
+                params: { path, header: { "If-Match": ifMatch(data.version) } },
+              }),
+            )
+          }
+        >
+          {() => versionField}
+        </ActionDialog>
+      ) : null}
+      {status === "past_due" ? (
+        <ActionDialog
+          triggerLabel={t("suspend")}
+          triggerVariant="danger"
+          triggerSize="sm"
+          triggerDescription={label}
+          title={t("suspendTitle")}
+          description={t("suspendBody", {
+            date: formatDate(subscription.grace_ends_on) ?? "",
+          })}
+          confirmLabel={t("suspend")}
+          confirmVariant="danger"
+          consequence={
+            current?.tier === "dedicated"
+              ? t("suspendDedicatedConsequence")
+              : current?.tier === "shared"
+                ? t("suspendSharedConsequence")
+                : t("suspendUnknownConsequence")
+          }
+          stepUp
+          schema={suspendSchema}
+          invalidate={INVALIDATE}
+          submit={(data) =>
+            unwrap(
+              api.POST("/api/v1/platform/subscriptions/{sub_id}/suspend", {
+                params: { path },
+                body: data,
+              }),
+            )
+          }
+        >
+          {(errors) => (
+            <>
+              <ReasonField error={errors.reason} />
+              {owner ? (
+                <label className="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    name="exam_window_override"
+                    className="mt-1 size-4 accent-primary"
+                  />
+                  {t("examWindowOverride")}
+                </label>
+              ) : null}
+            </>
+          )}
+        </ActionDialog>
+      ) : null}
       {status === "suspended" ? (
         <ActionDialog
           triggerLabel={t("reactivate")}
           triggerSize="sm"
           triggerDescription={label}
           title={t("reactivateTitle")}
+          description={t("reactivateBody")}
           confirmLabel={t("reactivate")}
           stepUp
           schema={z.object({})}

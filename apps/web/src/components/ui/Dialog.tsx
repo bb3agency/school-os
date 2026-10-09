@@ -76,7 +76,7 @@ export function Dialog({
         </div>
         {children ? <div className="space-y-4 px-4 py-4 sm:px-6">{children}</div> : null}
         {footer ? (
-          <div className="flex flex-wrap justify-end gap-2 rounded-b-xl border-t border-border bg-surface-muted px-4 py-3 max-sm:[&>*]:flex-1 sm:px-6 sm:py-4">
+          <div className="dialog-footer flex flex-wrap justify-end gap-2 rounded-b-xl border-t border-border bg-surface-muted px-4 py-3 max-sm:[&>*]:flex-1 sm:px-6 sm:py-4">
             {footer}
           </div>
         ) : null}

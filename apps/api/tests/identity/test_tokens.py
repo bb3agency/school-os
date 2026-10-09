@@ -158,7 +158,9 @@ def mint(key: SigningKey, headers: dict[str, Any] | None = None, **overrides: An
             claims.pop(name, None)
         else:
             claims[name] = value
-    hdr = {"kid": key.kid, **(headers or {})}
+    # RFC 9068 access tokens say so in the header (audit 2026-10-05: a token must be marked as an
+    # access token, by ``typ`` or by Cognito's ``token_use``); tests override it explicitly.
+    hdr = {"kid": key.kid, "typ": "at+jwt", **(headers or {})}
     return jwt.encode(claims, key.private_key, algorithm=key.alg, headers=hdr)
 
 
@@ -250,6 +252,31 @@ def test_FR_IAM_001_id_token_typ_header_is_rejected(idp: FakeIdp, rsa_key: Signi
 
 def test_FR_IAM_001_rfc9068_at_jwt_typ_is_accepted(idp: FakeIdp, rsa_key: SigningKey) -> None:
     raw = mint(rsa_key, headers={"typ": "at+jwt"})
+    assert make_verifier(idp).verify(raw).subject == SUBJECT
+
+
+@pytest.mark.parametrize("typ", ["JWT", "jwt", None])
+def test_FR_IAM_001_a_token_not_marked_as_access_token_is_rejected(
+    idp: FakeIdp, rsa_key: SigningKey, typ: str | None
+) -> None:
+    """Audit 2026-10-05 (platform, hardening "ID tokens with non-Cognito IdPs"): an IdP that
+    puts the client id in ``aud`` and sets no ``token_use`` issues ID tokens that look like
+    access tokens. A token must say it is an access token: header ``typ`` ``at+jwt`` (RFC 9068)
+    or the claim ``token_use = access`` (Cognito, the dev stub)."""
+    raw = mint(rsa_key, headers={"typ": typ})
+    assert jwt.get_unverified_header(raw).get("typ") == typ
+    with pytest.raises(Unauthenticated):
+        make_verifier(idp).verify(raw)
+
+
+@pytest.mark.parametrize(
+    ("typ", "token_use"),
+    [("JWT", "access"), (None, "access"), ("application/at+jwt", None), ("AT+JWT", None)],
+)
+def test_FR_IAM_001_access_token_marked_by_typ_or_token_use_is_accepted(
+    idp: FakeIdp, rsa_key: SigningKey, typ: str | None, token_use: str | None
+) -> None:
+    raw = mint(rsa_key, headers={"typ": typ}, token_use=token_use)
     assert make_verifier(idp).verify(raw).subject == SUBJECT
 
 
@@ -637,8 +664,12 @@ def _prod_settings(**overrides: Any) -> Settings:
     values: dict[str, Any] = {
         "env": Environment.PROD,
         "key_wrapper": KeyWrapperKind.KMS,
-        "database_url": SecretStr("postgresql+psycopg://sos_app:x@db:5432/schoolos"),
-        "platform_database_url": SecretStr("postgresql+psycopg://sos_platform:y@db:5432/schoolos"),
+        "database_url": SecretStr(
+            "postgresql+psycopg://sos_app:x@db:5432/schoolos?sslmode=verify-full"
+        ),
+        "platform_database_url": SecretStr(
+            "postgresql+psycopg://sos_platform:y@db:5432/schoolos?sslmode=verify-full"
+        ),
         "service_token_key": SecretStr("k" * 48),
         "oidc_issuer": ISSUER,
         "oidc_audience": AUDIENCE,

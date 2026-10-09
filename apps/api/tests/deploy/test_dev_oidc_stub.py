@@ -110,6 +110,15 @@ def test_SEC_005_stub_staff_issuer_asserts_mfa_like_the_platform_issuer() -> Non
     assert all("auth_time" not in c for c in claims.values())
 
 
+def test_FR_IAM_001_every_stub_mapping_marks_its_tokens_as_access_tokens() -> None:
+    """The API accepts only tokens marked as access tokens (``typ`` ``at+jwt`` or
+    ``token_use = access``; audit 2026-10-05). The stub signs plain ``JWT``, so every mapping
+    of every issuer sets ``token_use = access`` or local sign-in would stop working."""
+    for cb in stub_config()["tokenCallbacks"]:
+        for mapping in cb["requestMappings"]:
+            assert mapping["claims"]["token_use"] == "access", (cb["issuerId"], mapping["match"])
+
+
 def test_ADR_0023_stub_support_client_lives_only_in_the_operator_issuer() -> None:
     """The local stub mimics the Cognito support app client of the operator pool: client_id,
     token_use=access and MFA. Every mapping of every issuer asserts MFA; none pins auth_time."""
@@ -180,8 +189,12 @@ def _settings(env: Environment, **overrides: Any) -> Settings:
     values: dict[str, Any] = {
         "env": env,
         "key_wrapper": KeyWrapperKind.KMS,
-        "database_url": SecretStr("postgresql+psycopg://sos_app:x@db:5432/schoolos"),
-        "platform_database_url": SecretStr("postgresql+psycopg://sos_platform:y@db:5432/schoolos"),
+        "database_url": SecretStr(
+            "postgresql+psycopg://sos_app:x@db:5432/schoolos?sslmode=verify-full"
+        ),
+        "platform_database_url": SecretStr(
+            "postgresql+psycopg://sos_platform:y@db:5432/schoolos?sslmode=verify-full"
+        ),
         "service_token_key": SecretStr("k" * 48),
         "oidc_issuer": "https://cognito-idp.ap-south-1.amazonaws.com/ap-south-1_SYNTHETIC",
         "oidc_audience": "synthclient01",

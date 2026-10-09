@@ -14,6 +14,8 @@ locals {
   account_id = data.aws_caller_identity.current.account_id
   region     = data.aws_region.current.region
   secret_ns  = "sos/${var.env}"
+  # Known at plan time (the bucket name is), so tests can check the task-role resources (W3-06).
+  files_arn = "arn:aws:s3:::${module.s3.files_bucket}"
 
   image = {
     api    = "${module.ecr.repository_urls["api"]}:${var.release_version}"
@@ -63,6 +65,9 @@ locals {
     SOS_BILLING_SUPPLIER_STATE_CODE = var.billing_supplier_state_code
     SOS_BILLING_SUPPLIER_ADDRESS    = var.billing_supplier_address
     SOS_LOG_LEVEL                   = var.log_level
+    # Claude safety lock (docs/10 §11): the api and every Celery process refuse to start in
+    # staging/prod while a models.yaml role uses anthropic, unless this is true (default false).
+    SOS_ANTHROPIC_ZDR_CONFIRMED = tostring(var.anthropic_zdr_confirmed)
   }, local.invoice_env)
 
   # Staff invitation email (notifications.send_email runs in the worker; the api queues it). Only the
@@ -82,16 +87,25 @@ locals {
     SOS_PLATFORM_INVOICE_BUCKET = var.platform_invoice_bucket
   }
 
-  # Secrets every app container needs to start: the guarded settings and the broker.
+  # Secrets every app container needs to start: the guarded settings. The broker URL is per task
+  # (redis_secret below).
   app_base_secrets = {
     SOS_DATABASE_URL          = "${local.db_secret["app"]}:url::"
     SOS_PLATFORM_DATABASE_URL = "${local.db_secret["platform"]}:url::"
-    SOS_REDIS_URL             = "${module.redis.secret_arn}:url::"
     SOS_SERVICE_TOKEN_KEY     = local.rnd_secret["service_token_key"]
   }
   app_base_secret_arns = [
-    local.db_secret["app"], local.db_secret["platform"], module.redis.secret_arn, local.rnd_secret["service_token_key"],
+    local.db_secret["app"], local.db_secret["platform"], local.rnd_secret["service_token_key"],
   ]
+
+  # Audit 2026-10-05 P2-06: each task connects to Valkey as its own ElastiCache RBAC user (web only
+  # on its own keys; modules/redis access_strings). worker-pdf is the worker user; migrate runs the
+  # api image and gets the api user only to pass the start-up guard (its security group cannot
+  # reach the cache).
+  redis_secret = {
+    for task, user in { web = "web", api = "api", worker = "worker", worker_pdf = "worker", beat = "beat", migrate = "api" } :
+    task => { url = "${module.redis.user_secret_arns[user]}:url::", arn = module.redis.user_secret_arns[user] }
+  }
 
   # Provider API keys: only for the containers that call providers (api, worker).
   provider_secrets     = { for env_name, short in var.operator_secret_env : env_name => local.op_secret[short] }
@@ -117,6 +131,11 @@ module "kms" {
     }
     backup = {
       description = "SchoolOS ${var.env}: backups and snapshots in ap-south-1"
+    }
+    # Every dedicated host may decrypt release bundles, so they get their own key, never the data
+    # key (audit 2026-10-05 key separation).
+    artifacts = {
+      description = "SchoolOS ${var.env}: release artifacts (dedicated-tier bundles)"
     }
     logs = {
       description           = "SchoolOS ${var.env}: CloudWatch Logs and alarm topic"
@@ -153,6 +172,7 @@ module "s3" {
   bucket_suffix           = local.account_id
   data_kms_key_arn        = local.kms_data
   audit_kms_key_arn       = local.kms_audit
+  artifacts_kms_key_arn   = module.kms.key_arns["artifacts"]
   audit_object_lock_mode  = var.audit_object_lock_mode
   audit_object_lock_years = var.audit_object_lock_years
   audit_object_lock_days  = var.audit_object_lock_days
@@ -205,6 +225,7 @@ module "redis" {
   node_type          = var.redis_node_type
   num_cache_clusters = var.redis_num_nodes
   kms_key_arn        = local.kms_data
+  log_kms_key_arn    = local.kms_logs # the data key does not grant CloudWatch Logs
   secret_name        = "${local.secret_ns}/valkey"
   allowed_security_groups = {
     web        = module.web.security_group_id
@@ -336,11 +357,16 @@ check "pdf_worker_has_egress" {
 
 # --- Task role policies ------------------------------------------------------------------------
 
+# Audit W3-06: the internet-facing api can read and write school files but never tag or delete them
+# (no s3:DeleteObject, s3:PutObjectTagging or s3:PutObjectVersionTagging on t/*): tagging an object
+# sos-lifecycle=discarded (or export-7d) and deleting it would bypass the 90-day recovery window.
+# The api queues every discard as an outbox event (document.object.discard_requested); only the
+# worker role below tags and deletes. Asserted by tests/shared_platform.tftest.hcl.
 data "aws_iam_policy_document" "api" {
   statement {
     sid       = "FilesList"
     actions   = ["s3:ListBucket"]
-    resources = [module.s3.files_bucket_arn]
+    resources = [local.files_arn]
     condition {
       test     = "StringLike"
       variable = "s3:prefix"
@@ -350,8 +376,8 @@ data "aws_iam_policy_document" "api" {
 
   statement {
     sid       = "FilesObjects"
-    actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:GetObjectTagging", "s3:PutObjectTagging", "s3:AbortMultipartUpload"]
-    resources = ["${module.s3.files_bucket_arn}/t/*"]
+    actions   = ["s3:GetObject", "s3:PutObject", "s3:GetObjectTagging", "s3:AbortMultipartUpload"]
+    resources = ["${local.files_arn}/t/*"]
   }
 
   # Control-plane invoice PDFs (docs/16 §5.8, ADR-0017 Amendment 2026-09-28) and certificates
@@ -361,8 +387,8 @@ data "aws_iam_policy_document" "api" {
     sid     = "InvoicePdfObjects"
     actions = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
     resources = [
-      "${module.s3.files_bucket_arn}/platform/invoices/*",
-      "${module.s3.files_bucket_arn}/platform/deletion-certificates/*",
+      "${local.files_arn}/platform/invoices/*",
+      "${local.files_arn}/platform/deletion-certificates/*",
     ]
   }
 
@@ -397,14 +423,64 @@ data "aws_iam_policy_document" "api" {
   }
 }
 
+# worker-pdf: the api's file access plus the one tag its exports carry (export-7d, set in the same
+# PUT by documents.store_export_file), only under t/<tenant>/exports/. No delete, no other tag.
+data "aws_iam_policy_document" "worker_pdf" {
+  source_policy_documents = [data.aws_iam_policy_document.api.json]
+
+  statement {
+    sid       = "ExportLifecycleTag"
+    actions   = ["s3:PutObjectTagging"]
+    resources = ["${local.files_arn}/t/*/exports/*"]
+    condition {
+      test     = "StringEquals"
+      variable = "s3:RequestObjectTag/sos-lifecycle"
+      values   = ["export-7d"]
+    }
+  }
+}
+
 data "aws_iam_policy_document" "worker" {
   source_policy_documents = [data.aws_iam_policy_document.api.json]
+
+  # Audit W3-06: only the worker discards (PRV-016, retention purges, offboarding, the upload path's
+  # leftovers queued by the api) and tags exports on upload. ListBucketVersions: discard and purge
+  # tag every stored version (audit W3-07).
+  statement {
+    sid       = "FilesListVersions"
+    actions   = ["s3:ListBucketVersions"]
+    resources = [local.files_arn]
+    condition {
+      test     = "StringLike"
+      variable = "s3:prefix"
+      values   = ["t/*"]
+    }
+  }
+
+  statement {
+    sid       = "FilesDiscard"
+    actions   = ["s3:DeleteObject", "s3:PutObjectTagging", "s3:PutObjectVersionTagging"]
+    resources = ["${local.files_arn}/t/*"]
+  }
 
   # Daily signed audit export (07 §4 T4): write-only into the Object Lock bucket.
   statement {
     sid       = "AuditArchiveWrite"
     actions   = ["s3:PutObject", "s3:GetObject"]
     resources = ["${module.s3.audit_bucket_arn}/t/*"]
+  }
+
+  # The worker lists a school's archive keys to find its last signed manifest (verify_all_chains
+  # compares the DB head with it, H-04) and the days already archived (backfill, H-05).
+  statement {
+    sid       = "AuditArchiveList"
+    actions   = ["s3:ListBucket"]
+    resources = [module.s3.audit_bucket_arn]
+    condition {
+      test     = "StringLike"
+      variable = "s3:prefix"
+      values   = ["t/*"]
+    }
   }
 
   statement {
@@ -473,6 +549,7 @@ module "web" {
     APP_BASE_URL            = "https://${var.app_domain}"
     PLATFORM_BASE_URL       = "https://${var.admin_domain}"
     API_INTERNAL_URL        = "http://api:8000"
+    TRUSTED_PROXY_HOPS      = "1" # the ALB appends the client address (P2-07)
     OIDC_ISSUER             = module.cognito.tenant_issuer
     OIDC_CLIENT_ID          = module.cognito.tenant_client_id
     PLATFORM_OIDC_ISSUER    = module.cognito.platform_issuer
@@ -481,6 +558,12 @@ module "web" {
     SUPPORT_OIDC_CLIENT_ID = module.cognito.support_client_id
     # Origin of presigned upload/preview URLs (CSP connect-src + img-src, SEC-010/SEC-016).
     FILES_ORIGIN = module.s3.files_browser_origin
+    # Public marketing site (docs/17 §5.6), read at request time; empty = that part is hidden.
+    # Not secrets. Only the web task gets them (dedicated hosts serve no marketing pages).
+    SOS_PUBLIC_CONTACT_EMAIL   = var.public_contact_email
+    SOS_PUBLIC_COMPANY_NAME    = var.public_company_name
+    SOS_PUBLIC_COMPANY_ADDRESS = var.public_company_address
+    SOS_PUBLIC_WHATSAPP_NUMBER = var.public_whatsapp_number
   }
   secrets = {
     SESSION_SECRET              = local.rnd_secret["session_secret"]
@@ -488,12 +571,12 @@ module "web" {
     OIDC_CLIENT_SECRET          = module.cognito.tenant_client_secret_arn
     PLATFORM_OIDC_CLIENT_SECRET = module.cognito.platform_client_secret_arn
     SUPPORT_OIDC_CLIENT_SECRET  = module.cognito.support_client_secret_arn
-    REDIS_URL                   = "${module.redis.secret_arn}:url::"
+    REDIS_URL                   = local.redis_secret["web"].url
   }
   secret_arns = [
     local.rnd_secret["session_secret"], local.rnd_secret["service_token_key"],
     module.cognito.tenant_client_secret_arn, module.cognito.platform_client_secret_arn,
-    module.cognito.support_client_secret_arn, module.redis.secret_arn,
+    module.cognito.support_client_secret_arn, local.redis_secret["web"].arn,
   ]
   secrets_kms_key_arns = [local.kms_data]
   log_kms_key_arn      = local.kms_logs
@@ -535,9 +618,10 @@ module "api" {
     client_alias_port = 8000
   }
 
-  environment             = merge(local.app_env, local.email_env, { SOS_SERVICE_NAME = "api" })
-  secrets                 = merge(local.app_base_secrets, local.provider_secrets)
-  secret_arns             = concat(local.app_base_secret_arns, local.provider_secret_arns)
+  # X-Forwarded-For is trusted only from the VPC (the ALB and the web/BFF tasks; P2-07).
+  environment             = merge(local.app_env, local.email_env, { SOS_SERVICE_NAME = "api", SOS_TRUSTED_PROXIES = module.network.vpc_cidr_block })
+  secrets                 = merge(local.app_base_secrets, local.provider_secrets, { SOS_REDIS_URL = local.redis_secret["api"].url })
+  secret_arns             = concat(local.app_base_secret_arns, local.provider_secret_arns, [local.redis_secret["api"].arn])
   secrets_kms_key_arns    = [local.kms_data]
   attach_task_role_policy = true
   task_role_policy_json   = data.aws_iam_policy_document.api.json
@@ -570,8 +654,8 @@ module "worker" {
   service_connect        = { namespace_arn = module.cluster.service_connect_namespace_arn }
 
   environment             = merge(local.app_env, local.email_env, { SOS_SERVICE_NAME = "worker" })
-  secrets                 = merge(local.app_base_secrets, local.provider_secrets)
-  secret_arns             = concat(local.app_base_secret_arns, local.provider_secret_arns)
+  secrets                 = merge(local.app_base_secrets, local.provider_secrets, { SOS_REDIS_URL = local.redis_secret["worker"].url })
+  secret_arns             = concat(local.app_base_secret_arns, local.provider_secret_arns, [local.redis_secret["worker"].arn])
   secrets_kms_key_arns    = [local.kms_data]
   attach_task_role_policy = true
   task_role_policy_json   = data.aws_iam_policy_document.worker.json
@@ -581,7 +665,7 @@ module "worker" {
 
 # Consumes only the pdf queue, on the sandbox capacity (ADR-0025 option A), with the Chromium sandbox
 # on (pdf.chromium_sandbox). No provider API keys (it calls no LLM/embeddings/OCR provider); task
-# role = the api's (files bucket + data key), no audit archive or signing key.
+# role = the api's file access + the export-7d tag (worker_pdf), no delete, no audit archive or signing key.
 module "worker_pdf" {
   source = "../ecs_service"
 
@@ -606,11 +690,11 @@ module "worker_pdf" {
   enable_execute_command = var.enable_execute_command
 
   environment             = merge(local.app_env, { SOS_SERVICE_NAME = "worker-pdf" })
-  secrets                 = local.app_base_secrets
-  secret_arns             = local.app_base_secret_arns
+  secrets                 = merge(local.app_base_secrets, { SOS_REDIS_URL = local.redis_secret["worker_pdf"].url })
+  secret_arns             = concat(local.app_base_secret_arns, [local.redis_secret["worker_pdf"].arn])
   secrets_kms_key_arns    = [local.kms_data]
   attach_task_role_policy = true
-  task_role_policy_json   = data.aws_iam_policy_document.api.json
+  task_role_policy_json   = data.aws_iam_policy_document.worker_pdf.json
   log_kms_key_arn         = local.kms_logs
   tags                    = var.tags
 }
@@ -637,8 +721,8 @@ module "beat" {
   # Beat only talks to Valkey, but it loads the same Settings, so it needs the full base settings to
   # pass the start-up guards (egress stays limited to 6379).
   environment          = merge(local.app_env, { SOS_SERVICE_NAME = "beat" })
-  secrets              = local.app_base_secrets
-  secret_arns          = local.app_base_secret_arns
+  secrets              = merge(local.app_base_secrets, { SOS_REDIS_URL = local.redis_secret["beat"].url })
+  secret_arns          = concat(local.app_base_secret_arns, [local.redis_secret["beat"].arn])
   secrets_kms_key_arns = [local.kms_data]
   log_kms_key_arn      = local.kms_logs
   tags                 = var.tags
@@ -668,8 +752,9 @@ module "migrate" {
   environment = merge(local.app_env, { SOS_SERVICE_NAME = "migrate" })
   secrets = merge(local.app_base_secrets, {
     SOS_MIGRATOR_DATABASE_URL = "${local.db_secret["migrator"]}:url::"
+    SOS_REDIS_URL             = local.redis_secret["migrate"].url
   })
-  secret_arns          = concat(local.app_base_secret_arns, [local.db_secret["migrator"]])
+  secret_arns          = concat(local.app_base_secret_arns, [local.db_secret["migrator"], local.redis_secret["migrate"].arn])
   secrets_kms_key_arns = [local.kms_data]
   log_kms_key_arn      = local.kms_logs
   tags                 = var.tags
@@ -693,12 +778,14 @@ module "db_bootstrap" {
   assign_public_ip = local.assign_public_ip
   egress_vpc_ports = [5432]
   entry_point      = ["/bin/sh", "-c"]
+  # psql reads the role passwords from its environment (\getenv, psql 15+), never from its command
+  # line (/proc/*/cmdline); an unset variable stops the script (ON_ERROR_STOP).
   command = [join(" ", [
     "exec psql -X -v ON_ERROR_STOP=1",
-    "-v app_password=\"$SOS_APP_PASSWORD\"",
-    "-v migrator_password=\"$SOS_MIGRATOR_PASSWORD\"",
-    "-v platform_password=\"$SOS_PLATFORM_PASSWORD\"",
-    "-v readonly_password=\"$SOS_READONLY_PASSWORD\"",
+    "-c '\\getenv app_password SOS_APP_PASSWORD'",
+    "-c '\\getenv migrator_password SOS_MIGRATOR_PASSWORD'",
+    "-c '\\getenv platform_password SOS_PLATFORM_PASSWORD'",
+    "-c '\\getenv readonly_password SOS_READONLY_PASSWORD'",
     "-f ${var.db_bootstrap_sql_path}",
   ])]
 
@@ -751,7 +838,11 @@ module "observability" {
   rds_allocated_storage_gb   = var.rds_allocated_storage_gb
   redis_replication_group_id = module.redis.replication_group_id
   monthly_budget_usd         = var.monthly_budget_usd
-  tags                       = var.tags
+  # Security alarms read these services' structured logs (docs/07 §15).
+  api_log_group_name    = module.api.log_group_name
+  worker_log_group_name = module.worker.log_group_name
+  web_log_group_name    = module.web.log_group_name
+  tags                  = var.tags
 }
 
 module "ci" {
@@ -763,18 +854,27 @@ module "ci" {
   create_oidc_provider       = var.create_github_oidc_provider
   existing_oidc_provider_arn = var.existing_github_oidc_provider_arn
   deploy_environment         = var.github_deploy_environment
-  allow_main_branch          = var.github_allow_main_branch
-  ecr_repository_arns        = values(module.ecr.repository_arns)
-  ecs_cluster_arn            = module.cluster.arn
+  # P2-08 (b): staging deploys come only from deploy-staging.yml on main (after CI passed);
+  # production images and bundles only from release.yml on a CalVer tag.
+  deploy_workflows = var.github_deploy_environment == "production" ? [
+    "release.yml@refs/tags/20*",
+  ] : ["deploy-staging.yml@refs/heads/main"]
+  allow_main_branch   = var.github_allow_main_branch
+  ecr_repository_arns = values(module.ecr.repository_arns)
+  ecs_cluster_arn     = module.cluster.arn
+  # Not db_bootstrap: its execution role reads the RDS master secret. Operators start it with their
+  # own credentials (docs/10 §8); CI never does (audit 2026-10-05 P2-04).
   passable_role_arns = flatten([
-    for m in [module.web, module.api, module.worker, module.worker_pdf, module.beat, module.migrate, module.db_bootstrap] :
+    for m in [module.web, module.api, module.worker, module.worker_pdf, module.beat, module.migrate] :
     [m.task_role_arn, m.execution_role_arn]
   ])
+  one_off_task_families    = [module.migrate.task_definition_family]
   enable_artifacts_publish = true
   artifacts_bucket_arn     = module.s3.artifacts_bucket_arn
-  artifacts_kms_key_arn    = local.kms_data
+  artifacts_kms_key_arn    = module.s3.artifacts_kms_key_arn
   create_plan_role         = var.create_plan_role
   plan_can_read_secrets    = var.plan_can_read_secrets
+  plan_environment         = var.github_plan_environment
   secrets_kms_key_arn      = local.kms_data
   create_apply_role        = var.create_apply_role
   apply_environment        = var.github_apply_environment

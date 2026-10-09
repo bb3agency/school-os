@@ -45,6 +45,9 @@ beforeEach(() => {
         return info();
       }
       if (path === "/bff/auth/logout") return Response.json({ redirect_to: logoutRedirect });
+      if (path === "/bff/auth/sessions" && request.method === "DELETE") {
+        return Response.json({ redirect_to: logoutRedirect, revoked: 3 });
+      }
       return new Response(null, { status: 404 });
     }),
   );
@@ -62,6 +65,29 @@ async function flush() {
 }
 
 describe("SessionControls (docs/07 §5.2 shared-PC mode)", () => {
+  it("signs out everywhere: ends every session of the person, with CSRF (audit 2026-10-05)", async () => {
+    const navigate = vi.fn();
+    logoutRedirect = "https://idp.example/staff/endsession?client_id=staff-client";
+    renderWithIntl(
+      <SessionControls
+        kind="staff"
+        displayName="Office Clerk"
+        navigate={navigate}
+        variant="sidebar"
+      />,
+      "en",
+    );
+    const everywhere = screen.getByRole("button", { name: messages.en.auth.signOutEverywhere });
+    await act(async () => {
+      fireEvent.click(everywhere);
+    });
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith(logoutRedirect));
+    const call = requests.find((r) => r.url.includes("/bff/auth/sessions"));
+    expect(call?.method).toBe("DELETE");
+    expect(new URL(call!.url).search).toBe("?kind=staff&all=1");
+    expect(call?.headers.get("x-csrf-token")).toBe(CSRF);
+  });
+
   it("shows who is signed in and a visible Lock now button that signs out at once", async () => {
     const navigate = vi.fn();
     logoutRedirect = "https://idp.example/staff/endsession?client_id=staff-client";

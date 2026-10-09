@@ -66,6 +66,8 @@ export function Toggle({
       className={cn(
         "relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors",
         "disabled:cursor-not-allowed disabled:opacity-60",
+        // 44px tall hit area on touch screens; the track itself keeps its size.
+        "pointer-coarse:after:absolute pointer-coarse:after:-inset-y-2.5 pointer-coarse:after:inset-x-0 pointer-coarse:after:content-['']",
         on ? "border-success bg-success" : "border-border-control bg-border-control",
       )}
     >

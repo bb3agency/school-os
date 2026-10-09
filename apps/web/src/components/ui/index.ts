@@ -35,6 +35,8 @@ export {
 } from "./Card";
 export {
   DataTable,
+  StackedRows,
+  stackPlace,
   Table,
   TableScroll,
   TBody,
@@ -43,10 +45,12 @@ export {
   Th,
   Tr,
   type Column,
+  type StackedRowsProps,
   type TableDensity,
   type TableProps,
   type TableScrollProps,
 } from "./Table";
+export { NarrowSwitch } from "./NarrowSwitch";
 export { Dialog } from "./Dialog";
 export { EmptyState } from "./EmptyState";
 export { Eyebrow, type EyebrowTone } from "./Eyebrow";

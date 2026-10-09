@@ -142,3 +142,43 @@ def test_CLAUDE_6_12_dq_migration_reversible_with_data(populated: tuple[Config, 
             _scalar(admin, f"SELECT has_table_privilege('sos_app', 'sis.{table}', 'DELETE')")
             is False
         )
+
+
+def test_A_01_0049_downgrade_reopens_findings_waiting_for_confirmation(
+    populated: tuple[Config, Engine],
+) -> None:
+    """0049 (A-01): a finding waiting for a confirmation goes back to ``open`` on downgrade (it
+    keeps blocking under the previous code), the status CHECK is restored, RLS stays forced and
+    the walk back to head succeeds."""
+    from sqlalchemy.exc import IntegrityError
+
+    cfg, admin = populated
+    waiting = (
+        "UPDATE sis.dq_findings SET status = 'needs_confirmation' WHERE id = "
+        "(SELECT id FROM sis.dq_findings WHERE rule_id = 'DQ-003' ORDER BY id LIMIT 1)"
+    )
+    with admin.begin() as c:
+        c.execute(text(waiting))
+    command.downgrade(cfg, "0047_security_decisions")
+    assert (
+        _scalar(admin, "SELECT count(*) FROM sis.dq_findings WHERE status = 'needs_confirmation'")
+        == 0
+    )
+    assert (
+        _scalar(
+            admin,
+            "SELECT count(*) FROM sis.dq_findings WHERE rule_id = 'DQ-003' AND status = 'open'",
+        )
+        == 2
+    )
+    forced = _scalar(
+        admin,
+        "SELECT relrowsecurity AND relforcerowsecurity FROM pg_class "
+        "WHERE oid = 'sis.dq_findings'::regclass",
+    )
+    assert forced is True
+    with pytest.raises(IntegrityError), admin.begin() as c:
+        c.execute(text(waiting))
+    command.upgrade(cfg, "head")
+    with admin.begin() as c:
+        c.execute(text(waiting))

@@ -108,7 +108,26 @@ const PLAN = (id: string, code: string, status: string, version = 1) => ({
   features: {},
   published_at: status === "draft" ? null : "2026-06-01T00:00:00Z",
   created_at: "2026-06-01T00:00:00Z",
+  one_time_fee_inr: code === "standard" ? "15000.00" : "0.00",
+  description: code === "standard" ? "Synthetic shared plan wording." : null,
 });
+
+const BUNDLE = (id: string, name: string, answers: number, price: string) => ({
+  id,
+  code: `ai-${name.toLowerCase()}`,
+  version: 1,
+  name,
+  included_answers: answers,
+  price_inr: price,
+  overage_rate_inr: "1.50",
+  status: "published",
+  published_at: "2026-10-01T00:00:00Z",
+});
+const BUNDLES = [
+  BUNDLE("0192f3a4-0000-7000-8000-00000000d001", "Lite", 300, "699.00"),
+  BUNDLE("0192f3a4-0000-7000-8000-00000000d002", "Standard", 1000, "1499.00"),
+  BUNDLE("0192f3a4-0000-7000-8000-00000000d003", "High", 3000, "3499.00"),
+];
 
 const DETAIL = {
   tenant_id: T,
@@ -175,6 +194,7 @@ beforeEach(() => {
       PLAN("0192f3a4-0000-7000-8000-00000000a002", "premium", "published"),
       PLAN("0192f3a4-0000-7000-8000-00000000a003", "premium", "draft", 2),
     ]);
+  stub.routes["GET /bff/api/v1/platform/ai-bundles"] = () => page(BUNDLES);
 });
 afterEach(uninstallBffStub);
 
@@ -210,6 +230,46 @@ describe("school detail actions (FR-PLT-004..005, SEC-027)", () => {
     expect(JSON.parse(call?.body ?? "{}")).toEqual({
       reason: "abuse reported by the school in writing",
     });
+  });
+
+  it("R-18: a billing-suspended school can be put on hold; lifting the hold says billing stays", async () => {
+    const billingOnly = {
+      ...DETAIL,
+      tenant_status: "suspended",
+      tenant_status_reason: "billing",
+      security_hold: false,
+      subscription_status: "suspended",
+      subscription: { ...SUB, status: "suspended" },
+    };
+    stub.routes[`GET /bff/api/v1/platform/tenants/${T}`] = () => Response.json(billingOnly);
+    stub.routes[`POST /bff/api/v1/platform/tenants/${T}/suspend`] = () =>
+      Response.json({ ...billingOnly, security_hold: true });
+    const user = userEvent.setup();
+    const { unmount } = renderWithIntl(<SchoolDetailScreen schoolId={T} tab="overview" />);
+    // Billing only: no "Reactivate" (the subscription lifts it), but a hold can be placed.
+    await user.click(await screen.findByRole("button", { name: pm.schoolDetail.placeHold }));
+    expect(screen.queryByRole("button", { name: pm.schoolDetail.reactivate })).toBeNull();
+    const dialog = screen.getByRole("dialog", { name: pm.schoolDetail.placeHoldTitle });
+    expect(within(dialog).getByText(pm.schoolDetail.placeHoldBody)).toBeVisible();
+    await user.type(within(dialog).getByLabelText(cm.reason), "Security incident under review");
+    await user.click(within(dialog).getByRole("button", { name: pm.schoolDetail.placeHold }));
+    await waitFor(() =>
+      expect(stub.callsTo(`POST /bff/api/v1/platform/tenants/${T}/suspend`)).toHaveLength(1),
+    );
+    unmount();
+
+    stub.routes[`GET /bff/api/v1/platform/tenants/${T}`] = () =>
+      Response.json({
+        ...billingOnly,
+        tenant_status_reason: "Security incident",
+        security_hold: true,
+      });
+    renderWithIntl(<SchoolDetailScreen schoolId={T} tab="overview" />);
+    await user.click(await screen.findByRole("button", { name: pm.schoolDetail.liftHold }));
+    const lift = screen.getByRole("dialog", { name: pm.schoolDetail.liftHoldTitle });
+    expect(within(lift).getByText(pm.schoolDetail.liftHoldBillingBody)).toBeVisible();
+    expect(screen.queryByRole("button", { name: pm.schoolDetail.placeHold })).toBeNull();
+    expect(screen.getByText(new RegExp(`· ${pm.schoolDetail.securityHold}$`))).toBeVisible();
   });
 
   it("the second offboarding step by the same operator explains the two-person rule (409)", async () => {
@@ -529,6 +589,139 @@ describe("plans, subscriptions and invoices (FR-PLT-010..019)", () => {
     );
   });
 
+  it("plans show the one-time fee, the wording and the AI answer bundles (ADR-0038)", async () => {
+    renderWithIntl(<PlansScreen />);
+    expect(await screen.findByText("₹15,000.00")).toBeInTheDocument();
+    expect(screen.getByText("Synthetic shared plan wording.")).toBeInTheDocument();
+    const bundles = await screen.findByRole("table", { name: pm.plans.bundlesTitle });
+    const standard = within(bundles).getByRole("row", { name: /Standard/ });
+    expect(within(standard).getByText("1,000")).toBeInTheDocument();
+    expect(within(standard).getByText("₹1,499.00")).toBeInTheDocument();
+    expect(within(standard).getByText("₹1.50")).toBeInTheDocument();
+    // Answers, never tokens or "unlimited", for schools' bundles.
+    expect(bundles.textContent?.toLowerCase()).not.toMatch(/unlimited|token/);
+  });
+
+  it("a new plan sends its one-time fee and description", async () => {
+    stub.routes["POST /bff/api/v1/platform/plans"] = () =>
+      Response.json(PLAN("0192f3a4-0000-7000-8000-00000000a009", "standard", "draft"), {
+        status: 201,
+      });
+    const user = userEvent.setup();
+    renderWithIntl(<PlansScreen />);
+    await user.click(await screen.findByRole("button", { name: pm.plans.newPlan }));
+    const dialog = screen.getByRole("dialog", { name: pm.plans.newPlanTitle });
+    await user.type(within(dialog).getByLabelText(pm.plans.code), "shared-pilot");
+    await user.type(within(dialog).getByLabelText(pm.plans.colName), "Shared pilot");
+    await user.type(within(dialog).getByLabelText(pm.plans.basePrice), "4999.00");
+    await user.type(within(dialog).getByLabelText(pm.plans.oneTimeFee), "15000.00");
+    await user.type(within(dialog).getByLabelText(pm.plans.planDescription), "Pilot wording.");
+    await user.click(within(dialog).getByRole("button", { name: pm.plans.saveDraft }));
+    await waitFor(() => expect(stub.callsTo("POST /bff/api/v1/platform/plans")).toHaveLength(1));
+    expect(bodyOf("POST /bff/api/v1/platform/plans")).toMatchObject({
+      code: "shared-pilot",
+      base_price_inr: "4999.00",
+      one_time_fee_inr: "15000.00",
+      description: "Pilot wording.",
+    });
+  });
+
+  it("chooses an AI answer bundle for a subscription and shows it (ADR-0038)", async () => {
+    stub.routes["GET /bff/api/v1/platform/subscriptions"] = () =>
+      page([
+        {
+          ...SUB,
+          ai_bundle_id: "0192f3a4-0000-7000-8000-00000000d001",
+          ai_bundle_from: "2026-11-01",
+        },
+      ]);
+    stub.routes[`PUT /bff/api/v1/platform/subscriptions/${SUB.id}/ai-bundle`] = () =>
+      Response.json({
+        ...SUB,
+        ai_bundle_id: "0192f3a4-0000-7000-8000-00000000d002",
+        ai_bundle_from: "2026-11-01",
+      });
+    const user = userEvent.setup();
+    renderWithIntl(<SubscriptionsScreen />);
+    expect(await screen.findByText("Lite: 300 answers a month")).toBeInTheDocument();
+    expect(screen.getByText("One-time fee ₹15,000.00 on the first invoice")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: pm.subscriptions.removeAiBundle })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: pm.subscriptions.chooseAiBundle }));
+    const dialog = screen.getByRole("dialog", { name: pm.subscriptions.chooseAiBundleTitle });
+    const select = within(dialog).getByLabelText(pm.subscriptions.aiBundle);
+    expect(
+      within(select)
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual([
+      cm.chooseOne,
+      "Lite: 300 answers, ₹699.00 a month, ₹1.50 each extra answer",
+      "Standard: 1,000 answers, ₹1,499.00 a month, ₹1.50 each extra answer",
+      "High: 3,000 answers, ₹3,499.00 a month, ₹1.50 each extra answer",
+    ]);
+    await user.selectOptions(select, "0192f3a4-0000-7000-8000-00000000d002");
+    await user.click(within(dialog).getByRole("button", { name: pm.subscriptions.chooseAiBundle }));
+    await waitFor(() =>
+      expect(bodyOf(`PUT /bff/api/v1/platform/subscriptions/${SUB.id}/ai-bundle`)).toEqual({
+        ai_bundle_id: "0192f3a4-0000-7000-8000-00000000d002",
+      }),
+    );
+    // The subscription's version goes in If-Match (AA-13).
+    expect(
+      stub
+        .callsTo(`PUT /bff/api/v1/platform/subscriptions/${SUB.id}/ai-bundle`)[0]
+        ?.headers.get("if-match"),
+    ).toBe('"2"');
+  });
+
+  it("removes the AI answer bundle after confirmation", async () => {
+    stub.routes["GET /bff/api/v1/platform/subscriptions"] = () =>
+      page([
+        {
+          ...SUB,
+          ai_bundle_id: "0192f3a4-0000-7000-8000-00000000d003",
+          ai_bundle_from: "2026-11-01",
+        },
+      ]);
+    stub.routes[`DELETE /bff/api/v1/platform/subscriptions/${SUB.id}/ai-bundle`] = () =>
+      Response.json({ ...SUB, ai_bundle_id: null, ai_bundle_from: null });
+    const user = userEvent.setup();
+    renderWithIntl(<SubscriptionsScreen />);
+    await user.click(await screen.findByRole("button", { name: pm.subscriptions.removeAiBundle }));
+    const dialog = screen.getByRole("dialog", { name: pm.subscriptions.removeAiBundleTitle });
+    await user.click(within(dialog).getByRole("button", { name: pm.subscriptions.removeAiBundle }));
+    await waitFor(() =>
+      expect(
+        stub.callsTo(`DELETE /bff/api/v1/platform/subscriptions/${SUB.id}/ai-bundle`),
+      ).toHaveLength(1),
+    );
+    expect(
+      stub
+        .callsTo(`DELETE /bff/api/v1/platform/subscriptions/${SUB.id}/ai-bundle`)[0]
+        ?.headers.get("if-match"),
+    ).toBe('"2"');
+  });
+
+  it("offers no AI bundle on an annual plan", async () => {
+    stub.routes["GET /bff/api/v1/platform/plans"] = () =>
+      page([
+        {
+          ...PLAN("0192f3a4-0000-7000-8000-00000000a001", "standard", "published"),
+          billing_period: "annual",
+        },
+      ]);
+    stub.routes["GET /bff/api/v1/platform/subscriptions"] = () => page([SUB]);
+    renderWithIntl(<SubscriptionsScreen />);
+    expect(
+      await screen.findByRole("button", { name: pm.subscriptions.changePlan }),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: pm.subscriptions.chooseAiBundle }),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
   it("shows invoice numbers and records a payment with TDS and an Idempotency-Key", async () => {
     stub.routes["GET /bff/api/v1/platform/invoices"] = () =>
       page([
@@ -652,6 +845,10 @@ describe("fleet, flags, audit, operators, announcements, break-glass, support", 
         rollout_percent: 25,
       }),
     );
+    // A new flag has no ETag yet: nothing to overwrite (AA-13).
+    expect(
+      stub.callsTo("PUT /bff/api/v1/platform/flags/ask.citations_v2")[0]?.headers.get("if-match"),
+    ).toBeNull();
   });
 
   it("audit: verifies the chain and downloads CSV with Accept: text/csv", async () => {
@@ -797,6 +994,33 @@ describe("fleet, flags, audit, operators, announcements, break-glass, support", 
     });
   });
 
+  it("break-glass: a request is for the whole school, said so, and sends an empty scope (DL-10)", async () => {
+    stub.routes["GET /bff/api/v1/platform/break-glass-requests"] = () => page([]);
+    stub.routes["POST /bff/api/v1/platform/break-glass-requests"] = () =>
+      Response.json({ id: "0192f3a4-0000-7000-8000-00000000f102" }, { status: 201 });
+    const user = userEvent.setup();
+    renderWithIntl(<BreakGlassScreen />);
+    await user.click(await screen.findByRole("button", { name: pm.breakGlass.request }));
+    const dialog = screen.getByRole("dialog", { name: pm.breakGlass.requestTitle });
+    expect(within(dialog).getByText(/the whole school/)).toBeInTheDocument();
+    await user.selectOptions(
+      within(dialog).getByLabelText(pm.breakGlass.colSchool),
+      TENANT_SUMMARY.tenant_id,
+    );
+    await user.type(
+      within(dialog).getByLabelText(pm.breakGlass.colReason),
+      "The school asked for help with an import that failed",
+    );
+    await user.click(within(dialog).getByRole("button", { name: pm.breakGlass.request }));
+    await waitFor(() =>
+      expect(stub.callsTo("POST /bff/api/v1/platform/break-glass-requests")).toHaveLength(1),
+    );
+    expect(bodyOf("POST /bff/api/v1/platform/break-glass-requests")).toMatchObject({
+      tenant_id: T,
+      scope: {},
+    });
+  });
+
   it("break-glass: the requester cannot give the second emergency confirmation (409)", async () => {
     stub.routes["GET /bff/api/v1/platform/break-glass-requests"] = () =>
       page([
@@ -806,7 +1030,7 @@ describe("fleet, flags, audit, operators, announcements, break-glass, support", 
           requested_by: OP,
           reason_code: "security_incident",
           reason: "Suspected account compromise reported by principal",
-          scope: { access: "read" },
+          scope: {},
           duration_minutes: 60,
           emergency: true,
           emergency_confirmed_by_1: OP,

@@ -278,6 +278,9 @@ class VerifiedAnswer(Base):
     citations: Mapped[list[Any]] = mapped_column(JSONB)
     document_id: Mapped[uuid.UUID | None]
     verified_by: Mapped[uuid.UUID]
+    # Who wrote its current text or citations (0050_verified_answer_drafter; NULL on answers
+    # stored before it, whose ``verified_by`` stands in).
+    drafted_by: Mapped[uuid.UUID | None]
     verified_at: Mapped[dt.datetime]
     review_due: Mapped[dt.date | None] = mapped_column(Date)
     status: Mapped[str] = mapped_column(Text, server_default=text("'active'"))

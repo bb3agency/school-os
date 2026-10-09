@@ -157,6 +157,11 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
   const data = finding.data;
   const field = attributeLabel(attributes.data, data.attribute_key, locale);
   const open = isUnresolved(data.status);
+  // DL-06 (FR-CERT-002): a blocker is resolved by hand only by someone who may waive findings,
+  // after confirming it's them (the API answers 403 blocker_needs_waive / 428 otherwise). The
+  // change request that corrects the record closes it without that.
+  const blocker = data.severity === "blocker";
+  const canResolve = can("dq.findings.resolve") && (!blocker || can("dq.findings.waive"));
   const invalidate = [DQ_KEYS.findings, DQ_KEYS.summary] as const;
   const suggestsRequest = data.routes.some((route) => route.code === SCHOOL_RECORD_ROUTE);
   const pending = (requests.data ?? []).filter(
@@ -183,14 +188,23 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
                   {td("requestCorrection")}
                 </ButtonLink>
               ) : null}
-              {can("dq.findings.resolve") ? (
+              {blocker && can("dq.findings.resolve") && !can("dq.findings.waive") ? (
+                <p
+                  className="max-w-prose text-sm text-ink-muted"
+                  data-testid="blocker-resolve-hint"
+                >
+                  {td("blockerNeedsWaive")}
+                </p>
+              ) : null}
+              {canResolve ? (
                 <ActionDialog
                   triggerLabel={td("resolve")}
                   triggerVariant="primary"
                   title={td("resolveTitle")}
-                  description={td("resolveBody")}
+                  description={blocker ? td("blockerResolveBody") : td("resolveBody")}
                   confirmLabel={td("resolve")}
                   consequence={td("resolveConsequence")}
+                  stepUp={blocker}
                   schema={resolveSchema}
                   invalidate={invalidate}
                   errorNamespace="findings"
@@ -273,6 +287,13 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
         }
       />
 
+      {data.status === "needs_confirmation" ? (
+        // A-01: a blocker a write without evidence removed waits for a waive holder's Resolve.
+        <Alert tone="warning" title={td("needsConfirmationTitle")}>
+          <span data-testid="needs-confirmation">{td("needsConfirmationBody")}</span>
+        </Alert>
+      ) : null}
+
       <div className="grid gap-6 xl:grid-cols-[3fr_2fr]">
         <Card title={td("whatTitle")}>
           <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-[max-content_1fr]">
@@ -281,7 +302,7 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
               {data.student.display_name ? (
                 <Avatar name={data.student.display_name} size="sm" decorative />
               ) : null}
-              <span className="font-medium">
+              <span className="font-semibold">
                 <Value>{data.student.display_name}</Value>
               </span>
               {data.student.admission_no ? (
@@ -326,7 +347,7 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
                 <li key={route.code} className="flex gap-3">
                   <span
                     aria-hidden="true"
-                    className="flex size-7 shrink-0 items-center justify-center rounded-full bg-action text-xs font-medium text-on-action"
+                    className="flex size-7 shrink-0 items-center justify-center rounded-full bg-action text-xs font-semibold text-on-action"
                   >
                     {position + 1}
                   </span>
@@ -418,13 +439,13 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
                         <dl className="space-y-2">
                           {data.resolution_note ? (
                             <div>
-                              <dt className="font-medium text-ink">{td("note")}</dt>
+                              <dt className="font-semibold text-ink">{td("note")}</dt>
                               <dd className="whitespace-pre-line">{data.resolution_note}</dd>
                             </div>
                           ) : null}
                           {data.change_request_id ? (
                             <div>
-                              <dt className="font-medium text-ink">{td("linkedRequest")}</dt>
+                              <dt className="font-semibold text-ink">{td("linkedRequest")}</dt>
                               <dd>
                                 <Link
                                   href={`/change-requests/${data.change_request_id}`}
@@ -449,7 +470,7 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
                     status: "done" as const,
                     body: (
                       <dl>
-                        <dt className="font-medium text-ink">{td("waiveReason")}</dt>
+                        <dt className="font-semibold text-ink">{td("waiveReason")}</dt>
                         <dd className="whitespace-pre-line">
                           <Value>{data.waived_reason}</Value>
                         </dd>

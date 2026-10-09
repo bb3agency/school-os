@@ -32,13 +32,16 @@ from app.circulars import service
 from app.core.db import context_free_session, tenant_session
 from app.core.errors import DomainError
 from app.core.logging import get_logger
+from app.ops.service import TenantTask
 from app.tenancy import service as tenancy
 
 log = get_logger(__name__)
 
 MAX_RETRIES: Final = 3
 REMINDER_TASK: Final = "circulars.send_task_reminders"
-TENANT_STATUSES: Final = ("active", "suspended")
+# Audit 2026-10-05 A-12: a suspended or offboarding school gets no reminders (its people cannot
+# open the tasks; BR-08). They resume the morning after reactivation.
+TENANT_STATUSES: Final = ("active",)
 
 
 def _uuid(value: object) -> uuid.UUID:
@@ -47,6 +50,7 @@ def _uuid(value: object) -> uuid.UUID:
 
 @shared_task(
     name=service.READ_TASK,
+    base=TenantTask,
     bind=True,
     queue="ingest",
     acks_late=True,
@@ -68,6 +72,7 @@ def read_version(
 
 @shared_task(
     name=service.DRAFT_TASK,
+    base=TenantTask,
     bind=True,
     queue="ingest",
     acks_late=True,
@@ -89,6 +94,7 @@ def draft_notice(
 
 @shared_task(
     name=service.RENDER_TASK,
+    base=TenantTask,
     bind=True,
     queue="pdf",
     acks_late=True,

@@ -46,6 +46,8 @@ NOT_SETTINGS: dict[str, str] = {
     "AWS_DEFAULT_REGION": "AWS SDK default region on dedicated hosts",
     # Mount point of /var/lib/schoolos/state (backup.json from scripts/backup.sh) for the heartbeat.
     "SOS_HOST_STATE_DIR": "dedicated host state mount",
+    # botocore reads it: the per-container credential_process config (audit W3-06, dedicated).
+    "AWS_CONFIG_FILE": "dedicated per-container AWS credentials",
 }
 
 SYNTHETIC_TENANT = "0192a0de-0000-7000-8000-00000000a001"
@@ -132,6 +134,16 @@ def template_secret_names() -> set[str]:
     return names
 
 
+def template_derived_names() -> set[str]:
+    """compose.env keys scripts/lib.sh derives from secrets (P2-06 Valkey users)."""
+    names: set[str] = set()
+    for title, lines in _template_sections().items():
+        if title.startswith("compose.env derived keys"):
+            for line in lines:
+                names.update(re.findall(r"\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b", line))
+    return names
+
+
 def synthetic_secret(name: str) -> str:
     if name == "SOS_HEARTBEAT_KEY_ID":
         return "hb-synthetickeyidab"
@@ -143,6 +155,7 @@ def dedicated_host_env() -> dict[str, str]:
     env = template_assignments("host.env")
     env.update(template_assignments("version.env"))
     env.update({name: synthetic_secret(name) for name in template_secret_names()})
+    env.update({name: synthetic_secret(name) for name in template_derived_names()})
     return env
 
 
@@ -243,9 +256,14 @@ def _hcl_literal(expr: str) -> str | None:
 def synthetic_value(name: str) -> str:
     """A syntactically valid, obviously synthetic value for a computed/secret variable."""
     if name.endswith("DATABASE_URL"):
-        return f"postgresql+psycopg://sos_role:synthetic-{name.lower()}@db.example.test:5432/sos"
+        # The shape modules/secrets writes: TLS that checks the certificate and host name.
+        return (
+            f"postgresql+psycopg://sos_role:synthetic-{name.lower()}@db.example.test:5432/sos"
+            "?sslmode=verify-full&sslrootcert=/etc/ssl/rds/global-bundle.pem"
+        )
     values = {
-        "SOS_REDIS_URL": "rediss://:synthetic@valkey.example.test:6379/0",
+        # The shape modules/redis writes (url_template): TLS with certificate checks.
+        "SOS_REDIS_URL": "rediss://:synthetic@valkey.example.test:6379/0?ssl_cert_reqs=required",
         "SOS_BILLING_SUPPLIER_GSTIN": "37ABCDE1234F1Z5",
         "SOS_BILLING_SUPPLIER_STATE_CODE": "37",
         "SOS_BILLING_SUPPLIER_LEGAL_NAME": "Synthetic Staging Supplier Private Limited",
@@ -259,6 +277,10 @@ def synthetic_value(name: str) -> str:
         "SOS_EMAIL_APP_URL": "https://app.example.test",
         "SOS_EMAIL_SES_CONFIGURATION_SET": "sos-staging-email",
         "SOS_BILLING_SUPPLIER_ADDRESS": "Synthetic Plot 1; Synthetic Road; Vijayawada 520001",
+        # Terraform `anthropic_zdr_confirmed` (bool, default false), rendered with tostring().
+        "SOS_ANTHROPIC_ZDR_CONFIRMED": "false",
+        # module.network.vpc_cidr_block (P2-07: the ALB and BFF are the trusted proxies).
+        "SOS_TRUSTED_PROXIES": "10.20.0.0/16",
     }
     if name in values:
         return values[name]
@@ -485,6 +507,72 @@ def test_US_102_email_settings_reach_only_api_and_worker() -> None:
         assert "SOS_EMAIL_PROVIDER" in hcl.container_env(module)
     for module in ("worker_pdf", "beat", "migrate"):
         assert "SOS_EMAIL_PROVIDER" not in hcl.container_env(module), module
+
+
+# --- Claude safety lock (owner decision 2026-10-01; docs/10 §11) ---------------------------------
+
+
+@pytest.mark.parametrize("module", SHARED_TASKS)
+def test_SEC_020_shared_tier_tasks_get_the_anthropic_zdr_confirmation(module: str) -> None:
+    """Every app container runs the start-up lock (API and every Celery process), so each gets
+    SOS_ANTHROPIC_ZDR_CONFIRMED from the Terraform variable, which defaults to false."""
+    hcl = shared_hcl()
+    assert hcl.container_env(module).get("SOS_ANTHROPIC_ZDR_CONFIRMED") == (
+        "tostring(var.anthropic_zdr_confirmed)"
+    )
+    assert hcl.var_defaults["anthropic_zdr_confirmed"] == "false"
+
+
+@pytest.mark.parametrize("service", APP_CONTAINERS)
+def test_SEC_020_dedicated_anthropic_zdr_confirmation_defaults_to_false(
+    service: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert compose_env(service).get("SOS_ANTHROPIC_ZDR_CONFIRMED") == (
+        "${SOS_ANTHROPIC_ZDR_CONFIRMED:-false}"
+    )
+    host_env = dedicated_host_env()
+    env = {k: interpolate(v, host_env) for k, v in compose_env(service).items()}
+    assert build_settings(monkeypatch, env).anthropic_zdr_confirmed is False
+
+
+# --- public marketing site (shared tier only; docs/17 §5.6, docs/10 §11) ------------------------
+
+PUBLIC_SITE = {
+    "SOS_PUBLIC_CONTACT_EMAIL": "public_contact_email",
+    "SOS_PUBLIC_COMPANY_NAME": "public_company_name",
+    "SOS_PUBLIC_COMPANY_ADDRESS": "public_company_address",
+    "SOS_PUBLIC_WHATSAPP_NUMBER": "public_whatsapp_number",
+}
+
+
+def test_SEC_009_shared_tier_web_gets_the_public_site_settings() -> None:
+    """apps/web/src/features/marketing/settings.ts reads these at request time; empty = hidden."""
+    hcl = shared_hcl()
+    environment = hcl.map_entries(hcl.block("module", "web")["environment"])
+    for name, variable in PUBLIC_SITE.items():
+        assert environment.get(name) == f"var.{variable}", name
+        assert hcl.var_defaults[variable] == '""', f"{variable} must default to empty (hidden)"
+    secrets = hcl.map_entries(hcl.block("module", "web")["secrets"])
+    assert not set(PUBLIC_SITE) & set(secrets), "public site settings are not secrets"
+    for module in SHARED_TASKS:
+        assert not set(PUBLIC_SITE) & set(hcl.container_env(module)), module
+
+
+@pytest.mark.parametrize("env_dir", ["staging", "prod"])
+def test_SEC_009_envs_pass_the_public_site_settings_through(env_dir: str) -> None:
+    root = REPO / "infra" / "terraform" / "envs" / env_dir
+    hcl = Hcl(root / "main.tf", root / "variables.tf")
+    platform = hcl.block("module", "platform")
+    example = (root / "terraform.tfvars.example").read_text(encoding="utf-8")
+    for variable in PUBLIC_SITE.values():
+        assert platform.get(variable) == f"var.{variable}", variable
+        assert hcl.var_defaults[variable] == '""', variable
+        assert re.search(rf"(?m)^# {variable}\s+=", example), f"commented example for {variable}"
+
+
+def test_SEC_009_dedicated_hosts_do_not_get_the_public_site_settings() -> None:
+    """Marketing pages answer 404 on a dedicated host (docs/17 §5.6)."""
+    assert not set(PUBLIC_SITE) & set(compose_env("web"))
 
 
 def test_SEC_009_guard_really_refuses_a_bare_task(monkeypatch: pytest.MonkeyPatch) -> None:

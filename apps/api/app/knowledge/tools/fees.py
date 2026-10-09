@@ -14,10 +14,11 @@ re-checks both when it runs. Two shapes:
 - without a student: ``tally.service.fee_summary``: numbers only (students with dues, total,
   unlinked ledgers), no names.
 
-Sources are ``sos://fee/{id}`` (id derived from the school, the student or "summary", and the
-as-of date and sync time): no person, ledger or amount in the URI. Amounts are written in Indian
-grouping with two decimals, exactly as stored (``Decimal``), so the accountant can compare them
-with Tally. Read-only; no network.
+Sources are ``sos://fee/{id}#s{scope}`` (id derived from the school, the student or "summary",
+and the as-of date and sync time; ``scope`` fingerprints the caller's ``finance.read`` reach,
+re-checked when the answer is shown again, audit W3-09): no person, ledger or amount in the URI.
+Amounts are written in Indian grouping with two decimals, exactly as stored (``Decimal``), so
+the accountant can compare them with Tally. Read-only; no network.
 """
 
 from __future__ import annotations
@@ -115,29 +116,34 @@ class GetFeeDuesTool:
         error = ToolOutcome(call_id=call_id, blocks=(), is_error=True)
         if not self.allowed(ctx):
             return error
+        scope = sources.scope_fingerprint(ctx.scope_for(self._spec.permission))
         try:
             args = FeeArgs.model_validate(dict(arguments))
             if args.student_id is None:
-                block = self._summary(ctx.tenant_id, tally.fee_summary(session, ctx))
+                block = self._summary(ctx.tenant_id, tally.fee_summary(session, ctx), scope)
             else:
                 block = self._student(
-                    ctx.tenant_id, tally.student_fee_dues(session, ctx, args.student_id)
+                    ctx.tenant_id, tally.student_fee_dues(session, ctx, args.student_id), scope
                 )
         except (ValidationError, DomainError):
             return error
         return ToolOutcome(call_id=call_id, blocks=(block,))
 
     @staticmethod
-    def _source(tenant_id: uuid.UUID, subject: str, as_of: object, synced: object) -> str:
+    def _source(
+        tenant_id: uuid.UUID, subject: str, as_of: object, synced: object, scope: str
+    ) -> str:
         key = uuid.uuid5(_NAMESPACE, f"{tenant_id}|{subject}|{as_of}|{synced}")
-        return sources.fee_dues(key)
+        return sources.fee_dues(key, scope=scope)
 
-    def _student(self, tenant_id: uuid.UUID, dues: tally.StudentFeeDues) -> SearchResultBlock:
+    def _student(
+        self, tenant_id: uuid.UUID, dues: tally.StudentFeeDues, scope: str
+    ) -> SearchResultBlock:
         name = dues.display_name or "(no name recorded)"
         # "admission number", not "no.": answers are split into sentences at ". ".
         who = f"{name} (admission number {dues.admission_no or 'none'}"
         who += f", class {dues.class_section})" if dues.class_section else ")"
-        source = self._source(tenant_id, str(dues.student_id), dues.as_of, dues.synced_at)
+        source = self._source(tenant_id, str(dues.student_id), dues.as_of, dues.synced_at, scope)
         title = f"Fee dues from Tally · {name}"
         if not dues.ledgers:
             text = (
@@ -159,8 +165,10 @@ class GetFeeDuesTool:
         )
         return SearchResultBlock(source=source, title=title, text=text)
 
-    def _summary(self, tenant_id: uuid.UUID, summary: tally.FeeSummary) -> SearchResultBlock:
-        source = self._source(tenant_id, "summary", summary.as_of, summary.synced_at)
+    def _summary(
+        self, tenant_id: uuid.UUID, summary: tally.FeeSummary, scope: str
+    ) -> SearchResultBlock:
+        source = self._source(tenant_id, "summary", summary.as_of, summary.synced_at, scope)
         text = (
             f"Fee dues from Tally, linked ledgers only: {summary.students_with_dues} "
             f"student{'s' if summary.students_with_dues != 1 else ''} with dues, "

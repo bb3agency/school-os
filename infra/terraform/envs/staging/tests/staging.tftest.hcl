@@ -127,3 +127,41 @@ run "security_baseline_can_be_disabled" {
     error_message = "enable_security_baseline = false creates nothing."
   }
 }
+
+# Audit W3-06 (b): staging exercises the locked files copy with the DR path.
+run "files_locked_copy_with_the_dr_path" {
+  command = plan
+
+  assert {
+    condition     = length(module.files_replica) == 1 && module.files_replica[0].posture.object_lock_mode == "GOVERNANCE" && module.files_replica[0].posture.object_lock_days >= 90
+    error_message = "Staging replicates the files bucket to a locked bucket in ap-south-2."
+  }
+}
+
+# Audit W3-04: staging's plan role reads no secret values. Audit 2026-10-05 P2-09 (owner decision
+# 2026-10-07): the role also reads the state (Cognito client secrets) and, through ReadOnlyAccess,
+# DescribeUserPoolClient, so no pull request may assume it without a reviewer: it trusts only the
+# staging-plan GitHub Environment.
+run "pr_plan_role_reads_no_secrets" {
+  command = plan
+
+  assert {
+    condition     = !module.platform.github_actions.plan_reads_secrets
+    error_message = "Staging's plan role must not read secret values (W3-04)."
+  }
+
+  assert {
+    condition     = toset(module.platform.github_actions.plan_subjects) == toset(["repo:bb3agency/school-os:environment:staging-plan"])
+    error_message = "Staging's plan role trusts only the reviewer-gated staging-plan environment, never pull_request or main (P2-09)."
+  }
+}
+
+# Audit 2026-10-05 P2-08 (b): only deploy-staging.yml on main (which needs green CI) deploys staging.
+run "staging_deploy_only_from_the_staging_workflow_on_main" {
+  command = plan
+
+  assert {
+    condition     = module.platform.github_actions.deploy_workflow_refs == ["bb3agency/school-os/.github/workflows/deploy-staging.yml@refs/heads/main"]
+    error_message = "The staging deploy role pins job_workflow_ref to deploy-staging.yml on main."
+  }
+}

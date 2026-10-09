@@ -41,6 +41,19 @@ output "cors_rules" {
   ])
 }
 
+output "lifecycle_rules" {
+  description = "Rendered lifecycle rules by id: tag filter, expiration and noncurrent-version expiration days (empty map without rules; asserted by tests)."
+  value = merge([
+    for c in aws_s3_bucket_lifecycle_configuration.this : {
+      for r in c.rule : r.id => {
+        tags            = merge(flatten([for f in r.filter : [for t in f.tag : { (t.key) = t.value }]])...)
+        expiration_days = one([for e in r.expiration : e.days])
+        noncurrent_days = one([for n in r.noncurrent_version_expiration : n.noncurrent_days])
+      }
+    }
+  ]...)
+}
+
 # Posture outputs (consumed by terraform test assertions and by compositions for summaries).
 output "public_access_block" {
   description = "Block Public Access settings."

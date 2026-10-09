@@ -67,7 +67,7 @@ def test_US_501_run_then_list_findings_with_explanations(world: Any, api: Any) -
 def test_US_501_summary_rules_and_profiles(world: Any, api: Any) -> None:
     who = world.person("principal")
     rules = api.call(who, "GET", "/api/v1/dq/rules").json()
-    assert [r["id"] for r in rules] == [f"DQ-{i:03d}" for i in range(1, 13)]
+    assert [r["id"] for r in rules] == [f"DQ-{i:03d}" for i in (*range(1, 13), 21, 22)]
     assert all(r["explanation"]["en"] and r["explanation"]["te"] for r in rules)
     assert rules[0]["routes"][0] == {
         "code": "ROUTE-UIDAI",
@@ -148,6 +148,56 @@ def test_US_501_run_validation(world: Any, api: Any) -> None:
     assert two.status_code == 422
 
 
+def test_AA_18_run_scope_outside_the_callers_reach_answers_like_an_unknown_id(
+    world: Any, api: Any
+) -> None:
+    """Starting a run needs ``dq.findings.resolve`` (owner decision 2026-10-07), which no system
+    role holds scoped. A read-only class teacher gets the same 403 for an existing section and
+    an unknown id; a custom role with ``dq.findings.resolve`` scoped to 9A cannot tell an
+    existing section or class outside its scope from an id that does not exist: both are 422
+    ``not_found`` on the same field (AA-18)."""
+    import dataclasses
+
+    from app.core.errors import ValidationFailed
+    from app.dq import service as dq
+    from app.dq.schemas import RunCreate, RunScopeIn
+
+    teacher = world.person("class_teacher")
+    refused = [
+        api.call(teacher, "POST", "/api/v1/dq/runs", json={"scope": {"section_ids": [str(x)]}})
+        for x in (world.a.ids["section_9c"], uuid.uuid4())
+    ]
+    assert [r.status_code for r in refused] == [403, 403]
+    assert refused[0].json()["code"] == refused[1].json()["code"]
+
+    base = DS.ctx(world.a, "class_teacher")
+    custom = dataclasses.replace(
+        base,
+        permissions=base.permissions | {dq.RESOLVE},
+        scoped_permissions=base.scoped_permissions | {dq.RESOLVE},
+    )
+
+    def run(scope: dict[str, Any]) -> Any:
+        return DS.call(world.a, dq.request_run, RunCreate(scope=RunScopeIn(**scope)), as_ctx=custom)
+
+    def errors(scope: dict[str, Any]) -> Any:
+        with pytest.raises(ValidationFailed) as exc:
+            run(scope)
+        return exc.value.errors
+
+    for field, existing in (
+        ("section_ids", world.a.ids["section_9c"]),
+        ("class_ids", world.a.ids["class_x"]),
+    ):
+        outside, unknown = errors({field: [existing]}), errors({field: [uuid.uuid4()]})
+        assert outside == unknown
+        [error] = outside
+        assert (error["field"], error["code"]) == (f"scope.{field}.0", "not_found")
+    # The caller's own section still runs.
+    assert run({"section_ids": [world.a.ids["section_9a"]]}).id is not None
+    assert run({"class_ids": [world.a.ids["class_ix"]]}).id is not None
+
+
 def test_FR_DQ_020_resolve_needs_a_note_or_change_request(world: Any, api: Any) -> None:
     fid = DS.high_finding(world.a)
     who = world.person("office_staff")
@@ -193,6 +243,42 @@ def test_SEC_005_waive_needs_step_up_and_a_reason(world: Any, api: Any) -> None:
     assert (ok.json()["status"], ok.json()["waived_reason"]) == ("waived", "Accepted by board")
 
 
+def test_DL_06_resolving_a_blocker_needs_the_waive_permission_and_step_up(
+    world: Any, api: Any
+) -> None:
+    """FR-CERT-002 / FR-DQ-020: a blocker is cleared only by the change request that corrects it
+    or by a waive holder with a fresh MFA sign-in; "resolve with a note" is no way around it."""
+    fid = DS.blocker_finding(world.a)
+    path = f"/api/v1/dq/findings/{fid}/resolve"
+    note = {"note": "Checked the admission register"}
+    staff = api.call(world.person("office_staff"), "POST", path, json=note)
+    assert (staff.status_code, staff.json()["code"]) == (403, "blocker_needs_waive")
+    cr = api.call(
+        world.person("office_staff"),
+        "POST",
+        path,
+        json={"change_request_id": str(uuid.uuid4())},
+    )
+    assert (cr.status_code, cr.json()["code"]) == (403, "blocker_needs_waive")
+    admin = world.person("office_admin")  # holds dq.findings.waive
+    stale = api.call(admin, "POST", path, json=note, auth_age_s=301)
+    assert (stale.status_code, stale.json()["code"]) == (428, "step_up_required")
+    still = api.call(admin, "GET", f"/api/v1/dq/findings/{fid}")
+    assert still.json()["status"] == "open"
+    ok = api.call(admin, "POST", path, json=note)
+    assert ok.status_code == 200, ok.text
+    assert (ok.json()["status"], ok.json()["resolution"]) == ("resolved", "note")
+
+
+def test_DL_06_ordinary_findings_still_resolve_with_a_note(world: Any, api: Any) -> None:
+    fid = DS.high_finding(world.a)
+    staff = world.person("office_staff")  # no dq.findings.waive
+    path = f"/api/v1/dq/findings/{fid}/resolve"
+    ok = api.call(staff, "POST", path, json={"note": "Fixed on the register"}, auth_age_s=3600)
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["status"] == "resolved"
+
+
 def test_SEC_015_class_teacher_sees_only_own_sections(world: Any, api: Any) -> None:
     inside = DS.high_finding(world.a)
     outside = DS.high_finding(world.a, section_key="section_9c")
@@ -210,6 +296,22 @@ def test_SEC_015_class_teacher_sees_only_own_sections(world: Any, api: Any) -> N
         params={"section_id": str(world.a.ids["section_9c"])},
     )
     assert other.json()["data"] == []
+
+
+@pytest.mark.parametrize("role", ["auditor_readonly", "class_teacher"])
+def test_SEC_003_read_only_holders_cannot_start_a_check_run(
+    world: Any, api: Any, role: str
+) -> None:
+    """App-logic hardening (owner decision 2026-10-07): starting a run is work on the school's
+    findings, so it needs ``dq.findings.resolve``; readers keep reading. Value changes still
+    re-check students automatically (event runs)."""
+    sid = DS.student(world.a)
+    body = {"scope": {"student_ids": [str(sid)]}}
+    res = api.call(world.person(role), "POST", "/api/v1/dq/runs", json=body)
+    assert res.status_code == 403, res.text
+    assert api.call(world.person(role), "GET", "/api/v1/dq/findings").status_code == 200
+    ok = api.call(world.person("office_staff"), "POST", "/api/v1/dq/runs", json=body)
+    assert ok.status_code == 202, ok.text
 
 
 def test_SEC_001_lists_never_show_other_school(world: Any, api: Any) -> None:

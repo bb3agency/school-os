@@ -50,7 +50,7 @@ function Row({
       <div className="min-w-0 flex-1">
         <Link
           href={`/ask/c/${conversation.id}`}
-          className="block font-medium text-ink break-anywhere hover:text-primary hover:underline"
+          className="block font-semibold text-ink break-anywhere hover:text-primary hover:underline"
         >
           {conversation.pinned ? (
             <Icon name="pin" className="me-1.5 inline size-4 align-[-0.125em] text-primary" />

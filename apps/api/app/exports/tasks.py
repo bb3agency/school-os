@@ -27,6 +27,7 @@ from celery.schedules import crontab
 from app.core.db import context_free_session
 from app.core.logging import get_logger
 from app.exports import service
+from app.ops.service import TenantTask
 from app.tenancy import service as tenancy
 
 log = get_logger(__name__)
@@ -51,14 +52,24 @@ def _run(task: Task[Any, Any], tenant_id: str, payload: dict[str, Any]) -> str:
 
 
 @shared_task(
-    name=service.GENERATE_TASK, bind=True, queue="exports", acks_late=True, max_retries=MAX_RETRIES
+    name=service.GENERATE_TASK,
+    base=TenantTask,
+    bind=True,
+    queue="exports",
+    acks_late=True,
+    max_retries=MAX_RETRIES,
 )
 def generate(self: Task[Any, Any], tenant_id: str, event_id: str, payload: dict[str, Any]) -> str:
     return _run(self, tenant_id, payload)
 
 
 @shared_task(
-    name=service.RENDER_TASK, bind=True, queue="pdf", acks_late=True, max_retries=MAX_RETRIES
+    name=service.RENDER_TASK,
+    base=TenantTask,
+    bind=True,
+    queue="pdf",
+    acks_late=True,
+    max_retries=MAX_RETRIES,
 )
 def render(self: Task[Any, Any], tenant_id: str, event_id: str, payload: dict[str, Any]) -> str:
     return _run(self, tenant_id, payload)

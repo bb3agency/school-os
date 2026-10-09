@@ -116,3 +116,11 @@ def test_FR_OPS_004_every_enqueued_event_has_a_consumer() -> None:
         f"{event} ({where})" for event, where in events.items() if event not in ops.OUTBOX_ROUTES
     )
     assert missing == []
+
+
+def test_FR_OPS_004_every_outbox_route_has_a_producer() -> None:
+    """The other direction: a route whose event nobody enqueues is dead wiring (a renamed event
+    type leaves the consumer unreachable)."""
+    _loaded()
+    events = _enqueued_event_types()
+    assert sorted(event for event in ops.OUTBOX_ROUTES if event not in events) == []

@@ -4,6 +4,7 @@ PRV-003..005; invariants 3, 4, 7, 14). Separate synthetic school from ``support.
 
 from __future__ import annotations
 
+import dataclasses
 import datetime as dt
 import json
 import uuid
@@ -339,6 +340,63 @@ def test_FR_EW_013_timeline_lists_every_kind_newest_first(
     viewed = _events(admin_engine, school.tenant_id, "insights.viewed")[-1]
     assert viewed["summary"]["view"] == "timeline"
     assert viewed["resource_id"] == school.ids["a2"]
+
+
+def _timeline_with_attendance_and_marks(school: Any) -> None:
+    S.record(school, "section_9a", {school.ids["a2"]: ["present", "absent"]}, S.school_days(2))
+    exam_id = S.exam(school, f"Synthetic T {uuid.uuid4().hex[:5]}", S.school_days(1)[0])
+    S.marks(school, "section_9a", exam_id, {school.ids["a2"]: [("Maths", 30, 50)]})
+
+
+def test_AA_17_timeline_shows_attendance_and_exams_only_with_their_read_permissions(
+    school: Any,
+) -> None:
+    """A custom role holding insights.read (and the student reads it needs) but neither
+    attendance.read nor marks.read sees the timeline without attendance months or exams."""
+    _timeline_with_attendance_and_marks(school)
+    ct = S.ct_ctx(school)
+    kinds: dict[frozenset[str], set[str]] = {}
+    for dropped in (
+        frozenset({"attendance.read", "marks.read"}),
+        frozenset({"attendance.read"}),
+        frozenset({"marks.read"}),
+    ):
+        custom = dataclasses.replace(ct, permissions=ct.permissions - dropped)
+        assert custom.has("insights.read")
+        with tenant_session(school.tenant_id, custom.user_id) as db:
+            out = insights.timeline(db, custom, school.ids["a2"])
+        kinds[dropped] = {i.kind for i in out.items}
+    both = frozenset({"attendance.read", "marks.read"})
+    assert "attendance_month" not in kinds[both]
+    assert "exam" not in kinds[both]
+    assert "enrolment" in kinds[both]
+    assert "attendance_month" not in kinds[frozenset({"attendance.read"})]
+    assert "exam" in kinds[frozenset({"attendance.read"})]
+    assert "attendance_month" in kinds[frozenset({"marks.read"})]
+    assert "exam" not in kinds[frozenset({"marks.read"})]
+
+
+def test_AA_17_timeline_needs_attendance_and_marks_read_in_scope_for_the_student(
+    school: Any,
+) -> None:
+    """insights.read school-wide, attendance.read and marks.read only for another section:
+    the 9A student's timeline has no attendance months or exams."""
+    _timeline_with_attendance_and_marks(school)
+    principal = S.principal_ctx(school)
+    custom = dataclasses.replace(
+        principal,
+        scopes=dataclasses.replace(
+            principal.scopes, school=False, section_ids=frozenset({school.ids["section_9c"]})
+        ),
+        scoped_permissions=frozenset({"attendance.read", "marks.read"}),
+    )
+    with tenant_session(school.tenant_id, custom.user_id) as db:
+        kinds = {i.kind for i in insights.timeline(db, custom, school.ids["a2"]).items}
+    assert "enrolment" in kinds
+    assert not kinds & {"attendance_month", "exam"}
+    with tenant_session(school.tenant_id, principal.user_id) as db:
+        kinds = {i.kind for i in insights.timeline(db, principal, school.ids["a2"]).items}
+    assert {"attendance_month", "exam"} <= kinds
 
 
 # --- the principal (FR-EW-014, FR-EW-015) ---------------------------------------------------------

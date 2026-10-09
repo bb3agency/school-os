@@ -115,7 +115,7 @@ function ItemList({
               data-tooltip={item.label}
               className={cn(
                 // 40px rows (touch targets well over 24px, WCAG 2.5.8); labels wrap, never clip.
-                "relative flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                "relative flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors pointer-coarse:min-h-11",
                 "collapsed:justify-center collapsed:px-0",
                 active ? styles.active : styles.link,
               )}

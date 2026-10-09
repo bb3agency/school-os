@@ -27,7 +27,11 @@ per school)::
 - The bucket is versioned (90-day recovery window for overwrites and deletes). Objects that must
   not be kept at all (PRV-016: an image that showed a full Aadhaar number) are removed with
   :meth:`ObjectStore.discard`, which tags them ``sos-lifecycle=discarded`` before deleting; the
-  lifecycle rule ``discarded-1d`` (infra/terraform) expires such versions after one day.
+  lifecycle rule ``discarded-1d`` (infra/terraform) expires such versions after one day. Every
+  automatic deletion uses it too (retention purges, expired exports and uploads: docs/08 §7,
+  :meth:`ObjectStore.purge_prefix` for a prefix); only a person's delete keeps the 90-day window.
+  Discarding a version removes its derived objects too (``v<n>/derived/``, every stored version
+  of each tagged; data-layer hardening note 7).
 
 ``ObjectStore`` is a Protocol so tests can swap in an in-memory store; the real implementation
 is :class:`S3ObjectStore` (boto3; SeaweedFS locally and in CI via an endpoint override).
@@ -106,6 +110,7 @@ class ObjectHead:
     content_type: str | None
     sse: str | None = None
     kms_key_id: str | None = None
+    last_modified: dt.datetime | None = None
 
 
 def tenant_prefix(tenant_id: uuid.UUID) -> str:
@@ -126,6 +131,11 @@ def derived_key(
     if not relative or relative.startswith("/") or ".." in relative.split("/"):
         raise ValueError("derived path must be relative without '..'")
     return f"{tenant_prefix(tenant_id)}docs/{document_id}/v{version_no}/derived/{relative}"
+
+
+def derived_prefix(tenant_id: uuid.UUID, document_id: uuid.UUID, version_no: int) -> str:
+    """``t/<tenant_id>/docs/<document_id>/v<n>/derived/``: every derived object of a version."""
+    return f"{tenant_prefix(tenant_id)}docs/{document_id}/v{version_no}/derived/"
 
 
 def import_key(tenant_id: uuid.UUID, batch_id: uuid.UUID, ext: str) -> str:
@@ -336,6 +346,7 @@ class S3ObjectStore:
             content_type=res.get("ContentType"),
             sse=res.get("ServerSideEncryption"),
             kms_key_id=res.get("SSEKMSKeyId"),
+            last_modified=res.get("LastModified"),
         )
 
     def read_range(self, key: str, start: int, length: int) -> bytes:
@@ -437,24 +448,56 @@ class S3ObjectStore:
             raise ObjectStoreError("delete_failed") from exc
 
     def discard(self, key: str) -> None:
-        """Tag the current version ``sos-lifecycle=discarded``, then delete it. The versioned
-        bucket keeps the bytes as a noncurrent version, which the lifecycle rule
-        ``discarded-1d`` expires after one day instead of the 90-day recovery window. A key that
-        is gone already (no object, or only a delete marker) is fine: retries are safe."""
+        """Tag EVERY stored version of ``key`` ``sos-lifecycle=discarded``, then delete the
+        current one. The versioned bucket keeps the bytes as noncurrent versions, which the
+        lifecycle rule ``discarded-1d`` expires after one day instead of the 90-day recovery
+        window; an older version (the key written twice, e.g. a re-posted upload) is tagged too
+        (audit W3-07). A key that is gone already (no object, or only a delete marker) is fine:
+        retries are safe."""
         if not key.startswith("t/") or ".." in key.split("/"):
             raise ValueError("refusing to discard outside a tenant prefix")
+        versions = [v for v in self._versions(key) if v[0] == key]
+        self._discard_versions(key, versions)
+
+    def _versions(self, prefix: str) -> Iterator[tuple[str, str, bool]]:
+        """``(key, version_id, is_latest)`` of every stored version under ``prefix`` (delete
+        markers hold no bytes and are left out)."""
         try:
-            self._client.put_object_tagging(
-                Bucket=self._bucket,
-                Key=key,
-                Tagging={"TagSet": [{"Key": LIFECYCLE_TAG, "Value": DISCARDED}]},
-            )
+            paginator = self._client.get_paginator("list_object_versions")
+            for page in paginator.paginate(Bucket=self._bucket, Prefix=prefix):
+                for v in page.get("Versions", []):
+                    if "Key" in v and "VersionId" in v:
+                        yield v["Key"], v["VersionId"], bool(v.get("IsLatest"))
         except ClientError as exc:
-            code = str(exc.response.get("Error", {}).get("Code", ""))
-            if code in ("404", "NoSuchKey", "NotFound", "405", "MethodNotAllowed"):
-                return
-            raise ObjectStoreError("tag_failed") from exc
-        self.delete(key)
+            raise ObjectStoreError("list_failed") from exc
+
+    def _discard_versions(self, key: str, versions: list[tuple[str, str, bool]]) -> bool:
+        """Tag each version of ``key``, then delete the current object if there is one.
+        Returns whether a current object was deleted."""
+        for _, version_id, _ in versions:
+            try:
+                self._client.put_object_tagging(
+                    Bucket=self._bucket,
+                    Key=key,
+                    VersionId=version_id,
+                    Tagging={"TagSet": [{"Key": LIFECYCLE_TAG, "Value": DISCARDED}]},
+                )
+            except ClientError as exc:
+                code = str(exc.response.get("Error", {}).get("Code", ""))
+                if code in (
+                    "404",
+                    "NoSuchKey",
+                    "NoSuchVersion",
+                    "NotFound",
+                    "405",
+                    "MethodNotAllowed",
+                ):
+                    continue  # removed meanwhile (or a delete marker): nothing left to tag
+                raise ObjectStoreError("tag_failed") from exc
+        if any(latest for _, _, latest in versions):
+            self.delete(key)
+            return True
+        return False
 
     def delete_prefix(self, prefix: str) -> int:
         """Delete every object under ``prefix`` (must be inside a tenant prefix)."""
@@ -490,11 +533,14 @@ class S3ObjectStore:
         return sum(1 for _ in self._keys(check_tenant_prefix(prefix)))
 
     def purge_prefix(self, prefix: str) -> int:
+        """Discard every key under the prefix, including keys with only noncurrent versions
+        left (deleted earlier by a person, 90-day window) and older versions of live keys
+        (audit W3-07). Returns the number of current objects deleted."""
         # Collect first: deleting while paginating would shift the listing.
-        keys = list(self._keys(check_tenant_prefix(prefix)))
-        for key in keys:
-            self.discard(key)
-        return len(keys)
+        by_key: dict[str, list[tuple[str, str, bool]]] = {}
+        for version in self._versions(check_tenant_prefix(prefix)):
+            by_key.setdefault(version[0], []).append(version)
+        return sum(self._discard_versions(key, versions) for key, versions in by_key.items())
 
 
 class _S3MultipartWriter:

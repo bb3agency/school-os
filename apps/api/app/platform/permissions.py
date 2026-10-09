@@ -43,6 +43,14 @@ class Catalog:
     permissions: dict[str, PermissionSpec]
     roles: dict[str, frozenset[str]]
     step_up_max_age_seconds: int
+    # Two-person timing (audit 2026-10-05 A-13, A-14): request lifetime and the minimum age of
+    # the second operator's qualifying role.
+    two_person_request_ttl_hours: int = 72
+    two_person_min_role_age_days: int = 7
+
+    def roles_granting(self, permission: str) -> frozenset[str]:
+        """The operator roles whose permission set includes ``permission``."""
+        return frozenset(role for role, keys in self.roles.items() if permission in keys)
 
     def permissions_for(self, roles: set[str] | frozenset[str]) -> frozenset[str]:
         granted: set[str] = set()
@@ -73,7 +81,11 @@ def _load() -> Catalog:
         if unknown:
             raise ValueError(f"role {role} grants unknown permissions {sorted(unknown)}")
         roles[role] = frozenset(expanded)
-    return Catalog(perms, roles, int(raw["step_up_max_age_seconds"]))
+    ttl = int(raw["two_person_request_ttl_hours"])
+    min_age = int(raw["two_person_min_role_age_days"])
+    if ttl < 1 or min_age < 0:
+        raise ValueError("two-person timing must be positive")
+    return Catalog(perms, roles, int(raw["step_up_max_age_seconds"]), ttl, min_age)
 
 
 @lru_cache(maxsize=1)

@@ -14,7 +14,12 @@ budget at ``budget.usd_inr_rate``. Budget months are calendar months in IST. At
 ``alert_fraction`` (80 %) the first crossing per month is reported once; at
 ``degrade_fraction`` (100 %) calls are refused with :class:`BudgetExhausted` and the caller
 answers search-only until the month resets or the school raises its budget (FR-KB-011,
-NFR-CST-001).
+NFR-CST-001). The 100 % alert (owner decision 2026-10-03) is the FIRST reservation refused for
+budget in the school's IST month: reservations stop recorded spend about one estimate below the
+limit, so spend itself never reaches 100 %. It is claimed once per tenant and month with an
+atomic set-if-absent key in the spend store (``sos:kb:exhausted:{tenant}:{YYYY-MM}``) and
+logged like the 80 % alert (``kb.budget.alert_crossed``, ``action="exhausted"``, ids only). A
+budget of 0 (no AI spend at all) is a setting, not a spent budget, and does not alert.
 
 Reservations (FR-KB-011): before each provider call :meth:`BudgetGuard.admit` reserves the
 call's worst-case cost (``models.yaml`` ``budget.reservation.input_tokens`` at the model's input
@@ -45,7 +50,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Any, Literal, Protocol, runtime_checkable
+from typing import Any, Final, Literal, Protocol, runtime_checkable
 
 import redis
 
@@ -79,6 +84,21 @@ class TenantAiSettings:
     """The school's ``ai_features_enabled`` AND its ``kb.ask.enabled`` flag."""
     monthly_budget_inr: Decimal
     """``ai_monthly_budget_inr``; 0 means no AI spend at all."""
+
+
+def bundle_budget_inr(config: LlmConfig, included_answers: int) -> Decimal:
+    """The monthly budget of a school with an AI answer bundle (owner decision 2026-10-03):
+    included answers x ``budget.bundle.cost_per_answer_usd`` x (1 + headroom), in INR at
+    ``budget.usd_inr_rate``, rounded to a rupee."""
+    if included_answers <= 0:
+        raise ValueError("included_answers must be positive")
+    b = config.budget
+    usd = (
+        Decimal(included_answers)
+        * b.bundle.cost_per_answer_usd
+        * (1 + Decimal(str(b.bundle.overage_headroom_fraction)))
+    )
+    return (usd * b.usd_inr_rate).quantize(Decimal(1))
 
 
 @runtime_checkable
@@ -149,6 +169,11 @@ class SpendLedger(Protocol):
         (the id is remembered for ``keep_ms``)."""
         ...
 
+    def mark_exhausted(self, tenant_id: uuid.UUID, month: str) -> bool:
+        """Atomically record that the month's budget refused a call; ``True`` only for the
+        first caller of the month (set-if-absent), so the 100 % alert fires once."""
+        ...
+
 
 def _key(tenant_id: uuid.UUID, month: str) -> str:
     return f"sos:kb:spend:{tenant_id}:{month}"
@@ -164,6 +189,10 @@ def _expiry_key(tenant_id: uuid.UUID, month: str) -> str:
 
 def _done_key(tenant_id: uuid.UUID, month: str) -> str:
     return f"sos:kb:resv_done:{tenant_id}:{month}"
+
+
+def _exhausted_key(tenant_id: uuid.UUID, month: str) -> str:
+    return f"sos:kb:exhausted:{tenant_id}:{month}"
 
 
 def _micro(amount: Decimal) -> int:
@@ -183,6 +212,7 @@ class InMemorySpendLedger:
         """Per month key: reservation id -> (micro-USD, expires at ms)."""
         self._done: dict[str, dict[str, int]] = {}
         """Per month key: settled reservation id -> remembered until ms."""
+        self._exhausted: set[str] = set()
         self._lock = threading.Lock()
 
     def _prune(self, key: str, now_ms: int) -> dict[str, tuple[int, int]]:
@@ -250,6 +280,14 @@ class InMemorySpendLedger:
             done[reservation_id] = now_ms + keep_ms
             self._data[key] = self._data.get(key, 0) + _micro(actual)
             return Settlement(_usd(self._data[key]), state)
+
+    def mark_exhausted(self, tenant_id: uuid.UUID, month: str) -> bool:
+        with self._lock:
+            key = _exhausted_key(tenant_id, month)
+            if key in self._exhausted:
+                return False
+            self._exhausted.add(key)
+            return True
 
 
 # KEYS: spend, held (hash id -> micro), expiry (zset id -> expires ms), done (zset id -> keep ms)
@@ -379,6 +417,16 @@ class ValkeySpendLedger:
             raise KVUnavailable("valkey settle failed") from exc
         return Settlement(_usd(int(total)), _STATES[int(state)])
 
+    def mark_exhausted(self, tenant_id: uuid.UUID, month: str) -> bool:
+        """``SET key 1 NX EX`` (one atomic command on the primary): true for the first caller."""
+        try:
+            first = self._client.set(
+                _exhausted_key(tenant_id, month), b"1", nx=True, ex=_SPEND_TTL_S
+            )
+        except redis.RedisError as exc:
+            raise KVUnavailable("valkey set failed") from exc
+        return bool(first)
+
 
 # --- the guard ----------------------------------------------------------------------------------
 
@@ -413,6 +461,9 @@ class Admission:
 
 
 _RESERVATION = "kb_budget_reservation"
+DEFERRED_KEEP_S: Final = 2 * 24 * 3600
+"""How long a deferred settlement's id is remembered (longer than the task's retries), so it is
+never counted twice."""
 
 
 class BudgetGuard:
@@ -487,6 +538,7 @@ class BudgetGuard:
             # Fail closed: without the month's spend the budget cannot be enforced.
             raise ProviderUnavailable("AI answers are temporarily unavailable") from exc
         if not held:
+            self._report_exhausted(tenant_id, reservation.month)
             raise BudgetExhausted("This month's AI budget is used up")
         admission = Admission(settings, reservation)
         try:
@@ -495,6 +547,18 @@ class BudgetGuard:
             self.release(admission)
             raise
         return admission
+
+    def _report_exhausted(self, tenant_id: uuid.UUID, month: str) -> None:
+        """NFR-CST-001 100 % alert (owner decision 2026-10-03): the first reservation refused
+        for budget in the school's IST month, reported once through the 80 % alert's event.
+        Never raises: the refusal stands even when the alert cannot be recorded."""
+        try:
+            first = self._ledger.mark_exhausted(tenant_id, month)
+        except KVUnavailable:
+            log.error("kb.budget.alert_unrecorded", tenant_id=tenant_id, action="exhausted")
+            return
+        if first:
+            log.warning("kb.budget.alert_crossed", tenant_id=tenant_id, action="exhausted")
 
     def _rate_limit(self, tenant_id: uuid.UUID, feature: Feature) -> None:
         minute = self._now().strftime("%Y%m%d%H%M")
@@ -506,9 +570,11 @@ class BudgetGuard:
         if count > self._config.rate_limit.requests_per_minute_per_tenant:
             raise AiRateLimited("Too many AI requests. Wait a minute and try again.")
 
-    def settle(self, admission: Admission, cost_usd: Decimal) -> SpendAfter:
+    def settle(
+        self, admission: Admission, cost_usd: Decimal, *, keep_ms: int | None = None
+    ) -> SpendAfter:
         """Turn the reservation into the real cost (idempotent). Raises :class:`KVUnavailable`
-        when the store is down (the reservation then lapses on its TTL)."""
+        when the store is down (the gateway then queues :meth:`settle_deferred`)."""
         r = admission.reservation
         done = self._ledger.settle(
             r.tenant_id,
@@ -516,7 +582,7 @@ class BudgetGuard:
             str(r.id),
             cost_usd,
             now_ms=self._now_ms(),
-            keep_ms=self._ttl_ms(),
+            keep_ms=max(self._ttl_ms(), keep_ms or 0),
         )
         ids = {"tenant_id": r.tenant_id, "resource_type": _RESERVATION, "resource_id": r.id}
         applied = done.state != "duplicate"
@@ -530,6 +596,21 @@ class BudgetGuard:
         return SpendAfter(
             done.total_usd, level, alert_crossed=before == "ok" and level != "ok", applied=applied
         )
+
+    def settle_deferred(
+        self, tenant_id: uuid.UUID, reservation_id: uuid.UUID, month: str, cost_usd: Decimal
+    ) -> SpendAfter:
+        """Settle a billed call whose settlement the store refused at the time (worker task
+        ``knowledge.settle_spend``, audit W3-10). The same reservation id, so a retry or a
+        settlement that did land before the error counts once (the ledger remembers the id for
+        :data:`DEFERRED_KEEP_S`). Raises :class:`KVUnavailable` while the store is down (the
+        task retries). Reports the alert crossing like a settlement on the call's path."""
+        reservation = Reservation(reservation_id, tenant_id, month, cost_usd)
+        admission = Admission(self._policy.settings_for(tenant_id), reservation)
+        after = self.settle(admission, cost_usd, keep_ms=DEFERRED_KEEP_S * 1000)
+        if after.alert_crossed:
+            log.warning("kb.budget.alert_crossed", tenant_id=tenant_id, action=after.level)
+        return after
 
     def release(self, admission: Admission) -> None:
         """Free a reservation nothing was billed for; a no-op once settled. Never raises for the
@@ -554,6 +635,7 @@ class BudgetGuard:
 
 
 __all__ = [
+    "DEFERRED_KEEP_S",
     "IST",
     "Admission",
     "BudgetGuard",
@@ -568,4 +650,5 @@ __all__ = [
     "TenantAiSettings",
     "ValkeySpendLedger",
     "budget_month",
+    "bundle_budget_inr",
 ]

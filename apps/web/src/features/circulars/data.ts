@@ -5,6 +5,7 @@ import { useQuery, type Query } from "@tanstack/react-query";
 import { z } from "zod";
 import { AuthRedirectError } from "@/lib/bff/fetch";
 import { ApiError, NotAvailableError, toLoadable, unwrap, useBffClient } from "@/lib/bff/query";
+import { typedDateToIso } from "@/lib/date-format";
 import type { Loadable } from "@/lib/loadable";
 
 /**
@@ -248,13 +249,21 @@ export function noticeText(
     .trim();
 }
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+/**
+ * A due date typed in the school's format (or the other order, `useDateInput`); it must be a
+ * real date and is sent as the API's `YYYY-MM-DD`.
+ */
+export const typedDueOn = z
+  .string()
+  .trim()
+  .refine((value) => typedDateToIso(value) !== null, { error: "invalidDate" })
+  .transform((value) => typedDateToIso(value) ?? "");
 
 /** Confirm a suggested deadline: an owner is required; title and due date may be changed. */
 export const confirmSchema = z.object({
   owner_membership_id: z.string().uuid({ error: "required" }),
   title: z.string().trim().min(1, { error: "required" }).max(200, { error: "tooLong" }),
-  due_on: z.string().regex(ISO_DATE, { error: "invalidDate" }),
+  due_on: typedDueOn,
 });
 
 /** Add a task by hand (task.manage). */

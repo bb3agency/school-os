@@ -178,3 +178,18 @@ run "ec2_tasks_get_no_public_ip" {
 
   expect_failures = [aws_ecs_service.this]
 }
+
+# Audit 2026-10-05 hardening (confused deputy): ECS may assume the task and execution roles only on
+# behalf of this account's tasks.
+run "task_roles_trust_only_this_accounts_ecs" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for s in data.aws_iam_policy_document.assume.statement :
+      anytrue([for c in s.condition : c.test == "StringEquals" && c.variable == "aws:SourceAccount" && toset(c.values) == toset([data.aws_caller_identity.current.account_id])])
+      && anytrue([for c in s.condition : c.test == "ArnLike" && c.variable == "aws:SourceArn" && toset(c.values) == toset(["arn:aws:ecs:ap-south-1:${data.aws_caller_identity.current.account_id}:*"])])
+    ])
+    error_message = "The ecs-tasks trust policy pins aws:SourceAccount and aws:SourceArn (confused deputy)."
+  }
+}

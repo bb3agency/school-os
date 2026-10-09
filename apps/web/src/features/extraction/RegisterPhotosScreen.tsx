@@ -175,7 +175,7 @@ export function UploadPhotos({ onStarted }: { onStarted: (batch: ExtractionBatch
       <div id={statusId} role="status" aria-live="polite" className="min-h-6 space-y-2">
         {progress ? (
           <>
-            <p className="text-sm font-medium">{statusText(progress)}</p>
+            <p className="text-sm">{statusText(progress)}</p>
             <progress
               max={progress.total}
               value={progress.starting ? progress.total : progress.current - 1}
@@ -226,7 +226,7 @@ export function RegisterPhotosView({
       cell: (row) => (
         <Link
           href={`/register-photos/${row.id}`}
-          className="font-medium text-primary underline underline-offset-4"
+          className="font-semibold text-primary underline underline-offset-4"
         >
           {formatDateTime(row.created_at) ?? t("open")}
           <span className="sr-only">{t("openHint")}</span>

@@ -75,7 +75,8 @@ Why this needs a decision:
   <school id> --code <code>` **as the service account**. The agent calls
   `POST /api/v1/edge/tally/enrol` (guard `require_edge_agent_enrolment()`): school id header,
   timestamp within ±5 minutes, a fresh nonce, the code in the TLS-protected body. A wrong,
-  expired or used code is a plain 401 (no hint which), and at most **10 attempts per school per
+  expired or used code is a plain 401 (no hint which), and at most **10 wrong codes per school and
+  client address, 50 per school and 20 attempts per address per
   hour** are accepted (429 after that).
 - A valid code creates a **device** (`ops.tally_devices`) and returns, **once**, a device id, a
   key id and a 256-bit random **device secret**. The code is marked used in the same transaction;

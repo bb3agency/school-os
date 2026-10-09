@@ -246,6 +246,21 @@ def test_ADR_0023_support_sign_in_off_fails_closed(
         assert c.get("/tenant", headers=_h(service, staff)).json()["kind"] == "user"
 
 
+def test_SEC_002_the_unverified_issuer_never_replaces_signature_checks(
+    client: TestClient, service: ServiceTokenVerifier, ops_idp: Idp
+) -> None:
+    """``unverified_issuer`` decodes without the signature (semgrep ``unverified-jwt-decode``,
+    suppressed with a reason in tokens.py): the verifier it selects must verify the token again,
+    so a real support token with a broken signature, or the same claims unsigned, is refused."""
+    token = ops_idp.mint(SUPPORT_CLIENT)
+    assert client.get("/tenant", headers=_h(service, token)).status_code == 200
+    head, body, signature = token.split(".")
+    flipped = ("A" if signature[0] != "A" else "B") + signature[1:]
+    for forged in (f"{head}.{body}.{flipped}", f"{head}.{body}."):
+        assert unverified_issuer(forged) == OPS_ISSUER
+        assert client.get("/tenant", headers=_h(service, forged)).status_code == 401
+
+
 @pytest.mark.parametrize("junk", ["", "a.b", "not-a-jwt", "x" * 9000])
 def test_ADR_0023_unverified_issuer_of_junk_is_none(junk: str) -> None:
     assert unverified_issuer(junk) is None
@@ -326,8 +341,8 @@ def test_ADR_0023_staging_refuses_dev_support_issuer(issuer: str) -> None:
             env=Environment.STAGING,
             deployment_mode=DeploymentMode.DEDICATED,
             key_wrapper=KeyWrapperKind.KMS,
-            database_url="postgresql+psycopg://sos_app:x@db:5432/schoolos",
-            platform_database_url="postgresql+psycopg://sos_platform:y@db:5432/schoolos",
+            database_url="postgresql+psycopg://sos_app:x@db:5432/schoolos?sslmode=verify-full",
+            platform_database_url="postgresql+psycopg://sos_platform:y@db:5432/schoolos?sslmode=verify-full",
             service_token_key="k" * 48,
             oidc_issuer=STAFF_ISSUER,
             oidc_audience=STAFF_CLIENT,

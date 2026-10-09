@@ -176,9 +176,10 @@ def _register(actor: Actor, data: ProvisionIn, digest: str, *, wrapper: KeyWrapp
     tenant_id = new_id()
     lease = new_id()
     shared = data.tier == "shared"
+    deployment_id = new_id()
     heartbeat: tuple[str, bytes, str] | None = None
     if not shared:
-        heartbeat = new_heartbeat_key(tenant_id, wrapper)
+        heartbeat = new_heartbeat_key(tenant_id, deployment_id, wrapper)
     with platform_session() as s, db_errors():
         plan = billing.published_plan(s, data.plan_id)
         if plan["tier"] != data.tier:
@@ -207,7 +208,7 @@ def _register(actor: Actor, data: ProvisionIn, digest: str, *, wrapper: KeyWrapp
             s,
             m.deployments,
             {
-                "id": new_id(),
+                "id": deployment_id,
                 "tenant_id": tenant_id,
                 "tenant_code": data.code,
                 "school_name": data.school_name,

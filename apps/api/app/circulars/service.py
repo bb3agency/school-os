@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, MutableMapping
 from typing import Any, Final
 from zoneinfo import ZoneInfo
 
@@ -630,7 +630,13 @@ def get_circular(session: Session, ctx: UserContext, document_id: uuid.UUID) -> 
     )
 
 
-def request_reading(session: Session, ctx: UserContext, document_id: uuid.UUID) -> CircularDetail:
+def request_reading(
+    session: Session,
+    ctx: UserContext,
+    document_id: uuid.UUID,
+    *,
+    scope: MutableMapping[str, Any] | None = None,
+) -> CircularDetail:
     """Read (or read again) the current version of a circular (``circular.review``, FR-CIR-001).
 
     409 ``document_not_ready`` (not scanned yet), ``reading_in_progress``, ``reading_done`` (a
@@ -645,6 +651,7 @@ def request_reading(session: Session, ctx: UserContext, document_id: uuid.UUID) 
         )
     row = repo.reading_for_version(session, version.id)
     if row is None:
+        knowledge.admit_ai_request(ctx, scope=scope)  # SEC-020 / R-20
         reading_id = _queue_reading(session, doc.id, version.id, version.version_no)
         if reading_id is None:
             raise Conflict("This circular is already being read.", code="reading_in_progress")
@@ -658,6 +665,7 @@ def request_reading(session: Session, ctx: UserContext, document_id: uuid.UUID) 
             code="reading_attempts_used",
         )
     else:
+        knowledge.admit_ai_request(ctx, scope=scope)  # SEC-020 / R-20
         reading_id = row.id
         repo.update_reading(
             session,
@@ -745,8 +753,10 @@ def confirm_suggestion(
     version: int,
 ) -> TaskOut:
     """Turn a suggested deadline into a task (``circular.review``, FR-CIR-004): a person decides;
-    the task keeps the circular's citation. Audited ``circular.suggestion_confirmed`` and
-    ``task.created``; the owner is notified."""
+    the task keeps the circular's citation. Without a typed title the task gets the neutral
+    configured title and, without typed details, none: the AI summary of the circular is never
+    copied into the task, whose holders may not see the circular (audit DL-08). Audited
+    ``circular.suggestion_confirmed`` and ``task.created``; the owner is notified."""
     suggestion, reading = _locked_suggestion(session, ctx, suggestion_id, version)
     _refuse_aadhaar({"title": data.title, "details": data.details})
     _active_owner(session, data.owner_membership_id, "owner_membership_id")
@@ -758,8 +768,8 @@ def confirm_suggestion(
         session,
         {
             "id": new_id(),
-            "title": _cut(data.title or suggestion.title, limits.max_title_chars),
-            "details": data.details if data.details is not None else suggestion.details,
+            "title": _cut(data.title or limits.default_title_from_circular, limits.max_title_chars),
+            "details": data.details,
             "owner_membership_id": data.owner_membership_id,
             "due_on": data.due_on or suggestion.due_on,
             "status": "open",
@@ -912,7 +922,7 @@ def list_tasks(
     """``mine`` (default): tasks you own (``task.read``); ``all``: every task of the school
     (``task.read_all``, else 403). Without ``status``: open and in-progress tasks. Soonest due
     first; ``due`` = ``overdue`` / ``week`` (next 7 days) / ``later``."""
-    if view == "all" and not ctx.has(TASK_ALL):
+    if view == "all" and not _school_grant(ctx, TASK_ALL):
         raise Forbidden("You can see only your own tasks.", code="tasks_not_all")
     who = ctx.membership_id if view == "mine" else owner
     after = decode_cursor(cursor)
@@ -947,12 +957,21 @@ def list_tasks(
     return Page[TaskOut](data=data, next_cursor=next_cursor)
 
 
+def _school_grant(ctx: UserContext, permission: str) -> bool:
+    """``task.read_all`` / ``task.manage`` reach other people's tasks only when granted
+    school-wide: tasks belong to no class or section, so a scoped (custom role) grant fails
+    closed (app-logic hardening, SEC-015)."""
+    return ctx.has(permission) and ctx.scope_for(permission).school_wide
+
+
 def _visible_task(
     session: Session, ctx: UserContext, task_id: uuid.UUID, *, lock: bool = False
 ) -> Task:
     task = repo.get_task(session, task_id, lock=lock)
     if task is None or not (
-        task.owner_membership_id == ctx.membership_id or ctx.has(TASK_ALL) or ctx.has(TASK_MANAGE)
+        task.owner_membership_id == ctx.membership_id
+        or _school_grant(ctx, TASK_ALL)
+        or _school_grant(ctx, TASK_MANAGE)
     ):
         raise NotFound("Task not found")
     return task
@@ -972,7 +991,7 @@ def _linked_document(session: Session, ctx: UserContext, document_id: uuid.UUID)
 
 def create_task(session: Session, ctx: UserContext, data: TaskCreate) -> TaskOut:
     """Add a task by hand (``task.manage``), optionally linked to a circular you can see."""
-    if not ctx.has(TASK_MANAGE):
+    if not _school_grant(ctx, TASK_MANAGE):
         raise Forbidden()
     _refuse_aadhaar({"title": data.title, "details": data.details})
     _active_owner(session, data.owner_membership_id, "owner_membership_id")
@@ -1001,7 +1020,7 @@ def update_task(
 ) -> TaskOut:
     """Change title, details, due date or owner (``task.manage``; ``If-Match``). Done or
     cancelled tasks cannot change (409 ``task_closed``). A new owner is notified."""
-    if not ctx.has(TASK_MANAGE):
+    if not _school_grant(ctx, TASK_MANAGE):
         raise Forbidden()
     _refuse_aadhaar({"title": data.title, "details": data.details})
     task = _visible_task(session, ctx, task_id, lock=True)
@@ -1048,7 +1067,7 @@ def set_task_status(
     ``in_progress``, ``done`` (records who and when), back to ``open``; ``cancelled`` needs
     ``task.manage``. 409 ``task_status_not_allowed`` for other moves."""
     task = _visible_task(session, ctx, task_id, lock=True)
-    manager = ctx.has(TASK_MANAGE)
+    manager = _school_grant(ctx, TASK_MANAGE)
     if task.owner_membership_id != ctx.membership_id and not manager:
         raise Forbidden("Only the task's owner can change its status.", code="not_task_owner")
     _check_version(task.version, version)
@@ -1244,7 +1263,13 @@ def _queue_draft(session: Session, notice_id: uuid.UUID) -> None:
     ops.enqueue_event(session, DRAFT_EVENT, {"notice_id": notice_id})
 
 
-def create_notice(session: Session, ctx: UserContext, data: NoticeCreate) -> NoticeOut:
+def create_notice(
+    session: Session,
+    ctx: UserContext,
+    data: NoticeCreate,
+    *,
+    scope: MutableMapping[str, Any] | None = None,
+) -> NoticeOut:
     """Start a parent notice (``notice.draft``; FR-NOTICE-001..003). From a circular (C1 only,
     else 422 ``notice_source_personal``) or staff text (422 ``notice_personal_data`` with phone
     numbers, emails or Aadhaar-like numbers) the notice starts ``drafting`` and the worker
@@ -1255,6 +1280,8 @@ def create_notice(session: Session, ctx: UserContext, data: NoticeCreate) -> Not
         raise Forbidden()
     document_id = _checked_source(session, ctx, data)
     by_ai = data.source != "blank"
+    if by_ai:  # SEC-020 / R-20: the same per-user AI admission as Ask (429 ai_rate_limited)
+        knowledge.admit_ai_request(ctx, scope=scope)
     notice = repo.insert_notice(
         session,
         {
@@ -1382,7 +1409,12 @@ def abandon_draft(tenant_id: uuid.UUID, notice_id: uuid.UUID, code: str) -> None
 
 
 def retry_notice_draft(
-    session: Session, ctx: UserContext, notice_id: uuid.UUID, version: int
+    session: Session,
+    ctx: UserContext,
+    notice_id: uuid.UUID,
+    version: int,
+    *,
+    scope: MutableMapping[str, Any] | None = None,
 ) -> NoticeOut:
     """Ask the AI again after it could not draft the notice (``notice.draft``; ``If-Match``):
     ``draft_failed -> drafting``, with the source checked again with the caller's access (422
@@ -1390,7 +1422,7 @@ def retry_notice_draft(
     ``notice.draft_requested``."""
     if not ctx.has(NOTICE_DRAFT):
         raise Forbidden()
-    notice = _notice(session, notice_id, lock=True)
+    notice = _visible_notice(session, ctx, notice_id, lock=True)
     _check_version(notice.version, version)
     if notice.status != "draft_failed":
         raise Conflict(
@@ -1408,6 +1440,7 @@ def retry_notice_draft(
             text=notice.source_text,
         ),
     )
+    knowledge.admit_ai_request(ctx, scope=scope)  # SEC-020 / R-20
     notice = repo.update_notice(session, notice.id, {"status": "drafting", "draft_error": None})
     _queue_draft(session, notice.id)
     _audit(
@@ -1423,6 +1456,30 @@ def retry_notice_draft(
 def _notice(session: Session, notice_id: uuid.UUID, *, lock: bool = False) -> ParentNotice:
     notice = repo.get_notice(session, notice_id, lock=lock)
     if notice is None:
+        raise NotFound("Notice not found")
+    return notice
+
+
+def _notice_visible(session: Session, ctx: UserContext, notice: ParentNotice) -> bool:
+    """A-16 (with DL-08): a notice not yet approved that was drafted from a circular is shown
+    only to its drafter and to people who may read that circular (its AI text comes from it).
+    Approved notices are written for parents, so every drafter sees them."""
+    if notice.status == "approved" or notice.source != "circular":
+        return True
+    if notice.created_by == ctx.user_id or notice.document_id is None:
+        return True
+    try:
+        _circular(session, ctx, notice.document_id)
+    except NotFound:
+        return False
+    return True
+
+
+def _visible_notice(
+    session: Session, ctx: UserContext, notice_id: uuid.UUID, *, lock: bool = False
+) -> ParentNotice:
+    notice = _notice(session, notice_id, lock=lock)
+    if not _notice_visible(session, ctx, notice):
         raise NotFound("Notice not found")
     return notice
 
@@ -1448,13 +1505,14 @@ def list_notices(
         if more
         else None
     )
-    return Page[NoticeOut](data=[_notice_out(session, n) for n in rows], next_cursor=next_cursor)
+    shown = [n for n in rows if _notice_visible(session, ctx, n)]
+    return Page[NoticeOut](data=[_notice_out(session, n) for n in shown], next_cursor=next_cursor)
 
 
 def get_notice(session: Session, ctx: UserContext, notice_id: uuid.UUID) -> NoticeOut:
     if not ctx.has(NOTICE_DRAFT):
         raise Forbidden()
-    return _notice_out(session, _notice(session, notice_id))
+    return _notice_out(session, _visible_notice(session, ctx, notice_id))
 
 
 def update_notice(
@@ -1463,7 +1521,7 @@ def update_notice(
     """Edit a draft (``notice.draft``; ``If-Match``). 409 ``notice_approved`` once approved."""
     if not ctx.has(NOTICE_DRAFT):
         raise Forbidden()
-    notice = _notice(session, notice_id, lock=True)
+    notice = _visible_notice(session, ctx, notice_id, lock=True)
     _check_version(notice.version, version)
     _refuse_drafting(notice)
     if notice.status == "approved":
@@ -1502,10 +1560,12 @@ def approve_notice(
     """Approve a draft (``notice.approve``; ``If-Match``; FR-NOTICE-004/005): every title and
     body filled (422 ``notice_incomplete``; the Telugu ones only while Telugu is shown,
     ADR-0036), no phone numbers, emails or Aadhaar-like numbers
-    (422 ``notice_personal_data``). The PDF and image are rendered next (queue ``pdf``)."""
+    (422 ``notice_personal_data``). The PDF and image are rendered next (queue ``pdf``). The
+    drafter may approve their own notice; ``notice.approved`` then carries
+    ``self_approved: true``."""
     if not ctx.has(NOTICE_APPROVE):
         raise Forbidden()
-    notice = _notice(session, notice_id, lock=True)
+    notice = _visible_notice(session, ctx, notice_id, lock=True)
     _check_version(notice.version, version)
     _refuse_drafting(notice)
     if notice.status == "approved":
@@ -1530,18 +1590,24 @@ def approve_notice(
         "source_text": None,
     }
     # The database still requires both languages on an approved notice
-    # (parent_notices_approved_complete). While Telugu is hidden an empty Telugu title or body
-    # takes the English text, so no migration is needed; it is never shown as Telugu (the page
-    # skips a Telugu section that repeats the English one, and the API hides it).
+    # (parent_notices_approved_complete). While Telugu is hidden the Telugu title and body take
+    # the English text, so no migration is needed; it is never shown as Telugu (the page skips a
+    # Telugu section that repeats the English one, and the API hides it). Any Telugu text already
+    # there is replaced too: the approver could not see it (the API hides it), so it was never
+    # reviewed and must not reach parents when Telugu is switched on (audit 2026-10-06 R-16).
     if not telugu_enabled():
-        if not notice.title_te.strip():
-            values["title_te"] = notice.title_en
-        if not notice.body_te.strip():
-            values["body_te"] = notice.body_en
+        values["title_te"] = notice.title_en
+        values["body_te"] = notice.body_en
     notice = repo.update_notice(session, notice.id, values)
     _queue_render(session, notice.id)
+    # Self-approval stays allowed (FR-NOTICE-005); the event says so for the audit viewer
+    # (owner decision 2026-10-09).
     _audit(
-        session, "notice.approved", "parent_notice", notice.id, {"ai_drafted": notice.ai_drafted}
+        session,
+        "notice.approved",
+        "parent_notice",
+        notice.id,
+        {"ai_drafted": notice.ai_drafted, "self_approved": notice.created_by == ctx.user_id},
     )
     return _notice_out(session, notice)
 
@@ -1552,7 +1618,7 @@ def request_render(
     """Render the approved notice's files again (``notice.draft``; ``If-Match``)."""
     if not ctx.has(NOTICE_DRAFT):
         raise Forbidden()
-    notice = _notice(session, notice_id, lock=True)
+    notice = _visible_notice(session, ctx, notice_id, lock=True)
     _check_version(notice.version, version)
     if notice.status != "approved":
         raise Conflict("Approve the notice first.", code="notice_not_approved")
@@ -1582,7 +1648,7 @@ def download_url(
     again)."""
     if not ctx.has(NOTICE_DRAFT):
         raise Forbidden()
-    notice = _notice(session, notice_id)
+    notice = _visible_notice(session, ctx, notice_id)
     key = notice.pdf_key if file_format == "pdf" else notice.png_key
     if notice.render_status != "ready" or key is None:
         raise Conflict("The files are not ready yet.", code="notice_files_not_ready")

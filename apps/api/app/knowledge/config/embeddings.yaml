@@ -12,6 +12,9 @@ storage:
 
 query_cache_ttl_s: 600        # docs/06 §12: cache query embeddings for 10 minutes
 query_cache_max_entries: 2048 # per process (~16 MiB of 1024-dim vectors)
+# docs/08 §7 erasure chain: the daily sweep deletes cached document vectors no chunk uses once
+# they are this old (the grace covers an ingestion between embedding and writing its chunks).
+orphan_vector_grace_hours: 24
 
 # TenantEmbedder request shaping (K2). max_chars is a conservative proxy for the provider's
 # tokens-per-request limit (Voyage: 120k-1M tokens depending on the model; Telugu uses more

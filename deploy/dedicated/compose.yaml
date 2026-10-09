@@ -1,7 +1,8 @@
 # SchoolOS dedicated tier: single-host production install (ADR-0015, docs/10 §15, SEC-030).
 #
 # One school per host. tenant_id + RLS stay on; SOS_DEPLOYMENT_MODE=dedicated disables control-plane routes.
-# Only caddy publishes ports (80/443). db and valkey sit on an internal network with no egress.
+# Only caddy publishes ports (80/443). db (network data) and valkey (network cache) sit on internal
+# networks with no egress; web is on cache but never on data.
 # Never run `docker compose` directly: use scripts/compose.sh, which renders /etc/schoolos/compose.env
 # (host config + release image digests + secrets from Secrets Manager) and adds compose.walg.yaml when
 # WAL-G is enabled.
@@ -45,7 +46,6 @@ x-app-env: &app-env
   AWS_DEFAULT_REGION: ${AWS_REGION:?}
   SOS_DATABASE_URL: postgresql+psycopg://sos_app:${SOS_APP_DB_PASSWORD:?}@db:5432/schoolos
   SOS_PLATFORM_DATABASE_URL: postgresql+psycopg://sos_platform:${SOS_PLATFORM_DB_PASSWORD:?}@db:5432/schoolos
-  SOS_REDIS_URL: redis://:${VALKEY_PASSWORD:?}@valkey:6379/0
   SOS_S3_BUCKET_FILES: ${SOS_S3_BUCKET_FILES:?}
   SOS_S3_BUCKET_AUDIT: ${SOS_S3_BUCKET_AUDIT:?}
   # SSE-KMS with the host key, which also encrypts the files bucket (FR-DOC-003, SEC-011).
@@ -67,8 +67,11 @@ x-app-env: &app-env
   SOS_LLM_GCP_CREDENTIALS_SOURCE: ${SOS_LLM_GCP_CREDENTIALS_SOURCE:-}
   SOS_LLM_GCP_CREDENTIALS_JSON: ${SOS_LLM_GCP_CREDENTIALS_JSON:-}
   SOS_LLM_ZDR_CONFIRMED: ${SOS_LLM_ZDR_CONFIRMED:-false}
-  # Anthropic: only while a role in models.yaml uses the fallback provider.
+  # Anthropic: only while a role in models.yaml uses the fallback provider. Claude safety lock: the
+  # api and every Celery process refuse to start while a role uses anthropic unless host.env sets
+  # SOS_ANTHROPIC_ZDR_CONFIRMED=true (only once the Anthropic ZDR agreement and DPA are signed).
   SOS_ANTHROPIC_API_KEY: ${SOS_ANTHROPIC_API_KEY:-}
+  SOS_ANTHROPIC_ZDR_CONFIRMED: ${SOS_ANTHROPIC_ZDR_CONFIRMED:-false}
   # Heartbeat (docs/16 §12): identity from host.env (Terraform), key from the operator secret.
   SOS_CONTROL_PLANE_URL: ${SOS_CONTROL_PLANE_URL:?}
   SOS_DEPLOYMENT_ID: ${SOS_DEPLOYMENT_ID:?}
@@ -77,13 +80,24 @@ x-app-env: &app-env
   SOS_HEARTBEAT_KEY: ${SOS_HEARTBEAT_KEY:?}
   SOS_HOST_STATE_DIR: /run/schoolos-state
   SOS_LOG_LEVEL: ${SOS_LOG_LEVEL:-INFO}
+  # Rate limits (P2-07): X-Forwarded-For is trusted only from the internal container network
+  # (Caddy -> web -> api); the api is not published.
+  SOS_TRUSTED_PROXIES: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
 
 services:
   caddy:
     <<: [*hardening, *logging]
-    image: caddy:2.11.4-alpine
+    image: caddy:2.11.4-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
+    # Not root (audit 2026-10-05 hardening). Binding 80/443 needs no capability: the privileged-port
+    # floor is lowered inside this container's own network namespace. NET_BIND_SERVICE stays in the
+    # bounding set only because the image's caddy binary carries that file capability and cannot
+    # be executed without it; no-new-privileges keeps it out of the process (no effective caps).
+    # The ACME data and config directories belong to 10001 (scripts/lib.sh prepare_caddy_dirs).
+    user: "10001:10001"
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: 80
     cap_add:
-      - NET_BIND_SERVICE # binds 80/443 as root with every other capability dropped
+      - NET_BIND_SERVICE
     ports:
       - "80:80"
       - "443:443"
@@ -97,7 +111,7 @@ services:
       - /var/lib/schoolos/caddy/data:/data
       - /var/lib/schoolos/caddy/config:/config
     tmpfs:
-      - /tmp:size=16m
+      - /tmp:size=16m,uid=10001,gid=10001
     networks: [edge]
     depends_on:
       web:
@@ -122,6 +136,8 @@ services:
       APP_BASE_URL: https://${SOS_PUBLIC_HOST:?}
       SOS_CUSTOM_DOMAIN: ${SOS_CUSTOM_DOMAIN:-}
       API_INTERNAL_URL: http://api:8000
+      # Caddy appends the client address to X-Forwarded-For (P2-07 sign-in rate limits).
+      TRUSTED_PROXY_HOPS: "1"
       SESSION_SECRET: ${SESSION_SECRET:?}
       SOS_SERVICE_TOKEN_KEY: ${SOS_SERVICE_TOKEN_KEY:?}
       OIDC_ISSUER: ${SOS_OIDC_ISSUER:?}
@@ -131,7 +147,9 @@ services:
       SUPPORT_OIDC_ISSUER: ${SOS_SUPPORT_OIDC_ISSUER:-}
       SUPPORT_OIDC_CLIENT_ID: ${SUPPORT_OIDC_CLIENT_ID:-}
       SUPPORT_OIDC_CLIENT_SECRET: ${SUPPORT_OIDC_CLIENT_SECRET:-}
-      REDIS_URL: redis://:${VALKEY_PASSWORD:?}@valkey:6379/1
+      # P2-06: Valkey ACL user `web`: only the keys sos:web:* (sessions) and sos:rl:v1:bff:* (sign-in
+      # rate limits), read/write commands and its two Lua scripts; no queue, no SELECT, no pub/sub.
+      REDIS_URL: redis://web:${VALKEY_WEB_PASSWORD:?}@valkey:6379/0
       # Origin of presigned upload/preview URLs (CSP connect-src + img-src; docs/07 §10, §11). The API
       # presigns virtual-hosted, regional URLs, so this is derived from the same bucket and region
       # (Terraform output files_browser_origin; the bucket's CORS allows this host to POST).
@@ -139,7 +157,7 @@ services:
     tmpfs:
       - /tmp:size=64m,uid=10001,gid=10001
       - /app/.next/cache:size=128m,uid=10001,gid=10001
-    networks: [edge, app, data]
+    networks: [edge, app, cache] # never data: web cannot reach db:5432
     depends_on:
       api:
         condition: service_healthy
@@ -160,11 +178,17 @@ services:
     environment:
       <<: *app-env
       SOS_SERVICE_NAME: api
+      # P2-06: each service is its own Valkey ACL user (password derived by scripts/lib.sh).
+      SOS_REDIS_URL: redis://api:${VALKEY_API_PASSWORD:?}@valkey:6379/0
+      # Audit W3-06: the api role's own short-lived credentials (scripts/app-credentials.sh); it can
+      # read and write school files but never tag or delete them. IMDS (hop limit 1) is unreachable.
+      AWS_CONFIG_FILE: /run/aws/config
     volumes:
       - /var/lib/schoolos/state:/run/schoolos-state:ro
+      - /var/lib/schoolos/aws/api:/run/aws:ro
     tmpfs:
       - /tmp:size=128m,uid=10001,gid=10001
-    networks: [app, data]
+    networks: [app, data, cache]
     depends_on:
       db:
         condition: service_healthy
@@ -199,10 +223,15 @@ services:
     environment:
       <<: *app-env
       SOS_SERVICE_NAME: worker
+      SOS_REDIS_URL: redis://worker:${VALKEY_WORKER_PASSWORD:?}@valkey:6379/0
+      # Audit W3-06: the worker role (files incl. discard, audit archive, signing key).
+      AWS_CONFIG_FILE: /run/aws/config
+    volumes:
+      - /var/lib/schoolos/aws/worker:/run/aws:ro
     tmpfs:
       - /tmp:size=512m,uid=10001,gid=10001
     shm_size: 256m # headless Chromium (PDF rendering)
-    networks: [app, data]
+    networks: [app, data, cache]
     depends_on:
       db:
         condition: service_healthy
@@ -226,11 +255,12 @@ services:
     environment:
       <<: *app-env
       SOS_SERVICE_NAME: beat
+      SOS_REDIS_URL: redis://beat:${VALKEY_BEAT_PASSWORD:?}@valkey:6379/0
     volumes:
       - /var/lib/schoolos/state:/run/schoolos-state:ro # backup status for the heartbeat
     tmpfs:
       - /tmp:size=16m,uid=10001,gid=10001
-    networks: [app, data]
+    networks: [app, data, cache]
     depends_on:
       valkey:
         condition: service_healthy
@@ -262,17 +292,20 @@ services:
   db-bootstrap:
     <<: [*hardening, *logging]
     profiles: [tools]
-    image: pgvector/pgvector:0.8.6-pg16-bookworm
+    image: pgvector/pgvector:0.8.6-pg16-bookworm@sha256:ccc6e83d6e35e931dc7c5def2022729d5a6c370318d099181995567ff1fb4d6b
     user: "999:999"
     restart: "no"
     entrypoint: ["/bin/sh", "-c"]
+    # psql reads the role passwords from its environment (\getenv, psql 15+), never from its
+    # command line, which any process on the host can read in /proc/*/cmdline while it runs. An
+    # unset variable leaves :'name' unexpanded and the script stops (ON_ERROR_STOP).
     command:
       - >-
         exec psql -X -v ON_ERROR_STOP=1
-        -v app_password="$$SOS_APP_DB_PASSWORD"
-        -v migrator_password="$$SOS_MIGRATOR_DB_PASSWORD"
-        -v platform_password="$$SOS_PLATFORM_DB_PASSWORD"
-        -v readonly_password="$$SOS_READONLY_DB_PASSWORD"
+        -c '\getenv app_password SOS_APP_DB_PASSWORD'
+        -c '\getenv migrator_password SOS_MIGRATOR_DB_PASSWORD'
+        -c '\getenv platform_password SOS_PLATFORM_DB_PASSWORD'
+        -c '\getenv readonly_password SOS_READONLY_DB_PASSWORD'
         -f /bootstrap/bootstrap.sql
     environment:
       PGHOST: db
@@ -294,7 +327,7 @@ services:
 
   db:
     <<: [*hardening, *logging]
-    image: pgvector/pgvector:0.8.6-pg16-bookworm
+    image: pgvector/pgvector:0.8.6-pg16-bookworm@sha256:ccc6e83d6e35e931dc7c5def2022729d5a6c370318d099181995567ff1fb4d6b
     user: "999:999" # postgres; the data directory is pre-owned by bootstrap-host.sh
     shm_size: 256m
     stop_grace_period: 120s
@@ -327,6 +360,10 @@ services:
       - -c
       - idle_in_transaction_session_timeout=60000
       - -c
+      # Backstop for every session (audit 2026-10-05 "Role timeouts"); sos_migrator is exempt
+      # (role setting 0, infra/db/bootstrap.sql), the app sets its own per transaction.
+      - statement_timeout=300000
+      - -c
       - wal_level=replica
       - -c
       - archive_mode=${SOS_PG_ARCHIVE_MODE:-off}
@@ -352,26 +389,44 @@ services:
 
   valkey:
     <<: [*hardening, *logging]
-    image: valkey/valkey:8.1.10-alpine
+    image: valkey/valkey:8.1.10-alpine@sha256:081c2f5cb575efc901aa80ff9cdbd1ec6a301682fd35e1ebb4b0990a4a4a8507
     user: "999:999"
-    # The password goes into a tmpfs config file, never onto the command line (visible in `ps`).
+    # P2-06: one ACL user per service, the default user off. web reaches only its own keys
+    # (sos:web:* sessions, sos:rl:v1:bff:* sign-in limits) with read/write commands and EVAL on those
+    # keys; api/worker/beat get the broker and every key but no dangerous or admin command; health
+    # may only PING. The same rules are the shared tier's ElastiCache RBAC access strings
+    # (infra/terraform/modules/redis; apps/api/tests/deploy/test_valkey_acl.py keeps them equal).
+    # Passwords (derived per user by scripts/lib.sh) go into a tmpfs ACL file, never onto the
+    # command line (visible in `ps`).
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >-
         umask 077 &&
-        printf 'requirepass %s\nmasterauth %s\n' "$$VALKEY_PASSWORD" "$$VALKEY_PASSWORD" > /tmp/valkey.conf &&
-        unset VALKEY_PASSWORD &&
-        exec valkey-server /tmp/valkey.conf --dir /data --appendonly yes --appendfsync everysec
+        printf '%s\n'
+        'user default off resetkeys resetchannels -@all'
+        "user web on >$$VALKEY_WEB_PASSWORD ~sos:web:* ~sos:rl:v1:bff:* -@all +@read +@write -@dangerous +eval +evalsha +ping +hello +client|setinfo"
+        "user api on >$$VALKEY_API_PASSWORD ~* &* +@all -@dangerous -@admin"
+        "user worker on >$$VALKEY_WORKER_PASSWORD ~* &* +@all -@dangerous -@admin"
+        "user beat on >$$VALKEY_BEAT_PASSWORD ~* &* +@all -@dangerous -@admin"
+        "user health on >$$VALKEY_HEALTH_PASSWORD -@all +ping"
+        > /tmp/users.acl &&
+        printf '%s\n' "$$VALKEY_HEALTH_PASSWORD" > /tmp/health.pw &&
+        unset VALKEY_WEB_PASSWORD VALKEY_API_PASSWORD VALKEY_WORKER_PASSWORD VALKEY_BEAT_PASSWORD VALKEY_HEALTH_PASSWORD &&
+        exec valkey-server --aclfile /tmp/users.acl --dir /data --appendonly yes --appendfsync everysec
         --maxmemory ${SOS_VALKEY_MAXMEMORY:-192mb} --maxmemory-policy noeviction --protected-mode yes
     environment:
-      VALKEY_PASSWORD: ${VALKEY_PASSWORD:?}
+      VALKEY_WEB_PASSWORD: ${VALKEY_WEB_PASSWORD:?}
+      VALKEY_API_PASSWORD: ${VALKEY_API_PASSWORD:?}
+      VALKEY_WORKER_PASSWORD: ${VALKEY_WORKER_PASSWORD:?}
+      VALKEY_BEAT_PASSWORD: ${VALKEY_BEAT_PASSWORD:?}
+      VALKEY_HEALTH_PASSWORD: ${VALKEY_HEALTH_PASSWORD:?}
     volumes:
       - /var/lib/schoolos/valkey:/data
     tmpfs:
       - /tmp:size=1m,uid=999,gid=999
-    networks: [data]
+    networks: [cache]
     healthcheck:
-      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$(sed -n 's/^requirepass //p' /tmp/valkey.conf)\" valkey-cli ping | grep -q PONG"]
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$(cat /tmp/health.pw)\" valkey-cli --user health ping | grep -q PONG"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -384,6 +439,10 @@ networks:
   edge: {}
   # app tier: outbound internet for S3/KMS/Cognito/LLM providers/heartbeat
   app: {}
-  # data tier: no route out of the host (internal)
+  # data tier (Postgres): no route out of the host (internal). web is not on it: it holds no DB
+  # password and has no reason to reach db:5432 (audit 2026-10-05, network segmentation).
   data:
+    internal: true
+  # cache tier (Valkey): web, api, worker and beat; internal like data
+  cache:
     internal: true

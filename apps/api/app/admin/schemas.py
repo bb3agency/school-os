@@ -6,9 +6,9 @@ from __future__ import annotations
 import datetime as dt
 import re
 import uuid
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
 from app.admin.config import CATEGORY_RE
 
@@ -106,7 +106,9 @@ class RetentionUpdate(_In):
     """The retention period in days per configurable category. A category left out goes back
     to its default."""
 
-    rules: dict[str, int] = Field(default_factory=dict, max_length=50)
+    rules: dict[Annotated[str, StringConstraints(max_length=63, pattern=CATEGORY_RE)], int] = Field(
+        default_factory=dict, max_length=50
+    )
 
     @field_validator("rules")
     @classmethod

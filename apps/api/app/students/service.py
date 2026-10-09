@@ -69,6 +69,7 @@ from app.core.languages import telugu_text
 from app.core.logging import get_context, get_logger
 from app.core.records import RecordTable
 from app.core.textnorm import comparison_key
+from app.documents import service as documents
 from app.identity import service as identity
 from app.ops import service as ops
 from app.students import crypto
@@ -76,12 +77,14 @@ from app.students import repository as repo
 from app.students.canonical import Resolution, resolve
 from app.students.definitions import (
     AADHAAR_DETAIL,
+    DIGITS12_CODE,
     MASK,
     AttributeDef,
     CanonicalPolicy,
     CleanValue,
     aadhaar_display,
     aadhaar_error,
+    digits12_value,
     error,
     is_full_aadhaar,
     normalize_phone,
@@ -126,6 +129,9 @@ from app.tenancy import service as tenancy
 READ: Final = "student.read_basic"
 SENSITIVE: Final = "student.read_sensitive"
 UPDATE: Final = "student.update_nonidentity"
+
+APAAR_SEARCH_FIELD: Final = "apaar_id"
+"""Search-body field and typed attribute for the exact APAAR ID search (FR-STU-016, ADR-0037)."""
 
 VALUES_TABLE: Final = "sis.attribute_values"
 VALUE_COLUMN: Final = "value_ciphertext"
@@ -639,9 +645,21 @@ def value_history(
 # --- create and record -----------------------------------------------------------------------
 
 
-def _check_evidence(evidence_document_id: uuid.UUID | None) -> None:
-    """Evidence documents live in ``kb.documents`` (M1 documents module); until that module's
-    ``evidence_exists`` is available the id is stored as given (composite FK added in 0009)."""
+def _check_evidence(
+    session: Session, ctx: UserContext, evidence_document_id: uuid.UUID | None
+) -> None:
+    """Evidence named on a value must be a document the caller can see, with a usable version
+    (audit 2026-10-05 A-09: any id of the school was stored as given, so a value could claim
+    evidence the caller never saw, pin an unrelated document against deletion, and the 422/201
+    answer showed whether an id existed). 422 ``evidence_document_id not_found`` otherwise,
+    the same answer for an unknown id."""
+    if evidence_document_id is None:
+        return
+    if not (
+        documents.is_visible(session, ctx, evidence_document_id)
+        and documents.evidence_exists(session, evidence_document_id)
+    ):
+        raise ValidationFailed([error("evidence_document_id", "not_found")])
 
 
 def _identity_guard(
@@ -650,11 +668,16 @@ def _identity_guard(
     verification: Verification,
     existing: AttributeValue | None,
 ) -> None:
+    """Identity values change only through a change request (invariant 6, BR-01): no write may
+    set a decision, replace the admission-register value, or supersede a value that was verified
+    (e.g. by an approved change request at ``birth_certificate``; audit 2026-10-05 A-05)."""
     if not definition.is_identity:
         return
     if verification != "unverified":
         raise IdentityChangeRequired()
     if source == definition.policy.anchor and existing is not None:
+        raise IdentityChangeRequired()
+    if existing is not None and existing.verification_status == "verified":
         raise IdentityChangeRequired()
 
 
@@ -755,7 +778,7 @@ def create_student(
         if (item.attribute_key, item.source) in seen:
             raise ValidationFailed([error(f"values.{i}", "duplicate_value")])
         seen.add((item.attribute_key, item.source))
-        _check_evidence(item.evidence_document_id)
+        _check_evidence(session, ctx, item.evidence_document_id)
         cleaned.append((definition, item.source, clean, item.evidence_document_id))
     if not any(d.key == "full_name" for d, *_ in cleaned):
         raise ValidationFailed([error("values", "full_name_required")])
@@ -842,7 +865,7 @@ def record_value(  # noqa: PLR0917 - signature fixed by the M1 build contract
     defs = _definitions(session)
     definition = _definition_for(defs, attribute_key, "attribute_key")
     clean = validate_value(definition, source, value)
-    _check_evidence(evidence_document_id)
+    _check_evidence(session, ctx, evidence_document_id)
     previous = repo.current_value(session, student_id, attribute_key, source)
     if (
         previous is not None
@@ -921,6 +944,16 @@ def record_value_in(
         evidence_document_id=data.evidence_document_id,
         expected_version=expected_version,
         permission=UPDATE,
+    )
+
+
+def lock_student_for_change(session: Session, ctx: UserContext, student_id: uuid.UUID) -> None:
+    """Lock the student row (404 outside the caller's read scope) for the rest of the
+    transaction, as every value write does first: an approver locks it before comparing the
+    value a change request corrects, so no write can land between that check and the new value
+    (audit 2026-10-05, hardening "Change requests")."""
+    _visible_student(
+        session, ctx, student_id, permission=READ, structure=_structure(session), lock=True
     )
 
 
@@ -1110,6 +1143,9 @@ def _enrol(
     roll_no: str | None,
     started_on: dt.date | None,
 ) -> EnrollmentOut:
+    # Every enrolment path (API, imports, register extraction) ends here: a roll number is never
+    # a full Aadhaar number (invariant 4; audit 2026-10-04, DL-03).
+    reject_full_aadhaar({"roll_no": roll_no or ""})
     existing = repo.active_enrollment(session, student.id, section.academic_year_id, lock=True)
     if existing is not None and existing.section_id == section.id:
         raise Conflict("The student is already in this section.", code="already_enrolled")
@@ -1169,6 +1205,10 @@ def enrol(
         session, ctx, student_id, permission=UPDATE, structure=structure, lock=True
     )
     section = _enrolment_target(session, data.section_id)
+    # The target section must be in reach too, as for PATCH (SEC-015).
+    allowed = _allowed_sections(ctx, UPDATE, structure)
+    if allowed is not None and section.id not in allowed:
+        raise ValidationFailed([error("section_id", "not_found")])
     out = _enrol(session, ctx, student, section, roll_no=data.roll_no, started_on=data.started_on)
     _touch(session, student, _definitions(session))
     _values_changed(session, student_id, [ENROLLMENT_KEY])
@@ -1188,13 +1228,21 @@ def list_enrollments(
 def _owned_enrollment(
     session: Session, ctx: UserContext, student_id: uuid.UUID, enrollment_id: uuid.UUID
 ) -> tuple[Student, Any]:
-    """The student (in the caller's update scope) and one of its enrolments, locked; else 404."""
+    """The student (in the caller's update scope) and one of its enrolments, locked; else 404.
+
+    A scoped caller must also reach the enrolment's own section (in its own academic year,
+    R-10): reaching the student through the current enrolment does not reach an older one."""
     structure = _structure(session)
     student = _visible_student(
         session, ctx, student_id, permission=UPDATE, structure=structure, lock=True
     )
     enrollment = repo.get_enrollment(session, student_id, enrollment_id, lock=True)
     if enrollment is None:
+        raise NotFound("Enrolment not found")
+    if enrollment.academic_year_id != structure.year_id:
+        structure = _structure(session, enrollment.academic_year_id)
+    allowed = _allowed_sections(ctx, UPDATE, structure)
+    if allowed is not None and enrollment.section_id not in allowed:
         raise NotFound("Enrolment not found")
     return student, enrollment
 
@@ -1217,6 +1265,7 @@ def update_enrollment(
     student, enrollment = _owned_enrollment(session, ctx, student_id, enrollment_id)
     values: dict[str, Any] = {}
     if "roll_no" in fields:
+        reject_full_aadhaar({"roll_no": data.roll_no or ""})
         values["roll_no"] = data.roll_no
     if "section_id" in fields:
         if data.section_id is None:
@@ -1427,14 +1476,31 @@ def search(
     """Scoped, ranked search by partial name (EN/TE), admission number, class/section tokens
     (``9b``, ``IX-B``) and parent names (FR-STU-010, US-302). Scope: current-year enrolments in
     the caller's sections for scoped holders (US-302 AC2). ``filters.academic_year_id`` picks
-    another year: its enrolments give the class and section, and scoped holders reach that
-    year's sections exactly as they reach the current year's."""
+    another year: its enrolments give the class and section shown and filtered on, but a scoped
+    holder still reaches only the students of their CURRENT-year sections (owner decision
+    2026-10-09: a former class is out of reach); school-wide holders see every student.
+
+    ``filters.apaar_id`` (FR-STU-016, ADR-0037): exact match on the typed ``apaar_id``
+    attribute only, current values that are verified or recorded (not rejected); same scope.
+    The value is never logged or audited (PRV-020)."""
     if filters.query and is_full_aadhaar(filters.query):
         raise ValidationFailed([aadhaar_error("query")], detail=AADHAAR_DETAIL)
+    apaar: str | None = None
+    if filters.apaar_id is not None:
+        apaar = digits12_value(filters.apaar_id)
+        if apaar is None:
+            raise ValidationFailed([error(APAAR_SEARCH_FIELD, DIGITS12_CODE)])
     cfg = search_config()
     offset = _offset(cursor, cfg.max_offset)
     structure = _structure(session, filters.academic_year_id)
-    allowed = _allowed_sections(ctx, READ, structure)
+    current = structure if filters.academic_year_id is None else _structure(session)
+    allowed = _allowed_sections(ctx, READ, current)
+    reach_sections: frozenset[uuid.UUID] | None = None
+    if allowed is not None and current.year_id != structure.year_id:
+        # Another year: reach is still this year's sections (a filter on the student, not on
+        # the shown enrolment). No current year means a scoped holder reaches nobody.
+        reach_sections = allowed if current.year_id is not None else frozenset()
+        allowed = None
     parsed = parse_query(filters.query or "")
     sections: frozenset[uuid.UUID] | None = None
     if parsed.has_structure:
@@ -1453,13 +1519,19 @@ def search(
         )
         sections = _intersect(sections, in_class)
     empty = Page[StudentSummary](data=[], next_cursor=None)
-    if (allowed is not None and not allowed) or (sections is not None and not sections):
+    if (
+        (allowed is not None and not allowed)
+        or (reach_sections is not None and not reach_sections)
+        or (sections is not None and not sections)
+    ):
         return empty
     rows = repo.search(
         session,
         repo.SearchSpec(
             academic_year_id=structure.year_id,
             allowed_sections=allowed,
+            reach_year_id=current.year_id if reach_sections is not None else None,
+            reach_sections=reach_sections,
             section_filter=sections,
             status=filters.status,
             admission_no=filters.admission_no,
@@ -1471,9 +1543,12 @@ def search(
             admission_bonus=cfg.admission_exact_bonus,
             offset=offset,
             limit=limit,
+            apaar_key=APAAR_SEARCH_FIELD if apaar is not None else None,
+            apaar_id=apaar,
         ),
     )
     ranked = bool(parsed.name_key or parsed.admission_terms)
+    unranked_field = APAAR_SEARCH_FIELD if apaar is not None else None
     items = [
         StudentSummary(
             id=r.id,
@@ -1483,7 +1558,7 @@ def search(
             class_section=structure.label(r.section_id),
             section_id=r.section_id,
             match=StudentMatch(
-                field=r.match_field if ranked else None,
+                field=r.match_field if ranked else unranked_field,
                 score=round(float(r.score), 3) if ranked else None,
             ),
         )
@@ -2040,6 +2115,17 @@ def _guardian_secret_columns(
     return columns
 
 
+def get_guardian(
+    session: Session, ctx: UserContext, student_id: uuid.UUID, guardian_id: uuid.UUID
+) -> GuardianOut:
+    """One guardian of the student, masked like :func:`list_guardians` (404 when not linked),
+    e.g. to rebuild an ``Idempotency-Key`` replay (audit H-01)."""
+    for guardian in list_guardians(session, ctx, student_id):
+        if guardian.id == guardian_id:
+            return guardian
+    raise NotFound("Guardian not found")
+
+
 def add_guardian(
     session: Session, ctx: UserContext, student_id: uuid.UUID, data: GuardianCreate
 ) -> GuardianOut:
@@ -2057,7 +2143,15 @@ def add_guardian(
         if data.full_name or data.phone or data.address:
             raise ValidationFailed([error("guardian_id", "link_or_create")])
         guardian = repo.get_guardian(session, data.guardian_id)
-        if guardian is None:
+        # Only a guardian of a student the caller reaches may be linked (SEC-015): linking
+        # would otherwise expose another section's guardian (C3 phone/address) and its edits.
+        if guardian is None or (
+            _allowed_sections(ctx, UPDATE, structure) is not None
+            and not any(
+                _in_scope(session, ctx, sid, UPDATE, structure)
+                for sid in repo.guardian_student_ids(session, guardian.id)
+            )
+        ):
             raise ValidationFailed([error("guardian_id", "not_found")])
         created = False
     else:
@@ -2151,6 +2245,18 @@ def update_guardian(
     link = repo.get_link(session, student_id, guardian_id)
     if link is None:
         raise NotFound("Guardian not found")
+    if fields & {"full_name", "phone", "address"} and not all(
+        _in_scope(session, ctx, other, perm, structure)
+        for other in repo.guardian_student_ids(session, guardian_id)
+        for perm in (READ, UPDATE)
+    ):
+        # Name, phone and address are shared by every linked student (siblings): a scoped
+        # editor changes them only when every one is in reach (custom roles; SEC-015).
+        raise Forbidden(
+            "This guardian is also linked to a student outside your classes. Ask the office "
+            "to change their details.",
+            code="guardian_shared_out_of_scope",
+        )
     if "full_name" in fields and data.full_name is None:
         raise ValidationFailed([error("full_name", "missing")])
     phone = normalize_phone(data.phone) if data.phone else None

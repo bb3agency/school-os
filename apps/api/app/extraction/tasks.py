@@ -18,6 +18,7 @@ from celery import Task, shared_task
 from app.core.logging import get_logger
 from app.extraction import service
 from app.extraction.providers import ExtractionUnavailable
+from app.ops.service import TenantTask
 
 log = get_logger(__name__)
 
@@ -26,6 +27,7 @@ MAX_RETRIES = 5
 
 @shared_task(
     name=service.PROCESS_TASK,
+    base=TenantTask,
     bind=True,
     queue="ocr",
     acks_late=True,

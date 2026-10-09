@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import pytest
 
+from app.knowledge.config.llm import load_llm_config
 from app.knowledge.domain import (
     AssistantMessage,
     ConversationItem,
@@ -129,3 +130,53 @@ def test_FR_KB_008_streamed_text_never_shows_a_marker() -> None:
     pieces = ["Fees are due [", "1", "]. Pay at", " the office [2][", "1].", " Done [x]."]
     shown = "".join(stripper.feed(p) for p in pieces) + stripper.flush()
     assert shown == "Fees are due. Pay at the office. Done [x]."
+
+
+# --- per-sentence markers (docs/06 §9 rule 3 as built; answer_checks.sentences) ---------------
+
+RULES = load_llm_config().answer_checks.sentences
+
+
+def mark_sentences(text: str) -> list[tuple[str, list[str]]]:
+    marked = segments_from_markers(text, PASSAGES, require_numbers=True, sentences=RULES)
+    return [(s.text, [c.source for c in s.citations]) for s in marked.segments]
+
+
+def test_FR_KB_005_a_marker_cites_only_the_sentence_it_ends() -> None:
+    """``[n]`` at a sentence end cites that sentence; an earlier sentence of the same piece
+    without its own marker stays uncited (the answer check then drops it or falls back)."""
+    assert mark_sentences("Pay at the office. Fees are due on 15/10/2026 [1].") == [
+        ("Pay at the office.", []),
+        (" Fees are due on 15/10/2026.", [A.source]),
+    ]
+    # Each sentence with its own marker is cited on its own.
+    assert mark_sentences("Pay at the office [1]. Exams start at 09:30 [2].") == [
+        ("Pay at the office.", [A.source]),
+        (" Exams start at 09:30.", [B.source]),
+    ]
+    # Multiple markers at one sentence end cite every named passage.
+    assert mark_sentences("Pay at the office [1][2].") == [
+        ("Pay at the office.", [A.source, B.source]),
+    ]
+
+
+def test_FR_KB_007_numbers_are_checked_against_the_marked_sentence_only() -> None:
+    """An invented date in an unmarked earlier sentence no longer takes the marked sentence's
+    citation away (it is uncited itself); the marked sentence is checked on its own numbers."""
+    assert mark_sentences("Results come on 30/10/2026. Fees are due on 15/10/2026 [1].") == [
+        ("Results come on 30/10/2026.", []),
+        (" Fees are due on 15/10/2026.", [A.source]),
+    ]
+    # Without the sentence rules the whole piece is one claim and loses its marker.
+    assert mark("Results come on 30/10/2026. Fees are due on 15/10/2026 [1].") == [
+        ("Results come on 30/10/2026. Fees are due on 15/10/2026.", []),
+    ]
+
+
+def test_FR_KB_005_list_numbers_are_not_statement_numbers() -> None:
+    text = "Dates:\n1. Fees are due on 15/10/2026 [1].\n2. Exams start at 09:30 [2]."
+    assert mark_sentences(text) == [
+        ("Dates:", []),
+        ("\n1. Fees are due on 15/10/2026.", [A.source]),
+        ("\n2. Exams start at 09:30.", [B.source]),
+    ]

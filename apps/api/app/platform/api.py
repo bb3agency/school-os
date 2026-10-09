@@ -44,9 +44,11 @@ from app.platform import (
     usage,
 )
 from app.platform.auth import OperatorContext, require_platform
-from app.platform.common import Actor, must, today_ist
+from app.platform.common import Actor, if_match_required, must, today_ist
 from app.platform.permissions import ANY_OPERATOR
 from app.platform.schemas import (
+    AiBundleIn,
+    AiBundleOut,
     AnnouncementIn,
     AnnouncementOut,
     AuditVerifyOut,
@@ -116,13 +118,25 @@ def _actor(ctx: OperatorContext) -> Actor:
     return Actor(ctx.operator_id, ctx.request_id)
 
 
-def _version(if_match: str | None) -> int | None:
+def _optional_version(if_match: str | None) -> int | None:
+    """The version in ``If-Match`` when sent. Only for the create-or-replace flag routes, whose
+    service requires it once the flag exists (AA-13)."""
     if if_match is None:
         return None
     raw = if_match.removeprefix("W/").strip('"')
     if not raw.isdigit():
         raise BadRequest("If-Match must be an ETag returned by the API.", code="bad_if_match")
     return int(raw)
+
+
+def _version(if_match: str | None) -> int:
+    """The version in the required ``If-Match`` of an update (audit 2026-10-04 AA-13; docs/09
+    §2): missing -> 400 ``if_match_required``, the tenant routes' answer; stale -> 412 from the
+    service. Two operators editing at once can no longer overwrite each other."""
+    version = _optional_version(if_match)
+    if version is None:
+        raise if_match_required()
+    return version
 
 
 def _etag(response: Response, version: int) -> None:
@@ -158,8 +172,16 @@ def _idempotent(
     resource_type: str,
     location: Callable[[uuid.UUID], str],
     status_code: int = 201,
+    required: bool = True,
 ) -> Any:
-    """Run ``run`` once per (operator, Idempotency-Key); replays return the same resource."""
+    """Run ``run`` once per (operator, Idempotency-Key); replays return the same resource.
+    ``required=False`` accepts a request without a key (routes whose callers do not send one
+    yet); a key, when sent, is honoured the same way."""
+    if key is None and not required:
+        rid, result = run()
+        response.status_code = status_code
+        response.headers["Location"] = location(rid)
+        return result
     if key is None:
         raise BadRequest(
             "Send an Idempotency-Key header with this request.", code="idempotency_key_required"
@@ -365,6 +387,18 @@ def approve_offboarding(
     return tenants.approve_offboarding(_actor(ctx), tenant_id)
 
 
+@router.post("/tenants/{tenant_id}/offboarding:withdraw", response_model=TenantDetailOut)
+def withdraw_offboarding(
+    *,
+    tenant_id: uuid.UUID,
+    ctx: Annotated[Ctx, Depends(require_platform("platform.tenants.offboard"))],
+) -> TenantDetailOut:
+    """Withdraw a pending offboarding request (audit 2026-10-05 A-13). ``409 not_requested``
+    when there is none or it was already approved. Requests also expire on their own after
+    ``two_person_request_ttl_hours`` (``offboard_request_expires_at``)."""
+    return tenants.withdraw_offboarding(_actor(ctx), tenant_id)
+
+
 @router.get("/tenants/{tenant_id}/offboarding", response_model=OffboardingOut)
 def get_offboarding(
     *,
@@ -501,8 +535,10 @@ def list_plans(*, ctx: Annotated[Ctx, PlanRead], status: str | None = None) -> P
 
 
 @router.get("/plans/{plan_id}", response_model=PlanOut)
-def get_plan(*, plan_id: uuid.UUID, ctx: Annotated[Ctx, PlanRead]) -> PlanOut:
-    return billing.get_plan(plan_id)
+def get_plan(*, plan_id: uuid.UUID, response: Response, ctx: Annotated[Ctx, PlanRead]) -> PlanOut:
+    out = billing.get_plan(plan_id)
+    _etag(response, out.row_version)
+    return out
 
 
 @router.post("/plans", response_model=PlanOut, status_code=201)
@@ -538,9 +574,16 @@ def update_plan(
     *,
     plan_id: uuid.UUID,
     data: PlanPatch,
+    response: Response,
     ctx: Annotated[Ctx, Depends(require_platform("platform.plans.manage"))],
+    if_match: IfMatch = None,
 ) -> PlanOut:
-    return billing.update_plan(_actor(ctx), plan_id, data)
+    """Edit a draft plan. If-Match with the ETag (``row_version``) is required (400
+    ``if_match_required``); 412 ``precondition_failed`` when stale; 409 ``plan_published`` once
+    published."""
+    out = billing.update_plan(_actor(ctx), plan_id, data, expected_version=_version(if_match))
+    _etag(response, out.row_version)
+    return out
 
 
 @router.post("/plans/{plan_id}/publish", response_model=PlanOut)
@@ -555,6 +598,17 @@ def retire_plan(
     *, plan_id: uuid.UUID, ctx: Annotated[Ctx, Depends(require_platform("platform.plans.manage"))]
 ) -> PlanOut:
     return billing.set_plan_status(_actor(ctx), plan_id, "retired")
+
+
+@router.get("/ai-bundles", response_model=Page[AiBundleOut])
+def list_ai_bundles(
+    *,
+    ctx: Annotated[Ctx, PlanRead],
+    status: Annotated[str | None, Query(pattern=r"^(published|retired)$")] = None,
+) -> Page[AiBundleOut]:
+    """AI answer bundles: a monthly add-on with an included number of answers and a price per
+    extra answer (docs/16 §5.6). Seeded by catalogue migrations; never unlimited."""
+    return Page[AiBundleOut](data=billing.list_ai_bundles(status))
 
 
 # --- subscriptions ----------------------------------------------------------------------------
@@ -578,9 +632,12 @@ def list_subscriptions(
 def get_subscription(
     *,
     sub_id: uuid.UUID,
+    response: Response,
     ctx: Annotated[Ctx, Depends(require_platform("platform.subscriptions.read"))],
 ) -> SubscriptionOut:
-    return billing.get_subscription(sub_id)
+    out = billing.get_subscription(sub_id)
+    _etag(response, out.version)
+    return out
 
 
 @router.post("/subscriptions/{sub_id}/activate", response_model=SubscriptionOut)
@@ -611,16 +668,77 @@ def cancel_subscription(
     return billing.cancel_subscription(_actor(ctx), sub_id, data.reason)
 
 
+def _sub_etag(response: Response, out: SubscriptionOut) -> SubscriptionOut:
+    _etag(response, out.version)
+    return out
+
+
 @router.put("/subscriptions/{sub_id}/price-override", response_model=SubscriptionOut)
 def set_price_override(
-    *, sub_id: uuid.UUID, data: PriceOverrideIn, ctx: Annotated[Ctx, SubManage]
+    *,
+    sub_id: uuid.UUID,
+    data: PriceOverrideIn,
+    response: Response,
+    ctx: Annotated[Ctx, SubManage],
+    if_match: IfMatch = None,
 ) -> SubscriptionOut:
-    return billing.set_price_override(_actor(ctx), sub_id, data.price_override_inr, data.reason)
+    """Set a negotiated price. ``If-Match`` (the subscription's ETag) is required (400
+    ``if_match_required``; 412 when stale), here and on the other price-override and AI-bundle
+    routes."""
+    out = billing.set_price_override(
+        _actor(ctx),
+        sub_id,
+        data.price_override_inr,
+        data.reason,
+        expected_version=_version(if_match),
+    )
+    return _sub_etag(response, out)
 
 
 @router.delete("/subscriptions/{sub_id}/price-override", response_model=SubscriptionOut)
-def clear_price_override(*, sub_id: uuid.UUID, ctx: Annotated[Ctx, SubManage]) -> SubscriptionOut:
-    return billing.set_price_override(_actor(ctx), sub_id, None, None)
+def clear_price_override(
+    *,
+    sub_id: uuid.UUID,
+    response: Response,
+    ctx: Annotated[Ctx, SubManage],
+    if_match: IfMatch = None,
+) -> SubscriptionOut:
+    out = billing.set_price_override(
+        _actor(ctx), sub_id, None, None, expected_version=_version(if_match)
+    )
+    return _sub_etag(response, out)
+
+
+@router.put("/subscriptions/{sub_id}/ai-bundle", response_model=SubscriptionOut)
+def set_ai_bundle(
+    *,
+    sub_id: uuid.UUID,
+    data: AiBundleIn,
+    response: Response,
+    ctx: Annotated[Ctx, SubManage],
+    if_match: IfMatch = None,
+) -> SubscriptionOut:
+    """Choose or change the AI answer bundle (monthly plans only; ``409
+    ai_bundle_needs_monthly_plan``). It counts from the first full calendar month after today
+    (a trial's from the month after activation); answers above the quota are billed on the next
+    invoice at the bundle's price per extra answer. ``If-Match`` required (412 when stale)."""
+    out = billing.set_ai_bundle(
+        _actor(ctx), sub_id, data.ai_bundle_id, expected_version=_version(if_match)
+    )
+    return _sub_etag(response, out)
+
+
+@router.delete("/subscriptions/{sub_id}/ai-bundle", response_model=SubscriptionOut)
+def remove_ai_bundle(
+    *,
+    sub_id: uuid.UUID,
+    response: Response,
+    ctx: Annotated[Ctx, SubManage],
+    if_match: IfMatch = None,
+) -> SubscriptionOut:
+    """Remove the AI answer bundle: no bundle line and no overage from the next invoice."""
+    out = billing.set_ai_bundle(_actor(ctx), sub_id, None, expected_version=_version(if_match))
+    return _sub_etag(response, out)
 
 
 @router.post("/subscriptions/{sub_id}/suspend", response_model=SubscriptionOut)
@@ -719,10 +837,13 @@ def update_invoice(
     *,
     invoice_id: uuid.UUID,
     data: InvoicePatch,
+    response: Response,
     ctx: Annotated[Ctx, InvManage],
     if_match: IfMatch = None,
 ) -> InvoiceOut:
-    return billing.update_draft(
+    """Edit a draft. ``If-Match`` with the invoice's ETag is required (400
+    ``if_match_required``; 412 when stale)."""
+    out = billing.update_draft(
         _actor(ctx),
         invoice_id,
         lines=data.lines,
@@ -730,6 +851,8 @@ def update_invoice(
         notes_set="notes" in data.model_fields_set,
         expected_version=_version(if_match),
     )
+    _etag(response, out.version)
+    return out
 
 
 @router.delete("/invoices/{invoice_id}", status_code=204)
@@ -749,6 +872,15 @@ def void_invoice(
     *, invoice_id: uuid.UUID, data: Reasoned, ctx: Annotated[Ctx, InvManage]
 ) -> InvoiceOut:
     return billing.void_invoice(_actor(ctx), invoice_id, data.reason)
+
+
+@router.get("/invoices/{invoice_id}/payments", response_model=list[PaymentOut])
+def list_invoice_payments(
+    *, invoice_id: uuid.UUID, ctx: Annotated[Ctx, InvRead]
+) -> list[PaymentOut]:
+    """The invoice's payments, newest received first, reversed ones included with who reversed
+    them, when and why (docs/16 §5.9). 404 for an unknown invoice."""
+    return billing.list_payments(invoice_id)
 
 
 @router.post("/invoices/{invoice_id}/payments", response_model=PaymentOut, status_code=201)
@@ -787,6 +919,9 @@ def record_payment(
 def reverse_payment(
     *, payment_id: uuid.UUID, data: Reasoned, ctx: Annotated[Ctx, InvManage]
 ) -> PaymentOut:
+    """Reverse a ``recorded`` payment with a reason (10-500 characters); it is kept, never
+    deleted. ``409 invalid_state`` if it is already reversed. The invoice is re-settled, so a
+    ``paid`` invoice goes back to ``issued``; read the invoice again for its new status."""
     return billing.reverse_payment(_actor(ctx), payment_id, data.reason)
 
 
@@ -814,15 +949,38 @@ def list_flags(
 
 
 @router.put("/flags/{key}", response_model=FlagOut)
-def put_flag(*, key: FlagKey, data: FlagIn, ctx: Annotated[Ctx, FlagManage]) -> FlagOut:
-    return flags.set_global(_actor(ctx), key, data)
+def put_flag(
+    *,
+    key: FlagKey,
+    data: FlagIn,
+    response: Response,
+    ctx: Annotated[Ctx, FlagManage],
+    if_match: IfMatch = None,
+) -> FlagOut:
+    """Create or replace the global flag. ``If-Match`` (the flag's ETag) is required once the
+    flag exists (400 ``if_match_required``; 412 when stale, or when sent for a flag that does
+    not exist yet); a new flag is created without it."""
+    out = flags.set_global(_actor(ctx), key, data, expected_version=_optional_version(if_match))
+    _etag(response, out.version)
+    return out
 
 
 @router.put("/flags/{key}/tenants/{tenant_id}", response_model=FlagOut)
 def put_flag_override(
-    *, key: FlagKey, tenant_id: uuid.UUID, data: FlagOverrideIn, ctx: Annotated[Ctx, FlagManage]
+    *,
+    key: FlagKey,
+    tenant_id: uuid.UUID,
+    data: FlagOverrideIn,
+    response: Response,
+    ctx: Annotated[Ctx, FlagManage],
+    if_match: IfMatch = None,
 ) -> FlagOut:
-    return flags.set_override(_actor(ctx), key, tenant_id, data.enabled)
+    """Set one school's override. ``If-Match`` as for the global flag."""
+    out = flags.set_override(
+        _actor(ctx), key, tenant_id, data.enabled, expected_version=_optional_version(if_match)
+    )
+    _etag(response, out.version)
+    return out
 
 
 @router.delete("/flags/{key}/tenants/{tenant_id}", status_code=204)
@@ -841,9 +999,16 @@ FleetManage = Depends(require_platform("platform.fleet.manage"))
 
 @router.get("/deployments", response_model=Page[DeploymentOut])
 def list_deployments(
-    *, ctx: Annotated[Ctx, FleetRead], status: str | None = None
+    *,
+    ctx: Annotated[Ctx, FleetRead],
+    status: str | None = None,
+    tenant_id: uuid.UUID | None = None,
+    limit: Limit = 50,
+    cursor: str | None = None,
 ) -> Page[DeploymentOut]:
-    return Page[DeploymentOut](data=fleet.list_deployments(status))
+    """Deployments, newest first, cursor-paged (R-14); ``tenant_id`` for one school's."""
+    items, nxt = fleet.list_deployments(status, tenant_id=tenant_id, limit=limit, cursor=cursor)
+    return Page[DeploymentOut](data=items, next_cursor=nxt)
 
 
 @router.get("/deployments/{deployment_id}", response_model=DeploymentOut)
@@ -860,19 +1025,25 @@ def update_deployment(
     *,
     deployment_id: uuid.UUID,
     data: DeploymentPatch,
+    response: Response,
     ctx: Annotated[Ctx, FleetManage],
     if_match: IfMatch = None,
 ) -> DeploymentOut:
-    return fleet.update_deployment(
+    """``If-Match`` with the deployment's ETag is required (400 ``if_match_required``)."""
+    out = fleet.update_deployment(
         _actor(ctx), deployment_id, data, expected_version=_version(if_match)
     )
+    _etag(response, out.version)
+    return out
 
 
 @router.post("/deployments/{deployment_id}/heartbeat-key:rotate", response_model=HeartbeatKeyOut)
 def rotate_heartbeat_key(
     *, deployment_id: uuid.UUID, ctx: Annotated[Ctx, FleetManage], wrapper: Wrapper
 ) -> HeartbeatKeyOut:
-    """Returns the new key ONCE for the runbook (SSM Parameter Store)."""
+    """Returns the new key ONCE for the runbook (SSM Parameter Store). The old key stays valid
+    for the overlap (billing.yaml ``fleet.key_rotation_overlap_days``); 409 ``rotation_pending``
+    while an earlier rotation is inside it (audit 2026-10-06 R-15)."""
     return fleet.rotate_key(_actor(ctx), deployment_id, wrapper=wrapper)
 
 
@@ -897,8 +1068,12 @@ AnnManage = Depends(require_platform("platform.announcements.manage"))
 def list_announcements(
     *,
     ctx: Annotated[Ctx, Depends(require_platform(ANY_OPERATOR))],
+    limit: Limit = 50,
+    cursor: str | None = None,
 ) -> Page[AnnouncementOut]:
-    return Page[AnnouncementOut](data=announcements.list_announcements())
+    """Announcements, newest first, cursor-paged (R-14)."""
+    items, nxt = announcements.list_announcements(limit=limit, cursor=cursor)
+    return Page[AnnouncementOut](data=items, next_cursor=nxt)
 
 
 @router.post("/announcements", response_model=AnnouncementOut, status_code=201)
@@ -939,12 +1114,28 @@ def update_announcement(
     *,
     announcement_id: uuid.UUID,
     data: AnnouncementIn,
+    response: Response,
     ctx: Annotated[Ctx, AnnManage],
     if_match: IfMatch = None,
 ) -> AnnouncementOut:
+    """``If-Match`` with the announcement's ETag (its ``version``) is required (400
+    ``if_match_required``)."""
     out = announcements.update(
         _actor(ctx), announcement_id, data, expected_version=_version(if_match)
     )
+    announcements.publish()
+    _etag(response, out.version)
+    return out
+
+
+@router.post("/announcements/{announcement_id}/approve", response_model=AnnouncementOut)
+def approve_announcement(
+    *, announcement_id: uuid.UUID, ctx: Annotated[Ctx, AnnManage]
+) -> AnnouncementOut:
+    """A second operator approves a critical announcement (two-person; audit 2026-10-05).
+    ``409 same_operator``, ``request_expired``, ``requester_not_authorised``,
+    ``approver_not_eligible`` or ``invalid_state``. To withdraw it, cancel it."""
+    out = announcements.approve(_actor(ctx), announcement_id)
     announcements.publish()
     return out
 
@@ -1025,10 +1216,36 @@ def open_ticket(
 
 @router.post("/support/tickets/{ticket_id}/messages", response_model=TicketOut, status_code=201)
 def add_ticket_message(
-    *, ticket_id: uuid.UUID, data: TicketMessageIn, ctx: Annotated[Ctx, SupManage]
-) -> TicketOut:
-    return support.add_operator_message(
-        _actor(ctx), ticket_id, data.body, internal_note=data.internal_note
+    *,
+    request: Request,
+    response: Response,
+    ticket_id: uuid.UUID,
+    data: TicketMessageIn,
+    ctx: Annotated[Ctx, SupManage],
+    store: Store,
+    idempotency_key: IdemKey = None,
+) -> Any:
+    """Reply on a ticket. An ``Idempotency-Key`` is optional; a retry with the same key does not
+    post the message twice."""
+
+    def run() -> tuple[uuid.UUID, BaseModel]:
+        out = support.add_operator_message(
+            _actor(ctx), ticket_id, data.body, internal_note=data.internal_note
+        )
+        return out.id, out
+
+    return _idempotent(
+        ctx=ctx,
+        request=request,
+        response=response,
+        store=store,
+        key=idempotency_key,
+        body=data,
+        run=run,
+        replay=support.get_ticket,
+        resource_type="support_ticket",
+        location=lambda i: f"/api/v1/platform/support/tickets/{i}",
+        required=False,
     )
 
 
@@ -1037,10 +1254,14 @@ def update_ticket(
     *,
     ticket_id: uuid.UUID,
     data: TicketPatch,
+    response: Response,
     ctx: Annotated[Ctx, SupManage],
     if_match: IfMatch = None,
 ) -> TicketOut:
-    return support.update_ticket(_actor(ctx), ticket_id, data, expected_version=_version(if_match))
+    """``If-Match`` with the ticket's ETag is required (400 ``if_match_required``)."""
+    out = support.update_ticket(_actor(ctx), ticket_id, data, expected_version=_version(if_match))
+    _etag(response, out.version)
+    return out
 
 
 # --- break-glass ------------------------------------------------------------------------------
@@ -1051,17 +1272,44 @@ def list_breakglass(
     *,
     ctx: Annotated[Ctx, Depends(require_platform(ANY_OPERATOR))],
     tenant_id: uuid.UUID | None = None,
+    limit: Limit = 50,
+    cursor: str | None = None,
 ) -> Page[BreakGlassOut]:
-    return Page[BreakGlassOut](data=breakglass.list_requests(tenant_id))
+    """Break-glass requests, newest first, cursor-paged (R-14)."""
+    items, nxt = breakglass.list_requests(tenant_id, limit=limit, cursor=cursor)
+    return Page[BreakGlassOut](data=items, next_cursor=nxt)
 
 
 @router.post("/break-glass-requests", response_model=BreakGlassOut, status_code=201)
 def create_breakglass(
     *,
+    request: Request,
+    response: Response,
     data: BreakGlassIn,
     ctx: Annotated[Ctx, Depends(require_platform("platform.breakglass.request"))],
-) -> BreakGlassOut:
-    return breakglass.create_request(_actor(ctx), data)
+    store: Store,
+    idempotency_key: IdemKey = None,
+) -> Any:
+    """Request break-glass access. An ``Idempotency-Key`` is optional; a retry with the same key
+    answers with the same request instead of opening a second one."""
+
+    def run() -> tuple[uuid.UUID, BaseModel]:
+        out = breakglass.create_request(_actor(ctx), data)
+        return out.id, out
+
+    return _idempotent(
+        ctx=ctx,
+        request=request,
+        response=response,
+        store=store,
+        key=idempotency_key,
+        body=data,
+        run=run,
+        replay=breakglass.get_request,
+        resource_type="breakglass_request",
+        location=lambda i: f"/api/v1/platform/break-glass-requests/{i}",
+        required=False,
+    )
 
 
 @router.post("/break-glass-requests/{request_id}/emergency-confirm", response_model=BreakGlassOut)
@@ -1070,8 +1318,22 @@ def confirm_breakglass(
     request_id: uuid.UUID,
     ctx: Annotated[Ctx, Depends(require_platform("platform.breakglass.emergency"))],
 ) -> BreakGlassOut:
-    """Two different operators must confirm emergency access (SEC-029)."""
+    """Two different operators must confirm emergency access (SEC-029), within
+    ``two_person_request_ttl_hours`` of the request (``confirm_by``; audit 2026-10-05 A-13).
+    ``409 same_operator``, ``request_expired``, ``requester_not_authorised``,
+    ``approver_not_eligible`` or ``invalid_state``."""
     return breakglass.emergency_confirm(_actor(ctx), request_id)
+
+
+@router.post("/break-glass-requests/{request_id}/withdraw", response_model=BreakGlassOut)
+def withdraw_breakglass(
+    *,
+    request_id: uuid.UUID,
+    ctx: Annotated[Ctx, Depends(require_platform("platform.breakglass.request"))],
+) -> BreakGlassOut:
+    """Withdraw a request that is still waiting (audit 2026-10-05 A-13). It ends as
+    ``revoked``; ``409 invalid_state`` once approved, denied or ended."""
+    return breakglass.withdraw(_actor(ctx), request_id)
 
 
 # --- operators --------------------------------------------------------------------------------

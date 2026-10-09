@@ -14,7 +14,14 @@ import unicodedata
 import uuid
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    StringConstraints,
+)
 
 from app.authz.http import DEFAULT_LIMIT, MAX_LIMIT
 
@@ -164,12 +171,27 @@ class EnrollmentOut(_Out):
     version: int
 
 
+# School calendar dates (academic years, enrolments): years 2000-2999 only. A date at the edge
+# of the calendar (year 1 or 9999) reached the date maths and the database unchecked (audit
+# 2026-10-06 hardening; the same bounds as the billing dates of R-13).
+_SCHOOL_YEARS = (2000, 2999)
+
+
+def _school_year(value: dt.date) -> dt.date:
+    if not _SCHOOL_YEARS[0] <= value.year <= _SCHOOL_YEARS[1]:
+        raise ValueError(f"must be between the years {_SCHOOL_YEARS[0]} and {_SCHOOL_YEARS[1]}")
+    return value
+
+
+SchoolDate = Annotated[dt.date, AfterValidator(_school_year)]
+
+
 class EnrollmentIn(_In):
     """Enrol in a section; an active enrolment in the same academic year becomes ``transferred``."""
 
     section_id: uuid.UUID
     roll_no: RollNo | None = None
-    started_on: dt.date | None = None
+    started_on: SchoolDate | None = None
 
 
 class EnrollmentPatch(_In):
@@ -189,7 +211,7 @@ class EnrollmentEnd(_In):
     ``transferred`` (moved elsewhere). ``ended_on`` defaults to today (India time)."""
 
     status: EnrollmentEndStatus = "completed"
-    ended_on: dt.date | None = None
+    ended_on: SchoolDate | None = None
 
 
 # --- promotions (FR-TEN-011, US-202 AC2) --------------------------------------------------------
@@ -356,6 +378,7 @@ class SearchFilters(_In):
     status: StudentStatus | None = None
     admission_no: str | None = None
     academic_year_id: uuid.UUID | None = None
+    apaar_id: str | None = None
 
 
 class StudentSearchIn(_In):
@@ -375,8 +398,18 @@ class StudentSearchIn(_In):
     admission_no: str | None = Field(default=None, max_length=32)
     academic_year_id: uuid.UUID | None = Field(
         default=None,
-        description="Academic year whose enrolments are listed (class, section and "
-        "scope); the current year when left out. Unknown years answer 422.",
+        description="Academic year whose enrolments give the class and section shown and "
+        "filtered on; the current year when left out. Scoped holders still see only students "
+        "of their sections/classes this year. Unknown years answer 422.",
+    )
+    apaar_id: str | None = Field(
+        default=None,
+        max_length=32,
+        description="Exact APAAR ID (FR-STU-016, ADR-0037): 12 digits, spaces or hyphens "
+        "between the groups allowed. Matches only the student's current APAAR ID values "
+        "(verified or recorded, not rejected), within the caller's scope; anything else "
+        "answers 422 digits12_required. The only search field where a 12-digit number is "
+        "accepted: query and admission_no still refuse one (aadhaar_full_number_rejected).",
     )
     limit: int = Field(
         default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT, description="Page size (max 200)."
@@ -393,6 +426,7 @@ class StudentSearchIn(_In):
             status=self.status,
             admission_no=self.admission_no,
             academic_year_id=self.academic_year_id,
+            apaar_id=self.apaar_id,
         )
 
 

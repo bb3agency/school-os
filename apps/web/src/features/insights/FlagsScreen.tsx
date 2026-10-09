@@ -120,7 +120,7 @@ function RulesCard({ settings, canManage }: { settings: Settings; canManage: boo
               {settings.rules.map((rule) => (
                 <Tr key={rule.key}>
                   <Td>
-                    <p className="font-medium text-ink">{ruleName(rule.key)}</p>
+                    <p className="font-semibold text-ink">{ruleName(rule.key)}</p>
                     <p className="text-sm text-ink-muted">
                       {translateOr(t, `explain.${rule.key}`, "explain.other", {
                         threshold: rule.threshold,
@@ -141,7 +141,8 @@ function RulesCard({ settings, canManage }: { settings: Settings; canManage: boo
                           min: rule.min,
                           max: rule.max,
                         })}
-                        className="min-h-10 w-20 rounded-md border border-border-control bg-surface px-2 font-mono text-ink"
+                        inputMode="numeric"
+                        className="min-h-10 w-20 rounded-md border border-border-control bg-surface px-2 font-mono text-base text-ink pointer-coarse:min-h-11"
                       />
                     ) : (
                       <span className="font-mono">{rule.threshold}</span>
@@ -303,7 +304,7 @@ export function FlagsScreen() {
                             <Td>
                               <Link
                                 href={`/flags/${flag.id}`}
-                                className="font-medium break-words text-primary underline underline-offset-4"
+                                className="font-semibold break-words text-primary underline underline-offset-4"
                               >
                                 {flag.student.full_name ?? t("unnamed")}
                               </Link>

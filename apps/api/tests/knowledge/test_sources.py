@@ -41,13 +41,30 @@ def test_FR_KB_005_student_field_uri_round_trips() -> None:
         (sources.finding, "finding"),
         (sources.change_request, "change"),
         (sources.verified_answer, "verified"),
-        (sources.fee_dues, "fee"),  # M6 get_fee_dues (ADR-0032)
     ],
 )
 def test_FR_KB_005_simple_uris_round_trip(builder: object, kind: str) -> None:
     uri = builder(FINDING)  # type: ignore[operator]
     assert uri == f"sos://{kind}/{FINDING}"
     assert sources.parse(uri) == sources.SourceRef(kind=kind, object_id=FINDING)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("builder", "kind"),
+    [
+        (sources.student_count, "count"),
+        (sources.fee_dues, "fee"),  # M6 get_fee_dues (ADR-0032)
+    ],
+)
+def test_FR_KB_005_aggregate_uris_round_trip_with_their_scope(builder: object, kind: str) -> None:
+    scope = "0123456789abcdef"
+    uri = builder(FINDING, scope=scope)  # type: ignore[operator]
+    assert uri == f"sos://{kind}/{FINDING}#s{scope}"
+    assert sources.parse(uri) == sources.SourceRef(kind=kind, object_id=FINDING, scope=scope)  # type: ignore[arg-type]
+    # Keys stored before the fingerprint still parse (visibility treats them as school-wide).
+    assert sources.parse(f"sos://{kind}/{FINDING}").scope is None
+    with pytest.raises(ValueError, match="scope"):
+        builder(FINDING, scope="Class 9 A")  # type: ignore[operator]
 
 
 @pytest.mark.parametrize(

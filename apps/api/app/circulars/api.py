@@ -12,7 +12,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 
 from app.authz.context import UserContext
 from app.authz.dependencies import TenantDB, require, require_any
@@ -88,12 +88,14 @@ def get_circular(
 
 @router.post("/circulars/{document_id}/read", response_model=CircularDetail, status_code=202)
 def request_reading(
-    ctx: Reviewer, db: TenantDB, document_id: uuid.UUID, response: Response
+    ctx: Reviewer, db: TenantDB, document_id: uuid.UUID, request: Request, response: Response
 ) -> CircularDetail:
     """Read the circular's current version with AI now, or try again after "needs manual
     review" (``circular.review``). 409 ``document_not_ready``, ``reading_in_progress``,
-    ``reading_done`` or ``reading_attempts_used``."""
-    return _reading_etag(response, service.request_reading(db, ctx, document_id))
+    ``reading_done`` or ``reading_attempts_used``. 429 ``ai_rate_limited`` over your AI budget
+    (the same per-person limit as Ask; SEC-020)."""
+    out = service.request_reading(db, ctx, document_id, scope=request.scope)
+    return _reading_etag(response, out)
 
 
 @router.post("/circulars/{document_id}/review", response_model=CircularDetail)
@@ -122,9 +124,10 @@ def confirm_suggestion(
     body: SuggestionConfirmIn,
     version: IfMatch,
 ) -> TaskOut:
-    """Create a task from a suggested deadline, optionally changing its title, details or due
-    date, with an owner (``circular.review``; ``If-Match`` = the suggestion's version). 409
-    ``suggestion_decided``; 422 ``owner_not_active``."""
+    """Create a task from a suggested deadline, with an owner, the title and details you type
+    (without them a neutral title and no details: the AI summary is never copied into the
+    task) and the suggested or a changed due date (``circular.review``; ``If-Match`` = the
+    suggestion's version). 409 ``suggestion_decided``; 422 ``owner_not_active``."""
     return service.confirm_suggestion(db, ctx, suggestion_id, body, version)
 
 
@@ -256,7 +259,7 @@ def _notice_headers(out: NoticeOut) -> dict[str, str]:
 
 @router.post("/notices", response_model=NoticeOut, status_code=202)
 def create_notice(
-    ctx: NoticeDrafter, db: TenantDB, body: NoticeCreate, idem: IdempotencyDep
+    ctx: NoticeDrafter, db: TenantDB, body: NoticeCreate, idem: IdempotencyDep, request: Request
 ) -> Response:
     """Start a parent notice in English (and Telugu only while Telugu is shown, ADR-0036;
     ``notice.draft``): AI-drafted from a
@@ -267,11 +270,12 @@ def create_notice(
     (``draft_error`` says why: try again with ``POST /notices/{notice_id}/draft`` or write it
     yourself). A ``blank`` notice starts as ``draft``. Only the circular's text is sent to the
     AI, never student records. Accepts ``Idempotency-Key`` (a retry replays the first answer
-    and queues nothing)."""
+    and queues nothing). An AI draft counts against your AI budget, the same per-person limit
+    as Ask (429 ``ai_rate_limited``; SEC-020); a blank notice does not."""
     return idem.run(
         db,
         body,
-        lambda: service.create_notice(db, ctx, body),
+        lambda: service.create_notice(db, ctx, body, scope=request.scope),
         status_code=202,
         headers=_notice_headers,
     )
@@ -313,12 +317,14 @@ def retry_notice_draft(
     notice_id: uuid.UUID,
     body: NoticeRedraftIn,
     version: IfMatch,
+    request: Request,
     response: Response,
 ) -> NoticeOut:
     """Ask the AI to draft the notice again after it could not (``notice.draft``;
     ``If-Match``): ``draft_failed`` becomes ``drafting``; the source is checked again (422 as
-    for ``POST /notices``). 409 ``notice_not_draft_failed`` in any other state."""
-    out = service.retry_notice_draft(db, ctx, notice_id, version)
+    for ``POST /notices``). 409 ``notice_not_draft_failed`` in any other state. 429
+    ``ai_rate_limited`` over your AI budget (SEC-020)."""
+    out = service.retry_notice_draft(db, ctx, notice_id, version, scope=request.scope)
     response.headers["ETag"] = etag(out.version)
     return out
 

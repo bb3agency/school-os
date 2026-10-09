@@ -1,7 +1,17 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type MouseEvent,
+  type PointerEvent,
+} from "react";
 import { Pill } from "@/components/ui/Badge";
 import { Icon } from "@/components/ui/Icon";
 import { DownloadButton } from "@/features/documents/parts";
@@ -56,12 +66,37 @@ export function CitationChip({
 
   useEffect(() => cancelClose, [cancelClose]);
 
-  // While open: scrolling (the chip moves away from the fixed popover) or focus leaving the
-  // chip and its popover closes it; Escape closes it and leaves focus on the chip.
+  /*
+   * Touch (docs/17 §5.7): there is no hover, so the first tap on a chip opens its preview and a
+   * second tap follows the link to the source card (the preview's "Open" goes to the source's
+   * own screen). Touch pointers fire enter/leave around every tap, so only a mouse opens and
+   * closes the preview on hover. Keyboard focus still opens it.
+   */
+  const touchTap = useRef(false);
+  const onPointerDown = (event: PointerEvent<HTMLAnchorElement>) => {
+    touchTap.current = event.pointerType !== "mouse";
+  };
+  const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    const tap = touchTap.current;
+    touchTap.current = false;
+    if (!tap) return;
+    if (!open) {
+      event.preventDefault();
+      show();
+    } else {
+      setOpen(false);
+    }
+  };
+
+  // While open: scrolling (the chip moves away from the fixed popover), a tap outside or focus
+  // leaving the chip and its popover closes it; Escape closes it and leaves focus on the chip.
   useEffect(() => {
     if (!open) return;
     const close = () => setOpen(false);
     const onFocusIn = (event: FocusEvent) => {
+      if (!wrapper.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onOutside = (event: globalThis.PointerEvent) => {
       if (!wrapper.current?.contains(event.target as Node)) setOpen(false);
     };
     const onKey = (event: KeyboardEvent) => {
@@ -77,11 +112,13 @@ export function CitationChip({
     window.addEventListener("resize", close);
     document.addEventListener("focusin", onFocusIn);
     document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onOutside);
     return () => {
       window.removeEventListener("scroll", close);
       window.removeEventListener("resize", close);
       document.removeEventListener("focusin", onFocusIn);
       document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onOutside);
     };
   }, [open]);
 
@@ -92,11 +129,22 @@ export function CitationChip({
         href={`#${sourceCardId(prefix, citation.index)}`}
         aria-label={t("sourceLink", { index: citation.index, title: name })}
         aria-describedby={open ? popoverId : undefined}
-        onPointerEnter={show}
-        onPointerLeave={hideSoon}
-        onFocus={show}
+        onPointerEnter={(event) => {
+          if (event.pointerType === "mouse") show();
+        }}
+        onPointerLeave={(event) => {
+          if (event.pointerType === "mouse") hideSoon();
+        }}
+        onPointerDown={onPointerDown}
+        onClick={onClick}
+        onFocus={() => {
+          // A tap focuses the chip before its click: the click decides (see above).
+          if (!touchTap.current) show();
+        }}
         className={cn(
           "relative -top-[0.4em] mx-0.5 inline-flex h-[1.35em] min-w-[1.35em] items-center justify-center rounded-full px-1",
+          // A larger invisible hit area on touch screens (the chip itself stays small in text).
+          "pointer-coarse:after:absolute pointer-coarse:after:-inset-2.5 pointer-coarse:after:content-['']",
           "border border-border-soft bg-surface-muted font-mono text-[0.7rem] leading-none font-semibold text-ink-muted no-underline",
           "hover:border-primary hover:bg-primary-soft hover:text-primary motion-safe:hover:transition-colors",
           open && "border-primary bg-primary-soft text-primary",
@@ -111,7 +159,9 @@ export function CitationChip({
             anchor={chip}
             id={popoverId}
             onPointerEnter={cancelClose}
-            onPointerLeave={hideSoon}
+            onPointerLeave={(event) => {
+              if (event.pointerType === "mouse") hideSoon();
+            }}
           />
         </Suspense>
       ) : null}
@@ -149,14 +199,14 @@ export function SourceCard({ citation, id }: { citation: AskCitation; id: string
           {ref && ref.kind !== "count" && href ? (
             <Link
               href={href}
-              className="font-medium text-primary underline underline-offset-4 break-anywhere hover:no-underline"
+              className="font-semibold text-primary underline underline-offset-4 break-anywhere hover:no-underline"
               // The visible title starts the name (WCAG 2.5.3); the rest says what opens.
               aria-label={`${name} (${ref.kind === "fee" ? tt("sourceOpen") : openLabel(ref, t)})`}
             >
               {name}
             </Link>
           ) : (
-            <span className="font-medium break-anywhere text-ink">{name}</span>
+            <span className="font-semibold break-anywhere text-ink">{name}</span>
           )}
           {ref?.kind === "doc" && ref.page !== null ? (
             <Pill variant="tag">{t("page", { page: ref.page })}</Pill>

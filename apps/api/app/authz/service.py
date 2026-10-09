@@ -5,36 +5,17 @@
 - :func:`record_login`: the BFF calls ``POST /me/login-event`` once after the OIDC callback. It
   resolves the membership and audits ``auth.login.succeeded`` or, when the school refuses the
   session (suspended school, MFA missing), ``auth.login.denied`` in that school's own chain.
-  Rate-limited per user.
+  Rate-limited per user by the route guard (policy ``login_event`` in app/core/rate_limits.yaml).
 """
 
 from __future__ import annotations
 
-import hashlib
 import uuid
-from typing import Final
 
 from app.authz.context import UserContext
-from app.authz.kv import KVUnavailable, kv_store
 from app.authz.resolver import ME_ACTIVE_TENANT, ME_LOGIN_EVENT, AccessDenied, AuthzResolver
-from app.core.errors import RateLimited
-from app.core.logging import get_logger
 from app.identity import service as identity
 from app.identity.principal import Principal
-
-LOGIN_EVENTS_PER_MINUTE: Final = 10
-log = get_logger(__name__)
-
-
-def _rate_limit(subject: str, *, limit: int, window_s: int) -> None:
-    digest = hashlib.sha256(subject.encode()).hexdigest()[:32]
-    try:
-        count = kv_store().incr(f"sos:rl:login-event:{digest}", ttl_s=window_s)
-    except KVUnavailable:
-        log.warning("authz.rate_limit_unavailable")
-        return  # fail open: the IdP throttles sign-ins itself (FR-IAM-005)
-    if count > limit:
-        raise RateLimited("Too many sign-in events. Wait a minute and try again.")
 
 
 def switch_active_tenant(
@@ -66,7 +47,6 @@ def record_login(
     tenant_hint: uuid.UUID | None,
     request_id: str | None,
 ) -> UserContext:
-    _rate_limit(principal.subject, limit=LOGIN_EVENTS_PER_MINUTE, window_s=60)
     choice = resolver.choose(resolver.choices(principal), tenant_hint)
     try:
         ctx = resolver.context_for(principal, choice, request_id=request_id, route=ME_LOGIN_EVENT)

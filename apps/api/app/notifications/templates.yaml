@@ -232,15 +232,8 @@ templates:
       title: అత్యవసర సపోర్ట్ అనుమతి తెరవబడింది
       body: "{reason_code, select, security_incident {భద్రతా సంఘటన కారణంగా} legal_obligation {చట్టపరమైన అవసరం కారణంగా} other {అత్యవసర కారణంగా}} SchoolOS మీ పాఠశాల రికార్డులకు అత్యవసర అనుమతి తెరిచింది. ఇద్దరు SchoolOS సిబ్బంది దీన్ని నిర్ధారించారు. అనుమతి చూడటానికి మాత్రమే, {minutes} నిమిషాల తర్వాత ముగుస్తుంది. 'సపోర్ట్ అనుమతి' పేజీ నుండి మీరు దీన్ని ఇప్పుడే ముగించవచ్చు. సపోర్ట్ చూసినవన్నీ ఆడిట్ లాగ్‌లో ఉంటాయి."
 
-  announcement.new:
-    params: [announcement_id]
-    resource_type: announcement
-    en:
-      title: New message from SchoolOS
-      body: There is a new message from SchoolOS. Read it in the banner at the top of the page.
-    te:
-      title: SchoolOS నుండి కొత్త సందేశం
-      body: SchoolOS నుండి కొత్త సందేశం వచ్చింది. పేజీ పైభాగంలోని బ్యానర్‌లో దాన్ని చదవండి.
+  # No announcement template (owner decision 2026-10-04): platform announcements reach schools
+  # only as the banner; the control plane never writes school notifications (ADR-0020).
 
   # --- certificates (M3; US-1102, FR-CERT-012) ------------------------------------------------
   certificate.approval_requested:

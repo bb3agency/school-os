@@ -42,7 +42,7 @@ from app.authz.context import UserContext
 from app.authz.http import Page, decode_cursor, encode_cursor
 from app.core import feature_flags
 from app.core import purge as purging
-from app.core.crypto import KeyWrapper
+from app.core.crypto import KeyWrapper, wrap_bound
 from app.core.db import tenant_session
 from app.core.errors import (
     Conflict,
@@ -151,11 +151,19 @@ def _grouped(code: str) -> str:
     return "-".join(code[i : i + 4] for i in range(0, len(code), 4))
 
 
-def _new_key(tenant_id: uuid.UUID, wrapper: KeyWrapper) -> tuple[str, bytes, str]:
-    """(key id, wrapped secret, secret as base64url). The plaintext is returned once."""
+def device_resource(device_id: uuid.UUID) -> str:
+    """The row a device secret is bound to in its KMS context (data-protection audit H-03)."""
+    return f"tally_device/{device_id}"
+
+
+def _new_key(
+    tenant_id: uuid.UUID, device_id: uuid.UUID, wrapper: KeyWrapper
+) -> tuple[str, bytes, str]:
+    """(key id, wrapped secret, secret as base64url). The plaintext is returned once. The secret
+    is wrapped bound to the school AND the device row (H-03)."""
     raw = secrets.token_bytes(SECRET_BYTES)
     key_id = "tdk-" + "".join(secrets.choice(KEY_ID_ALPHABET) for _ in range(20))
-    wrapped = wrapper.wrap(raw, tenant_id=tenant_id)
+    wrapped = wrap_bound(wrapper, raw, tenant_id=tenant_id, resource=device_resource(device_id))
     return key_id, wrapped, base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
 
 
@@ -170,6 +178,7 @@ def create_enrolment_code(
     maximum of active agents."""
     _require_on(session, ctx)
     cfg = rules().enrolment
+    repo.lock_device_slots(session)  # audit 2026-10-06: count and insert without a race
     if repo.count_active_devices(session) >= cfg.max_active_devices:
         raise Conflict(
             f"At most {cfg.max_active_devices} Tally agents can be active. Revoke one first.",
@@ -367,12 +376,15 @@ def _party_outs(session: Session, ctx: UserContext, parties: Sequence[Party]) ->
     links = repo.links_of(session, [p.id for p in parties])
     everyone = {sid for ids in links.values() for sid in ids}
     visible = students.summaries(session, ctx, everyone)
+    # Balances are money: only school-wide finance readers see them (a custom role may hold
+    # tally.configure alone to link ledgers; app-logic hardening, ADR-0032 §5).
+    fees = can_read_fees(ctx)
     return [
         PartyOut(
             id=p.id,
             ledger_name=p.ledger_name,
             group_name=p.group_name,
-            closing_balance=p.closing_balance,
+            closing_balance=p.closing_balance if fees else None,
             as_of=p.as_of,
             present=p.present,
             links=[_linked_out(visible[s]) for s in links.get(p.id, []) if s in visible],
@@ -466,7 +478,11 @@ def link_party(
 def unlink_party(
     session: Session, ctx: UserContext, party_id: uuid.UUID, student_id: uuid.UUID
 ) -> None:
+    """Remove a ledger's link (FR-TALLY-006). As for linking, the student must be one the
+    caller reads (R-11); otherwise, like an unknown link, 404."""
     _require_on(session, ctx)
+    if student_id not in students.summaries(session, ctx, [student_id]):
+        raise NotFound("Link not found")
     if repo.get_party(session, party_id) is None or not repo.delete_link(
         session, party_id, student_id
     ):
@@ -641,18 +657,31 @@ def enrol(caller: EnrolmentCaller, data: EnrolIn, *, wrapper: KeyWrapper) -> Enr
     code is a plain 401 (nothing stored); the secret is returned once and stored wrapped."""
     now = _now()
     with tenant_session(caller.tenant_id) as session:
+        # A school that is not active cannot enrol (audit 2026-10-04 AA-15): the same 401 as a
+        # wrong code, checked first, so the code is not used and nothing tells them apart.
+        try:
+            active = tenancy.get_tenant(session).status == "active"
+        except NotFound:
+            active = False
+        if not active:
+            log.warning("tally.agent.rejected", error_code="school_not_active", outcome="rejected")
+            raise Unauthenticated("Edge agent request rejected")
         code = repo.lock_code(session, code_hash(data.code))
         if code is None or code.used_at is not None or code.expires_at <= now:
             log.warning("tally.agent.rejected", error_code="bad_code", outcome="rejected")
+            caller.failed()
             raise Unauthenticated("Edge agent request rejected")
         cfg = rules().enrolment
+        # Held until commit, so a concurrent enrolment counts this agent (audit 2026-10-06).
+        repo.lock_device_slots(session)
         if repo.count_active_devices(session) >= cfg.max_active_devices:
             raise Conflict("Too many active Tally agents.", code="too_many_devices")
-        key_id, wrapped, secret = _new_key(caller.tenant_id, wrapper)
+        device_id = new_id()
+        key_id, wrapped, secret = _new_key(caller.tenant_id, device_id, wrapper)
         device = repo.insert_device(
             session,
             {
-                "id": new_id(),
+                "id": device_id,
                 "name": code.device_name,
                 "enrolment_code_id": code.id,
                 "key_id": key_id,
@@ -907,14 +936,17 @@ def rotate_key(caller: AgentCaller, *, wrapper: KeyWrapper) -> KeyRotationOut:
     now = _now()
     with tenant_session(caller.tenant_id) as session:
         device = _touch(session, _active_device(session, caller), caller, now)
-        key_id, wrapped, secret = _new_key(caller.tenant_id, wrapper)
+        key_id, wrapped, secret = _new_key(caller.tenant_id, device.id, wrapper)
+        # A rotation already pending keeps its start: rotating again with the old key must not
+        # extend the old key's life past the overlap (SEC-030).
+        pending = device.next_key_id is not None and device.rotation_started_at is not None
         repo.update_device(
             session,
             device.id,
             {
                 "next_key_id": key_id,
                 "next_key_ciphertext": wrapped,
-                "rotation_started_at": now,
+                "rotation_started_at": device.rotation_started_at if pending else now,
             },
         )
         audit.record(

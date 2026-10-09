@@ -109,7 +109,7 @@ function Row({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
     <div className="grid gap-1 py-3 sm:grid-cols-[16rem_1fr] sm:gap-4">
       <dt className="text-sm text-ink-muted">{label}</dt>
-      <dd className="font-medium text-ink">{children}</dd>
+      <dd className="text-ink">{children}</dd>
     </div>
   );
 }
@@ -119,7 +119,7 @@ function Fact({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
     <div className="min-w-0 space-y-1 rounded-lg border border-border bg-surface-muted px-4 py-3">
       <dt className="text-sm text-ink-muted">{label}</dt>
-      <dd className="font-medium break-words text-ink">{children}</dd>
+      <dd className="font-semibold break-words text-ink">{children}</dd>
     </div>
   );
 }
@@ -317,7 +317,7 @@ function SettingsForm({
               className="space-y-2"
               aria-describedby={languagesError ? `${languagesId}-error` : `${languagesId}-hint`}
             >
-              <legend className="text-sm font-medium text-ink">{t("form.languagesField")}</legend>
+              <legend className="text-sm font-semibold text-ink">{t("form.languagesField")}</legend>
               <p id={`${languagesId}-hint`} className="text-sm text-ink-muted">
                 {t("form.languagesHint")}
               </p>
@@ -348,7 +348,7 @@ function SettingsForm({
             className="space-y-2"
             aria-describedby={dateError ? `${dateId}-error` : undefined}
           >
-            <legend className="text-sm font-medium text-ink">{t("form.dateFormatField")}</legend>
+            <legend className="text-sm font-semibold text-ink">{t("form.dateFormatField")}</legend>
             <div className="flex flex-wrap gap-2">
               {DATE_FORMATS.map((format) => (
                 <label key={format} className={chip}>
@@ -428,7 +428,7 @@ function SettingsForm({
       >
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="min-w-0 space-y-1">
-            <h2 id={`${saveId}-title`} className="font-medium text-ink">
+            <h2 id={`${saveId}-title`} className="font-semibold text-ink">
               {t("saveBar.title")}
             </h2>
             <p className="text-sm text-ink-muted">{t("saveBar.body")}</p>

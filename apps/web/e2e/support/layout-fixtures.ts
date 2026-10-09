@@ -723,9 +723,11 @@ const NOTIFICATIONS: Schemas["NotificationOut"][] = [
     uid("00000000d0", 70),
   ],
   [
-    "announcement.new",
-    "announcement",
-    "కొత్త సందేశం: ఆదివారం నిర్వహణ",
+    // Telugu-rendered row (language "te"). Announcements send no notification (banner only,
+    // owner decision 2026-10-04), so this stress row uses a circular.
+    "circular.read_ready",
+    "circular",
+    "సర్క్యులర్ సారాంశం సిద్ధంగా ఉంది: ఆదివారం నిర్వహణ",
     TE_TEXT,
     uid("00000000a5", 1),
   ],
@@ -1147,6 +1149,7 @@ function subscription(i: number, tenant_id: string): Schemas["SubscriptionOut"] 
     cancelled_at: status === "cancelled" ? at(20) : null,
     pending_plan_id: i === 6 ? uid("00000000a0", 2) : null,
     price_override_inr: i === 3 ? "123456.78" : null,
+    override_reason: i === 3 ? "Multi-campus society, price agreed in writing" : null,
     version: 1 + i,
   };
 }
@@ -1205,6 +1208,49 @@ const PLATFORM_INVOICES: Schemas["InvoiceOut"][] = Array.from({ length: 8 }, (_,
   invoice(i, pick(SCHOOLS, i)[0]),
 );
 
+/** An invoice's payments (docs/16 §5.9): one recorded, one reversed with a long reason. */
+function invoicePayments(invoiceId: string): Schemas["PaymentOut"][] {
+  const base = {
+    invoice_id: invoiceId,
+    provider: "manual",
+    notes: null,
+    recorded_by: uid("00000000f0", 1),
+    recorded_by_name: "Synthetic Billing Admin",
+  };
+  return [
+    {
+      ...base,
+      id: uid("0000000d2", 2),
+      method: "bank_transfer",
+      amount_inr: "5798.84",
+      tds_inr: "99.98",
+      received_on: date(9, 20),
+      reference: LONG_TOKEN,
+      status: "recorded",
+      recorded_at: at(20),
+      reversed_by: null,
+      reversed_by_name: null,
+      reversed_at: null,
+      reversal_reason: null,
+    },
+    {
+      ...base,
+      id: uid("0000000d2", 1),
+      method: "cheque",
+      amount_inr: "5898.82",
+      tds_inr: "0.00",
+      received_on: date(9, 10),
+      reference: "CHQ-000123",
+      status: "reversed",
+      recorded_at: at(10),
+      reversed_by: uid("00000000f0", 2),
+      reversed_by_name: `Synthetic Owner ${LONG_TOKEN}`,
+      reversed_at: at(12),
+      reversal_reason: LONG_TEXT.slice(0, 500),
+    },
+  ];
+}
+
 function tenantDetail(tenant_id: string): Schemas["TenantDetailOut"] {
   const index = Math.max(
     0,
@@ -1223,6 +1269,7 @@ function tenantDetail(tenant_id: string): Schemas["TenantDetailOut"] {
       : {}),
     boards: ["STATE_AP", "CBSE", "CISCE"],
     tenant_status_reason: summary.tenant_status === "suspended" ? LONG_TEXT : null,
+    security_hold: summary.tenant_status === "suspended",
     offboard_requested_at: summary.tenant_status === "offboarding" ? at(21) : null,
     offboard_approved_at: null,
     subscription: subscription(0, tenant_id),
@@ -1274,6 +1321,7 @@ function usageRow(tenant_id: string, day: number, i: number): Schemas["UsageDail
     ai_input_tokens: [420_000, 2_706_000, 0, 37_365_000, 0, 99_000][i % 6] ?? 0,
     ai_output_tokens: [70_000, 451_000, 0, 6_227_500, 0, 16_500][i % 6] ?? 0,
     ai_cost_inr: ["112.40", "721.60", "0.00", "9964.25", "0.00", "26.40"][i % 6] ?? "0.00",
+    ai_answers: [120, 860, 0, 11_980, 0, 30][i % 6] ?? 0,
   };
 }
 
@@ -2148,6 +2196,11 @@ const ROUTES: Array<[RegExp, Handler]> = [
         ),
       ),
   ],
+  [
+    re("/platform/invoices/{id}"),
+    ([, id = ""]) => PLATFORM_INVOICES.find((row) => row.id === id) ?? PLATFORM_INVOICES[1],
+  ],
+  [re("/platform/invoices/{id}/payments"), ([, id = ""]) => invoicePayments(id)],
 ];
 
 /** Searches sent as POST that only read (answered like the GET lists above). */

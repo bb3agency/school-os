@@ -16,13 +16,15 @@ from pydantic import SecretStr, ValidationError
 from sqlalchemy import text
 
 from app.core.config import DeploymentMode, Settings
+from app.core.crypto import BOUND_PREFIX, CryptoError, unwrap_bound
 from app.core.db import platform_session
 from app.core.errors import Unauthenticated
 from app.identity.service_token import InMemoryReplayStore
 from app.platform import fleet, heartbeat_client
+from app.platform.common import fleet_cfg, today_ist
 from app.platform.schemas import HeartbeatIn
 
-from .conftest import Api, Operator, provision_payload
+from .conftest import Api, MakeOperator, Operator, provision_payload
 
 pytestmark = pytest.mark.db
 
@@ -57,7 +59,7 @@ def _payload(dep: dict[str, Any], **extra: Any) -> dict[str, Any]:
         },
         "queues": {"ingest": {"depth": 0, "oldest_s": 0}},
         "usage": {
-            "date": "2026-09-25",
+            "date": str(today_ist()),
             "active_users": 3,
             "staff_users": 7,
             "students_active": 120,
@@ -98,11 +100,59 @@ def dep(api: Api, owner: Operator, make_plan: Callable[..., uuid.UUID]) -> dict[
     return _dedicated(api, owner, make_plan)
 
 
-def test_SEC_028_valid_heartbeat_is_accepted_and_recorded(api: Api, dep: dict[str, Any]) -> None:
+def _announce(api: Api, agent: Operator, **audience: Any) -> str:
+    now = dt.datetime.now(dt.UTC)
+    body = {
+        "title_en": "Synthetic maintenance",
+        "body_en": "SchoolOS will be unavailable from 22:00 to 22:30 IST.",
+        "severity": "maintenance",
+        "starts_at": (now - dt.timedelta(minutes=1)).isoformat(),
+        "ends_at": (now + dt.timedelta(minutes=30)).isoformat(),
+        **audience,
+    }
+    res = api.call("POST", "/announcements", agent, json=body)
+    assert res.status_code == 201, res.text
+    return str(res.json()["id"])
+
+
+def _addressed_to(tenant_id: str, ids: set[str]) -> bool:
+    """Every id is an announcement addressed to this dedicated school (all schools, the
+    dedicated tier, or its id)."""
+    if not ids:
+        return True
+    with platform_session() as s:
+        rows = s.execute(
+            text(
+                "SELECT audience, audience_tier, audience_tenant_ids "
+                "FROM platform.announcements WHERE id = ANY(CAST(:ids AS uuid[]))"
+            ),
+            {"ids": sorted(ids)},
+        ).all()
+    return len(rows) == len(ids) and all(
+        r.audience == "all"
+        or (r.audience == "tier" and r.audience_tier == "dedicated")
+        or uuid.UUID(tenant_id) in r.audience_tenant_ids
+        for r in rows
+    )
+
+
+def test_SEC_028_valid_heartbeat_is_accepted_and_recorded(
+    api: Api, dep: dict[str, Any], make_operator: MakeOperator
+) -> None:
+    # Announcements are shared control-plane rows that other tests leave active (they used to
+    # make `announcements == []` fail after test_school_side.py), so assert only on this test's
+    # own: the one for this school is delivered, the one for another school is not, and
+    # everything delivered is addressed to this school.
+    agent = make_operator("support_agent")
+    mine = _announce(api, agent, audience="tenants", audience_tenant_ids=[dep["tenant_id"]])
+    theirs = _announce(api, agent, audience="tenants", audience_tenant_ids=[str(uuid.uuid4())])
     raw, headers = _signed(dep, _payload(dep))
     res = api.client.post(URL, content=raw, headers=headers)
     assert res.status_code == 200, res.text
-    assert res.json()["announcements"] == []
+    delivered = {a["id"] for a in res.json()["announcements"]}
+    assert mine in delivered
+    assert theirs not in delivered
+    assert _addressed_to(dep["tenant_id"], delivered)
     with platform_session() as s:
         row = s.execute(
             text(
@@ -237,6 +287,56 @@ def test_SEC_028_key_rotation_overlap(
     fleet.verify_heartbeat(new_headers, new_raw, wrapper=wrapper, stores=stores, at=later)
 
 
+def test_R_15_second_rotation_while_one_is_pending_is_409_and_keeps_both_keys(
+    api: Api, dep: dict[str, Any], owner: Operator, wrapper: Any
+) -> None:
+    """Audit 2026-10-06 R-15: a second rotation (double click, retry) used to promote the
+    pending key and drop the one the host still signs with. Now it answers 409
+    ``rotation_pending`` until the overlap (billing.yaml fleet.key_rotation_overlap_days, 7)
+    has passed; the old key keeps working during the overlap and stops after it."""
+    rotate = f"/deployments/{dep['deployment_id']}/heartbeat-key:rotate"
+    first = api.call("POST", rotate, owner)
+    assert first.status_code == 200, first.text
+    new = first.json()
+    second = api.call("POST", rotate, owner)
+    assert (second.status_code, second.json()["code"]) == (409, "rotation_pending")
+
+    stores = fleet.FleetStores(InMemoryReplayStore(), InMemoryReplayStore())
+    overlap = dt.timedelta(days=int(fleet_cfg()["key_rotation_overlap_days"]))
+    assert overlap == dt.timedelta(days=7)
+    inside = dt.datetime.now(dt.UTC) + overlap - dt.timedelta(hours=1)
+    for key, key_id in (
+        (dep["heartbeat_key"], dep["heartbeat_key_id"]),
+        (new["heartbeat_key"], new["heartbeat_key_id"]),
+    ):
+        raw, headers = _signed(
+            dep, _payload(dep), key=key, key_id=key_id, ts=int(inside.timestamp())
+        )
+        fleet.verify_heartbeat(headers, raw, wrapper=wrapper, stores=stores, at=inside)
+        _next_minute(stores)
+    after = dt.datetime.now(dt.UTC) + overlap + dt.timedelta(hours=1)
+    old_raw, old_headers = _signed(dep, _payload(dep), ts=int(after.timestamp()))
+    with pytest.raises(Unauthenticated):
+        fleet.verify_heartbeat(old_headers, old_raw, wrapper=wrapper, stores=stores, at=after)
+
+    # Once the overlap has passed, the next rotation is accepted again (the pending key is
+    # promoted first, so the key the host now uses stays valid during the new overlap).
+    with platform_session() as s:
+        s.execute(
+            text(
+                "UPDATE platform.deployments SET heartbeat_rotation_started_at = "
+                "heartbeat_rotation_started_at - interval '8 days' WHERE id = :d"
+            ),
+            {"d": dep["deployment_id"]},
+        )
+    third = api.call("POST", rotate, owner)
+    assert third.status_code == 200, third.text
+    raw, headers = _signed(
+        dep, _payload(dep), key=new["heartbeat_key"], key_id=new["heartbeat_key_id"]
+    )
+    fleet.verify_heartbeat(headers, raw, wrapper=wrapper, stores=stores)
+
+
 def test_FR_PLT_025_staleness_marks_unreachable(api: Api, dep: dict[str, Any]) -> None:
     raw, headers = _signed(dep, _payload(dep))
     assert api.client.post(URL, content=raw, headers=headers).status_code == 200
@@ -339,3 +439,97 @@ def test_SEC_028_fuzzed_unknown_fields_are_rejected(extra: dict[str, Any]) -> No
     HeartbeatIn.model_validate(base)
     with pytest.raises(ValidationError):
         HeartbeatIn.model_validate({**base, **extra})
+
+
+def _usage_dates(tenant_id: str) -> list[dt.date]:
+    with platform_session() as s:
+        return list(
+            s.execute(
+                text("SELECT usage_date FROM platform.usage_daily WHERE tenant_id = :t"),
+                {"t": tenant_id},
+            ).scalars()
+        )
+
+
+def _with_usage_date(dep: dict[str, Any], day: dt.date) -> dict[str, Any]:
+    body = _payload(dep)
+    body["usage"]["date"] = day.isoformat()
+    return body
+
+
+def test_AA_09_usage_for_today_and_yesterday_ist_is_recorded(
+    api: Api, dep: dict[str, Any], fleet_stores: fleet.FleetStores
+) -> None:
+    today = today_ist()
+    for day in (today - dt.timedelta(days=1), today):
+        _next_minute(fleet_stores)
+        raw, headers = _signed(dep, _with_usage_date(dep, day))
+        assert api.client.post(URL, content=raw, headers=headers).status_code == 200
+    assert sorted(_usage_dates(dep["tenant_id"])) == [today - dt.timedelta(days=1), today]
+
+
+def test_AA_09_older_usage_is_ignored_but_the_heartbeat_counts(
+    api: Api, dep: dict[str, Any]
+) -> None:
+    """A signed heartbeat cannot rewrite usage of days already counted or invoiced."""
+    old = today_ist() - dt.timedelta(days=2)
+    raw, headers = _signed(dep, _with_usage_date(dep, old))
+    res = api.client.post(URL, content=raw, headers=headers)
+    assert res.status_code == 200, res.text
+    assert _usage_dates(dep["tenant_id"]) == []
+    with platform_session() as s:
+        seen: dt.datetime | None = s.execute(
+            text("SELECT last_heartbeat_at FROM platform.deployments WHERE id = :d"),
+            {"d": dep["deployment_id"]},
+        ).scalar_one()
+    assert seen is not None
+
+
+def test_AA_09_future_usage_is_refused(api: Api, dep: dict[str, Any]) -> None:
+    future = today_ist() + dt.timedelta(days=1)
+    raw, headers = _signed(dep, _with_usage_date(dep, future))
+    res = api.client.post(URL, content=raw, headers=headers)
+    assert (res.status_code, res.json()["code"]) == (422, "usage_date_in_future")
+    assert _usage_dates(dep["tenant_id"]) == []
+
+
+def _stored_key(deployment_id: str) -> bytes:
+    with platform_session() as s:
+        return bytes(
+            s.execute(
+                text("SELECT heartbeat_key_ciphertext FROM platform.deployments WHERE id = :d"),
+                {"d": deployment_id},
+            ).scalar_one()
+        )
+
+
+def _store_key(deployment_id: str, wrapped: bytes) -> None:
+    with platform_session() as s:
+        s.execute(
+            text("UPDATE platform.deployments SET heartbeat_key_ciphertext = :w WHERE id = :d"),
+            {"w": wrapped, "d": deployment_id},
+        )
+
+
+def test_H_03_heartbeat_key_is_bound_to_its_deployment_row(
+    api: Api, dep: dict[str, Any], wrapper: Any
+) -> None:
+    """Data-protection audit 2026-10-05 H-03: the key is wrapped with the school AND the
+    deployment id in its context; unwrapping it for another deployment fails, and a key wrapped
+    before the change (school id only) still verifies."""
+    stored = _stored_key(dep["deployment_id"])
+    assert stored.startswith(BOUND_PREFIX)
+    raw = heartbeat_client.decode_key(dep["heartbeat_key"])
+    tenant = uuid.UUID(dep["tenant_id"])
+    with pytest.raises(CryptoError):
+        unwrap_bound(wrapper, stored, tenant_id=tenant, resource=f"deployment/{uuid.uuid4()}")
+    assert (
+        unwrap_bound(
+            wrapper, stored, tenant_id=tenant, resource=f"deployment/{dep['deployment_id']}"
+        )
+        == raw
+    )
+    _store_key(dep["deployment_id"], wrapper.wrap(raw, tenant_id=tenant))  # legacy row
+    body, headers = _signed(dep, _payload(dep))
+    res = api.client.post(URL, content=body, headers=headers)
+    assert res.status_code == 200, res.text

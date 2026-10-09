@@ -95,7 +95,7 @@ function Decisions({ certificate }: { certificate: Certificate }) {
                 api.POST("/api/v1/certificates/{certificate_id}/approve", {
                   params: { path },
                   headers,
-                  body: { note: input.note },
+                  body: { note: input.note, draft_sha256: certificate.draft_sha256 ?? "" },
                 }),
               )
             }
@@ -246,7 +246,7 @@ function Lines({ lines, locale }: { lines: readonly ContentLine[]; locale: strin
           <dt className="text-sm text-ink-muted">
             {locale === "te" && line.label_te ? line.label_te : line.label_en}
           </dt>
-          <dd className="font-medium break-words text-ink">
+          <dd className="break-words text-ink">
             <Value>{line.value}</Value>
           </dd>
         </div>
@@ -425,7 +425,7 @@ export function CertificateDetailScreen({ certificateId }: { certificateId: stri
                         <dt className="text-sm text-ink-muted">
                           {input ? t(`inputs.${input.key}` as "inputs.remarks") : key}
                         </dt>
-                        <dd className="font-medium break-words text-ink">
+                        <dd className="break-words text-ink">
                           {inputText(catalog, data, key, value, locale)}
                         </dd>
                       </div>

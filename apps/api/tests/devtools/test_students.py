@@ -40,7 +40,8 @@ from app.extraction.sanitize import page_has_aadhaar
 from app.students.definitions import AttributeDef, CanonicalPolicy, validate_value
 
 SEED = 20260926
-RULES = [f"DQ-{n:03d}" for n in range(1, 13)]
+# DQ-022 (ADR-0037) comes with every Aadhaar/UDISE+ mismatch; DQ-021 has no seeded case.
+RULES = [*(f"DQ-{n:03d}" for n in range(1, 13)), "DQ-022"]
 DIGIT_RUN = re.compile(r"\d[\d\s-]{10,}\d")
 ATTRIBUTES_YAML = Path(__file__).resolve().parents[2] / "app" / "students" / "attributes.yaml"
 TODAY = dt.date(2026, 9, 27)
@@ -285,6 +286,12 @@ def test_invariant_4_no_full_aadhaar_in_values_or_manifest() -> None:
     for s in school.students:
         for key, _source, value in s.values:
             assert not contains_full_aadhaar(value), key
+            if key == "apaar_id":
+                # The one 12-digit value (ADR-0037): starts with 1 and fails Verhoeff, so it is
+                # never an Aadhaar look-alike and passes every mask untouched.
+                assert re.fullmatch(r"1\d{11}", value)
+                assert not verhoeff_valid(value)
+                continue
             assert not _digit_runs(value), key
             if key == "aadhaar_last4":
                 assert re.fullmatch(r"\d{4}", value)
@@ -293,6 +300,22 @@ def test_invariant_4_no_full_aadhaar_in_values_or_manifest() -> None:
     text = json.dumps(school.manifest(), ensure_ascii=False)
     assert not _digit_runs(text)
     assert not contains_full_aadhaar(text)
+
+
+def test_FR_STU_013_synthetic_pen_and_apaar_ids() -> None:
+    """Every student has a UDISE+ PEN; about 60 % an APAAR ID, unique in the school (no
+    accidental DQ-021), unverified from UDISE+ (ADR-0037)."""
+    school = _school("full")
+    pens = [
+        s.value("udise_pen", st.UDISE) for s in school.students if s.injection != "duplicate_of"
+    ]
+    assert all(p is not None and re.fullmatch(r"[1-9]\d{10}", p) for p in pens)
+    apaar = [v for s in school.students if (v := s.value("apaar_id", st.UDISE)) is not None]
+    assert 0.55 <= len(apaar) / len(school.students) <= 0.65
+    assert len(set(apaar)) == len(apaar)
+    assert not any(
+        src != st.UDISE for s in school.students for k, src, _ in s.values if k == "apaar_id"
+    )
 
 
 def test_SEC_008_manifest_holds_ids_and_codes_only() -> None:
@@ -382,9 +405,11 @@ def test_docs12_s3_student_profiles_refuse_outside_local_and_ci(env: Environment
     settings = Settings(
         env=env,
         key_wrapper=KeyWrapperKind.KMS,
-        database_url=SecretStr("postgresql+psycopg://sos_app:secret@db.internal/schoolos"),
+        database_url=SecretStr(
+            "postgresql+psycopg://sos_app:secret@db.internal/schoolos?sslmode=verify-full"
+        ),
         platform_database_url=SecretStr(
-            "postgresql+psycopg://sos_platform:secret@db.internal/schoolos"
+            "postgresql+psycopg://sos_platform:secret@db.internal/schoolos?sslmode=verify-full"
         ),
         service_token_key=SecretStr("x" * 48),
     )

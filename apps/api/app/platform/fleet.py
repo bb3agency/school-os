@@ -33,7 +33,7 @@ from pydantic import ValidationError
 from sqlalchemy import func, select
 
 from app.core.config import get_settings
-from app.core.crypto import CryptoError, KeyWrapper, get_key_wrapper
+from app.core.crypto import CryptoError, KeyWrapper, get_key_wrapper, unwrap_bound
 from app.core.db import platform_session
 from app.core.errors import (
     Conflict,
@@ -48,7 +48,18 @@ from app.identity.service_token import InMemoryReplayStore, RedisReplayStore, Re
 from app.platform import announcements, usage
 from app.platform import models as m
 from app.platform import repository as repo
-from app.platform.common import SYSTEM, Actor, audit_platform, db_errors, fleet_cfg, must, now
+from app.platform.common import (
+    SYSTEM,
+    Actor,
+    audit_platform,
+    clamp_limit,
+    db_errors,
+    fleet_cfg,
+    must,
+    now,
+    parse_cursor,
+    today_ist,
+)
 from app.platform.schemas import (
     DeploymentOut,
     DeploymentPatch,
@@ -57,7 +68,7 @@ from app.platform.schemas import (
     HeartbeatKeyOut,
     HeartbeatOut,
 )
-from app.platform.tenants import new_heartbeat_key
+from app.platform.tenants import heartbeat_key_resource, new_heartbeat_key
 
 log = get_logger(__name__)
 
@@ -71,12 +82,23 @@ _REJECTED = "Heartbeat rejected"
 # --- deployments ------------------------------------------------------------------------------
 
 
-def list_deployments(status: str | None = None) -> list[DeploymentOut]:
+def list_deployments(
+    status: str | None = None,
+    *,
+    tenant_id: uuid.UUID | None = None,
+    limit: int = 50,
+    cursor: str | None = None,
+) -> tuple[list[DeploymentOut], str | None]:
+    """Newest first, keyset-paged on the UUIDv7 id (audit 2026-10-06 R-14: the list was unpaged,
+    one row per school). ``tenant_id`` narrows it to one school's deployment."""
+    limit = clamp_limit(limit)
+    conds = [m.deployments.c.status == status] if status else []
+    if tenant_id is not None:
+        conds.append(m.deployments.c.tenant_id == tenant_id)
     with platform_session() as s:
-        stmt = select(m.deployments).order_by(m.deployments.c.tenant_code)
-        if status:
-            stmt = stmt.where(m.deployments.c.status == status)
-        return [DeploymentOut.model_validate(dict(r)) for r in s.execute(stmt).mappings()]
+        rows = repo.list_rows(s, m.deployments, *conds, limit=limit, cursor=parse_cursor(cursor))
+    items = [DeploymentOut.model_validate(dict(r)) for r in rows[:limit]]
+    return items, (str(rows[limit - 1]["id"]) if len(rows) > limit else None)
 
 
 def get_deployment(deployment_id: uuid.UUID) -> DeploymentOut:
@@ -124,7 +146,9 @@ def update_deployment(
 
 
 def rotate_key(actor: Actor, deployment_id: uuid.UUID, *, wrapper: KeyWrapper) -> HeartbeatKeyOut:
-    """New key valid alongside the current one for the overlap; returned ONCE (runbook -> SSM)."""
+    """New key valid alongside the current one for the overlap; returned ONCE (runbook -> SSM).
+
+    409 ``rotation_pending`` while an earlier rotation is inside the overlap (R-15)."""
     with platform_session() as s, db_errors():
         row = repo.get(s, m.deployments, deployment_id, for_update=True)
         if row is None:
@@ -133,8 +157,21 @@ def rotate_key(actor: Actor, deployment_id: uuid.UUID, *, wrapper: KeyWrapper) -
             raise Conflict(
                 "Only live dedicated deployments have heartbeat keys.", code="invalid_state"
             )
-        values = _promoted(row) if row["heartbeat_next_key_id"] else {}
-        key_id, wrapped, plaintext = new_heartbeat_key(row["tenant_id"], wrapper)
+        values: dict[str, Any] = {}
+        if row["heartbeat_next_key_id"]:
+            # Audit 2026-10-06 R-15: during the overlap the host may still sign with the
+            # current key, so a second rotation (double click, retry; the key is shown once)
+            # must not promote the pending key and drop it. After the overlap the pending key is
+            # promoted first, as the staleness sweep would have done.
+            overlap = dt.timedelta(days=int(fleet_cfg()["key_rotation_overlap_days"]))
+            if now() - row["heartbeat_rotation_started_at"] <= overlap:
+                raise Conflict(
+                    "A key rotation is already in progress. The new key is valid now; the old "
+                    "one stops working when the overlap ends.",
+                    code="rotation_pending",
+                )
+            values = _promoted(row)
+        key_id, wrapped, plaintext = new_heartbeat_key(row["tenant_id"], row["id"], wrapper)
         values.update(
             {
                 "heartbeat_next_key_id": key_id,
@@ -288,7 +325,12 @@ def verify_heartbeat(
             [{"field": "body", "code": "too_large", "message_key": "errors.too_large"}]
         )
     try:
-        key = wrapper.unwrap(wrapped, tenant_id=dep["tenant_id"])
+        key = unwrap_bound(
+            wrapper,
+            wrapped,
+            tenant_id=dep["tenant_id"],
+            resource=heartbeat_key_resource(dep["id"]),
+        )
     except CryptoError:
         raise _reject("key_unwrap_failed") from None
     if not hmac.compare_digest(sign(key, timestamp, body), signature):
@@ -315,7 +357,10 @@ def verify_heartbeat(
         log.warning("fleet.heartbeat.rejected", error_code="replay", outcome="rejected")
         raise Conflict("This heartbeat was already received.", code="replay")
     if not stores.rate.claim(str(dep["id"]), dt.timedelta(seconds=int(cfg["rate_limit_seconds"]))):
-        raise RateLimited("One heartbeat per minute per deployment.")
+        raise RateLimited(
+            "One heartbeat per minute per deployment.",
+            retry_after_s=int(cfg["rate_limit_seconds"]),
+        )
     return VerifiedHeartbeat(dep, payload)
 
 
@@ -374,9 +419,39 @@ def _status_for(payload: HeartbeatIn, at: dt.datetime) -> str:  # noqa: PLR0911
     return "healthy"
 
 
+class UsageDateInFuture(ValidationFailed):
+    """A heartbeat's usage day is after today in IST (AA-09)."""
+
+    code = "usage_date_in_future"
+
+
+def _usage_to_record(verified: VerifiedHeartbeat, current: dt.datetime) -> bool:
+    """Audit AA-09 (owner decision 2026-10-04): a host reports usage only for today and yesterday
+    (IST). An older day is ignored and logged with IDs only (it cannot rewrite days already
+    counted or invoiced); a future day is refused (422 ``usage_date_in_future``)."""
+    usage_in = verified.payload.usage
+    if usage_in is None:
+        return False
+    today = today_ist(current)
+    if usage_in.date > today:
+        raise UsageDateInFuture(
+            [{"field": "usage.date", "code": "in_future", "message_key": "errors.invalid"}]
+        )
+    if usage_in.date < today - dt.timedelta(days=1):
+        log.warning(
+            "fleet.heartbeat.usage_too_old",
+            deployment_id=str(verified.deployment["id"]),
+            tenant_id=str(verified.deployment["tenant_id"]),
+            outcome="ignored",
+        )
+        return False
+    return True
+
+
 def accept_heartbeat(verified: VerifiedHeartbeat, *, at: dt.datetime | None = None) -> HeartbeatOut:
     current = at or now()
     payload = verified.payload
+    record_usage = _usage_to_record(verified, current)
     status = _status_for(payload, current)
     with platform_session() as s, db_errors():
         dep = repo.get(s, m.deployments, verified.deployment["id"], for_update=True)
@@ -408,7 +483,7 @@ def accept_heartbeat(verified: VerifiedHeartbeat, *, at: dt.datetime | None = No
                 {"from": dep["status"], "to": status},
                 tenant_id=dep["tenant_id"],
             )
-        if payload.usage is not None:
+        if record_usage and payload.usage is not None:
             usage.ingest_heartbeat(s, dep["tenant_id"], payload.usage)
         target = dep["target_version"]
     return HeartbeatOut(

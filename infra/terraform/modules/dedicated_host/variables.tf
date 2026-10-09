@@ -226,6 +226,16 @@ variable "control_plane_url" {
   type        = string
 }
 
+variable "security_alarm_topic_arn" {
+  description = "SNS topic for the host's security alarms (audit 2026-10-05): the shared prod stack's alarm topic (output alarm_topic_arn), same account and region."
+  type        = string
+
+  validation {
+    condition     = can(regex("^arn:aws:sns:ap-south-1:[0-9]{12}:[A-Za-z0-9_-]{1,256}$", var.security_alarm_topic_arn))
+    error_message = "security_alarm_topic_arn: an SNS topic ARN in ap-south-1 (the prod alarm topic)."
+  }
+}
+
 variable "operator_secret_keys" {
   description = "Keys of the operator-supplied JSON secret (placeholders __SET_ME__ until set). SOS_HEARTBEAT_KEY_ID and SOS_HEARTBEAT_KEY are shown once by the panel."
   type        = list(string)
@@ -241,6 +251,17 @@ variable "generated_secret_version" {
   description = "Bump to regenerate every generated credential (then run scripts/fetch-secrets.sh and the documented rotation steps)."
   type        = number
   default     = 1
+}
+
+variable "imds_hop_limit" {
+  description = "IMDSv2 PUT response hop limit. 1 (default) keeps every container away from the instance role (audit W3-06); set 2 only for the one apply that precedes upgrading a host from a release older than the per-container credentials (README: Upgrading), then back to 1."
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = contains([1, 2], var.imds_hop_limit)
+    error_message = "imds_hop_limit must be 1 (default) or 2 (transition only)."
+  }
 }
 
 variable "walg_enabled" {

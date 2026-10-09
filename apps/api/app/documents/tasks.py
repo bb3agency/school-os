@@ -4,13 +4,18 @@
   ``document.version.registered``; AV scan -> ``ready`` | ``quarantined``. Retries with backoff
   while the scanner is unavailable; after the last attempt the version is ``failed``.
 - ``documents.purge_objects`` (queue ``maintenance``): consumer of ``document.deleted``;
-  removes the stored objects of a deleted document.
+  removes the stored objects of a deleted document: discarded (1-day lifecycle rule) for an
+  automatic retention deletion, a plain delete (90-day recovery window) for a person's delete
+  (docs/08 §7). Idempotent; retries with backoff while the store fails.
 - ``documents.purge_expired_uploads`` (beat, daily): unregistered uploads past expiry.
 - ``documents.discard_object`` (queue ``maintenance``): consumer of
   ``document.version.discarded`` (PRV-016); deletes the object of a discarded version, tagged
   for the short lifecycle rule. Retries with backoff while the store fails.
 - ``documents.sweep_discarded_objects`` (beat, daily): the same for versions discarded in the
   last 7 days, in case the outbox task gave up.
+- ``documents.discard_unused_object`` (queue ``maintenance``): consumer of
+  ``document.object.discard_requested`` (W3-06); discards an object the upload path no longer
+  needs (the api only queues it: its role cannot tag or delete). Retries with backoff.
 
 Register this module in ``sos_worker.celery_app.TASK_MODULES`` and merge
 :func:`beat_schedule` into the beat configuration.
@@ -29,12 +34,14 @@ from app.core.logging import get_logger
 from app.documents import service
 from app.documents.scanning import ScannerUnavailable
 from app.documents.storage import ObjectStoreError
+from app.ops.service import TenantTask
 from app.tenancy import service as tenancy
 
 log = get_logger(__name__)
 
 SCAN_MAX_RETRIES = 6
 DISCARD_MAX_RETRIES = 8
+PURGE_MAX_RETRIES = 8
 
 
 def _uuid(value: object) -> uuid.UUID:
@@ -43,6 +50,7 @@ def _uuid(value: object) -> uuid.UUID:
 
 @shared_task(
     name=service.SCAN_TASK,
+    base=TenantTask,
     bind=True,
     queue="ingest",
     acks_late=True,
@@ -63,16 +71,42 @@ def scan(self: Task[Any, Any], tenant_id: str, event_id: str, payload: dict[str,
         raise self.retry(exc=exc, countdown=min(30 * 2**self.request.retries, 900)) from exc
 
 
-@shared_task(name=service.PURGE_TASK, queue="maintenance", acks_late=True, ignore_result=True)
-def purge_objects(tenant_id: str, event_id: str, payload: dict[str, Any]) -> int:
+@shared_task(
+    name=service.PURGE_TASK,
+    base=TenantTask,
+    bind=True,
+    queue="maintenance",
+    acks_late=True,
+    max_retries=PURGE_MAX_RETRIES,
+    ignore_result=True,
+)
+def purge_objects(
+    self: Task[Any, Any], tenant_id: str, event_id: str, payload: dict[str, Any]
+) -> int:
+    document_id = _uuid(payload["document_id"])
     batch_ids = [_uuid(b) for b in payload.get("batch_ids", [])]
-    return service.purge_document_objects(
-        _uuid(tenant_id), _uuid(payload["document_id"]), batch_ids
-    )
+    # ``discard`` only in events of automatic retention deletions (docs/08 §7); events queued
+    # before the flag existed are a person's delete (plain delete, 90-day recovery window).
+    discard = payload.get("discard") is True
+    try:
+        return service.purge_document_objects(
+            _uuid(tenant_id), document_id, batch_ids, discard=discard
+        )
+    except ObjectStoreError as exc:
+        if self.request.retries >= PURGE_MAX_RETRIES:
+            log.error(
+                "documents.purge.failed",
+                error_code="storage_unavailable",
+                resource_type="document",
+                resource_id=document_id,
+            )
+            return 0
+        raise self.retry(exc=exc, countdown=min(30 * 2**self.request.retries, 3600)) from exc
 
 
 @shared_task(
     name=service.DISCARD_TASK,
+    base=TenantTask,
     bind=True,
     queue="maintenance",
     acks_late=True,
@@ -101,6 +135,28 @@ def discard_object(
                 resource_type="document",
                 resource_id=document_id,
             )
+            return False
+        raise self.retry(exc=exc, countdown=min(30 * 2**self.request.retries, 3600)) from exc
+
+
+@shared_task(
+    name=service.OBJECT_DISCARD_TASK,
+    base=TenantTask,
+    bind=True,
+    queue="maintenance",
+    acks_late=True,
+    max_retries=DISCARD_MAX_RETRIES,
+    ignore_result=True,
+)
+def discard_unused_object(
+    self: Task[Any, Any], tenant_id: str, event_id: str, payload: dict[str, Any]
+) -> bool:
+    try:
+        return service.discard_unused_object(_uuid(tenant_id), payload)
+    except ObjectStoreError as exc:
+        if self.request.retries >= DISCARD_MAX_RETRIES:
+            # A staging object is removed by the daily purge_expired_uploads anyway.
+            log.error("documents.discard_unused.failed", error_code="storage_unavailable")
             return False
         raise self.retry(exc=exc, countdown=min(30 * 2**self.request.retries, 3600)) from exc
 

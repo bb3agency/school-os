@@ -32,6 +32,23 @@ variable "deploy_environment" {
   type        = string
 }
 
+variable "deploy_workflows" {
+  description = "Workflow files and refs (`<file>@<ref>`, relative to .github/workflows/) whose jobs may assume the deploy role, matched against the job_workflow_ref claim (audit P2-08). Example: deploy-staging.yml@refs/heads/main."
+  type        = list(string)
+
+  validation {
+    condition = length(var.deploy_workflows) > 0 && alltrue([
+      for w in var.deploy_workflows : can(regex("^[A-Za-z0-9._-]+\\.ya?ml@refs/(heads|tags)/[A-Za-z0-9._*/-]+$", w))
+    ])
+    error_message = "At least one <file>.yml@refs/heads/<branch> or @refs/tags/<pattern>."
+  }
+
+  validation {
+    condition     = alltrue([for w in var.deploy_workflows : !startswith(split("@", w)[1], "refs/heads/") || !strcontains(w, "*")])
+    error_message = "Branch refs are exact (no wildcard): a wildcard branch would let any branch's copy of the workflow deploy."
+  }
+}
+
 variable "allow_main_branch" {
   description = "Also allow jobs on refs/heads/main without an environment (staging auto-deploy). Keep false for prod."
   type        = bool
@@ -49,8 +66,18 @@ variable "ecs_cluster_arn" {
 }
 
 variable "passable_role_arns" {
-  description = "Task/execution role ARNs the deploy role may pass to ECS."
+  description = "Task/execution role ARNs the deploy role may pass to ECS. Never a role that can read the RDS master secret (db-bootstrap)."
   type        = list(string)
+}
+
+variable "one_off_task_families" {
+  description = "Task definition families the deploy role may start with ecs:RunTask (the migrate task). Never db-bootstrap: it holds the RDS master password."
+  type        = list(string)
+
+  validation {
+    condition     = length(var.one_off_task_families) > 0 && alltrue([for f in var.one_off_task_families : can(regex("^[A-Za-z0-9_-]{1,255}$", f)) && !strcontains(f, "db-bootstrap")])
+    error_message = "List at least one task definition family (no wildcards), and never db-bootstrap."
+  }
 }
 
 variable "enable_artifacts_publish" {
@@ -78,9 +105,25 @@ variable "create_plan_role" {
 }
 
 variable "plan_can_read_secrets" {
-  description = "Let the PR plan role refresh secret versions (GetSecretValue). Only for accounts with synthetic data (staging)."
+  description = "Let the plan role refresh secret versions (GetSecretValue). Only for accounts with synthetic data (staging), and only when plan_environment gates the role (audit W3-04: a same-repo pull request must never read secrets)."
   type        = bool
   default     = false
+
+  validation {
+    condition     = !var.plan_can_read_secrets || var.plan_environment != null
+    error_message = "plan_can_read_secrets needs plan_environment: a role every pull request can assume must not read secrets (audit W3-04)."
+  }
+}
+
+variable "plan_environment" {
+  description = "GitHub Environment (with required reviewers) the plan role trusts instead of every pull request and main. Null = pull requests and main, read-only and without secrets."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.plan_environment == null || can(regex("^[A-Za-z0-9._-]{1,64}$", coalesce(var.plan_environment, "x")))
+    error_message = "plan_environment: a GitHub Environment name."
+  }
 }
 
 variable "secrets_kms_key_arn" {

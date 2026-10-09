@@ -1,8 +1,17 @@
 import { expect, test, type Page } from "@playwright/test";
+import {
+  expectFocusInsideOpenDialog,
+  expectFocusRing,
+  expectNoAxeViolations,
+  pressOn,
+  settleAnimations,
+} from "./support/a11y-helpers";
 import { installFixtures } from "./support/layout-fixtures";
 import {
   LOCALES,
   REQUIRED_VIEWPORTS,
+  expectBottomSheet,
+  smallTouchTargets,
   SCREEN_GROUPS,
   measure,
   problems,
@@ -269,15 +278,92 @@ test.describe("dialogs on a phone (NFR-A11Y-001)", () => {
         .click();
       const dialog = page.locator("dialog[open]");
       await expect(dialog).toBeVisible();
-      const box = await dialog.boundingBox();
-      expect(box).not.toBeNull();
-      expect(box!.x).toBeGreaterThanOrEqual(15);
-      expect(box!.x + box!.width).toBeLessThanOrEqual(375 - 15);
-      expect(box!.y).toBeGreaterThanOrEqual(0);
-      expect(box!.y + box!.height).toBeLessThanOrEqual(812);
+      // docs/17 §5.7: below 640px a dialog is a bottom sheet (it used to float 16px from the
+      // sides): the full width, on the bottom edge, inside the screen, actions on screen.
+      await expectBottomSheet(dialog, 375, 812);
       expect(problems(await measure(page))).toEqual([]);
       await page.keyboard.press("Escape");
       await expect(dialog).toBeHidden();
+    });
+  }
+});
+
+/** A paid invoice with a recorded and a reversed payment (layout-fixtures `invoicePayments`). */
+const INVOICE_PAGE = "/platform/invoices/0192f3a4-0000-7000-8000-0000000c2002";
+
+test.describe("invoice payments: 'Reverse payment' dialog (FR-PLT-018, NFR-A11Y-001)", () => {
+  test.skip(!standIn, "set E2E_STAND_IN=1 (needs Valkey at REDIS_URL)");
+
+  // 390×844: the phone where the reversed payment's reason once made a ~460px tall row.
+  for (const [width, height] of [...REQUIRED_VIEWPORTS, [390, 844] as const]) {
+    test(`at ${width}×${height}: the page and the dialog fit, keyboard only, no axe violations`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height });
+      await installFixtures(page);
+      await signInAs(page, "/platform", "operator-1");
+      await page.goto(INVOICE_PAGE);
+      await settle(page);
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      // Only the recorded payment can be reversed; the reversed one keeps its reason.
+      const trigger = page.getByRole("button", { name: "Reverse payment" });
+      await expect(trigger).toHaveCount(1);
+      await expect(page.getByText("Reversed", { exact: true })).toBeVisible();
+      expect(problems(await measure(page))).toEqual([]);
+      if (width < 640) {
+        // docs/17 §5.7: each payment is a card and the reversal's reason spans the card
+        // (in the narrow status column of the table it was a tall strip of short lines).
+        const list = page.locator("[data-stacked-list]");
+        await expect(list).toHaveCount(1);
+        const card = await list.boundingBox();
+        const reason = await list.getByText(/^Reason: /).boundingBox();
+        expect(card).not.toBeNull();
+        expect(reason).not.toBeNull();
+        // The card's width less its 16px padding on each side (and a little rounding).
+        expect(reason!.width).toBeGreaterThanOrEqual(card!.width - 2 * 16 - 4);
+      }
+      await expectNoAxeViolations(page, `invoice page ${width}`);
+
+      // Keyboard only: focus the trigger, Enter opens the dialog with focus inside it.
+      await pressOn(trigger, "Enter", "Reverse payment");
+      const dialog = page.getByRole("dialog", { name: "Reverse this payment?" });
+      await expect(dialog).toBeVisible();
+      await expectFocusInsideOpenDialog(page);
+      if (width < 640) {
+        // A bottom sheet on phones (docs/17 §5.7; it used to float 16px from the sides).
+        await expectBottomSheet(dialog, width, height);
+      } else {
+        const box = await dialog.boundingBox();
+        expect(box).not.toBeNull();
+        expect(box!.x).toBeGreaterThanOrEqual(width < 768 ? 15 : 0);
+        expect(box!.x + box!.width).toBeLessThanOrEqual(width - (width < 768 ? 15 : 0));
+        expect(box!.y).toBeGreaterThanOrEqual(0);
+        expect(box!.y + box!.height).toBeLessThanOrEqual(height);
+      }
+      expect(problems(await measure(page))).toEqual([]);
+      await expectNoAxeViolations(page, `reverse dialog ${width}`);
+
+      // Tab reaches the reason, then the confirm button, without leaving the dialog.
+      const reasonField = dialog.getByRole("textbox", { name: "Why are you reversing it?" });
+      const confirm = dialog.getByRole("button", { name: "Reverse payment" });
+      for (
+        let i = 0;
+        i < 6 && !(await reasonField.evaluate((el) => el === document.activeElement));
+        i += 1
+      )
+        await page.keyboard.press("Tab");
+      await expect(reasonField).toBeFocused();
+      for (
+        let i = 0;
+        i < 6 && !(await confirm.evaluate((el) => el === document.activeElement));
+        i += 1
+      )
+        await page.keyboard.press("Tab");
+      await expectFocusRing(confirm, "confirm reversal");
+      // Escape closes it and returns focus to the row's trigger.
+      await page.keyboard.press("Escape");
+      await expect(dialog).toBeHidden();
+      await expect(trigger).toBeFocused();
     });
   }
 });
@@ -322,3 +408,99 @@ test.describe("print: A4 pages (CLAUDE.md §10)", () => {
     expect(pdf.byteLength).toBeGreaterThan(1000);
   });
 });
+
+/**
+ * Mobile rules (docs/17 §5.7) on the key screens at the phone, tablet and office-PC widths,
+ * with a touch screen below 1024px: no sideways page scroll and nothing past the screen, the
+ * key record lists as cards below 640px (tables from there), primary controls of at least
+ * 44px on touch, dialogs that fit (bottom sheets on phones) and no axe violations.
+ */
+const KEY_VIEWPORTS: ReadonlyArray<readonly [number, number]> = [
+  [360, 740],
+  [390, 844],
+  [768, 1024],
+  [1366, 768],
+];
+
+const KEY_SCREENS = {
+  school: {
+    subject: "clerk",
+    signInPath: "/support",
+    stacked: [
+      "/students",
+      "/findings",
+      "/documents",
+      "/imports",
+      "/settings/users",
+      "/certificates",
+    ],
+    // The clerk cannot see tasks (an info alert); the tasks cards are covered in vitest.
+    other: ["/tasks", "/notifications", "/ask/c/0192f3a4-0000-7000-8000-00000000e9a1"],
+  },
+  platform: {
+    subject: "operator-1",
+    signInPath: "/platform",
+    stacked: ["/platform/schools", "/platform/subscriptions", "/platform/invoices"],
+    other: [],
+  },
+} as const;
+
+for (const [width, height] of KEY_VIEWPORTS) {
+  const touch = width < 1024;
+  test.describe(`key screens at ${width}×${height}${touch ? " (touch)" : ""} (NFR-A11Y-001)`, () => {
+    test.skip(!standIn, "set E2E_STAND_IN=1 (needs Valkey at REDIS_URL)");
+    test.use({ viewport: { width, height }, hasTouch: touch, isMobile: width < 768 });
+
+    for (const [name, group] of Object.entries(KEY_SCREENS)) {
+      test(`${name}: fits, stacks below 640px, 44px touch targets, axe clean`, async ({ page }) => {
+        test.setTimeout(6 * 60_000);
+        await installFixtures(page);
+        await signInAs(page, group.signInPath, group.subject);
+        const failures: string[] = [];
+        for (const path of [...group.stacked, ...group.other]) {
+          await page.goto(path);
+          await settle(page);
+          await expect(page.locator("main#main, main").first(), path).toBeVisible();
+          for (const problem of problems(await measure(page))) failures.push(`${path}: ${problem}`);
+          if ((group.stacked as readonly string[]).includes(path)) {
+            const lists = await page.locator("[data-stacked-list]").count();
+            if (width < 640 && lists === 0) failures.push(`${path}: no stacked list below 640px`);
+            if (width >= 640 && lists > 0) failures.push(`${path}: stacked list at ${width}px`);
+          }
+          if (touch) {
+            for (const small of await page.evaluate(smallTouchTargets))
+              failures.push(`${path}: touch target under 44px: ${small}`);
+          }
+          await expectNoAxeViolations(page, `${path} at ${width}px`);
+        }
+        expect(failures).toEqual([]);
+      });
+    }
+
+    test("a form dialog fits the screen (a bottom sheet below 640px)", async ({ page }) => {
+      await installFixtures(page);
+      await signInAs(page, "/platform", "operator-1");
+      await page.goto("/platform/plans");
+      await settle(page);
+      await page.getByRole("button", { name: "New plan", exact: true }).click();
+      const dialog = page.locator("dialog[open]");
+      await expect(dialog).toBeVisible();
+      // Measure the settled dialog, not a frame of its 200ms entrance (scale 0.97 to 1).
+      await settleAnimations(page);
+      if (width < 640) {
+        await expectBottomSheet(dialog, width, height);
+      } else {
+        const box = await dialog.boundingBox();
+        expect(box).not.toBeNull();
+        expect(box!.x).toBeGreaterThanOrEqual(0);
+        expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+        expect(box!.y).toBeGreaterThanOrEqual(0);
+        expect(box!.y + box!.height).toBeLessThanOrEqual(height);
+      }
+      if (touch) expect(await page.evaluate(smallTouchTargets)).toEqual([]);
+      await expectNoAxeViolations(page, `new plan dialog at ${width}px`);
+      await page.keyboard.press("Escape");
+      await expect(dialog).toBeHidden();
+    });
+  });
+}

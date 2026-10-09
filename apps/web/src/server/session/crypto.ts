@@ -40,7 +40,7 @@ export function deriveKey(secret: Uint8Array, purpose: KeyPurpose): Buffer {
 /** AES-256-GCM: `v1.<base64url(iv | ciphertext | tag)>`. */
 export function seal(key: Buffer, plaintext: string, aad: string): string {
   const iv = randomBytes(IV_BYTES);
-  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const cipher = createCipheriv("aes-256-gcm", key, iv, { authTagLength: TAG_BYTES });
   cipher.setAAD(Buffer.from(aad, "utf8"));
   const body = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
   return `${SEAL_VERSION}.${Buffer.concat([iv, body, cipher.getAuthTag()]).toString("base64url")}`;
@@ -55,7 +55,7 @@ export function unseal(key: Buffer, sealed: string, aad: string): string {
   const tag = raw.subarray(raw.length - TAG_BYTES);
   const body = raw.subarray(IV_BYTES, raw.length - TAG_BYTES);
   try {
-    const decipher = createDecipheriv("aes-256-gcm", key, iv);
+    const decipher = createDecipheriv("aes-256-gcm", key, iv, { authTagLength: TAG_BYTES });
     decipher.setAAD(Buffer.from(aad, "utf8"));
     decipher.setAuthTag(tag);
     return Buffer.concat([decipher.update(body), decipher.final()]).toString("utf8");

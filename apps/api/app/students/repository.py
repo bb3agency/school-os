@@ -21,6 +21,7 @@ from sqlalchemy import (
     case,
     cast,
     delete,
+    exists,
     false,
     func,
     insert,
@@ -775,6 +776,11 @@ def summary_rows(session: Session, student_ids: Collection[uuid.UUID]) -> list[R
 class SearchSpec:
     academic_year_id: uuid.UUID | None
     allowed_sections: frozenset[uuid.UUID] | None  # None = whole school
+    # Reach through ANOTHER year (owner decision 2026-10-09): when searching a non-current year,
+    # a scoped caller reaches only students with an active enrolment in one of these sections
+    # of ``reach_year_id`` (the current year); ``allowed_sections`` is then None.
+    reach_year_id: uuid.UUID | None
+    reach_sections: frozenset[uuid.UUID] | None
     section_filter: frozenset[uuid.UUID] | None  # None = no section filter
     status: str | None
     admission_no: str | None
@@ -786,6 +792,9 @@ class SearchSpec:
     admission_bonus: float
     offset: int
     limit: int
+    # FR-STU-016: exact match on one typed attribute (``apaar_id``), current and not rejected.
+    apaar_key: str | None = None
+    apaar_id: str | None = None
 
 
 def _ws(query: str, column: Any) -> ColumnElement[float]:
@@ -806,12 +815,35 @@ def search(session: Session, spec: SearchSpec) -> list[Row[Any]]:
     match_field: ColumnElement[Any] = literal(None)
     if spec.allowed_sections is not None:
         conditions.append(e.section_id.in_(list(spec.allowed_sections)))
+    if spec.reach_sections is not None:
+        now = aliased(Enrollment)
+        conditions.append(
+            exists().where(
+                now.tenant_id == Student.tenant_id,
+                now.student_id == Student.id,
+                now.status == "active",
+                now.academic_year_id == spec.reach_year_id,
+                now.section_id.in_(list(spec.reach_sections)),
+            )
+        )
     if spec.section_filter is not None:
         conditions.append(e.section_id.in_(list(spec.section_filter)))
     if spec.status is not None:
         conditions.append(Student.status == spec.status)
     if spec.admission_no is not None:
         conditions.append(func.upper(Student.admission_no) == spec.admission_no.upper())
+    if spec.apaar_key is not None and spec.apaar_id is not None:
+        v = aliased(AttributeValue)
+        conditions.append(
+            exists().where(
+                v.tenant_id == Student.tenant_id,
+                v.student_id == Student.id,
+                v.attribute_key == spec.apaar_key,
+                v.superseded_by.is_(None),
+                v.verification_status != "rejected",
+                v.value_text == spec.apaar_id,
+            )
+        )
     if spec.admission_terms:
         adm = func.upper(func.coalesce(Student.admission_no, ""))
         conditions.append(or_(*[func.starts_with(adm, t) for t in spec.admission_terms]))

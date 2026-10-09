@@ -168,6 +168,29 @@ def test_FR_OPS_004_kv_idempotency_store_for_the_control_plane() -> None:
     assert store.begin("op:2", "key-000001", "h1") is None  # per operator
 
 
+def test_AA_14_control_plane_in_progress_marker_expires_after_a_minute() -> None:
+    """A claim whose request died (or whose ``complete`` failed after the commit) must not
+    block retries for a day: the in-progress marker lives 60 s, as on the tenant routes
+    (``app.authz.http.PENDING_TTL_S``); a completed record is kept for 24 h."""
+    from app.authz.http import PENDING_TTL_S
+    from app.ops.idempotency import IdempotencyRecord
+
+    now = [1000.0]
+    store = KVIdempotencyStore(InMemoryKV(clock=lambda: now[0]))
+    assert store.begin("op:1", "key-000001", "h1") is None
+    now[0] += PENDING_TTL_S - 1
+    held = store.begin("op:1", "key-000001", "h1")
+    assert held is not None
+    assert held.state == "in_progress"
+    now[0] += 2  # past the pending TTL: the key can be claimed again
+    assert store.begin("op:1", "key-000001", "h1") is None
+    store.complete("op:1", "key-000001", IdempotencyRecord("h1", "completed", 201))
+    now[0] += 23 * 3600
+    done = store.begin("op:1", "key-000001", "h1")
+    assert done is not None
+    assert done.state == "completed"
+
+
 def test_FR_OPS_004_beat_entries() -> None:
     tasks = {v["task"] for v in beat_schedule().values()}
     assert tasks == {"ops.dispatch_outbox", "ops.purge_idempotency_keys"}

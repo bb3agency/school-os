@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { notificationHref } from "@/features/notifications/data";
+import { setSchoolDateFormat } from "@/lib/date-format";
 import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
 import { intlErrors, messages, renderWithIntl } from "@/test/render";
 import { me } from "@/test/school-fixtures";
@@ -189,6 +190,7 @@ afterEach(() => {
   uninstallBffStub();
   setCircularsPollDelayForTesting(null);
   setNoticeDownloadOpenerForTesting(null);
+  setSchoolDateFormat(null);
   expect(intlErrors).toEqual([]);
 });
 
@@ -251,10 +253,51 @@ describe("circulars inbox and detail (US-1601, US-1602)", () => {
     );
     const call = stub.callsTo(`POST /bff/api/v1/circular-suggestions/${SUGGESTION}/confirm`)[0];
     expect(call?.headers.get("If-Match")).toBe('W/"1"');
+    // DL-08: the task title starts neutral, never the AI summary (task holders may not see
+    // the circular); the reviewer can type their own.
     expect(JSON.parse(call?.body ?? "{}")).toEqual({
       owner_membership_id: OWNER,
-      title: "Submit the UDISE+ sheets",
+      title: en.circulars.suggestion.defaultTaskTitle,
       due_on: "2026-10-15",
+    });
+  });
+
+  it("shows the suggested due date in the school's format, checks it and sends ISO", async () => {
+    stub.routes["GET /bff/api/v1/me"] = () =>
+      Response.json(
+        me(["document.read", "circular.review"], {
+          settings: { idle_timeout_minutes: 15, date_format: "DD-MM-YYYY", languages: ["en"] },
+        }),
+      );
+    stub.routes[`GET /bff/api/v1/circulars/${DOC}`] = () => Response.json(detail());
+    stub.routes[`POST /bff/api/v1/circular-suggestions/${SUGGESTION}/confirm`] = () =>
+      Response.json(task(), { status: 201 });
+    renderWithIntl(<CircularDetailScreen documentId={DOC} />);
+    const user = userEvent.setup();
+    const due = await screen.findByLabelText(en.circulars.suggestion.dueOn);
+    await waitFor(() =>
+      expect(screen.getByLabelText(en.circulars.suggestion.dueOn)).toHaveValue("15-10-2026"),
+    );
+    expect(due).not.toHaveAttribute("type", "date");
+    expect(screen.getByLabelText(en.circulars.suggestion.dueOn)).toHaveAccessibleDescription(
+      "Use DD-MM-YYYY, for example 15-10-2026.",
+    );
+    await user.selectOptions(screen.getByLabelText(en.circulars.suggestion.owner), OWNER);
+    const field = screen.getByLabelText(en.circulars.suggestion.dueOn);
+    await user.clear(field);
+    await user.type(field, "31-02-2026");
+    await user.click(screen.getByRole("button", { name: en.circulars.suggestion.confirm }));
+    expect(
+      await screen.findByText("Enter a real date as DD-MM-YYYY, for example 15-10-2026."),
+    ).toBeVisible();
+    const confirm = `POST /bff/api/v1/circular-suggestions/${SUGGESTION}/confirm`;
+    expect(stub.callsTo(confirm)).toHaveLength(0);
+    await user.clear(field);
+    await user.type(field, "20-10-2026");
+    await user.click(screen.getByRole("button", { name: en.circulars.suggestion.confirm }));
+    await waitFor(() => expect(stub.callsTo(confirm)).toHaveLength(1));
+    expect(JSON.parse(stub.callsTo(confirm)[0]?.body ?? "{}")).toMatchObject({
+      due_on: "2026-10-20",
     });
   });
 
@@ -296,6 +339,32 @@ describe("circulars inbox and detail (US-1601, US-1602)", () => {
 });
 
 describe("tasks (US-1603, US-1604)", () => {
+  it("below 640px the tasks are cards: title, due in words, owner, status, actions (docs/17 §5.7)", async () => {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) => ({
+        matches: query === "(width < 40rem)",
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      })),
+    );
+    try {
+      signedIn(["task.read"]);
+      stub.routes["GET /bff/api/v1/tasks"] = () => page([task()]);
+      renderWithIntl(<TasksScreen />);
+      const list = await screen.findByRole("list", { name: en.tasks.listTitle });
+      const card = within(list).getByRole("listitem");
+      expect(within(card).getByText(task().title)).toBeVisible();
+      expect(within(card).getByText(en.tasks.due.overdue)).toBeVisible();
+      expect(
+        within(card).getByRole("button", { name: `${en.tasks.move.done}: ${task().title}` }),
+      ).toBeVisible();
+      expect(screen.queryByRole("table")).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("shows my tasks with overdue in words and marks one done with If-Match", async () => {
     signedIn(["task.read"]);
     stub.routes["GET /bff/api/v1/tasks"] = () => page([task()]);

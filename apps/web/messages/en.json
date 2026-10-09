@@ -24,7 +24,6 @@
     "search": "Search",
     "applyFilters": "Apply filters",
     "dateHint": "Use DD/MM/YYYY, for example 01/06/2026.",
-    "notConnected": "This screen is not connected to the server yet. Nothing was saved.",
     "scrollableTable": "{caption}. Scroll sideways to see all columns.",
     "notAvailableYetTitle": "Not available yet",
     "notAvailableYetBody": "This part of SchoolOS is still being set up. Check again later.",
@@ -118,7 +117,9 @@
     "announcement": {
       "draft": "Draft",
       "scheduled": "Scheduled",
-      "cancelled": "Cancelled"
+      "cancelled": "Cancelled",
+      "ended": "Ended",
+      "pending_approval": "Waiting for approval"
     },
     "breakGlass": {
       "requested": "Waiting for approval",
@@ -326,6 +327,7 @@
         "breakGlassLink": "Go to Support access",
         "invitedTitle": "Waiting for them to sign in",
         "invitedBody": "The invitation becomes active the first time this person signs in with their sign-in ID.",
+        "contactHidden": "This person already has a SchoolOS account, so they accept or decline the invitation themselves when they sign in. Their email appears here only after they accept.",
         "removedTitle": "This person has been removed",
         "removedBody": "They can no longer sign in to this school. To give them access again, send a new invitation.",
         "aboutTitle": "About",
@@ -375,7 +377,15 @@
           "languageHint": "The language SchoolOS uses for this person.",
           "submit": "Save details"
         },
-        "profileShared": "This person also works at another school on SchoolOS, so their name, email and language are shared and can't be changed here. Ask them to update their profile, or contact SchoolOS support."
+        "profileShared": "This person also works at another school on SchoolOS, so their name, email and language are shared and can't be changed here. Ask them to update their profile, or contact SchoolOS support.",
+        "resend": {
+          "button": "Send the invitation again",
+          "title": "Send the invitation email again?",
+          "body": "We'll email the invitation to {email} again. It can be sent once every 10 minutes.",
+          "sentTitle": "Invitation email on its way",
+          "sentBody": "It should arrive in a few minutes. The invitation works until {date}.",
+          "noEmail": "There is no email address for this person, so the invitation can't be emailed. Add one with Edit details, or give them their sign-in ID yourself."
+        }
       },
       "errors": {
         "role_not_grantable": {
@@ -413,6 +423,26 @@
         "roles_required": {
           "title": "Choose at least one role",
           "body": "A staff member keeps at least one role. To stop their access, use Suspend or Remove instead."
+        },
+        "email_disabled": {
+          "title": "Email isn't switched on for this school",
+          "body": "Give the person their sign-in ID yourself, or contact SchoolOS support to switch email on."
+        },
+        "not_invited": {
+          "title": "This person is no longer waiting for an invitation",
+          "body": "They have already signed in, or they were removed. Reload the page to see their status."
+        },
+        "invitation_expired": {
+          "title": "This invitation has expired",
+          "body": "Remove this person and invite them again to send a new invitation."
+        },
+        "email_missing": {
+          "title": "There is no email address for this person",
+          "body": "Add their email address with Edit details, then send the invitation again."
+        },
+        "rate_limited": {
+          "title": "The invitation was sent a few minutes ago",
+          "body": "Wait 10 minutes before sending it again, and ask them to check their spam folder."
         }
       },
       "inviteForm": {
@@ -461,7 +491,6 @@
         "staff_users": "Staff users",
         "documents": "Documents",
         "storage_gb": "Storage",
-        "ai_tokens_month": "Ask the school (AI tokens)",
         "ai_budget_inr": "Ask the school (AI cost)"
       },
       "pastDueTitle": "Payment overdue",
@@ -476,7 +505,26 @@
       "colStatus": "Status",
       "emptyTitle": "No invoices yet",
       "emptyBody": "Invoices appear here each month once your subscription is active.",
-      "home": "Home"
+      "home": "Home",
+      "ai": {
+        "title": "AI answers",
+        "description": "Answers from Ask the school with sources, counted each calendar month.",
+        "none": "No AI answer bundle. Ask SchoolOS support to add one.",
+        "bundle": "Bundle",
+        "bundleName": "{name} bundle",
+        "included": "Included answers",
+        "perMonth": "{value} a month",
+        "price": "Bundle price",
+        "pricePerMonth": "{amount} a month plus GST",
+        "overage": "Each extra answer",
+        "overageRate": "{amount} plus GST",
+        "thisMonth": "Answers this month",
+        "usedOf": "{used} of {included}",
+        "countedTo": "Counted up to {date}. Each day is added the next morning.",
+        "notCountedYet": "No answers counted yet this month. Each day is added the next morning.",
+        "countsFrom": "Answers count against this bundle from {date}.",
+        "overageNote": "Answers above the included number are billed on the next month's invoice. To change the bundle, contact SchoolOS support."
+      }
     },
     "audit": {
       "title": "Audit log",
@@ -507,9 +555,7 @@
         "noAccessTitle": "You can't check the audit log",
         "noAccessBody": "This check is for staff who can read the audit log, such as the principal. Ask your school's office admin if you need this.",
         "howTitle": "How the check works",
-        "howBody": "Every audit event is linked to the one before it by a fingerprint. The check recomputes every fingerprint from the first event to the last. It reads the whole log, so it can take a minute in a large school.",
-        "checking": "Checking…",
-        "checkingBody": "Checking the audit log. Keep this page open.",
+        "howBody": "Every audit event is linked to the one before it by a fingerprint. SchoolOS checks every fingerprint each night. \"Check again\" also checks the events added since the last check; you can ask once every 10 minutes.",
         "checkAgain": "Check again",
         "okTitle": "The audit log is intact",
         "okBody": "Verified up to event {last}: {count, plural, one {# event was} other {# events were}} checked and none was changed.",
@@ -518,7 +564,6 @@
         "brokenIntact": "Events before it are intact ({count, plural, one {# event} other {# events}}, up to event {last}).",
         "brokenFromStart": "The problem starts at the first event.",
         "brokenAction": "Do not try to fix this yourself. Contact SchoolOS support now and tell them the event number above.",
-        "checkedAt": "Checked on {time}.",
         "reason": {
           "duplicate_seq": "Two events have the same number.",
           "seq_gap": "An event is missing: the numbers skip one.",
@@ -526,12 +571,19 @@
           "hash_mismatch": "This event was changed after it was recorded.",
           "head_missing": "The record of the latest event is missing.",
           "head_mismatch": "The latest event does not match the recorded end of the log.",
-          "other": "The events do not link up as expected."
+          "other": "The events do not link up as expected.",
+          "checkpoint_mismatch": "The last verified event was changed after it was checked."
         },
         "statusLabel": "Result of the last check",
         "notRunTitle": "Not checked yet",
-        "notRunBody": "Run the check to see whether every event is still linked to the one before it.",
-        "eventsChecked": "Events checked"
+        "notRunBody": "The first check runs tonight, or now when you select Check integrity.",
+        "eventsChecked": "Events checked",
+        "queued": "Check queued",
+        "queuedBody": "The check is waiting to run. The result appears here in a few minutes; you can leave this page.",
+        "okIncremental": "Verified up to event {last}: {count, plural, =0 {no new events since the last check} one {# new event was checked} other {# new events were checked}} and none was changed.",
+        "lastVerifiedAt": "Last verified on {time}.",
+        "coolDownTitle": "The log was checked a moment ago",
+        "coolDownBody": "You can ask for another check in {minutes, plural, one {# minute} other {# minutes}}. SchoolOS also checks the whole log every night."
       },
       "home": "Home",
       "filterActionPlaceholder": "Such as student.update",
@@ -559,6 +611,8 @@
       "ticketTitle": "Support ticket",
       "description": "Ask SchoolOS for help. We reply here and by email.",
       "listTitle": "Your school's tickets",
+      "listTitleOwn": "Tickets you opened",
+      "ownOnlyNote": "You see the tickets you opened. The owner, principal and office admin see every ticket of the school.",
       "colNumber": "Ticket",
       "colSubject": "Subject",
       "colStatus": "Status",
@@ -584,6 +638,7 @@
     }
   },
   "platform": {
+    "showMore": "Show more",
     "badge": "Platform admin",
     "nav": {
       "label": "Platform",
@@ -676,7 +731,6 @@
     },
     "schoolDetail": {
       "title": "School details",
-      "codeLine": "Code: {code}",
       "tabsLabel": "School details sections",
       "tabs": {
         "overview": "Overview",
@@ -709,11 +763,18 @@
       "resendInviteBody": "A new invitation email goes to the owner.",
       "suspend": "Suspend school",
       "suspendDialogTitle": "Suspend this school?",
-      "suspendDialogBody": "Staff will not be able to sign in until the school is reactivated. The owner can still download the school's data. Records are kept.",
+      "suspendDialogBody": "Staff will not be able to sign in until the school is reactivated. The owner can still download the school's data. Records are kept. For non-payment, suspend the subscription on the Subscription tab instead.",
       "suspendConfirm": "Suspend school",
       "reactivate": "Reactivate school",
       "reactivateTitle": "Reactivate this school?",
       "reactivateBody": "Staff can sign in again straight away.",
+      "securityHold": "security hold",
+      "placeHold": "Place security hold",
+      "placeHoldTitle": "Place a security hold on this school?",
+      "placeHoldBody": "The school is already suspended for non-payment. A security hold keeps it suspended after the subscription is paid, until you lift the hold.",
+      "liftHold": "Lift security hold",
+      "liftHoldTitle": "Lift the security hold?",
+      "liftHoldBillingBody": "The school stays suspended for non-payment until its subscription is reactivated.",
       "offboard": "Request offboarding",
       "offboardTitle": "Request offboarding for this school?",
       "offboardBody": "After a second operator approves, the school's data is exported, then deleted within 30 days and its keys destroyed. This cannot be undone.",
@@ -864,7 +925,13 @@
         "hostReference": "Host teardown reference",
         "downloadCertificate": "Download certificate",
         "certificatePending": "The certificate is not ready yet. Try again in a few minutes."
-      }
+      },
+      "withdrawOffboard": "Withdraw offboarding request",
+      "withdrawOffboardTitle": "Withdraw the offboarding request?",
+      "withdrawOffboardBody": "The school stays as it is. Anyone who may offboard schools can request it again later.",
+      "offboardExpires": "If no one approves it by {date}, it expires and must be requested again.",
+      "offboardExpiredTitle": "The offboarding request has expired",
+      "offboardExpiredBody": "Requested on {date} and not approved in time. Withdraw it, or make a new request."
     },
     "provision": {
       "title": "Provision school",
@@ -986,7 +1053,25 @@
       "retireTitle": "Retire {name} version {version}?",
       "retireBody": "No new subscriptions can use it. Existing subscriptions continue.",
       "emptyTitle": "No plans yet",
-      "emptyBody": "Create and publish a plan with prices and limits before provisioning schools."
+      "emptyBody": "Create and publish a plan with prices and limits before provisioning schools.",
+      "oneTimeFee": "One-time fee (₹)",
+      "oneTimeFeeHint": "Implementation and data verification, before GST. Charged once, on the school's first invoice. Leave empty for none.",
+      "colOneTimeFee": "One-time fee",
+      "planDescription": "Description",
+      "planDescriptionHint": "Plain words about what the plan gives a school, up to 300 characters.",
+      "bundlesTitle": "AI answer bundles",
+      "bundlesBody": "A monthly add-on for monthly plans. Each bundle includes a number of AI answers a month; answers above it are billed on the next invoice at the price per extra answer. Prices are before GST.",
+      "colBundle": "Bundle",
+      "colIncluded": "Answers a month",
+      "colBundlePrice": "Price a month (before GST)",
+      "colExtra": "Each extra answer",
+      "bundlesEmptyTitle": "No AI answer bundles",
+      "bundlesEmptyBody": "AI answer bundles come from the billing catalogue.",
+      "edit": "Edit",
+      "editTitle": "Edit {name} version {version} (draft)",
+      "editBody": "Only drafts can change. Once published, a plan's prices and limits are fixed.",
+      "fixedFieldsNote": "The plan code, deployment, billing period, pricing, GST rate and SAC code stay as they are. To change them, save a new version instead.",
+      "saveChanges": "Save changes"
     },
     "subscriptions": {
       "title": "Subscriptions",
@@ -1022,7 +1107,40 @@
       "cancel": "Cancel subscription",
       "cancelTitle": "Cancel this subscription?",
       "cancelBody": "It stays active until the end of the current period, then ends.",
-      "cancelTrialBody": "The trial ends now."
+      "cancelTrialBody": "The trial ends now.",
+      "oneTimeFeeValue": "One-time fee {amount} on the first invoice",
+      "colAiBundle": "AI answers",
+      "noAiBundle": "No bundle",
+      "aiBundleValue": "{name}: {answers} answers a month",
+      "aiBundleFrom": "Counts from {date}",
+      "chooseAiBundle": "AI answer bundle",
+      "chooseAiBundleTitle": "Choose the AI answer bundle",
+      "chooseAiBundleBody": "Billed every month with the plan. Answers count from the first full calendar month; answers above the bundle are billed on the next invoice.",
+      "aiBundle": "Bundle",
+      "aiBundleOption": "{name}: {answers} answers, {price} a month, {rate} each extra answer",
+      "removeAiBundle": "Remove AI bundle",
+      "removeAiBundleTitle": "Remove the AI answer bundle?",
+      "removeAiBundleBody": "From the next invoice there is no bundle charge and no charge for extra answers.",
+      "setOverride": "Set negotiated price",
+      "changeOverride": "Change negotiated price",
+      "setOverrideTitle": "Negotiated price for this school",
+      "overrideBody": "Replaces the plan's base price on this school's subscription invoices.",
+      "overrideAmount": "Negotiated price (₹, before GST)",
+      "overrideAmountHint": "For each billing period, for example 3999.00. GST is added on the invoice.",
+      "overrideConsequence": "Invoices made from now on use this price instead of the plan's base price. Invoices already made don't change.",
+      "removeOverride": "Remove negotiated price",
+      "removeOverrideTitle": "Remove the negotiated price?",
+      "removeOverrideBody": "Invoices made from now on use the plan's base price again. Invoices already made don't change.",
+      "overrideValue": "Negotiated price: {amount}",
+      "suspend": "Suspend subscription",
+      "suspendTitle": "Suspend this subscription for non-payment?",
+      "suspendBody": "This is a billing suspension: only for a past-due subscription whose 15-day grace period has ended (grace ended {date}). It is not the school suspension on the Overview tab, which is for security or abuse.",
+      "suspendSharedConsequence": "The school is suspended too: staff can't sign in until you reactivate the subscription after the overdue invoices are paid. Records are kept.",
+      "suspendDedicatedConsequence": "Only the subscription changes. The school's dedicated environment keeps running; it is not switched off from here.",
+      "suspendUnknownConsequence": "A school on the shared platform is suspended too, so staff can't sign in until you reactivate the subscription. For a dedicated school only the subscription changes.",
+      "examWindowOverride": "Today is inside a protected board-exam window and I approve this suspension as platform owner",
+      "reactivateBody": "Overdue invoices must be paid first. A school suspended for non-payment can sign in again straight away.",
+      "overrideReason": "Reason for the negotiated price"
     },
     "invoices": {
       "title": "Invoices",
@@ -1089,7 +1207,51 @@
       "gstNoteTitle": "Numbers and GST",
       "gstNote": "CGST and SGST apply when the school is in the same state as our billing entity; IGST applies otherwise. The GST column shows the split.",
       "gstSplitIntra": "CGST {cgst} + SGST {sgst}",
-      "gstSplitInter": "IGST {igst}"
+      "gstSplitInter": "IGST {igst}",
+      "openInvoice": "Open invoice {number}",
+      "detailTitle": "Invoice",
+      "detailEyebrow": "Invoice",
+      "summary": "Summary",
+      "amountPaid": "Amount received",
+      "tdsReceived": "TDS deducted by the school",
+      "payments": {
+        "title": "Payments",
+        "colReceived": "Received on",
+        "colAmount": "Amount",
+        "colMethod": "Paid by",
+        "colReference": "Reference",
+        "colRecordedBy": "Recorded by",
+        "colStatus": "Status",
+        "colActions": "Actions",
+        "status": {
+          "recorded": "Recorded",
+          "reversed": "Reversed"
+        },
+        "tdsValue": "+ TDS {tds}",
+        "reversedBy": "Reversed by {name} on {date}",
+        "reversalReason": "Reason: {reason}",
+        "unknownOperator": "an operator",
+        "emptyTitle": "No payments yet",
+        "emptyBody": "Payments recorded against this invoice appear here, newest first.",
+        "onlyIssued": "Payments are recorded against issued invoices only.",
+        "reverse": "Reverse payment",
+        "reverseTitle": "Reverse this payment?",
+        "rowLabel": "{amount} received on {date}, reference {reference}",
+        "reverseBody": "{payment}. Use this when a payment was recorded in error or a cheque bounced. The payment stays on record, marked reversed; it is never deleted.",
+        "reverseNote": "The school is not told automatically: tell its billing contact yourself. Its Plan & billing page shows the amount as due again. If the due date has passed, the daily billing check marks the subscription past due and its grace period starts; nothing is suspended automatically.",
+        "reverseConsequence": "The invoice goes back to Issued (unpaid) and its balance due rises by {amount}.",
+        "reason": "Why are you reversing it?",
+        "errors": {
+          "invalid_state": {
+            "title": "Already reversed",
+            "body": "This payment was reversed already, perhaps by someone else. The list now shows its current status."
+          },
+          "not_found": {
+            "title": "Payment not found",
+            "body": "It may have been changed by someone else. The list has been reloaded; check it and try again."
+          }
+        }
+      }
     },
     "usage": {
       "title": "Usage and quotas",
@@ -1228,15 +1390,30 @@
       "bothLanguagesHint": "Write the title and message in both English and Telugu before saving.",
       "listTitle": "Scheduled and past announcements",
       "colTitle": "Title",
-      "colAudience": "Shown to",
       "colStarts": "Starts",
       "colEnds": "Ends",
       "colStatus": "Status",
       "cancelAnnouncement": "Cancel",
       "cancelTitle": "Cancel this announcement?",
       "cancelBody": "Schools stop seeing it straight away.",
+      "edit": "Edit",
+      "editTitle": "Edit announcement",
+      "editBody": "Schools see the change within a minute on the shared platform, and at the next heartbeat on dedicated hosts.",
+      "editSave": "Save changes",
+      "updated": "Announcement updated.",
+      "errors": {
+        "invalid_state": {
+          "title": "This announcement can't be changed any more",
+          "body": "It has ended or was cancelled, so it is read-only. The list now shows its current status. To show the message again, create a new announcement."
+        }
+      },
       "emptyTitle": "No announcements yet",
-      "emptyBody": "Announcements you schedule appear here."
+      "emptyBody": "Announcements you schedule appear here.",
+      "statusPendingApproval": "Critical banners wait for a second operator's approval before schools see them.",
+      "approve": "Approve",
+      "approveTitle": "Approve this critical announcement?",
+      "approveBody": "Every school in the audience sees it from its start time. A different operator must approve the one who submitted it.",
+      "approvalExpires": "Approve by {date}"
     },
     "support": {
       "title": "Support tickets",
@@ -1274,8 +1451,6 @@
       "assignedMe": "You",
       "assignKeep": "Keep ({name})",
       "assignMe": "Me",
-      "firstResponseDue": "First reply due",
-      "resolutionDue": "Resolution due",
       "flagPersonalData": "This ticket contains personal data (it will be redacted)",
       "flaggedTitle": "Flagged: personal data",
       "flaggedBody": "Do not copy this ticket's text anywhere. Ask the school to use record IDs.",
@@ -1299,7 +1474,7 @@
       "openSchool": "Open the school",
       "openSchoolHint": "Support sign-in: you sign in again with MFA. Only the operator who asked can use it. Read only; every page is recorded in the school's audit log.",
       "requestTitle": "Request temporary access",
-      "requestBody": "Read-only access for the time you choose. Every action is audited in the school's log.",
+      "requestBody": "Read-only access to the whole school for the time you choose. The school approves it unless two operators confirm an emergency. Every action is audited in the school's log.",
       "colSchool": "School",
       "colReason": "Reason",
       "colDuration": "Duration",
@@ -1324,7 +1499,11 @@
       "twoPersonNote": "Two-person rule: the operator who requested it cannot confirm it.",
       "emptyTitle": "No break-glass requests",
       "emptyBody": "Requests for temporary access to a school appear here.",
-      "needsSecondOperator": "A different operator must confirm."
+      "needsSecondOperator": "A different operator must confirm.",
+      "withdraw": "Withdraw",
+      "withdrawTitle": "Withdraw this request?",
+      "withdrawBody": "The school no longer sees it and it cannot be approved or confirmed.",
+      "confirmBy": "Confirm by {date}"
     },
     "operators": {
       "title": "Operators and roles",
@@ -1487,7 +1666,12 @@
       "citation_source_unsupported": "Only a document page can be a source here, like sos://doc/…/v2#p1.",
       "citation_not_found": "No document you can read matches this source. Check it, or copy it again.",
       "citation_not_current": "This is not the current version of the document. Use the newest version's page.",
-      "citation_text_not_found": "This text is not on that page. Copy the exact words from the document."
+      "citation_text_not_found": "This text is not on that page. Copy the exact words from the document.",
+      "answer_personal_data": "Remove phone numbers, email addresses and Aadhaar numbers. Everyone in the school can read this answer.",
+      "owner_not_active": "This person can no longer be given tasks. Choose someone else.",
+      "aadhaar_last4_only": "Don't enter Aadhaar numbers. Use only the last 4 digits.",
+      "not_approved": "This correction request is not approved yet. Resolve the finding after it is approved.",
+      "other_attribute": "This correction request is for another field. Choose one for this field."
     },
     "api": {
       "generic": {
@@ -1612,7 +1796,8 @@
       },
       "rate_limited": {
         "title": "Too many attempts",
-        "body": "Wait a minute, then try again."
+        "body": "Wait a minute, then try again.",
+        "bodyWait": "Too many requests. Wait {seconds} seconds and try again."
       },
       "bad_gateway": {
         "title": "The server is not responding",
@@ -1672,6 +1857,38 @@
       "certificate_pending": {
         "title": "The certificate is not ready yet",
         "body": "It is issued a few minutes after the keys are destroyed. Try again later."
+      },
+      "rotation_pending": {
+        "title": "A key rotation is already in progress",
+        "body": "The new heartbeat key is valid now and the old one keeps working for 7 days. Rotate again after that."
+      },
+      "already_on_hold": {
+        "title": "This school is already on a security hold",
+        "body": "Reload the page to see its current state."
+      },
+      "value_out_of_range": {
+        "title": "The number or date is too large",
+        "body": "This number or date is too large. Check it and try again."
+      },
+      "idempotency_access_changed": {
+        "title": "Your access changed",
+        "body": "Your role or classes changed since you first sent this. Reload the page to see the current state, then try again if you still need to."
+      },
+      "invalid_characters": {
+        "title": "The text has hidden characters",
+        "body": "Some text contains invisible characters (often from copying and pasting). Type the text again instead of pasting it, then try again."
+      },
+      "request_expired": {
+        "title": "This request has expired",
+        "body": "Two-person requests must be approved within 72 hours. Withdraw it, then make a new request if it is still needed."
+      },
+      "requester_not_authorised": {
+        "title": "The first operator can no longer make this request",
+        "body": "The operator who made it has left or lost the permission. Withdraw it; a current operator can make a new request."
+      },
+      "approver_not_eligible": {
+        "title": "Ask another operator to approve",
+        "body": "You cannot be the second person on this request: your role is less than 7 days old, or one of you gave the other their role."
       }
     },
     "stepUp": {
@@ -1696,6 +1913,8 @@
     "signOut": "Sign out",
     "signingOut": "Signing out…",
     "signOutFailed": "We couldn't sign you out. Check your internet connection, then try again.",
+    "signOutEverywhere": "Sign out everywhere",
+    "signOutEverywhereHint": "Sign out on every computer and phone where you are signed in, including this one.",
     "idle": {
       "title": "Are you still there?",
       "body": "To keep school records safe on shared computers, you will be signed out in about 1 minute.",
@@ -1723,7 +1942,8 @@
       "mfa_required": "Your account needs two-step verification (MFA). Set it up, then sign in again.",
       "step_up_failed": "We couldn't confirm it's you. Sign in again to continue.",
       "support_not_allowed": "Support access could not be opened. Only the operator who asked can use an approved request, and only while it is active. Check the request in the admin panel.",
-      "support_ended": "This support access has ended or the school revoked it. Ask the school to approve a new request."
+      "support_ended": "This support access has ended or the school revoked it. Ask the school to approve a new request.",
+      "too_many_attempts": "Too many sign-in attempts from this network. Wait a few minutes, then sign in again."
     }
   },
   "validation": {
@@ -1780,7 +2000,8 @@
     "chooseWhoCanSee": "Choose at least one role, class, section or staff member, or choose \"Whole school\".",
     "tooManyAclEntries": "Choose at most 50, or choose \"Whole school\".",
     "invalidIssueDate": "Choose a date, or leave it empty.",
-    "noAadhaar": "This looks like a full Aadhaar number. SchoolOS never stores one: remove it."
+    "noAadhaar": "This looks like a full Aadhaar number. SchoolOS never stores one: remove it.",
+    "emergencyReason": "Emergency access is only for a security incident or a legal obligation. Choose one of those, or untick Emergency."
   },
   "support": {
     "piiWarningTitle": "Do not include student personal data",
@@ -1818,6 +2039,15 @@
     "errorGeneric": "Something went wrong. Reload the page and try again.",
     "loadErrorTitle": "We couldn't load your schools",
     "loadErrorBody": "Check your internet connection and reload the page. If it keeps happening, contact support."
+  },
+  "invitations": {
+    "title": "Invitations waiting for you",
+    "body": "A school invited you. It sees your contact details only after you accept.",
+    "accept": "Accept",
+    "decline": "Decline",
+    "acceptLabel": "Accept the invitation from {school}",
+    "declineLabel": "Decline the invitation from {school}",
+    "failed": "We couldn't answer this invitation. Reload the page and try again."
   },
   "noAccess": {
     "title": "You don't have access to a school yet",
@@ -1916,7 +2146,10 @@
       "matchedOn": "Found by: {field}",
       "filterYear": "Academic year",
       "currentYear": "Current year",
-      "crumbHome": "Home"
+      "crumbHome": "Home",
+      "apaarLabel": "APAAR ID",
+      "apaarHint": "Finds the student with exactly this 12-digit APAAR ID.",
+      "apaarInvalid": "Enter the 12 digits of the APAAR ID, for example 1234 5678 9012."
     },
     "create": {
       "title": "Add a student",
@@ -1961,6 +2194,7 @@
       "identityField": "Identity field: changes need a correction request",
       "restrictedField": "Restricted: hidden until you choose Show",
       "provisional": "Provisional",
+      "apaarNotVerified": "Not verified yet. An APAAR ID counts once someone checks it against the UDISE+ portal or the APAAR card and marks it verified.",
       "conflicts": "Differs from: {sources}",
       "recordedOn": "Recorded {date}",
       "hasEvidence": "evidence attached",
@@ -2000,6 +2234,8 @@
       "value": "Value",
       "digits4Hint": "Only the last 4 digits of the Aadhaar number, for example 1234.",
       "digits4Invalid": "Enter exactly 4 digits: the last 4 digits of the Aadhaar number.",
+      "digits12Hint": "The 12-digit APAAR ID as shown in the UDISE+ portal or on the APAAR card. Spaces between groups of 4 are fine.",
+      "digits12Invalid": "Enter the 12 digits of the APAAR ID, for example 1234 5678 9012.",
       "identityNote": "This is an identity field. Once the admission register value is recorded, changing it needs a correction request with evidence, approved by the principal.",
       "submit": "Record value",
       "goToChangeRequests": "Open correction requests for this student"
@@ -2326,6 +2562,7 @@
       "duplicate_in_file": "the same admission number is also in row {row}. Keep one of them.",
       "no_matching_student": "no student has this admission number. Only the admission register can add new students.",
       "student_create_not_permitted": "you can't add new students. Ask your office admin.",
+      "sensitive_update_not_permitted": "you can't change this sensitive field for an existing student. Ask your office admin.",
       "student_out_of_scope": "this student is not in your classes.",
       "class_not_found": "this class does not exist. Add it under school structure, or fix the file.",
       "section_not_found": "this section does not exist this year. Add it under school structure, or fix the file.",
@@ -2378,8 +2615,6 @@
         "skipped": "Skipped",
         "reverted": "Undone"
       },
-      "errorPrefix": "Error:",
-      "warningPrefix": "Warning:",
       "sensitive": "{count, plural, one {Has # restricted value (hidden)} other {Has # restricted values (hidden)}}",
       "filter": "Show",
       "filters": {
@@ -2603,14 +2838,11 @@
     "queue": {
       "title": "Rows to check",
       "description": "Each row found on the photos. Open a row to compare it with the page, correct it, and save or discard it.",
-      "colWhere": "Where",
       "where": "Page {page}, row {row}",
       "colAdmissionNo": "Admission number (as read)",
       "colName": "Name (as read)",
-      "colCheck": "Check carefully",
       "lowConfidence": "{count, plural, one {# unclear value} other {# unclear values}}",
       "colStatus": "Status",
-      "colOpen": "Open",
       "review": "Check this row",
       "view": "View",
       "filter": "Show",
@@ -2739,6 +2971,10 @@
         "title": "Someone already checked this row",
         "body": "Go back to the list of rows and open the next one."
       },
+      "student_create_required": {
+        "title": "You cannot add new students",
+        "body": "Choose the existing student this row belongs to, or ask someone who can add students to save it."
+      },
       "evidence_unavailable": {
         "title": "The photo of this page is no longer available",
         "body": "The row can't be saved without it. Discard it, then photograph the page again and upload it."
@@ -2832,6 +3068,7 @@
     "status": {
       "open": "Open",
       "reopened": "Came back",
+      "needs_confirmation": "Needs confirmation",
       "resolved": "Resolved",
       "waived": "Accepted"
     },
@@ -2853,6 +3090,10 @@
       "aadhaar_full_number_rejected": {
         "title": "Remove the Aadhaar number",
         "body": "Never type a full Aadhaar number. If you need to refer to it, use only the last 4 digits."
+      },
+      "blocker_needs_waive": {
+        "title": "Only the office admin or principal can resolve this",
+        "body": "This problem stops certificates and submissions. Ask someone who may accept problems, or request a correction of the record."
       }
     },
     "detail": {
@@ -2899,7 +3140,11 @@
       "problem": "Problem",
       "relatedLabel": "Related pages",
       "resolveConsequence": "Nothing on the student's record changes. The next check looks at it again.",
-      "waiveConsequence": "Nothing on the student's record changes."
+      "waiveConsequence": "Nothing on the student's record changes.",
+      "blockerResolveBody": "This problem stops certificates and submissions. Say what was done, or link the correction request that fixes it. You will be asked to confirm it's you. If the problem is still there at the next check, it opens again.",
+      "blockerNeedsWaive": "This problem stops certificates and submissions. It closes when the correction request that fixes the record is approved, or the office admin or principal can resolve or accept it.",
+      "needsConfirmationTitle": "Check this correction before it counts",
+      "needsConfirmationBody": "The values now agree, but they were changed without evidence. Certificates and submissions stay blocked until the office admin or principal checks the paper record and confirms the correction with Resolve. If the values disagree again, the problem comes back."
     },
     "rules": {
       "title": "What SchoolOS checks",
@@ -3055,6 +3300,22 @@
       "storage_unavailable": {
         "title": "Files can't be stored right now",
         "body": "Try again in a few minutes. Nothing was saved."
+      },
+      "requester_inactive": {
+        "title": "The person who asked has left",
+        "body": "They are no longer an active member of the school. Reject this request; someone active must ask again if the correction is still needed."
+      },
+      "evidence_not_ready": {
+        "title": "The evidence is still being checked",
+        "body": "The attached file is being checked for viruses. Try again in a few minutes."
+      },
+      "evidence_not_usable": {
+        "title": "The evidence can't be used",
+        "body": "The attached file failed the virus check or is no longer available. Reject this request; it must be made again with a new scan."
+      },
+      "evidence_not_visible": {
+        "title": "You can't open the evidence",
+        "body": "You can't approve a correction without seeing its evidence. Ask someone who can open it to decide, or reject the request."
       }
     },
     "validation": {
@@ -3244,6 +3505,7 @@
     "durationHours": "{hours, plural, one {# hour} other {# hours}}",
     "durationMinutes": "{minutes} minutes",
     "scopeWholeSchool": "The whole school",
+    "scopeIgnored": "Also sent by SchoolOS, but these do not limit what they can see: {items}.",
     "status": {
       "requested": "Waiting for you",
       "approved": "Confirmed by SchoolOS",
@@ -3989,10 +4251,8 @@
     },
     "list": {
       "colTitle": "Title",
-      "colType": "Type",
       "colStatus": "Status",
       "colVersion": "Version",
-      "colSensitivity": "Kind of content",
       "colVisibility": "Who can see it",
       "colUpdated": "Last changed",
       "noVersion": "No file yet",
@@ -4042,11 +4302,7 @@
       "colVersion": "Version",
       "latest": "(newest)",
       "colStatus": "Status",
-      "colKind": "File type",
       "otherKind": "Other",
-      "colSize": "Size",
-      "colUploaded": "Uploaded on",
-      "colOpen": "Open",
       "downloadShort": "Download",
       "downloadVersion": "Download version {version}",
       "cannotOpen": "Cannot be opened",
@@ -4231,9 +4487,12 @@
       "unConfirm": "Unarchive"
     }
   },
+  "touch": {
+    "sheetHelp": "On a touch screen, tap a cell to change it, then tap Save or Cancel."
+  },
   "sheets": {
     "grid": {
-      "keyboardHelpEdit": "Use the arrow keys to move between cells. Press Enter to change a cell, Enter again to save it, or Escape to cancel.",
+      "keyboardHelpEdit": "Use the arrow keys to move between cells. Press Enter or F2 to change a cell, Enter to save it or Escape to cancel. Tab leaves the table.",
       "keyboardHelpRead": "Use the arrow keys to move between cells. This sheet can't be changed here.",
       "scrollLabel": "{caption}. Scroll sideways to see all columns.",
       "rowNumber": "Row",
@@ -4250,7 +4509,14 @@
         "aadhaar": "Don't enter a full Aadhaar number. Enter only its last 4 digits.",
         "tooLong": "Use at most 1,000 characters.",
         "control": "Keep the value on one line."
-      }
+      },
+      "pending": "Not saved yet",
+      "searchLabel": "Find on this page",
+      "searchColumn": "In column",
+      "allColumns": "All columns",
+      "searchCount": "{shown, plural, one {# row} other {# rows}} of {total} on this page match.",
+      "noMatch": "No rows on this page match. Clear the search or try another page.",
+      "leaveDraft": "You have a change you haven't saved. Leave this page and lose it?"
     },
     "import": {
       "title": "Check the sheet",
@@ -4288,7 +4554,10 @@
       "openTitle": "Check the sheet",
       "openDescriptionEdit": "See every row as it is in your file and correct cells before you add the rows. You can also download it.",
       "openDescriptionRead": "See every row as it was in your file, or download it.",
-      "open": "Open the sheet"
+      "open": "Open the sheet",
+      "rowWarning": "Has warnings",
+      "fixInSheet": "Correct cells in the sheet",
+      "fixInSheetHint": "Open your file as a sheet, correct the cells with problems and each row is checked again at once."
     },
     "document": {
       "title": "Sheet",
@@ -4326,7 +4595,16 @@
       "note": "The saved version keeps values only, not formatting. Downloads include unsaved changes; for personal data you'll be asked to confirm it's you.",
       "pagesLabel": "Pages of the sheet",
       "open": "Open as a sheet",
-      "openHint": "See the rows in a table, correct cells or download the sheet."
+      "openHint": "See the rows in a table, correct cells or download the sheet.",
+      "leaveUnsaved": "Your changes to this sheet are not saved. Leave this page and lose them?",
+      "conflictTitle": "This document changed while you were working",
+      "conflictBody": "Someone saved a newer version. Your changes are still on this page: download them to keep a copy, then reload the sheet and make them again on the newest version.",
+      "conflictDownload": "Download my changes (CSV)",
+      "conflictReload": "Reload the sheet",
+      "previewTitle": "Sheet preview",
+      "previewDescription": "The first rows of the first worksheet. Open the sheet to see every row, correct cells or download it.",
+      "previewCaption": "First rows of the sheet",
+      "previewUnavailable": "This file can't be shown as a table here. Download it instead."
     },
     "errors": {
       "aadhaar_full_number_rejected": {
@@ -4681,6 +4959,10 @@
           "title": "Already retired",
           "body": "This answer was retired already. Close this and reload the page to see its current state."
         },
+        "reviewer_must_differ": {
+          "title": "Someone else must check this answer",
+          "body": "You wrote this answer, so another staff member who manages verified answers must check and confirm it. Ask them to do it."
+        },
         "not_found": {
           "title": "Answer or source not found",
           "body": "You can't read a document this answer cites, or the answer is gone. Ask the office to check who can see the documents."
@@ -4900,7 +5182,6 @@
     "cta": {
       "signIn": "Sign in",
       "talk": "Talk to us",
-      "talkEmail": "Talk to us by email",
       "learnMore": "Learn more",
       "existing": "Already using SchoolOS? Sign in with your school account.",
       "whatsapp": "Ask on WhatsApp",
@@ -5743,6 +6024,10 @@
         "title": "The PDF is still being made",
         "body": "Try again in a moment. You can print from the print view meanwhile."
       },
+      "certificate_cancelled": {
+        "title": "This certificate was cancelled",
+        "body": "Its PDF is not handed out. Print it from the print view, where it is marked CANCELLED."
+      },
       "document_not_ready": {
         "title": "The PDF is still being checked",
         "body": "Every file is checked for viruses first. Try again in a moment."
@@ -5758,6 +6043,18 @@
       "too_many_rows": {
         "title": "This register is too long to print at once",
         "body": "Choose one certificate type or a single academic year."
+      },
+      "certificate_draft_changed": {
+        "title": "The certificate changed after you opened it",
+        "body": "A detail it prints was changed since you read it. Reload the page, check the draft again and then approve."
+      },
+      "change_request_pending": {
+        "title": "A correction is waiting for approval",
+        "body": "A detail this certificate prints has a correction request waiting. Decide the correction first, then issue the certificate."
+      },
+      "requester_inactive": {
+        "title": "The person who prepared it has left",
+        "body": "They are no longer an active member of the school. Reject this request; someone active must prepare it again."
       }
     },
     "detail": {
@@ -5866,7 +6163,8 @@
         "openFinding": "Open the finding",
         "requestCorrection": "Request a correction",
         "openStructure": "Open school structure",
-        "openCertificates": "Open the student's certificates"
+        "openCertificates": "Open the student's certificates",
+        "change_request_pending": "A correction to a detail it prints is waiting for approval. Decide the correction first."
       }
     },
     "registers": {
@@ -5994,7 +6292,10 @@
       "owner": "Owner",
       "chooseOwner": "Choose a person",
       "taskTitle": "Task",
+      "defaultTaskTitle": "Follow up circular",
       "dueOn": "Due date",
+      "dueHint": "Use {format}, for example {example}.",
+      "dueInvalid": "Enter a real date as {format}, for example {example}.",
       "confirm": "Confirm as task",
       "dismiss": "Dismiss",
       "openTasks": "See it in Tasks",
@@ -6110,9 +6411,25 @@
       "owner": "Owner",
       "chooseOwner": "Choose a person",
       "dueOn": "Due date",
+      "dueHint": "Use {format}, for example {example}.",
+      "dueInvalid": "Enter a real date as {format}, for example {example}.",
       "details": "Details (optional)",
       "submit": "Add task",
       "saved": "Task added."
+    },
+    "edit": {
+      "action": "Edit",
+      "title": "Edit task",
+      "description": "Change the task, its owner, due date or details. A new owner is told in the app.",
+      "taskTitle": "Task",
+      "owner": "Owner",
+      "formerOwner": "{name} (no longer active)",
+      "dueOn": "Due date",
+      "dueHint": "Use {format}, for example {example}.",
+      "dueInvalid": "Enter a real date as {format}, for example {example}.",
+      "details": "Details (optional)",
+      "save": "Save changes",
+      "updated": "Task updated."
     },
     "errors": {
       "task_closed": {
@@ -6690,6 +7007,7 @@
       "marks_over_max": "Some marks are more than the maximum.",
       "absent_has_no_marks": "A student marked absent cannot also have marks.",
       "exam_other_year": "This exam belongs to another academic year.",
+      "recorded_in_another_section": "Some days or papers were recorded in the section the student was in before. Ask the principal to correct them.",
       "exam_name_taken": "An exam with this name already exists this year. Choose another name.",
       "too_old": "The date is too far back. Notes can go back 60 days.",
       "not_enrolled": "The student is not in a section this year.",

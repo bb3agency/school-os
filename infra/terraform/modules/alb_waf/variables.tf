@@ -77,9 +77,14 @@ variable "access_logs_bucket" {
 }
 
 variable "ssl_policy" {
-  description = "TLS policy (TLS 1.2+ with 1.3)."
+  description = "TLS policy: TLS 1.3 plus TLS 1.2 with AEAD forward-secret suites only (the -Res- variant: no CBC), or TLS 1.3 only."
   type        = string
-  default     = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+  default     = "ELBSecurityPolicy-TLS13-1-2-Res-2021-06"
+
+  validation {
+    condition     = can(regex("^ELBSecurityPolicy-TLS13-1-(2-Res-|3-)", var.ssl_policy))
+    error_message = "ssl_policy must be ELBSecurityPolicy-TLS13-1-2-Res-* (TLS 1.2 without CBC suites, 1.3 enabled) or ELBSecurityPolicy-TLS13-1-3-* (TLS 1.3 only)."
+  }
 }
 
 variable "waf_rate_limit_per_5min" {
@@ -98,6 +103,34 @@ variable "waf_auth_path_prefix" {
   description = "URI prefix of the BFF authentication routes that get the stricter rate limit."
   type        = string
   default     = "/bff/auth/"
+}
+
+variable "waf_machine_rate_limit_per_5min" {
+  description = "Per-IP limit for the machine paths (fleet heartbeat, Tally edge agent) in one evaluation window (P2-07)."
+  type        = number
+  default     = 300
+}
+
+variable "waf_machine_path_prefixes" {
+  description = "URI prefixes of the machine paths that get the machine rate limit (at least two: WAF or_statement)."
+  type        = list(string)
+  default     = ["/api/v1/fleet/", "/api/v1/edge/"]
+
+  validation {
+    condition     = length(var.waf_machine_path_prefixes) >= 2
+    error_message = "List at least two prefixes (the scope-down is an OR statement)."
+  }
+}
+
+variable "waf_rate_window_sec" {
+  description = "Evaluation window of the rate-based rules in seconds (WAF allows 60, 120, 300 or 600); also the Retry-After of their 429."
+  type        = number
+  default     = 300
+
+  validation {
+    condition     = contains([60, 120, 300, 600], var.waf_rate_window_sec)
+    error_message = "waf_rate_window_sec must be 60, 120, 300 or 600."
+  }
 }
 
 variable "waf_log_retention_days" {

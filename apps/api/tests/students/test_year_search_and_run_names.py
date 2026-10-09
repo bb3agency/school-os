@@ -2,9 +2,9 @@
 (FR-STU-010, US-302, FR-TEN-011, US-202 AC2; invariants 2, 3 and 5). Synthetic data only.
 
 ``academic_year_id`` on ``GET /students`` and ``POST /students/search`` picks the year whose
-enrolments are listed; scoped holders reach exactly what they reach today (their sections, or
-the sections of their classes, in that year). Promotion runs carry the display names (never
-emails) of who committed and who undid them.
+enrolments are listed; scoped holders still reach only the students of their CURRENT-year
+sections or classes (owner decision 2026-10-09; the full case is in test_past_year_reach.py).
+Promotion runs carry the display names (never emails) of who committed and who undid them.
 """
 
 from __future__ import annotations
@@ -130,7 +130,10 @@ def test_FR_STU_010_list_and_search_a_non_current_year(school: Any, api: Any) ->
 def test_US_302_year_filter_keeps_the_callers_scope(
     school: Any, api: Any, admin_engine: Engine
 ) -> None:
-    pair, ids = _year_world(school)
+    """Owner decision 2026-10-09: a grant on an earlier year's section, or on a class, does not
+    reach a student through that year's enrolment. This school has no current year, so scoped
+    holders reach nobody, whichever year they ask for (before: the past year's sections)."""
+    pair, _ = _year_world(school)
     year = str(pair.from_year)
     class_teacher = W.add_member(
         admin_engine, school.tenant_id, ["teacher"], scopes=[("class", school.ids["class_IX"])]
@@ -147,11 +150,8 @@ def test_US_302_year_filter_keeps_the_callers_scope(
         ["class_teacher"],
         scopes=[("section", pair.section("to", "X"))],
     )
-    for who, expected in (
-        (class_teacher, {str(ids["ix"])}),
-        (section_teacher, {str(ids["x"])}),
-        (other_section, set()),
-    ):
+    expected: set[str] = set()
+    for who in (class_teacher, section_teacher, other_section):
         listed = api.call(who, "GET", GET, params={"academic_year_id": year})
         assert _ids(listed) == expected
         searched = api.call(

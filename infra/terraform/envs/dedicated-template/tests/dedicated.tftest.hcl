@@ -84,6 +84,8 @@ variables {
   artifacts_bucket      = "sos-prod-artifacts-111122223333"
   artifacts_kms_key_arn = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000001"
   control_plane_url     = "https://app.example.test"
+
+  security_alarm_topic_arn = "arn:aws:sns:ap-south-1:111122223333:sos-prod-alarms"
 }
 
 run "host_is_hardened" {
@@ -185,4 +187,20 @@ run "operator_pool_id_is_validated" {
   }
 
   expect_failures = [var.operator_user_pool_id]
+}
+
+# Audit W3-06 (b): the school's files have an independent, locked copy in Hyderabad.
+run "files_locked_copy_in_hyderabad" {
+  command = plan
+
+  assert {
+    condition = (
+      module.files_replica.posture.object_lock_mode == "GOVERNANCE"
+      && module.files_replica.posture.object_lock_days >= 90
+      && module.files_replica.posture.replica_region == "ap-south-2"
+      && module.files_replica.posture.sse_algorithm == "aws:kms"
+      && module.files_replica.posture.delete_markers == "Enabled"
+    )
+    error_message = "The school's files bucket is replicated to a locked, encrypted bucket in ap-south-2."
+  }
 }

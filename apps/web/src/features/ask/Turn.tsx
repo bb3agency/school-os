@@ -176,7 +176,7 @@ function UserMessage({ turn, handlers }: { turn: TurnModel; handlers: TurnHandle
           className="block w-full resize-y rounded-2xl border border-border-control bg-surface px-4 py-3 text-base leading-relaxed"
         />
         {error ? (
-          <p id={errorId} role="alert" className="text-sm font-medium text-danger">
+          <p id={errorId} role="alert" className="text-sm font-semibold text-danger">
             {error}
           </p>
         ) : null}
@@ -252,7 +252,7 @@ function Preview({ text, streaming }: { text: string; streaming: boolean }) {
   const caret = streaming ? <span aria-hidden="true" className="chat-caret" /> : undefined;
   return (
     <div role="group" aria-labelledby={labelId} className="space-y-1.5">
-      <p id={labelId} className="flex items-center gap-1.5 text-xs font-medium text-ink-subtle">
+      <p id={labelId} className="flex items-center gap-1.5 text-xs text-ink-subtle">
         <Icon name="clock" className="size-3.5" />
         {t("previewLabel")}
       </p>
@@ -333,7 +333,7 @@ function AssistantMessage({ turn, handlers }: { turn: TurnModel; handlers: TurnH
               <button
                 type="button"
                 onClick={() => handlers.onRegenerate(queryId, turn.question)}
-                className="min-h-6 font-medium text-primary underline underline-offset-4 hover:no-underline"
+                className="min-h-6 font-semibold text-primary underline underline-offset-4 hover:no-underline"
               >
                 {ta("fresh")}
               </button>
@@ -425,7 +425,7 @@ function AssistantMessage({ turn, handlers }: { turn: TurnModel; handlers: TurnH
                 key={question}
                 type="button"
                 onClick={() => handlers.onFollowUp(question)}
-                className="inline-flex min-h-9 max-w-full items-center gap-2 rounded-full border border-border-soft bg-surface px-3.5 py-1.5 text-start text-sm text-ink hover:border-primary hover:bg-primary-soft hover:text-primary motion-safe:hover:transition-colors"
+                className="inline-flex min-h-9 max-w-full items-center gap-2 rounded-full border border-border-soft bg-surface px-3.5 py-1.5 pointer-coarse:min-h-11 text-start text-sm text-ink hover:border-primary hover:bg-primary-soft hover:text-primary motion-safe:hover:transition-colors"
               >
                 <Icon name="cornerDownRight" className="size-4 shrink-0 text-ink-subtle" />
                 <span className="break-anywhere">{question}</span>

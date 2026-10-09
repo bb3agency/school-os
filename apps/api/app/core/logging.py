@@ -83,6 +83,9 @@ ALLOWED_FIELDS: tuple[str, ...] = (
     "resource_id",
     "action",
     "outcome",
+    "policy",
+    "ip_hash",
+    "retry_after_s",
     "logger",
 )
 CONTEXT_FIELDS: frozenset[str] = frozenset(
@@ -100,7 +103,7 @@ _HEX_RE = re.compile(r"[0-9a-f]{16}|[0-9a-f]{32}")
 # Values we generate ourselves (not user input) and machine identifiers validated by shape.
 _GENERATED = frozenset({"ts", "level", "service", "version", "env", "logger"})
 _UUID_FIELDS = frozenset({"tenant_id", "user_id", "job_id", "resource_id", "request_id"})
-_HEX_FIELDS = frozenset({"trace_id", "span_id"})
+_HEX_FIELDS = frozenset({"trace_id", "span_id", "ip_hash"})
 _LEVELS = {
     "debug": "DEBUG",
     "info": "INFO",

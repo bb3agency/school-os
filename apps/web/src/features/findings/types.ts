@@ -39,13 +39,14 @@ export const SEVERITIES: Exhaustive<Severity, typeof severities> = severities;
 const statuses = [
   "open",
   "reopened",
+  "needs_confirmation",
   "resolved",
   "waived",
 ] as const satisfies readonly FindingStatus[];
 export const FINDING_STATUSES: Exhaustive<FindingStatus, typeof statuses> = statuses;
 
 /** Unresolved findings: the API's default when no status is given. */
-export const UNRESOLVED: readonly FindingStatus[] = ["open", "reopened"];
+export const UNRESOLVED: readonly FindingStatus[] = ["open", "reopened", "needs_confirmation"];
 
 const ruleIds = [
   "DQ-001",
@@ -60,6 +61,8 @@ const ruleIds = [
   "DQ-010",
   "DQ-011",
   "DQ-012",
+  "DQ-021",
+  "DQ-022",
 ] as const satisfies readonly RuleId[];
 export const RULE_IDS: Exhaustive<RuleId, typeof ruleIds> = ruleIds;
 
@@ -85,7 +88,7 @@ export function pick(text: Pick<Bilingual, "en" | "te">, locale: string): string
 }
 
 export function isUnresolved(status: FindingStatus): boolean {
-  return status === "open" || status === "reopened";
+  return status === "open" || status === "reopened" || status === "needs_confirmation";
 }
 
 /** Correction route that means "change the school record through a change request". */

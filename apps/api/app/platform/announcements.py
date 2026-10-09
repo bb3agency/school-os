@@ -27,7 +27,15 @@ from app.core.languages import telugu_enabled
 from app.core.logging import get_logger
 from app.platform import models as m
 from app.platform import repository as repo
-from app.platform.common import Actor, audit_platform, db_errors, now
+from app.platform import two_person
+from app.platform.common import (
+    Actor,
+    audit_platform,
+    clamp_limit,
+    db_errors,
+    now,
+    parse_cursor,
+)
 from app.platform.schemas import AnnouncementBrief, AnnouncementIn, AnnouncementOut
 
 log = get_logger(__name__)
@@ -85,8 +93,17 @@ def get_cache() -> AnnouncementCache:
     return InMemoryAnnouncementCache()
 
 
+MANAGE_PERMISSION = "platform.announcements.manage"
+
+
 def _out(row: Any) -> AnnouncementOut:
-    out = AnnouncementOut.model_validate(dict(row))
+    data = dict(row)
+    data["approval_expires_at"] = (
+        two_person.expires_at(data.get("submitted_at"))
+        if data["status"] == "pending_approval"
+        else None
+    )
+    out = AnnouncementOut.model_validate(data)
     if telugu_enabled():
         return out
     # English first (ADR-0036): the Telugu text stays stored but is not shown.
@@ -120,12 +137,39 @@ def _values(data: AnnouncementIn, row: Any = None) -> dict[str, Any]:
     return values
 
 
-def list_announcements() -> list[AnnouncementOut]:
+def _approval_values(actor: Actor, values: dict[str, Any]) -> dict[str, Any]:
+    """Two-person rule for critical banners (audit 2026-10-05 hardening; owner decision
+    2026-10-07): a critical announcement asked to go out (``scheduled``) waits as
+    ``pending_approval`` until a second operator approves it. Any change clears an approval."""
+    critical_out = values["severity"] == "critical" and values["status"] == "scheduled"
+    if critical_out:
+        return {
+            "status": "pending_approval",
+            "submitted_by": actor.operator_id,
+            "submitted_at": now(),
+            "approved_by": None,
+            "approved_at": None,
+        }
+    return {"submitted_by": None, "submitted_at": None, "approved_by": None, "approved_at": None}
+
+
+def has_ended(ends_at: dt.datetime, at: dt.datetime) -> bool:
+    """Ended: the banner feed shows an announcement while ``starts_at <= at < ends_at``
+    (:func:`_active_rows`, :func:`active_announcements`), so it has ended from ``ends_at`` on.
+    Server time, UTC."""
+    return ends_at <= at
+
+
+def list_announcements(
+    *, limit: int = 50, cursor: str | None = None
+) -> tuple[list[AnnouncementOut], str | None]:
+    """Newest first, keyset-paged on the UUIDv7 id (audit 2026-10-06 R-14: the list stopped at
+    200 rows with no cursor, so older announcements were silently missing)."""
+    limit = clamp_limit(limit)
     with platform_session() as s:
-        rows = s.execute(
-            select(m.announcements).order_by(m.announcements.c.starts_at.desc()).limit(200)
-        ).mappings()
-        return [_out(r) for r in rows]
+        rows = repo.list_rows(s, m.announcements, limit=limit, cursor=parse_cursor(cursor))
+    items = [_out(r) for r in rows[:limit]]
+    return items, (str(rows[limit - 1]["id"]) if len(rows) > limit else None)
 
 
 def get(announcement_id: uuid.UUID) -> AnnouncementOut:
@@ -138,10 +182,12 @@ def get(announcement_id: uuid.UUID) -> AnnouncementOut:
 
 def create(actor: Actor, data: AnnouncementIn) -> AnnouncementOut:
     with platform_session() as s, db_errors():
+        values = _values(data)
+        values |= _approval_values(actor, values)
         row = repo.insert_row(
             s,
             m.announcements,
-            {**_values(data), "id": new_id(), "created_by": actor.operator_id},
+            {**values, "id": new_id(), "created_by": actor.operator_id},
         )
         audit_platform(
             s,
@@ -149,7 +195,7 @@ def create(actor: Actor, data: AnnouncementIn) -> AnnouncementOut:
             "announcement.created",
             "announcement",
             row["id"],
-            {"audience": data.audience, "severity": data.severity, "status": data.status},
+            {"audience": data.audience, "severity": data.severity, "status": row["status"]},
         )
         return _out(row)
 
@@ -163,13 +209,69 @@ def update(
             raise NotFound("Announcement not found")
         if row["status"] == "cancelled":
             raise Conflict("A cancelled announcement cannot change.", code="invalid_state")
+        if has_ended(row["ends_at"], now()):
+            # Owner decision 2026-10-04: an ended announcement is read-only (docs/16 §5.13).
+            raise Conflict("An announcement that has ended cannot change.", code="invalid_state")
         if expected_version is not None and row["version"] != expected_version:
             raise PreconditionFailed()
         values = _values(data, row)
         changed = sorted(k for k, v in values.items() if row[k] != v)
+        unchanged_approved = (
+            not changed and row["status"] == "scheduled" and row["approved_by"] is not None
+        )
+        if not unchanged_approved:
+            values |= _approval_values(actor, values)
         row = repo.update_row(s, m.announcements, announcement_id, values)
         audit_platform(
-            s, actor, "announcement.updated", "announcement", announcement_id, {"fields": changed}
+            s,
+            actor,
+            "announcement.updated",
+            "announcement",
+            announcement_id,
+            {"fields": changed, "status": row["status"]},
+        )
+        return _out(row)
+
+
+def approve(actor: Actor, announcement_id: uuid.UUID) -> AnnouncementOut:
+    """Second operator approves a critical announcement (``pending_approval`` -> ``scheduled``).
+
+    409 ``invalid_state`` unless it is pending; ``same_operator`` for the operator who submitted
+    it (DB CHECK too); ``request_expired``, ``requester_not_authorised`` and
+    ``approver_not_eligible`` as for the other two-person flows (app.platform.two_person).
+    Withdrawing is cancelling (``POST .../cancel``). Audit ``announcement.approved``."""
+    with platform_session() as s, db_errors():
+        row = repo.get(s, m.announcements, announcement_id, for_update=True)
+        if row is None:
+            raise NotFound("Announcement not found")
+        if row["status"] != "pending_approval":
+            raise Conflict(
+                "Only an announcement waiting for approval can be approved.", code="invalid_state"
+            )
+        if has_ended(row["ends_at"], now()):
+            raise Conflict("An announcement that has ended cannot change.", code="invalid_state")
+        if row["submitted_by"] == actor.operator_id:
+            raise Conflict("A different operator must approve.", code="same_operator")
+        two_person.check_second_step(
+            s,
+            first_operator_id=row["submitted_by"],
+            approver_id=actor.operator_id,
+            permission=MANAGE_PERMISSION,
+            requested_at=row["submitted_at"],
+        )
+        row = repo.update_row(
+            s,
+            m.announcements,
+            announcement_id,
+            {"status": "scheduled", "approved_by": actor.operator_id, "approved_at": now()},
+        )
+        audit_platform(
+            s,
+            actor,
+            "announcement.approved",
+            "announcement",
+            announcement_id,
+            {"severity": row["severity"], "audience": row["audience"]},
         )
         return _out(row)
 
@@ -180,6 +282,12 @@ def cancel(actor: Actor, announcement_id: uuid.UUID) -> AnnouncementOut:
         if row is None:
             raise NotFound("Announcement not found")
         if row["status"] != "cancelled":
+            if has_ended(row["ends_at"], now()):
+                # Owner decision 2026-10-04: an ended announcement is fully read-only; a
+                # cancelled one keeps answering with itself (cancelling twice is harmless).
+                raise Conflict(
+                    "An announcement that has ended cannot change.", code="invalid_state"
+                )
             row = repo.update_row(s, m.announcements, announcement_id, {"status": "cancelled"})
             audit_platform(s, actor, "announcement.cancelled", "announcement", announcement_id, {})
         return _out(row)

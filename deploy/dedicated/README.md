@@ -27,7 +27,14 @@ only on the internal network, where the BFF calls it with the signed service tok
   The security group allows only 80/443 in (plus UDP 443 for HTTP/3).
 - Root and data EBS volumes, the files bucket, the audit archive, secrets and logs use the school's own CMK.
   Backups go to ap-south-2 under a separate CMK in that region.
-- The instance role can reach only this school's buckets, keys and secrets, plus ECR pull and the release bundles.
+- The instance role can reach only this school's secrets, keys, backups and logs, plus ECR pull and the release
+  bundles. **Each app container has its own role (audit W3-06):** IMDS hop limit 1 keeps every container away
+  from the instance role; `scripts/app-credentials.sh` (before the stack starts, then every 10 minutes from
+  `schoolos-app-credentials.timer`) assumes `sos-ded-<code>-api` and `sos-ded-<code>-worker` with 1-hour sessions
+  and writes their credentials to `/var/lib/schoolos/aws/{api,worker}/`, mounted read-only at `/run/aws`. The
+  api role reads and writes school files but can never tag or delete them; only the worker discards. With WAL-G
+  on, the db container gets the instance role's credentials in `/var/lib/schoolos/aws/walg/`. Check on a host:
+  `sudo ls -l /var/lib/schoolos/aws/api` and `systemctl list-timers schoolos-app-credentials.timer`.
 - Containers: `read_only` root filesystem, `tmpfs` scratch space, `no-new-privileges`, `cap_drop: ALL`
   (caddy adds only `NET_BIND_SERVICE`), non-root UIDs (app 10001, postgres/valkey 999), memory/CPU limits and
   health checks. The Valkey password lives in a tmpfs config file, never on a command line.
@@ -53,7 +60,7 @@ only on the internal network, where the BFF calls it with the signed service tok
 | `school_code`, `deployment_id`, `tenant_id` (from the platform panel: Provision school → Dedicated) | tfvars |
 | Platform host name (`domain`), optional school `custom_domain`, `acme_email` | tfvars |
 | Release `release_version` + `bundle_sha256` (from CI release notes) | tfvars |
-| Shared prod outputs: `artifacts_bucket`, `artifacts_kms_key_arn`, `control_plane_url` | tfvars |
+| Shared prod outputs: `buckets.artifacts` (`artifacts_bucket`), `kms_key_arns.artifacts` (`artifacts_kms_key_arn`: the artifacts bucket's own key, never the data key), `alarm_topic_arn` (`security_alarm_topic_arn`: the host's security alarms), `control_plane_url` | tfvars |
 | Heartbeat key ID + key (shown once by the panel); when the school has AI: the Vertex AI credential JSON `SOS_LLM_GCP_CREDENTIALS_JSON` (workload identity config, ADR-0033; docs/10 §11.1) and, only for an Anthropic fallback role, the Anthropic API key (ZDR organisation) | Secrets Manager, after apply |
 
 Terraform writes the non-secret host settings to `/etc/schoolos/host.env` under the names the app reads
@@ -149,7 +156,21 @@ migration back (they are backward compatible) or a role grant the sync already a
 permissions the migrations put in the catalog), and it keeps the last three releases. Upgrades run outside
 school hours (after 18:00 IST or on Sundays), with 48 h notice.
 
-If a release changes `systemd/`, run `scripts/bootstrap-host.sh` afterwards. It is idempotent.
+`upgrade.sh` also installs the release's systemd units and refreshes the app containers' credentials before
+any service restarts (from the release with per-container credentials on). If a release changes `systemd/` and
+the host runs an older `upgrade.sh`, run `scripts/bootstrap-host.sh` afterwards. It is idempotent.
+
+**Upgrading a host to per-container credentials (audit W3-06, once per host).** Older hosts run every container
+on the instance role through IMDS (hop limit 2), and Terraform never replaces a host's user data. Order:
+
+1. Set `imds_hop_limit = 2` in `schools/<code>.tfvars` and apply (creates the api and worker roles and the
+   locked files replica; IMDS stays reachable for the old release).
+2. Upgrade as above, then run `sudo /opt/schoolos/deploy/dedicated/scripts/bootstrap-host.sh` once (it installs
+   the credential timer, writes the credentials and restarts the stack). Check
+   `sudo ls -l /var/lib/schoolos/aws/api` and that an upload and a download work.
+3. Remove `imds_hop_limit` (default 1) and apply again (in place, no reboot).
+
+A rollback to a release older than per-container credentials needs `imds_hop_limit = 2` again.
 
 The upgrade adds missing system roles and grants itself (step 5). Grants roles.yaml no longer lists are kept
 and reported; remove them only when the release notes ask for it: `sudo scripts/sync-system-roles.sh --prune`
@@ -166,6 +187,7 @@ idempotent and audited in the school's own chain; exit code 3 means a dry run fo
 | WAL-G (optional) | `archive_command` → `wal-g wal-push`, `archive_timeout` 5 min; nightly `backup-push`, `delete retain FULL 14` | `wal-g/` | 14 full backups |
 | EBS snapshots | Data Lifecycle Manager, daily | ap-south-1 | 7 |
 | Files | S3 versioning (90 days noncurrent) | files bucket | lifecycle |
+| Files, locked copy | S3 replication of every version under `t/` (audit W3-06) | `sos-ded-<code>-frep-<account>` (ap-south-2), Object Lock GOVERNANCE, the backup-region `files` CMK | each version 90 days; nobody can bypass the lock |
 
 The backup bucket has Object Lock (GOVERNANCE, 30 days), so a compromised host cannot erase recent backups.
 Each run writes `/var/lib/schoolos/state/backup.json`, which `beat` reads for the heartbeat, and publishes the
@@ -217,14 +239,14 @@ After offboarding approval (docs/16 §13.4):
 1. Deliver the final tenant export. Stop the stack: `systemctl disable --now schoolos`.
 2. Set `termination_protection = false`, apply, then `terraform destroy`. Buckets that still hold objects will fail
    to delete; that is expected.
-3. **Crypto-shred:** schedule deletion of both school keys (the data CMK in ap-south-1 and the backup CMK in
-   ap-south-2) with a 30-day window:
+3. **Crypto-shred:** schedule deletion of the school keys (the data CMK in ap-south-1, and the backup and
+   files-replica CMKs in ap-south-2) with a 30-day window:
    `aws kms schedule-key-deletion --key-id <arn> --pending-window-in-days 30`. Once the keys are deleted,
    the EBS snapshots, backups, files, audit archive and secrets encrypted with them can never be read again.
    The audit signing key (`terraform output kms_key_arns`, `audit_signing`) encrypts nothing: export its
    public key (`aws kms get-public-key`) with the certificate of deletion, then schedule its deletion too.
-4. Empty and remove the buckets after their retention windows (backup Object Lock 30 days; the audit archive
-   stays under COMPLIANCE for 3 years and is unreadable after step 3). Mark the deployment `decommissioned`
+4. Empty and remove the buckets after their retention windows (backup Object Lock 30 days, files replica 90
+   days; the audit archive stays under COMPLIANCE for 3 years and is unreadable after step 3). Mark the deployment `decommissioned`
    and issue the certificate of deletion.
 
 ## Files
@@ -235,6 +257,6 @@ After offboarding approval (docs/16 §13.4):
 | `compose.walg.yaml` | WAL-G overlay for db |
 | `Caddyfile` | TLS, security headers, edge path blocks, log redaction of OIDC `code`/`state` |
 | `.env.template` | every variable the stack reads (no secrets) |
-| `scripts/` | `bootstrap-host.sh`, `fetch-secrets.sh`, `compose.sh`, `upgrade.sh`, `sync-system-roles.sh`, `backup.sh`, `restore.sh`, `package.sh` (CI), `lib.sh` |
-| `systemd/` | `schoolos.service`, `schoolos-backup.{service,timer}`, `schoolos-monthly-reboot.{service,timer}`, unattended-upgrades schedule drop-in |
+| `scripts/` | `bootstrap-host.sh`, `fetch-secrets.sh`, `app-credentials.sh`, `compose.sh`, `upgrade.sh`, `sync-system-roles.sh`, `backup.sh`, `restore.sh`, `package.sh` (CI), `lib.sh` |
+| `systemd/` | `schoolos.service`, `schoolos-app-credentials.{service,timer}`, `schoolos-backup.{service,timer}`, `schoolos-monthly-reboot.{service,timer}`, unattended-upgrades schedule drop-in |
 | `walg/` | archive wrapper and pinned WAL-G version |

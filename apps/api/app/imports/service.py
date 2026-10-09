@@ -471,6 +471,7 @@ def _validation_context(
         has_current_year=structure.year_id is not None,
         allowed_sections=allowed,
         can_create=ctx.has(CREATE_STUDENT),
+        can_update_sensitive=ctx.has(READ_SENSITIVE),
         existing=_existing_students(
             session,
             ctx,
@@ -573,8 +574,14 @@ def create_import(session: Session, ctx: UserContext, data: ImportCreate) -> Imp
 
     The document must be visible to the caller (404 otherwise), XLSX or CSV (415) and at most
     10 MB (413, FR-IMP-001). Parsing runs in a worker. Audit: ``import.created``.
+
+    A-15: without ``student.read_sensitive`` the caller imports only files they uploaded
+    themselves (another person's sheet, such as a class teacher's marks sheet, answers 404 as an
+    invisible document would): the import's sheet view would otherwise show it to them.
     """
     if not documents.is_visible(session, ctx, data.document_id):
+        raise NotFound("Document not found")
+    if not ctx.has(READ_SENSITIVE) and not documents.is_own_upload(session, ctx, data.document_id):
         raise NotFound("Document not found")
     try:
         obj = documents.document_object(session, data.document_id)
@@ -724,13 +731,27 @@ def set_mapping(
             problems.append(issue(f"columns.{i}.index", "duplicate_column"))
         if column.target != IGNORE:
             mapping[str(column.index)] = column.target
-    problems += mapping_problems(mapping, len(batch.columns), _specs(session), batch.source)
+    specs = _specs(session)
+    problems += mapping_problems(mapping, len(batch.columns), specs, batch.source)
+    if not ctx.has(READ_SENSITIVE):
+        # A restricted column may go to "ignore" or another restricted field, never to a field
+        # whose checked values the caller could then read (audit 2026-10-06 R-06).
+        restricted = _restricted_columns(batch, len(batch.columns), specs)
+        for i, column in enumerate(data.columns):
+            spec = specs.get(column.target)
+            if (
+                column.index in restricted
+                and column.target != IGNORE
+                and not (spec and spec.sensitive)
+            ):
+                problems.append(issue(f"columns.{i}.target", "column_restricted"))
     if problems:
         raise ValidationFailed(problems)
     repo.replace_rows(session, batch.tenant_id, batch.id, [])
     updated = repo.update_batch(
         session,
         batch.id,
+        columns=_sticky_restrictions(batch, mapping, specs),
         mapping=mapping,
         mapping_template_id=None,
         status="parsed",
@@ -902,9 +923,29 @@ def _restricted_columns(
     for column in batch.columns or ():
         index, suggested = column.get("index"), column.get("suggested")
         spec = specs.get(suggested) if isinstance(suggested, str) else None
-        if isinstance(index, int) and 0 <= index < width and spec is not None and spec.sensitive:
+        sticky = column.get("restricted") is True
+        if isinstance(index, int) and 0 <= index < width and (sticky or (spec and spec.sensitive)):
             out.add(index)
     return out
+
+
+def _sticky_restrictions(
+    batch: ImportBatch, mapping: Mapping[str, str], specs: Mapping[str, AttributeSpec]
+) -> list[dict[str, Any]]:
+    """The batch's columns with ``restricted`` set on every column that was ever mapped to a
+    restricted (C3) field, by the old or the new mapping. Unmapping such a column, or mapping it
+    to a C2 field, must not show its values to someone without ``student.read_sensitive``
+    (audit 2026-10-06 R-06)."""
+    sensitive = {
+        int(k)
+        for m in (batch.mapping, mapping)
+        for k, target in m.items()
+        if k.isdigit() and (spec := specs.get(target)) is not None and spec.sensitive
+    }
+    return [
+        {**c, "restricted": True} if c.get("index") in sensitive else dict(c)
+        for c in batch.columns or ()
+    ]
 
 
 def _sheet_cell(cell: Cell, *, restricted: bool, edited: bool) -> SheetCellOut:
