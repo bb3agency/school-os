@@ -6,10 +6,13 @@ SEC-014; BR-01, BR-04; ADR-0010).
   attribute's rules by ``students.validate_identity_value``; full Aadhaar numbers refused), a
   reason (10..1000 characters) and an evidence document that exists, is usable (not
   quarantined), is visible to the caller and has purpose ``evidence``. One pending request per
-  student, attribute and source. The value being corrected is snapshotted with its id.
+  student, attribute and source. The value being corrected is snapshotted with its id, and the
+  evidence version current at submit is pinned (``evidence_version_id``).
 - **Approve (FR-CR-002/003).** ``student.identity_change.approve`` + MFA within 5 minutes, by
   someone other than the requester (checked here AND by a database CHECK), on a pending,
-  unexpired request whose old value is still the current one, with ``If-Match``. In the same
+  unexpired request whose old value is still the current one (checked with the student row
+  locked), whose maker is still an active member and whose pinned evidence version passed its
+  virus scan and is visible to the approver, with ``If-Match``. In the same
   transaction ``students.record_verified_identity_value`` records the new *verified* value (the
   old one stays in history, superseded), the request is closed, both are audited and
   ``change_request.approved`` goes to the outbox (DQ re-evaluates the student's findings).
@@ -121,6 +124,45 @@ class RequestOutdated(Conflict):
     def __init__(self) -> None:
         super().__init__(
             "The value was changed after this request was made. Reject it and submit a new one."
+        )
+
+
+class RequesterInactive(Conflict):
+    code = "requester_inactive"
+
+    def __init__(self) -> None:
+        super().__init__(
+            "The person who submitted this request is no longer an active member of the school. "
+            "Reject it; someone active must submit the correction again."
+        )
+
+
+class EvidenceNotReady(Conflict):
+    code = "evidence_not_ready"
+
+    def __init__(self) -> None:
+        super().__init__(
+            "The evidence file is still being checked for viruses. Try again in a few minutes."
+        )
+
+
+class EvidenceNotUsable(Conflict):
+    code = "evidence_not_usable"
+
+    def __init__(self) -> None:
+        super().__init__(
+            "The evidence file attached to this request failed the virus check or is no longer "
+            "available. Reject the request; it must be submitted again with a new scan."
+        )
+
+
+class EvidenceNotVisible(Conflict):
+    code = "evidence_not_visible"
+
+    def __init__(self) -> None:
+        super().__init__(
+            "You can't open the evidence attached to this request, so you can't approve it. "
+            "Ask someone who can open it to decide, or reject the request."
         )
 
 
@@ -408,6 +450,20 @@ def _check_evidence(session: Session, ctx: UserContext, document_id: uuid.UUID) 
         raise EvidenceRequired("evidence_not_usable")
 
 
+def _check_evidence_for_approval(session: Session, ctx: UserContext, row: ChangeRequest) -> None:
+    """The approver decides on the file the requester attached: the pinned version must be
+    clean and the approver must be able to open the document (audit 2026-10-05)."""
+    state = documents.evidence_state(
+        session, ctx, row.evidence_document_id, row.evidence_version_id
+    )
+    if state == "not_visible":
+        raise EvidenceNotVisible()
+    if state == "pending":
+        raise EvidenceNotReady()
+    if state != "ready":
+        raise EvidenceNotUsable()
+
+
 def _current_value(
     session: Session, student_id: uuid.UUID, attribute_key: str, source: str
 ) -> students.SourceValue | None:
@@ -452,6 +508,7 @@ def submit(session: Session, ctx: UserContext, data: ChangeRequestCreate) -> Cha
             raise NotIdentityAttribute() from None
         raise
     _check_evidence(session, ctx, data.evidence_document_id)
+    evidence_version_id = documents.evidence_version(session, data.evidence_document_id)
     old = _current_value(session, data.student_id, data.attribute_key, data.target_source)
     request_id = new_id()
     columns: dict[str, Any] = {}
@@ -485,6 +542,7 @@ def submit(session: Session, ctx: UserContext, data: ChangeRequestCreate) -> Cha
             old_value_id=old.value_id if old is not None else None,
             reason=reason,
             evidence_document_id=data.evidence_document_id,
+            evidence_version_id=evidence_version_id,
             status="pending",
             requested_by=ctx.membership_id,
             requested_at=now,
@@ -501,6 +559,7 @@ def submit(session: Session, ctx: UserContext, data: ChangeRequestCreate) -> Cha
             "target_source": row.target_source,
             "old_value_id": row.old_value_id,
             "evidence_document_id": row.evidence_document_id,
+            "evidence_version_id": row.evidence_version_id,
             "sensitive": definition.sensitive,
         },
     )
@@ -577,7 +636,10 @@ def approve(
     """Approve and apply a correction (FR-CR-002/003); see the module docstring for the rules.
 
     Errors: 404; 403 ``self_approval_forbidden``; 428 ``step_up_required``; 412; 409
-    ``request_not_pending`` / ``request_expired`` / ``request_outdated``.
+    ``request_not_pending`` / ``request_expired`` / ``request_outdated`` /
+    ``requester_inactive`` (the maker is no longer an active member) / ``evidence_not_ready``
+    (the pinned evidence version is still being scanned) / ``evidence_not_usable`` (it failed
+    the scan) / ``evidence_not_visible`` (the approver cannot open the evidence).
     """
     row = _load(session, ctx, request_id, permissions=[APPROVE], lock=True)
     if row.requested_by == ctx.membership_id:
@@ -587,6 +649,12 @@ def approve(
     _check_version(row, expected_version)
     _check_open(row, now)
     note = _clean_text("note", data.note, required=False)
+    if not identity.is_active_member(session, row.requested_by):
+        raise RequesterInactive()
+    _check_evidence_for_approval(session, ctx, row)
+    # Lock the student first, as every value write does, so the old value cannot change
+    # between this check and the new value (audit 2026-10-05).
+    students.lock_student_for_change(session, ctx, row.student_id)
     current = _current_value(session, row.student_id, row.attribute_key, row.target_source)
     if (current.value_id if current is not None else None) != row.old_value_id:
         raise RequestOutdated()
@@ -731,6 +799,36 @@ def request_student(session: Session, request_id: uuid.UUID) -> uuid.UUID | None
     check, so callers must already hold their own permission on the linking resource."""
     row = repo.get_request(session, request_id)
     return row.student_id if row is not None else None
+
+
+@dataclass(frozen=True, slots=True)
+class RequestLink:
+    """What another module needs to validate a link to a request (IDs and codes only)."""
+
+    student_id: uuid.UUID
+    attribute_key: str
+    status: str
+
+
+def request_link(session: Session, request_id: uuid.UUID) -> RequestLink | None:
+    """The student, attribute and status of a request of the current school, or ``None`` (e.g.
+    DQ resolves a finding only with an approved request about its student and field). No
+    permission check, as for :func:`request_student`."""
+    row = repo.get_request(session, request_id)
+    if row is None:
+        return None
+    return RequestLink(
+        student_id=row.student_id, attribute_key=row.attribute_key, status=row.status
+    )
+
+
+def pending_attribute_keys(
+    session: Session, student_id: uuid.UUID, attribute_keys: Collection[str]
+) -> set[str]:
+    """Which of ``attribute_keys`` have a correction waiting for approval for the student (a
+    certificate that prints such a field waits for the decision; audit 2026-10-05). IDs and
+    keys only; no permission check: the caller has checked its own scope on the student."""
+    return repo.pending_keys(session, student_id, attribute_keys, _now(session))
 
 
 # --- correction memo ---------------------------------------------------------------------------

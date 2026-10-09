@@ -14,7 +14,14 @@ import unicodedata
 import uuid
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    StringConstraints,
+)
 
 from app.authz.http import DEFAULT_LIMIT, MAX_LIMIT
 
@@ -164,12 +171,27 @@ class EnrollmentOut(_Out):
     version: int
 
 
+# School calendar dates (academic years, enrolments): years 2000-2999 only. A date at the edge
+# of the calendar (year 1 or 9999) reached the date maths and the database unchecked (audit
+# 2026-10-06 hardening; the same bounds as the billing dates of R-13).
+_SCHOOL_YEARS = (2000, 2999)
+
+
+def _school_year(value: dt.date) -> dt.date:
+    if not _SCHOOL_YEARS[0] <= value.year <= _SCHOOL_YEARS[1]:
+        raise ValueError(f"must be between the years {_SCHOOL_YEARS[0]} and {_SCHOOL_YEARS[1]}")
+    return value
+
+
+SchoolDate = Annotated[dt.date, AfterValidator(_school_year)]
+
+
 class EnrollmentIn(_In):
     """Enrol in a section; an active enrolment in the same academic year becomes ``transferred``."""
 
     section_id: uuid.UUID
     roll_no: RollNo | None = None
-    started_on: dt.date | None = None
+    started_on: SchoolDate | None = None
 
 
 class EnrollmentPatch(_In):
@@ -189,7 +211,7 @@ class EnrollmentEnd(_In):
     ``transferred`` (moved elsewhere). ``ended_on`` defaults to today (India time)."""
 
     status: EnrollmentEndStatus = "completed"
-    ended_on: dt.date | None = None
+    ended_on: SchoolDate | None = None
 
 
 # --- promotions (FR-TEN-011, US-202 AC2) --------------------------------------------------------

@@ -95,7 +95,7 @@ function Decisions({ certificate }: { certificate: Certificate }) {
                 api.POST("/api/v1/certificates/{certificate_id}/approve", {
                   params: { path },
                   headers,
-                  body: { note: input.note },
+                  body: { note: input.note, draft_sha256: certificate.draft_sha256 ?? "" },
                 }),
               )
             }

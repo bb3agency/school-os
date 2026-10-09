@@ -178,6 +178,7 @@ def create_enrolment_code(
     maximum of active agents."""
     _require_on(session, ctx)
     cfg = rules().enrolment
+    repo.lock_device_slots(session)  # audit 2026-10-06: count and insert without a race
     if repo.count_active_devices(session) >= cfg.max_active_devices:
         raise Conflict(
             f"At most {cfg.max_active_devices} Tally agents can be active. Revoke one first.",
@@ -671,6 +672,8 @@ def enrol(caller: EnrolmentCaller, data: EnrolIn, *, wrapper: KeyWrapper) -> Enr
             caller.failed()
             raise Unauthenticated("Edge agent request rejected")
         cfg = rules().enrolment
+        # Held until commit, so a concurrent enrolment counts this agent (audit 2026-10-06).
+        repo.lock_device_slots(session)
         if repo.count_active_devices(session) >= cfg.max_active_devices:
             raise Conflict("Too many active Tally agents.", code="too_many_devices")
         device_id = new_id()

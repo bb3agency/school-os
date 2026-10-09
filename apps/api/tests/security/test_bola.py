@@ -154,7 +154,8 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
         "certificate_type": "bonafide",
         "inputs": {"purpose": "bus_pass"},
     },
-    ("POST", "/api/v1/certificates/{certificate_id}/approve"): None,
+    # A-11: the approval carries the draft fingerprint it was read with.
+    ("POST", "/api/v1/certificates/{certificate_id}/approve"): {"draft_sha256": "0" * 64},
     ("POST", "/api/v1/certificates/{certificate_id}/reject"): {
         "reason": "Synthetic BOLA rejection"
     },

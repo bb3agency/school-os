@@ -1038,11 +1038,14 @@ def _cert_pending(w: Any, role: str | None = None) -> Any:
 def _cert_decide(action: str) -> Builder:
     def build(w: Any, r: str, a: Engine) -> Request:
         tc = _cert_pending(w, r if action == "withdraw" else None)
-        body = (
-            None
-            if action in ("approve", "withdraw")
-            else {"reason": "Synthetic matrix reason for this decision"}
-        )
+        body: dict[str, Any] | None
+        if action == "approve":
+            # A-11: the approval carries the draft fingerprint it was read with.
+            body = {"draft_sha256": _cert().draft_hash(w.a, tc.id)}
+        elif action == "withdraw":
+            body = None
+        else:
+            body = {"reason": "Synthetic matrix reason for this decision"}
         return (
             f"/api/v1/certificates/{tc.id}/{action}",
             body,

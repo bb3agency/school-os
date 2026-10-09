@@ -29,10 +29,15 @@ export function toIsoDate(value: string | undefined): string | undefined {
   return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(iso) ? iso : undefined;
 }
 
+/** Midnight of a day in India time: the API needs an explicit offset on its time filters. */
+function istMidnight(iso: string | undefined): string | undefined {
+  return iso ? `${iso}T00:00:00+05:30` : undefined;
+}
+
 /** The API query for the filters: blank values and dates that are not real are left out. */
 export function auditQuery(filters: AuditFilters): AuditQuery {
-  const from = toIsoDate(filters.from);
-  const to = toIsoDate(filters.to);
+  const from = istMidnight(toIsoDate(filters.from));
+  const to = istMidnight(toIsoDate(filters.to));
   return {
     ...(filters.actor?.trim() ? { actor: filters.actor.trim() } : {}),
     ...(filters.action?.trim() ? { action: filters.action.trim() } : {}),

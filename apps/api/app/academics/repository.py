@@ -118,9 +118,14 @@ def student_marks(
 # --- exams ----------------------------------------------------------------------------------------
 
 
+# Same name in the same year: exact (0035) or differing only in case (0049, audit 2026-10-06).
+_EXAM_NAME_CONSTRAINTS = frozenset({"exams_name_per_year", "exams_name_per_year_ci"})
+
+
 def insert_exam(session: Session, values: Mapping[str, Any]) -> Exam | None:
-    """The new exam, or ``None`` when a concurrent request created one with the same name in
-    the same year first (``exams_name_per_year``; the savepoint keeps the transaction usable)."""
+    """The new exam, or ``None`` when a concurrent request created one with the same name
+    (whatever its case) in the same year first (``exams_name_per_year`` /
+    ``exams_name_per_year_ci``; the savepoint keeps the transaction usable)."""
     exam = Exam(tenant_id=current_tenant_id(session), **values)
     try:
         with session.begin_nested():
@@ -128,7 +133,7 @@ def insert_exam(session: Session, values: Mapping[str, Any]) -> Exam | None:
             session.flush()
     except IntegrityError as exc:
         diag = getattr(exc.orig, "diag", None)
-        if getattr(diag, "constraint_name", None) == "exams_name_per_year":
+        if getattr(diag, "constraint_name", None) in _EXAM_NAME_CONSTRAINTS:
             return None
         raise
     session.refresh(exam)

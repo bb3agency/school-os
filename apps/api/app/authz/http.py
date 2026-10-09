@@ -136,6 +136,23 @@ class IdempotencyKeyReused(DomainError):
     status, code, title = 422, "idempotency_key_reused", "Idempotency key used with another body"
 
 
+def _grants(ctx: UserContext) -> str:
+    """Fingerprint of what the caller may do (roles, permissions and scopes): a stored response
+    is replayed only to the same access (audit 2026-10-05 hardening "Idempotency")."""
+    data = {
+        "m": str(ctx.membership_id),
+        "r": sorted(ctx.roles),
+        "p": sorted(ctx.permissions),
+        "sp": sorted(ctx.scoped_permissions),
+        "school": ctx.scopes.school,
+        "c": sorted(str(i) for i in ctx.scopes.class_ids),
+        "s": sorted(str(i) for i in ctx.scopes.section_ids),
+    }
+    return hashlib.sha256(
+        json.dumps(data, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+
+
 def _body_hash(body: BaseModel | None) -> str:
     data = body.model_dump(mode="json") if body is not None else None
     return hashlib.sha256(
@@ -147,7 +164,9 @@ class Idempotency:
     """Replays the first response for a repeated ``Idempotency-Key`` (docs/09 §2).
 
     Same key + same body -> original status, body and Location; same key + different body ->
-    422 ``idempotency_key_reused``; first request still running -> 409 ``idempotency_in_progress``.
+    422 ``idempotency_key_reused``; first request still running -> 409 ``idempotency_in_progress``;
+    the caller's roles, permissions or scopes changed since the first request -> 409
+    ``idempotency_access_changed`` (the stored body is not returned and nothing is run again).
 
     ``refetch`` (routes whose response carries C3 text: behaviour notes, flags, guardians,
     change requests, extraction rows; audit 2026-10-05 H-01): the record keeps status, the
@@ -167,6 +186,7 @@ class Idempotency:
         if raw is not None:
             scope = hashlib.sha256(f"{request.method} {request.url.path} {raw}".encode())
             self.key = f"sos:idem:{ctx.tenant_id}:{ctx.user_id}:{scope.hexdigest()}"
+        self.grants = _grants(ctx)
 
     @staticmethod
     def _response(
@@ -192,6 +212,12 @@ class Idempotency:
             raise Conflict(
                 "The first request with this Idempotency-Key is still running.",
                 code="idempotency_in_progress",
+            )
+        if record.get("grants") != self.grants:
+            raise Conflict(
+                "Your access changed since this request was first sent. Reload the page to see "
+                "the current state before trying again.",
+                code="idempotency_access_changed",
             )
         if "ref" in record:
             if refetch is None:  # pragma: no cover - a route keeps its refetch
@@ -247,7 +273,14 @@ class Idempotency:
             {"ref": str(result.id)} if refetch is not None else {"body": payload}  # type: ignore[attr-defined]
         )
         record = json.dumps(
-            {"state": "done", "hash": body_hash, "status": status_code, "headers": extra, **kept}
+            {
+                "state": "done",
+                "hash": body_hash,
+                "grants": self.grants,
+                "status": status_code,
+                "headers": extra,
+                **kept,
+            }
         ).encode()
 
         def store_result(_: Session) -> None:

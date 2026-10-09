@@ -375,6 +375,85 @@ def test_R_13_a_concurrent_duplicate_exam_is_a_422_not_a_500(
     assert "exam_name_taken" in _codes(err)
 
 
+def test_exam_names_differing_only_in_case_cannot_both_be_created_concurrently(
+    school: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The name check is case-insensitive but the unique constraint was not, so two concurrent
+    creates differing only in case both succeeded (audit 2026-10-06 hardening "Exam names").
+    The unique index on lower(name) (migration 0049) refuses the second one."""
+    actor = S.principal_ctx(school)
+    today = min(academics.today_ist(), S.YEAR_END)
+    name = f"Synthetic Case {uuid.uuid4().hex[:5]}"
+    with tenant_session(school.tenant_id, actor.user_id) as db:
+        academics.create_exam(db, actor, ExamCreate(name=name, held_on=today))
+    monkeypatch.setattr(academics_repo, "exam_name_taken", lambda *_a, **_k: False)
+    with (
+        pytest.raises(ValidationFailed) as err,
+        tenant_session(school.tenant_id, actor.user_id) as db,
+    ):
+        academics.create_exam(db, actor, ExamCreate(name=name.upper(), held_on=today))
+    assert "exam_name_taken" in _codes(err)
+
+
+def test_exam_name_index_is_skipped_not_failed_when_case_duplicates_exist(
+    school: Any, admin_engine: Engine
+) -> None:
+    """Migration 0049 is backward compatible: a school that already has two exams whose names
+    differ only in case keeps working; the index is simply not created (a warning)."""
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[2] / "migrations" / "versions" / "0049_open_items.py"
+    spec = importlib.util.spec_from_file_location("sos_test_migration_0049", path)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    actor = S.principal_ctx(school)
+    name = f"Synthetic Legacy {uuid.uuid4().hex[:5]}"
+    with admin_engine.connect() as c:
+        tx = c.begin()
+        try:
+            c.execute(text("DROP INDEX sis.exams_name_per_year_ci"))
+            year = c.execute(
+                text(
+                    "SELECT academic_year_id FROM sis.exams WHERE tenant_id = :t LIMIT 1"
+                ).bindparams(t=school.tenant_id)
+            ).scalar()
+            if year is None:
+                year = c.execute(
+                    text(
+                        "SELECT id FROM core.academic_years WHERE tenant_id = :t AND is_current"
+                    ).bindparams(t=school.tenant_id)
+                ).scalar_one()
+            for variant in (name, name.lower()):
+                c.execute(
+                    text(
+                        "INSERT INTO sis.exams (id, tenant_id, academic_year_id, name, held_on, "
+                        "created_by) VALUES (:i, :t, :y, :n, '2026-08-01', :u)"
+                    ),
+                    {
+                        "i": uuid.uuid4(),
+                        "t": school.tenant_id,
+                        "y": year,
+                        "n": variant,
+                        "u": actor.user_id,
+                    },
+                )
+            for statement in module.EXAM_NAMES_UP:
+                c.execute(text(statement))
+            created: bool = c.execute(
+                text("SELECT to_regclass('sis.exams_name_per_year_ci') IS NOT NULL")
+            ).scalar_one()
+            assert created is False
+        finally:
+            tx.rollback()
+    with admin_engine.connect() as c:
+        assert c.execute(
+            text("SELECT to_regclass('sis.exams_name_per_year_ci') IS NOT NULL")
+        ).scalar_one()
+
+
 def test_FR_MRK_002_marks_grid_with_percent_and_absent_papers(school: Any) -> None:
     exam_id = S.exam(school, f"Synthetic SA {uuid.uuid4().hex[:5]}", S.school_days(1)[0])
     a1 = school.ids["a1"]

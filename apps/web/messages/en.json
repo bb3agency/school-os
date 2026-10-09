@@ -1653,7 +1653,9 @@
       "citation_text_not_found": "This text is not on that page. Copy the exact words from the document.",
       "answer_personal_data": "Remove phone numbers, email addresses and Aadhaar numbers. Everyone in the school can read this answer.",
       "owner_not_active": "This person can no longer be given tasks. Choose someone else.",
-      "aadhaar_last4_only": "Don't enter Aadhaar numbers. Use only the last 4 digits."
+      "aadhaar_last4_only": "Don't enter Aadhaar numbers. Use only the last 4 digits.",
+      "not_approved": "This correction request is not approved yet. Resolve the finding after it is approved.",
+      "other_attribute": "This correction request is for another field. Choose one for this field."
     },
     "api": {
       "generic": {
@@ -1851,6 +1853,14 @@
       "value_out_of_range": {
         "title": "The number or date is too large",
         "body": "This number or date is too large. Check it and try again."
+      },
+      "idempotency_access_changed": {
+        "title": "Your access changed",
+        "body": "Your role or classes changed since you first sent this. Reload the page to see the current state, then try again if you still need to."
+      },
+      "invalid_characters": {
+        "title": "The text has hidden characters",
+        "body": "Some text contains invisible characters (often from copying and pasting). Type the text again instead of pasting it, then try again."
       }
     },
     "stepUp": {
@@ -3259,6 +3269,22 @@
       "storage_unavailable": {
         "title": "Files can't be stored right now",
         "body": "Try again in a few minutes. Nothing was saved."
+      },
+      "requester_inactive": {
+        "title": "The person who asked has left",
+        "body": "They are no longer an active member of the school. Reject this request; someone active must ask again if the correction is still needed."
+      },
+      "evidence_not_ready": {
+        "title": "The evidence is still being checked",
+        "body": "The attached file is being checked for viruses. Try again in a few minutes."
+      },
+      "evidence_not_usable": {
+        "title": "The evidence can't be used",
+        "body": "The attached file failed the virus check or is no longer available. Reject this request; it must be made again with a new scan."
+      },
+      "evidence_not_visible": {
+        "title": "You can't open the evidence",
+        "body": "You can't approve a correction without seeing its evidence. Ask someone who can open it to decide, or reject the request."
       }
     },
     "validation": {
@@ -5982,6 +6008,18 @@
       "too_many_rows": {
         "title": "This register is too long to print at once",
         "body": "Choose one certificate type or a single academic year."
+      },
+      "certificate_draft_changed": {
+        "title": "The certificate changed after you opened it",
+        "body": "A detail it prints was changed since you read it. Reload the page, check the draft again and then approve."
+      },
+      "change_request_pending": {
+        "title": "A correction is waiting for approval",
+        "body": "A detail this certificate prints has a correction request waiting. Decide the correction first, then issue the certificate."
+      },
+      "requester_inactive": {
+        "title": "The person who prepared it has left",
+        "body": "They are no longer an active member of the school. Reject this request; someone active must prepare it again."
       }
     },
     "detail": {
@@ -6090,7 +6128,8 @@
         "openFinding": "Open the finding",
         "requestCorrection": "Request a correction",
         "openStructure": "Open school structure",
-        "openCertificates": "Open the student's certificates"
+        "openCertificates": "Open the student's certificates",
+        "change_request_pending": "A correction to a detail it prints is waiting for approval. Decide the correction first."
       }
     },
     "registers": {

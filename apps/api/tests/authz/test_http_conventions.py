@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import uuid
 from collections.abc import Iterator
@@ -75,6 +76,66 @@ def test_docs_09_in_progress_key_is_409(store: InMemoryKV) -> None:
     assert calls == [1]
     record = json.loads(store.get(idem.key or "") or b"{}")
     assert record["state"] == "pending", "stored as done only after the commit"
+
+
+def _done(ctx: UserContext, key: str, body: Body) -> Idempotency:
+    """Run once and commit, so the response is stored for replay."""
+    idem = Idempotency(_request({"Idempotency-Key": key}), ctx)
+    session = Session()
+    idem.run(session, body, lambda: Body(code="FIRST"))
+    session.commit()
+    return idem
+
+
+def test_docs_09_replay_returns_the_stored_response_while_access_is_unchanged(
+    store: InMemoryKV,
+) -> None:
+    ctx = dataclasses.replace(_ctx(), permissions=frozenset({"tenant.structure.manage"}))
+    _done(ctx, "key-00000010", Body(code="IX"))
+    again = Idempotency(_request({"Idempotency-Key": "key-00000010"}), ctx)
+    res = again.run(Session(), Body(code="IX"), lambda: Body(code="SECOND"))
+    assert res.headers["Idempotent-Replayed"] == "true"
+    assert json.loads(bytes(res.body)) == {"code": "FIRST"}
+
+
+@pytest.mark.parametrize(
+    "change",
+    ["permission_removed", "scope_narrowed", "now_scoped"],
+)
+def test_docs_09_replay_refused_after_the_callers_access_changed(
+    store: InMemoryKV, change: str
+) -> None:
+    """A stored body is returned only to the access it was produced for: after a role or scope
+    change the caller gets 409, not a body from before (audit 2026-10-05 hardening
+    "Idempotency")."""
+    section_a, section_b = uuid.uuid4(), uuid.uuid4()
+    ctx = dataclasses.replace(
+        _ctx(),
+        permissions=frozenset({"student.update", "student.read_basic"}),
+        scoped_permissions=frozenset({"student.update", "student.read_basic"}),
+        scopes=Scopes(section_ids=frozenset({section_a, section_b})),
+    )
+    _done(ctx, "key-00000011", Body(code="IX"))
+    later = {
+        "permission_removed": dataclasses.replace(
+            ctx, permissions=frozenset({"student.read_basic"})
+        ),
+        "scope_narrowed": dataclasses.replace(
+            ctx, scopes=Scopes(section_ids=frozenset({section_a}))
+        ),
+        "now_scoped": dataclasses.replace(ctx, scoped_permissions=frozenset()),
+    }[change]
+    calls: list[int] = []
+
+    def op() -> Body:
+        calls.append(1)
+        return Body(code="X")
+
+    again = Idempotency(_request({"Idempotency-Key": "key-00000011"}), later)
+    with pytest.raises(Conflict) as exc:
+        again.run(Session(), Body(code="IX"), op)
+    assert exc.value.code == "idempotency_access_changed"
+    assert calls == [], "the operation is not run again either"
 
 
 def test_docs_09_failed_operation_releases_key(store: InMemoryKV) -> None:

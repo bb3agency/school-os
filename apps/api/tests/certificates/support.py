@@ -156,6 +156,16 @@ def pending_tc(school: Any, student_id: uuid.UUID | None = None) -> CertificateO
     return issue(school, student_id or student(school), "transfer")
 
 
+def draft_hash(school: Any, certificate_id: uuid.UUID, *, role: str = "principal") -> str:
+    """The ``draft_sha256`` of a pending certificate as ``role`` reads it (A-11); a placeholder
+    for one that is not pending, so the approval's own refusal is what a test sees."""
+    install()
+    out: CertificateOut = call(
+        school, school.people[role], role, certificates.get_certificate, certificate_id
+    )
+    return out.draft_sha256 or "0" * 64
+
+
 def approve(
     school: Any, certificate: CertificateOut, *, role: str = "principal", person: Any = None
 ) -> CertificateOut:
@@ -167,7 +177,7 @@ def approve(
         role,
         certificates.approve,
         certificate.id,
-        ApproveIn(),
+        ApproveIn(draft_sha256=draft_hash(school, certificate.id)),
         expected_version=certificate.version,
     )
     return out

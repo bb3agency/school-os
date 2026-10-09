@@ -1,4 +1,4 @@
-"""``sis.change_requests`` (migration 0014_change_requests, docs/05 §5).
+"""``sis.change_requests`` (migrations 0014_change_requests and 0049_open_items, docs/05 §5).
 
 Describes the table for typed queries only; DDL (RLS, CHECKs, the frozen-row trigger, column
 grants) lives in the migration. FKs into other modules' tables are enforced by the database and
@@ -37,6 +37,8 @@ class ChangeRequest(Base):
     key_version: Mapped[int | None] = mapped_column(Integer)
     reason: Mapped[str] = mapped_column(Text)
     evidence_document_id: Mapped[uuid.UUID]
+    # The evidence version current at submit (0049; NULL for older requests).
+    evidence_version_id: Mapped[uuid.UUID | None]
     status: Mapped[str] = mapped_column(Text, server_default=text("'pending'"))
     requested_by: Mapped[uuid.UUID]
     requested_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())

@@ -116,6 +116,17 @@ def list_devices(session: Session) -> list[Device]:
     )
 
 
+def lock_device_slots(session: Session) -> None:
+    """Serialise agent-cap checks of the current school until the transaction ends
+    (transaction-level advisory lock), so two enrolments at once cannot both pass the count."""
+    session.execute(
+        text(
+            "SELECT pg_advisory_xact_lock("
+            "hashtextextended('tally.device_slots:' || core.current_tenant()::text, 0))"
+        )
+    )
+
+
 def count_active_devices(session: Session) -> int:
     return int(
         session.execute(
@@ -502,6 +513,7 @@ __all__ = [
     "list_groups",
     "list_parties",
     "lock_code",
+    "lock_device_slots",
     "mark_code_used",
     "mark_parties_missing",
     "parties_of_company",

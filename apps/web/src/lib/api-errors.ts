@@ -60,6 +60,9 @@ export const KNOWN_API_CODES = [
   "value_out_of_range",
   "rotation_pending",
   "already_on_hold",
+  // Audit 2026-10-05/06 hardening: replay after an access change; hidden direction characters.
+  "idempotency_access_changed",
+  "invalid_characters",
 ] as const;
 export type KnownApiCode = (typeof KNOWN_API_CODES)[number];
 

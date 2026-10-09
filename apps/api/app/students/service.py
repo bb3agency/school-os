@@ -947,6 +947,16 @@ def record_value_in(
     )
 
 
+def lock_student_for_change(session: Session, ctx: UserContext, student_id: uuid.UUID) -> None:
+    """Lock the student row (404 outside the caller's read scope) for the rest of the
+    transaction, as every value write does first: an approver locks it before comparing the
+    value a change request corrects, so no write can land between that check and the new value
+    (audit 2026-10-05, hardening "Change requests")."""
+    _visible_student(
+        session, ctx, student_id, permission=READ, structure=_structure(session), lock=True
+    )
+
+
 def record_verified_identity_value(
     session: Session,
     ctx: UserContext,

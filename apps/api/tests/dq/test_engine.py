@@ -268,8 +268,22 @@ def test_FR_DQ_020_resolve_and_waive_rules(world: Any, admin_engine: Engine) -> 
             "change_request_id",
             code,
         )
-    finding_student = DS.one_by_id(admin_engine, fid)["student_id"]
-    cr = DS.change_request(admin_engine, world.a, finding_student)
+    finding = DS.one_by_id(admin_engine, fid)
+    finding_student, field = finding["student_id"], finding["attribute_key"]
+    # Hardening (audit 2026-10-06): only an APPROVED request about the finding's field resolves
+    # it; a pending one (it may still be rejected) or one about another field does not.
+    other_field = "dob" if field != "dob" else "gender"
+    cr = DS.change_request(admin_engine, world.a, finding_student, field)
+    other = DS.change_request(admin_engine, world.a, finding_student, other_field)
+    DS.approve_change_request(world.a, other)
+    for cr_id, code in ((cr, "not_approved"), (other, "other_attribute")):
+        with pytest.raises(ValidationFailed) as err:
+            DS.call(world.a, dq.resolve_finding, fid, ResolveIn(change_request_id=cr_id))
+        assert (err.value.errors[0]["field"], err.value.errors[0]["code"]) == (
+            "change_request_id",
+            code,
+        )
+    DS.approve_change_request(world.a, cr)
     out = DS.call(world.a, dq.resolve_finding, fid, ResolveIn(change_request_id=cr))
     assert (out.resolution, out.change_request_id) == ("change_request", cr)
     with pytest.raises(Conflict):

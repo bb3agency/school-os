@@ -42,7 +42,7 @@ import uuid
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Final
+from typing import Any, Final, Literal
 
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
@@ -1503,6 +1503,40 @@ def evidence_exists(session: Session, document_id: uuid.UUID) -> bool:
     return usable is not None
 
 
+_EVIDENCE_USABLE: Final = ("queued", "scanning", "extracting", "chunking", "embedding", "ready")
+_EVIDENCE_PENDING: Final = frozenset({"queued", "scanning"})
+# Past the virus scan (text extraction and indexing come after it).
+_EVIDENCE_CLEAN: Final = frozenset({"extracting", "chunking", "embedding", "ready"})
+
+EvidenceState = Literal["ready", "pending", "unusable", "not_visible"]
+
+
+def evidence_version(session: Session, document_id: uuid.UUID) -> uuid.UUID | None:
+    """The latest usable version of evidence ``document_id`` (the one a change request pins at
+    submit), or ``None``; callers check :func:`evidence_exists` first."""
+    usable = repo.latest_version_with_status(session, document_id, _EVIDENCE_USABLE)
+    return usable.id if usable is not None else None
+
+
+def evidence_state(
+    session: Session, ctx: UserContext, document_id: uuid.UUID, version_id: uuid.UUID | None
+) -> EvidenceState:
+    """Whether the approver of a change request may rely on its evidence (audit 2026-10-05,
+    hardening "Change requests"): ``not_visible`` when the caller's ACL/scope does not reach the
+    document, else the state of the pinned version (the latest version when ``version_id`` is
+    ``None``, for requests submitted before versions were pinned): ``ready`` once its virus
+    scan is clean (also while it is being indexed), ``pending`` while it is queued or
+    scanning, ``unusable`` otherwise."""
+    if not is_visible(session, ctx, document_id):
+        return "not_visible"
+    version = repo.get_version(session, document_id, version_id=version_id)
+    if version is None:
+        return "unusable"
+    if version.status in _EVIDENCE_CLEAN:
+        return "ready"
+    return "pending" if version.status in _EVIDENCE_PENDING else "unusable"
+
+
 def is_visible(session: Session, ctx: UserContext, document_id: uuid.UUID) -> bool:
     """Whether the caller's ACL/scope reaches the document (for other modules' scoped reads)."""
     return repo.get_document(session, document_id, visibility=_visibility(session, ctx)) is not None
@@ -2685,6 +2719,8 @@ __all__ = [
     "discard_version",
     "document_object",
     "evidence_exists",
+    "evidence_state",
+    "evidence_version",
     "export_download_url",
     "export_files",
     "export_records",

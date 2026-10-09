@@ -638,9 +638,11 @@ export interface paths {
          * Approve Certificate
          * @description Approve and issue a transfer certificate (or a TC duplicate): serial number, register
          *     entry and, for a TC, the student leaves the rolls (permission ``certificate.approve``, MFA
-         *     within 5 minutes, not the person who prepared it, ``If-Match``). Errors:
+         *     within 5 minutes, not the person who prepared it, ``If-Match``). The body carries the
+         *     ``draft_sha256`` read from ``GET /certificates/{id}``. Errors:
          *     ``self_approval_forbidden`` (403), ``step_up_required`` (428), ``certificate_not_pending``
-         *     / ``certificate_blocked`` (409).
+         *     / ``certificate_blocked`` / ``change_request_pending`` / ``requester_inactive`` /
+         *     ``certificate_draft_changed`` (409: what it prints changed since it was read).
          */
         post: operations["approve_certificate_api_v1_certificates__certificate_id__approve_post"];
         delete?: never;
@@ -6270,6 +6272,18 @@ export interface components {
             /** Next Cursor */
             next_cursor: string | null;
         };
+        /**
+         * ApproveIn
+         * @description ``draft_sha256``: the ``draft_sha256`` of the certificate as the approver read it (``GET
+         *     /certificates/{id}``). If what the certificate would print changed since, approval is
+         *     refused with 409 ``certificate_draft_changed`` (audit 2026-10-05 A-11).
+         */
+        app__certificates__schemas__ApproveIn: {
+            /** Draft Sha256 */
+            draft_sha256: string;
+            /** Note */
+            note?: string | null;
+        };
         /** DownloadUrlOut */
         app__certificates__schemas__DownloadUrlOut: {
             /**
@@ -6281,6 +6295,11 @@ export interface components {
             filename: string;
             /** Url */
             url: string;
+        };
+        /** ApproveIn */
+        app__changes__schemas__ApproveIn: {
+            /** Note */
+            note?: string | null;
         };
         /**
          * MemberOut
@@ -6377,11 +6396,6 @@ export interface components {
             data: components["schemas"]["TicketOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
-        };
-        /** ApproveIn */
-        ApproveIn: {
-            /** Note */
-            note?: string | null;
         };
         /**
          * AskIn
@@ -6924,7 +6938,7 @@ export interface components {
              * Code
              * @enum {string}
              */
-            code: "dq_blocker" | "missing_value" | "no_enrolment" | "student_not_active" | "no_current_year" | "transfer_certificate_exists";
+            code: "dq_blocker" | "missing_value" | "no_enrolment" | "student_not_active" | "no_current_year" | "transfer_certificate_exists" | "change_request_pending";
             /** Finding Id */
             finding_id?: string | null;
             /** Rule Id */
@@ -7236,6 +7250,8 @@ export interface components {
             decision_note: string | null;
             /** Document Id */
             document_id: string | null;
+            /** Draft Sha256 */
+            draft_sha256?: string | null;
             /** Duplicate No */
             duplicate_no: number | null;
             /** Duplicate Reason */
@@ -15550,9 +15566,9 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
-                "application/json": components["schemas"]["ApproveIn"] | null;
+                "application/json": components["schemas"]["app__certificates__schemas__ApproveIn"];
             };
         };
         responses: {
@@ -16092,7 +16108,7 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/json": components["schemas"]["ApproveIn"] | null;
+                "application/json": components["schemas"]["app__changes__schemas__ApproveIn"] | null;
             };
         };
         responses: {

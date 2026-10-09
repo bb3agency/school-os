@@ -167,9 +167,17 @@ def test_SEC_005_approve_needs_if_match_and_recent_mfa(school: Any, api: Any) ->
     missing = api.call(principal, "POST", path)
     assert missing.status_code == 400
     assert missing.json()["code"] == "if_match_required"
-    wrong = api.call(principal, "POST", path, headers={"If-Match": 'W/"9"'})
+    wrong = api.call(
+        principal, "POST", path, headers={"If-Match": 'W/"9"'}, json={"draft_sha256": "0" * 64}
+    )
     assert wrong.status_code == 412
-    ok = api.call(principal, "POST", path, headers={"If-Match": f'W/"{tc.version}"'})
+    ok = api.call(
+        principal,
+        "POST",
+        path,
+        headers={"If-Match": f'W/"{tc.version}"'},
+        json={"draft_sha256": C.draft_hash(school, tc.id)},
+    )
     assert ok.status_code == 200, ok.text
     assert ok.json()["status"] == "issued"
     self_try = api.call(

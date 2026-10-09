@@ -622,6 +622,16 @@ def member_display_names(
     return repo.display_names(session, sorted(set(membership_ids)))
 
 
+def is_active_member(session: Session, membership_id: uuid.UUID) -> bool:
+    """Whether ``membership_id`` is an active, unexpired member of this school (e.g. the maker of
+    a request waiting for approval, who may have left since; audit 2026-10-05). No permission
+    check: IDs in, a yes or no out."""
+    membership = repo.get_membership(session, membership_id)
+    if membership is None or membership.status != "active":
+        return False
+    return membership.expires_at is None or membership.expires_at > dt.datetime.now(dt.UTC)
+
+
 def members_for_users(
     session: Session, user_ids: Collection[uuid.UUID]
 ) -> dict[uuid.UUID, tuple[uuid.UUID, str]]:
