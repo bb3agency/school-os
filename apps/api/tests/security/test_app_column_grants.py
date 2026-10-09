@@ -14,6 +14,7 @@ Catalog checks (``information_schema``) plus one behavioural check per table as 
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterable
 
 import pytest
 from sqlalchemy import Engine, text
@@ -60,7 +61,7 @@ EXPECTED_UPDATE: dict[str, set[str]] = {
 def _update_columns(engine: Engine, table: str) -> set[str]:
     schema, name = table.split(".")
     with engine.connect() as c:
-        rows = c.execute(
+        rows: Iterable[str] = c.execute(
             text(
                 "SELECT column_name FROM information_schema.column_privileges "
                 "WHERE table_schema = :s AND table_name = :n AND grantee = 'sos_app' "
@@ -74,7 +75,7 @@ def _update_columns(engine: Engine, table: str) -> set[str]:
 def _table_privileges(engine: Engine, table: str) -> set[str]:
     schema, name = table.split(".")
     with engine.connect() as c:
-        rows = c.execute(
+        rows: Iterable[str] = c.execute(
             text(
                 "SELECT privilege_type FROM information_schema.role_table_grants "
                 "WHERE table_schema = :s AND table_name = :n AND grantee = 'sos_app'"
