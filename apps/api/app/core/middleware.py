@@ -13,6 +13,11 @@
   ``multipart/form-data``, also 1 MiB: no route takes multipart (files go straight to presigned
   S3 URLs), so the header must not let an unauthenticated client make the API buffer more
   (SEC-010). Oversized requests get a 413 problem+json.
+- ``BidiControlMiddleware`` (audit 2026-10-06 hardening, CVE-2021-42574): a JSON body whose
+  text (values or keys) holds a Unicode text-direction control (``Bidi_Control``: ALM, LRM, RLM,
+  LRE..RLO, LRI..PDI) gets 422 ``invalid_characters``, so a name or note can never read
+  differently on screen than it is stored. The signed machine routes (edge agents, fleet
+  heartbeats) are exempt: they clean their own text.
 - ``RateLimitMiddleware`` (P2-07, docs/09 §2.7): resolves the client IP from the trusted proxy
   chain, applies the per-IP layer (``machine_ip`` on the machine paths) and the IP's
   authentication backoff before the body is read, answers 429 problem+json with ``Retry-After``,
@@ -26,8 +31,11 @@ behave normally.
 
 from __future__ import annotations
 
+import json
+import re
 import time
 from collections.abc import Iterable
+from typing import Any
 
 from fastapi import FastAPI
 from starlette.datastructures import Headers, MutableHeaders
@@ -44,9 +52,11 @@ from app.core.logging import bind_context, get_logger, request_scope, reset_cont
 
 __all__ = [
     "API_CSP",
+    "BIDI_CONTROLS",
     "DEFAULT_MAX_BODY_BYTES",
     "DEFAULT_MAX_MULTIPART_BYTES",
     "REQUEST_ID_HEADER",
+    "BidiControlMiddleware",
     "BodySizeLimitMiddleware",
     "RateLimitMiddleware",
     "RequestContextMiddleware",
@@ -289,6 +299,101 @@ class BodySizeLimitMiddleware:
             await self._reject(scope, receive, send, limit)
 
 
+# Unicode Bidi_Control: ALM, LRM, RLM, LRE, RLE, PDF, LRO, RLO, LRI, RLI, FSI, PDI.
+BIDI_CONTROLS = frozenset(
+    "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
+)
+# Cheap pre-check on the raw bytes: the characters in UTF-8, or as JSON escapes.
+_BIDI_HINT = re.compile(
+    rb"\xd8\x9c|\xe2\x80[\x8e\x8f\xaa-\xae]|\xe2\x81[\xa6-\xa9]"
+    rb"|\\u(?:061[cC]|200[eEfF]|202[a-eA-E]|206[6-9])"
+)
+_BODY_METHODS = frozenset({"POST", "PUT", "PATCH"})
+MACHINE_PATH_PREFIXES = ("/api/v1/edge/", "/api/v1/fleet/")
+
+
+def _has_bidi(value: Any) -> bool:
+    if isinstance(value, str):
+        return any(ch in BIDI_CONTROLS for ch in value)
+    if isinstance(value, dict):
+        return any(_has_bidi(k) or _has_bidi(v) for k, v in value.items())
+    if isinstance(value, list):
+        return any(_has_bidi(v) for v in value)
+    return False
+
+
+class BidiControlMiddleware:
+    """Refuse text-direction controls in JSON request bodies (see the module docstring)."""
+
+    def __init__(
+        self,
+        app: ASGIApp,
+        *,
+        api_prefix: str = API_PREFIX,
+        exempt_prefixes: Iterable[str] = MACHINE_PATH_PREFIXES,
+    ) -> None:
+        self.app = app
+        self.api_prefix = api_prefix
+        self.exempt_prefixes = tuple(exempt_prefixes)
+
+    def _applies(self, scope: Scope) -> bool:
+        path = str(scope.get("path", ""))
+        if str(scope.get("method", "")).upper() not in _BODY_METHODS:
+            return False
+        if not path.startswith(self.api_prefix + "/") or path.startswith(self.exempt_prefixes):
+            return False
+        return "json" in Headers(scope=scope).get("content-type", "").lower()
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or not self._applies(scope):
+            await self.app(scope, receive, send)
+            return
+        chunks: list[bytes] = []
+        while True:
+            message = await receive()
+            if message["type"] != "http.request":
+                break
+            chunks.append(message.get("body", b""))
+            if not message.get("more_body", False):
+                break
+        body = b"".join(chunks)
+        if _BIDI_HINT.search(body):
+            try:
+                parsed: Any = json.loads(body)
+            except ValueError:
+                parsed = None  # not JSON after all: the route answers it
+            if _has_bidi(parsed):
+                response = problem(
+                    Request(scope),
+                    status=422,
+                    code="invalid_characters",
+                    title="Validation failed",
+                    detail="Remove the invisible text-direction characters from the text and "
+                    "try again.",
+                    extra={
+                        "errors": [
+                            {
+                                "field": "body",
+                                "code": "invalid_characters",
+                                "message_key": "errors.invalid_characters",
+                            }
+                        ]
+                    },
+                )
+                await response(scope, receive, send)
+                return
+        replayed = False
+
+        async def replay() -> Message:
+            nonlocal replayed
+            if not replayed:
+                replayed = True
+                return {"type": "http.request", "body": body, "more_body": False}
+            return await receive()
+
+        await self.app(scope, replay, send)
+
+
 class RateLimitMiddleware:
     """Layer 1 (per client IP) and the RateLimit response headers (docs/09 §2.7)."""
 
@@ -366,12 +471,13 @@ def install_middleware(
     quiet_paths: Iterable[str] = ("/healthz", "/readyz"),
 ) -> None:
     """Add the middleware in the right order (outermost last): headers > context > rate limit >
-    body limit."""
+    body limit > text-direction check."""
     docs_paths: set[str] = set()
     if not settings.is_production_like:
         for path in (app.docs_url, app.redoc_url, app.swagger_ui_oauth2_redirect_url):
             if path:
                 docs_paths.add(path)
+    app.add_middleware(BidiControlMiddleware)
     app.add_middleware(
         BodySizeLimitMiddleware,
         max_body_bytes=max_body_bytes,

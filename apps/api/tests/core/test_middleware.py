@@ -24,6 +24,7 @@ from app.core.errors import NotFound, install_error_handlers
 from app.core.logging import bind_context, setup_logging
 from app.core.middleware import (
     REQUEST_ID_HEADER,
+    BidiControlMiddleware,
     BodySizeLimitMiddleware,
     RateLimitMiddleware,
     RequestContextMiddleware,
@@ -389,11 +390,100 @@ def test_SEC_010_a_multipart_content_type_does_not_raise_the_limit_on_the_real_a
     assert res.status_code == 413, res.text
 
 
+# --- Text-direction controls (audit 2026-10-06 hardening) ----------------------------------
+
+BIDI = ["\u202e", "\u202a", "\u2066", "\u2069", "\u200f", "\u061c"]
+
+
+@pytest.mark.parametrize("char", BIDI)
+@pytest.mark.parametrize("escaped", [False, True])
+def test_SEC_010_bidi_controls_in_json_text_are_refused(
+    client: TestClient, char: str, escaped: bool
+) -> None:
+    """Trojan-Source style direction overrides (CVE-2021-42574) make a name or note read
+    differently on screen than it is stored: refused with 422 ``invalid_characters`` on every
+    school-side JSON body, whether sent raw or as a JSON escape."""
+    data = {"name": f"Synthetic {char}Name", "dob": SYNTHETIC_DOB, "phone": SYNTHETIC_PHONE}
+    body = json.dumps(data, ensure_ascii=escaped).encode()
+    res = client.post(
+        "/api/v1/students", content=body, headers={"Content-Type": "application/json"}
+    )
+    assert res.status_code == 422, res.text
+    problem = res.json()
+    assert problem["code"] == "invalid_characters"
+    assert problem["errors"] == [
+        {
+            "field": "body",
+            "code": "invalid_characters",
+            "message_key": "errors.invalid_characters",
+        }
+    ]
+    assert GENERATED_ID.match(problem["request_id"])
+
+
+def test_SEC_010_bidi_check_also_covers_keys_and_nested_values(client: TestClient) -> None:
+    for payload in ({"x\u202e": 1}, {"a": [{"b": "ok \u2067 text"}]}):
+        res = client.post("/api/v1/students", json=payload)
+        assert res.status_code == 422
+        assert res.json()["code"] == "invalid_characters"
+
+
+def test_SEC_010_plain_text_telugu_and_escaped_backslashes_pass(client: TestClient) -> None:
+    for name in (SYNTHETIC_NAME, SYNTHETIC_TELUGU_NAME, "Path C:\\u202e literally", "a\u200dz"):
+        res = client.post(
+            "/api/v1/students",
+            json={"name": name, "dob": SYNTHETIC_DOB, "phone": SYNTHETIC_PHONE},
+        )
+        assert res.status_code == 200, (name, res.text)
+    # Not JSON: left to the route (here the raw body is just counted).
+    raw = client.post(
+        "/api/v1/raw", content="x\u202ey".encode(), headers={"Content-Type": "text/plain"}
+    )
+    assert raw.status_code == 200
+    assert raw.json() == {"size": len("x\u202ey".encode())}
+
+
+def test_SEC_010_bidi_check_skips_the_signed_machine_routes() -> None:
+    """Edge agents and fleet heartbeats sign their bodies and clean their own text; a request
+    there is passed through untouched."""
+    import asyncio
+
+    seen: list[bytes] = []
+
+    async def inner(scope: dict[str, Any], receive: Any, send: Any) -> None:
+        message = await receive()
+        seen.append(message.get("body", b""))
+
+    body = json.dumps({"ledger": "A\u202eB"}, ensure_ascii=False).encode()
+
+    async def receive() -> dict[str, Any]:
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    async def send(message: dict[str, Any]) -> None:
+        raise AssertionError("the middleware must not answer")
+
+    for path in ("/api/v1/edge/tally/snapshots", "/api/v1/fleet/heartbeat"):
+        scope = {
+            "type": "http",
+            "method": "POST",
+            "path": path,
+            "headers": [(b"content-type", b"application/json")],
+        }
+        asyncio.run(BidiControlMiddleware(inner)(scope, receive, send))
+    assert seen == [body, body]
+
+
 # --- ASGI hygiene ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
-    "middleware_cls", [RequestContextMiddleware, SecurityHeadersMiddleware, BodySizeLimitMiddleware]
+    "middleware_cls",
+    [
+        RequestContextMiddleware,
+        SecurityHeadersMiddleware,
+        BodySizeLimitMiddleware,
+        BidiControlMiddleware,
+    ],
 )
 def test_NFR_OBS_001_non_http_scopes_pass_through(middleware_cls: type[Any]) -> None:
     import asyncio
@@ -417,10 +507,12 @@ def test_NFR_OBS_001_middleware_is_installed_by_create_app() -> None:
     app = create_app()
     classes: list[object] = [m.cls for m in app.user_middleware]
     # Outermost first: headers wrap request context, which wraps the rate limiter (P2-07; a 429
-    # still carries the request id and security headers), which wraps the body limit.
+    # still carries the request id and security headers), which wraps the body limit, which
+    # wraps the text-direction check (it reads the body only once the size is known to be OK).
     assert classes == [
         SecurityHeadersMiddleware,
         RequestContextMiddleware,
         RateLimitMiddleware,
         BodySizeLimitMiddleware,
+        BidiControlMiddleware,
     ]
