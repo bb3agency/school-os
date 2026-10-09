@@ -750,25 +750,6 @@
         "title": "AnnouncementOut",
         "type": "object"
       },
-      "ApproveIn": {
-        "additionalProperties": false,
-        "properties": {
-          "note": {
-            "anyOf": [
-              {
-                "maxLength": 1000,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Note"
-          }
-        },
-        "title": "ApproveIn",
-        "type": "object"
-      },
       "AskIn": {
         "additionalProperties": false,
         "description": "One question to the school's records and documents (docs/09 \u00a75.4, docs/06 \u00a75).\n\nSend ``conversation_id`` to continue one of your conversations; omit it (and\n``session_id``) to start a new one and read its id from the ``meta`` event.\n``session_id`` is the older name: it continues your conversation with that id or starts\none. ``regenerate_of`` answers one of your latest messages again (``question`` is then\noptional and ignored); ``edit_of`` replaces one with ``question``. Either way the message\nand every later one become ``superseded``.",
@@ -2244,7 +2225,8 @@
               "no_enrolment",
               "student_not_active",
               "no_current_year",
-              "transfer_certificate_exists"
+              "transfer_certificate_exists",
+              "change_request_pending"
             ],
             "title": "Code",
             "type": "string"
@@ -3035,6 +3017,17 @@
               }
             ],
             "title": "Document Id"
+          },
+          "draft_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Draft Sha256"
           },
           "duplicate_no": {
             "anyOf": [
@@ -22315,6 +22308,34 @@
         "title": "Page[TicketOut]",
         "type": "object"
       },
+      "app__certificates__schemas__ApproveIn": {
+        "additionalProperties": false,
+        "description": "``draft_sha256``: the ``draft_sha256`` of the certificate as the approver read it (``GET\n/certificates/{id}``). If what the certificate would print changed since, approval is\nrefused with 409 ``certificate_draft_changed`` (audit 2026-10-05 A-11).",
+        "properties": {
+          "draft_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Draft Sha256",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "required": [
+          "draft_sha256"
+        ],
+        "title": "ApproveIn",
+        "type": "object"
+      },
       "app__certificates__schemas__DownloadUrlOut": {
         "properties": {
           "expires_at": {
@@ -22337,6 +22358,25 @@
           "filename"
         ],
         "title": "DownloadUrlOut",
+        "type": "object"
+      },
+      "app__changes__schemas__ApproveIn": {
+        "additionalProperties": false,
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "title": "ApproveIn",
         "type": "object"
       },
       "app__circulars__schemas__MemberOut": {
@@ -25180,7 +25220,7 @@
     },
     "/api/v1/certificates/{certificate_id}/approve": {
       "post": {
-        "description": "Approve and issue a transfer certificate (or a TC duplicate): serial number, register\nentry and, for a TC, the student leaves the rolls (permission ``certificate.approve``, MFA\nwithin 5 minutes, not the person who prepared it, ``If-Match``). Errors:\n``self_approval_forbidden`` (403), ``step_up_required`` (428), ``certificate_not_pending``\n/ ``certificate_blocked`` (409).",
+        "description": "Approve and issue a transfer certificate (or a TC duplicate): serial number, register\nentry and, for a TC, the student leaves the rolls (permission ``certificate.approve``, MFA\nwithin 5 minutes, not the person who prepared it, ``If-Match``). The body carries the\n``draft_sha256`` read from ``GET /certificates/{id}``. Errors:\n``self_approval_forbidden`` (403), ``step_up_required`` (428), ``certificate_not_pending``\n/ ``certificate_blocked`` / ``change_request_pending`` / ``requester_inactive`` /\n``certificate_draft_changed`` (409: what it prints changed since it was read).",
         "operationId": "approve_certificate_api_v1_certificates__certificate_id__approve_post",
         "parameters": [
           {
@@ -25198,18 +25238,11 @@
           "content": {
             "application/json": {
               "schema": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/ApproveIn"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "title": "Body"
+                "$ref": "#/components/schemas/app__certificates__schemas__ApproveIn"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -26054,7 +26087,7 @@
               "schema": {
                 "anyOf": [
                   {
-                    "$ref": "#/components/schemas/ApproveIn"
+                    "$ref": "#/components/schemas/app__changes__schemas__ApproveIn"
                   },
                   {
                     "type": "null"

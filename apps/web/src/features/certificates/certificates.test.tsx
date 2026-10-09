@@ -35,6 +35,7 @@ const YEAR = "0192f3a4-0000-7000-8000-0000000000a1";
 const READ = "certificate.read";
 const ISSUE = "certificate.issue";
 const APPROVE = "certificate.approve";
+const DRAFT = "abababababababababababababababababababababababababababababababab";
 
 function certificate(
   overrides: Partial<Schemas["CertificateOut"]> = {},
@@ -366,8 +367,8 @@ describe("certificate detail (US-1102..US-1107)", () => {
     stub.routes[`GET /bff/api/v1/certificates/${CERT}`] = () => Response.json(body);
   }
 
-  it("an approver approves a TC with If-Match (step-up note shown)", async () => {
-    detail([READ, APPROVE], certificate({ can_approve: true }));
+  it("an approver approves a TC with If-Match and the draft fingerprint it read (A-11)", async () => {
+    detail([READ, APPROVE], certificate({ can_approve: true, draft_sha256: DRAFT }));
     stub.routes[`POST /bff/api/v1/certificates/${CERT}/approve`] = () =>
       Response.json(certificate({ status: "issued", serial: "TC/2026-27/0001" }));
     renderWithIntl(<CertificateDetailScreen certificateId={CERT} />);
@@ -384,9 +385,25 @@ describe("certificate detail (US-1102..US-1107)", () => {
     );
     const call = stub.callsTo(`POST /bff/api/v1/certificates/${CERT}/approve`)[0];
     expect(call?.headers.get("if-match")).toBe('W/"1"');
-    expect(JSON.parse(call?.body ?? "{}")).toEqual({ note: "Checked with the register" });
+    expect(JSON.parse(call?.body ?? "{}")).toEqual({
+      note: "Checked with the register",
+      draft_sha256: DRAFT,
+    });
     expect(screen.getByText("Reason for leaving")).toBeInTheDocument();
     expect(screen.getByText("Parent transferred")).toBeInTheDocument();
+  });
+
+  it("a draft changed since it was read says to reload and check it again (A-11)", async () => {
+    detail([READ, APPROVE], certificate({ can_approve: true, draft_sha256: DRAFT }));
+    stub.routes[`POST /bff/api/v1/certificates/${CERT}/approve`] = () =>
+      problem(409, "certificate_draft_changed");
+    renderWithIntl(<CertificateDetailScreen certificateId={CERT} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Approve and issue" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Approve and issue" }));
+    expect(
+      await within(dialog).findByText("The certificate changed after you opened it"),
+    ).toBeInTheDocument();
   });
 
   it("the requester sees their own request, can withdraw it and is never offered approval", async () => {

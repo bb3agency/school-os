@@ -235,7 +235,7 @@ describe("audit log CSV download (FR-AUD-005, US-1001, SEC-005)", () => {
     const [call] = stub.callsTo(EXPORT);
     expect(call?.url.searchParams.get("actor")).toBe(USER);
     expect(call?.url.searchParams.get("action")).toBe("student.update");
-    expect(call?.url.searchParams.get("from")).toBe("2026-06-01");
+    expect(call?.url.searchParams.get("from")).toBe("2026-06-01T00:00:00+05:30");
     // A date that is not real is left out, as in the table; no page size on a file.
     expect(call?.url.searchParams.has("to")).toBe(false);
     expect(call?.url.searchParams.has("limit")).toBe(false);
