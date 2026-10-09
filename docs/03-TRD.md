@@ -76,7 +76,7 @@ A multi-tenant web application (Next.js BFF + FastAPI API + Celery workers) on A
 | FR-STU-006 | Attributes MUST be defined in `attribute_definitions` (type, classification, identity flag, validation, export mappings) so new fields need no schema change. | I |
 | FR-STU-007 | C3 (restricted) values MUST be encrypted at the application layer with the tenant DEK. | T |
 | FR-STU-008 | Guardians MUST be modelled separately and linked to students with relationship type. | T |
-| FR-STU-010 | Search MUST support partial names, transliteration (Telugu↔Latin), admission number, class/section, and parent name, filtered by scope. | T |
+| FR-STU-010 | Search MUST support partial names, transliteration (Telugu↔Latin), admission number, class/section, and parent name, filtered by scope. A class or section scope reaches only students actively enrolled in its sections or classes in the current academic year, whatever year is searched (owner decision 2026-10-09; docs/07 §6.1). | T |
 | FR-STU-011 | Search results for 2,000-student tenants MUST return in ≤ 300 ms p95. | T |
 | FR-STU-012 | The system MUST reject input of full Aadhaar numbers in any field and store only `aadhaar_last4` plus as-printed fields. | T |
 | FR-STU-013 | The student record MUST hold the APAAR ID as attribute `apaar_id` (C2, not an identity field, ADR-0037) with provenance: sources `udise_plus`, `parent_form` and `manual_entry` (precedence in that order); a value counts (canonical, verified) only after a person verifies it against the portal or the card. Corrections are recorded as new values from a source and verified again (history kept, FR-STU-005). | T |
@@ -159,7 +159,7 @@ A multi-tenant web application (Next.js BFF + FastAPI API + Celery workers) on A
 | FR-KB-010 | Scope leakage tests (cross-section, cross-tenant) MUST be part of the eval gate with zero tolerance. | T |
 | FR-KB-011 | Per-tenant monthly AI budgets MUST be enforced with graceful degradation (search-only mode). | T |
 | FR-KB-012 | Conversation context is scoped to the user's own conversations; cross-conversation memory is per user and per school, visible, editable and deletable by that user; never cross-user. *(Amended 2026-09-30 by ADR-0034; was: "Conversation context MUST be session-scoped; no cross-user memory.")* | T |
-| FR-KB-030 | Authorized users MAY promote answers to verified answers; verified answers are flagged for review when cited sources change. | T |
+| FR-KB-030 | Authorized users MAY promote answers to verified answers; verified answers are flagged for review when cited sources change. The person who drafted a verified answer (created it, or last changed its text or citations) MUST NOT review it: 409 `reviewer_must_differ`. Exception: when no other active member of the school holds `kb.verified_answer.manage`, the drafter MAY review it, and the `kb.verified_answer.reviewed` audit event MUST carry `self_reviewed: true` (owner decision 2026-10-09). | T |
 
 ### 3.9 Exports (FR-EXP)
 
@@ -293,7 +293,7 @@ Every row below is proposed from the roadmap scope (14 · M4; stories US-1601..U
 | FR-NOTICE-002 | Circulars classified C2 or C3 MUST NOT be used for notices; staff text and edited notices with phone numbers, email addresses or Aadhaar-like numbers MUST be refused with a fix-it message. *(Proposed from the roadmap scope; PO to confirm.)* | T |
 | FR-NOTICE-003 | Drafting MUST go through `knowledge.gateway` (role `notice`, prompt `parent_notice`); the draft is marked AI-drafted and is editable; if AI is unavailable an empty draft opens. *(Proposed from the roadmap scope; PO to confirm.)* | T |
 | FR-NOTICE-004 | A notice MUST have English and Telugu title and body within configured lengths before approval. *(Proposed from the roadmap scope; PO to confirm.)* Telugu part: **Deferred: hidden while `SOS_TELUGU_ENABLED` is off (ADR-0036).** | T |
-| FR-NOTICE-005 | Only holders of `notice.approve` may approve; approved notices are immutable. *(Proposed from the roadmap scope; PO to confirm.)* | T |
+| FR-NOTICE-005 | Only holders of `notice.approve` may approve; approved notices are immutable. The person who drafted a notice MAY approve it themselves; the approval's audit event MUST then carry `self_approved: true`, so it shows in the audit viewer (owner decision 2026-10-09). *(Proposed from the roadmap scope; PO to confirm.)* | T |
 | FR-NOTICE-006 | After approval the worker MUST render an A4 PDF and a PNG with headless Chromium and the bundled Noto Sans Telugu; downloads use presigned links ≤ 5 min and are audited. *(Proposed from the roadmap scope; PO to confirm.)* Telugu part: **Deferred: hidden while `SOS_TELUGU_ENABLED` is off (ADR-0036).** | T |
 | FR-NOTICE-007 | Drafting, editing, approving and downloading MUST be audited (ids and codes only) and every model call metered (feature `notices`). *(Proposed from the roadmap scope; PO to confirm.)* | T |
 | FR-NOTICE-008 | SchoolOS MUST NOT send notices to parents; staff copy or download them. *(Proposed from the roadmap scope; PO to confirm.)* | I |

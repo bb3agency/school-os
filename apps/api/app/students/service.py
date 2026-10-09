@@ -1476,8 +1476,9 @@ def search(
     """Scoped, ranked search by partial name (EN/TE), admission number, class/section tokens
     (``9b``, ``IX-B``) and parent names (FR-STU-010, US-302). Scope: current-year enrolments in
     the caller's sections for scoped holders (US-302 AC2). ``filters.academic_year_id`` picks
-    another year: its enrolments give the class and section, and scoped holders reach that
-    year's sections exactly as they reach the current year's.
+    another year: its enrolments give the class and section shown and filtered on, but a scoped
+    holder still reaches only the students of their CURRENT-year sections (owner decision
+    2026-10-09: a former class is out of reach); school-wide holders see every student.
 
     ``filters.apaar_id`` (FR-STU-016, ADR-0037): exact match on the typed ``apaar_id``
     attribute only, current values that are verified or recorded (not rejected); same scope.
@@ -1492,7 +1493,14 @@ def search(
     cfg = search_config()
     offset = _offset(cursor, cfg.max_offset)
     structure = _structure(session, filters.academic_year_id)
-    allowed = _allowed_sections(ctx, READ, structure)
+    current = structure if filters.academic_year_id is None else _structure(session)
+    allowed = _allowed_sections(ctx, READ, current)
+    reach_sections: frozenset[uuid.UUID] | None = None
+    if allowed is not None and current.year_id != structure.year_id:
+        # Another year: reach is still this year's sections (a filter on the student, not on
+        # the shown enrolment). No current year means a scoped holder reaches nobody.
+        reach_sections = allowed if current.year_id is not None else frozenset()
+        allowed = None
     parsed = parse_query(filters.query or "")
     sections: frozenset[uuid.UUID] | None = None
     if parsed.has_structure:
@@ -1511,13 +1519,19 @@ def search(
         )
         sections = _intersect(sections, in_class)
     empty = Page[StudentSummary](data=[], next_cursor=None)
-    if (allowed is not None and not allowed) or (sections is not None and not sections):
+    if (
+        (allowed is not None and not allowed)
+        or (reach_sections is not None and not reach_sections)
+        or (sections is not None and not sections)
+    ):
         return empty
     rows = repo.search(
         session,
         repo.SearchSpec(
             academic_year_id=structure.year_id,
             allowed_sections=allowed,
+            reach_year_id=current.year_id if reach_sections is not None else None,
+            reach_sections=reach_sections,
             section_filter=sections,
             status=filters.status,
             admission_no=filters.admission_no,

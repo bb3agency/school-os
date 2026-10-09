@@ -1090,6 +1090,30 @@ def active_members(session: Session) -> list[StaffMemberOut]:
     ]
 
 
+def active_holders(session: Session, permission: str) -> list[uuid.UUID]:
+    """Membership ids of this school's active, unexpired members whose roles grant
+    ``permission`` (any scope), without break-glass support memberships: the people who could
+    do a piece of work instead of the caller (e.g. a second reviewer of a verified answer,
+    FR-KB-030). No permission check: a permission key in, membership ids out."""
+    now = dt.datetime.now(dt.UTC)
+    roles = repo.list_roles(session)
+    perms = repo.role_permission_keys(session, [r.id for r in roles])
+    granting = {r.key for r in roles if r.key != BREAKGLASS_ROLE and permission in perms[r.id]}
+    if not granting:
+        return []
+    members = [
+        m
+        for m in repo.list_memberships(session, status="active")
+        if m.expires_at is None or m.expires_at > now
+    ]
+    keys = repo.role_keys_by_membership(session, [m.id for m in members])
+    return [
+        m.id
+        for m in members
+        if BREAKGLASS_ROLE not in keys.get(m.id, set()) and granting & keys.get(m.id, set())
+    ]
+
+
 def list_permissions(session: Session) -> list[PermissionOut]:
     """The grantable tenant catalog (no platform or implicit permissions)."""
     implicit = implicit_permissions()

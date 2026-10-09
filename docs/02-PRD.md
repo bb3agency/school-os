@@ -105,7 +105,7 @@ Format: **US-ID · As a … I want … so that …** followed by acceptance crit
 
 **US-302** · As staff, I want to find a student by partial name, admission number, class or parent name in English or Telugu. [FR-STU-010]
 - AC1: "venkat sai 9b" finds "VENKATA SAI K." in 9B; Telugu script queries find transliterated matches.
-- AC2: Results respect my scope.
+- AC2: Results respect my scope. Class teachers and teachers find only students in their classes or sections this academic year, also when they look at an earlier year; last year's class is out of their reach (owner decision 2026-10-09). School-wide staff find students of every year.
 - AC3: I can find a student by the exact APAAR ID (12 digits, with or without spaces) using a separate "APAAR ID" search option. It matches only the student's recorded or verified APAAR ID (not a rejected or replaced one, not other fields), within my scope; the number is never written to logs. [FR-STU-016, ADR-0037]
 
 **US-303** · As staff, I never want to enter an Aadhaar number by mistake. [FR-STU-012, BR-02]
@@ -169,6 +169,7 @@ Format: **US-ID · As a … I want … so that …** followed by acceptance crit
 
 **US-802** · As a principal, I want to save a checked answer as a "verified answer" so that everyone gets the same reliable response. [FR-KB-030..032]
 - AC1: Verified answers show who verified them and when; they are re-reviewed when source documents change.
+- AC2: The person who wrote a verified answer cannot also confirm it on review; another staff member who manages verified answers must. If nobody else in the school can, the writer may, and the audit log marks it as self-reviewed (owner decision 2026-10-09).
 
 **US-803** · As a class teacher, I must not be able to learn about students outside my sections through the assistant. [FR-KB-010, BR-06]
 - AC1: Asking about a student in another section returns "not found in records you can access".
@@ -332,7 +333,7 @@ Operators are SchoolOS staff with platform roles (16 §2, §6). None of these st
 - AC2: A circular marked personal (C2) or restricted (C3) cannot be used for a notice; free text with phone numbers, email addresses or Aadhaar-like numbers is refused with a message saying what to remove.
 - AC3: If AI is unavailable, an empty draft opens so I can write the notice myself.
 
-**US-1606** · As a principal, I want to approve a notice and then copy its text or download it as a printable A4 page or an image. [FR-NOTICE-005, FR-NOTICE-006] *(Proposed from the roadmap scope; PO to confirm.)*
+**US-1606** · As a principal, I want to approve a notice and then copy its text or download it as a printable A4 page or an image. A principal may approve a notice they drafted themselves; the audit log marks it as self-approved. [FR-NOTICE-005, FR-NOTICE-006] *(Proposed from the roadmap scope; PO to confirm.)*
 - AC1: Only holders of `notice.approve` can approve; both languages must be filled; an approved notice cannot be edited.
 - AC2: After approval the A4 PDF and a PNG image are rendered (Telugu without clipped glyphs); download links last at most 5 minutes and every download is audited; the plain text can be copied for WhatsApp-style groups. *(Telugu part deferred: hidden while `SOS_TELUGU_ENABLED` is off, ADR-0036.)*
 - AC3: SchoolOS never sends the notice to parents itself (no parent logins or messaging in core, §9).

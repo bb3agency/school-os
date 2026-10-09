@@ -2872,7 +2872,9 @@ export interface paths {
          *     ``needs_review`` after a cited document changed. Its citations (new ones if you send them)
          *     must quote the current version of documents you can read (422 as on create); it becomes
          *     ``active`` and you become its verifier. 404 when you cannot read a document it cites; 409
-         *     ``verified_answer_retired``; 412 when it changed since you read it.
+         *     ``verified_answer_retired``; 409 ``reviewer_must_differ`` when you drafted it and someone
+         *     else in the school can review it (owner decision 2026-10-09); 412 when it changed since you
+         *     read it.
          */
         post: operations["review_verified_answer_api_v1_knowledge_verified_answers__answer_id__review_post"];
         delete?: never;
@@ -12783,7 +12785,7 @@ export interface components {
         StudentSearchIn: {
             /**
              * Academic Year Id
-             * @description Academic year whose enrolments are listed (class, section and scope); the current year when left out. Unknown years answer 422.
+             * @description Academic year whose enrolments give the class and section shown and filtered on; the current year when left out. Scoped holders still see only students of their sections/classes this year. Unknown years answer 422.
              */
             academic_year_id?: string | null;
             /** Admission No */
@@ -26382,7 +26384,7 @@ export interface operations {
     search_students_api_v1_students_get: {
         parameters: {
             query?: {
-                /** @description Academic year whose enrolments are listed (class, section and scope); the current year when left out. Unknown years answer 422. */
+                /** @description Academic year whose enrolments give the class and section shown and filtered on; the current year when left out. Scoped holders still see only students of their sections/classes this year. Unknown years answer 422. */
                 academic_year_id?: string | null;
                 /**
                  * @deprecated

@@ -1355,6 +1355,7 @@ class SchoolKnowledgeService:
                 "answer_text": mask_aadhaar(nfc(data.answer_text)),
                 "citations": citations,
                 "verified_by": ctx.membership_id,
+                "drafted_by": ctx.membership_id,
                 "verified_at": now,
                 "review_due": data.review_due,
             },
@@ -1385,6 +1386,12 @@ class SchoolKnowledgeService:
             raise Conflict("This verified answer is retired.", code="verified_answer_retired")
         return row
 
+    @staticmethod
+    def _drafter_of(row: VerifiedAnswer) -> uuid.UUID:
+        """Who wrote the answer's current text: ``drafted_by``, or for an answer stored before
+        0050_verified_answer_drafter, the person who stands behind it now."""
+        return row.drafted_by if row.drafted_by is not None else row.verified_by
+
     def review_verified_answer(
         self,
         session: Session,
@@ -1398,8 +1405,22 @@ class SchoolKnowledgeService:
         cited document changed (FR-KB-030, docs/06 §4.8). Its citations (the new ones, else the
         stored ones) must again quote the CURRENT version of documents the caller can read;
         it becomes ``active``, verified by the caller now. Audited
-        ``kb.verified_answer.reviewed`` with the changed field names only."""
+        ``kb.verified_answer.reviewed`` with the changed field names only.
+
+        The reviewer must not be the answer's drafter (owner decision 2026-10-09): 409
+        ``reviewer_must_differ`` while another active member holds
+        ``kb.verified_answer.manage``. With no one else to ask, the drafter may review it and
+        the event carries ``self_reviewed: true``. A reviewer who changes the text or citations
+        becomes the drafter."""
         row = self._managed_answer(session, ctx, answer_id, expected_version)
+        self_reviewed = self._drafter_of(row) == ctx.membership_id
+        if self_reviewed and any(
+            m != ctx.membership_id for m in identity.active_holders(session, MANAGE_VERIFIED)
+        ):
+            raise Conflict(
+                "You drafted this answer, so someone else must review it.",
+                code="reviewer_must_differ",
+            )
         citations = self._checked_citations(
             session,
             ctx,
@@ -1423,6 +1444,8 @@ class SchoolKnowledgeService:
             changed.append("answer_text")
         if data.citations is not None:
             changed.append("citations")
+        if data.answer_text is not None or data.citations is not None:
+            values["drafted_by"] = ctx.membership_id
         if "review_due" in data.model_fields_set:
             values["review_due"] = data.review_due
             changed.append("review_due")
@@ -1440,6 +1463,7 @@ class SchoolKnowledgeService:
                 "previous_status": row.status,
                 "changed": changed,
                 "citations": len(citations),
+                "self_reviewed": self_reviewed,
             },
             request_id=ctx.request_id,
         )
