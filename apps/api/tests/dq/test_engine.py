@@ -184,6 +184,32 @@ def test_A_01_a_blocker_cleared_by_a_verified_value_resolves_and_an_unbacked_one
     assert DS.one(admin_engine, plain, "DQ-002")["status"] == "reopened"
 
 
+def test_SEC_015_resolve_and_waive_follow_their_own_scope_for_custom_roles(world: Any) -> None:
+    """App-logic hardening (custom roles): a school-wide reader whose ``dq.findings.resolve`` and
+    ``dq.findings.waive`` are scoped to 9A reads a 9C finding but cannot resolve or waive it."""
+    import dataclasses
+
+    from app.authz.context import Scopes
+    from app.core.errors import Forbidden
+
+    base = DS.ctx(world.a, "office_admin")
+    custom = dataclasses.replace(
+        base,
+        permissions=base.permissions | {dq.RESOLVE, dq.WAIVE},
+        scoped_permissions=frozenset({dq.RESOLVE, dq.WAIVE}),
+        scopes=Scopes(section_ids=frozenset({world.a.ids["section_9a"]})),
+    )
+    outside = DS.high_finding(world.a, section_key="section_9c")
+    inside = DS.high_finding(world.a)
+    assert DS.call(world.a, dq.get_finding, outside, as_ctx=custom).status == "open"
+    with pytest.raises(Forbidden):
+        DS.call(world.a, dq.resolve_finding, outside, ResolveIn(note="Not mine"), as_ctx=custom)
+    with pytest.raises(Forbidden):
+        DS.call(world.a, dq.waive_finding, outside, WaiveIn(reason="Not mine"), as_ctx=custom)
+    out = DS.call(world.a, dq.resolve_finding, inside, ResolveIn(note="Mine"), as_ctx=custom)
+    assert out.status == "resolved"
+
+
 def test_US_502_resolved_with_note_reopens_when_the_conflict_is_still_there(
     world: Any, admin_engine: Engine
 ) -> None:

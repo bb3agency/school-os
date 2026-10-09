@@ -10923,9 +10923,9 @@ export interface components {
             candidates: components["schemas"]["LinkedStudentOut"][];
             /**
              * Closing Balance
-             * @description Positive: the party owes the school
+             * @description Positive: the party owes the school. Null without school-wide finance.read
              */
-            closing_balance: string;
+            closing_balance: string | null;
             /** Group Name */
             group_name: string;
             /**
@@ -10960,9 +10960,9 @@ export interface components {
             as_of: string;
             /**
              * Closing Balance
-             * @description Positive: the party owes the school
+             * @description Positive: the party owes the school. Null without school-wide finance.read
              */
-            closing_balance: string;
+            closing_balance: string | null;
             /** Group Name */
             group_name: string;
             /**

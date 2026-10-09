@@ -287,6 +287,43 @@ def test_FR_TASK_004_owner_moves_their_task_and_cannot_cancel_it(
     assert stale.status_code == 412
 
 
+def test_SEC_015_scoped_task_grants_reach_only_your_own_tasks(ai_on: Any) -> None:
+    """App-logic hardening (custom roles): ``task.read_all`` and ``task.manage`` granted only
+    through a scoped grant do not reach other people's tasks (tasks belong to no section, so a
+    scoped grant fails closed)."""
+    from app.authz.context import Scopes
+    from app.circulars.schemas import TaskStatusIn
+    from app.core.errors import NotFound
+
+    school = ai_on.a
+    task_id = C.task(school, owner=school.people["teacher"], by="principal")
+    base = C.ctx(school, "office_admin")
+    scoped = dataclasses.replace(
+        base,
+        scoped_permissions=base.scoped_permissions | {service.TASK_ALL, service.TASK_MANAGE},
+        scopes=Scopes(section_ids=frozenset({school.ids["section_9a"]})),
+    )
+    with tenant_session(school.tenant_id, scoped.user_id) as db:
+        with pytest.raises(NotFound):
+            service.get_task(db, scoped, task_id)
+        with pytest.raises(NotFound):
+            service.set_task_status(db, scoped, task_id, TaskStatusIn(status="cancelled"), 1)
+        with pytest.raises(Forbidden):
+            service.list_tasks(
+                db,
+                scoped,
+                view="all",
+                status=None,
+                due=None,
+                owner=None,
+                document_id=None,
+                limit=50,
+                cursor=None,
+            )
+    with tenant_session(school.tenant_id, base.user_id) as db:
+        assert service.get_task(db, base, task_id).id == task_id
+
+
 def test_FR_TASK_003_manager_reassigns_and_cancels(
     ai_on: Any, api: Any, admin_engine: Engine
 ) -> None:

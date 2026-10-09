@@ -163,6 +163,23 @@ def _reach(session: Session, ctx: UserContext) -> frozenset[uuid.UUID] | None:
     return frozenset(students.list_students_in_scope(session, ctx, permissions=(READ,)))
 
 
+def _require_action_scope(
+    session: Session, ctx: UserContext, permission: str, row: RowMapping
+) -> None:
+    """Resolve and waive reach a finding through their OWN scope too (custom roles may grant
+    them narrower than ``dq.findings.read``): 403 ``out_of_scope`` for a finding the caller
+    may read but not act on."""
+    if not ctx.has(permission) or ctx.scope_for(permission).school_wide:
+        return  # the route checks the permission; other callers (change requests) as before
+    reach = frozenset(students.list_students_in_scope(session, ctx, permissions=(permission,)))
+    if row["student_id"] not in reach:
+        raise Forbidden(
+            "This finding is about a student outside your classes. Ask someone who looks "
+            "after that class.",
+            code="out_of_scope",
+        )
+
+
 def _visible(reach: frozenset[uuid.UUID] | None, student_id: uuid.UUID | None) -> bool:
     return student_id is not None and (reach is None or student_id in reach)
 
@@ -906,6 +923,7 @@ def resolve_finding(
     re-run reopens it if the conflict is still there (AC2). Audit: ``dq.finding.resolved``."""
     _reject_aadhaar("note", data.note)
     row, reach = _visible_finding(session, ctx, finding_id, lock=True)
+    _require_action_scope(session, ctx, RESOLVE, row)
     _open_for_change(row, expected_version)
     blocker = row["severity"] == Severity.BLOCKER.value
     if blocker:
@@ -989,6 +1007,7 @@ def waive_finding(
     conflict: a re-run with different values reopens it. Audit: ``dq.finding.waived``."""
     _reject_aadhaar("reason", data.reason)
     row, reach = _visible_finding(session, ctx, finding_id, lock=True)
+    _require_action_scope(session, ctx, WAIVE, row)
     _open_for_change(row, expected_version)
     if row["severity"] == Severity.BLOCKER.value:
         _require_step_up(ctx)

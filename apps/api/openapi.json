@@ -13721,10 +13721,17 @@
             "type": "array"
           },
           "closing_balance": {
-            "description": "Positive: the party owes the school",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-            "title": "Closing Balance",
-            "type": "string"
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Positive: the party owes the school. Null without school-wide finance.read",
+            "title": "Closing Balance"
           },
           "group_name": {
             "title": "Group Name",
@@ -13822,10 +13829,17 @@
             "type": "string"
           },
           "closing_balance": {
-            "description": "Positive: the party owes the school",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-            "title": "Closing Balance",
-            "type": "string"
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Positive: the party owes the school. Null without school-wide finance.read",
+            "title": "Closing Balance"
           },
           "group_name": {
             "title": "Group Name",

@@ -150,7 +150,11 @@ describe("findings list (US-501 AC1/AC2, FR-DQ-006)", () => {
     expect(within(warnings).getByText("A. Test")).toBeInTheDocument();
     // Status filter defaults to unresolved (the API's default too).
     const call = stub.callsTo("GET /bff/api/v1/dq/findings")[0];
-    expect(call?.url.searchParams.getAll("status")).toEqual(["open", "reopened", "needs_confirmation"]);
+    expect(call?.url.searchParams.getAll("status")).toEqual([
+      "open",
+      "reopened",
+      "needs_confirmation",
+    ]);
   });
 
   it("shows the explanation in Telugu for Telugu readers", async () => {

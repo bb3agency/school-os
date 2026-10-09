@@ -920,7 +920,7 @@ def list_tasks(
     """``mine`` (default): tasks you own (``task.read``); ``all``: every task of the school
     (``task.read_all``, else 403). Without ``status``: open and in-progress tasks. Soonest due
     first; ``due`` = ``overdue`` / ``week`` (next 7 days) / ``later``."""
-    if view == "all" and not ctx.has(TASK_ALL):
+    if view == "all" and not _school_grant(ctx, TASK_ALL):
         raise Forbidden("You can see only your own tasks.", code="tasks_not_all")
     who = ctx.membership_id if view == "mine" else owner
     after = decode_cursor(cursor)
@@ -955,12 +955,19 @@ def list_tasks(
     return Page[TaskOut](data=data, next_cursor=next_cursor)
 
 
+def _school_grant(ctx: UserContext, permission: str) -> bool:
+    """``task.read_all`` / ``task.manage`` reach other people's tasks only when granted
+    school-wide: tasks belong to no class or section, so a scoped (custom role) grant fails
+    closed (app-logic hardening, SEC-015)."""
+    return ctx.has(permission) and ctx.scope_for(permission).school_wide
+
+
 def _visible_task(
     session: Session, ctx: UserContext, task_id: uuid.UUID, *, lock: bool = False
 ) -> Task:
     task = repo.get_task(session, task_id, lock=lock)
     if task is None or not (
-        task.owner_membership_id == ctx.membership_id or ctx.has(TASK_ALL) or ctx.has(TASK_MANAGE)
+        task.owner_membership_id == ctx.membership_id or _school_grant(ctx, TASK_ALL) or _school_grant(ctx, TASK_MANAGE)
     ):
         raise NotFound("Task not found")
     return task
@@ -980,7 +987,7 @@ def _linked_document(session: Session, ctx: UserContext, document_id: uuid.UUID)
 
 def create_task(session: Session, ctx: UserContext, data: TaskCreate) -> TaskOut:
     """Add a task by hand (``task.manage``), optionally linked to a circular you can see."""
-    if not ctx.has(TASK_MANAGE):
+    if not _school_grant(ctx, TASK_MANAGE):
         raise Forbidden()
     _refuse_aadhaar({"title": data.title, "details": data.details})
     _active_owner(session, data.owner_membership_id, "owner_membership_id")
@@ -1009,7 +1016,7 @@ def update_task(
 ) -> TaskOut:
     """Change title, details, due date or owner (``task.manage``; ``If-Match``). Done or
     cancelled tasks cannot change (409 ``task_closed``). A new owner is notified."""
-    if not ctx.has(TASK_MANAGE):
+    if not _school_grant(ctx, TASK_MANAGE):
         raise Forbidden()
     _refuse_aadhaar({"title": data.title, "details": data.details})
     task = _visible_task(session, ctx, task_id, lock=True)
@@ -1056,7 +1063,7 @@ def set_task_status(
     ``in_progress``, ``done`` (records who and when), back to ``open``; ``cancelled`` needs
     ``task.manage``. 409 ``task_status_not_allowed`` for other moves."""
     task = _visible_task(session, ctx, task_id, lock=True)
-    manager = ctx.has(TASK_MANAGE)
+    manager = _school_grant(ctx, TASK_MANAGE)
     if task.owner_membership_id != ctx.membership_id and not manager:
         raise Forbidden("Only the task's owner can change its status.", code="not_task_owner")
     _check_version(task.version, version)

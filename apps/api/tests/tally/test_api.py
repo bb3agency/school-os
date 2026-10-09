@@ -586,6 +586,26 @@ def test_FR_TALLY_007_status_totals_only_for_finance_readers(
     assert owner["groups_selected"] == 2
 
 
+def test_SEC_003_party_balances_only_for_finance_readers(
+    api: Any, admin_engine: Engine
+) -> None:
+    """App-logic hardening (custom roles): a ``tally.configure`` holder without school-wide
+    ``finance.read`` links ledgers but does not see their balances (null)."""
+    import dataclasses
+
+    school, agent = _ready(api, admin_engine)
+    T.snapshot(api, agent, [T.party("Synthetic Party Balance", "125.00")])
+    person = school.people["accountant"]
+    full = T.SW.ctx_for(school.tenant_id, person, "accountant")
+    configure_only = dataclasses.replace(full, permissions=full.permissions - {service.READ})
+    with tenant_session(school.tenant_id, person.user_id) as db:
+        (hidden,) = service.list_parties(db, configure_only).data
+        (shown,) = service.list_parties(db, full).data
+        assert hidden.closing_balance is None
+        assert service.get_party(db, configure_only, hidden.id).closing_balance is None
+    assert str(shown.closing_balance) == "125.00"
+
+
 def test_FR_TALLY_006_links_only_to_students_in_this_school(
     api: Any, admin_engine: Engine, world: Any
 ) -> None:
