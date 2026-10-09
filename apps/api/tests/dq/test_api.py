@@ -178,9 +178,7 @@ def test_AA_18_run_scope_outside_the_callers_reach_answers_like_an_unknown_id(
     )
 
     def run(scope: dict[str, Any]) -> Any:
-        return DS.call(
-            world.a, dq.request_run, RunCreate(scope=RunScopeIn(**scope)), as_ctx=custom
-        )
+        return DS.call(world.a, dq.request_run, RunCreate(scope=RunScopeIn(**scope)), as_ctx=custom)
 
     def errors(scope: dict[str, Any]) -> Any:
         with pytest.raises(ValidationFailed) as exc:
