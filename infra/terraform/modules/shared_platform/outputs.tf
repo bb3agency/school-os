@@ -117,10 +117,11 @@ output "ses" {
 output "github_actions" {
   description = "Role ARNs for GitHub Actions (configure-aws-credentials role-to-assume)."
   value = {
-    deploy_role_arn = module.ci.deploy_role_arn
-    plan_role_arn   = module.ci.plan_role_arn
-    apply_role_arn  = module.ci.apply_role_arn
-    deploy_subjects = module.ci.deploy_subjects
+    deploy_role_arn      = module.ci.deploy_role_arn
+    plan_role_arn        = module.ci.plan_role_arn
+    apply_role_arn       = module.ci.apply_role_arn
+    deploy_subjects      = module.ci.deploy_subjects
+    deploy_workflow_refs = module.ci.deploy_workflow_refs
     # Audit W3-04: who may assume the plan role, and whether it may read secrets.
     plan_subjects      = module.ci.plan_subjects
     plan_reads_secrets = module.ci.plan_reads_secrets

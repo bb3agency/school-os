@@ -835,9 +835,14 @@ module "ci" {
   create_oidc_provider       = var.create_github_oidc_provider
   existing_oidc_provider_arn = var.existing_github_oidc_provider_arn
   deploy_environment         = var.github_deploy_environment
-  allow_main_branch          = var.github_allow_main_branch
-  ecr_repository_arns        = values(module.ecr.repository_arns)
-  ecs_cluster_arn            = module.cluster.arn
+  # P2-08 (b): staging deploys come only from deploy-staging.yml on main (after CI passed);
+  # production images and bundles only from release.yml on a CalVer tag.
+  deploy_workflows = var.github_deploy_environment == "production" ? [
+    "release.yml@refs/tags/20*",
+  ] : ["deploy-staging.yml@refs/heads/main"]
+  allow_main_branch   = var.github_allow_main_branch
+  ecr_repository_arns = values(module.ecr.repository_arns)
+  ecs_cluster_arn     = module.cluster.arn
   # Not db_bootstrap: its execution role reads the RDS master secret. Operators start it with their
   # own credentials (docs/10 §8); CI never does (audit 2026-10-05 P2-04).
   passable_role_arns = flatten([

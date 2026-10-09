@@ -32,6 +32,23 @@ variable "deploy_environment" {
   type        = string
 }
 
+variable "deploy_workflows" {
+  description = "Workflow files and refs (`<file>@<ref>`, relative to .github/workflows/) whose jobs may assume the deploy role, matched against the job_workflow_ref claim (audit P2-08). Example: deploy-staging.yml@refs/heads/main."
+  type        = list(string)
+
+  validation {
+    condition = length(var.deploy_workflows) > 0 && alltrue([
+      for w in var.deploy_workflows : can(regex("^[A-Za-z0-9._-]+\\.ya?ml@refs/(heads|tags)/[A-Za-z0-9._*/-]+$", w))
+    ])
+    error_message = "At least one <file>.yml@refs/heads/<branch> or @refs/tags/<pattern>."
+  }
+
+  validation {
+    condition     = alltrue([for w in var.deploy_workflows : !startswith(split("@", w)[1], "refs/heads/") || !strcontains(w, "*")])
+    error_message = "Branch refs are exact (no wildcard): a wildcard branch would let any branch's copy of the workflow deploy."
+  }
+}
+
 variable "allow_main_branch" {
   description = "Also allow jobs on refs/heads/main without an environment (staging auto-deploy). Keep false for prod."
   type        = bool

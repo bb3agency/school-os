@@ -1,7 +1,10 @@
 # Staging deploy (shared tier, ECS Fargate) — docs/10 §8 step 1.
 #
-# main -> build + SBOM + scan -> push to ECR (tag = git SHA; ECR tags are immutable)
+# main -> full CI (ci.yml as a reusable workflow; nothing deploys unless it passes, audit P2-08 b)
+#      -> build + SBOM + scan -> push to ECR (tag = git SHA; ECR tags are immutable)
 #      -> run the one-off migrate task (sos_migrator) -> roll ECS services -> smoke test.
+# The staging deploy role trusts only this file on refs/heads/main (job_workflow_ref; modules/ci_oidc),
+# so a dispatch from another branch cannot assume it.
 #
 # Nothing happens until the repository variables below are configured: the `preflight` job
 # reports what is missing in the run summary and every other job is skipped.
@@ -99,9 +102,19 @@ jobs:
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           fi
 
+  ci:
+    # The whole CI workflow on this commit; build and deploy need it to succeed.
+    name: ci
+    needs: preflight
+    if: needs.preflight.outputs.enabled == 'true'
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+      security-events: write # the security job uploads semgrep SARIF
+
   build:
     name: build + push (${{ matrix.image }})
-    needs: preflight
+    needs: [preflight, ci]
     if: needs.preflight.outputs.enabled == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 40
@@ -168,7 +181,7 @@ jobs:
 
   deploy:
     name: migrate + roll ECS + smoke
-    needs: [preflight, build]
+    needs: [preflight, ci, build]
     if: needs.preflight.outputs.enabled == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45

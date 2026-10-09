@@ -11,12 +11,17 @@ on:
     branches: [main]
   merge_group:
   workflow_dispatch:
+  # deploy-staging.yml runs this whole workflow before it deploys (audit 2026-10-05 P2-08 b:
+  # staging deploys only a commit whose CI passed, without workflow_run).
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
+  # github.workflow is the caller's name when called, so a staging deploy's CI never waits on or
+  # cancels the push CI run of the same commit.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   # Superseded PR pushes are cancelled; every commit on main runs to completion.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
@@ -182,6 +187,9 @@ jobs:
     name: security
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write # semgrep SARIF to code scanning
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -194,7 +202,14 @@ jobs:
       - name: make security
         env:
           SEMGREP_SEND_METRICS: "off"
-        run: make security
+        run: make security SEMGREP_ARGS=--sarif-output=semgrep.sarif
+      - name: Upload semgrep SARIF (code scanning)
+        # Pull requests from forks get a read-only token; the findings still fail `make security`.
+        if: always() && hashFiles('semgrep.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
 
   ci-config:
     # Lints the CI/governance config itself: custom semgrep rule tests, actionlint, zizmor.
@@ -215,14 +230,15 @@ jobs:
       - name: semgrep rule tests
         env:
           SEMGREP_SEND_METRICS: "off"
-        run: uvx semgrep==1.178.0 --test --metrics=off .semgrep
+        # Tools come from hash-pinned requirement files (Scorecard Pinned-Dependencies).
+        run: uv run --no-project --with-requirements .github/tools/semgrep-requirements.txt semgrep --test --metrics=off .semgrep
       - name: actionlint
         run: actionlint -color
       - name: zizmor
         env:
           GH_TOKEN: ${{ github.token }}
         # Explicit --config: see .github/zizmor.yml for the one disabled audit and why.
-        run: uvx zizmor==1.30.1 --format=github --config .github/zizmor.yml .
+        run: uv run --no-project --with-requirements .github/tools/zizmor-requirements.txt zizmor --format=github --config .github/zizmor.yml .
 
   terraform:
     name: terraform

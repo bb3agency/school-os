@@ -147,3 +147,13 @@ run "pr_plan_role_reads_no_secrets" {
     error_message = "Staging's plan role trusts every same-repo pull request, so it must not read secrets."
   }
 }
+
+# Audit 2026-10-05 P2-08 (b): only deploy-staging.yml on main (which needs green CI) deploys staging.
+run "staging_deploy_only_from_the_staging_workflow_on_main" {
+  command = plan
+
+  assert {
+    condition     = module.platform.github_actions.deploy_workflow_refs == ["bb3agency/school-os/.github/workflows/deploy-staging.yml@refs/heads/main"]
+    error_message = "The staging deploy role pins job_workflow_ref to deploy-staging.yml on main."
+  }
+}
