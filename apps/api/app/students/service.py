@@ -2210,6 +2210,18 @@ def update_guardian(
     link = repo.get_link(session, student_id, guardian_id)
     if link is None:
         raise NotFound("Guardian not found")
+    if fields & {"full_name", "phone", "address"} and not all(
+        _in_scope(session, ctx, other, perm, structure)
+        for other in repo.guardian_student_ids(session, guardian_id)
+        for perm in (READ, UPDATE)
+    ):
+        # Name, phone and address are shared by every linked student (siblings): a scoped
+        # editor changes them only when every one is in reach (custom roles; SEC-015).
+        raise Forbidden(
+            "This guardian is also linked to a student outside your classes. Ask the office "
+            "to change their details.",
+            code="guardian_shared_out_of_scope",
+        )
     if "full_name" in fields and data.full_name is None:
         raise ValidationFailed([error("full_name", "missing")])
     phone = normalize_phone(data.phone) if data.phone else None

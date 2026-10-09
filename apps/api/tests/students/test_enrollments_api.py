@@ -104,6 +104,30 @@ def test_SEC_015_scoped_editor_cannot_link_a_guardian_of_a_student_outside_scope
     assert res.status_code == 201, res.text
 
 
+def test_SEC_015_scoped_editor_cannot_edit_a_guardian_shared_with_a_student_outside_scope(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """App-logic hardening (custom roles): a guardian's name, phone and address are shared by
+    every student it is linked to, so a 9A editor changes them only when every linked student
+    is in reach (403 ``guardian_shared_out_of_scope``). Their own link (relationship) still
+    changes."""
+    editor = _scoped_editor(world, admin_engine)
+    in_9a, in_9c = _student(world), _student(world, "section_9c")
+    gid = SW.add_guardian(world.a, in_9a, full_name="Synthetica Shared Parent")
+    linked = api.call(
+        world.person("office_admin"),
+        "POST",
+        f"{BASE}/{in_9c}/guardians",
+        json={"relationship": "father", "guardian_id": str(gid)},
+    )
+    assert linked.status_code == 201, linked.text
+    path = f"{BASE}/{in_9a}/guardians/{gid}"
+    res = api.call(editor, "PATCH", path, json={"full_name": "Changed"}, headers=_if_match(1))
+    assert (res.status_code, res.json()["code"]) == (403, "guardian_shared_out_of_scope")
+    ok = api.call(editor, "PATCH", path, json={"relationship": "mother"}, headers=_if_match(1))
+    assert ok.status_code == 200, ok.text
+
+
 def test_SEC_015_scoped_editor_cannot_enrol_into_a_section_outside_scope(
     world: Any, api: Any, admin_engine: Engine
 ) -> None:
