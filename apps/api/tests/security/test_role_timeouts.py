@@ -18,7 +18,7 @@ from sqlalchemy import Engine, text
 
 def _role_settings(admin_engine: Engine, role: str) -> dict[str, str]:
     with admin_engine.connect() as conn:
-        config = conn.execute(
+        config: list[str] | None = conn.execute(
             text("SELECT rolconfig FROM pg_roles WHERE rolname = :r"), {"r": role}
         ).scalar_one()
     return dict(item.split("=", 1) for item in (config or []))

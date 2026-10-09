@@ -1,9 +1,9 @@
 """Dedicated hosts run the shared tier's security log filters (audit 2026-10-05 hardening
 "Dedicated hosts have no security alarms"; SEC-007, docs/07 §15).
 
-``infra/terraform/modules/dedicated_host`` repeats the ``modules/observability`` metric filters on the
-host log group. ``tests/deploy/test_security_log_events.py`` pins every observability event to the
-code that writes it; this test pins the dedicated copy to the observability one, so renaming an
+``infra/terraform/modules/dedicated_host`` repeats the ``modules/observability`` metric filters on
+the host log group. ``tests/deploy/test_security_log_events.py`` pins every observability event to
+the code that writes it; this test pins the dedicated copy to the observability one, so renaming an
 event breaks a test on both tiers instead of disarming a dedicated alarm.
 """
 
