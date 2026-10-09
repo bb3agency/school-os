@@ -198,4 +198,6 @@ def test_AA_hardening_dns_prefetch_is_off_in_the_pdf_renderer(
     meta = '<meta http-equiv="x-dns-prefetch-control" content="off">'
     assert meta in rendered
     head = rendered.lower().find("<head>")
-    assert rendered.find(meta) < rendered.find("<title>") if head >= 0 else rendered.startswith(meta)
+    assert (
+        rendered.find(meta) < rendered.find("<title>") if head >= 0 else rendered.startswith(meta)
+    )
