@@ -41,6 +41,8 @@ from contextlib import closing
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Final
 
+from sqlalchemy.exc import IntegrityError
+
 from app.audit import service as audit
 from app.core import languages, ratelimit, retention
 from app.core import purge as purging
@@ -371,12 +373,17 @@ class SchoolKnowledgeService:
             if found is not None and found.deleted_at is None:
                 return found, False
             if found is None and repo.conversation_owner(session, request.session_id) is None:
-                return (
-                    self._new_conversation(
-                        session, ctx, question, conversation_id=request.session_id, now=now
-                    ),
-                    True,
-                )
+                # The id may belong to another school's conversation (RLS hides it): the insert
+                # then fails in its savepoint and a fresh conversation starts, exactly as for an
+                # unknown id, so nothing tells the caller it exists.
+                try:
+                    with session.begin_nested():
+                        created = self._new_conversation(
+                            session, ctx, question, conversation_id=request.session_id, now=now
+                        )
+                except IntegrityError:
+                    created = self._new_conversation(session, ctx, question, now=now)
+                return created, True
         return self._new_conversation(session, ctx, question, now=now), True
 
     def _revision(
