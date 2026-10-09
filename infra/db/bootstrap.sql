@@ -68,6 +68,17 @@ ALTER ROLE sos_platform SET search_path = pg_catalog, public;
 ALTER ROLE sos_readonly SET search_path = pg_catalog, public;
 ALTER ROLE sos_app      SET idle_in_transaction_session_timeout = '30s';
 ALTER ROLE sos_platform SET idle_in_transaction_session_timeout = '30s';
+-- Role timeouts (audit 2026-10-05 hardening; SEC-002). The app sets statement_timeout per
+-- transaction (core.db); the role default is the backstop for anything outside that path.
+-- sos_readonly (people, reporting tools) gets short limits and read-only transactions.
+-- sos_migrator is exempt from the dedicated host's server-wide statement_timeout (index builds).
+ALTER ROLE sos_app      SET statement_timeout = '5min';
+ALTER ROLE sos_platform SET statement_timeout = '5min';
+ALTER ROLE sos_readonly SET statement_timeout = '60s';
+ALTER ROLE sos_readonly SET idle_in_transaction_session_timeout = '60s';
+ALTER ROLE sos_readonly SET idle_session_timeout = '30min';
+ALTER ROLE sos_readonly SET default_transaction_read_only = on;
+ALTER ROLE sos_migrator SET statement_timeout = 0;
 
 -- 2. Extensions (need admin rights; created in public) ----------------------------------
 CREATE EXTENSION IF NOT EXISTS vector;

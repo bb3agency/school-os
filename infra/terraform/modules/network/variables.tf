@@ -55,6 +55,17 @@ variable "interface_endpoints" {
   default     = []
 }
 
+variable "s3_endpoint_extra_read_bucket_arns" {
+  description = "Extra AWS-owned (or third-party) bucket ARNs the tasks may read (s3:GetObject) through the S3 gateway endpoint. This account's buckets are always reachable."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for b in var.s3_endpoint_extra_read_bucket_arns : can(regex("^arn:aws:s3:::[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", b))])
+    error_message = "List bucket ARNs (arn:aws:s3:::<name>), without object paths or wildcards."
+  }
+}
+
 variable "flow_logs_enabled" {
   description = "Enable VPC flow logs to CloudWatch Logs."
   type        = bool
@@ -62,9 +73,9 @@ variable "flow_logs_enabled" {
 }
 
 variable "flow_log_traffic_type" {
-  description = "ACCEPT | REJECT | ALL. VPC flow logs cannot be sampled natively; REJECT-only with a 10-minute aggregation window is the 'sampled' cost-control default (07 §13)."
+  description = "ACCEPT | REJECT | ALL. ALL (audit 2026-10-05 detection gap: accepted flows show exfiltration and lateral movement) with a 10-minute aggregation window to keep the volume down; REJECT only is the cheaper fallback (07 §13)."
   type        = string
-  default     = "REJECT"
+  default     = "ALL"
 
   validation {
     condition     = contains(["ACCEPT", "REJECT", "ALL"], var.flow_log_traffic_type)

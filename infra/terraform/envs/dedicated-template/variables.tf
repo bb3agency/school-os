@@ -111,7 +111,7 @@ variable "artifacts_bucket" {
 }
 
 variable "artifacts_kms_key_arn" {
-  description = "KMS key of the artifacts bucket (shared prod stack output kms_key_arns.data)."
+  description = "KMS key of the artifacts bucket (shared prod stack output kms_key_arns.artifacts; its own key since audit 2026-10-05, never the data key)."
   type        = string
 }
 
@@ -123,6 +123,11 @@ variable "ecr_account_id" {
 
 variable "control_plane_url" {
   description = "Control-plane URL for heartbeats, e.g. https://app.schoolos.in."
+  type        = string
+}
+
+variable "security_alarm_topic_arn" {
+  description = "The prod stack's alarm topic (prod output alarm_topic_arn): receives this host's security alarms (audit 2026-10-05)."
   type        = string
 }
 

@@ -73,6 +73,12 @@ GRANT sos_definer TO sos_migrator WITH INHERIT FALSE, SET TRUE;   -- migrations 
 
 ALTER ROLE sos_app, sos_platform, sos_readonly SET search_path = pg_catalog, public;
 ALTER ROLE sos_app, sos_platform SET idle_in_transaction_session_timeout = '30s';
+-- Role timeouts (audit 2026-10-05): backstops; the app sets statement_timeout per transaction.
+ALTER ROLE sos_app, sos_platform SET statement_timeout = '5min';
+ALTER ROLE sos_readonly SET statement_timeout = '60s';                    -- also
+ALTER ROLE sos_readonly SET idle_in_transaction_session_timeout = '60s';  -- idle_session_timeout 30min,
+ALTER ROLE sos_readonly SET default_transaction_read_only = on;           -- read-only transactions
+ALTER ROLE sos_migrator SET statement_timeout = 0;  -- exempt from the dedicated server-wide 5 min (index builds)
 
 CREATE EXTENSION IF NOT EXISTS vector, pg_trgm, citext, pgcrypto;   -- in public
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;

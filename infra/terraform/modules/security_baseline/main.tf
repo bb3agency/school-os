@@ -60,6 +60,7 @@ locals {
     "kms.amazonaws.com",
     "s3.amazonaws.com",
     "ec2.amazonaws.com",
+    "access-analyzer.amazonaws.com",
   ]
   tamper_event_names = [
     # CloudTrail
@@ -74,6 +75,8 @@ locals {
     "DeleteFindingAggregator", "UpdateFindingAggregator", "DisableImportFindingsForProduct",
     # KMS, S3 account guardrails, EBS default encryption
     "DisableKey", "ScheduleKeyDeletion", "DeleteAccountPublicAccessBlock", "PutAccountPublicAccessBlock", "DisableEbsEncryptionByDefault",
+    # IAM Access Analyzer, EBS snapshot and AMI public-access blocks (audit 2026-10-05, CIS gaps)
+    "DeleteAnalyzer", "DisableSnapshotBlockPublicAccess", "DisableImageBlockPublicAccess",
   ]
 
   log_bucket_tamper_event_names = [
@@ -559,6 +562,45 @@ resource "aws_ebs_encryption_by_default" "dr" {
   enabled = true
 }
 
+# Audit 2026-10-05 hardening, CIS account-level gaps. Access Analyzer (account zone of trust) reports
+# any resource shared outside the account; the external-access analyzer is free.
+resource "aws_accessanalyzer_analyzer" "this" {
+  for_each = var.iam_access_analyzer ? toset([local.region, local.dr_region]) : toset([])
+  region   = each.key
+
+  analyzer_name = "${var.name_prefix}-account-analyzer"
+  type          = "ACCOUNT"
+  tags          = local.tags
+}
+
+# Only the break-glass IAM users have passwords (people sign in through IAM Identity Center or
+# Cognito); CIS 1.8 and 1.9. No forced expiry (NIST SP 800-63B, CIS v3 dropped it).
+resource "aws_iam_account_password_policy" "this" {
+  count = var.iam_password_policy ? 1 : 0
+
+  minimum_password_length        = 14
+  require_lowercase_characters   = true
+  require_uppercase_characters   = true
+  require_numbers                = true
+  require_symbols                = true
+  allow_users_to_change_password = true
+  password_reuse_prevention      = 24
+}
+
+resource "aws_ebs_snapshot_block_public_access" "this" {
+  for_each = var.block_public_snapshots_and_images ? toset([local.region, local.dr_region]) : toset([])
+  region   = each.key
+
+  state = "block-all-sharing"
+}
+
+resource "aws_ec2_image_block_public_access" "this" {
+  for_each = var.block_public_snapshots_and_images ? toset([local.region, local.dr_region]) : toset([])
+  region   = each.key
+
+  state = "block-new-sharing"
+}
+
 # --- Alerting: EventBridge (ap-south-1) -> SNS -> on-call ------------------------------------------
 
 resource "aws_sns_topic" "alerts" {
@@ -646,7 +688,167 @@ locals {
         }
       })
     }
+
+    # CIS CloudWatch.1, 3, 4, 6, 8 and 10-14 as EventBridge rules (the metric filters need a billed
+    # CloudWatch Logs copy of the trail; owner decision 2026-09-27). CloudWatch.5, 7 and 9 are the
+    # detection-tampering rule. Root, sign-in and IAM events arrive from us-east-1 (global_forward).
+    # Terraform applies trigger iam-changes, bucket-policy-changes and network-changes too: check
+    # each such alert against an apply run.
+    root-activity = {
+      description = "Root user activity (API call or console sign-in). CIS CloudWatch.1; P1 security until explained."
+      pattern = jsonencode({
+        "detail-type" = ["AWS API Call via CloudTrail", "AWS Console Sign In via CloudTrail"]
+        detail        = { userIdentity = { type = ["Root"] } }
+      })
+    }
+    console-sign-in-problems = {
+      description = "Failed console sign-in, or an IAM user signed in without MFA. CIS CloudWatch.3 and 6."
+      pattern = jsonencode({
+        "detail-type" = ["AWS Console Sign In via CloudTrail"]
+        detail = {
+          eventName = ["ConsoleLogin"]
+          "$or" = [
+            { responseElements = { ConsoleLogin = ["Failure"] } },
+            { additionalEventData = { MFAUsed = [{ "anything-but" = "Yes" }] }, userIdentity = { type = ["IAMUser"] }, responseElements = { ConsoleLogin = ["Success"] } },
+          ]
+        }
+      })
+    }
+    iam-changes = {
+      description = "IAM policy, credential or password-policy change. CIS CloudWatch.4."
+      pattern = jsonencode({
+        "detail-type" = ["AWS API Call via CloudTrail"]
+        detail = {
+          eventSource = ["iam.amazonaws.com"]
+          eventName   = local.iam_change_event_names
+        }
+      })
+    }
+    bucket-policy-changes = {
+      description = "S3 bucket policy, ACL, CORS, lifecycle or replication change on any bucket. CIS CloudWatch.8."
+      pattern = jsonencode({
+        "detail-type" = ["AWS API Call via CloudTrail"]
+        detail = {
+          eventSource = ["s3.amazonaws.com"]
+          eventName = [
+            "PutBucketAcl", "PutBucketPolicy", "PutBucketCors", "PutBucketLifecycle", "PutBucketReplication",
+            "DeleteBucketPolicy", "DeleteBucketCors", "DeleteBucketLifecycle", "DeleteBucketReplication",
+          ]
+        }
+      })
+    }
+    network-changes = {
+      description = "Security group, network ACL, gateway, route table or VPC change. CIS CloudWatch.10-14."
+      pattern = jsonencode({
+        "detail-type" = ["AWS API Call via CloudTrail"]
+        detail = {
+          eventSource = ["ec2.amazonaws.com"]
+          eventName   = local.network_change_event_names
+        }
+      })
+    }
   }
+
+  iam_change_event_names = [
+    "DeleteGroupPolicy", "DeleteRolePolicy", "DeleteUserPolicy", "PutGroupPolicy", "PutRolePolicy", "PutUserPolicy",
+    "CreatePolicy", "DeletePolicy", "CreatePolicyVersion", "DeletePolicyVersion", "SetDefaultPolicyVersion",
+    "AttachRolePolicy", "DetachRolePolicy", "AttachUserPolicy", "DetachUserPolicy", "AttachGroupPolicy", "DetachGroupPolicy",
+    "UpdateAssumeRolePolicy", "CreateUser", "CreateAccessKey", "UpdateAccessKey", "CreateLoginProfile", "UpdateLoginProfile",
+    "DeactivateMFADevice", "DeleteVirtualMFADevice", "UpdateAccountPasswordPolicy", "DeleteAccountPasswordPolicy",
+    "CreateOpenIDConnectProvider", "UpdateOpenIDConnectProviderThumbprint", "AddClientIDToOpenIDConnectProvider", "CreateSAMLProvider",
+  ]
+
+  network_change_event_names = [
+    # Security groups (CloudWatch.10)
+    "AuthorizeSecurityGroupIngress", "AuthorizeSecurityGroupEgress", "RevokeSecurityGroupIngress", "RevokeSecurityGroupEgress",
+    "ModifySecurityGroupRules", "CreateSecurityGroup", "DeleteSecurityGroup",
+    # Network ACLs (CloudWatch.11)
+    "CreateNetworkAcl", "CreateNetworkAclEntry", "DeleteNetworkAcl", "DeleteNetworkAclEntry", "ReplaceNetworkAclEntry", "ReplaceNetworkAclAssociation",
+    # Gateways (CloudWatch.12)
+    "CreateCustomerGateway", "DeleteCustomerGateway", "AttachInternetGateway", "CreateInternetGateway", "DeleteInternetGateway", "DetachInternetGateway",
+    # Route tables (CloudWatch.13)
+    "CreateRoute", "CreateRouteTable", "ReplaceRoute", "ReplaceRouteTableAssociation", "DeleteRouteTable", "DeleteRoute", "DisassociateRouteTable",
+    # VPCs (CloudWatch.14)
+    "CreateVpc", "DeleteVpc", "ModifyVpcAttribute", "AcceptVpcPeeringConnection", "CreateVpcPeeringConnection", "DeleteVpcPeeringConnection",
+    "RejectVpcPeeringConnection",
+  ]
+}
+
+# --- Global events (us-east-1) -> ap-south-1 -----------------------------------------------------
+#
+# IAM API calls and most root and console sign-in events are delivered to EventBridge only in
+# us-east-1. This forward-only rule sends them to the ap-south-1 default bus, where the rules above
+# page. Nothing is stored in us-east-1: the events are AWS account metadata (no school data) that
+# CloudTrail already records there as global service events (NFR-PRV-001 is about school data).
+
+locals {
+  global_region = "us-east-1"
+  global_forward_pattern = {
+    "detail-type" = ["AWS API Call via CloudTrail", "AWS Console Sign In via CloudTrail"]
+    detail = {
+      "$or" = [
+        { eventSource = ["iam.amazonaws.com", "signin.amazonaws.com"] },
+        { userIdentity = { type = ["Root"] } },
+      ]
+    }
+  }
+}
+
+data "aws_iam_policy_document" "global_forward_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["events.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [local.account_id]
+    }
+  }
+}
+
+data "aws_iam_policy_document" "global_forward" {
+  statement {
+    actions   = ["events:PutEvents"]
+    resources = [local.primary_bus_arn]
+  }
+}
+
+resource "aws_iam_role" "global_forward" {
+  count = var.forward_global_events ? 1 : 0
+
+  name               = "${var.name_prefix}-${local.global_region}-global-forward"
+  assume_role_policy = data.aws_iam_policy_document.global_forward_assume.json
+  tags               = local.tags
+}
+
+resource "aws_iam_role_policy" "global_forward" {
+  count = var.forward_global_events ? 1 : 0
+
+  name   = "put-events-primary-bus"
+  role   = aws_iam_role.global_forward[0].id
+  policy = data.aws_iam_policy_document.global_forward.json
+}
+
+resource "aws_cloudwatch_event_rule" "global_forward" {
+  count  = var.forward_global_events ? 1 : 0
+  region = local.global_region
+
+  name          = "${var.name_prefix}-global-forward"
+  description   = "SEC-023: forward IAM, console sign-in and root events (global, us-east-1 only) to ${local.region}."
+  event_pattern = jsonencode(local.global_forward_pattern)
+  tags          = local.tags
+}
+
+resource "aws_cloudwatch_event_target" "global_forward" {
+  count  = var.forward_global_events ? 1 : 0
+  region = local.global_region
+
+  rule     = aws_cloudwatch_event_rule.global_forward[0].name
+  arn      = local.primary_bus_arn
+  role_arn = aws_iam_role.global_forward[0].arn
 }
 
 resource "aws_cloudwatch_event_rule" "alert" {

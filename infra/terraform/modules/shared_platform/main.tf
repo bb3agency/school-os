@@ -132,6 +132,11 @@ module "kms" {
     backup = {
       description = "SchoolOS ${var.env}: backups and snapshots in ap-south-1"
     }
+    # Every dedicated host may decrypt release bundles, so they get their own key, never the data
+    # key (audit 2026-10-05 key separation).
+    artifacts = {
+      description = "SchoolOS ${var.env}: release artifacts (dedicated-tier bundles)"
+    }
     logs = {
       description           = "SchoolOS ${var.env}: CloudWatch Logs and alarm topic"
       allow_cloudwatch_logs = true
@@ -167,6 +172,7 @@ module "s3" {
   bucket_suffix           = local.account_id
   data_kms_key_arn        = local.kms_data
   audit_kms_key_arn       = local.kms_audit
+  artifacts_kms_key_arn   = module.kms.key_arns["artifacts"]
   audit_object_lock_mode  = var.audit_object_lock_mode
   audit_object_lock_years = var.audit_object_lock_years
   audit_object_lock_days  = var.audit_object_lock_days
@@ -865,7 +871,7 @@ module "ci" {
   one_off_task_families    = [module.migrate.task_definition_family]
   enable_artifacts_publish = true
   artifacts_bucket_arn     = module.s3.artifacts_bucket_arn
-  artifacts_kms_key_arn    = local.kms_data
+  artifacts_kms_key_arn    = module.s3.artifacts_kms_key_arn
   create_plan_role         = var.create_plan_role
   plan_can_read_secrets    = var.plan_can_read_secrets
   plan_environment         = var.github_plan_environment

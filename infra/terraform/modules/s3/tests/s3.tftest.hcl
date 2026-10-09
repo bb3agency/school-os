@@ -25,10 +25,11 @@ mock_provider "aws" {
 }
 
 variables {
-  name_prefix       = "sos-test"
-  bucket_suffix     = "111122223333"
-  data_kms_key_arn  = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000001"
-  audit_kms_key_arn = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000002"
+  name_prefix           = "sos-test"
+  bucket_suffix         = "111122223333"
+  data_kms_key_arn      = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000001"
+  audit_kms_key_arn     = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000002"
+  artifacts_kms_key_arn = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000003"
 }
 
 run "buckets_block_public_access" {
@@ -63,14 +64,26 @@ run "data_buckets_use_cmk" {
   }
 
   assert {
-    condition     = module.artifacts.sse_algorithm == "aws:kms"
-    error_message = "Artifacts bucket must use SSE-KMS."
+    condition     = module.artifacts.sse_algorithm == "aws:kms" && module.artifacts.kms_key_arn == var.artifacts_kms_key_arn && output.artifacts_kms_key_arn == var.artifacts_kms_key_arn
+    error_message = "Artifacts bucket must use SSE-KMS with its own CMK (every dedicated host may decrypt it; audit 2026-10-05)."
   }
 
   assert {
     condition     = module.logs.sse_algorithm == "AES256"
     error_message = "Log-delivery bucket uses SSE-S3 (ALB/S3 access logs cannot target SSE-KMS)."
   }
+}
+
+# Audit 2026-10-05 hardening (key separation): every dedicated host may decrypt the artifacts key, so
+# it must never be the data key that protects the files bucket, RDS and Secrets Manager.
+run "artifacts_key_is_not_the_data_key" {
+  command = plan
+
+  variables {
+    artifacts_kms_key_arn = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000001"
+  }
+
+  expect_failures = [var.artifacts_kms_key_arn]
 }
 
 run "audit_archive_object_lock_compliance_3y" {
@@ -212,4 +225,42 @@ run "cors_origin_must_be_https" {
   }
 
   expect_failures = [var.cors_rules]
+}
+
+# Audit W3-06, PRV-016: the worker tags every automatic deletion (and every image that showed a full
+# Aadhaar number) sos-lifecycle=discarded before deleting it; the files bucket must then expire the
+# object and its noncurrent version after one day instead of keeping it for the 90-day window.
+run "files_bucket_discards_tagged_objects_after_one_day" {
+  command = plan
+
+  assert {
+    condition = (
+      length(module.files.lifecycle_rules["discarded-1d"].tags) == 1 &&
+      module.files.lifecycle_rules["discarded-1d"].tags["sos-lifecycle"] == "discarded" &&
+      module.files.lifecycle_rules["discarded-1d"].expiration_days == 1 &&
+      module.files.lifecycle_rules["discarded-1d"].noncurrent_days == 1
+    )
+    error_message = "The files bucket expires sos-lifecycle=discarded objects and their noncurrent versions after 1 day (W3-06, PRV-016)."
+  }
+
+  assert {
+    condition     = module.files.lifecycle_rules["noncurrent-and-multipart"].noncurrent_days == 90
+    error_message = "Every other deletion stays recoverable for the 90-day window (W3-06)."
+  }
+}
+
+# Audit 2026-10-05 hardening (confused deputy): ALB access logs land only under this account's
+# AWSLogs prefix, and a delivery that names its source account must be this one.
+run "alb_log_delivery_pins_the_account" {
+  command = plan
+
+  assert {
+    condition = one([
+      for s in data.aws_iam_policy_document.logs_delivery.statement : anytrue([
+        for c in s.condition : c.variable == "aws:SourceAccount" && toset(c.values) == toset(["111122223333"])
+      ]) && toset(s.resources) == toset(["arn:aws:s3:::sos-test-logs-111122223333/alb/AWSLogs/111122223333/*"])
+      if s.sid == "AlbLogDelivery"
+    ])
+    error_message = "The ALB log delivery statement pins this account (resource prefix and aws:SourceAccount)."
+  }
 }

@@ -180,6 +180,30 @@ variable "account_public_access_block" {
   default     = true
 }
 
+variable "iam_access_analyzer" {
+  description = "IAM Access Analyzer (account zone of trust, external access; free) in both regions (CIS 1.20)."
+  type        = bool
+  default     = true
+}
+
+variable "iam_password_policy" {
+  description = "Account password policy for the break-glass IAM users: 14+ characters, all classes, last 24 not reused (CIS 1.8, 1.9)."
+  type        = bool
+  default     = true
+}
+
+variable "block_public_snapshots_and_images" {
+  description = "Block public sharing of EBS snapshots (all sharing) and AMIs (new sharing) in both regions."
+  type        = bool
+  default     = true
+}
+
+variable "forward_global_events" {
+  description = "Forward IAM, console sign-in and root events from us-east-1 (their only EventBridge region) to the ap-south-1 bus, where the CIS-equivalent alert rules page."
+  type        = bool
+  default     = true
+}
+
 variable "ebs_encryption_by_default" {
   description = "Encrypt new EBS volumes by default in both regions (dedicated hosts already set their own CMK)."
   type        = bool

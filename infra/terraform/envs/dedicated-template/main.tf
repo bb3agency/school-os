@@ -140,6 +140,7 @@ module "host" {
   support_oidc_client_id         = try(module.support[0].client_id, "")
   support_oidc_client_secret_arn = try(module.support[0].client_secret_arn, "")
   control_plane_url              = var.control_plane_url
+  security_alarm_topic_arn       = var.security_alarm_topic_arn
   walg_enabled                   = var.walg_enabled
   imds_hop_limit                 = var.imds_hop_limit
   termination_protection         = var.termination_protection

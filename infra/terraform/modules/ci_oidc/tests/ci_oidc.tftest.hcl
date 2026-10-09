@@ -156,6 +156,45 @@ run "pr_plan_role_reads_no_secrets" {
   }
 }
 
+# Audit 2026-10-05 P2-09: ReadOnlyAccess lets the plan role read every log group (security events,
+# WAF logs with client IPs) although no refresh needs log data. An explicit deny wins over it, gated
+# or not.
+run "plan_role_never_reads_log_data" {
+  command = plan
+
+  assert {
+    condition = anytrue([
+      for s in data.aws_iam_policy_document.plan.statement :
+      s.effect == "Deny" && contains(s.resources, "*") && length(setsubtract(toset([
+        "logs:GetLogEvents", "logs:FilterLogEvents", "logs:StartQuery", "logs:GetQueryResults",
+        "logs:StartLiveTail", "logs:GetLogRecord", "logs:GetLogObject", "logs:Unmask",
+      ]), toset(s.actions))) == 0
+    ])
+    error_message = "The plan role is explicitly denied every CloudWatch Logs data read (P2-09)."
+  }
+}
+
+run "gated_plan_role_never_reads_log_data" {
+  command = plan
+
+  variables {
+    plan_environment = "staging-plan"
+  }
+
+  assert {
+    condition = anytrue([
+      for s in data.aws_iam_policy_document.plan.statement :
+      s.effect == "Deny" && contains(s.actions, "logs:GetLogEvents") && contains(s.actions, "logs:FilterLogEvents")
+    ])
+    error_message = "The gated plan role is denied log data reads too (P2-09)."
+  }
+
+  assert {
+    condition     = toset(output.plan_subjects) == toset(["repo:bb3agency/school-os:environment:staging-plan"])
+    error_message = "A gated plan role trusts only its GitHub Environment, never pull_request or main (P2-09)."
+  }
+}
+
 run "pr_plan_role_cannot_be_given_secrets" {
   command = plan
 

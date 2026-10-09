@@ -202,6 +202,7 @@ run "worker_image_and_upload_encryption" {
         data          = "arn:aws:kms:ap-south-1:444455556666:key/00000000-0000-0000-0000-00000000da7a"
         audit         = "arn:aws:kms:ap-south-1:444455556666:key/00000000-0000-0000-0000-0000000a0d17"
         backup        = "arn:aws:kms:ap-south-1:444455556666:key/00000000-0000-0000-0000-00000000bac0"
+        artifacts     = "arn:aws:kms:ap-south-1:444455556666:key/00000000-0000-0000-0000-0000000a7f00"
         logs          = "arn:aws:kms:ap-south-1:444455556666:key/00000000-0000-0000-0000-000000000109"
         audit-signing = "arn:aws:kms:ap-south-1:444455556666:key/00000000-0000-0000-0000-00000000519e"
       }
@@ -209,6 +210,13 @@ run "worker_image_and_upload_encryption" {
         audit-signing = { key_spec = "ECC_NIST_P256", key_usage = "SIGN_VERIFY", rotation = false }
       }
     }
+  }
+
+  # Audit 2026-10-05 key separation: every dedicated host may decrypt release bundles, so the
+  # artifacts bucket has its own key, never the data key.
+  assert {
+    condition     = module.s3.artifacts_kms_key_arn == "arn:aws:kms:ap-south-1:444455556666:key/00000000-0000-0000-0000-0000000a7f00"
+    error_message = "The artifacts bucket uses its own CMK (kms_key_arns.artifacts), not the data key."
   }
 
   assert {

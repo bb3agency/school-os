@@ -228,6 +228,116 @@ run "alerts_reach_on_call" {
   }
 }
 
+# Audit 2026-10-05 hardening, CIS account-level gaps: IAM Access Analyzer, an account password policy
+# (break-glass IAM users), and public sharing of EBS snapshots and AMIs blocked, in both regions.
+run "cis_account_guardrails" {
+  command = plan
+
+  assert {
+    condition     = output.posture.access_analyzers == { "ap-south-1" = "ACCOUNT", "ap-south-2" = "ACCOUNT" }
+    error_message = "An account IAM Access Analyzer runs in ap-south-1 and ap-south-2 (CIS 1.20)."
+  }
+
+  assert {
+    condition = (
+      output.posture.password_policy.minimum_password_length >= 14 &&
+      output.posture.password_policy.password_reuse_prevention == 24 &&
+      output.posture.password_policy.require_lowercase_characters &&
+      output.posture.password_policy.require_uppercase_characters &&
+      output.posture.password_policy.require_numbers &&
+      output.posture.password_policy.require_symbols
+    )
+    error_message = "The account password policy needs 14+ characters, all classes, and no reuse of the last 24 (CIS 1.8, 1.9)."
+  }
+
+  assert {
+    condition     = output.posture.ebs_snapshot_public_access == { "ap-south-1" = "block-all-sharing", "ap-south-2" = "block-all-sharing" }
+    error_message = "EBS snapshots cannot be shared publicly in either region."
+  }
+
+  assert {
+    condition     = output.posture.ami_public_access == { "ap-south-1" = "block-new-sharing", "ap-south-2" = "block-new-sharing" }
+    error_message = "AMIs cannot be made public in either region."
+  }
+
+  assert {
+    condition = length(setsubtract(
+      ["DeleteAnalyzer", "DisableSnapshotBlockPublicAccess", "DisableImageBlockPublicAccess"],
+      output.posture.alert_rules["detection-tampering"].detail.eventName,
+    )) == 0 && contains(output.posture.alert_rules["detection-tampering"].detail.eventSource, "access-analyzer.amazonaws.com")
+    error_message = "Switching the new guardrails off alerts like any other tampering."
+  }
+}
+
+# Known and still open from earlier rounds (audit 2026-10-05): root sign-in and IAM events reach
+# EventBridge only in us-east-1. A forward-only rule there sends them to the ap-south-1 bus, where the
+# CIS-equivalent rules (CloudWatch.1, 3, 4, 6, 8, 10-14 without the billed CloudWatch Logs copy of
+# the trail) page the security topic.
+run "global_iam_and_sign_in_events_alert" {
+  command = plan
+
+  assert {
+    condition = (
+      output.posture.global_forward.region == "us-east-1" &&
+      output.posture.global_forward.target == "arn:aws:events:ap-south-1:111122223333:event-bus/default" &&
+      toset(output.posture.global_forward.pattern.detail["$or"][0].eventSource) == toset(["iam.amazonaws.com", "signin.amazonaws.com"]) &&
+      output.posture.global_forward.pattern.detail["$or"][1].userIdentity.type == ["Root"]
+    )
+    error_message = "us-east-1 forwards IAM, sign-in and root events to the ap-south-1 default bus."
+  }
+
+  assert {
+    condition     = output.posture.alert_rules["root-activity"].detail.userIdentity.type == ["Root"]
+    error_message = "Any root activity alerts (CIS CloudWatch.1)."
+  }
+
+  assert {
+    condition = (
+      output.posture.alert_rules["console-sign-in-problems"].detail.eventName == ["ConsoleLogin"] &&
+      output.posture.alert_rules["console-sign-in-problems"].detail["$or"][0].responseElements.ConsoleLogin == ["Failure"] &&
+      output.posture.alert_rules["console-sign-in-problems"].detail["$or"][1].additionalEventData.MFAUsed == [{ "anything-but" = "Yes" }]
+    )
+    error_message = "Failed console sign-ins and IAM user sign-ins without MFA alert (CIS CloudWatch.3, 6)."
+  }
+
+  assert {
+    condition = length(setsubtract(
+      ["PutRolePolicy", "AttachRolePolicy", "CreatePolicyVersion", "CreateAccessKey", "UpdateAssumeRolePolicy", "DeleteAccountPasswordPolicy"],
+      output.posture.alert_rules["iam-changes"].detail.eventName,
+    )) == 0 && output.posture.alert_rules["iam-changes"].detail.eventSource == ["iam.amazonaws.com"]
+    error_message = "IAM policy, credential and password-policy changes alert (CIS CloudWatch.4)."
+  }
+
+  assert {
+    condition = length(setsubtract(
+      ["PutBucketPolicy", "PutBucketAcl", "DeleteBucketPolicy", "PutBucketReplication"],
+      output.posture.alert_rules["bucket-policy-changes"].detail.eventName,
+    )) == 0
+    error_message = "S3 bucket policy changes on any bucket alert (CIS CloudWatch.8)."
+  }
+
+  assert {
+    condition = length(setsubtract(
+      ["AuthorizeSecurityGroupIngress", "CreateNetworkAclEntry", "AttachInternetGateway", "CreateRoute", "ModifyVpcAttribute", "CreateVpcPeeringConnection"],
+      output.posture.alert_rules["network-changes"].detail.eventName,
+    )) == 0
+    error_message = "Security group, NACL, gateway, route table and VPC changes alert (CIS CloudWatch.10-14)."
+  }
+}
+
+run "global_forwarding_can_be_disabled" {
+  command = plan
+
+  variables {
+    forward_global_events = false
+  }
+
+  assert {
+    condition     = output.posture.global_forward == null
+    error_message = "No us-east-1 resources when global forwarding is off."
+  }
+}
+
 run "governance_mode_for_staging" {
   command = plan
 

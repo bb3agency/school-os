@@ -92,3 +92,17 @@ run "rejects_other_major_versions" {
 
   expect_failures = [var.engine_version]
 }
+
+# Audit 2026-10-05 hardening (confused deputy): Enhanced Monitoring assumes the role only for this
+# account's instances.
+run "monitoring_role_trusts_only_this_account" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for s in data.aws_iam_policy_document.monitoring_assume.statement :
+      anytrue([for c in s.condition : c.test == "StringEquals" && c.variable == "aws:SourceAccount" && toset(c.values) == toset([data.aws_caller_identity.current.account_id])])
+    ])
+    error_message = "The RDS monitoring trust policy pins aws:SourceAccount (confused deputy)."
+  }
+}

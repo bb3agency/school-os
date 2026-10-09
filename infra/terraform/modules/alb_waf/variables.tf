@@ -77,13 +77,13 @@ variable "access_logs_bucket" {
 }
 
 variable "ssl_policy" {
-  description = "TLS policy (TLS 1.2+ with 1.3)."
+  description = "TLS policy: TLS 1.3 plus TLS 1.2 with AEAD forward-secret suites only (the -Res- variant: no CBC), or TLS 1.3 only."
   type        = string
-  default     = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+  default     = "ELBSecurityPolicy-TLS13-1-2-Res-2021-06"
 
   validation {
-    condition     = can(regex("^ELBSecurityPolicy-TLS13-", var.ssl_policy))
-    error_message = "ssl_policy must be an ELBSecurityPolicy-TLS13-* policy (TLS 1.2 minimum, 1.3 enabled)."
+    condition     = can(regex("^ELBSecurityPolicy-TLS13-1-(2-Res-|3-)", var.ssl_policy))
+    error_message = "ssl_policy must be ELBSecurityPolicy-TLS13-1-2-Res-* (TLS 1.2 without CBC suites, 1.3 enabled) or ELBSecurityPolicy-TLS13-1-3-* (TLS 1.3 only)."
   }
 }
 

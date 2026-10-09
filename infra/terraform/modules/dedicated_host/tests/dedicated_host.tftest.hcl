@@ -55,6 +55,54 @@ variables {
   oidc_client_id         = "exampleclientid"
   oidc_client_secret_arn = "arn:aws:secretsmanager:ap-south-1:111122223333:secret:sos/dedicated/demo-school/oidc-AbCdEf"
   control_plane_url      = "https://app.example.test"
+
+  security_alarm_topic_arn = "arn:aws:sns:ap-south-1:111122223333:sos-prod-alarms"
+}
+
+# Audit 2026-10-05 hardening: dedicated hosts had no security alarms. The P2-02 / P2-07 metric filters
+# run on the host's log group (every container logs there), in a namespace the host role cannot
+# write, and alarm the prod on-call topic.
+run "security_alarms_on_the_host_log_group" {
+  command = plan
+
+  assert {
+    condition = length(setsubtract(
+      ["audit_chain_broken", "audit_chain_checked", "api_auth_failures", "api_auth_failed", "refresh_token_reuse", "breakglass_session", "api_rate_limited", "rate_limiter_unavailable", "sign_in_failed", "bff_auth_rate_limited"],
+      keys(aws_cloudwatch_log_metric_filter.security),
+    )) == 0
+    error_message = "The host log group feeds the audit-chain, auth, session-theft, break-glass and rate-limit filters."
+  }
+
+  assert {
+    condition = alltrue([
+      for f in aws_cloudwatch_log_metric_filter.security :
+      f.log_group_name == "/schoolos/dedicated/demo-school" && one(f.metric_transformation).namespace == "SchoolOS/Security/dedicated/demo-school"
+    ])
+    error_message = "Filters read the host log group and write SchoolOS/Security/dedicated/<code>, which the host role (SchoolOS/Dedicated only) cannot write."
+  }
+
+  assert {
+    condition = alltrue([
+      for a in concat(values(aws_cloudwatch_metric_alarm.security), [aws_cloudwatch_metric_alarm.audit_chain_failure, aws_cloudwatch_metric_alarm.audit_chain_not_run]) :
+      a.alarm_actions == toset(["arn:aws:sns:ap-south-1:111122223333:sos-prod-alarms"]) && a.namespace == "SchoolOS/Security/dedicated/demo-school"
+    ])
+    error_message = "Every host security alarm notifies the on-call topic."
+  }
+
+  assert {
+    condition     = aws_cloudwatch_metric_alarm.audit_chain_not_run.treat_missing_data == "breaching" && aws_cloudwatch_metric_alarm.audit_chain_failure.threshold == 1
+    error_message = "A broken chain alarms at once; no verification in a day alarms too."
+  }
+}
+
+run "security_alarm_topic_required" {
+  command = plan
+
+  variables {
+    security_alarm_topic_arn = "not-an-arn"
+  }
+
+  expect_failures = [var.security_alarm_topic_arn]
 }
 
 run "imdsv2_required" {
@@ -386,4 +434,18 @@ run "imds_hop_limit_is_one_or_two" {
   }
 
   expect_failures = [var.imds_hop_limit]
+}
+
+# Audit 2026-10-05 hardening (confused deputy): Data Lifecycle Manager assumes the snapshot role
+# only on behalf of this account.
+run "dlm_role_trusts_only_this_account" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for s in data.aws_iam_policy_document.dlm_assume.statement :
+      anytrue([for c in s.condition : c.test == "StringEquals" && c.variable == "aws:SourceAccount" && toset(c.values) == toset([data.aws_caller_identity.current.account_id])])
+    ])
+    error_message = "The DLM trust policy pins aws:SourceAccount (confused deputy)."
+  }
 }

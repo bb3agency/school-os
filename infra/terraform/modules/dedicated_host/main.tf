@@ -121,6 +121,144 @@ resource "aws_cloudwatch_log_group" "host" {
   tags              = local.tags
 }
 
+# --- Security alarms (audit 2026-10-05 hardening: dedicated hosts had none) ------------------------
+#
+# The same filters as modules/observability (P2-02, P2-07), on the host log group that every container
+# writes to. Events are unique per writer, so one group is enough. The control-plane-only events
+# (heartbeat rejections, denied operators) are not here. The namespace is not SchoolOS/Dedicated, the
+# only one the host role may write, so a compromised host cannot feed or silence these metrics.
+# apps/api/tests/deploy/test_dedicated_security_alarms.py pins the events to the observability ones.
+
+locals {
+  security_ns = "SchoolOS/Security/dedicated/${var.school_code}"
+
+  security_filters = {
+    audit_chain_broken = {
+      pattern = "{ $.event = \"audit.chain.broken\" }"
+      metric  = "AuditChainVerificationFailures"
+    }
+    audit_chain_checked = {
+      pattern = "{ ($.event = \"audit.chain.verified\") || ($.event = \"audit.chain.broken\") }"
+      metric  = "AuditChainsChecked"
+    }
+    api_auth_failures = {
+      pattern = "{ ($.event = \"http.request\") && ($.status = 401) }"
+      metric  = "ApiAuthFailures"
+    }
+    breakglass_session = {
+      pattern = "{ ($.event = \"http.request\") && ($.route = \"POST /api/v1/breakglass/support-session\") && ($.status = 200) }"
+      metric  = "BreakGlassSessionsStarted"
+    }
+    refresh_token_reuse = {
+      pattern = "{ $.event = \"refresh_token_reuse_detected\" }"
+      metric  = "RefreshTokenReuse"
+    }
+    api_rate_limited = {
+      pattern = "{ $.event = \"security.rate_limited\" }"
+      metric  = "ApiRateLimited"
+    }
+    api_auth_failed = {
+      pattern = "{ $.event = \"security.auth.failed\" }"
+      metric  = "ApiAuthFailed"
+    }
+    rate_limiter_unavailable = {
+      pattern = "{ $.event = \"security.rate_limit.unavailable\" }"
+      metric  = "RateLimiterUnavailable"
+    }
+    sign_in_failed = {
+      pattern = "{ ($.event = \"signin_failed\") || ($.event = \"step_up_failed\") }"
+      metric  = "SignInFailures"
+    }
+    bff_auth_rate_limited = {
+      pattern = "{ $.event = \"auth_rate_limited\" }"
+      metric  = "BffAuthRateLimited"
+    }
+  }
+
+  # One school per host: lower volumes than the shared tier, same thresholds as its defaults.
+  security_alarms = {
+    api_auth_failures        = { description = "SECURITY: many 401 answers from the API (token replay or a stolen service token). docs/07 §15.", threshold = 50 }
+    breakglass_session       = { description = "SECURITY (notice): a SchoolOS support break-glass session started (ADR-0023). Check it matches an approved request.", threshold = 1 }
+    refresh_token_reuse      = { description = "SECURITY: a spent refresh token was presented again; the session family was revoked (FR-IAM-004).", threshold = 1 }
+    api_rate_limited         = { description = "SECURITY: many API requests refused by rate limits (P2-07).", threshold = 200 }
+    api_auth_failed          = { description = "SECURITY: many rejected tokens or refused sign-ins at the API (ASVS 2.2.1).", threshold = 30 }
+    rate_limiter_unavailable = { description = "SECURITY: the API rate limiter cannot reach Valkey.", threshold = 1 }
+    sign_in_failed           = { description = "SECURITY: a spike of refused sign-in or step-up callbacks in the BFF (P2-07).", threshold = 30 }
+    bff_auth_rate_limited    = { description = "SECURITY: the BFF is refusing sign-ins for its per-IP limit or backoff (P2-07).", threshold = 200 }
+  }
+}
+
+resource "aws_cloudwatch_log_metric_filter" "security" {
+  for_each = local.security_filters
+
+  name           = "${local.name}-${replace(each.key, "_", "-")}"
+  log_group_name = aws_cloudwatch_log_group.host.name
+  pattern        = each.value.pattern
+
+  metric_transformation {
+    name          = each.value.metric
+    namespace     = local.security_ns
+    value         = "1"
+    default_value = "0"
+    unit          = "Count"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "security" {
+  for_each = local.security_alarms
+
+  alarm_name          = "${local.name}-${replace(each.key, "_", "-")}"
+  alarm_description   = "${var.school_code}: ${each.value.description}"
+  namespace           = local.security_ns
+  metric_name         = local.security_filters[each.key].metric
+  statistic           = "Sum"
+  period              = 300
+  evaluation_periods  = 1
+  threshold           = each.value.threshold
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [var.security_alarm_topic_arn]
+  tags                = local.tags
+
+  depends_on = [aws_cloudwatch_log_metric_filter.security]
+}
+
+resource "aws_cloudwatch_metric_alarm" "audit_chain_failure" {
+  alarm_name          = "${local.name}-audit-chain-verification-failed"
+  alarm_description   = "P1 SECURITY (${var.school_code}): audit hash-chain verification failed (SEC-007). Runbook R5."
+  namespace           = local.security_ns
+  metric_name         = local.security_filters.audit_chain_broken.metric
+  statistic           = "Sum"
+  period              = 3600
+  evaluation_periods  = 1
+  threshold           = 1
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [var.security_alarm_topic_arn]
+  ok_actions          = [var.security_alarm_topic_arn]
+  tags                = local.tags
+
+  depends_on = [aws_cloudwatch_log_metric_filter.security]
+}
+
+resource "aws_cloudwatch_metric_alarm" "audit_chain_not_run" {
+  alarm_name          = "${local.name}-audit-chain-verification-missing"
+  alarm_description   = "${var.school_code}: daily audit chain verification has not checked any chain in the last day (SLO: 100% daily)."
+  namespace           = local.security_ns
+  metric_name         = local.security_filters.audit_chain_checked.metric
+  statistic           = "Sum"
+  period              = 86400
+  evaluation_periods  = 1
+  threshold           = 1
+  comparison_operator = "LessThanThreshold"
+  treat_missing_data  = "breaching"
+  alarm_actions       = [var.security_alarm_topic_arn]
+  ok_actions          = [var.security_alarm_topic_arn]
+  tags                = local.tags
+
+  depends_on = [aws_cloudwatch_log_metric_filter.security]
+}
+
 # --- Secrets (values never in state) ----------------------------------------------------
 
 ephemeral "random_password" "generated" {
@@ -538,12 +676,18 @@ resource "aws_route53_record" "public_host" {
 
 # --- Daily EBS snapshots (crash-consistent, complements pg_dump/WAL-G) ------------------------
 
+# Confused deputy (audit 2026-10-05 hardening): only on behalf of this account.
 data "aws_iam_policy_document" "dlm_assume" {
   statement {
     actions = ["sts:AssumeRole"]
     principals {
       type        = "Service"
       identifiers = ["dlm.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
     }
   }
 }

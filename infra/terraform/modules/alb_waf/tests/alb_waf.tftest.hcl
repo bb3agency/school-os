@@ -31,8 +31,8 @@ run "tls_and_redirect" {
   command = plan
 
   assert {
-    condition     = aws_lb_listener.https.ssl_policy == "ELBSecurityPolicy-TLS13-1-2-2021-06"
-    error_message = "TLS 1.2+ with TLS 1.3 policy."
+    condition     = aws_lb_listener.https.ssl_policy == "ELBSecurityPolicy-TLS13-1-2-Res-2021-06"
+    error_message = "TLS 1.2+ with TLS 1.3, restricted to AEAD forward-secret suites (no TLS 1.2 CBC; audit 2026-10-05 hardening)."
   }
 
   assert {
@@ -43,6 +43,47 @@ run "tls_and_redirect" {
   assert {
     condition     = aws_lb.this.drop_invalid_header_fields && one(aws_lb.this.access_logs).enabled
     error_message = "Drop invalid headers and keep access logs."
+  }
+}
+
+# Audit 2026-10-05 hardening: the plain TLS13-1-2 policy still offers TLS 1.2 CBC suites.
+run "tls_policy_without_cbc_is_required" {
+  command = plan
+
+  variables {
+    ssl_policy = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+  }
+
+  expect_failures = [var.ssl_policy]
+}
+
+# Audit 2026-10-05 detection gap: an ALB-attached WAF inspects only the first 8 KB of a body, and
+# SizeRestrictions_BODY counts instead of blocking (large JSON bodies are legitimate). No route
+# takes anything but JSON (files go to presigned S3 URLs; multipart is refused by the API), so a
+# body over 8 KB that is not JSON is blocked; JSON beyond 8 KB is left to the strict app parsers.
+run "oversized_non_json_bodies_are_blocked" {
+  command = plan
+
+  assert {
+    condition = length([
+      for r in aws_wafv2_web_acl.this.rule : r
+      if r.name == "block-oversized-non-json-body"
+      && length(one(r.action).block) == 1
+      && one(one(one(one(r.statement).and_statement).statement[0].size_constraint_statement).field_to_match).body[0].oversize_handling == "MATCH"
+      && one(one(one(r.statement).and_statement).statement[0].size_constraint_statement).comparison_operator == "GT"
+      && one(one(one(r.statement).and_statement).statement[0].size_constraint_statement).size == 8192
+      && one(one(one(one(one(r.statement).and_statement).statement[1].not_statement).statement).byte_match_statement).search_string == "json"
+    ]) == 1
+    error_message = "A rule blocks bodies over 8 KB (oversize counts as a match) unless the Content-Type is JSON."
+  }
+
+  assert {
+    condition = one([
+      for r in aws_wafv2_web_acl.this.rule : r.priority if r.name == "block-oversized-non-json-body"
+      ]) < min([
+      for r in aws_wafv2_web_acl.this.rule : r.priority if startswith(r.name, "AWSManagedRules")
+    ]...)
+    error_message = "The oversize rule runs before the managed rule groups."
   }
 }
 

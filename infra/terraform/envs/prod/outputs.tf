@@ -3,6 +3,11 @@ output "alb_dns_name" {
   value       = module.platform.alb_dns_name
 }
 
+output "alarm_topic_arn" {
+  description = "Alarm topic (on-call); every dedicated host's security alarms go here too (dedicated-template security_alarm_topic_arn)."
+  value       = module.platform.alarm_topic_arn
+}
+
 output "acm_validation_records" {
   description = "ACM validation records to create at your DNS provider."
   value       = module.platform.acm_validation_records

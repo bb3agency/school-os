@@ -195,6 +195,9 @@ resource "aws_sns_topic" "alarms" {
   tags              = var.tags
 }
 
+data "aws_caller_identity" "current" {}
+
+# Confused deputy (audit 2026-10-05 hardening): only this account's alarms and budgets publish.
 data "aws_iam_policy_document" "alarms_topic" {
   statement {
     sid       = "AllowCloudWatchAlarms"
@@ -203,6 +206,11 @@ data "aws_iam_policy_document" "alarms_topic" {
     principals {
       type        = "Service"
       identifiers = ["cloudwatch.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
     }
   }
 
@@ -213,6 +221,11 @@ data "aws_iam_policy_document" "alarms_topic" {
     principals {
       type        = "Service"
       identifiers = ["budgets.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
     }
   }
 }
