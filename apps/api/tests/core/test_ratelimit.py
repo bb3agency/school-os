@@ -181,6 +181,23 @@ def test_P2_07_config_loads_with_every_layer_and_exempts_only_health() -> None:
     assert config.policies["invitations"].fail == "closed"
 
 
+def test_SEC_020_knowledge_search_has_a_per_user_limit() -> None:
+    """Audit 2026-10-04 hardening: /knowledge/search (search-only Ask, an embedding per call)
+    carries a per-person route budget; with a frozen clock the next call past it is refused."""
+    config = rl.load_config()
+    names = config.routes["POST /api/v1/knowledge/search"]
+    per_user = [config.policies[n] for n in names if config.policies[n].per == "user"]
+    assert per_user, names
+    p = per_user[0]
+    assert p.quota <= 60
+    clock = Clock()
+    store = rl.InMemoryRateLimitStore(clock=clock)
+    key = "sos:rl:test:knowledge-search:user-1"
+    results = [store.acquire([], [spec(key, p.quota, p.window_s)]) for _ in range(p.quota + 1)]
+    assert [r.allowed for r in results] == [True] * p.quota + [False]
+    assert results[-1].buckets[0].retry_ms > 0
+
+
 def test_P2_07_settings_guard_keeps_limiting_on_outside_local_and_ci() -> None:
     with pytest.raises(ValidationError, match="SOS_RATE_LIMIT_ENABLED"):
         Settings(
