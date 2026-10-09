@@ -13,6 +13,7 @@ import {
   loadSessionInfo,
   SESSION_INFO_EVENT,
   signOut,
+  signOutEverywhere,
   type Navigate,
   type SessionInfo,
   type SessionKind,
@@ -76,6 +77,18 @@ export function SessionControls({
     }
   }, [kind, navigate]);
 
+  const everywhere = useCallback(async () => {
+    setBusy(true);
+    setFailed(false);
+    try {
+      await signOutEverywhere(kind, navigate);
+    } catch {
+      setFailed(true);
+      setBusy(false);
+    }
+  }, [kind, navigate]);
+  const everywhereHintId = useId();
+
   const lockLabel = busy ? t("signingOut") : kind === "staff" ? t("lockNow") : t("signOut");
   const dark = tone === "dark";
 
@@ -123,6 +136,21 @@ export function SessionControls({
         </button>
         <span id={hintId} className="sr-only">
           {t("lockNowHint")}
+        </span>
+        <button
+          type="button"
+          onClick={() => void everywhere()}
+          disabled={busy}
+          aria-describedby={everywhereHintId}
+          className={cn(
+            "min-h-10 w-full rounded-md px-3 py-2 text-sm underline-offset-2 hover:underline disabled:opacity-60 collapsed:sr-only",
+            dark ? "text-platform-muted" : "text-ink-subtle",
+          )}
+        >
+          {t("signOutEverywhere")}
+        </button>
+        <span id={everywhereHintId} className="sr-only">
+          {t("signOutEverywhereHint")}
         </span>
         {failed ? (
           <p

@@ -34,6 +34,13 @@ export const ABSOLUTE_TIMEOUT_MS: Record<SessionKind, number> = {
   support: 8 * 60 * 60_000,
 };
 
+/**
+ * Concurrent sessions per person and kind (audit 2026-10-05 hardening, ASVS 3.3.4): a new sign-in
+ * past this ends the least recently used other session (one office PC, a phone, a home laptop
+ * and a spare). Step-up re-creates a session of the same family and is not a new one.
+ */
+export const MAX_SESSIONS_PER_PERSON = 5;
+
 const SESSION_ID = /^[A-Za-z0-9_-]{43}$/;
 
 /**
@@ -248,6 +255,7 @@ export class SessionStore {
     await this.kv.pexpire(indexKey, absolute);
     await this.kv.sadd(key.family(meta.family), id);
     await this.kv.pexpire(key.family(meta.family), absolute);
+    await this.enforceCap(meta, id);
     return { cookieValue, session: this.toSession(id, meta, now, input.accessExpiresAt) };
   }
 
@@ -401,6 +409,23 @@ export class SessionStore {
       else await this.kv.srem(indexKey, id);
     }
     return sessions.sort((a, b) => b.lastSeenAt - a.lastSeenAt);
+  }
+
+  /** End the oldest (least recently used) sessions beyond MAX_SESSIONS_PER_PERSON. */
+  private async enforceCap(meta: StoredMeta, keep: string): Promise<void> {
+    const sessions = await this.listFor({ kind: meta.kind, issuer: meta.iss, subject: meta.sub });
+    // The same family is this sign-in (step-up replaces its own session): never counted.
+    const others = sessions.filter((s) => s.id !== keep && s.familyId !== meta.family);
+    for (const session of others.slice(Math.max(0, MAX_SESSIONS_PER_PERSON - 1))) {
+      await this.revoke(session.id);
+    }
+  }
+
+  /** Revoke every live session of this person and kind ("sign out everywhere"). */
+  async revokeAllFor(owner: Pick<Session, "kind" | "issuer" | "subject">): Promise<Session[]> {
+    const sessions = await this.listFor(owner);
+    for (const session of sessions) await this.revoke(session.id);
+    return sessions;
   }
 
   async revokeByHandle(owner: Session, handle: string): Promise<Session | null> {

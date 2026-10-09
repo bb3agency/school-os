@@ -473,7 +473,9 @@ describe("/bff/auth/sessions", () => {
     expect(owner).not.toBeNull();
     expect(await h.runtime.store.listFor(owner!)).toHaveLength(MAX_SESSIONS_PER_PERSON);
     const live = await Promise.all(
-      cookies.map(async (cookie) => (await h.runtime.store.load(cookie, { touch: false })) !== null),
+      cookies.map(
+        async (cookie) => (await h.runtime.store.load(cookie, { touch: false })) !== null,
+      ),
     );
     // The new sign-in is kept; exactly one earlier session (the least recently used) ended.
     expect(live.at(-1)).toBe(true);

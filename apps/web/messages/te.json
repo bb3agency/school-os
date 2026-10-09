@@ -1874,6 +1874,8 @@
     "signOut": "సైన్ అవుట్",
     "signingOut": "సైన్ అవుట్ అవుతోంది…",
     "signOutFailed": "సైన్ అవుట్ చేయలేకపోయాం. మీ ఇంటర్నెట్ కనెక్షన్ చూసి మళ్లీ ప్రయత్నించండి.",
+    "signOutEverywhere": "Sign out everywhere",
+    "signOutEverywhereHint": "Sign out on every computer and phone where you are signed in, including this one.",
     "idle": {
       "title": "మీరు ఇంకా ఉన్నారా?",
       "body": "షేర్ చేసిన కంప్యూటర్లలో పాఠశాల రికార్డులు సురక్షితంగా ఉండేందుకు, సుమారు 1 నిమిషంలో మీరు సైన్ అవుట్ అవుతారు.",

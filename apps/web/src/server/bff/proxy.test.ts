@@ -297,6 +297,34 @@ describe("BFF proxy /bff/api/v1/* (SEC-004)", () => {
     });
   });
 
+  it("ends the session when the API says the membership is gone (suspended or removed; audit 2026-10-05)", async () => {
+    await h.signIn("staff", clerk);
+    const cookie = h.jar.get("__Host-sos_session");
+    h.setApi(() => json({ status: 403, code: "no_membership" }, 403));
+    const response = h.absorb(await call("/bff/api/v1/students"));
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({ code: "unauthenticated" });
+    expect(await h.runtime.store.load(cookie, { touch: false })).toBeNull();
+    expect(h.jar.has("__Host-sos_session")).toBe(false);
+  });
+
+  it("ends an operator session when the API says the operator is no longer active", async () => {
+    await h.signIn("operator", operator);
+    const cookie = h.jar.get("__Host-sos_platform_session");
+    h.setApi(() => json({ status: 403, code: "not_operator" }, 403));
+    const response = await call("/bff/api/v1/platform/tenants");
+    expect(response.status).toBe(401);
+    expect(await h.runtime.store.load(cookie, { touch: false })).toBeNull();
+  });
+
+  it("keeps the session on any other 403", async () => {
+    await h.signIn("staff", clerk);
+    const cookie = h.jar.get("__Host-sos_session");
+    h.setApi(() => json({ status: 403, code: "forbidden" }, 403));
+    expect((await call("/bff/api/v1/students")).status).toBe(403);
+    expect(await h.runtime.store.load(cookie, { touch: false })).not.toBeNull();
+  });
+
   it("uses the operator step-up route for platform calls", async () => {
     await h.signIn("operator", operator);
     h.setApi(() => json({ code: "step_up_required" }, 428));

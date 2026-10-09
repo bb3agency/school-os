@@ -1874,6 +1874,8 @@
     "signOut": "Sign out",
     "signingOut": "Signing out…",
     "signOutFailed": "We couldn't sign you out. Check your internet connection, then try again.",
+    "signOutEverywhere": "Sign out everywhere",
+    "signOutEverywhereHint": "Sign out on every computer and phone where you are signed in, including this one.",
     "idle": {
       "title": "Are you still there?",
       "body": "To keep school records safe on shared computers, you will be signed out in about 1 minute.",
