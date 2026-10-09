@@ -70,16 +70,16 @@ The round-one reports (`audit-2026-10-04-*.md`) were read first. Nothing they fo
 
 **Verified answers**
 - `answer_text` is free text, with no personal-number screen (notices and memories have one). **Fixed in 3cc7452:** 422 `answer_personal_data` on create and update. Test: `tests/knowledge/test_ask_api.py::test_SEC_016_a_verified_answer_refuses_phone_numbers_and_emails`.
-- A creator may also review their own answer. FR-KB-030 allows this. **Left open:** allowed by FR-KB-030; changing it is a product rule, not a defect.
+- A creator may also review their own answer. FR-KB-030 allows this. **Fixed in 869721e0** (owner decision 2026-10-09: the drafter of a verified answer cannot review it; 409 `reviewer_must_differ`, unless no other active member holds `kb.verified_answer.manage`, when the review is audited with `self_reviewed: true`; migration `0050_verified_answer_drafter` keeps the drafter, since `verified_by` changes with every review). Tests: `tests/knowledge/test_ask_api.py::test_FR_KB_030_the_drafter_cannot_review_their_own_answer`, `::test_FR_KB_030_self_review_is_allowed_when_no_one_else_holds_the_permission`.
 
 **Notices**
-- The principal can approve their own notice draft. This matches FR-NOTICE-005; record it if separation of duties is wanted. **Left open:** allowed by FR-NOTICE-005; separation of duties here is a product rule.
+- The principal can approve their own notice draft. This matches FR-NOTICE-005; record it if separation of duties is wanted. **Fixed in 8af59990** (owner decision 2026-10-09: self-approval stays allowed by FR-NOTICE-005, and `notice.approved` carries `self_approved: true` when the approver drafted the notice, so the audit viewer shows it). Test: `tests/circulars/test_api.py::test_FR_NOTICE_005_self_approval_is_allowed_and_marked_in_the_audit_event`.
 
 **Tally**
 - Revert of an import silently drops its `ops.tally_party_links` (ON DELETE CASCADE) instead of refusing with `import_has_dependents`. **Fixed in 1fd9b1bd:** the link is NO ACTION, so the revert answers 409 `import_has_dependents`. Test: `tests/imports/test_commit_revert.py::test_FR_IMP_005_revert_refused_when_a_tally_party_is_linked_to_an_imported_student`.
 
 **Students**
-- **Past-year access.** Past-year search and past-year enrolment edits reach students who are no longer in the caller's scope. **Left open:** the audit gives no recommendation, and who may see last year's students (a teacher's former class) is a product rule.
+- **Past-year access.** Past-year search and past-year enrolment edits reach students who are no longer in the caller's scope. **Fixed in 0b22a08d** (owner decision 2026-10-09: section- and class-scoped grants reach a student only through an active enrolment in their sections or classes in the CURRENT academic year; a past-year-only student is 404 and left out of lists and search for any year asked; school-wide grants see every year. Reads and enrolment edits already needed current-year reach; the year filter on list and search no longer widens it). Tests: `tests/students/test_past_year_reach.py::test_SEC_015_BOLA_a_scoped_grant_does_not_reach_a_past_year_student`, `::test_SEC_015_BOLA_past_year_lists_and_search_leave_out_students_outside_current_reach`, `::test_SEC_015_BOLA_past_year_enrolment_edits_need_current_reach`.
 - **Guardian edits.** A guardian shared with a sibling outside scope can be edited by a custom scoped updater. **Fixed in eb51a9e:** name, phone and address change only when every linked student is in reach (403 `guardian_shared_out_of_scope`). Test: `tests/students/test_enrollments_api.py::test_SEC_015_scoped_editor_cannot_edit_a_guardian_shared_with_a_student_outside_scope`.
 
 **Platform**
