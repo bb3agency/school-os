@@ -1624,7 +1624,9 @@ export interface paths {
         /**
          * Start Run
          * @description Check sections, classes, students or an import batch, optionally for an export profile
-         *     such as ``cisce-registration-2026`` (permission ``dq.findings.read``). Small scopes are
+         *     such as ``cisce-registration-2026`` (permission ``dq.findings.resolve``: read-only holders
+         *     such as auditors and class teachers read findings but do not start runs; value changes
+         *     re-check students automatically). Small scopes are
          *     checked at once (status ``completed``); bigger ones are queued (status ``queued``) and you
          *     are notified when they finish. A section or class outside your scope answers like an unknown
          *     one (422 ``not_found``). Accepts ``Idempotency-Key``.
@@ -8779,7 +8781,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "open" | "resolved" | "waived" | "reopened";
+            status: "open" | "resolved" | "waived" | "reopened" | "needs_confirmation";
             student: components["schemas"]["StudentRef"];
             /** Values */
             values: components["schemas"]["FindingValue"][];
@@ -10952,9 +10954,9 @@ export interface components {
             candidates: components["schemas"]["LinkedStudentOut"][];
             /**
              * Closing Balance
-             * @description Positive: the party owes the school
+             * @description Positive: the party owes the school. Null without school-wide finance.read
              */
-            closing_balance: string;
+            closing_balance: string | null;
             /** Group Name */
             group_name: string;
             /**
@@ -10989,9 +10991,9 @@ export interface components {
             as_of: string;
             /**
              * Closing Balance
-             * @description Positive: the party owes the school
+             * @description Positive: the party owes the school. Null without school-wide finance.read
              */
-            closing_balance: string;
+            closing_balance: string | null;
             /** Group Name */
             group_name: string;
             /**
@@ -17515,7 +17517,7 @@ export interface operations {
                 rule_id?: ("DQ-001" | "DQ-002" | "DQ-003" | "DQ-004" | "DQ-005" | "DQ-006" | "DQ-007" | "DQ-008" | "DQ-009" | "DQ-010" | "DQ-011" | "DQ-012" | "DQ-021" | "DQ-022")[] | null;
                 section_id?: string | null;
                 severity?: ("blocker" | "high" | "medium" | "low" | "info")[] | null;
-                status?: ("open" | "resolved" | "waived" | "reopened")[] | null;
+                status?: ("open" | "resolved" | "waived" | "reopened" | "needs_confirmation")[] | null;
                 student_id?: string | null;
             };
             header?: never;

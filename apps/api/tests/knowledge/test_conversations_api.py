@@ -305,6 +305,18 @@ def test_invariant_3_another_persons_conversation_is_404_and_never_joined(
     )
 
 
+def test_SEC_001_a_legacy_session_id_from_another_school_starts_a_fresh_conversation(
+    world: Any, api: Any, admin_engine: Engine, fake: Any
+) -> None:
+    """App-logic hardening: another school's conversation id sent as a legacy ``session_id``
+    answers like an unknown id (a new conversation), not a unique-violation error that would
+    reveal it exists."""
+    b_owner = world.b.people["owner"]
+    cid = _ask(api, b_owner, "When is the Yak festival?")[0][1]["conversation_id"]
+    mine = _ask(api, _person(admin_engine, world), "And the time?", session_id=cid)
+    assert mine[0][1]["conversation_id"] != cid
+
+
 def test_FR_KB_012_delete_hides_the_conversation_everywhere_and_keeps_the_query_log(
     world: Any, api: Any, admin_engine: Engine, fake: Any
 ) -> None:

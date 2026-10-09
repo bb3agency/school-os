@@ -65,4 +65,7 @@ dq_findings = Table(
     Column("version", Integer, nullable=False),
 )
 
-ACTIVE_STATUSES = ("open", "reopened")
+# A-01: a blocker a write without evidence removed waits for a waive holder's confirmation
+# (step-up) and stays unresolved until then: certificates and exports keep refusing.
+NEEDS_CONFIRMATION = "needs_confirmation"
+ACTIVE_STATUSES = ("open", "reopened", NEEDS_CONFIRMATION)

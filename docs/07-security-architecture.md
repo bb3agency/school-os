@@ -165,7 +165,7 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | tenant.billing.read (Plan & billing page) | ✓ | ✓ | — | — | ✓ | — | — | — | — |
 | support.ticket.create (open support tickets; read and reply on the ones you opened; no student data) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
 | support.manage (read and reply on every support ticket of the school; audit 2026-10-06 R-17) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
-| user.manage (invite, deactivate) | ✓ᴿ | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — |
+| user.manage (invite, deactivate; inviting a scoped role such as class teacher with a `school` scope also needs role.assign: A-19) | ✓ᴿ | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — |
 | role.assign | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
 | student.read_basic | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | S | S | ✓ |
 | student.read_sensitive | ✓ | ✓ | ✓ | — | — | — | S | — | — |
@@ -175,7 +175,7 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | student.identity_change.approve | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
 | student.export (bulk) | ✓ᴿ | ✓ᴿ | ✓ᴿ | — | — | ✓ᴿ | — | — | — |
 | import.run | — | ✓ | ✓ | ✓ | — | ✓ | — | — | — |
-| import.commit | — | ✓ | ✓ | — | — | ✓ | — | — | — |
+| import.commit (also updates existing students in scope with non-sensitive values, from sheets and the register-photo queue; writing a C3 value to an existing student also needs student.read_sensitive: A-10, owner decision 2026-10-07) | — | ✓ | ✓ | — | — | ✓ | — | — | — |
 | dq.findings.read | ✓ | ✓ | ✓ | ✓ | — | ✓ | S | — | ✓ |
 | dq.findings.resolve | — | ✓ | ✓ | ✓ | — | ✓ | — | — | — |
 | dq.findings.waive | — | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — |

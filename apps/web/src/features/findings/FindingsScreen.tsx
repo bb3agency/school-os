@@ -233,7 +233,7 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
         breadcrumb={[{ label: t("crumbHome"), href: "/" }, { label: t("title") }]}
         actions={
           <>
-            {can("dq.findings.read") ? (
+            {can("dq.findings.resolve") ? (
               <RunChecksDialog defaultProfile={filters.profileKey} />
             ) : null}
             <Button variant="secondary" onClick={() => window.print()}>

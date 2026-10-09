@@ -471,6 +471,7 @@ def _validation_context(
         has_current_year=structure.year_id is not None,
         allowed_sections=allowed,
         can_create=ctx.has(CREATE_STUDENT),
+        can_update_sensitive=ctx.has(READ_SENSITIVE),
         existing=_existing_students(
             session,
             ctx,
@@ -573,8 +574,14 @@ def create_import(session: Session, ctx: UserContext, data: ImportCreate) -> Imp
 
     The document must be visible to the caller (404 otherwise), XLSX or CSV (415) and at most
     10 MB (413, FR-IMP-001). Parsing runs in a worker. Audit: ``import.created``.
+
+    A-15: without ``student.read_sensitive`` the caller imports only files they uploaded
+    themselves (another person's sheet, such as a class teacher's marks sheet, answers 404 as an
+    invisible document would): the import's sheet view would otherwise show it to them.
     """
     if not documents.is_visible(session, ctx, data.document_id):
+        raise NotFound("Document not found")
+    if not ctx.has(READ_SENSITIVE) and not documents.is_own_upload(session, ctx, data.document_id):
         raise NotFound("Document not found")
     try:
         obj = documents.document_object(session, data.document_id)

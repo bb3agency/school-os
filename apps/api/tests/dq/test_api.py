@@ -276,6 +276,22 @@ def test_SEC_015_class_teacher_sees_only_own_sections(world: Any, api: Any) -> N
     assert other.json()["data"] == []
 
 
+@pytest.mark.parametrize("role", ["auditor_readonly", "class_teacher"])
+def test_SEC_003_read_only_holders_cannot_start_a_check_run(
+    world: Any, api: Any, role: str
+) -> None:
+    """App-logic hardening (owner decision 2026-10-07): starting a run is work on the school's
+    findings, so it needs ``dq.findings.resolve``; readers keep reading. Value changes still
+    re-check students automatically (event runs)."""
+    sid = DS.student(world.a)
+    body = {"scope": {"student_ids": [str(sid)]}}
+    res = api.call(world.person(role), "POST", "/api/v1/dq/runs", json=body)
+    assert res.status_code == 403, res.text
+    assert api.call(world.person(role), "GET", "/api/v1/dq/findings").status_code == 200
+    ok = api.call(world.person("office_staff"), "POST", "/api/v1/dq/runs", json=body)
+    assert ok.status_code == 202, ok.text
+
+
 def test_SEC_001_lists_never_show_other_school(world: Any, api: Any) -> None:
     b = DS.high_finding(world.b)
     res = api.call(world.person("owner"), "GET", "/api/v1/dq/findings", params={"limit": 200})

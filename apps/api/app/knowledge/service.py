@@ -41,6 +41,8 @@ from contextlib import closing
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Final
 
+from sqlalchemy.exc import IntegrityError
+
 from app.audit import service as audit
 from app.core import languages, ratelimit, retention
 from app.core import purge as purging
@@ -190,6 +192,13 @@ INTERNAL_ERROR_KEY: Final = "kb.errors.internal"
 
 def _error(field: str, code: str) -> dict[str, str]:
     return {"field": field, "code": code, "message_key": f"errors.{code}"}
+
+
+def _refuse_answer_personal(text: str) -> None:
+    """Verified answers are shown to the whole school: no phone numbers, emails or
+    Aadhaar-like numbers in the free text (as for notices and memories; 422)."""
+    if has_personal_numbers(text):
+        raise ValidationFailed([_error("answer_text", "answer_personal_data")])
 
 
 def _result_out(chunk: RankedChunk) -> SearchResultOut:
@@ -364,12 +373,17 @@ class SchoolKnowledgeService:
             if found is not None and found.deleted_at is None:
                 return found, False
             if found is None and repo.conversation_owner(session, request.session_id) is None:
-                return (
-                    self._new_conversation(
-                        session, ctx, question, conversation_id=request.session_id, now=now
-                    ),
-                    True,
-                )
+                # The id may belong to another school's conversation (RLS hides it): the insert
+                # then fails in its savepoint and a fresh conversation starts, exactly as for an
+                # unknown id, so nothing tells the caller it exists.
+                try:
+                    with session.begin_nested():
+                        created = self._new_conversation(
+                            session, ctx, question, conversation_id=request.session_id, now=now
+                        )
+                except IntegrityError:
+                    created = self._new_conversation(session, ctx, question, now=now)
+                return created, True
         return self._new_conversation(session, ctx, question, now=now), True
 
     def _revision(
@@ -1327,6 +1341,7 @@ class SchoolKnowledgeService:
         the current version of a document the caller can read (docs/06 §8-9)."""
         if not ctx.has(MANAGE_VERIFIED):
             raise Forbidden()
+        _refuse_answer_personal(data.answer_text)
         citations = self._checked_citations(session, ctx, [c.model_dump() for c in data.citations])
         now = dt.datetime.now(dt.UTC)
         row = repo.insert_verified_answer(
@@ -1401,6 +1416,7 @@ class SchoolKnowledgeService:
         }
         changed = []
         if data.answer_text is not None:
+            _refuse_answer_personal(data.answer_text)
             values["answer_text"] = mask_aadhaar(nfc(data.answer_text))
             changed.append("answer_text")
         if data.citations is not None:

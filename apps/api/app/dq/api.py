@@ -52,9 +52,11 @@ OptionalIfMatch = Annotated[int | None, Depends(optional_if_match)]
 
 
 @router.post("/runs", response_model=RunOut, status_code=202)
-def start_run(ctx: Reader, db: TenantDB, body: RunCreate, idem: IdempotencyDep) -> Response:
+def start_run(ctx: Resolver, db: TenantDB, body: RunCreate, idem: IdempotencyDep) -> Response:
     """Check sections, classes, students or an import batch, optionally for an export profile
-    such as ``cisce-registration-2026`` (permission ``dq.findings.read``). Small scopes are
+    such as ``cisce-registration-2026`` (permission ``dq.findings.resolve``: read-only holders
+    such as auditors and class teachers read findings but do not start runs; value changes
+    re-check students automatically). Small scopes are
     checked at once (status ``completed``); bigger ones are queued (status ``queued``) and you
     are notified when they finish. A section or class outside your scope answers like an unknown
     one (422 ``not_found``). Accepts ``Idempotency-Key``."""

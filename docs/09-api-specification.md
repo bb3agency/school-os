@@ -263,7 +263,7 @@ Certificate notes (M3, as built; data model 05 §5.7). The stories and requireme
 ### Imports and extraction
 | Method | Path | Permission |
 |---|---|---|
-| POST | `/imports` (JSON: `document_id` of an uploaded, scanned `import_file`, `source`, `kind` = `spreadsheet`) → 202 (**M1**) | `import.run` |
+| POST | `/imports` (JSON: `document_id` of an uploaded, scanned `import_file`, `source`, `kind` = `spreadsheet`) → 202 (**M1**). Without `student.read_sensitive` only your own upload (else 404; A-15) | `import.run` |
 | GET | `/imports` · `/imports/{id}` (`ETag`) · `/imports/{id}/rows?status=error\|valid\|warning\|committed\|skipped` (cursor) (**M1**) | `import.run` |
 | PUT | `/imports/{id}/mapping` (`If-Match`) (**M1**) | `import.run` |
 | POST | `/imports/{id}/validate` → 202 (**M1**) | `import.run` |
@@ -298,7 +298,7 @@ Imports notes (M1, as built; US-401, FR-IMP-001..007):
 ### Data quality
 | Method | Path | Permission |
 |---|---|---|
-| POST | `/dq/runs` (`scope`: `section_ids` \| `class_ids` \| `student_ids` \| `batch_id`, `profile_key`) → 202 (**built**) | `dq.findings.read` |
+| POST | `/dq/runs` (`scope`: `section_ids` \| `class_ids` \| `student_ids` \| `batch_id`, `profile_key`) → 202 (**built**) | `dq.findings.resolve` (read-only holders read findings but do not start runs; hardening, owner decision 2026-10-07) |
 | GET | `/dq/runs/{id}` (**built**) | `dq.findings.read` (scoped holders: own runs) |
 | GET | `/dq/findings` (`severity`, `rule_id`, `section_id`, `status`, `student_id`, `profile_key`, `attribute_key`, cursor) · `/dq/findings/{id}` (`ETag`) (**built**) | `dq.findings.read` |
 | POST | `/dq/findings/{id}/resolve` (`note` and/or `change_request_id`; optional `If-Match`) (**built**). A blocker also needs `dq.findings.waive` (else `403 blocker_needs_waive`) and step-up MFA (`428 step_up_required`), like waiving (FR-DQ-020, DL-06) | `dq.findings.resolve` |
@@ -388,7 +388,7 @@ All **built** (module `app/circulars`, docs/05 §6.3, docs/06 §4.10). The AI re
 | GET | `/tasks/{task_id}` | `task.read`: your own task, any task with `task.read_all` or `task.manage`, else 404. The circular citation only if you can see that circular (FR-TASK-002, FR-CIR-006) |
 | PATCH | `/tasks/{task_id}` (`If-Match`; `title`, `details`, `owner_membership_id`, `due_on`) | `task.manage` (school); 409 `task_closed`; a new owner is told in the app (FR-TASK-003) |
 | POST | `/tasks/{task_id}/status` (`If-Match`; `status`) | `task.read`: the owner moves `open` ⇄ `in_progress` → `done` (and reopens); `task.manage` holders may do it for any task and cancel. 403 `not_task_owner`; 409 `task_status_not_allowed`, `task_cancel_not_allowed` (FR-TASK-003, FR-TASK-004) |
-| GET | `/notices` (`status`, cursor, `limit`) | `notice.draft`; newest first (US-1605) |
+| GET | `/notices` (`status`, cursor, `limit`) | `notice.draft`; newest first (US-1605). A notice not yet approved that was drafted from a circular is shown only to its drafter and to people who may read that circular (elsewhere 404 and left out of the list; A-16) |
 | POST | `/notices` (`Idempotency-Key`; `source` `circular` + `document_id`, `staff_text` + `text` ≤ 4000, or `blank`) | `notice.draft` (school); **202** with `Location`. An AI notice starts `drafting` and is drafted in the background (worker `circulars.draft_notice`, queue `ingest`); ask `GET /notices/{notice_id}` again (with backoff) until it is `draft` or `draft_failed` with `draft_error` (the gateway's code, `no_text`, `source_unavailable`, `notice_source_personal`, `worker_error`). A `blank` notice starts as `draft`. A repeated `Idempotency-Key` replays the first 202 and queues nothing. 422 `notice_source_personal` (circular not C1), `notice_personal_data` (staff text with a phone number, email or Aadhaar-like number), `document_id` `required`/`not_found` (FR-NOTICE-001..003) |
 | GET | `/notices/{notice_id}` | `notice.draft`; includes `ai_drafted`, `render_status`, `files_available` (US-1605) |
 | PATCH | `/notices/{notice_id}` (`If-Match`; any of `title_en`, `body_en`, `title_te`, `body_te`) | `notice.draft` (school); editing a `draft_failed` notice makes it a `draft`. 409 `notice_approved`, `notice_drafting`; 422 `notice_personal_data` (FR-NOTICE-002, FR-NOTICE-004) |

@@ -1651,6 +1651,7 @@
       "citation_not_found": "మీరు చదవగల ఏ పత్రమూ ఈ ఆధారంతో సరిపోలడం లేదు. తనిఖీ చేయండి లేదా మళ్ళీ కాపీ చేయండి.",
       "citation_not_current": "ఇది పత్రం యొక్క ప్రస్తుత వెర్షన్ కాదు. కొత్త వెర్షన్ పేజీని వాడండి.",
       "citation_text_not_found": "ఈ వాక్యం ఆ పేజీలో లేదు. పత్రంలోని ఖచ్చితమైన పదాలను కాపీ చేయండి.",
+      "answer_personal_data": "ఫోన్ నంబర్లు, ఇమెయిల్ చిరునామాలు మరియు ఆధార్ నంబర్లను తీసివేయండి. పాఠశాలలో అందరూ ఈ సమాధానాన్ని చదవగలరు.",
       "owner_not_active": "This person can no longer be given tasks. Choose someone else.",
       "aadhaar_last4_only": "Don't enter Aadhaar numbers. Use only the last 4 digits."
     },
@@ -2520,6 +2521,7 @@
       "duplicate_in_file": "ఇదే ప్రవేశ సంఖ్య వరుస {row} లో కూడా ఉంది. వాటిలో ఒకదాన్నే ఉంచండి.",
       "no_matching_student": "ఈ ప్రవేశ సంఖ్యతో ఏ విద్యార్థీ లేరు. ప్రవేశ రిజిస్టర్ మాత్రమే కొత్త విద్యార్థులను చేర్చగలదు.",
       "student_create_not_permitted": "మీరు కొత్త విద్యార్థులను చేర్చలేరు. మీ ఆఫీస్ అడ్మిన్‌ను అడగండి.",
+      "sensitive_update_not_permitted": "ఉన్న విద్యార్థి యొక్క ఈ సున్నితమైన వివరాన్ని మీరు మార్చలేరు. మీ ఆఫీస్ అడ్మిన్‌ను అడగండి.",
       "student_out_of_scope": "ఈ విద్యార్థి మీ తరగతుల్లో లేరు.",
       "class_not_found": "ఈ తరగతి లేదు. పాఠశాల నిర్మాణంలో దాన్ని చేర్చండి, లేదా ఫైల్‌ను సరిచేయండి.",
       "section_not_found": "ఈ సంవత్సరం ఈ సెక్షన్ లేదు. పాఠశాల నిర్మాణంలో దాన్ని చేర్చండి, లేదా ఫైల్‌ను సరిచేయండి.",
@@ -3025,6 +3027,7 @@
     "status": {
       "open": "తెరిచి ఉంది",
       "reopened": "మళ్లీ వచ్చింది",
+      "needs_confirmation": "నిర్ధారణ అవసరం",
       "resolved": "పరిష్కరించబడింది",
       "waived": "అంగీకరించబడింది"
     },
@@ -3098,7 +3101,9 @@
       "resolveConsequence": "Nothing on the student's record changes. The next check looks at it again.",
       "waiveConsequence": "Nothing on the student's record changes.",
       "blockerResolveBody": "This problem stops certificates and submissions. Say what was done, or link the correction request that fixes it. You will be asked to confirm it's you. If the problem is still there at the next check, it opens again.",
-      "blockerNeedsWaive": "This problem stops certificates and submissions. It closes when the correction request that fixes the record is approved, or the office admin or principal can resolve or accept it."
+      "blockerNeedsWaive": "This problem stops certificates and submissions. It closes when the correction request that fixes the record is approved, or the office admin or principal can resolve or accept it.",
+      "needsConfirmationTitle": "ఈ సవరణ లెక్కలోకి వచ్చే ముందు తనిఖీ చేయండి",
+      "needsConfirmationBody": "ఇప్పుడు విలువలు సరిపోతున్నాయి, కానీ ఆధారం లేకుండా మార్చబడ్డాయి. ఆఫీస్ అడ్మిన్ లేదా ప్రిన్సిపాల్ కాగితపు రికార్డును తనిఖీ చేసి సవరణను నిర్ధారించే వరకు సర్టిఫికెట్లు మరియు సమర్పణలు ఆగి ఉంటాయి. విలువలు మళ్లీ వేరుగా ఉంటే, సమస్య తిరిగి వస్తుంది."
     },
     "rules": {
       "title": "SchoolOS ఏమి తనిఖీ చేస్తుంది",

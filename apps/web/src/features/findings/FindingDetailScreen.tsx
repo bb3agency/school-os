@@ -287,6 +287,13 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
         }
       />
 
+      {data.status === "needs_confirmation" ? (
+        // A-01: a blocker a write without evidence removed waits for a waive holder's Resolve.
+        <Alert tone="warning" title={td("needsConfirmationTitle")}>
+          <span data-testid="needs-confirmation">{td("needsConfirmationBody")}</span>
+        </Alert>
+      ) : null}
+
       <div className="grid gap-6 xl:grid-cols-[3fr_2fr]">
         <Card title={td("whatTitle")}>
           <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-[max-content_1fr]">

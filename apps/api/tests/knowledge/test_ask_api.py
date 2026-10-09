@@ -584,6 +584,23 @@ def test_FR_KB_030_verified_answer_must_quote_a_current_visible_document(
     assert str(ok.json()["id"]) in {str(e["resource_id"]) for e in audits}
 
 
+def test_SEC_016_a_verified_answer_refuses_phone_numbers_and_emails(
+    world: Any, api: Any, docs: dict[str, uuid.UUID], fake: Any
+) -> None:
+    """App-logic hardening: verified answers are shown to everyone in the school, so the free
+    text is screened for personal numbers like notices and memories (422)."""
+    principal = world.person("principal")
+    res = _verified(
+        api,
+        principal,
+        docs["sports"],
+        "held on 28/11/2026",
+        answer_text="Held on 28/11/2026. Call 9876543210 or parent@example.test.",
+    )
+    assert res.status_code == 422, res.text
+    assert res.json()["errors"][0]["code"] == "answer_personal_data"
+
+
 def test_FR_KB_030_list_hides_answers_citing_documents_the_caller_cannot_read(
     world: Any, api: Any, docs: dict[str, uuid.UUID], fake: Any
 ) -> None:

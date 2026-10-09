@@ -183,7 +183,9 @@ function LinkPanel({ partyId, onClose }: { partyId: string; onClose: () => void 
             <p className="break-words">
               <span className="font-semibold">{detail.ledger_name}</span>{" "}
               <span className="text-ink-muted">({detail.group_name})</span>{" "}
-              <Amount value={detail.closing_balance} withKind />
+              {detail.closing_balance === null ? null : (
+                <Amount value={detail.closing_balance} withKind />
+              )}
             </p>
             <p className="text-sm text-ink-muted">{t("personDecides")}</p>
             {linked ? (
@@ -359,7 +361,11 @@ export function TallyLedgersScreen() {
                               </Td>
                               <Td>{party.group_name}</Td>
                               <Td className="text-right">
-                                <Amount value={party.closing_balance} withKind />
+                                {party.closing_balance === null ? (
+                                  <span className="text-ink-muted">—</span>
+                                ) : (
+                                  <Amount value={party.closing_balance} withKind />
+                                )}
                               </Td>
                               <Td>
                                 <LinkedList party={party} />

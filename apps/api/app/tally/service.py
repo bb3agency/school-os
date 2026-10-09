@@ -375,12 +375,15 @@ def _party_outs(session: Session, ctx: UserContext, parties: Sequence[Party]) ->
     links = repo.links_of(session, [p.id for p in parties])
     everyone = {sid for ids in links.values() for sid in ids}
     visible = students.summaries(session, ctx, everyone)
+    # Balances are money: only school-wide finance readers see them (a custom role may hold
+    # tally.configure alone to link ledgers; app-logic hardening, ADR-0032 §5).
+    fees = can_read_fees(ctx)
     return [
         PartyOut(
             id=p.id,
             ledger_name=p.ledger_name,
             group_name=p.group_name,
-            closing_balance=p.closing_balance,
+            closing_balance=p.closing_balance if fees else None,
             as_of=p.as_of,
             present=p.present,
             links=[_linked_out(visible[s]) for s in links.get(p.id, []) if s in visible],

@@ -136,7 +136,9 @@ class PartyOut(_Out):
     id: uuid.UUID
     ledger_name: str
     group_name: str
-    closing_balance: Decimal = Field(description="Positive: the party owes the school")
+    closing_balance: Decimal | None = Field(
+        description="Positive: the party owes the school. Null without school-wide finance.read"
+    )
     as_of: dt.date
     present: bool
     links: list[LinkedStudentOut]

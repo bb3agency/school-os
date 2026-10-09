@@ -255,6 +255,20 @@ def _guard_invite_roles(session: Session, ctx: UserContext, roles: Iterable[Role
     _guard_grantable(session, ctx, sensitive)
 
 
+def _guard_invite_school_scope(
+    ctx: UserContext, data: InviteIn, templates: Mapping[str, RoleDef]
+) -> None:
+    """A-19: a ``school`` scope on a role whose grants are scoped (class teacher, teacher) gives
+    school-wide reach; it needs ``role.assign``, as changing scopes later does (403
+    ``role_not_grantable``). Section and class scopes stay with ``user.manage``."""
+    if not any(s.type == "school" for s in data.scopes) or ctx.has("role.assign"):
+        return
+    if ctx.roles & assign_any_roles():
+        return
+    if any(g.scoped for k in data.roles if k in templates for g in templates[k].grants):
+        raise _not_grantable()
+
+
 def _guard_status_reach(session: Session, ctx: UserContext, membership: Membership) -> None:
     """Suspending, removing or reactivating a member takes away or gives back every role they
     hold, so it follows the invite rule (SEC-003): a member with a privileged or custom role is
@@ -633,6 +647,7 @@ def invite_user(session: Session, ctx: UserContext, data: InviteIn) -> UserOut:
     roles = _roles_by_key(session, data.roles)
     _guard_invite_roles(session, ctx, roles.values())
     templates: Mapping[str, RoleDef] = system_roles()
+    _guard_invite_school_scope(ctx, data, templates)
     defs = [templates[k] for k in data.roles if k in templates and roles[k].is_system]
     ttls = [d.membership_ttl for d in defs if d.membership_ttl is not None]
     expires_at = dt.datetime.now(dt.UTC) + min(ttls) if ttls else None

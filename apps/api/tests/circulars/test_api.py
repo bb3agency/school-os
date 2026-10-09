@@ -319,6 +319,43 @@ def test_FR_TASK_004_owner_moves_their_task_and_cannot_cancel_it(
     assert stale.status_code == 412
 
 
+def test_SEC_015_scoped_task_grants_reach_only_your_own_tasks(ai_on: Any) -> None:
+    """App-logic hardening (custom roles): ``task.read_all`` and ``task.manage`` granted only
+    through a scoped grant do not reach other people's tasks (tasks belong to no section, so a
+    scoped grant fails closed)."""
+    from app.authz.context import Scopes
+    from app.circulars.schemas import TaskStatusIn
+    from app.core.errors import NotFound
+
+    school = ai_on.a
+    task_id = C.task(school, owner=school.people["teacher"], by="principal")
+    base = C.ctx(school, "office_admin")
+    scoped = dataclasses.replace(
+        base,
+        scoped_permissions=base.scoped_permissions | {service.TASK_ALL, service.TASK_MANAGE},
+        scopes=Scopes(section_ids=frozenset({school.ids["section_9a"]})),
+    )
+    with tenant_session(school.tenant_id, scoped.user_id) as db:
+        with pytest.raises(NotFound):
+            service.get_task(db, scoped, task_id)
+        with pytest.raises(NotFound):
+            service.set_task_status(db, scoped, task_id, TaskStatusIn(status="cancelled"), 1)
+        with pytest.raises(Forbidden):
+            service.list_tasks(
+                db,
+                scoped,
+                view="all",
+                status=None,
+                due=None,
+                owner=None,
+                document_id=None,
+                limit=50,
+                cursor=None,
+            )
+    with tenant_session(school.tenant_id, base.user_id) as db:
+        assert service.get_task(db, base, task_id).id == task_id
+
+
 def test_FR_TASK_003_manager_reassigns_and_cancels(
     ai_on: Any, api: Any, admin_engine: Engine
 ) -> None:
@@ -613,6 +650,40 @@ def test_invariant_8_the_worker_drafts_only_what_the_requester_can_still_see(
         "draft_failed",
         "source_unavailable",
     )
+
+
+def test_A_16_a_draft_from_a_circular_you_cannot_see_is_not_shown_until_approved(
+    ai_on: Any, api: Any, admin_engine: Engine, installed: Any
+) -> None:
+    """A-16 (owner decision 2026-10-07, with DL-08): a notice the principal drafts from a
+    circular only they may read is not shown to other notice drafters (404, left out of the
+    list) while it is a draft. Once approved it is written for parents, so every drafter sees
+    and downloads it as before."""
+    school = ai_on.a
+    principal, office = school.people["principal"], school.people["office_staff"]
+    document_id = C.read_circular(admin_engine, school, acl=[("role", "principal")])
+    res = api.call(
+        principal,
+        "POST",
+        "/api/v1/notices",
+        json={"source": "circular", "document_id": str(document_id)},
+    )
+    assert res.status_code == 202, res.text
+    notice_id = res.json()["id"]
+    assert C.draft_now(school, uuid.UUID(notice_id)) == "draft"
+    path = f"/api/v1/notices/{notice_id}"
+    assert api.call(principal, "GET", path).status_code == 200
+    assert api.call(office, "GET", path).status_code == 404
+    patch = {"title_en": "Changed by someone else"}
+    assert api.call(office, "PATCH", path, json=patch, headers=_if(2)).status_code == 404
+    listed = api.call(office, "GET", "/api/v1/notices", params={"limit": 200})
+    assert notice_id not in {n["id"] for n in listed.json()["data"]}
+    version = api.call(principal, "GET", path).json()["version"]
+    approved = api.call(principal, "POST", f"{path}/approve", json={}, headers=_if(version))
+    assert approved.status_code == 200, approved.text
+    assert api.call(office, "GET", path).status_code == 200
+    listed = api.call(office, "GET", "/api/v1/notices", params={"limit": 200})
+    assert notice_id in {n["id"] for n in listed.json()["data"]}
 
 
 def test_FR_NOTICE_002_personal_circulars_and_numbers_are_refused(

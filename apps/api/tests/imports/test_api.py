@@ -211,6 +211,27 @@ def test_FR_IMP_001_create_import_checks_the_document(
     assert bad_source.status_code == 422
 
 
+def test_A_15_an_import_starts_only_from_your_own_upload_unless_you_read_sensitive(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """A-15 (owner decision 2026-10-07): office staff (import.run, no read_sensitive) cannot
+    start an import from someone else's sheet (e.g. a class teacher's marks sheet) and read it
+    through the import; 404 as for an invisible document. Their own upload still works, and a
+    read_sensitive holder (office admin) may import a colleague's upload."""
+    data = S.xlsx_bytes(S.class_list(1)[0])
+    clerk = world.person("office_staff")
+
+    def post(who: Any, doc: uuid.UUID) -> Any:
+        body = {"document_id": str(doc), "source": "udise_plus"}
+        return api.call(who, "POST", "/api/v1/imports", json=body)
+
+    teachers = _doc(admin_engine, world.a, data, role="class_teacher")
+    assert post(clerk, teachers).status_code == 404
+    own = _doc(admin_engine, world.a, data, role="office_staff")
+    assert post(clerk, own).status_code == 202
+    assert post(world.person("office_admin"), teachers).status_code == 202
+
+
 def test_FR_IMP_001_idempotent_create(world: Any, api: Any, admin_engine: Engine) -> None:
     admin = world.person("office_admin")
     doc = _doc(admin_engine, world.a, S.xlsx_bytes(S.class_list(1)[0]))

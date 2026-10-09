@@ -103,6 +103,31 @@ def test_FR_IAM_002_privileged_invite_sets_mfa_required(
     assert flag is True
 
 
+@pytest.mark.parametrize("role", ["class_teacher", "teacher"])
+def test_A_19_a_school_wide_scope_on_a_scoped_role_needs_role_assign(
+    world: Any, api: Any, admin_engine: Engine, role: str
+) -> None:
+    """A-19 (owner decision 2026-10-07): ``user.manage`` alone may invite a class teacher for
+    some sections, but a ``school`` scope on a role whose grants are scoped (school-wide
+    behaviour notes and marks) needs ``role.assign``, as changing scopes later does."""
+    school = [{"type": "school"}]
+    before = len(W.audit_events(admin_engine, world.a.tenant_id))
+    res = api.call(
+        world.person("office_admin"), "POST", USERS, json=invite_body(roles=[role], scopes=school)
+    )
+    assert (res.status_code, res.json()["code"]) == (403, "role_not_grantable")
+    assert len(W.audit_events(admin_engine, world.a.tenant_id)) == before
+    sections = [{"type": "section", "ref": str(world.a.ids["section_9a"])}]
+    ok = api.call(
+        world.person("office_admin"), "POST", USERS, json=invite_body(roles=[role], scopes=sections)
+    )
+    assert ok.status_code == 201, ok.text
+    owner = api.call(
+        world.person("owner"), "POST", USERS, json=invite_body(roles=[role], scopes=school)
+    )
+    assert owner.status_code == 201, owner.text
+
+
 def test_US_102_office_admin_cannot_grant_owner(world: Any, api: Any, admin_engine: Engine) -> None:
     before = len(W.audit_events(admin_engine, world.a.tenant_id))
     res = api.call(world.person("office_admin"), "POST", USERS, json=invite_body(roles=["owner"]))
