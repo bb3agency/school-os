@@ -182,10 +182,13 @@ def _user_out(session: Session, membership: Membership) -> UserOut:
         raise NotFound("User not found")
     shared = (repo.user_membership_count(session, user.id) or 0) > 1
     hidden = _contact_hidden(membership, shared)
+    # Audit A-18: while hidden, show the name this school typed (older invitations without one
+    # keep the account's name) and do not say the profile is shared with another school.
+    name = (membership.invited_display_name or user.display_name) if hidden else user.display_name
     return UserOut(
         id=user.id,
         membership_id=membership.id,
-        display_name=user.display_name,
+        display_name=name,
         email=None if hidden else user.email,
         contact_hidden=hidden,
         preferred_language=output_language(user.preferred_language),  # ADR-0036
@@ -196,7 +199,7 @@ def _user_out(session: Session, membership: Membership) -> UserOut:
         last_login_at=None if hidden else user.last_login_at,
         created_at=membership.created_at,
         version=membership.version,
-        profile_shared=shared,
+        profile_shared=shared and not hidden,
     )
 
 
@@ -679,6 +682,7 @@ def invite_user(session: Session, ctx: UserContext, data: InviteIn) -> UserOut:
             expires_at=expires_at,
             created_by=ctx.user_id,
             mfa_required=any(d.mfa_required for d in defs),
+            invited_display_name=data.display_name,
         )
     _record(
         session,

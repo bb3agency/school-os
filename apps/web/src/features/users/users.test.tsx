@@ -573,11 +573,17 @@ describe("user detail (US-102 AC2, FR-IAM-012..014)", () => {
   });
 
   it("an invitation to an existing account hides their email and says who accepts (DL-09)", async () => {
-    serveUser(user({ status: "invited", email: null, contact_hidden: true, profile_shared: true }));
+    setMe([MANAGE, ASSIGN, READ_BASIC], ["owner"]);
+    // A-18: the API shows the name the school typed and profile_shared false while it is open.
+    serveUser(
+      user({ status: "invited", email: null, contact_hidden: true, profile_shared: false }),
+    );
     renderWithIntl(<UserDetailScreen userId={USER} />);
     expect(await screen.findByTestId("contact-hidden")).toHaveTextContent(
       /they accept or decline the invitation themselves/,
     );
+    expect(screen.queryByRole("button", { name: detailCopy.edit.trigger })).toBeNull();
+    expect(screen.queryByText(detailCopy.profileShared)).toBeNull();
   });
 
   it("a profile shared with another school offers no edit and says why (ADR-0028)", async () => {

@@ -485,7 +485,9 @@ export function UserDetailScreen({ userId }: { userId: string }) {
       <Card
         title={td("aboutTitle")}
         actions={
-          canManage && !removed && !profileShared ? (
+          // A-18: an open invitation to an account of another school is not edited either; the
+          // contact-hidden note says the person accepts it themselves.
+          canManage && !removed && !profileShared && !user.contact_hidden ? (
             <EditProfile user={user} isSelf={isSelf} />
           ) : null
         }

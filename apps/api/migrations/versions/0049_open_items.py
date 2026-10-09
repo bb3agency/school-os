@@ -6,6 +6,11 @@
   pre-check lists), so the record cannot be printed until a ``dq.findings.waive`` holder with a
   fresh MFA sign-in confirms the correction through ``POST /dq/findings/{id}/resolve`` (audited
   ``dq.finding.resolved``). Expand only: one more value in the status CHECK.
+- **A-18** (audit-2026-10-05-app-logic): ``core.memberships.invited_display_name`` keeps the name
+  the school typed when it invited someone. While an invitation to an account shared with
+  another school is open, the school is shown that name, not the account's own (nullable;
+  older invitations keep showing the account's name). ``sos_app`` already inserts the whole
+  row; no UPDATE grant is added, so the typed name is never rewritten.
 - **Change requests pin their evidence version** (audit 2026-10-05, hardening "Change
   requests"). ``sis.change_requests.evidence_version_id`` names the version of the evidence
   document that was current at submit. Composite FK ``(tenant_id, evidence_document_id,
@@ -46,6 +51,7 @@ Downgrade, in reverse order:
   constraints, the status value and the columns are dropped;
 - the exam-name index is dropped, the Tally link cascade is restored, and the pinned evidence
   version column is dropped (approval then checks the latest ready version);
+- the invited-name column is dropped;
 - DQ rows waiting for confirmation go back to ``open`` (they keep blocking, which fails safe),
   then the status CHECK is restored.
 
@@ -85,6 +91,14 @@ _A01_REOPEN = (
     "UPDATE sis.dq_findings SET status = 'open', version = version + 1, updated_at = now() "
     "WHERE status = 'needs_confirmation'"
 )
+
+# --- A-18: the name the school typed on an invitation ---------------------------------------------
+
+INVITED_NAME_UP = (
+    "ALTER TABLE core.memberships ADD COLUMN invited_display_name text "
+    "CHECK (invited_display_name IS NULL OR char_length(invited_display_name) <= 200)"
+)
+INVITED_NAME_DOWN = "ALTER TABLE core.memberships DROP COLUMN IF EXISTS invited_display_name"
 
 # --- Change-request evidence pin, Tally links, exam names (audits 2026-10-05/06) -----------------
 
@@ -169,6 +183,7 @@ ALTER TABLE platform.announcements
 
 def upgrade() -> None:
     op.execute(_A01_UP)
+    op.execute(INVITED_NAME_UP)
     for statement in (*EVIDENCE_PIN_UP, *TALLY_LINKS_UP, *EXAM_NAMES_UP):
         op.execute(statement)
     op.execute(ANNOUNCEMENTS_UP)
@@ -178,6 +193,7 @@ def downgrade() -> None:
     op.execute(ANNOUNCEMENTS_DOWN)
     for statement in (*EXAM_NAMES_DOWN, *TALLY_LINKS_DOWN, *EVIDENCE_PIN_DOWN):
         op.execute(statement)
+    op.execute(INVITED_NAME_DOWN)
     op.execute(UNFORCE)
     op.execute(_A01_REOPEN)
     op.execute(REFORCE)

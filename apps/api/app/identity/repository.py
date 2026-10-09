@@ -315,6 +315,7 @@ def create_membership(
     expires_at: dt.datetime | None = None,
     created_by: uuid.UUID | None = None,
     mfa_required: bool = False,
+    invited_display_name: str | None = None,
 ) -> Membership:
     """Link a user to the current tenant. Audit: ``membership.created``.
 
@@ -331,6 +332,7 @@ def create_membership(
             expires_at=expires_at,
             created_by=created_by,
             mfa_required=mfa_required,
+            invited_display_name=invited_display_name,
         )
         .returning(Membership),
         execution_options={"populate_existing": True},

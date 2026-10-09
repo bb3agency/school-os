@@ -246,3 +246,26 @@ def test_DL_09_functions_are_pinned_and_not_callable_by_other_roles(
                 {"r": role, "sig": signature},
             ).scalar_one()
             assert can is allowed, (signature, role)
+
+
+def test_A_18_inviting_school_sees_the_name_it_typed_and_not_the_other_schools_profile(
+    api: Any, admin_engine: Engine
+) -> None:
+    """Audit 2026-10-05 A-18 (owner decision 2026-10-07): while the invitation to an existing
+    account is open, the inviting school sees the name it typed and ``profile_shared: false``,
+    never the account's stored name; once the person accepts they are shown as any member."""
+    person, owner_b, _b, invited = _invite_existing(api, admin_engine)
+    stored = person.display_name
+    assert stored != "Synthetic Typed Name"
+    assert (invited["display_name"], invited["profile_shared"]) == ("Synthetic Typed Name", False)
+    one = api.call(owner_b, "GET", f"{USERS}/{person.user_id}").json()
+    assert (one["display_name"], one["profile_shared"]) == ("Synthetic Typed Name", False)
+    listed = api.call(owner_b, "GET", USERS, params={"limit": 100})
+    row = next(u for u in listed.json()["data"] if u["id"] == str(person.user_id))
+    assert (row["display_name"], row["profile_shared"]) == ("Synthetic Typed Name", False)
+    assert stored not in listed.text
+    mid = uuid.UUID(invited["membership_id"])
+    accepted = api.call(person, "POST", f"/api/v1/me/invitations/{mid}/accept")
+    assert accepted.status_code == 200, accepted.text
+    after = api.call(owner_b, "GET", f"{USERS}/{person.user_id}").json()
+    assert (after["display_name"], after["profile_shared"]) == (stored, True)
