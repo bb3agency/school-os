@@ -212,7 +212,7 @@ def test_W3_10_the_sink_queues_the_settlement_with_the_metering_row(
         )
     )
     with tenant_session(tid) as s:
-        calls = s.execute(text("SELECT count(*) FROM kb.llm_calls")).scalar_one()
+        calls: int = s.execute(text("SELECT count(*) FROM kb.llm_calls")).scalar_one()
         rows = s.execute(
             text("SELECT event_type, payload FROM ops.outbox WHERE event_type = :e"),
             {"e": policy.SETTLE_EVENT},

@@ -504,8 +504,12 @@ def test_FR_IMP_024_prod_settings_never_run_the_fake(world: Any, admin_engine: E
     prod = Settings(
         env=Environment.PROD,
         key_wrapper=KeyWrapperKind.KMS,
-        database_url=SecretStr("postgresql+psycopg://sos_app:x@db:5432/schoolos?sslmode=verify-full"),
-        platform_database_url=SecretStr("postgresql+psycopg://sos_platform:y@db:5432/s?sslmode=verify-full"),
+        database_url=SecretStr(
+            "postgresql+psycopg://sos_app:x@db:5432/schoolos?sslmode=verify-full"
+        ),
+        platform_database_url=SecretStr(
+            "postgresql+psycopg://sos_platform:y@db:5432/s?sslmode=verify-full"
+        ),
         service_token_key=SecretStr("k" * 48),
         extraction_provider=ExtractionProviderKind.FAKE,
     )

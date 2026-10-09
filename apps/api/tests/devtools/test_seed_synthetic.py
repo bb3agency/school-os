@@ -123,7 +123,9 @@ def test_docs12_s3_refuses_outside_local_and_ci(env: Environment) -> None:
     settings = Settings(
         env=env,
         key_wrapper=KeyWrapperKind.KMS,
-        database_url=SecretStr("postgresql+psycopg://sos_app:secret@db.internal/schoolos?sslmode=verify-full"),
+        database_url=SecretStr(
+            "postgresql+psycopg://sos_app:secret@db.internal/schoolos?sslmode=verify-full"
+        ),
         platform_database_url=SecretStr(
             "postgresql+psycopg://sos_platform:secret@db.internal/schoolos?sslmode=verify-full"
         ),
