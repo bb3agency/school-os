@@ -21,6 +21,7 @@ from sqlalchemy import Engine, text
 
 from app.core.db import tenant_session
 from app.tally import agent_auth, service
+from app.tally.config import rules as tally_rules
 
 from .conftest import T
 
@@ -251,7 +252,7 @@ def test_AA_15_one_address_is_capped_across_schools(
 ) -> None:
     """Every attempt from one address counts, any school and any outcome, before anything else
     is checked (spraying tenant ids)."""
-    cap = service.rules().enrolment.max_attempts_per_address_per_hour
+    cap = tally_rules().enrolment.max_attempts_per_address_per_hour
     codes = [T.enrol_with(api, uuid.uuid4(), "ZZZZ-ZZZZ-ZZZZ").status_code for _ in range(cap + 1)]
     assert codes == [401] * cap + [429]
     school = T.fresh_school(admin_engine)
@@ -265,7 +266,7 @@ def test_AA_15_one_address_is_capped_across_schools(
 def test_AA_15_a_school_wide_cap_bounds_guessing_from_many_addresses(
     api: Any, admin_engine: Engine, client_address: list[str]
 ) -> None:
-    cfg = service.rules().enrolment
+    cfg = tally_rules().enrolment
     school = T.fresh_school(admin_engine)
     per_address = cfg.max_failures_per_address_per_hour
     for n in range(cfg.max_failures_per_school_per_hour // per_address):

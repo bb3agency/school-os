@@ -10,7 +10,7 @@ import hashlib
 import threading
 import unicodedata
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from decimal import Decimal
 from typing import Any
 
@@ -994,7 +994,7 @@ def test_AA_hardening_every_price_override_event_keeps_amounts_and_binds_its_rea
     three = api.call("DELETE", path, billing_admin, headers={"If-Match": two.headers["ETag"]})
     assert one.status_code == two.status_code == three.status_code == 200
     with platform_session() as s:
-        rows = (
+        rows: Sequence[Any] = (
             s.execute(
                 text(
                     "SELECT summary FROM platform.audit_events WHERE resource_id = :s "
