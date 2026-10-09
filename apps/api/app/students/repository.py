@@ -776,6 +776,11 @@ def summary_rows(session: Session, student_ids: Collection[uuid.UUID]) -> list[R
 class SearchSpec:
     academic_year_id: uuid.UUID | None
     allowed_sections: frozenset[uuid.UUID] | None  # None = whole school
+    # Reach through ANOTHER year (owner decision 2026-10-09): when searching a non-current year,
+    # a scoped caller reaches only students with an active enrolment in one of these sections
+    # of ``reach_year_id`` (the current year); ``allowed_sections`` is then None.
+    reach_year_id: uuid.UUID | None
+    reach_sections: frozenset[uuid.UUID] | None
     section_filter: frozenset[uuid.UUID] | None  # None = no section filter
     status: str | None
     admission_no: str | None
@@ -810,6 +815,17 @@ def search(session: Session, spec: SearchSpec) -> list[Row[Any]]:
     match_field: ColumnElement[Any] = literal(None)
     if spec.allowed_sections is not None:
         conditions.append(e.section_id.in_(list(spec.allowed_sections)))
+    if spec.reach_sections is not None:
+        now = aliased(Enrollment)
+        conditions.append(
+            exists().where(
+                now.tenant_id == Student.tenant_id,
+                now.student_id == Student.id,
+                now.status == "active",
+                now.academic_year_id == spec.reach_year_id,
+                now.section_id.in_(list(spec.reach_sections)),
+            )
+        )
     if spec.section_filter is not None:
         conditions.append(e.section_id.in_(list(spec.section_filter)))
     if spec.status is not None:

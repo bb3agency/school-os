@@ -157,8 +157,9 @@ def search_students(
     academic_year_id: Annotated[
         uuid.UUID | None,
         Query(
-            description="Academic year whose enrolments are listed (class, section and scope); "
-            "the current year when left out. Unknown years answer 422."
+            description="Academic year whose enrolments give the class and section shown and "
+            "filtered on; the current year when left out. Scoped holders still see only "
+            "students of their sections/classes this year. Unknown years answer 422."
         ),
     ] = None,
     limit: Limit = 50,

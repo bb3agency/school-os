@@ -105,7 +105,7 @@ Format: **US-ID · As a … I want … so that …** followed by acceptance crit
 
 **US-302** · As staff, I want to find a student by partial name, admission number, class or parent name in English or Telugu. [FR-STU-010]
 - AC1: "venkat sai 9b" finds "VENKATA SAI K." in 9B; Telugu script queries find transliterated matches.
-- AC2: Results respect my scope.
+- AC2: Results respect my scope. Class teachers and teachers find only students in their classes or sections this academic year, also when they look at an earlier year; last year's class is out of their reach (owner decision 2026-10-09). School-wide staff find students of every year.
 - AC3: I can find a student by the exact APAAR ID (12 digits, with or without spaces) using a separate "APAAR ID" search option. It matches only the student's recorded or verified APAAR ID (not a rejected or replaced one, not other fields), within my scope; the number is never written to logs. [FR-STU-016, ADR-0037]
 
 **US-303** · As staff, I never want to enter an Aadhaar number by mistake. [FR-STU-012, BR-02]

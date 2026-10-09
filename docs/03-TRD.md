@@ -76,7 +76,7 @@ A multi-tenant web application (Next.js BFF + FastAPI API + Celery workers) on A
 | FR-STU-006 | Attributes MUST be defined in `attribute_definitions` (type, classification, identity flag, validation, export mappings) so new fields need no schema change. | I |
 | FR-STU-007 | C3 (restricted) values MUST be encrypted at the application layer with the tenant DEK. | T |
 | FR-STU-008 | Guardians MUST be modelled separately and linked to students with relationship type. | T |
-| FR-STU-010 | Search MUST support partial names, transliteration (Telugu↔Latin), admission number, class/section, and parent name, filtered by scope. | T |
+| FR-STU-010 | Search MUST support partial names, transliteration (Telugu↔Latin), admission number, class/section, and parent name, filtered by scope. A class or section scope reaches only students actively enrolled in its sections or classes in the current academic year, whatever year is searched (owner decision 2026-10-09; docs/07 §6.1). | T |
 | FR-STU-011 | Search results for 2,000-student tenants MUST return in ≤ 300 ms p95. | T |
 | FR-STU-012 | The system MUST reject input of full Aadhaar numbers in any field and store only `aadhaar_last4` plus as-printed fields. | T |
 | FR-STU-013 | The student record MUST hold the APAAR ID as attribute `apaar_id` (C2, not an identity field, ADR-0037) with provenance: sources `udise_plus`, `parent_form` and `manual_entry` (precedence in that order); a value counts (canonical, verified) only after a person verifies it against the portal or the card. Corrections are recorded as new values from a source and verified again (history kept, FR-STU-005). | T |

@@ -398,8 +398,9 @@ class StudentSearchIn(_In):
     admission_no: str | None = Field(default=None, max_length=32)
     academic_year_id: uuid.UUID | None = Field(
         default=None,
-        description="Academic year whose enrolments are listed (class, section and "
-        "scope); the current year when left out. Unknown years answer 422.",
+        description="Academic year whose enrolments give the class and section shown and "
+        "filtered on; the current year when left out. Scoped holders still see only students "
+        "of their sections/classes this year. Unknown years answer 422.",
     )
     apaar_id: str | None = Field(
         default=None,

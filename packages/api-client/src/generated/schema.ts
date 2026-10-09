@@ -12785,7 +12785,7 @@ export interface components {
         StudentSearchIn: {
             /**
              * Academic Year Id
-             * @description Academic year whose enrolments are listed (class, section and scope); the current year when left out. Unknown years answer 422.
+             * @description Academic year whose enrolments give the class and section shown and filtered on; the current year when left out. Scoped holders still see only students of their sections/classes this year. Unknown years answer 422.
              */
             academic_year_id?: string | null;
             /** Admission No */
@@ -26384,7 +26384,7 @@ export interface operations {
     search_students_api_v1_students_get: {
         parameters: {
             query?: {
-                /** @description Academic year whose enrolments are listed (class, section and scope); the current year when left out. Unknown years answer 422. */
+                /** @description Academic year whose enrolments give the class and section shown and filtered on; the current year when left out. Scoped holders still see only students of their sections/classes this year. Unknown years answer 422. */
                 academic_year_id?: string | null;
                 /**
                  * @deprecated
