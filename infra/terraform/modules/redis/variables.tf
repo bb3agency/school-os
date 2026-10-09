@@ -43,7 +43,7 @@ variable "num_cache_clusters" {
 }
 
 variable "kms_key_arn" {
-  description = "CMK for at-rest encryption and the auth-token secret."
+  description = "CMK for at-rest encryption and the connection secrets."
   type        = string
 }
 
@@ -54,7 +54,7 @@ variable "log_kms_key_arn" {
 }
 
 variable "auth_token_version" {
-  description = "Bump to rotate the AUTH token (a new token is generated and written to ElastiCache and Secrets Manager; it never enters state)."
+  description = "Bump to rotate every Valkey user password (new passwords are generated and written to ElastiCache and Secrets Manager; they never enter state)."
   type        = number
   default     = 1
 }
@@ -72,7 +72,7 @@ variable "log_retention_days" {
 }
 
 variable "secret_name" {
-  description = "Secrets Manager name for connection details (JSON: host, port, auth_token, url)."
+  description = "Secrets Manager name prefix for the per-user connection secrets (<name>/<user>, JSON: host, port, username, password, url)."
   type        = string
 }
 

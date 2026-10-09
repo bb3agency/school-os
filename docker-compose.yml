@@ -12,6 +12,8 @@ x-python-app: &python-app
   image: schoolos-python:dev
   env_file: .env
   environment:
+    # The image defaults to SOS_ENV=prod (fail closed); the local stack is always local.
+    SOS_ENV: ${SOS_ENV:-local}
     SOS_DATABASE_URL: postgresql+psycopg://sos_app:${SOS_DB_APP_PASSWORD}@db:5432/schoolos
     SOS_PLATFORM_DATABASE_URL: postgresql+psycopg://sos_platform:${SOS_DB_PLATFORM_PASSWORD}@db:5432/schoolos
     SOS_MIGRATOR_DATABASE_URL: postgresql+psycopg://sos_migrator:${SOS_DB_MIGRATOR_PASSWORD}@db:5432/schoolos

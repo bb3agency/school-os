@@ -11,6 +11,10 @@ locals {
     ["repo:${local.repo}:environment:${var.deploy_environment}"],
     var.allow_main_branch ? ["repo:${local.repo}:ref:refs/heads/main"] : [],
   )
+  # Audit 2026-10-05 P2-08 (b): only these workflow files at these refs may use the deploy role.
+  # `environment:<name>` alone let any workflow on any branch that targets the environment assume it
+  # (workflow_dispatch runs from any ref); job_workflow_ref names the file and the ref it ran from.
+  deploy_workflow_refs = [for w in var.deploy_workflows : "${local.repo}/.github/workflows/${w}"]
 }
 
 resource "aws_iam_openid_connect_provider" "github" {
@@ -39,6 +43,12 @@ data "aws_iam_policy_document" "deploy_trust" {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
       values   = local.deploy_subjects
+    }
+    # GitHub provider-specific claim as an IAM condition key. StringLike: tag refs may use `*`.
+    condition {
+      test     = "StringLike"
+      variable = "token.actions.githubusercontent.com:job_workflow_ref"
+      values   = local.deploy_workflow_refs
     }
   }
 }
@@ -345,6 +355,11 @@ output "plan_reads_secrets" {
 output "plan_role_arn" {
   description = "Role for terraform plan on pull requests."
   value       = var.create_plan_role ? aws_iam_role.plan[0].arn : null
+}
+
+output "deploy_workflow_refs" {
+  description = "job_workflow_ref values allowed to assume the deploy role (P2-08)."
+  value       = local.deploy_workflow_refs
 }
 
 output "deploy_subjects" {

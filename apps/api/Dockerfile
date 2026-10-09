@@ -3,14 +3,18 @@
 #   docker build -f apps/api/Dockerfile --target api    -t schoolos-api .     (api, migrate, db-bootstrap)
 #   docker build -f apps/api/Dockerfile --target worker -t schoolos-worker .  (worker and beat: + Chromium)
 # The default target (no --target) is `api`.
-ARG PYTHON_IMAGE=python:3.12-slim-bookworm
+# python:3.12-slim-bookworm, pinned by digest (multi-arch index; update via the weekly dependency PR).
+ARG PYTHON_IMAGE=python:3.12-slim-bookworm@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258
+# uv 0.12.19 (pyproject required-version), Astral's official image pinned by digest: no unhashed
+# installer for uv (Scorecard Pinned-Dependencies).
+ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.12.19@sha256:04d046b13e60d6bcec73cbc5e1cad25d680dea90c8573340950a0ac2d1aef424
+
+FROM ${UV_IMAGE} AS uv
 
 FROM ${PYTHON_IMAGE} AS build
 # Optional build secret `extra_ca` (a CA bundle) for builds behind a TLS-inspecting proxy.
 # Never baked into the image; production builds do not pass it.
-RUN --mount=type=secret,id=extra_ca,required=false \
-    if [ -s /run/secrets/extra_ca ]; then export PIP_CERT=/run/secrets/extra_ca; fi; \
-    pip install --no-cache-dir uv==0.12.19
+COPY --from=uv /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never UV_PROJECT_ENVIRONMENT=/opt/venv
 WORKDIR /src
 COPY pyproject.toml uv.lock .python-version ./
@@ -37,6 +41,9 @@ RUN if [ "$INSTALL_PSQL" = "true" ]; then \
     fi \
     && groupadd --system --gid 10001 sos && useradd --system --uid 10001 --gid sos --no-create-home sos
 ENV PATH=/opt/venv/bin:$PATH PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+# Fail closed: a container started without SOS_ENV runs the staging/prod start-up guards (local
+# would turn them all off). Local compose (.env) and CI (workflow env) set SOS_ENV explicitly.
+ENV SOS_ENV=prod
 COPY --from=build /opt/venv /opt/venv
 WORKDIR /app
 COPY apps/api/alembic.ini /app/alembic.ini

@@ -54,7 +54,7 @@ mount_data_volume() {
 make_dirs() {
   install -d -m 0700 -o 999 -g 999 "$SOS_DATA_DIR/pg"
   install -d -m 0700 -o 999 -g 999 "$SOS_DATA_DIR/valkey"
-  install -d -m 0700 -o root -g root "$SOS_DATA_DIR/caddy" "$SOS_DATA_DIR/caddy/data" "$SOS_DATA_DIR/caddy/config"
+  prepare_caddy_dirs "$release_dir" # Caddy runs as 10001
   install -d -m 0700 -o root -g root "$SOS_DATA_DIR/backups" "$SOS_DATA_DIR/backups/tmp"
   install -d -m 0755 -o root -g root "$SOS_DATA_DIR/state" "$SOS_DATA_DIR/walg"
   install -d -m 0755 "$SOS_RELEASES_DIR" /etc/schoolos

@@ -8,16 +8,17 @@ COMPOSE   ?= docker compose
 HAS_WEB   := $(wildcard package.json)
 GITLEAKS_IMAGE  ?= zricethezav/gitleaks:v8.30.1
 TRIVY_IMAGE     ?= aquasec/trivy:0.74.0
-SEMGREP_VERSION ?= 1.178.0
+# semgrep 1.178.0 and every dependency, pinned with hashes (Scorecard Pinned-Dependencies).
+SEMGREP_REQUIREMENTS := .github/tools/semgrep-requirements.txt
+# Extra semgrep flags (CI adds --sarif-output=semgrep.sarif for code scanning).
+SEMGREP_ARGS ?=
 # make security: `.semgrep/` is excluded as a target because its files are deliberate bad-code
-# fixtures for the custom rules (tested by `semgrep --test` in the ci-config job). Registry rules
-# turned off, one reason each (docs/13, dependencies; SEC-009):
-#  - uv-missing-dependency-cooldown: `exclude-newer = "7 days"` makes uv.lock unsatisfiable
-#    (the locked google-auth is newer than 7 days), so `uv sync --locked` breaks.
+# fixtures for the custom rules (tested by `semgrep --test` in the ci-config job). The registry rule
+# uv-missing-dependency-cooldown is satisfied ([tool.uv] exclude-newer = "7 days"). Turned off, with
+# its reason (docs/13, dependencies; SEC-009):
 #  - npm-missing-minimum-release-age: `min-release-age` needs npm 11.10+, newer than the npm
 #    bundled with our Node (.nvmrc); package-lock.json and `ignore-scripts=true` cover installs.
-SEMGREP_EXCLUDE_RULES := --exclude-rule package_managers.uv.uv-missing-dependency-cooldown.uv-missing-dependency-cooldown
-SEMGREP_EXCLUDE_RULES += --exclude-rule package_managers.npm.npm-missing-minimum-release-age.npm-missing-minimum-release-age
+SEMGREP_EXCLUDE_RULES := --exclude-rule package_managers.npm.npm-missing-minimum-release-age.npm-missing-minimum-release-age
 # Same Terraform version as CI (.github/actions/install-tools); multi-arch index digest.
 TERRAFORM_IMAGE ?= hashicorp/terraform:1.16.4@sha256:985cdc6c1d9b0a65b83377f666efd2f740b47f02ac55be1ced3d18f7d3b0e829
 
@@ -159,7 +160,7 @@ endif
 
 security: ## gitleaks, semgrep, pip-audit, npm audit, trivy (fs + config)
 	$(GITLEAKS) git --no-banner --redact --config .gitleaks.toml .
-	$(UV) run --with semgrep==$(SEMGREP_VERSION) --no-project semgrep scan --error --metrics=off \
+	$(UV) run --with-requirements $(SEMGREP_REQUIREMENTS) --no-project semgrep scan --error --metrics=off $(SEMGREP_ARGS) \
 	  --config .semgrep --config p/python --config p/typescript --config p/owasp-top-ten \
 	  --exclude .venv --exclude node_modules --exclude docs --exclude .claude \
 	  --exclude .semgrep $(SEMGREP_EXCLUDE_RULES) .

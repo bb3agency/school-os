@@ -19,6 +19,38 @@ variables {
   ecs_cluster_arn       = "arn:aws:ecs:ap-south-1:111122223333:cluster/sos-test"
   passable_role_arns    = ["arn:aws:iam::111122223333:role/sos-test-api-task"]
   one_off_task_families = ["sos-test-migrate"]
+  deploy_workflows      = ["release.yml@refs/tags/20*"]
+}
+
+# Audit 2026-10-05 P2-08 (b): `environment:<name>` alone let a workflow from any branch that targets
+# the environment assume the deploy role; job_workflow_ref pins the workflow file and its ref.
+run "deploy_role_pins_job_workflow_ref" {
+  command = plan
+
+  assert {
+    condition     = output.deploy_workflow_refs == ["bb3agency/school-os/.github/workflows/release.yml@refs/tags/20*"]
+    error_message = "Only the release workflow on a CalVer tag may assume the prod deploy role."
+  }
+}
+
+run "deploy_workflows_required" {
+  command = plan
+
+  variables {
+    deploy_workflows = []
+  }
+
+  expect_failures = [var.deploy_workflows]
+}
+
+run "deploy_workflow_branch_wildcard_refused" {
+  command = plan
+
+  variables {
+    deploy_workflows = ["deploy-staging.yml@refs/heads/*"]
+  }
+
+  expect_failures = [var.deploy_workflows]
 }
 
 # Audit 2026-10-05 P2-04: RunTask on any task definition let the deploy role start the db-bootstrap
