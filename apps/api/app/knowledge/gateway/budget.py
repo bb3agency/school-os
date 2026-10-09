@@ -50,7 +50,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Any, Literal, Protocol, runtime_checkable
+from typing import Any, Final, Literal, Protocol, runtime_checkable
 
 import redis
 
@@ -461,6 +461,9 @@ class Admission:
 
 
 _RESERVATION = "kb_budget_reservation"
+DEFERRED_KEEP_S: Final = 2 * 24 * 3600
+"""How long a deferred settlement's id is remembered (longer than the task's retries), so it is
+never counted twice."""
 
 
 class BudgetGuard:
@@ -567,9 +570,11 @@ class BudgetGuard:
         if count > self._config.rate_limit.requests_per_minute_per_tenant:
             raise AiRateLimited("Too many AI requests. Wait a minute and try again.")
 
-    def settle(self, admission: Admission, cost_usd: Decimal) -> SpendAfter:
+    def settle(
+        self, admission: Admission, cost_usd: Decimal, *, keep_ms: int | None = None
+    ) -> SpendAfter:
         """Turn the reservation into the real cost (idempotent). Raises :class:`KVUnavailable`
-        when the store is down (the reservation then lapses on its TTL)."""
+        when the store is down (the gateway then queues :meth:`settle_deferred`)."""
         r = admission.reservation
         done = self._ledger.settle(
             r.tenant_id,
@@ -577,7 +582,7 @@ class BudgetGuard:
             str(r.id),
             cost_usd,
             now_ms=self._now_ms(),
-            keep_ms=self._ttl_ms(),
+            keep_ms=max(self._ttl_ms(), keep_ms or 0),
         )
         ids = {"tenant_id": r.tenant_id, "resource_type": _RESERVATION, "resource_id": r.id}
         applied = done.state != "duplicate"
@@ -591,6 +596,21 @@ class BudgetGuard:
         return SpendAfter(
             done.total_usd, level, alert_crossed=before == "ok" and level != "ok", applied=applied
         )
+
+    def settle_deferred(
+        self, tenant_id: uuid.UUID, reservation_id: uuid.UUID, month: str, cost_usd: Decimal
+    ) -> SpendAfter:
+        """Settle a billed call whose settlement the store refused at the time (worker task
+        ``knowledge.settle_spend``, audit W3-10). The same reservation id, so a retry or a
+        settlement that did land before the error counts once (the ledger remembers the id for
+        :data:`DEFERRED_KEEP_S`). Raises :class:`KVUnavailable` while the store is down (the
+        task retries). Reports the alert crossing like a settlement on the call's path."""
+        reservation = Reservation(reservation_id, tenant_id, month, cost_usd)
+        admission = Admission(self._policy.settings_for(tenant_id), reservation)
+        after = self.settle(admission, cost_usd, keep_ms=DEFERRED_KEEP_S * 1000)
+        if after.alert_crossed:
+            log.warning("kb.budget.alert_crossed", tenant_id=tenant_id, action=after.level)
+        return after
 
     def release(self, admission: Admission) -> None:
         """Free a reservation nothing was billed for; a no-op once settled. Never raises for the
@@ -615,6 +635,7 @@ class BudgetGuard:
 
 
 __all__ = [
+    "DEFERRED_KEEP_S",
     "IST",
     "Admission",
     "BudgetGuard",

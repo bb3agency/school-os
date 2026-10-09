@@ -153,6 +153,8 @@ def create_celery() -> Celery:
             "knowledge.tidy_conversations": {"queue": "maintenance"},
             # docs/08 §7 erasure chain: the daily sweep of cached vectors no chunk uses.
             "knowledge.purge_orphan_vectors": {"queue": "maintenance"},
+            # Audit W3-10: a budget settlement the spend store refused, retried from the outbox.
+            "knowledge.settle_spend": {"queue": "maintenance"},
             "knowledge.*": {"queue": "ingest"},
             # M4 (FR-CIR-002): circular reading through the knowledge gateway, next to the
             # ingestion that triggers it; notice PDFs/PNGs on the Chromium workers

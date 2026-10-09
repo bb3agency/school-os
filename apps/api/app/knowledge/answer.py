@@ -76,6 +76,7 @@ from app.knowledge.domain import (
     ToolSpec,
     UserMessage,
 )
+from app.knowledge.gateway.citations import numbers_in
 from app.knowledge.gateway.errors import GatewayError, InvalidModelOutput
 from app.knowledge.interfaces import LlmGateway, StreamingLlmGateway
 from app.knowledge.prompts.registry import PromptTemplate
@@ -250,6 +251,18 @@ class _Provided:
             return False
         return any(cited in normalise(b.text) for b in blocks)  # rule 2
 
+    def numbers(self, citation: Citation) -> frozenset[int]:
+        """The numbers the blocks holding the cited text write (title and text; Roman class
+        numerals count as their number), as the Gemini marker path reads its passages."""
+        cited = normalise(citation.cited_text)
+        return frozenset().union(
+            *(
+                numbers_in(f"{b.title}\n{b.text}", roman=True)
+                for b in self.by_source.get(citation.source, ())
+                if cited and cited in normalise(b.text)
+            )
+        )
+
     def first(self, source: str) -> SearchResultBlock:
         return self.by_source[source][0]
 
@@ -339,14 +352,37 @@ def _snippet(text: str) -> str:
     return text if len(text) <= SNIPPET_CHARS else text[: SNIPPET_CHARS - 1].rstrip() + "…"
 
 
+def _numbers_supported(
+    text: str, citations: Sequence[Citation], provided: _Provided, rules: SentenceRules
+) -> bool:
+    """Every number each sentence of ``text`` writes (without its list marker or table pipes)
+    appears in the blocks its citations cite (``require_numbers_in_passage``)."""
+    available = frozenset().union(*(provided.numbers(c) for c in citations))
+    return all(numbers_in(sentence_body(s)) <= available for s in split_sentences(text, rules))
+
+
 def validate(
-    segments: Sequence[AnswerSegment], provided: _Provided
+    segments: Sequence[AnswerSegment],
+    provided: _Provided,
+    *,
+    numbers: SentenceRules | None = None,
 ) -> tuple[list[AnswerSegment], int]:
-    """Keep only valid citations (§9 rules 1-2) and sanitise the text (§9 rule 5)."""
+    """Keep only valid citations (§9 rules 1-2) and sanitise the text (§9 rule 5).
+
+    With ``numbers`` (``citations.require_numbers_in_passage``; the sentence rules) a segment
+    whose sentences write a number its cited blocks do not loses all its citations, on every
+    path: Gemini markers are checked in the codec already, native citations (the Anthropic
+    fallback) only here (audit 2026-10-04 W3-08)."""
     out: list[AnswerSegment] = []
     dropped = 0
     for seg in segments:
         good = tuple(c for c in seg.citations if provided.supports(c))
+        if (
+            good
+            and numbers is not None
+            and not _numbers_supported(seg.text, good, provided, numbers)
+        ):
+            good = ()
         dropped += len(seg.citations) - len(good)
         text = sanitise(seg.text)
         if text.strip() or good:
@@ -761,9 +797,13 @@ class AnswerEngine:
         provided: _Provided,
     ) -> Answer:
         final = turns[-1] if turns and not turns[-1].tool_calls else None
-        segments, dropped = validate(final.segments if final else (), provided)
-        base = self._base(language, turns, runs, provided, dropped)
         checks = self._config.answer_checks
+        segments, dropped = validate(
+            final.segments if final else (),
+            provided,
+            numbers=checks.sentences if self._config.citations.require_numbers_in_passage else None,
+        )
+        base = self._base(language, turns, runs, provided, dropped)
         enforced = enforce_sentences(segments, checks.sentences)
         uncited = enforced.unsupported
         if not any(s.citations for s in segments):

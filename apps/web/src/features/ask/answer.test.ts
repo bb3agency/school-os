@@ -290,6 +290,10 @@ describe("sos:// sources (docs/06 §8)", () => {
     expect(count).toEqual({ kind: "count", id: DOC });
     expect(sourceHref(count!)).toBeNull();
     expect(parseSource("sos://count/not-a-uuid")).toBeNull();
+    // W3-09: the scope fingerprint the API adds is accepted; anything else after the id is not.
+    expect(parseSource(`sos://count/${DOC}#s0123456789abcdef`)).toEqual({ kind: "count", id: DOC });
+    expect(parseSource(`sos://count/${DOC}#sXYZ`)).toBeNull();
+    expect(parseSource(`sos://finding/${DOC}#s0123456789abcdef`)).toBeNull();
   });
 
   it("a fee dues source from Tally opens the fee dues screen, never a ledger URL (FR-TALLY-008)", () => {
@@ -298,6 +302,7 @@ describe("sos:// sources (docs/06 §8)", () => {
     expect(sourceHref(fee!)).toBe("/fees");
     expect(parseSource("sos://fee/not-a-uuid")).toBeNull();
     expect(parseSource(`sos://fee/${DOC}/ledger`)).toBeNull();
+    expect(sourceHref(parseSource(`sos://fee/${DOC}#s0123456789abcdef`)!)).toBe("/fees");
   });
 
   it("refuses anything that is not a well-formed sos:// URI", () => {

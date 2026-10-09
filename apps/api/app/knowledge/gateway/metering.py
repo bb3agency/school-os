@@ -46,6 +46,16 @@ def cost_usd(price: ModelPrice, cache: CachePriceMultipliers, usage: RawUsage) -
 
 
 @dataclass(frozen=True, slots=True)
+class UnsettledSpend:
+    """A billed call whose settlement the spend store refused (``KVUnavailable``): the sink
+    queues it (outbox) so the worker settles the same reservation later (audit W3-10)."""
+
+    reservation_id: uuid.UUID
+    month: str
+    """The IST month that admitted the call (its cost is recorded there)."""
+
+
+@dataclass(frozen=True, slots=True)
 class MeteringEvent:
     tenant_id: uuid.UUID
     feature: Feature
@@ -65,6 +75,8 @@ class MeteringEvent:
     """The tenant's IST-month spend after this call (None when the call cost nothing)."""
     document_id: uuid.UUID | None = None
     """The document the call served (contextual chunk headers, docs/06 §4.11), else None."""
+    unsettled: UnsettledSpend | None = None
+    """Set when the cost could not be added to the month now (settled later by the worker)."""
 
 
 class MeteringSink(Protocol):
@@ -81,4 +93,11 @@ class RecordingSink:
         self.events.append(event)
 
 
-__all__ = ["MeteringEvent", "MeteringSink", "Outcome", "RecordingSink", "cost_usd"]
+__all__ = [
+    "MeteringEvent",
+    "MeteringSink",
+    "Outcome",
+    "RecordingSink",
+    "UnsettledSpend",
+    "cost_usd",
+]

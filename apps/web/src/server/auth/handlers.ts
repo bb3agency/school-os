@@ -647,6 +647,36 @@ function unauthenticated(requestId: string) {
   });
 }
 
+/**
+ * DELETE /bff/auth/sessions?kind=&all=1 (CSRF): "sign out everywhere" (audit 2026-10-05
+ * hardening). Every session of this person and kind ends here and at the IdP (refresh tokens
+ * revoked), so other devices are signed out at their next request; this browser also ends
+ * its IdP session, like Sign out.
+ */
+async function signOutEverywhere(
+  runtime: AuthRuntime,
+  owner: Session,
+  kind: SessionKind,
+  requestId: string,
+): Promise<Response> {
+  const sessions = await runtime.store.listFor(owner);
+  for (const session of sessions) await revokeAtIdp(runtime, session);
+  const revoked = await runtime.store.revokeAllFor(owner);
+  logEvent("signed_out_everywhere", { kind }, "info");
+  let redirectTo = signedOutUrl(kind);
+  try {
+    const endSession = await runtime.oidc[kind].endSessionUrl(null);
+    if (endSession) redirectTo = endSession.href;
+  } catch {
+    logEvent("end_session_unavailable", { kind });
+  }
+  const secure = runtime.config.secureCookies;
+  return jsonResponse(
+    { redirect_to: redirectTo, revoked: revoked.length },
+    { cookies: [clearCookie(sessionCookieName(kind, secure), secure)], requestId },
+  );
+}
+
 /** GET /bff/auth/sessions?kind= (list own) · DELETE ?kind=&id=<handle> (CSRF, revoke one). */
 export async function handleSessions(request: Request, runtime: AuthRuntime) {
   const requestId = requestIdFrom(request.headers);
@@ -659,6 +689,9 @@ export async function handleSessions(request: Request, runtime: AuthRuntime) {
 
   if (request.method === "DELETE") {
     if (!csrfOk(request, owner, runtime)) return csrfFailed(requestId);
+    if (new URL(request.url).searchParams.get("all") === "1") {
+      return signOutEverywhere(runtime, owner, kind, requestId);
+    }
     const handle = new URL(request.url).searchParams.get("id") ?? "";
     const revoked = /^[A-Za-z0-9_-]{16,64}$/.test(handle)
       ? await runtime.store.revokeByHandle(owner, handle)
@@ -741,13 +774,20 @@ export async function handleActiveTenant(request: Request, runtime: AuthRuntime)
     } else {
       await response.body?.cancel();
     }
-    if ([401, 403].includes(response.status)) {
+    // The school is stored only when the API accepted it (2xx). Any other answer keeps the
+    // school chosen before (audit 2026-10-04 hardening: a 404, 422 or 429 never sets it).
+    if (!response.ok) {
+      if (response.status === 429) {
+        return problem(requestId, 429, "rate_limited", "Too many attempts", {
+          detail: "Wait a minute, then choose the school again.",
+        });
+      }
+      if (response.status >= 500) {
+        return problem(requestId, 503, "service_unavailable", "Try again in a moment");
+      }
       return problem(requestId, 403, "tenant_not_available", "You can't open this school", {
         detail: "Ask the school's office admin to give you access.",
       });
-    }
-    if (response.status >= 500 && response.status !== 501) {
-      return problem(requestId, 503, "service_unavailable", "Try again in a moment");
     }
   } catch (error) {
     if (error instanceof SessionEndedError) return unauthenticated(requestId);

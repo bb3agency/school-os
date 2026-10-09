@@ -169,6 +169,18 @@ def _tls_without_certificate_check(url: str) -> bool:
     return values not in (["required"], ["cert_required"])
 
 
+def _postgres_tls_verified(url: str) -> bool:
+    """A database URL whose TLS checks the server certificate AND host name: exactly one
+    ``sslmode=verify-full`` (libpq keywords are lower-case; anything else means no TLS, TLS
+    without checks, or an ambiguous URL)."""
+    values = [
+        value.strip()
+        for key, value in parse_qsl(urlsplit(url).query, keep_blank_values=True)
+        if key == "sslmode"
+    ]
+    return values == ["verify-full"]
+
+
 # Placeholder supplier identity for local/CI invoices; refused in staging/prod (FR-PLT-016).
 DEV_SUPPLIER_NAME = "SchoolOS Synthetic Supplier (dev)"
 DEV_SUPPLIER_GSTIN = "37AAAAA0000A1Z5"
@@ -486,6 +498,21 @@ class Settings(BaseSettings):
         if self.is_production_like and not _is_public_https(self.email_app_url or ""):
             raise ValueError(f"SOS_EMAIL_APP_URL must be a public https URL in {self.env}")
 
+    def _guard_postgres_tls(self) -> None:
+        """Shared tier, staging/prod: the database is RDS across the VPC, so TLS must check the
+        server's certificate and host name (audit 2026-10-05; Terraform writes
+        ``sslmode=verify-full``, modules/secrets). The migrator URL is set only in the migrate
+        task (the api keeps the dev-only default it never uses). Dedicated hosts reach their
+        database on the host's own compose network."""
+        if self.deployment_mode is not DeploymentMode.SHARED:
+            return
+        for name in ("database_url", "platform_database_url", "migrator_database_url"):
+            url = getattr(self, name).get_secret_value()
+            if name == "migrator_database_url" and "dev-only" in url:
+                continue
+            if not _postgres_tls_verified(url):
+                raise ValueError(f"SOS_{name.upper()} must set sslmode=verify-full in {self.env}")
+
     @model_validator(mode="after")
     def _guard_production(self) -> Settings:
         """Fail closed: dev-only conveniences can never run in staging or production."""
@@ -502,6 +529,7 @@ class Settings(BaseSettings):
                 value: SecretStr = getattr(self, name)
                 if "dev-only" in value.get_secret_value():
                     raise ValueError(f"{name} uses a dev-only default in {self.env}")
+            self._guard_postgres_tls()
             # TLS to Valkey must check the certificate: the Celery broker would otherwise
             # accept anyone's (SEC-011, ASVS 9.2.1).
             if _tls_without_certificate_check(self.redis_url.get_secret_value()):

@@ -10,6 +10,7 @@ import {
   handleSessions,
   handleStepUp,
 } from "./handlers";
+import { MAX_SESSIONS_PER_PERSON } from "@/server/session/store";
 
 const TENANT = "0192f3a4-0000-7000-8000-000000000001";
 const OTHER_TENANT = "0192f3a4-0000-7000-8000-000000000002";
@@ -420,6 +421,67 @@ describe("/bff/auth/sessions", () => {
     expect(missing.status).toBe(404);
   });
 
+  it("signs out everywhere: every session of the person, at the IdP too, CSRF required (audit 2026-10-05)", async () => {
+    await h.signIn("staff", clerk);
+    const firstCookie = h.jar.get("__Host-sos_session") ?? "";
+    h.jar.clear();
+    await h.signIn("staff", { sub: "staff-sub-2", name: "Another Clerk" });
+    const otherPerson = h.jar.get("__Host-sos_session") ?? "";
+    h.jar.clear();
+    await h.signIn("staff", clerk);
+    const current = h.jar.get("__Host-sos_session") ?? "";
+    const csrf = await h.csrf();
+    const revoke = vi.spyOn(h.runtime.oidc.staff, "revoke");
+
+    const forged = await handleSessions(
+      h.request("/bff/auth/sessions?all=1", { method: "DELETE" }),
+      h.runtime,
+    );
+    expect(forged.status).toBe(403);
+    expect(await h.runtime.store.load(firstCookie, { touch: false })).not.toBeNull();
+
+    const response = h.absorb(
+      await handleSessions(
+        h.request("/bff/auth/sessions?all=1", {
+          method: "DELETE",
+          headers: { "x-csrf-token": csrf },
+        }),
+        h.runtime,
+      ),
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { redirect_to: string; revoked: number };
+    expect(body.revoked).toBe(2);
+    // Like "Sign out": the IdP session in this browser ends too.
+    expect(new URL(body.redirect_to).pathname).toBe("/staff/endsession");
+    expect(revoke).toHaveBeenCalledTimes(2);
+    expect(await h.runtime.store.load(firstCookie, { touch: false })).toBeNull();
+    expect(await h.runtime.store.load(current, { touch: false })).toBeNull();
+    expect(h.jar.has("__Host-sos_session")).toBe(false);
+    // Another person's session is untouched.
+    expect(await h.runtime.store.load(otherPerson, { touch: false })).not.toBeNull();
+  });
+
+  it("keeps at most MAX_SESSIONS_PER_PERSON sessions: a new sign-in ends the least recently used", async () => {
+    const cookies: string[] = [];
+    for (let i = 0; i <= MAX_SESSIONS_PER_PERSON; i += 1) {
+      h.jar.clear();
+      await h.signIn("staff", clerk);
+      cookies.push(h.jar.get("__Host-sos_session") ?? "");
+    }
+    const owner = await h.runtime.store.load(cookies.at(-1), { touch: false });
+    expect(owner).not.toBeNull();
+    expect(await h.runtime.store.listFor(owner!)).toHaveLength(MAX_SESSIONS_PER_PERSON);
+    const live = await Promise.all(
+      cookies.map(
+        async (cookie) => (await h.runtime.store.load(cookie, { touch: false })) !== null,
+      ),
+    );
+    // The new sign-in is kept; exactly one earlier session (the least recently used) ended.
+    expect(live.at(-1)).toBe(true);
+    expect(live.filter((alive) => !alive)).toHaveLength(1);
+  });
+
   it("needs a session", async () => {
     const response = await handleSessions(h.request("/bff/auth/sessions"), h.runtime);
     expect(response.status).toBe(401);
@@ -518,6 +580,27 @@ describe("POST /bff/auth/active-tenant", () => {
     // Still the school chosen at sign-in.
     expect(session?.activeTenantId).toBe(TENANT);
   });
+
+  it.each([
+    [404, 403],
+    [409, 403],
+    [422, 403],
+    [429, 429],
+    [501, 503],
+    [503, 503],
+  ])(
+    "stores the school only on a 2xx: an API %i keeps the school chosen before (audit W3 hardening)",
+    async (status, expected) => {
+      await h.signIn("staff", clerk);
+      const response = await switchTo(OTHER_TENANT, () => new Response(null, { status }));
+      expect(response.status).toBe(expected);
+      expect(response.headers.get("content-type")).toContain("application/problem+json");
+      const session = await h.runtime.store.load(h.jar.get("__Host-sos_session"), {
+        touch: false,
+      });
+      expect(session?.activeTenantId).toBe(TENANT);
+    },
+  );
 
   it("validates the tenant id", async () => {
     await h.signIn("staff", clerk);

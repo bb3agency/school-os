@@ -24,8 +24,12 @@ def _settings(env: Environment, **overrides: object) -> Settings:
     if env in (Environment.STAGING, Environment.PROD):
         base.update(
             key_wrapper=KeyWrapperKind.KMS,
-            database_url=SecretStr("postgresql+psycopg://sos_app:x@db:5432/schoolos"),
-            platform_database_url=SecretStr("postgresql+psycopg://sos_platform:y@db:5432/schoolos"),
+            database_url=SecretStr(
+                "postgresql+psycopg://sos_app:x@db:5432/schoolos?sslmode=verify-full"
+            ),
+            platform_database_url=SecretStr(
+                "postgresql+psycopg://sos_platform:y@db:5432/schoolos?sslmode=verify-full"
+            ),
             service_token_key=SecretStr("k" * 48),
             billing_supplier_legal_name="Example Technologies Private Limited",
             billing_supplier_gstin="37ABCDE1234F1Z5",

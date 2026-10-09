@@ -66,8 +66,12 @@ def _settings(env: Environment = Environment.CI, level: str = "INFO") -> Setting
             log_level=level,
             version="2026.10.1",
             key_wrapper="kms",
-            database_url=SecretStr("postgresql+psycopg://sos_app:x@db/schoolos"),
-            platform_database_url=SecretStr("postgresql+psycopg://sos_platform:x@db/schoolos"),
+            database_url=SecretStr(
+                "postgresql+psycopg://sos_app:x@db/schoolos?sslmode=verify-full"
+            ),
+            platform_database_url=SecretStr(
+                "postgresql+psycopg://sos_platform:x@db/schoolos?sslmode=verify-full"
+            ),
             service_token_key=SecretStr("k" * 48),
         )
     return Settings(env=env, log_level=level, version="2026.10.1")

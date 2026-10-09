@@ -44,9 +44,10 @@ from typing import Any, Final
 from celery import Task, shared_task
 from celery.schedules import crontab
 
+from app.authz.kv import KVUnavailable
 from app.core.db import context_free_session, tenant_session
 from app.core.logging import get_logger
-from app.knowledge import composition, contextual_backfill, service
+from app.knowledge import composition, contextual_backfill, policy, service
 from app.knowledge.config.contextual import load_contextual_config
 from app.knowledge.ingestion import hooks, runtime
 from app.ops.service import TenantTask
@@ -58,6 +59,8 @@ MAX_RETRIES: Final = 5
 PURGE_QUERIES_TASK: Final = "knowledge.purge_queries"
 CONTEXT_BACKFILL_TASK: Final = "knowledge.contextualize_backfill"
 SUMMARY_TASK: Final = service.SUMMARY_TASK
+SETTLE_TASK: Final = policy.SETTLE_TASK
+SETTLE_MAX_RETRIES: Final = 10
 TIDY_CONVERSATIONS_TASK: Final = "knowledge.tidy_conversations"
 PURGE_ORPHAN_VECTORS_TASK: Final = "knowledge.purge_orphan_vectors"
 # Schools whose query log is still kept (an offboarded school's rows go with the whole purge).
@@ -249,6 +252,35 @@ def summarise_conversation(
                 error_code="retries_exhausted",
                 error_type=type(exc).__name__,
                 action=SUMMARY_TASK,
+            )
+            return "failed"
+        raise self.retry(exc=exc, countdown=min(30 * 2**self.request.retries, 900)) from exc
+
+
+@shared_task(
+    name=SETTLE_TASK,
+    bind=True,
+    queue="maintenance",
+    acks_late=True,
+    max_retries=SETTLE_MAX_RETRIES,
+    ignore_result=True,
+)
+def settle_spend(
+    self: Task[Any, Any], tenant_id: str, event_id: str, payload: dict[str, Any]
+) -> str:
+    """Add a billed call's cost to the school's month after the spend store refused it on the
+    call's path (audit W3-10; outbox ``kb.budget.settle_requested``). Retried with backoff
+    (30 s doubling, at most 15 min apart) while the store is down; idempotent per reservation."""
+    del event_id
+    try:
+        return service.settle_spend(_uuid(tenant_id), payload)
+    except KVUnavailable as exc:
+        if self.request.retries >= SETTLE_MAX_RETRIES:
+            log.error(
+                "knowledge.task.gave_up",
+                error_code="retries_exhausted",
+                error_type=type(exc).__name__,
+                action=SETTLE_TASK,
             )
             return "failed"
         raise self.retry(exc=exc, countdown=min(30 * 2**self.request.retries, 900)) from exc
