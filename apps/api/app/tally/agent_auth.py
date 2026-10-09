@@ -50,7 +50,7 @@ from fastapi import Depends, Request
 from app.authz.kv import InMemoryKV, KVStore, KVUnavailable, RedisKV
 from app.core import ratelimit
 from app.core.config import get_settings
-from app.core.crypto import CryptoError, KeyWrapper, get_key_wrapper
+from app.core.crypto import CryptoError, KeyWrapper, get_key_wrapper, unwrap_bound
 from app.core.db import tenant_session
 from app.core.errors import (
     Conflict,
@@ -258,7 +258,9 @@ def verify_signed(
     if len(body) > MAX_BODY_BYTES:
         raise _reject("body_too_large", device_id)
     try:
-        secret = wrapper.unwrap(found[0], tenant_id=tenant_id)
+        secret = unwrap_bound(
+            wrapper, found[0], tenant_id=tenant_id, resource=f"tally_device/{device_id}"
+        )
     except CryptoError:
         raise _reject("key_unwrap_failed", device_id) from None
     expected = sign(secret, method=method, path=path, timestamp=timestamp, nonce=nonce, body=body)

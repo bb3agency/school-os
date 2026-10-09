@@ -858,3 +858,29 @@ def test_R_11_unlinking_needs_the_student_to_be_visible(api: Any, admin_engine: 
     # A caller who reads the student still unlinks.
     assert api.call(accountant, "DELETE", f"{path}/{sita}").status_code == 204
     assert _scalar(admin_engine, count, t=school.tenant_id) == 0
+
+
+# --- device secrets bound to their row (data-protection audit 2026-10-05 H-03) ------------------
+
+
+def test_H_03_a_device_secret_copied_to_another_device_row_does_not_work(
+    api: Any, admin_engine: Engine
+) -> None:
+    """Someone with database write access copies device A's wrapped secret onto device B's row
+    and signs as B with A's secret: refused, because the secret is bound to A's row."""
+    school = T.fresh_school(admin_engine)
+    a = T.enrol(api, school)
+    b = T.enrol(api, school, name="Spare PC")
+    with admin_engine.begin() as c:
+        c.execute(
+            text(
+                "UPDATE ops.tally_devices SET key_ciphertext = "
+                "(SELECT key_ciphertext FROM ops.tally_devices WHERE id = :a) WHERE id = :b"
+            ),
+            {"a": a.device_id, "b": b.device_id},
+        )
+    forged = T.Agent(
+        tenant_id=school.tenant_id, device_id=b.device_id, key_id=b.key_id, secret=a.secret
+    )
+    assert forged.call(api, "GET", "/api/v1/edge/tally/config").status_code == 401
+    assert a.call(api, "GET", "/api/v1/edge/tally/config").status_code == 200

@@ -5,6 +5,12 @@
 - Wrapping uses a :class:`KeyWrapper`: AWS KMS in every deployed environment
   (``EncryptionContext = {"tenant_id": ...}``), or a local-dev AES-256-GCM wrapper that refuses to
   run in staging/prod.
+- Machine secrets that belong to one row (a Tally device secret, a dedicated host's heartbeat
+  key) are wrapped with :func:`wrap_bound`: the context also names that row
+  (``resource = "tally_device/<id>"`` or ``"deployment/<id>"``), so a wrapped secret copied to
+  another row of the same school does not unwrap. Such values start with :data:`BOUND_PREFIX`;
+  values without it were wrapped before (tenant id only) and still unwrap (data-protection audit
+  2026-10-05 H-03). Removing the prefix does not help: the value then fails the tenant-only check.
 - Field ciphertext format (fixed now, used from M1):
   ``version(1) | key_version(2, big-endian) | nonce(12) | ciphertext | tag(16)``.
   The GCM associated data is ``header || aad`` where ``aad = tenant_id|table|column|row_id``
@@ -65,13 +71,42 @@ class KeyWrapper(Protocol):
         """Identifier of the wrapping key (stored in ``core.tenant_keys.kms_key_arn``)."""
         ...
 
-    def wrap(self, dek: bytes, *, tenant_id: uuid.UUID) -> bytes: ...
+    def wrap(self, dek: bytes, *, tenant_id: uuid.UUID, resource: str | None = None) -> bytes: ...
 
-    def unwrap(self, wrapped: bytes, *, tenant_id: uuid.UUID) -> bytes: ...
+    def unwrap(
+        self, wrapped: bytes, *, tenant_id: uuid.UUID, resource: str | None = None
+    ) -> bytes: ...
 
 
-def _tenant_context(tenant_id: uuid.UUID) -> dict[str, str]:
-    return {"tenant_id": str(tenant_id)}
+def _tenant_context(tenant_id: uuid.UUID, resource: str | None = None) -> dict[str, str]:
+    ctx = {"tenant_id": str(tenant_id)}
+    if resource is not None:
+        ctx["resource"] = resource
+    return ctx
+
+
+def _local_aad(tenant_id: uuid.UUID, resource: str | None) -> bytes:
+    base = str(tenant_id)
+    return (base if resource is None else f"{base}|{resource}").encode("ascii")
+
+
+BOUND_PREFIX = b"SOSb1:"
+"""Marks a value wrapped by :func:`wrap_bound` (a KMS blob or local wrap never starts so)."""
+
+
+def wrap_bound(wrapper: KeyWrapper, secret: bytes, *, tenant_id: uuid.UUID, resource: str) -> bytes:
+    """Wrap a secret bound to its tenant AND one row (H-03)."""
+    return BOUND_PREFIX + wrapper.wrap(secret, tenant_id=tenant_id, resource=resource)
+
+
+def unwrap_bound(
+    wrapper: KeyWrapper, wrapped: bytes, *, tenant_id: uuid.UUID, resource: str
+) -> bytes:
+    """Unwrap a :func:`wrap_bound` value for ``resource``; a value without the marker was wrapped
+    before rows were bound and is unwrapped with the tenant-only context."""
+    if wrapped.startswith(BOUND_PREFIX):
+        return wrapper.unwrap(wrapped[len(BOUND_PREFIX) :], tenant_id=tenant_id, resource=resource)
+    return wrapper.unwrap(wrapped, tenant_id=tenant_id)
 
 
 class KmsKeyWrapper:
@@ -91,21 +126,23 @@ class KmsKeyWrapper:
     def key_id(self) -> str:
         return self._key_arn
 
-    def wrap(self, dek: bytes, *, tenant_id: uuid.UUID) -> bytes:
+    def wrap(self, dek: bytes, *, tenant_id: uuid.UUID, resource: str | None = None) -> bytes:
         try:
             response = self._client.encrypt(
-                KeyId=self._key_arn, Plaintext=dek, EncryptionContext=_tenant_context(tenant_id)
+                KeyId=self._key_arn,
+                Plaintext=dek,
+                EncryptionContext=_tenant_context(tenant_id, resource),
             )
         except (ClientError, BotoCoreError) as exc:
             raise CryptoError("KMS encrypt failed") from exc
         return response["CiphertextBlob"]
 
-    def unwrap(self, wrapped: bytes, *, tenant_id: uuid.UUID) -> bytes:
+    def unwrap(self, wrapped: bytes, *, tenant_id: uuid.UUID, resource: str | None = None) -> bytes:
         try:
             response = self._client.decrypt(
                 CiphertextBlob=wrapped,
                 KeyId=self._key_arn,
-                EncryptionContext=_tenant_context(tenant_id),
+                EncryptionContext=_tenant_context(tenant_id, resource),
             )
         except (ClientError, BotoCoreError) as exc:
             raise CryptoError("KMS decrypt failed") from exc
@@ -138,17 +175,17 @@ class LocalDevKeyWrapper:
     def key_id(self) -> str:
         return self._key_id
 
-    def wrap(self, dek: bytes, *, tenant_id: uuid.UUID) -> bytes:
+    def wrap(self, dek: bytes, *, tenant_id: uuid.UUID, resource: str | None = None) -> bytes:
         nonce = secrets.token_bytes(NONCE_BYTES)
-        sealed = self._aead.encrypt(nonce, dek, str(tenant_id).encode("ascii"))
+        sealed = self._aead.encrypt(nonce, dek, _local_aad(tenant_id, resource))
         return bytes([_LOCAL_WRAP_VERSION]) + nonce + sealed
 
-    def unwrap(self, wrapped: bytes, *, tenant_id: uuid.UUID) -> bytes:
+    def unwrap(self, wrapped: bytes, *, tenant_id: uuid.UUID, resource: str | None = None) -> bytes:
         if len(wrapped) < 1 + NONCE_BYTES + TAG_BYTES or wrapped[0] != _LOCAL_WRAP_VERSION:
             raise CryptoError("wrapped key has an unknown format")
         nonce, sealed = wrapped[1 : 1 + NONCE_BYTES], wrapped[1 + NONCE_BYTES :]
         try:
-            return self._aead.decrypt(nonce, sealed, str(tenant_id).encode("ascii"))
+            return self._aead.decrypt(nonce, sealed, _local_aad(tenant_id, resource))
         except InvalidTag as exc:
             raise CryptoError("wrapped key failed authentication") from exc
 

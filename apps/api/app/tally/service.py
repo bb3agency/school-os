@@ -42,7 +42,7 @@ from app.authz.context import UserContext
 from app.authz.http import Page, decode_cursor, encode_cursor
 from app.core import feature_flags
 from app.core import purge as purging
-from app.core.crypto import KeyWrapper
+from app.core.crypto import KeyWrapper, wrap_bound
 from app.core.db import tenant_session
 from app.core.errors import (
     Conflict,
@@ -151,11 +151,19 @@ def _grouped(code: str) -> str:
     return "-".join(code[i : i + 4] for i in range(0, len(code), 4))
 
 
-def _new_key(tenant_id: uuid.UUID, wrapper: KeyWrapper) -> tuple[str, bytes, str]:
-    """(key id, wrapped secret, secret as base64url). The plaintext is returned once."""
+def device_resource(device_id: uuid.UUID) -> str:
+    """The row a device secret is bound to in its KMS context (data-protection audit H-03)."""
+    return f"tally_device/{device_id}"
+
+
+def _new_key(
+    tenant_id: uuid.UUID, device_id: uuid.UUID, wrapper: KeyWrapper
+) -> tuple[str, bytes, str]:
+    """(key id, wrapped secret, secret as base64url). The plaintext is returned once. The secret
+    is wrapped bound to the school AND the device row (H-03)."""
     raw = secrets.token_bytes(SECRET_BYTES)
     key_id = "tdk-" + "".join(secrets.choice(KEY_ID_ALPHABET) for _ in range(20))
-    wrapped = wrapper.wrap(raw, tenant_id=tenant_id)
+    wrapped = wrap_bound(wrapper, raw, tenant_id=tenant_id, resource=device_resource(device_id))
     return key_id, wrapped, base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
 
 
@@ -662,11 +670,12 @@ def enrol(caller: EnrolmentCaller, data: EnrolIn, *, wrapper: KeyWrapper) -> Enr
         cfg = rules().enrolment
         if repo.count_active_devices(session) >= cfg.max_active_devices:
             raise Conflict("Too many active Tally agents.", code="too_many_devices")
-        key_id, wrapped, secret = _new_key(caller.tenant_id, wrapper)
+        device_id = new_id()
+        key_id, wrapped, secret = _new_key(caller.tenant_id, device_id, wrapper)
         device = repo.insert_device(
             session,
             {
-                "id": new_id(),
+                "id": device_id,
                 "name": code.device_name,
                 "enrolment_code_id": code.id,
                 "key_id": key_id,
@@ -921,7 +930,7 @@ def rotate_key(caller: AgentCaller, *, wrapper: KeyWrapper) -> KeyRotationOut:
     now = _now()
     with tenant_session(caller.tenant_id) as session:
         device = _touch(session, _active_device(session, caller), caller, now)
-        key_id, wrapped, secret = _new_key(caller.tenant_id, wrapper)
+        key_id, wrapped, secret = _new_key(caller.tenant_id, device.id, wrapper)
         # A rotation already pending keeps its start: rotating again with the old key must not
         # extend the old key's life past the overlap (SEC-030).
         pending = device.next_key_id is not None and device.rotation_started_at is not None
