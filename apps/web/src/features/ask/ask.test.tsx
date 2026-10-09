@@ -821,6 +821,21 @@ describe("verified answers (US-802, FR-KB-030)", () => {
     expect(await within(dialog).findByText("Already retired")).toBeInTheDocument();
   });
 
+  it("explains 409 reviewer_must_differ (the drafter cannot review their own answer)", async () => {
+    setMe(["kb.ask", "kb.verified_answer.manage"]);
+    stub.routes["GET /bff/api/v1/knowledge/verified-answers"] = () => page([verified()]);
+    stub.routes[`POST /bff/api/v1/knowledge/verified-answers/${VERIFIED}/review`] = () =>
+      problem(409, "reviewer_must_differ");
+    renderWithIntl(<VerifiedAnswersPage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Check and confirm" }));
+    const dialog = await screen.findByRole("dialog", { name: "Confirm this verified answer" });
+    await user.click(within(dialog).getByRole("button", { name: "Confirm answer" }));
+    expect(
+      await within(dialog).findByText("Someone else must check this answer"),
+    ).toBeInTheDocument();
+  });
+
   it("review and retire are offered only to kb.verified_answer.manage, never on retired answers", async () => {
     stub.routes["GET /bff/api/v1/knowledge/verified-answers"] = () => page([verified()]);
     const { unmount } = renderWithIntl(<VerifiedAnswersPage />);

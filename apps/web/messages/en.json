@@ -4959,6 +4959,10 @@
           "title": "Already retired",
           "body": "This answer was retired already. Close this and reload the page to see its current state."
         },
+        "reviewer_must_differ": {
+          "title": "Someone else must check this answer",
+          "body": "You wrote this answer, so another staff member who manages verified answers must check and confirm it. Ask them to do it."
+        },
         "not_found": {
           "title": "Answer or source not found",
           "body": "You can't read a document this answer cites, or the answer is gone. Ask the office to check who can see the documents."

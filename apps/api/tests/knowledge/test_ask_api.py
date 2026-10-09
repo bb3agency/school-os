@@ -980,7 +980,10 @@ def test_FR_KB_030_review_confirms_a_flagged_answer_and_names_the_verifier(
     b_principal = W.add_member(admin_engine, world.b.tenant_id, ["principal"])
     other_school = _manage(api, b_principal, vid, "review", 2)
     assert other_school.status_code == 404
-    ok = _manage(api, principal, vid, "review", 2, answer_text="Sports day: 28/11/2026.")
+    # A different reviewer (the drafter may not review their own answer; owner decision
+    # 2026-10-09).
+    reviewer = world.person("office_admin")
+    ok = _manage(api, reviewer, vid, "review", 2, answer_text="Sports day: 28/11/2026.")
     assert ok.status_code == 200, ok.text
     body = ok.json()
     assert (body["status"], body["version"], body["answer_text"]) == (
@@ -988,8 +991,8 @@ def test_FR_KB_030_review_confirms_a_flagged_answer_and_names_the_verifier(
         3,
         "Sports day: 28/11/2026.",
     )
-    assert body["verified_by"] == str(principal.membership_id)
-    assert body["verified_by_name"] == principal.display_name
+    assert body["verified_by"] == str(reviewer.membership_id)
+    assert body["verified_by_name"] == reviewer.display_name
     assert ok.headers["ETag"] == 'W/"3"'
     audits = [
         e
@@ -1001,6 +1004,79 @@ def test_FR_KB_030_review_confirms_a_flagged_answer_and_names_the_verifier(
     assert "28/11/2026" not in str(audits[0]["summary"])
 
 
+def _review_events(admin: Engine, tenant_id: uuid.UUID, answer_id: str) -> list[dict[str, Any]]:
+    return [
+        e
+        for e in W.audit_events(admin, tenant_id, "kb.verified_answer.reviewed")
+        if str(e["resource_id"]) == answer_id
+    ]
+
+
+def test_FR_KB_030_the_drafter_cannot_review_their_own_answer(
+    world: Any, api: Any, admin_engine: Engine, docs: dict[str, uuid.UUID], fake: Any
+) -> None:
+    """Owner decision 2026-10-09: the person who drafted a verified answer cannot also review
+    it while another active member holds ``kb.verified_answer.manage`` (409
+    ``reviewer_must_differ``). A reviewer who corrects the text becomes its drafter, so the
+    next review needs someone else again."""
+    principal, office_admin = world.person("principal"), world.person("office_admin")
+    vid = _vid(_verified(api, principal, docs["sports"], "held on 28/11/2026"))
+    _set_status(admin_engine, vid, "needs_review")
+    own = _manage(api, principal, vid, "review", 2)
+    assert own.status_code == 409, own.text
+    assert own.json()["code"] == "reviewer_must_differ"
+    assert "someone else" in own.json()["detail"]
+    with admin_engine.connect() as c:
+        stored = c.execute(
+            text("SELECT version FROM kb.verified_answers WHERE id = :i"), {"i": vid}
+        ).scalar_one()
+    assert stored == 2, "nothing changed"
+    corrected = _manage(api, office_admin, vid, "review", 2, answer_text="Sports day: 28/11.")
+    assert corrected.status_code == 200, corrected.text
+    again = _manage(api, office_admin, vid, "review", 3)
+    assert (again.status_code, again.json()["code"]) == (409, "reviewer_must_differ")
+    confirmed = _manage(api, principal, vid, "review", 3)
+    assert confirmed.status_code == 200, confirmed.text
+    events = _review_events(admin_engine, world.a.tenant_id, vid)
+    assert [e["summary"]["self_reviewed"] for e in events] == [False, False]
+
+
+def test_FR_KB_030_self_review_is_allowed_when_no_one_else_holds_the_permission(
+    api: Any, admin_engine: Engine, fake: Any
+) -> None:
+    """The exception: when no OTHER active member of the school holds
+    ``kb.verified_answer.manage`` (a suspended or expired holder does not count), the drafter
+    may review their own answer, and ``kb.verified_answer.reviewed`` carries
+    ``self_reviewed: true``."""
+    import datetime as dt
+
+    school = W.School(W.provision_school())
+    school.people["owner"] = W.add_member(admin_engine, school.tenant_id, ["owner"])
+    principal = W.add_member(admin_engine, school.tenant_id, ["principal"])
+    W.add_member(admin_engine, school.tenant_id, ["office_admin"], status="suspended")
+    expired = W.add_member(
+        admin_engine,
+        school.tenant_id,
+        ["office_admin"],
+        expires_at=dt.datetime.now(dt.UTC) + dt.timedelta(minutes=1),
+    )
+    with admin_engine.begin() as c:  # a time-bound membership that has ended
+        c.execute(
+            text(
+                "UPDATE core.memberships SET created_at = now() - interval '2 days', "
+                "expires_at = now() - interval '1 day' WHERE id = :m"
+            ),
+            {"m": expired.membership_id},
+        )
+    doc = K.text_document(admin_engine, school, SPORTS, title="Sports day", acl=ALL_ROLES)[0]
+    K.enable_ai(admin_engine, school.tenant_id)
+    vid = _vid(_verified(api, principal, doc, "held on 28/11/2026"))
+    _set_status(admin_engine, vid, "needs_review")
+    own = _manage(api, principal, vid, "review", 2)
+    assert own.status_code == 200, own.text
+    assert _review_events(admin_engine, school.tenant_id, vid)[0]["summary"]["self_reviewed"]
+
+
 def test_FR_KB_030_review_rechecks_citations_against_the_current_version(
     world: Any, api: Any, admin_engine: Engine, docs: dict[str, uuid.UUID], fake: Any
 ) -> None:
@@ -1008,7 +1084,7 @@ def test_FR_KB_030_review_rechecks_citations_against_the_current_version(
     vid = _vid(_verified(api, principal, docs["sports"], "held on 28/11/2026"))
     bad = _manage(
         api,
-        principal,
+        world.person("office_admin"),  # not the drafter (owner decision 2026-10-09)
         vid,
         "review",
         1,

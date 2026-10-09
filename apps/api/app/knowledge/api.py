@@ -266,7 +266,9 @@ def review_verified_answer(
     ``needs_review`` after a cited document changed. Its citations (new ones if you send them)
     must quote the current version of documents you can read (422 as on create); it becomes
     ``active`` and you become its verifier. 404 when you cannot read a document it cites; 409
-    ``verified_answer_retired``; 412 when it changed since you read it."""
+    ``verified_answer_retired``; 409 ``reviewer_must_differ`` when you drafted it and someone
+    else in the school can review it (owner decision 2026-10-09); 412 when it changed since you
+    read it."""
     out = service.get_service().review_verified_answer(
         db, ctx, answer_id, body, expected_version=version
     )

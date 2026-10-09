@@ -34023,7 +34023,7 @@
     },
     "/api/v1/knowledge/verified-answers/{answer_id}/review": {
       "post": {
-        "description": "Confirm a verified answer again, as it is or corrected (permission\n``kb.verified_answer.manage``; ``If-Match``; FR-KB-030). Use it for answers flagged\n``needs_review`` after a cited document changed. Its citations (new ones if you send them)\nmust quote the current version of documents you can read (422 as on create); it becomes\n``active`` and you become its verifier. 404 when you cannot read a document it cites; 409\n``verified_answer_retired``; 412 when it changed since you read it.",
+        "description": "Confirm a verified answer again, as it is or corrected (permission\n``kb.verified_answer.manage``; ``If-Match``; FR-KB-030). Use it for answers flagged\n``needs_review`` after a cited document changed. Its citations (new ones if you send them)\nmust quote the current version of documents you can read (422 as on create); it becomes\n``active`` and you become its verifier. 404 when you cannot read a document it cites; 409\n``verified_answer_retired``; 409 ``reviewer_must_differ`` when you drafted it and someone\nelse in the school can review it (owner decision 2026-10-09); 412 when it changed since you\nread it.",
         "operationId": "review_verified_answer_api_v1_knowledge_verified_answers__answer_id__review_post",
         "parameters": [
           {

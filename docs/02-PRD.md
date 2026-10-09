@@ -169,6 +169,7 @@ Format: **US-ID · As a … I want … so that …** followed by acceptance crit
 
 **US-802** · As a principal, I want to save a checked answer as a "verified answer" so that everyone gets the same reliable response. [FR-KB-030..032]
 - AC1: Verified answers show who verified them and when; they are re-reviewed when source documents change.
+- AC2: The person who wrote a verified answer cannot also confirm it on review; another staff member who manages verified answers must. If nobody else in the school can, the writer may, and the audit log marks it as self-reviewed (owner decision 2026-10-09).
 
 **US-803** · As a class teacher, I must not be able to learn about students outside my sections through the assistant. [FR-KB-010, BR-06]
 - AC1: Asking about a student in another section returns "not found in records you can access".
