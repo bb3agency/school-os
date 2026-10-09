@@ -44,7 +44,7 @@ def _render(tmp_path: Path, release_env: str | None) -> subprocess.CompletedProc
     (etc / "host.env").write_text("SOS_DEPLOYMENT_MODE=dedicated\n", encoding="utf-8", newline="\n")
     # fetch-secrets.sh writes single-quoted values; VALKEY_PASSWORD seeds the ACL users (P2-06).
     (etc / "secrets.env").write_text(
-        "SOS_SYNTHETIC=1\nVALKEY_PASSWORD='synthetic-valkey-0123456789'\n",
+        "SOS_SYNTHETIC=1\nVALKEY_PASSWORD='synthetic-only'\n",
         encoding="utf-8",
         newline="\n",
     )

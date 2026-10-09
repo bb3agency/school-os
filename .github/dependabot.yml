@@ -60,7 +60,6 @@ updates:
   - package-ecosystem: docker
     directories:
       - /apps/api
-      - /apps/worker
       - /apps/web
       - /deploy/dedicated
     schedule:
