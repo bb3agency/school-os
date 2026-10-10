@@ -214,6 +214,7 @@ class Profile(BaseModel):
         if not all(_URL_RE.match(v) for v in value):
             raise ValueError("source entries must be https URLs")
         return value
+
     portal_fields: tuple[PortalField, ...] = ()
 
     @field_validator("key")
