@@ -15,10 +15,10 @@ import functools
 import re
 from collections.abc import Mapping
 from importlib import resources
-from typing import Any, Final
+from typing import Any, Final, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
 
 from app.core.textnorm import has_telugu
 from app.dq.matching import MatchClass
@@ -112,8 +112,37 @@ class NameFormat(BaseModel):
         return self
 
 
+PortalSection = Literal["general", "enrolment", "facility", "identifier"]
+
+
+class PortalField(BaseModel):
+    """One field of the portal's own data capture format, and where SchoolOS holds it (an
+    attribute key, ``class``, ``section`` or ``roll_no``) or ``null`` when the clerk enters it in
+    the portal directly. ``never_from_schoolos``: the value never leaves SchoolOS (e.g. the
+    Aadhaar number; invariant 4)."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    label: str = Field(min_length=1, max_length=120)
+    section: PortalSection
+    maps_to: str | None = None
+    required: bool = False
+    never_from_schoolos: bool = False
+    note: str | None = Field(default=None, max_length=300)
+
+    @field_validator("maps_to")
+    @classmethod
+    def _target(cls, value: str | None) -> str | None:
+        if value is not None and not _ATTRIBUTE_RE.match(value):
+            raise ValueError("maps_to must be an attribute key or class/section/roll_no")
+        return value
+
+
 class Profile(BaseModel):
-    """One board/portal submission format (the exports module reuses the key)."""
+    """One board/portal submission format (the exports module reuses the key).
+
+    ``source``: the public documents the format was built from; ``verified``: false until a
+    school or the official template confirmed it (owner decision D3 of 2026-10-10)."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -125,6 +154,9 @@ class Profile(BaseModel):
     unverified_identity_severity: Severity | None = None
     name_format: NameFormat | None = None
     needs_apaar: bool = False
+    source: tuple[HttpUrl, ...] = ()
+    verified: bool = False
+    portal_fields: tuple[PortalField, ...] = ()
 
     @field_validator("key")
     @classmethod

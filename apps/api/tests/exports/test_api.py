@@ -162,7 +162,7 @@ def test_ADR_0021_udise_category_opt_in_over_http(
     assert res.status_code == 202, res.text
     assert res.json()["include_sensitive"] is True
     requested = EX.audit_rows(admin_engine, school.tenant_id, uuid.UUID(res.json()["id"]))[0]
-    assert requested["summary"]["sensitive_columns"] == ["category"]
+    assert requested["summary"]["sensitive_columns"] == ["category", "religion", "disability"]
 
 
 # --- ADR-0021 decision 3: who sees whose exports ---------------------------------------------
