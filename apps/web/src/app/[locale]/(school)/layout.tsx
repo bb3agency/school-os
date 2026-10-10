@@ -1,4 +1,4 @@
-import type { Me, SchoolChoices } from "@schoolos/api-client";
+import type { Me, SchoolChoices, TenantProfile } from "@schoolos/api-client";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
@@ -52,9 +52,15 @@ export default async function SchoolLayout({ children }: { children: ReactNode }
   // on; its status route answers 404 while it is off. Asked only for people who could use it.
   const tallyUser =
     !suspended && (profile?.permissions ?? []).some((key) => TALLY_PERMISSIONS.includes(key));
-  const tally = tallyUser
-    ? (await apiGetAsSession<unknown>("staff", "/api/v1/tally/status"))?.status === 200
-    : false;
+  // FR-TEN-022 (ADR-0041): a school running SchoolOS alongside its current ERP hides them too.
+  const [tallyStatus, tenant] = tallyUser
+    ? await Promise.all([
+        apiGetAsSession<unknown>("staff", "/api/v1/tally/status"),
+        apiGetAsSession<TenantProfile>("staff", "/api/v1/tenant"),
+      ])
+    : [null, null];
+  const tally =
+    tallyStatus?.status === 200 && !(tenant?.data?.modules_hidden ?? []).includes("tally");
 
   const activeTenantId = profile?.tenant_id ?? session.activeTenantId;
   const schoolName =

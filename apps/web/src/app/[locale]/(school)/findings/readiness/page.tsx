@@ -7,7 +7,7 @@ export const generateMetadata = pageMetadata((t) => t("readiness.title"));
 
 type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
 
-/** US-503, US-505: board and portal readiness by section (profile and section in the URL). */
+/** US-504, US-506: board and portal readiness by section (profile and section in the URL). */
 export default async function ReadinessPage({ searchParams }: Props) {
   const query = await searchParams;
   const profile = isProfileKey(query.profile) ? query.profile : DEFAULT_PROFILE;

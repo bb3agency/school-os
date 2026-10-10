@@ -2,7 +2,8 @@
 # §10 canonical resolution; FR-STU-002, FR-STU-004, FR-STU-006, FR-STU-012, CLAUDE.md §6.13).
 #
 # Seeded as global rows (tenant_id NULL) by migration 0008_sis_students (its keys) and later
-# migrations for the keys they add (0042_apaar_id: udise_pen, apaar_id). Schools can add their
+# migrations for the keys they add (0042_apaar_id: udise_pen, apaar_id; 0051_apaar_consent_pen
+# re-seeds udise_pen with the 11-digit format). Schools can add their
 # own attributes later (tenant rows); global rows are read-only for the app (policy attrdef_*).
 # Change this file only together with a migration that re-seeds it.
 #
@@ -15,7 +16,9 @@
 #   is_identity      identity fields: the admission register value is the legal anchor (BR-01);
 #                    changing it needs a change request (maker-checker, ADR-0010)
 #   validation       max_length, pattern, values (enum), name (normalise as a person name),
-#                    sources (allowed sources; omitted = all), not_future (dates)
+#                    sources (allowed sources; omitted = all), not_future (dates), compact
+#                    (remove spaces and hyphens first), format_code (error code when the
+#                    pattern does not match; default invalid_format)
 #   canonical_policy precedence (sources in order), require_verified, anchor (identity: the only
 #                    source that makes the canonical value non-provisional), show_conflicts_from
 #   label_en/label_te UI labels
@@ -159,11 +162,14 @@ attributes:
     classification: C2
     is_identity: false
     sort_order: 92
-    # TODO(portal format): confirm the PEN format from the UDISE+ portal (ADR-0037 follow-up).
-    validation: {max_length: 20, pattern: '^[A-Za-z0-9]{1,20}$',
-                 sources: [udise_plus, manual_entry]}
+    # 11 digits (public UDISE+ guides; ADR-0039, FR-STU-017; re-seeded by 0051_apaar_consent_pen).
+    # Spaces and hyphens are removed first (compact). Unique among the school's active students
+    # (FR-STU-018). tc_incoming: the PEN printed on the previous school's transfer certificate.
+    validation: {max_length: 15, pattern: '^[0-9]{11}$', compact: true,
+                 format_code: digits11_required,
+                 sources: [udise_plus, tc_incoming, manual_entry]}
     canonical_policy:
-      precedence: [udise_plus, manual_entry]
+      precedence: [udise_plus, tc_incoming, manual_entry]
       require_verified: true
       show_conflicts_from: []
     label_en: UDISE+ PEN

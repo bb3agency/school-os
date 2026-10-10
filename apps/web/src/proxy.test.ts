@@ -254,7 +254,7 @@ describe("proxy (SEC-010, NFR-I18N-001)", () => {
     }
   });
 
-  it("leaves the readiness slips' CSP to the API, and only that path (FR-DQ-035)", () => {
+  it("leaves the readiness slips' CSP to the API, and only that path (FR-DQ-045)", () => {
     const slips = proxy(request("/bff/api/v1/dq/readiness/bseap-ssc-2027/slips"));
     expect(slips.headers.get("content-security-policy")).toBeNull();
     expect(slips.headers.get("x-content-type-options")).toBe("nosniff");

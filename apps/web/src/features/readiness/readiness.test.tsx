@@ -93,7 +93,7 @@ function detail(overrides: Partial<ReadinessDetail> = {}): ReadinessDetail {
             waived: false,
             severity: "blocker",
             explanation: {
-              code: "DQ-030-PARENT",
+              code: "DQ-031-PARENT",
               en: "Full name on Aadhaar differs from the right value (spaces differ). The parent must correct Aadhaar at an Aadhaar centre.",
               te: "",
             },
@@ -174,7 +174,7 @@ afterEach(() => {
   expect(intlErrors).toEqual([]);
 });
 
-describe("readiness helpers (FR-DQ-035)", () => {
+describe("readiness helpers (FR-DQ-045)", () => {
   it("links slips through the BFF and computes the ready share", () => {
     expect(slipHref(SSC, { studentId: STUDENT })).toBe(
       `/bff/api/v1/dq/readiness/${SSC}/slips?student_id=${STUDENT}`,
@@ -187,7 +187,7 @@ describe("readiness helpers (FR-DQ-035)", () => {
   });
 });
 
-describe("board readiness screen (US-503, US-505)", () => {
+describe("board readiness screen (US-504, US-506)", () => {
   it("shows 142 of 160 ready, the unverified format and the sections, without a run button for readers", async () => {
     common(READ);
     renderWithIntl(<ReadinessScreen profileKey={SSC} sectionId={null} />);
@@ -243,7 +243,7 @@ describe("board readiness screen (US-503, US-505)", () => {
   });
 });
 
-describe("student readiness (US-504)", () => {
+describe("student readiness (US-505)", () => {
   it("highlights the exact characters and says who fixes it", async () => {
     common(READ);
     stub.routes[`GET /bff/api/v1/dq/readiness/${SSC}/students/${STUDENT}`] = () =>

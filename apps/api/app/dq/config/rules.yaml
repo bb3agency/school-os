@@ -165,11 +165,23 @@ rules:
     explanation_key: DQ-022
     routes: [ROUTE-UIDAI, ROUTE-UDISE]
 
-  # ADR-0040 (FR-DQ-030..FR-DQ-033): board and portal readiness, only for profiles with a
+  # FR-DQ-033 (ADR-0041): the office's own records (a refresh from the school's current ERP is
+  # imported as source manual_entry) vs the admission register. The register stays the anchor
+  # (BR-01): the ERP value is corrected first; the register only through a change request.
+  - id: DQ-030
+    version: 1
+    check: cross_source
+    scope: student
+    attribute_keys: [full_name, dob, gender, father_name, mother_name]
+    sources: [admission_register, manual_entry]
+    severity: {mode: fixed, level: medium}
+    explanation_key: DQ-030
+    routes: [ROUTE-ERP, ROUTE-SCHOOL-CR]
+  # ADR-0040 (FR-DQ-040..FR-DQ-043): board and portal readiness, only for profiles with a
   # `readiness:` section (bseap-ssc-2027, apaar). The profile's identity fields are compared
   # EXACTLY across its sources; each difference names who fixes it (config/readiness.yaml), which
   # sets the finding's severity, explanation and routes (the catalog values here are defaults).
-  - id: DQ-030
+  - id: DQ-031
     version: 1
     check: readiness_diff
     scope: student
@@ -178,5 +190,5 @@ rules:
               birth_certificate, tc_incoming]
     requires_profile: true
     severity: {mode: fixed, level: blocker}
-    explanation_key: DQ-030
+    explanation_key: DQ-031
     routes: [ROUTE-SCHOOL-CR, ROUTE-UIDAI, ROUTE-UDISE]

@@ -315,23 +315,43 @@ Not built: the MSI installer and code signing; signed auto-update; exposure of `
 
 **Questions for the PO and security review**: the ten questions of ADR-0032 (Tally version and ledger layout at the design partner, HMAC vs Ed25519, C2 vs C3 for fee data, who enrols, updates, an Excel fallback, bill-wise dues, the 48-hour silence window, class-teacher access).
 
+### R1 status: APAAR consent, UDISE+ 2026-27 profile, transfer-in by PEN (2026-10-10)
+
+Built on `wip/r1-apaar-udise` (docs/18 §3 R1.2-R1.3; ADR-0039; stories US-1901..US-1905 in 02-PRD C19; FR-APC-001..006, FR-STU-017..019, FR-IMP-010, FR-EXP-006 in 03-TRD; migration `0051_apaar_consent_pen`, to be re-chained at merge if another `0051` lands first):
+
+- **APAAR consent register** (`app/apaar`): append-only decisions with the signed form as evidence, printable A4 forms with a refusal option in English or Telugu per school (D9), section summary and pending follow-up list, refused students skipped by DQ-009/DQ-022. Permissions `apaar.consent.read` / `apaar.consent.record`; run the system-role sync after the migration (ADR-0022).
+- **PEN**: 11 digits, `tc_incoming` source, exact search, duplicate guard on create, values and imports, `POST /students/national-id-check` for transfer-ins.
+- **UDISE+ 2026-27 profile**: Student Module field list with `portal_fields`, `source` URLs, `verified: false` (D3); export layout version 3.
+- **Web**: `/apaar` consent screen, PEN check on the new-student form and detail page, PEN/APAAR import mapping.
+
+Open: the consent wording and the court order are from secondary sources (check the official revised form); the Telugu form text needs a native reviewer; the UDISE+ field list awaits a school's portal screen or the official 2026-27 DCF; the BSEAP readiness diff and the APAAR failure list are a separate R1 work item (`app/dq/readiness*`).
+
 ### M7 · Multi-school readiness
 **Scope:** self-serve onboarding wizard · import templates library · online payment collection if ADR-0016 is accepted (basic billing already shipped in M0) · tenant admin improvements · support tooling beyond tickets · first dedicated-tier schools at scale (SEC-030 before the first one) · Stage 1 infrastructure (Multi-AZ, replicas, cross-account backups) · external pen test · published security overview for schools.
 **Exit:** 5 schools live with < 1 week onboarding effort each; SLOs met for 2 consecutive months.
+*(The import templates library was pulled forward into R1.5, below.)*
 
-### R1 · Board and portal readiness (product plan 2026-27, docs/18; owner decisions 2026-10-10)
-**Scope:** AP SSC Class 9/10 readiness (exact diff, fix owner, parent verification slip, class dashboard) · UDISE+ 2026-27 profile with PEN and transfer-in-by-PEN guard · APAAR consent register and failure list · CBSE registration profile · CISCE profile refresh · import template library and "alongside your current ERP" mode.
+### R1 · Board and portal readiness (2026-27 plan, docs/18 §3)
 
-### R1 status (2026-10-10)
+R1 status, part C (`wip/r1-boards-imports`, 2026-10-10; ADR-0041 Proposed):
 
-**R1-A built on `wip/r1-ssc-readiness` (not yet merged; migration `0051_readiness` revises `0050_verified_answer_drafter` and may need re-chaining at merge):** US-503..US-505, FR-DQ-030..036, ADR-0040.
+- [x] Boards per school (`BSEAP`, `CBSE`, `CISCE`) and per class in school settings; profile lists filtered by board (FR-TEN-020, FR-TEN-021, US-203). Migration `0052_boards_import_presets` (column grant only).
+- [x] CBSE registration (IX/XI) and LOC (X/XII) profiles and pre-check layouts; CISCE ICSE/ISC 2026-27 profile superseding the 2026 one (FR-DQ-030..032, FR-EXP-007, US-503). **All `verified: false`** (owner decision D3): field lists, lengths and codes come from secondary public sources; confirm with a pilot school.
+- [x] Import template library: blank SchoolOS template, register Excel, UDISE+ student list, generic ERP export; header-only XLSX downloads; preset picker in the mapping step (FR-IMP-030..032, US-403). No MyClassboard/Entab/Fedena presets (no usable public column lists).
+- [x] "Alongside your current ERP" mode: hides the Tally connector, refresh-from-ERP path as `manual_entry`, DQ-030 for differences from the register (FR-TEN-022, FR-IMP-033, FR-DQ-033, US-204).
+- [x] Per-student parent verification slip (with the BSEAP readiness check, R1.1; part A below).
+- [ ] subject/minority/single-girl-child attributes if pilots need them pre-checked; sync school boards to the control plane (protected windows).
+
+R1 status, part A (`wip/r1-ssc-readiness`, 2026-10-10; ADR-0040 Proposed):
+
+Migration `0053_readiness` revises `0052_boards_import_presets`; US-504..US-506, FR-DQ-040..046, ADR-0040.
 - **Diff engine** (`app/dq/readiness.py`, pure): exact, NFC-first comparison of name, date of birth, gender and parents' names across register, Aadhaar-as-printed, UDISE+ and board records, with kinds in plain words and character-level diffs; fix owners from `app/dq/config/readiness.yaml` (register is the legal anchor unless a birth certificate or incoming TC contradicts it).
 - **Profiles** `bseap-ssc-2027` (Classes IX, X) and `apaar` (APAAR failure list), each with public `source` URLs and `verified: false` (D3).
-- **Findings**: rule DQ-030 per readiness profile; resolve, waive, `needs_confirmation` and change-request links apply; reads overlay waivers.
+- **Findings**: rule DQ-031 per readiness profile; resolve, waive, `needs_confirmation` and change-request links apply; reads overlay waivers.
 - **API** `/api/v1/dq/readiness/...` (summary, section students, student detail, runs, A4 slips) with `dq.readiness.read` / `dq.readiness.manage` (07 §6.2); audits `dq.readiness.student_viewed`, `dq.readiness.slips_printed`, `dq.run.completed`.
 - **Web** `/findings/readiness` (profile picker, section progress, student list, slips) and `/findings/readiness/{student}` (highlighted diff, fix-owner badges), English and Telugu catalogues.
 
-Not built (other R1 stories): the APAAR consent register (another wave), UDISE+ 2026-27 field list and transfer-in by PEN, CBSE and refreshed CISCE profiles, the import template library. Not verified: every readiness format (D3), the BSEAP nominal-roll field list (parents' names, caste, medium are unconfirmed). Release note: existing schools need `python -m app.identity.sync_system_roles --apply` after `0051` (ADR-0022).
+Not verified: every readiness format (D3), the BSEAP nominal-roll field list (parents' names, caste, medium are unconfirmed). Release note: existing schools need `python -m app.identity.sync_system_roles --apply` after `0053` (ADR-0022).
 
 ## 3. Pilot-ready gate (before any real student data)
 

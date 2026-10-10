@@ -11,7 +11,7 @@ type Props = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-/** US-504: one student's readiness with the exact differences (another school's ID: 404). */
+/** US-505: one student's readiness with the exact differences (another school's ID: 404). */
 export default async function ReadinessStudentPage({ params, searchParams }: Props) {
   const { studentId } = await params;
   if (!UUID_PATTERN.test(studentId)) notFound();

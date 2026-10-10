@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted |
+| Status | Accepted · Amended by ADR-0039 (consent register; PEN is 11 digits; duplicate guard) |
 | Date | 2026-10-01 |
 | Deciders | Product owner (accepted 2026-10-01, with option (a) of decision 3); engineering (proposal) |
 | Amends / supersedes | none (adds to the attribute catalogue of docs/05 §5; keeps ADR-0007 unchanged) |

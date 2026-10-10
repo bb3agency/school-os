@@ -31,7 +31,7 @@ const OWN_CSP_PATHS: readonly RegExp[] = [
   // FR-CERT-011, FR-REG-004: certificate and register print views (hashed style blocks only).
   /^\/bff\/api\/v1\/certificates\/[0-9a-f-]{36}\/print$/i,
   /^\/bff\/api\/v1\/registers\/(transfer-certificates|certificates|admission-withdrawal)$/i,
-  // FR-DQ-035 (ADR-0040): parent verification slips of board and portal readiness.
+  // FR-DQ-045 (ADR-0040): parent verification slips of board and portal readiness.
   /^\/bff\/api\/v1\/dq\/readiness\/[a-z0-9][a-z0-9-]{0,63}\/slips$/i,
 ];
 

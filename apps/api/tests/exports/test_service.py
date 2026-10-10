@@ -254,7 +254,7 @@ def test_portal_precheck_masks_c3_unless_included(
     requested = EX.audit_rows(admin_engine, school.tenant_id, shown.id)[0]["summary"]
     assert requested["include_sensitive"] is True
     # ADR-0021 decision 2: the audit event names the restricted columns, never their values.
-    assert requested["sensitive_columns"] == ["category"]
+    assert requested["sensitive_columns"] == ["category", "religion", "disability"]
     assert "obc" not in str(requested).lower()
     unmasked = EX.audit_rows(admin_engine, school.tenant_id, masked.id)[0]["summary"]
     assert (unmasked["include_sensitive"], unmasked["sensitive_columns"]) == (False, [])
@@ -877,20 +877,61 @@ def test_docs_05_13_files_purged_after_seven_days(
         assert exports.get_export(db, EX.ctx(school, person, "principal"), export_id).files == []
 
 
+def _list_profiles(school: Any, *, include_all: bool = False) -> list[Any]:
+    person = school.people["principal"]
+    with tenant_session(school.tenant_id, person.user_id) as db:
+        return exports.list_profiles(
+            EX.ctx(school, person, "principal"), db, include_all=include_all
+        )
+
+
 def test_list_profiles(school: Any) -> None:
-    profiles = exports.list_profiles(EX.ctx(school, school.people["principal"], "principal"))
+    profiles = _list_profiles(school, include_all=True)
     keys = {p.key: p for p in profiles}
     assert keys["cisce-registration-2026"].kind == "board"
     assert keys["cisce-registration-2026"].permission == "export.board"
+    assert keys["cisce-registration-2026"].superseded is True
     assert keys["udise-plus"].permission == "export.portal"
     assert all(p.allowed for p in profiles)
-    assert keys["udise-plus"].fields[:2] == ["admission_no", "full_name"]
+    assert keys["udise-plus"].fields[:2] == ["full_name", "gender"]  # 2026-27 portal order
+    # FR-EXP-007 (ADR-0041): the R1 board layouts, unverified until a school confirms them.
+    for key in ("cbse-registration-2027", "cbse-loc-2027", "cisce-registration-2027"):
+        assert keys[key].kind == "board"
+        assert keys[key].verified is False
+        assert keys[key].source
+    assert keys["cbse-registration-2027"].board == "CBSE"
+
+
+def test_FR_TEN_020_export_profiles_follow_the_schools_boards(
+    school: Any, admin_engine: Engine
+) -> None:
+    with admin_engine.begin() as c:
+        before: list[str] = c.execute(
+            text("SELECT boards FROM core.tenants WHERE id = :t"), {"t": school.tenant_id}
+        ).scalar_one()
+        c.execute(
+            text("UPDATE core.tenants SET boards = '{CBSE}' WHERE id = :t"),
+            {"t": school.tenant_id},
+        )
+    try:
+        keys = {p.key for p in _list_profiles(school)}
+        assert {"cbse-registration-2027", "cbse-loc-2027", "udise-plus"} <= keys
+        assert not {k for k in keys if k.startswith("cisce-")}
+        assert "cisce-registration-2027" in {
+            p.key for p in _list_profiles(school, include_all=True)
+        }
+    finally:
+        with admin_engine.begin() as c:
+            c.execute(
+                text("UPDATE core.tenants SET boards = :b WHERE id = :t"),
+                {"b": list(before), "t": school.tenant_id},
+            )
 
 
 def test_ADR_0036_profile_labels_and_list_watermark_are_english_while_telugu_is_hidden(
     school: Any, section: str
 ) -> None:
-    profiles = exports.list_profiles(EX.ctx(school, school.people["principal"], "principal"))
+    profiles = _list_profiles(school, include_all=True)
     assert all(p.label_te == "" for p in profiles)
     assert not contains_telugu("".join(p.model_dump_json() for p in profiles))
     EX.student(school, section_key=section, roll_no="7")

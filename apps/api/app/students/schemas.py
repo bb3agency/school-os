@@ -46,6 +46,8 @@ Source = Literal[
 ]
 StudentStatus = Literal["provisional", "active", "left", "graduated"]
 Relationship = Literal["father", "mother", "guardian"]
+AdmissionKind = Literal["new", "transfer_in"]
+NationalIdKey = Literal["udise_pen", "apaar_id"]
 Verification = Literal["unverified", "verified", "rejected"]
 VerifyDecision = Literal["verified", "rejected"]
 AttributeKey = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]{1,63}$")]
@@ -153,6 +155,50 @@ class StudentCreate(_In):
     status: StudentStatus = "active"
     section_id: uuid.UUID | None = None
     roll_no: RollNo | None = None
+    admission_kind: AdmissionKind | None = Field(
+        default=None,
+        description="new: first school (UDISE+ creates a new record). transfer_in: the child "
+        "comes from another school and already has a UDISE+ record: a udise_pen value (from "
+        "the transfer certificate, tc_incoming, or the portal) is then required, so the office "
+        "imports the child into UDISE+ by PEN instead of creating a second record (FR-STU-018; "
+        "422 pen_required_for_transfer_in).",
+    )
+
+
+class NationalIdCheckIn(_In):
+    """``POST /students/national-id-check`` (FR-STU-018): is this PEN or APAAR ID already on a
+    record of this school? In the body, never the URL (SEC-008)."""
+
+    udise_pen: str | None = Field(
+        default=None, max_length=32, description="11 digits; spaces or hyphens are removed."
+    )
+    apaar_id: str | None = Field(
+        default=None, max_length=32, description="12 digits; spaces or hyphens are removed."
+    )
+
+
+class NationalIdMatch(_Out):
+    identifier: NationalIdKey
+    student_id: uuid.UUID
+    display_name: str | None
+    admission_no: str | None
+    status: str
+    class_section: str | None
+
+
+class NationalIdCheckOut(_Out):
+    """``matches``: records of this school holding the number (live or former). ``udise_action``:
+    what to do in UDISE+ for a new admission with this PEN: ``open_existing_record`` (the child
+    is already on this school's rolls: open that record, do not admit again),
+    ``readmit_existing_record`` (a former student of this school: re-admit that record),
+    ``import_by_pen`` (not in this school: create the record here with the PEN, then import the
+    child in UDISE+ by PEN; the previous school must release it), ``new_udise_record`` (no PEN
+    given: search UDISE+ by name and date of birth first)."""
+
+    matches: list[NationalIdMatch]
+    udise_action: Literal[
+        "open_existing_record", "readmit_existing_record", "import_by_pen", "new_udise_record"
+    ]
 
 
 class StudentPatch(_In):
@@ -379,6 +425,7 @@ class SearchFilters(_In):
     admission_no: str | None = None
     academic_year_id: uuid.UUID | None = None
     apaar_id: str | None = None
+    udise_pen: str | None = None
 
 
 class StudentSearchIn(_In):
@@ -411,6 +458,13 @@ class StudentSearchIn(_In):
         "answers 422 digits12_required. The only search field where a 12-digit number is "
         "accepted: query and admission_no still refuse one (aadhaar_full_number_rejected).",
     )
+    udise_pen: str | None = Field(
+        default=None,
+        max_length=32,
+        description="Exact UDISE+ PEN (FR-STU-019): 11 digits, spaces or hyphens allowed. "
+        "Matches only the student's current PEN values (verified or recorded, not rejected), "
+        "within the caller's scope; anything else answers 422 digits11_required.",
+    )
     limit: int = Field(
         default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT, description="Page size (max 200)."
     )
@@ -427,6 +481,7 @@ class StudentSearchIn(_In):
             admission_no=self.admission_no,
             academic_year_id=self.academic_year_id,
             apaar_id=self.apaar_id,
+            udise_pen=self.udise_pen,
         )
 
 

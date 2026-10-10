@@ -62,6 +62,8 @@ READ_ONLY_EXPENSIVE_OK = {
     ("GET", "/api/v1/support/tickets"),
     ("GET", "/api/v1/platform/support/tickets"),
     ("GET", "/api/v1/import-templates"),
+    # A preset applied to an existing import's headers (FR-IMP-031): a read, nothing stored.
+    ("GET", "/api/v1/imports/{import_id}/preset-mapping"),
     ("PATCH", "/api/v1/imports/{import_id}/sheet/rows/{row_no}"),
 }
 

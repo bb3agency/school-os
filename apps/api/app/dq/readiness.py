@@ -1,5 +1,5 @@
-"""Board and portal readiness: exact cross-source diff and fix owners (FR-DQ-030..FR-DQ-034,
-US-503, US-504, ADR-0040).
+"""Board and portal readiness: exact cross-source diff and fix owners (FR-DQ-040..FR-DQ-044,
+US-504, US-505, ADR-0040).
 
 Pure module (import-linter contract ``dq-pure-library``): no database, no routes.
 

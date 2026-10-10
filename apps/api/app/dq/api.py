@@ -1,5 +1,5 @@
-"""Data-quality routes (docs/09 Data quality; US-501..US-505, FR-DQ-002, FR-DQ-020,
-FR-DQ-030..FR-DQ-036).
+"""Data-quality routes (docs/09 Data quality; US-501..US-506, FR-DQ-002, FR-DQ-020,
+FR-DQ-040..FR-DQ-046).
 
 Every route declares its permission with ``require()``; the service limits findings to the
 caller's students (class teachers: their sections this year) and answers 404 outside them.
@@ -169,10 +169,19 @@ def list_rules(ctx: Reader) -> list[RuleOut]:
 
 
 @router.get("/profiles", response_model=list[ProfileOut])
-def list_profiles(ctx: Reader) -> list[ProfileOut]:
-    """Export pre-check profiles, e.g. CISCE registration and UDISE+ (permission
-    ``dq.findings.read``)."""
-    return dq.profiles_catalog()
+def list_profiles(
+    ctx: Reader,
+    db: TenantDB,
+    include_all: Annotated[
+        bool,
+        Query(alias="all", description="Also list profiles of boards the school did not declare."),
+    ] = False,
+) -> list[ProfileOut]:
+    """Export pre-check profiles, e.g. UDISE+, CBSE registration and CISCE (permission
+    ``dq.findings.read``). Board profiles are listed for the school's declared boards only
+    (FR-TEN-020; every profile while none is declared); each says which of its classes follow
+    its board here, whether its format is verified, and its public sources (ADR-0041)."""
+    return dq.school_profiles(db, include_all=include_all)
 
 
 @router.get("/summary", response_model=SummaryOut)
@@ -188,7 +197,7 @@ def get_summary(
     return dq.summary(db, ctx, profile_key=profile_key, section_ids=section_ids)
 
 
-# --- board and portal readiness (US-503..US-505, FR-DQ-030..FR-DQ-036, ADR-0040) ---------------
+# --- board and portal readiness (US-504..US-506, FR-DQ-040..FR-DQ-046, ADR-0040) ---------------
 
 ReadinessReader = Annotated[UserContext, Depends(require(readiness.READ))]
 ReadinessManager = Annotated[UserContext, Depends(require(readiness.MANAGE))]
@@ -259,7 +268,7 @@ def start_readiness_run(
     idem: IdempotencyDep,
 ) -> Response:
     """Check sections, classes or students for the profile and store each difference as a
-    DQ-030 finding, so it can be resolved, waived or linked to a change request (permission
+    DQ-031 finding, so it can be resolved, waived or linked to a change request (permission
     ``dq.readiness.manage``). An empty scope means the profile's classes. Small scopes are
     checked at once (``completed``), bigger ones are queued. Accepts ``Idempotency-Key``."""
     return idem.run(

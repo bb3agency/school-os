@@ -1,13 +1,13 @@
-"""Board and portal readiness: summary, student detail, runs and parent slips (US-503..US-505,
-FR-DQ-030..FR-DQ-036, ADR-0040). Routes: ``app.dq.api`` (``/api/v1/dq/readiness/...``).
+"""Board and portal readiness: summary, student detail, runs and parent slips (US-504..US-506,
+FR-DQ-040..FR-DQ-046, ADR-0040). Routes: ``app.dq.api`` (``/api/v1/dq/readiness/...``).
 
 - **Live, overlaid.** Readiness is computed from the current values on every read (the same
-  pure assessment the DQ-030 check runs: :func:`app.dq.checks.assess_readiness`), then the
-  stored DQ-030 findings of the profile are laid over it by fingerprint: a difference whose
+  pure assessment the DQ-031 check runs: :func:`app.dq.checks.assess_readiness`), then the
+  stored DQ-031 findings of the profile are laid over it by fingerprint: a difference whose
   finding is **waived** (same conflict) no longer counts, and a finding that waits for a
   confirmation (A-01, ``needs_confirmation``) holds the student as ``blocked`` even though the
   values now agree. Runs (``POST .../runs``) persist the findings so the resolve/waive workflow
-  and change requests apply (FR-DQ-033); they reuse ``dq.request_run`` (audit
+  and change requests apply (FR-DQ-043); they reuse ``dq.request_run`` (audit
   ``dq.run.completed``).
 - **Scope (SEC-015).** Everything is limited to the students the caller reaches with both
   ``student.read_basic`` and ``dq.readiness.read`` (class teachers: their sections this year);
@@ -70,7 +70,7 @@ READ: Final = "dq.readiness.read"
 MANAGE: Final = "dq.readiness.manage"
 STUDENT_READ: Final = "student.read_basic"
 SENSITIVE: Final = "student.read_sensitive"
-RULE_ID: Final = "DQ-030"
+RULE_ID: Final = "DQ-031"
 MAX_SLIPS: Final = 300
 NOT_RECORDED: Final = "—"
 
@@ -297,7 +297,7 @@ def summary(
     *,
     section_ids: Collection[uuid.UUID] | None = None,
 ) -> ReadinessSummaryOut:
-    """Readiness by section of the profile's classes in the caller's scope (US-503 AC3)."""
+    """Readiness by section of the profile's classes in the caller's scope (US-504 AC3)."""
     profile = readiness_profile(profile_key)
     sections = _profile_sections(session, profile)
     wanted = [s for s in (section_ids or sections) if s in sections]
@@ -506,7 +506,7 @@ def student_detail(
     session: Session, ctx: UserContext, profile_key: str, student_id: uuid.UUID
 ) -> ReadinessStudentDetailOut:
     """One student's readiness with the values of every record and the exact differences
-    (US-504 AC1). C3 values only with ``student.read_sensitive`` for the student (audited)."""
+    (US-505 AC1). C3 values only with ``student.read_sensitive`` for the student (audited)."""
     profile = readiness_profile(profile_key)
     students.ensure_in_scope(session, ctx, student_id, READ)
     reveal = _can_reveal(session, ctx, student_id)
@@ -573,7 +573,7 @@ def student_detail(
 def request_run(
     session: Session, ctx: UserContext, profile_key: str, data: ReadinessRunIn
 ) -> RunOut:
-    """Check the scope for the profile and store the differences as DQ-030 findings
+    """Check the scope for the profile and store the differences as DQ-031 findings
     (``dq.request_run``: small scopes now, bigger ones queued; audit ``dq.run.completed``).
     An empty scope means the profile's classes."""
     profile = readiness_profile(profile_key)
@@ -704,7 +704,7 @@ def slips(
     include_ready: bool = True,
 ) -> str:
     """Printable parent verification slips (A4 HTML), for one student or one section
-    (US-504 AC2). Audit ``dq.readiness.slips_printed`` (counts and ids only)."""
+    (US-505 AC2). Audit ``dq.readiness.slips_printed`` (counts and ids only)."""
     profile = readiness_profile(profile_key)
     if (student_id is None) == (section_id is None):
         raise ValidationFailed(

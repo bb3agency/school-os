@@ -1,0 +1,71 @@
+# Export pre-check profile: CBSE registration of Class IX and XI students on Pariksha Sangam,
+# session 2026-27 (registration for the 2028 board examinations) (FR-DQ-030..032, US-503;
+# DQ-005, DQ-006, DQ-009). Loaded and validated by app.dq.profiles.load_profiles(); the file
+# name is the profile key. The exports module (FR-EXP-002) shares this key.
+#
+# UNVERIFIED (owner decision D3, docs/18 §8; ADR-0041): built from public, mostly secondary
+# sources listed under `source`. The CBSE registration circular for 2026-27 and the Pariksha
+# Sangam field list were not obtained; field names, lengths and code lists are best guesses.
+# Confirm with a CBSE school's registration screen, then set `verified: true` and bump `version`.
+key: cbse-registration-2027
+version: 1
+label_en: CBSE registration (Class IX and XI) 2026-27
+label_te: CBSE నమోదు (IX, XI తరగతులు) 2026-27
+board: CBSE
+classes: [IX, XI]
+verified: false
+source:
+  - https://www.cbse.gov.in/cbsenew/cbse.html
+  - https://news.careers360.com/cbse-board-exams-apaar-id-class-9-11-loc-registration-2026-27-two-level-10-maths-social-science-2028/amp
+  - https://righttoinformation.wiki/cbse-apaar-id-board-exam-registration-mandatory-2026-27
+  - https://news.allen.in/cbse-registration-rules-2025-26-for-class-9-and-11/
+  - https://gulfnews.com/uae/education/cbse-issues-new-class-9-and-11-registration-rules-for-2025-26-key-guidelines-explained-1.500270752
+
+# DQ-005: the canonical value must exist (blocker). Category is asked for every candidate.
+required_fields: [full_name, dob, gender, mother_name, father_name, admission_no, category]
+
+unverified_identity_severity: low
+
+# DQ-006: names as CBSE prints them on the certificate: English letters, no titles such as
+# Mr./Kumari (checked by the clerk; see board_fields notes). Length is a guess (unverified).
+name_format:
+  fields: [full_name, mother_name, father_name]
+  min_length: 2
+  max_length: 100
+  latin_only: true
+  allowed_punctuation: " .'"
+
+# APAAR ID is a mandatory registration field from 2026-27 (CBSE circular of 15 Sep 2025 as
+# reported; governing body decision reported 19 Feb 2026). DQ-009 lists students without a
+# verified APAAR ID whose Aadhaar details are incomplete. A parent may refuse APAAR consent
+# (Supreme Court, 20 Jul 2026): the column then takes REFUSED, so the ID is not a DQ-005
+# blocker here; the APAAR consent register (R1, separate work) records the refusal.
+needs_apaar: true
+
+# CBSE asks schools to print a verification slip per student after registration and have the
+# parent check names, date of birth and subjects (secondary sources above).
+parent_verification_slip: true
+
+# The Pariksha Sangam registration columns as far as public sources show them.
+board_fields:
+  - {name: "Candidate's name", attribute: full_name,
+     note: "English capital letters as in the admission register; no titles (Mr., Master, Kumari)."}
+  - {name: "Mother's name", attribute: mother_name, note: "No titles such as Smt. or Mrs."}
+  - {name: "Father's name", attribute: father_name, note: "No titles such as Shri or Mr."}
+  - {name: "Guardian's name", attribute: null, required: false,
+     note: "Only where the guardian is not a parent. SchoolOS does not hold it yet; enter on the portal."}
+  - {name: "Date of birth", attribute: dob, note: "As in the admission register (DD/MM/YYYY)."}
+  - {name: "Gender", attribute: gender}
+  - {name: "Category", attribute: category, note: "General, SC, ST, OBC (CBSE code list unverified)."}
+  - {name: "APAAR ID", attribute: apaar_id,
+     note: "12 digits; REFUSED where the parent refused consent in writing; NOGEN where generation failed."}
+  - {name: "Admission number", attribute: admission_no}
+  - {name: "Subjects (codes)", attribute: null,
+     note: "SchoolOS does not hold subject choices yet; enter the CBSE subject codes on the portal."}
+  - {name: "Person with disability (PwD/CWSN)", attribute: disability, required: false,
+     note: "Restricted value; shown masked in the pre-check sheet."}
+  - {name: "Minority status", attribute: null, required: false,
+     note: "Not held by SchoolOS yet; enter on the portal."}
+  - {name: "Single girl child", attribute: null, required: false,
+     note: "Not held by SchoolOS yet; enter on the portal."}
+  - {name: "Photograph", attribute: null, note: "Uploaded on the portal; SchoolOS does not hold photographs."}

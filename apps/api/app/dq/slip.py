@@ -1,4 +1,4 @@
-"""Parent verification slip for board and portal readiness (FR-DQ-035, US-504, ADR-0040).
+"""Parent verification slip for board and portal readiness (FR-DQ-045, US-505, ADR-0040).
 
 A self-contained A4 HTML page, one student per sheet, rendered with :class:`string.Template`:
 every value goes through :func:`html.escape` and the Aadhaar mask (invariant 4, defence in

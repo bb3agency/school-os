@@ -199,7 +199,7 @@ function Detail({ data, profileKey }: { data: ReadinessDetail; profileKey: strin
 }
 
 /**
- * One student's readiness (US-504): the value every record holds, the exact difference
+ * One student's readiness (US-505): the value every record holds, the exact difference
  * character by character (when you may see both values), and who must fix it.
  */
 export function ReadinessStudentScreen({

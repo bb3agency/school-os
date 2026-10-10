@@ -56,6 +56,7 @@ roles:
       certificate.read: school
       certificate.approve: school_step_up
       register.read: school_step_up
+      apaar.consent.read: school
 
   principal:
     name_en: Principal
@@ -114,6 +115,8 @@ roles:
       certificate.issue: school
       certificate.approve: school_step_up
       register.read: school_step_up
+      apaar.consent.read: school
+      apaar.consent.record: school
 
   office_admin:
     name_en: Office admin
@@ -156,6 +159,8 @@ roles:
       register.read: school_step_up
       attendance.record: school
       attendance.read: school
+      apaar.consent.read: school
+      apaar.consent.record: school
 
   office_staff:
     name_en: Office staff
@@ -180,6 +185,8 @@ roles:
       support.ticket.create: school
       certificate.read: school
       certificate.issue: school
+      apaar.consent.read: school
+      apaar.consent.record: school
 
   accountant:
     name_en: Accountant
@@ -220,6 +227,7 @@ roles:
       exam.manage: school
       marks.record: school
       marks.read: school
+      apaar.consent.read: school
 
   class_teacher:
     name_en: Class teacher
@@ -242,6 +250,7 @@ roles:
       marks.record: scoped
       marks.read: scoped
       support.ticket.create: school
+      apaar.consent.read: scoped
 
   teacher:
     name_en: Teacher
@@ -268,6 +277,7 @@ roles:
       finance.read: school
       certificate.read: school
       register.read: school_step_up
+      apaar.consent.read: school
 
 # Break-glass support access (docs/07 §6.4, US-103, FR-OPS-004). NOT a system role: it is not
 # cloned at provisioning, not listed for assignment and never assignable by staff. It is created

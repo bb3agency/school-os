@@ -67,7 +67,7 @@ def test_US_501_run_then_list_findings_with_explanations(world: Any, api: Any) -
 def test_US_501_summary_rules_and_profiles(world: Any, api: Any) -> None:
     who = world.person("principal")
     rules = api.call(who, "GET", "/api/v1/dq/rules").json()
-    assert [r["id"] for r in rules] == [f"DQ-{i:03d}" for i in (*range(1, 13), 21, 22, 30)]
+    assert [r["id"] for r in rules] == [f"DQ-{i:03d}" for i in (*range(1, 13), 21, 22, 30, 31)]
     assert all(r["explanation"]["en"] and r["explanation"]["te"] for r in rules)
     assert rules[0]["routes"][0] == {
         "code": "ROUTE-UIDAI",
@@ -75,7 +75,16 @@ def test_US_501_summary_rules_and_profiles(world: Any, api: Any) -> None:
         "te": "తల్లిదండ్రులు UIDAI ద్వారా ఆధార్‌లో సవరణ చేయించుకోవాలి.",
     }
     profiles = {p["key"] for p in api.call(who, "GET", "/api/v1/dq/profiles").json()}
-    assert profiles == {"cisce-registration-2026", "udise-plus", "bseap-ssc-2027", "apaar"}
+    # No board declared: every profile (FR-TEN-020, ADR-0041).
+    assert profiles == {
+        "cisce-registration-2026",
+        "cisce-registration-2027",
+        "cbse-registration-2027",
+        "cbse-loc-2027",
+        "bseap-ssc-2027",
+        "apaar",
+        "udise-plus",
+    }
     summary = api.call(
         who,
         "GET",

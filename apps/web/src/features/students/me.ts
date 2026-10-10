@@ -58,4 +58,6 @@ export const PERM = {
   certificateIssue: "certificate.issue",
   certificateApprove: "certificate.approve",
   insightsRead: "insights.read",
+  apaarRead: "apaar.consent.read",
+  apaarRecord: "apaar.consent.record",
 } as const;

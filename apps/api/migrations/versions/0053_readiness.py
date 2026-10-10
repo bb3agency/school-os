@@ -1,13 +1,13 @@
-"""Board and portal readiness: permission catalog (ADR-0040; FR-DQ-030..FR-DQ-036, SEC-003).
+"""Board and portal readiness: permission catalog (ADR-0040; FR-DQ-040..FR-DQ-046, SEC-003).
 
 Data migration on the global catalog ``core.permissions`` (no RLS; ``0004_authz_seed``'s
 docstring: later catalog changes get their own revision that re-runs the upsert):
 
 - ``dq.readiness.read``: see board and portal readiness and print parent verification slips;
-- ``dq.readiness.manage``: run readiness checks (they store DQ-030 findings).
+- ``dq.readiness.manage``: run readiness checks (they store DQ-031 findings).
 
 No table changes: readiness is computed from the per-source values and stored as findings in
-``sis.dq_findings`` (rule DQ-030, profile key), which already has RLS and the composite keys.
+``sis.dq_findings`` (rule DQ-031, profile key), which already has RLS and the composite keys.
 
 The rows are written out here rather than read from ``permissions.yaml`` so this revision means
 the same thing whatever the YAML says later. **Role grants of existing schools are NOT changed
@@ -18,8 +18,8 @@ ADR-0022, docs/10 §8).
 Downgrade deletes the two keys, each in its own savepoint, keeping a key that a role still holds
 (the foreign-key check sees rows RLS hides from the migrator), like ``0019_export_access``.
 
-Revision ID: 0051_readiness
-Revises: 0050_verified_answer_drafter
+Revision ID: 0053_readiness
+Revises: 0052_boards_import_presets
 Create Date: 2026-10-10
 """
 
@@ -28,8 +28,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0051_readiness"
-down_revision = "0050_verified_answer_drafter"
+revision = "0053_readiness"
+down_revision = "0052_boards_import_presets"
 branch_labels = None
 depends_on = None
 

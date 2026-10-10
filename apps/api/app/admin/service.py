@@ -74,6 +74,7 @@ from app.admin.schemas import (
     TenantExportDownloadOut,
     TenantExportOut,
 )
+from app.apaar import service as apaar
 from app.audit import export as audit_export
 from app.audit import service as audit
 from app.audit.viewer import AuditFilters
@@ -556,6 +557,8 @@ def _collect(session: Session, snap: _Snapshot) -> tuple[list[RecordTable], dict
         *documents.export_records(session),
         *documents.export_withheld_files(session, include_sensitive=snap.include_sensitive),
         *certificates.export_records(session),
+        # ADR-0039: the APAAR consent register (decisions, history) and the form language.
+        *apaar.export_records(session),
         *circulars.export_records(session),
         *academics.export_records(session),
         *insights.export_records(session, include_sensitive=snap.include_sensitive),

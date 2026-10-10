@@ -111,6 +111,8 @@ FR-…, NFR-…, SEC-…, PRV-…; docs sections affected.
 | [ADR-0034](ADR-0034-ask-conversations-and-memory.md) | Ask conversations, context and per-user memory (amends FR-KB-012 and ADR-0008) | Accepted |
 | [ADR-0035](ADR-0035-contextual-retrieval-and-reranking.md) | Contextual chunk headers and a reranker for "Ask the school" (behind switches, off) | Proposed |
 | [ADR-0036](ADR-0036-english-first-telugu-hidden.md) | English first; Telugu hidden behind one switch (`SOS_TELUGU_ENABLED`, off) | Accepted |
-| [ADR-0037](ADR-0037-apaar-id.md) | Store the APAAR ID (and UDISE+ PEN) as student attributes with provenance | Accepted |
+| [ADR-0037](ADR-0037-apaar-id.md) | Store the APAAR ID (and UDISE+ PEN) as student attributes with provenance | Accepted · Amended by ADR-0039 |
 | [ADR-0038](ADR-0038-commercial-catalogue-one-time-fee-and-ai-answer-bundles.md) | Commercial catalogue: one-time fee and AI answer bundles with overage (amends ADR-0015) | Accepted |
+| [ADR-0039](ADR-0039-apaar-consent-register-and-pen.md) | APAAR consent register, the 11-digit PEN and the transfer-in duplicate guard (amends ADR-0037) | Accepted |
 | [ADR-0040](ADR-0040-board-and-portal-readiness.md) | Board and portal readiness: exact cross-source diff with fix owners | Proposed |
+| [ADR-0041](ADR-0041-boards-import-presets-and-alongside-mode.md) | Boards per school, CBSE/CISCE profiles from public sources, import presets and the "alongside your current ERP" mode | Proposed |

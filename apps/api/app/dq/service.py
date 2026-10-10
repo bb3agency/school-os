@@ -63,10 +63,11 @@ from app.dq import repository as repo
 from app.dq.explanations import Language, load_explanations
 from app.dq.masking import FULL_MASK
 from app.dq.models import ACTIVE_STATUSES
-from app.dq.profiles import load_engine_config, load_profiles
+from app.dq.profiles import load_engine_config, load_profiles, superseded_keys
 from app.dq.rules import Severity, load_rules
 from app.dq.schemas import (
     Bilingual,
+    BoardFieldOut,
     FindingFilters,
     FindingOut,
     FindingValue,
@@ -224,7 +225,7 @@ def _param_text(
         return issue.text(language.value) if issue is not None else text
     if name == "student" and not related_visible:
         return FULL_MASK
-    # DQ-030 (ADR-0040): the record to correct and the kinds of difference, as codes.
+    # DQ-031 (ADR-0040): the record to correct and the kinds of difference, as codes.
     readiness_text = {"source": readiness.source_text, "diff": readiness.kinds_text}.get(name)
     if readiness_text is not None:
         return readiness_text(text, readiness.load_readiness_config(), language.value)
@@ -1105,6 +1106,12 @@ def rules_catalog() -> list[RuleOut]:
 
 
 def profiles_catalog() -> list[ProfileOut]:
+    """Every packaged profile (any board), e.g. to validate a stored profile key."""
+    profiles = load_profiles()
+    older = superseded_keys(profiles)
+    # A superseded profile written before boards were recorded (cisce-registration-2026) takes
+    # its board from the profile that replaces it; its file stays as it was.
+    successor_board = {p.supersedes: p.board for p in profiles.values() if p.supersedes}
     return [
         ProfileOut(
             key=p.key,
@@ -1113,12 +1120,39 @@ def profiles_catalog() -> list[ProfileOut]:
             label_te=telugu_text(p.label_te) or "",  # empty while Telugu is hidden (ADR-0036)
             required_fields=list(p.required_fields),
             needs_apaar=p.needs_apaar,
-            source=list(p.source),
+            board=p.board or successor_board.get(p.key),
+            classes=list(p.classes),
+            applies_to_classes=list(p.classes),
             verified=p.verified,
+            source=list(p.source),
+            supersedes=p.supersedes,
+            superseded=p.key in older,
+            parent_verification_slip=p.parent_verification_slip,
+            board_fields=[BoardFieldOut.model_validate(f.model_dump()) for f in p.board_fields],
             readiness=p.readiness is not None,
         )
-        for p in load_profiles().values()
+        for p in profiles.values()
     ]
+
+
+def profile_shown(profile: ProfileOut, boards: Collection[str]) -> bool:
+    """FR-TEN-020: portal profiles (no board) always; board profiles for the school's boards;
+    every profile while the school has declared no board."""
+    return profile.board is None or not boards or profile.board in boards
+
+
+def school_profiles(session: Session, *, include_all: bool = False) -> list[ProfileOut]:
+    """The profiles for this school's boards (FR-TEN-020), each with the classes that follow
+    its board here (FR-TEN-021). ``include_all`` lists other boards' profiles too."""
+    boards, class_boards = tenancy.school_boards(session)
+    out: list[ProfileOut] = []
+    for profile in profiles_catalog():
+        if not include_all and not profile_shown(profile, boards):
+            continue
+        board = profile.board
+        applies = [c for c in profile.classes if class_boards.get(c, board) == board]
+        out.append(profile.model_copy(update={"applies_to_classes": applies}))
+    return out
 
 
 def summary(

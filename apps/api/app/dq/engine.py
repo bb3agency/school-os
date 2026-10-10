@@ -49,6 +49,7 @@ from typing import Any, Final
 from sqlalchemy import RowMapping
 from sqlalchemy.orm import Session
 
+from app.apaar import service as apaar
 from app.authz.context import Scopes, UserContext
 from app.core.ids import new_id
 from app.dq import repository as repo
@@ -238,6 +239,8 @@ def load_facts(
         session, student_ids, canonical_keys, include_sensitive=True
     )
     enrolments = students.active_enrolments(session, student_ids)
+    # ADR-0039 (FR-APC-006): parents who refused APAAR consent are never pushed to APAAR.
+    refused = apaar.refused_student_ids(session, student_ids)
     years, sections, classes = _structure(session)
 
     def enrolment_fact(e: students.ActiveEnrolment) -> EnrolmentFact:
@@ -274,6 +277,7 @@ def load_facts(
             values=values,
             canonical=canon,
             enrolments=tuple(enrolment_fact(e) for e in enrolments.get(sid, ())),
+            apaar_refused=sid in refused,
         )
     return facts
 

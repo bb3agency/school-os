@@ -1,5 +1,5 @@
 # Board and portal readiness: who fixes a difference, and what a student's readiness is
-# (FR-DQ-030..FR-DQ-036, US-503..US-505, ADR-0040; CLAUDE.md §6.6, §6.13).
+# (FR-DQ-040..FR-DQ-046, US-504..US-506, ADR-0040; CLAUDE.md §6.6, §6.13).
 # Loaded and validated by app.dq.readiness.load_readiness_config(). Which fields and sources a
 # board or portal compares lives in its profile (config/profiles/*.yaml `readiness:`).
 #
@@ -51,12 +51,12 @@ severity:
 
 # Explanation texts (explanations.yaml `rules`) and correction routes per finding.
 explanations:
-  parent_aadhaar: DQ-030-PARENT
-  school_udise: DQ-030-UDISE
-  school_register: DQ-030-REGISTER
-  unknown: DQ-030-UNKNOWN
-  missing: DQ-030-MISSING
-  advisory: DQ-030-ADVISORY
+  parent_aadhaar: DQ-031-PARENT
+  school_udise: DQ-031-UDISE
+  school_register: DQ-031-REGISTER
+  unknown: DQ-031-UNKNOWN
+  missing: DQ-031-MISSING
+  advisory: DQ-031-ADVISORY
 routes:
   parent_aadhaar: [ROUTE-UIDAI]
   school_udise: [ROUTE-UDISE]

@@ -54,6 +54,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.apaar
     app.academics
     app.insights
     app.tally
@@ -87,6 +88,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.apaar
     app.academics
     app.insights
     app.tally
@@ -120,6 +122,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.apaar
     app.academics
     app.insights
     app.tally
@@ -156,6 +159,7 @@ forbidden_modules =
     app.admin
     app.circulars
     app.certificates
+    app.apaar
     app.academics
     app.insights
     app.tally
@@ -194,6 +198,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.apaar
     app.academics
     app.insights
     app.tally
@@ -225,6 +230,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.apaar
     app.academics
     app.insights
     app.tally
@@ -258,6 +264,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.apaar
     app.academics
     app.insights
     app.tally
@@ -291,6 +298,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.apaar
     app.academics
     app.insights
     app.tally
@@ -324,6 +332,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.apaar
     app.academics
     app.insights
     app.tally
@@ -357,6 +366,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.apaar
     app.academics
     app.insights
     app.tally
@@ -390,6 +400,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.apaar
     app.academics
     app.insights
     app.tally
@@ -449,6 +460,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.apaar
     app.academics
     app.insights
     app.tally
@@ -468,6 +480,7 @@ source_modules =
     app.imports.values
     app.imports.validation
     app.imports.config
+    app.imports.presets
 forbidden_modules =
     sqlalchemy
     fastapi
@@ -506,6 +519,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.apaar
     app.academics
     app.insights
     app.tally
@@ -539,6 +553,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.apaar
     app.academics
     app.insights
     app.tally
@@ -571,6 +586,7 @@ source_modules =
     app.knowledge
     app.circulars
     app.certificates
+    app.apaar
     app.academics
     app.insights
     app.tally
@@ -625,6 +641,7 @@ source_modules =
     app.knowledge
     app.circulars
     app.certificates
+    app.apaar
     app.academics
     app.insights
     app.tally
@@ -660,6 +677,7 @@ source_modules =
     app.knowledge
     app.circulars
     app.certificates
+    app.apaar
     app.academics
     app.insights
     app.tally
@@ -716,6 +734,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.apaar
     app.academics
     app.insights
     app.tally
@@ -796,6 +815,7 @@ forbidden_modules =
     app.admin
     app.circulars
     app.certificates
+    app.apaar
     app.academics
     app.insights
     app.tally
@@ -865,6 +885,7 @@ forbidden_modules =
     app.admin
     app.circulars
     app.certificates
+    app.apaar
     app.tally
 
 # --- 5. circulars (M4: circular readings, tasks, parent notices) ---------------------------
@@ -896,6 +917,7 @@ source_modules =
     app.knowledge
     app.admin
     app.certificates
+    app.apaar
     app.academics
     app.insights
     app.tally
@@ -950,6 +972,7 @@ source_modules =
     app.knowledge
     app.admin
     app.circulars
+    app.apaar
     app.academics
     app.insights
     app.tally
@@ -1012,6 +1035,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.apaar
     app.insights
     app.tally
 forbidden_modules =
@@ -1045,6 +1069,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.apaar
     app.academics
     app.tally
 forbidden_modules =
@@ -1123,6 +1148,7 @@ source_modules =
     app.admin
     app.circulars
     app.certificates
+    app.apaar
     app.academics
     app.insights
 forbidden_modules =
@@ -1150,3 +1176,63 @@ forbidden_modules =
     app.ops
     app.students
     app.knowledge
+
+# --- 7. APAAR consent register (R1; ADR-0039) ----------------------------------------------
+# Other modules use only app.apaar.service (dq reads which parents refused, admin exports the
+# register). It reaches students, guardians, documents and sections through their services.
+
+[importlinter:contract:apaar-internals]
+name = apaar: repository/models are private (use app.apaar.service)
+type = forbidden
+source_modules =
+    app.main
+    app.core
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.ops
+    app.devtools
+    app.dq
+    app.students
+    app.documents
+    app.notifications
+    app.breakglass
+    app.imports
+    app.changes
+    app.extraction
+    app.exports
+    app.knowledge
+    app.admin
+    app.circulars
+    app.certificates
+    app.academics
+    app.insights
+    app.tally
+forbidden_modules =
+    app.apaar.repository
+    app.apaar.models
+allow_indirect_imports = True
+
+# The configuration and the printed form stay pure (no database, web or feature modules), so the
+# form renders and tests without a database (FR-APC-004).
+[importlinter:contract:apaar-pure-library]
+name = apaar config/templates stay pure (no DB, web or feature modules)
+type = forbidden
+source_modules =
+    app.apaar.config
+    app.apaar.templates
+forbidden_modules =
+    sqlalchemy
+    fastapi
+    app.core.db
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.ops
+    app.students
+    app.documents
+    app.dq

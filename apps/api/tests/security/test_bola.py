@@ -226,6 +226,12 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     },
     ("DELETE", "/api/v1/tally/parties/{party_id}/links/{student_id}"): None,
     ("POST", "/api/v1/notices/{notice_id}/draft"): {},
+    # APAAR consent register (ADR-0039): another school's student is 404 like a random id.
+    ("POST", "/api/v1/students/{student_id}/apaar-consent"): {
+        "status": "refused",
+        "relationship": "father",
+        "decided_on": "2026-07-01",
+    },
 }
 
 
@@ -271,6 +277,7 @@ ACTOR: dict[tuple[str, str], str] = dict.fromkeys(
         ("GET", "/api/v1/imports/{import_id}/sheet"),
         ("PATCH", "/api/v1/imports/{import_id}/sheet/rows/{row_no}"),
         ("GET", "/api/v1/imports/{import_id}/sheet/export"),
+        ("GET", "/api/v1/imports/{import_id}/preset-mapping"),
         # Cancelling needs student.identity_change.request (the owner only approves).
         ("POST", "/api/v1/change-requests/{change_request_id}/cancel"),
         # Issuing, previews, duplicates, withdrawals and PDF retries need certificate.issue
@@ -299,6 +306,8 @@ ACTOR: dict[tuple[str, str], str] = dict.fromkeys(
         ("POST", "/api/v1/students/{student_id}/behaviour-notes"),
         ("POST", "/api/v1/behaviour-notes/{note_id}/erase"),
         ("GET", "/api/v1/students/{student_id}/timeline"),
+        # ADR-0039: recording APAAR consent is not an owner permission (docs/07 §6.2).
+        ("POST", "/api/v1/students/{student_id}/apaar-consent"),
     ),
     "principal",
 )
@@ -779,6 +788,7 @@ ID_ROUTES = _id_routes()
 QUERY: dict[tuple[str, str], dict[str, str]] = {
     ("GET", "/api/v1/students/{student_id}/certificates/preview"): {"certificate_type": "bonafide"},
     ("GET", "/api/v1/sections/{section_id}/attendance/month"): {"month": "2026-09"},
+    ("GET", "/api/v1/imports/{import_id}/preset-mapping"): {"preset": "register-excel"},
 }
 
 

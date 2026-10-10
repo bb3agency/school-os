@@ -1,5 +1,5 @@
 /**
- * Board and portal readiness types (US-503..US-505, ADR-0040), all from the generated API client.
+ * Board and portal readiness types (US-504..US-506, ADR-0040), all from the generated API client.
  * Runtime lists carry `satisfies` checks so they fail to compile if the API adds a value.
  */
 import type { components } from "@schoolos/api-client";

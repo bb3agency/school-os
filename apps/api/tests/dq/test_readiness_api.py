@@ -1,4 +1,4 @@
-"""Board and portal readiness routes (US-503..US-505, FR-DQ-030..FR-DQ-036, SEC-003, SEC-008,
+"""Board and portal readiness routes (US-504..US-506, FR-DQ-040..FR-DQ-046, SEC-003, SEC-008,
 SEC-015, invariants 4-6). Synthetic data only."""
 
 from __future__ import annotations
@@ -74,7 +74,7 @@ def field(detail: dict[str, Any], key: str) -> dict[str, Any]:
     return next(f for f in detail["fields"] if f["attribute_key"] == key)
 
 
-def test_US_503_summary_counts_sections_in_scope(world: Any, api: Any) -> None:
+def test_US_504_summary_counts_sections_in_scope(world: Any, api: Any) -> None:
     ssc_student(world.a)
     name = fresh_name()
     ssc_student(world.a, name=name, aadhaar_name=name.replace(" Sai Kumar", " Saikumar"))
@@ -113,7 +113,7 @@ def test_SEC_003_readiness_permissions(world: Any, api: Any) -> None:
     assert run(api, world.person("class_teacher"), sid).status_code == 403
 
 
-def test_US_504_student_detail_shows_the_exact_difference_and_who_fixes_it(
+def test_US_505_student_detail_shows_the_exact_difference_and_who_fixes_it(
     world: Any, api: Any, admin_engine: Engine
 ) -> None:
     name = fresh_name()
@@ -184,7 +184,7 @@ def test_SEC_015_readiness_bola_and_other_school(world: Any, api: Any) -> None:
     assert all(s["section_id"] == str(world.a.ids["section_9a"]) for s in own.json())
 
 
-def test_FR_DQ_033_runs_store_findings_idempotently_and_waivers_count(
+def test_FR_DQ_043_runs_store_findings_idempotently_and_waivers_count(
     world: Any, api: Any, admin_engine: Engine
 ) -> None:
     name = fresh_name()
@@ -193,12 +193,12 @@ def test_FR_DQ_033_runs_store_findings_idempotently_and_waivers_count(
     first = run(api, staff, sid)
     assert first.status_code == 202, first.text
     assert first.json()["status"] == "completed"
-    rows = DS.findings(admin_engine, sid, "DQ-030")
+    rows = DS.findings(admin_engine, sid, "DQ-031")
     by_attribute = {r["attribute_key"]: r for r in rows}
     assert set(by_attribute) == {"full_name", "dob"}
     dob = by_attribute["dob"]
     assert (dob["explanation_code"], dob["severity"], dob["profile_key"]) == (
-        "DQ-030-UDISE",
+        "DQ-031-UDISE",
         "blocker",
         SSC,
     )
@@ -207,7 +207,7 @@ def test_FR_DQ_033_runs_store_findings_idempotently_and_waivers_count(
     second = run(api, staff, sid)
     assert second.status_code == 202
     assert second.json()["stats"]["new"] == 0
-    assert len(DS.findings(admin_engine, sid, "DQ-030")) == len(rows)
+    assert len(DS.findings(admin_engine, sid, "DQ-031")) == len(rows)
     detail = api.call(world.person("office_admin"), "GET", f"{BASE}/students/{sid}").json()
     assert detail["status"] == "needs_school"
     # The principal waives the UDISE+ date difference: the student counts as ready.
@@ -227,7 +227,7 @@ def test_FR_DQ_033_runs_store_findings_idempotently_and_waivers_count(
     assert any(e["summary"].get("profile_key") == SSC for e in completed)
 
 
-def test_FR_DQ_032_default_run_scope_is_the_profile_classes(world: Any, api: Any) -> None:
+def test_FR_DQ_042_default_run_scope_is_the_profile_classes(world: Any, api: Any) -> None:
     res = api.call(
         world.person("exam_coordinator"),
         "POST",
@@ -242,7 +242,7 @@ def test_FR_DQ_032_default_run_scope_is_the_profile_classes(world: Any, api: Any
     }
 
 
-def test_FR_DQ_034_apaar_failure_list(world: Any, api: Any) -> None:
+def test_FR_DQ_044_apaar_failure_list(world: Any, api: Any) -> None:
     name = fresh_name()
     sid, _ = ssc_student(world.a, name=name, udise_name=name + " Reddy")
     res = api.call(
@@ -264,7 +264,7 @@ def test_FR_DQ_034_apaar_failure_list(world: Any, api: Any) -> None:
     assert item["against"] == "admission_register"
 
 
-def test_US_504_parent_slip_is_printable_and_audited(
+def test_US_505_parent_slip_is_printable_and_audited(
     world: Any, api: Any, admin_engine: Engine
 ) -> None:
     sid, name = ssc_student(world.a, udise_dob="2012-03-15")
@@ -324,7 +324,7 @@ def test_SEC_008_readiness_calls_do_not_log_personal_data(
         assert word not in logs
 
 
-def test_FR_DQ_036_profiles_catalog_marks_readiness_and_verification(world: Any, api: Any) -> None:
+def test_FR_DQ_046_profiles_catalog_marks_readiness_and_verification(world: Any, api: Any) -> None:
     res = api.call(world.person("office_staff"), "GET", "/api/v1/dq/profiles")
     by_key = {p["key"]: p for p in res.json()}
     assert by_key[SSC]["readiness"] is True
@@ -333,7 +333,7 @@ def test_FR_DQ_036_profiles_catalog_marks_readiness_and_verification(world: Any,
     assert by_key["udise-plus"]["readiness"] is False
 
 
-def test_US_503_findings_list_explains_readiness_findings(world: Any, api: Any) -> None:
+def test_US_504_findings_list_explains_readiness_findings(world: Any, api: Any) -> None:
     sid, _ = ssc_student(world.a, udise_dob="2012-03-15")
     office = world.person("office_admin")
     run(api, office, sid)
@@ -341,7 +341,7 @@ def test_US_503_findings_list_explains_readiness_findings(world: Any, api: Any) 
         office,
         "GET",
         "/api/v1/dq/findings",
-        params={"student_id": str(sid), "rule_id": "DQ-030"},
+        params={"student_id": str(sid), "rule_id": "DQ-031"},
     )
     assert listed.status_code == 200, listed.text
     (finding,) = listed.json()["data"]

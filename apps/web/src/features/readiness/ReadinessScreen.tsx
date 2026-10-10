@@ -86,7 +86,7 @@ function RunReadinessDialog({ profile, sectionId }: { profile: string; sectionId
 }
 
 /**
- * Board readiness (US-503, US-505; FR-DQ-032..FR-DQ-036): pick a board or portal (AP SSC 2027,
+ * Board readiness (US-504, US-506; FR-DQ-042..FR-DQ-046): pick a board or portal (AP SSC 2027,
  * APAAR), see how many students of each section are ready, who must act for the rest, open a
  * section's students and print parent verification slips. Class teachers see their sections.
  */

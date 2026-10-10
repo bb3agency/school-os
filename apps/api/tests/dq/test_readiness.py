@@ -1,5 +1,5 @@
-"""Board and portal readiness: exact diff, fix owners, profiles and the DQ-030 check
-(FR-DQ-030..FR-DQ-034, US-503..US-505, ADR-0040). Pure, in memory; synthetic names only
+"""Board and portal readiness: exact diff, fix owners, profiles and the DQ-031 check
+(FR-DQ-040..FR-DQ-044, US-504..US-506, ADR-0040). Pure, in memory; synthetic names only
 (Telugu-origin names written in Latin script, as AP school registers do)."""
 
 from __future__ import annotations
@@ -72,13 +72,13 @@ def assess(values: dict[str, str | None], spec: ReadinessField = NAME) -> rd.Fie
         ("RAVI TEJA", "SUDHA RANI", ("different",)),
     ],
 )
-def test_FR_DQ_030_name_differences_are_exact_and_named(
+def test_FR_DQ_040_name_differences_are_exact_and_named(
     a: str, b: str, expected: tuple[str, ...]
 ) -> None:
     assert kinds(a, b) == expected
 
 
-def test_FR_DQ_030_nfc_forms_of_the_same_name_are_equal() -> None:
+def test_FR_DQ_040_nfc_forms_of_the_same_name_are_equal() -> None:
     composed, decomposed = "RENÉE", "RENÉE"
     assert composed != decomposed
     assert kinds(composed, decomposed) == ()
@@ -95,16 +95,16 @@ def test_FR_DQ_030_nfc_forms_of_the_same_name_are_equal() -> None:
         ("2012-03-14", "14/03/2012", ("unreadable",)),
     ],
 )
-def test_FR_DQ_030_dates_compare_as_dates(a: str, b: str, expected: tuple[str, ...]) -> None:
+def test_FR_DQ_040_dates_compare_as_dates(a: str, b: str, expected: tuple[str, ...]) -> None:
     assert rd.diff("date", a, b, classifier) == expected
 
 
-def test_FR_DQ_030_gender_compares_exactly() -> None:
+def test_FR_DQ_040_gender_compares_exactly() -> None:
     assert rd.diff("enum", "male", "male", classifier) == ()
     assert rd.diff("enum", "male", "female", classifier) == ("different",)
 
 
-def test_FR_DQ_030_changes_say_exactly_what_differs() -> None:
+def test_FR_DQ_040_changes_say_exactly_what_differs() -> None:
     def said(a: str, b: str) -> list[str]:
         return [c.text(CFG, "en") for c in rd.describe("name", a, b, kinds(a, b))]
 
@@ -134,7 +134,7 @@ def owners(result: rd.FieldAssessment) -> dict[str | None, str]:
     return {i.source: i.owner for i in result.items}
 
 
-def test_FR_DQ_031_aadhaar_differs_from_an_undisputed_register_parent_fixes_aadhaar() -> None:
+def test_FR_DQ_041_aadhaar_differs_from_an_undisputed_register_parent_fixes_aadhaar() -> None:
     result = assess({REG: "VENKATA SAI KUMAR", AAD: "VENKATA SAIKUMAR", UDISE: "VENKATA SAI KUMAR"})
     assert result.reference == REG
     (item,) = result.items
@@ -147,7 +147,7 @@ def test_FR_DQ_031_aadhaar_differs_from_an_undisputed_register_parent_fixes_aadh
     assert rd.student_status(result.items, CFG) == "needs_parent"
 
 
-def test_FR_DQ_031_udise_and_board_differences_go_to_the_school_through_udise() -> None:
+def test_FR_DQ_041_udise_and_board_differences_go_to_the_school_through_udise() -> None:
     result = assess(
         {
             REG: "KOMMINENI VENKATA SAI",
@@ -161,7 +161,7 @@ def test_FR_DQ_031_udise_and_board_differences_go_to_the_school_through_udise() 
     assert rd.student_status(result.items, CFG) == "needs_school"
 
 
-def test_FR_DQ_031_register_contradicted_by_birth_certificate_is_the_record_to_correct() -> None:
+def test_FR_DQ_041_register_contradicted_by_birth_certificate_is_the_record_to_correct() -> None:
     result = assess(
         {
             REG: "SRINIVAS RAO",
@@ -177,14 +177,14 @@ def test_FR_DQ_031_register_contradicted_by_birth_certificate_is_the_record_to_c
     assert register.kinds == ("variant",)
 
 
-def test_FR_DQ_031_corroborated_register_keeps_the_parent_as_owner() -> None:
+def test_FR_DQ_041_corroborated_register_keeps_the_parent_as_owner() -> None:
     result = assess(
         {REG: "SRINIVAS RAO", AAD: "SREENIVAS RAO", UDISE: "SRINIVAS RAO", BIRTH: "SRINIVAS RAO"}
     )
     assert owners(result) == {AAD: "parent_aadhaar"}
 
 
-def test_FR_DQ_031_disputed_register_without_agreement_is_undecided() -> None:
+def test_FR_DQ_041_disputed_register_without_agreement_is_undecided() -> None:
     result = assess(
         {REG: "SRINIVAS RAO", AAD: "SREENIVAS RAO", UDISE: "SRINIVASA RAO", BIRTH: "SRINU RAO"}
     )
@@ -193,7 +193,7 @@ def test_FR_DQ_031_disputed_register_without_agreement_is_undecided() -> None:
     assert rd.student_status(result.items, CFG) == "blocked"
 
 
-def test_FR_DQ_031_missing_values_name_who_must_record_them() -> None:
+def test_FR_DQ_041_missing_values_name_who_must_record_them() -> None:
     result = assess({REG: None, AAD: "VENKATA SAI", UDISE: "VENKATA  SAI"})
     reasons = sorted((i.reason, i.owner, i.source) for i in result.items)
     assert reasons == [("missing", "school_register", REG), ("undecided", "unknown", None)]
@@ -203,7 +203,7 @@ def test_FR_DQ_031_missing_values_name_who_must_record_them() -> None:
     assert rd.student_status(missing_aadhaar.items, CFG) == "blocked"
 
 
-def test_FR_DQ_031_capital_letters_only_are_advisory() -> None:
+def test_FR_DQ_041_capital_letters_only_are_advisory() -> None:
     result = assess({REG: "VENKATA SAI", AAD: "Venkata Sai", UDISE: "VENKATA SAI"})
     (item,) = result.items
     assert item.advisory
@@ -212,13 +212,13 @@ def test_FR_DQ_031_capital_letters_only_are_advisory() -> None:
     assert rd.item_severity(item, CFG).value == "info"
 
 
-def test_FR_DQ_031_matching_records_are_ready() -> None:
+def test_FR_DQ_041_matching_records_are_ready() -> None:
     result = assess({REG: "VENKATA SAI", AAD: "VENKATA SAI", UDISE: "VENKATA SAI", BOARD: None})
     assert result.items == ()
     assert rd.student_status(result.items, CFG) == "ready"
 
 
-def test_FR_DQ_034_apaar_compares_udise_with_aadhaar_using_the_register_as_referee() -> None:
+def test_FR_DQ_044_apaar_compares_udise_with_aadhaar_using_the_register_as_referee() -> None:
     spec = ReadinessField(attribute="full_name", sources=(UDISE, AAD), required=(UDISE, AAD))
     udise_wrong = rd.assess_field(
         spec,
@@ -274,7 +274,7 @@ def test_D3_readiness_profiles_name_public_sources_and_stay_unverified() -> None
     assert profiles["apaar"].readiness.skip_when_verified == "apaar_id"  # type: ignore[union-attr]
 
 
-# --- DQ-030 check -----------------------------------------------------------------------------
+# --- DQ-031 check -----------------------------------------------------------------------------
 
 
 def _student(class_code: str = "IX", **values: str | None) -> Any:
@@ -292,9 +292,9 @@ def _student(class_code: str = "IX", **values: str | None) -> Any:
     return CS.facts(values=raw, enrolments=[CS.enrolment(class_code)])
 
 
-def test_FR_DQ_033_check_raises_one_finding_per_difference_with_masked_values() -> None:
+def test_FR_DQ_043_check_raises_one_finding_per_difference_with_masked_values() -> None:
     facts = _student()
-    rule = load_rules()["DQ-030"]
+    rule = load_rules()["DQ-031"]
     assert rule.check is CheckKind.READINESS_DIFF
     assert rule.requires_profile
     found = [
@@ -302,12 +302,12 @@ def test_FR_DQ_033_check_raises_one_finding_per_difference_with_masked_values() 
         for f in evaluate(
             CS.context([facts], profiles=["bseap-ssc-2027"]), build_checks(load_rules())
         )
-        if f.rule_id == "DQ-030"
+        if f.rule_id == "DQ-031"
     ]
     by_attribute = {f.attribute_key: f for f in found}
     assert set(by_attribute) == {"full_name", "dob"}
     name = by_attribute["full_name"]
-    assert name.explanation_code == "DQ-030-PARENT"
+    assert name.explanation_code == "DQ-031-PARENT"
     assert name.route_codes == ("ROUTE-UIDAI",)
     assert name.severity.value == "blocker"
     assert name.details["owner"] == "parent_aadhaar"
@@ -322,7 +322,7 @@ def test_FR_DQ_033_check_raises_one_finding_per_difference_with_masked_values() 
     assert {fingerprint_of(f) for f in found} <= {fingerprint_of(f) for f in again}
 
 
-def test_FR_DQ_032_ssc_applies_to_classes_ix_and_x_only() -> None:
+def test_FR_DQ_042_ssc_applies_to_classes_ix_and_x_only() -> None:
     profile = load_profiles()["bseap-ssc-2027"]
     cfg = load_engine_config()
     assert assess_readiness(_student("IX"), profile, cfg, classifier).applies
@@ -330,7 +330,7 @@ def test_FR_DQ_032_ssc_applies_to_classes_ix_and_x_only() -> None:
     assert not assess_readiness(_student("VIII"), profile, cfg, classifier).applies
 
 
-def test_FR_DQ_034_apaar_skips_students_with_a_verified_apaar_id() -> None:
+def test_FR_DQ_044_apaar_skips_students_with_a_verified_apaar_id() -> None:
     profile = load_profiles()["apaar"]
     cfg = load_engine_config()
     pending = _student("V")
@@ -353,7 +353,7 @@ def test_FR_DQ_034_apaar_skips_students_with_a_verified_apaar_id() -> None:
         {("full_name", UDISE): "KOMMINENI VENKATA SIA"},  # UDISE+
     ],
 )
-def test_FR_DQ_033_every_readiness_finding_has_a_complete_explanation(
+def test_FR_DQ_043_every_readiness_finding_has_a_complete_explanation(
     values: dict[tuple[str, str], str | None],
 ) -> None:
     raw: dict[tuple[str, str], str | None] = {
@@ -370,7 +370,7 @@ def test_FR_DQ_033_every_readiness_finding_has_a_complete_explanation(
         for f in evaluate(
             CS.context([facts], profiles=["bseap-ssc-2027"]), build_checks(load_rules())
         )
-        if f.rule_id == "DQ-030"
+        if f.rule_id == "DQ-031"
     ]
     assert found
     catalog = load_explanations()

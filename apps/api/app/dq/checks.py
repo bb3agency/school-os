@@ -1,5 +1,5 @@
-"""Rule checks DQ-001..DQ-012, DQ-021, DQ-022, DQ-030 (docs/02 §5, FR-DQ-001, FR-DQ-003,
-FR-DQ-004, FR-DQ-006, FR-DQ-021, FR-DQ-022, FR-DQ-030).
+"""Rule checks DQ-001..DQ-012, DQ-021, DQ-022, DQ-030, DQ-031 (docs/02 §5, FR-DQ-001,
+FR-DQ-003, FR-DQ-004, FR-DQ-006, FR-DQ-021, FR-DQ-022, FR-DQ-033, FR-DQ-040).
 
 Pure module: every check implements :class:`app.dq.rules.RuleCheck` over a
 :class:`CheckContext` of in-memory facts that the engine (:mod:`app.dq.engine`) loads in bulk
@@ -36,7 +36,7 @@ Check kinds and their rules:
                               student is checked, since only DQ-008 findings may pair students)
 ``apaar_demographics``        UDISE+ vs Aadhaar-as-printed (as ``cross_source``) for students
 (DQ-022)                      without a verified APAAR ID
-``readiness_diff`` (DQ-030)   per readiness profile: the profile's identity fields compared
+``readiness_diff`` (DQ-031)   per readiness profile: the profile's identity fields compared
                               exactly across its sources (:mod:`app.dq.readiness`); one finding
                               per difference with its fix owner (ADR-0040)
 ============================  =====================================================================
@@ -136,6 +136,9 @@ class StudentFacts:
     values: Mapping[str, Mapping[str, SourceFact]] = field(default_factory=dict)
     canonical: Mapping[str, CanonicalFact] = field(default_factory=dict)
     enrolments: tuple[EnrolmentFact, ...] = ()
+    # FR-APC-006 (ADR-0039): the parents refused (or withdrew) APAAR consent, so the APAAR
+    # readiness rules (DQ-009, DQ-022) never push this student to an APAAR action.
+    apaar_refused: bool = False
 
     def value(self, attribute_key: str, source: str) -> SourceFact | None:
         fact = self.values.get(attribute_key, {}).get(source)
@@ -652,6 +655,8 @@ class AadhaarDetailsCheck(_Check):
             for facts in context.students.values():
                 if facts.has_verified(context.config.apaar_attribute):
                     continue  # ADR-0037: the APAAR ID exists; readiness no longer matters
+                if facts.apaar_refused:
+                    continue  # ADR-0039: the parents refused consent; no APAAR action
                 missing = [k for k in keys if facts.value(k, source) is None]
                 if not missing:
                     continue
@@ -747,14 +752,17 @@ class ApaarIdCheck(_Check):
 
 class ApaarDemographicsCheck(CrossSourceCheck):
     """DQ-022 (ADR-0037): UDISE+ vs Aadhaar-as-printed, compared as DQ-010/011 do, for students
-    without a verified APAAR ID (generation authenticates against Aadhaar)."""
+    without a verified APAAR ID (generation authenticates against Aadhaar) whose parents did
+    not refuse APAAR consent (ADR-0039, FR-APC-006)."""
 
     def _students(self, context: CheckContext) -> Iterable[StudentFacts]:
         key = context.config.apaar_attribute
-        return [f for f in context.students.values() if not f.has_verified(key)]
+        return [
+            f for f in context.students.values() if not f.has_verified(key) and not f.apaar_refused
+        ]
 
 
-# --- readiness (DQ-030, ADR-0040) ---------------------------------------------------------------
+# --- readiness (DQ-031, ADR-0040) ---------------------------------------------------------------
 
 
 @dataclass(frozen=True, slots=True)
@@ -835,14 +843,14 @@ def readiness_finding(
     config: EngineConfig,
     rcfg: rd.ReadinessConfig | None = None,
 ) -> Finding:
-    """The DQ-030 finding of one readiness item (masked values, codes; FR-DQ-033)."""
+    """The DQ-031 finding of one readiness item (masked values, codes; FR-DQ-043)."""
     cfg = rcfg or rd.load_readiness_config()
     key = item.attribute
     held = assessment.facts.get(key, {})
     values = [
         value_entry(config.physical_key(key, s), s, held[s]) for s in item.sources if s in held
     ]
-    # DQ-030-REGISTER names the record that contradicts the register; the others the record
+    # DQ-031-REGISTER names the record that contradicts the register; the others the record
     # to correct (or the one with no value).
     contradicted = item.owner == "school_register" and item.reason == "mismatch"
     named = item.against if contradicted else item.source
@@ -874,7 +882,7 @@ def readiness_finding(
 
 
 class ReadinessCheck(_Check):
-    """DQ-030 per readiness profile (bseap-ssc-2027, apaar): one finding per difference, with
+    """DQ-031 per readiness profile (bseap-ssc-2027, apaar): one finding per difference, with
     the fix owner deciding severity, explanation and routes (ADR-0040)."""
 
     def evaluate(self, context: CheckContext, /) -> Iterator[Finding]:

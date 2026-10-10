@@ -1,10 +1,10 @@
 """Data-quality rule registry types (docs/02 §5, FR-DQ-001, FR-DQ-004, FR-DQ-006).
 
-Rules are declarative: ``config/rules.yaml`` lists DQ-001..DQ-012, DQ-021, DQ-022 and DQ-030
-with their version, check kind, scope, attributes, sources compared, severity policy, explanation
-template key and suggested correction routes. The checks themselves belong to the DQ engine
-(M1 wave 2), which implements :class:`RuleCheck` per ``check`` kind and emits :class:`Finding`
-values.
+Rules are declarative: ``config/rules.yaml`` lists DQ-001..DQ-012, DQ-021, DQ-022, DQ-030 and
+DQ-031 with their version, check kind, scope, attributes, sources compared, severity policy,
+explanation template key and suggested correction routes. The checks themselves belong to the
+DQ engine (M1 wave 2), which implements :class:`RuleCheck` per ``check`` kind and emits
+:class:`Finding` values.
 
 A finding is identified by its :func:`finding_fingerprint` (student, rule, attribute, sorted
 sources), which makes findings idempotent across runs and lets a re-run reopen a resolved
@@ -78,7 +78,7 @@ class CheckKind(StrEnum):
     ENROLMENT_OVERLAP = "enrolment_overlap"
     APAAR_ID = "apaar_id"  # DQ-021 (ADR-0037)
     APAAR_DEMOGRAPHICS = "apaar_demographics"  # DQ-022 (ADR-0037)
-    READINESS_DIFF = "readiness_diff"  # DQ-030 (ADR-0040)
+    READINESS_DIFF = "readiness_diff"  # DQ-031 (ADR-0040)
 
 
 # sis.attribute_values.source (docs/05 §5) plus the resolved canonical value (docs/05 §10).

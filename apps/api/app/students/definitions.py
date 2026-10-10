@@ -39,6 +39,7 @@ _MAX_TEXT: Final = 1000
 # digits12 (FR-STU-015): 12 ASCII digits, optionally grouped 4-4-4 by one space or hyphen.
 _DIGITS12_RE: Final = re.compile(r"[0-9]{4}[ -]?[0-9]{4}[ -]?[0-9]{4}")
 DIGITS12_CODE: Final = "digits12_required"
+_COMPACT_RE: Final = re.compile(r"[ -]")
 _EXPLICIT_PHONE_RE: Final = re.compile(r"\+91[ \u00a0-]?[6-9][0-9]{4}[ \u00a0-]?[0-9]{5}")
 
 
@@ -107,6 +108,18 @@ class AttributeDef:
     def not_future(self) -> bool:
         return bool(self.validation.get("not_future", False))
 
+    @property
+    def compact(self) -> bool:
+        """Spaces and hyphens are removed before the checks (``udise_pen``: ``2134 5678 901``
+        is stored as ``21345678901``; FR-STU-017)."""
+        return bool(self.validation.get("compact", False))
+
+    @property
+    def format_code(self) -> str:
+        """The error code when ``pattern`` does not match (default ``invalid_format``)."""
+        code = self.validation.get("format_code")
+        return code if isinstance(code, str) and code else "invalid_format"
+
 
 @dataclass(frozen=True, slots=True)
 class CleanValue:
@@ -171,6 +184,17 @@ def digits12_value(raw: str) -> str | None:
     if _DIGITS12_RE.fullmatch(text) is None:
         return None
     return text.replace(" ", "").replace("-", "")
+
+
+DIGITS11_CODE: Final = "digits11_required"
+_DIGITS11_RE: Final = re.compile(r"[0-9]{11}")
+
+
+def digits11_value(raw: str) -> str | None:
+    """The 11 ASCII digits of a UDISE+ PEN input, spaces and hyphens removed (FR-STU-017,
+    FR-STU-019): ``2134 5678 901`` -> ``21345678901``; anything else ``None``."""
+    compact = _COMPACT_RE.sub("", clean_text(raw))
+    return compact if _DIGITS11_RE.fullmatch(compact) else None
 
 
 def _typed_digits12(payload: Mapping[Any, Any], typed_keys: Collection[str]) -> bool:
@@ -240,6 +264,8 @@ def validate_value(
     if _CONTROL_RE.search(value) or len(value) > _MAX_TEXT:
         raise ValidationFailed([error(field_name, "invalid")])
     rules = definition.validation
+    if definition.compact:
+        value = _COMPACT_RE.sub("", value)
     if definition.data_type == "date":
         return _date_value(value, rules, field_name, today or dt.datetime.now(dt.UTC).date())
     max_length = int(rules.get("max_length", _MAX_TEXT))
@@ -249,7 +275,7 @@ def validate_value(
         raise ValidationFailed([error(field_name, "digits4_required", AADHAAR_MESSAGE_KEY)])
     pattern = rules.get("pattern")
     if isinstance(pattern, str) and re.fullmatch(pattern, value) is None:
-        raise ValidationFailed([error(field_name, "invalid_format")])
+        raise ValidationFailed([error(field_name, definition.format_code)])
     if definition.data_type == "enum":
         options = [str(v) for v in rules.get("values", ())]
         lowered = value.lower()
