@@ -822,6 +822,46 @@
         "title": "AnnouncementOut",
         "type": "object"
       },
+      "ApaarSettingsIn": {
+        "additionalProperties": false,
+        "properties": {
+          "form_language": {
+            "enum": [
+              "en",
+              "te"
+            ],
+            "title": "Form Language",
+            "type": "string"
+          }
+        },
+        "required": [
+          "form_language"
+        ],
+        "title": "ApaarSettingsIn",
+        "type": "object"
+      },
+      "ApaarSettingsOut": {
+        "properties": {
+          "form_language": {
+            "enum": [
+              "en",
+              "te"
+            ],
+            "title": "Form Language",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "form_language",
+          "version"
+        ],
+        "title": "ApaarSettingsOut",
+        "type": "object"
+      },
       "AskIn": {
         "additionalProperties": false,
         "description": "One question to the school's records and documents (docs/09 \u00a75.4, docs/06 \u00a75).\n\nSend ``conversation_id`` to continue one of your conversations; omit it (and\n``session_id``) to start a new one and read its id from the ``meta`` event.\n``session_id`` is the older name: it continues your conversation with that id or starts\none. ``regenerate_of`` answers one of your latest messages again (``question`` is then\noptional and ignored); ``edit_of`` replaces one with ``question``. Either way the message\nand every later one become ``superseded``.",
@@ -4483,6 +4523,385 @@
         "title": "ConnectorStatus",
         "type": "object"
       },
+      "ConsentEntryOut": {
+        "properties": {
+          "decided_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided On"
+          },
+          "evidence_document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Document Id"
+          },
+          "form_language": {
+            "anyOf": [
+              {
+                "enum": [
+                  "en",
+                  "te"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form Language"
+          },
+          "guardian_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guardian Id"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "recorded_at": {
+            "format": "date-time",
+            "title": "Recorded At",
+            "type": "string"
+          },
+          "recorded_by": {
+            "format": "uuid",
+            "title": "Recorded By",
+            "type": "string"
+          },
+          "recorded_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recorded By Name"
+          },
+          "relationship": {
+            "anyOf": [
+              {
+                "enum": [
+                  "father",
+                  "mother",
+                  "guardian"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relationship"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "given",
+              "refused",
+              "pending",
+              "withdrawn"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "seq",
+          "status",
+          "relationship",
+          "guardian_id",
+          "decided_on",
+          "form_language",
+          "evidence_document_id",
+          "note",
+          "recorded_by",
+          "recorded_by_name",
+          "recorded_at"
+        ],
+        "title": "ConsentEntryOut",
+        "type": "object"
+      },
+      "ConsentIn": {
+        "additionalProperties": false,
+        "description": "A parent's decision as written on the returned form (FR-APC-001..003).\n\n``given`` needs the signed form (``evidence_document_id``: a document uploaded with purpose\n``evidence``); ``refused`` and ``withdrawn`` may carry it. Every decision names who decided\n(``relationship``, and ``guardian_id`` when that guardian is on the student's record) and the\ndate on the form (``decided_on``). ``pending`` records that a form went home and is awaited.",
+        "properties": {
+          "decided_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided On"
+          },
+          "evidence_document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The signed form, uploaded first as a document (evidence).",
+            "title": "Evidence Document Id"
+          },
+          "form_language": {
+            "anyOf": [
+              {
+                "enum": [
+                  "en",
+                  "te"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Language of the form the parent signed (en or te).",
+            "title": "Form Language"
+          },
+          "guardian_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guardian Id"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional note (at most 500 characters; no Aadhaar numbers).",
+            "title": "Note"
+          },
+          "relationship": {
+            "anyOf": [
+              {
+                "enum": [
+                  "father",
+                  "mother",
+                  "guardian"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relationship"
+          },
+          "status": {
+            "enum": [
+              "given",
+              "refused",
+              "pending",
+              "withdrawn"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "ConsentIn",
+        "type": "object"
+      },
+      "ConsentRowOut": {
+        "description": "One student of the register list (FR-APC-005).",
+        "properties": {
+          "admission_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admission No"
+          },
+          "class_section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Section"
+          },
+          "decided_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided On"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "has_apaar_id": {
+            "title": "Has Apaar Id",
+            "type": "boolean"
+          },
+          "has_form": {
+            "title": "Has Form",
+            "type": "boolean"
+          },
+          "recorded_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recorded At"
+          },
+          "section_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Id"
+          },
+          "status": {
+            "enum": [
+              "given",
+              "refused",
+              "pending",
+              "withdrawn"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "student_id",
+          "display_name",
+          "admission_no",
+          "class_section",
+          "section_id",
+          "status",
+          "decided_on",
+          "has_form",
+          "recorded_at",
+          "version",
+          "has_apaar_id"
+        ],
+        "title": "ConsentRowOut",
+        "type": "object"
+      },
+      "ConsentSummaryOut": {
+        "description": "Given / refused / pending / withdrawn per section of the current academic year, for the\nstudents the caller may see (FR-APC-005). Students with no decision count as pending.",
+        "properties": {
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/SectionSummaryOut"
+            },
+            "title": "Sections",
+            "type": "array"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/StatusCounts"
+          }
+        },
+        "required": [
+          "totals",
+          "sections"
+        ],
+        "title": "ConsentSummaryOut",
+        "type": "object"
+      },
       "ContentLine": {
         "properties": {
           "key": {
@@ -6976,6 +7395,11 @@
             },
             "title": "Required Fields",
             "type": "array"
+          },
+          "verified": {
+            "default": false,
+            "title": "Verified",
+            "type": "boolean"
           },
           "version": {
             "title": "Version",
@@ -10121,6 +10545,17 @@
               }
             ],
             "title": "Ref"
+          },
+          "student_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Id"
           }
         },
         "required": [
@@ -11430,6 +11865,132 @@
           "superseded"
         ],
         "title": "MessageOut",
+        "type": "object"
+      },
+      "NationalIdCheckIn": {
+        "additionalProperties": false,
+        "description": "``POST /students/national-id-check`` (FR-STU-018): is this PEN or APAAR ID already on a\nrecord of this school? In the body, never the URL (SEC-008).",
+        "properties": {
+          "apaar_id": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "12 digits; spaces or hyphens are removed.",
+            "title": "Apaar Id"
+          },
+          "udise_pen": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "11 digits; spaces or hyphens are removed.",
+            "title": "Udise Pen"
+          }
+        },
+        "title": "NationalIdCheckIn",
+        "type": "object"
+      },
+      "NationalIdCheckOut": {
+        "description": "``matches``: records of this school holding the number (live or former). ``udise_action``:\nwhat to do in UDISE+ for a new admission with this PEN: ``open_existing_record`` (the child\nis already on this school's rolls: open that record, do not admit again),\n``readmit_existing_record`` (a former student of this school: re-admit that record),\n``import_by_pen`` (not in this school: create the record here with the PEN, then import the\nchild in UDISE+ by PEN; the previous school must release it), ``new_udise_record`` (no PEN\ngiven: search UDISE+ by name and date of birth first).",
+        "properties": {
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/NationalIdMatch"
+            },
+            "title": "Matches",
+            "type": "array"
+          },
+          "udise_action": {
+            "enum": [
+              "open_existing_record",
+              "readmit_existing_record",
+              "import_by_pen",
+              "new_udise_record"
+            ],
+            "title": "Udise Action",
+            "type": "string"
+          }
+        },
+        "required": [
+          "matches",
+          "udise_action"
+        ],
+        "title": "NationalIdCheckOut",
+        "type": "object"
+      },
+      "NationalIdMatch": {
+        "properties": {
+          "admission_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admission No"
+          },
+          "attribute_key": {
+            "enum": [
+              "udise_pen",
+              "apaar_id"
+            ],
+            "title": "Attribute Key",
+            "type": "string"
+          },
+          "class_section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Section"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attribute_key",
+          "student_id",
+          "display_name",
+          "admission_no",
+          "status",
+          "class_section"
+        ],
+        "title": "NationalIdMatch",
         "type": "object"
       },
       "NoteIn": {
@@ -12920,6 +13481,34 @@
           "next_cursor"
         ],
         "title": "Page[ClassOut]",
+        "type": "object"
+      },
+      "Page_ConsentRowOut_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ConsentRowOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ],
+        "title": "Page[ConsentRowOut]",
         "type": "object"
       },
       "Page_ConversationOut_": {
@@ -15067,6 +15656,19 @@
             },
             "title": "Required Fields",
             "type": "array"
+          },
+          "source": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Source",
+            "type": "array"
+          },
+          "verified": {
+            "default": false,
+            "title": "Verified",
+            "type": "boolean"
           },
           "version": {
             "title": "Version",
@@ -17503,6 +18105,29 @@
         "title": "SectionOut",
         "type": "object"
       },
+      "SectionSummaryOut": {
+        "properties": {
+          "class_section": {
+            "title": "Class Section",
+            "type": "string"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/StatusCounts"
+          },
+          "section_id": {
+            "format": "uuid",
+            "title": "Section Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "section_id",
+          "class_section",
+          "counts"
+        ],
+        "title": "SectionSummaryOut",
+        "type": "object"
+      },
       "SectionUpdate": {
         "additionalProperties": false,
         "description": "Omit a field to keep it; send ``class_teacher_membership_id: null`` to clear it.",
@@ -18121,10 +18746,109 @@
         "title": "StaffRef",
         "type": "object"
       },
+      "StatusCounts": {
+        "properties": {
+          "given": {
+            "title": "Given",
+            "type": "integer"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "integer"
+          },
+          "refused": {
+            "title": "Refused",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "withdrawn": {
+            "title": "Withdrawn",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "given",
+          "refused",
+          "pending",
+          "withdrawn"
+        ],
+        "title": "StatusCounts",
+        "type": "object"
+      },
+      "StudentConsentOut": {
+        "description": "Current state (``pending`` when nothing was recorded) and the full history, newest first.\n``version`` is the number of recorded decisions (send it back as ``If-Match``).",
+        "properties": {
+          "current": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConsentEntryOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/ConsentEntryOut"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "given",
+              "refused",
+              "pending",
+              "withdrawn"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "student_id",
+          "status",
+          "current",
+          "history",
+          "version"
+        ],
+        "title": "StudentConsentOut",
+        "type": "object"
+      },
       "StudentCreate": {
         "additionalProperties": false,
         "description": "New student with its first values (docs/09: source required per value).\n\n``values`` must include ``full_name``. ``section_id`` enrols the student in that section's\nacademic year.",
         "properties": {
+          "admission_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "new",
+                  "transfer_in"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "new: first school (UDISE+ creates a new record). transfer_in: the child comes from another school and already has a UDISE+ record: a udise_pen value (from the transfer certificate, tc_incoming, or the portal) is then required, so the office imports the child into UDISE+ by PEN instead of creating a second record (FR-STU-018; 422 pen_required_for_transfer_in).",
+            "title": "Admission Kind"
+          },
           "roll_no": {
             "anyOf": [
               {
@@ -18577,6 +19301,19 @@
               }
             ],
             "title": "Status"
+          },
+          "udise_pen": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Exact UDISE+ PEN (FR-STU-019): 11 digits, spaces or hyphens allowed. Matches only the student's current PEN values (verified or recorded, not rejected), within the caller's scope; anything else answers 422 digits11_required.",
+            "title": "Udise Pen"
           }
         },
         "title": "StudentSearchIn",
@@ -23990,6 +24727,355 @@
         "summary": "List Announcements",
         "tags": [
           "school"
+        ]
+      }
+    },
+    "/api/v1/apaar/consents": {
+      "get": {
+        "description": "Students of the current academic year with their APAAR consent state, by class and name\n(permission ``apaar.consent.read``; class teachers: their sections). ``status=pending`` is\nthe follow-up list.",
+        "operationId": "list_consents_api_v1_apaar_consents_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "section_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Section Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "class_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Class Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "given",
+                    "refused",
+                    "pending",
+                    "withdrawn"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "description": "Page size (max 200).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Page size (max 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque cursor from next_cursor.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque cursor from next_cursor.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ConsentRowOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List Consents",
+        "tags": [
+          "apaar"
+        ]
+      }
+    },
+    "/api/v1/apaar/consents/summary": {
+      "get": {
+        "description": "Given / refused / pending / withdrawn counts per section and in total (permission\n``apaar.consent.read``; class teachers: their sections). Counts only.",
+        "operationId": "consent_summary_api_v1_apaar_consents_summary_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "section_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Section Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "class_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Class Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsentSummaryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Consent Summary",
+        "tags": [
+          "apaar"
+        ]
+      }
+    },
+    "/api/v1/apaar/settings": {
+      "get": {
+        "description": "The language of the printed parent form, ``en`` or ``te`` (permission\n``apaar.consent.read``, ``apaar.consent.record`` or ``tenant.settings.manage``).",
+        "operationId": "get_settings_api_v1_apaar_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApaarSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get Settings",
+        "tags": [
+          "apaar"
+        ]
+      },
+      "put": {
+        "description": "Choose the language of the printed parent form: English or Telugu, per school (owner\ndecision D9; the staff screens stay English). Permission ``tenant.settings.manage``, MFA\nwithin 5 minutes, ``If-Match`` (``W/\"0\"`` before the first save). Audited.",
+        "operationId": "put_settings_api_v1_apaar_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApaarSettingsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApaarSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Put Settings",
+        "tags": [
+          "apaar"
         ]
       }
     },
@@ -42946,6 +44032,120 @@
         ]
       }
     },
+    "/api/v1/sections/{section_id}/apaar-consent-forms": {
+      "get": {
+        "description": "APAAR consent forms for a section of the current year, one A4 page per student\n(permission ``apaar.consent.read`` or ``apaar.consent.record``; class teachers: their\nsections). Errors: ``no_forms`` / ``too_many_forms`` (409). The print is audited.",
+        "operationId": "print_section_forms_api_v1_sections__section_id__apaar_consent_forms_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "section_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Section Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Print only students in this state, e.g. pending to send again.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "given",
+                    "refused",
+                    "pending",
+                    "withdrawn"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Print only students in this state, e.g. pending to send again.",
+              "title": "Status"
+            }
+          },
+          {
+            "description": "Language of the printed form; the school's setting when left out.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "en",
+                    "te"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Language of the printed form; the school's setting when left out.",
+              "title": "Language"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Print-ready A4 pages (one per student)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Print Section Forms",
+        "tags": [
+          "apaar"
+        ]
+      }
+    },
     "/api/v1/sections/{section_id}/archive": {
       "post": {
         "description": "Archive a section: hidden from lists, kept for old records (permission\n``tenant.structure.manage``; ``If-Match``). A section with active enrolments answers 409\n``structure_in_use``.",
@@ -43954,7 +45154,7 @@
         ]
       },
       "post": {
-        "description": "Add a student with first values, each with its source; optionally enrol in a section\n(permission ``student.create``). Accepts ``Idempotency-Key``.",
+        "description": "Add a student with first values, each with its source; optionally enrol in a section\n(permission ``student.create``). Accepts ``Idempotency-Key``. A PEN or APAAR ID already on\nanother active record of the school is refused (422 ``national_id_in_use``, with that\nrecord's ``student_id`` when you may read it); ``admission_kind: transfer_in`` needs a PEN\n(422 ``pen_required_for_transfer_in``; FR-STU-018).",
         "operationId": "create_student_api_v1_students_post",
         "requestBody": {
           "content": {
@@ -44018,9 +45218,75 @@
         ]
       }
     },
+    "/api/v1/students/national-id-check": {
+      "post": {
+        "description": "Before admitting a child, check whether this school already has a record with the PEN or\nAPAAR ID (FR-STU-018, transfer-in by PEN; permission ``student.create``). Answers the\nmatching records (current and former students) and ``udise_action``: what to do in UDISE+\n(open or re-admit the existing record, import the child by PEN, or search UDISE+ by name and\ndate of birth when there is no PEN). Numbers travel in the body, never the URL (SEC-008);\nread-only, nothing is written or audited; the numbers are never logged (PRV-020). Errors:\n``digits11_required`` / ``digits12_required`` (422).",
+        "operationId": "check_national_ids_api_v1_students_national_id_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NationalIdCheckIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NationalIdCheckOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Check National Ids",
+        "tags": [
+          "students"
+        ]
+      }
+    },
     "/api/v1/students/search": {
       "post": {
-        "description": "Find students by partial name in English or Telugu, admission number, class/section\n(``9b``, ``IX-B``) or parent name, with the filters in the JSON body so personal data never\nappears in a URL (SEC-008; permission ``student.read_basic``; class and subject teachers see\nonly students in their sections/classes this year). Same results, page size and cursor as\n``GET /students``; send ``next_cursor`` back as ``cursor`` with the same filters. Read-only:\nnothing is written, so no ``Idempotency-Key``. ``apaar_id`` finds a student by exact APAAR\nID (12 digits; current verified or recorded values of the typed ``apaar_id`` attribute only,\nsame scope; FR-STU-016, ADR-0037); it is the only field that accepts a 12-digit number. A\nfull Aadhaar number anywhere else in the body is refused (422\n``aadhaar_full_number_rejected``).",
+        "description": "Find students by partial name in English or Telugu, admission number, class/section\n(``9b``, ``IX-B``) or parent name, with the filters in the JSON body so personal data never\nappears in a URL (SEC-008; permission ``student.read_basic``; class and subject teachers see\nonly students in their sections/classes this year). Same results, page size and cursor as\n``GET /students``; send ``next_cursor`` back as ``cursor`` with the same filters. Read-only:\nnothing is written, so no ``Idempotency-Key``. ``apaar_id`` finds a student by exact APAAR\nID (12 digits; current verified or recorded values of the typed ``apaar_id`` attribute only,\nsame scope; FR-STU-016, ADR-0037); it is the only field that accepts a 12-digit number.\n``udise_pen`` finds a student by exact UDISE+ PEN (11 digits, else 422 ``digits11_required``;\nsame rules and scope; FR-STU-019). A full Aadhaar number anywhere else in the body is\nrefused (422 ``aadhaar_full_number_rejected``).",
         "operationId": "search_students_by_body_api_v1_students_search_post",
         "requestBody": {
           "content": {
@@ -44225,6 +45491,240 @@
         "summary": "Update Student",
         "tags": [
           "students"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/apaar-consent": {
+      "get": {
+        "description": "The student's APAAR consent state (``pending`` until a decision is recorded) and every\nrecorded decision, newest first (permission ``apaar.consent.read`` or\n``apaar.consent.record``; class teachers: their sections). ``ETag`` is the number of\ndecisions, for ``If-Match`` on the next one.",
+        "operationId": "get_student_consent_api_v1_students__student_id__apaar_consent_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentConsentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get Student Consent",
+        "tags": [
+          "apaar"
+        ]
+      },
+      "post": {
+        "description": "Record a parent's APAAR consent decision: ``given`` (with the signed form as an evidence\ndocument), ``refused``, ``withdrawn`` (after a given consent) or ``pending`` (form sent,\nawaited). Appended to the register; nothing is overwritten (permission\n``apaar.consent.record``). Accepts ``Idempotency-Key`` and ``If-Match`` (the ``ETag`` read).\nErrors: ``consent_not_given`` / ``consent_already_decided`` (409), stale ``If-Match`` (412),\nfield errors such as ``signed_form_required`` or ``aadhaar_full_number_rejected`` (422).",
+        "operationId": "record_student_consent_api_v1_students__student_id__apaar_consent_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentConsentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Record Student Consent",
+        "tags": [
+          "apaar"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/apaar-consent/form": {
+      "get": {
+        "description": "The student's APAAR consent form as a print-ready A4 page, with a refusal option, in the\nschool's parent-form language unless ``language`` says otherwise (permission\n``apaar.consent.read`` or ``apaar.consent.record``). Never prints an Aadhaar number. The print\nis audited.",
+        "operationId": "print_student_form_api_v1_students__student_id__apaar_consent_form_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the printed form; the school's setting when left out.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "en",
+                    "te"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Language of the printed form; the school's setting when left out.",
+              "title": "Language"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Print-ready A4 pages (one per student)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Print Student Form",
+        "tags": [
+          "apaar"
         ]
       }
     },

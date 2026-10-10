@@ -334,6 +334,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/apaar/consents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Consents
+         * @description Students of the current academic year with their APAAR consent state, by class and name
+         *     (permission ``apaar.consent.read``; class teachers: their sections). ``status=pending`` is
+         *     the follow-up list.
+         */
+        get: operations["list_consents_api_v1_apaar_consents_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apaar/consents/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Consent Summary
+         * @description Given / refused / pending / withdrawn counts per section and in total (permission
+         *     ``apaar.consent.read``; class teachers: their sections). Counts only.
+         */
+        get: operations["consent_summary_api_v1_apaar_consents_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apaar/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Settings
+         * @description The language of the printed parent form, ``en`` or ``te`` (permission
+         *     ``apaar.consent.read``, ``apaar.consent.record`` or ``tenant.settings.manage``).
+         */
+        get: operations["get_settings_api_v1_apaar_settings_get"];
+        /**
+         * Put Settings
+         * @description Choose the language of the printed parent form: English or Telugu, per school (owner
+         *     decision D9; the staff screens stay English). Permission ``tenant.settings.manage``, MFA
+         *     within 5 minutes, ``If-Match`` (``W/"0"`` before the first save). Audited.
+         */
+        put: operations["put_settings_api_v1_apaar_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/attributes": {
         parameters: {
             query?: never;
@@ -4743,6 +4813,28 @@ export interface paths {
         patch: operations["update_section_api_v1_sections__section_id__patch"];
         trace?: never;
     };
+    "/api/v1/sections/{section_id}/apaar-consent-forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Print Section Forms
+         * @description APAAR consent forms for a section of the current year, one A4 page per student
+         *     (permission ``apaar.consent.read`` or ``apaar.consent.record``; class teachers: their
+         *     sections). Errors: ``no_forms`` / ``too_many_forms`` (409). The print is audited.
+         */
+        get: operations["print_section_forms_api_v1_sections__section_id__apaar_consent_forms_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sections/{section_id}/archive": {
         parameters: {
             query?: never;
@@ -4953,7 +5045,10 @@ export interface paths {
         /**
          * Create Student
          * @description Add a student with first values, each with its source; optionally enrol in a section
-         *     (permission ``student.create``). Accepts ``Idempotency-Key``.
+         *     (permission ``student.create``). Accepts ``Idempotency-Key``. A PEN or APAAR ID already on
+         *     another active record of the school is refused (422 ``national_id_in_use``, with that
+         *     record's ``student_id`` when you may read it); ``admission_kind: transfer_in`` needs a PEN
+         *     (422 ``pen_required_for_transfer_in``; FR-STU-018).
          */
         post: operations["create_student_api_v1_students_post"];
         delete?: never;
@@ -4986,6 +5081,61 @@ export interface paths {
          *     ``If-Match`` required).
          */
         patch: operations["update_student_api_v1_students__student_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/apaar-consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Student Consent
+         * @description The student's APAAR consent state (``pending`` until a decision is recorded) and every
+         *     recorded decision, newest first (permission ``apaar.consent.read`` or
+         *     ``apaar.consent.record``; class teachers: their sections). ``ETag`` is the number of
+         *     decisions, for ``If-Match`` on the next one.
+         */
+        get: operations["get_student_consent_api_v1_students__student_id__apaar_consent_get"];
+        put?: never;
+        /**
+         * Record Student Consent
+         * @description Record a parent's APAAR consent decision: ``given`` (with the signed form as an evidence
+         *     document), ``refused``, ``withdrawn`` (after a given consent) or ``pending`` (form sent,
+         *     awaited). Appended to the register; nothing is overwritten (permission
+         *     ``apaar.consent.record``). Accepts ``Idempotency-Key`` and ``If-Match`` (the ``ETag`` read).
+         *     Errors: ``consent_not_given`` / ``consent_already_decided`` (409), stale ``If-Match`` (412),
+         *     field errors such as ``signed_form_required`` or ``aadhaar_full_number_rejected`` (422).
+         */
+        post: operations["record_student_consent_api_v1_students__student_id__apaar_consent_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/apaar-consent/form": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Print Student Form
+         * @description The student's APAAR consent form as a print-ready A4 page, with a refusal option, in the
+         *     school's parent-form language unless ``language`` says otherwise (permission
+         *     ``apaar.consent.read`` or ``apaar.consent.record``). Never prints an Aadhaar number. The print
+         *     is audited.
+         */
+        get: operations["print_student_form_api_v1_students__student_id__apaar_consent_form_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/students/{student_id}/behaviour-notes": {
@@ -5297,6 +5447,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/students/national-id-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check National Ids
+         * @description Before admitting a child, check whether this school already has a record with the PEN or
+         *     APAAR ID (FR-STU-018, transfer-in by PEN; permission ``student.create``). Answers the
+         *     matching records (current and former students) and ``udise_action``: what to do in UDISE+
+         *     (open or re-admit the existing record, import the child by PEN, or search UDISE+ by name and
+         *     date of birth when there is no PEN). Numbers travel in the body, never the URL (SEC-008);
+         *     read-only, nothing is written or audited; the numbers are never logged (PRV-020). Errors:
+         *     ``digits11_required`` / ``digits12_required`` (422).
+         */
+        post: operations["check_national_ids_api_v1_students_national_id_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/students/search": {
         parameters: {
             query?: never;
@@ -5315,9 +5491,10 @@ export interface paths {
          *     ``GET /students``; send ``next_cursor`` back as ``cursor`` with the same filters. Read-only:
          *     nothing is written, so no ``Idempotency-Key``. ``apaar_id`` finds a student by exact APAAR
          *     ID (12 digits; current verified or recorded values of the typed ``apaar_id`` attribute only,
-         *     same scope; FR-STU-016, ADR-0037); it is the only field that accepts a 12-digit number. A
-         *     full Aadhaar number anywhere else in the body is refused (422
-         *     ``aadhaar_full_number_rejected``).
+         *     same scope; FR-STU-016, ADR-0037); it is the only field that accepts a 12-digit number.
+         *     ``udise_pen`` finds a student by exact UDISE+ PEN (11 digits, else 422 ``digits11_required``;
+         *     same rules and scope; FR-STU-019). A full Aadhaar number anywhere else in the body is
+         *     refused (422 ``aadhaar_full_number_rejected``).
          */
         post: operations["search_students_by_body_api_v1_students_search_post"];
         delete?: never;
@@ -6330,6 +6507,24 @@ export interface components {
             title_en: string;
             /** Title Te */
             title_te: string;
+            /** Version */
+            version: number;
+        };
+        /** ApaarSettingsIn */
+        ApaarSettingsIn: {
+            /**
+             * Form Language
+             * @enum {string}
+             */
+            form_language: "en" | "te";
+        };
+        /** ApaarSettingsOut */
+        ApaarSettingsOut: {
+            /**
+             * Form Language
+             * @enum {string}
+             */
+            form_language: "en" | "te";
             /** Version */
             version: number;
         };
@@ -7850,6 +8045,126 @@ export interface components {
             /** Unlinked Due */
             unlinked_due: string | null;
         };
+        /** ConsentEntryOut */
+        ConsentEntryOut: {
+            /** Decided On */
+            decided_on: string | null;
+            /** Evidence Document Id */
+            evidence_document_id: string | null;
+            /** Form Language */
+            form_language: ("en" | "te") | null;
+            /** Guardian Id */
+            guardian_id: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Note */
+            note: string | null;
+            /**
+             * Recorded At
+             * Format: date-time
+             */
+            recorded_at: string;
+            /**
+             * Recorded By
+             * Format: uuid
+             */
+            recorded_by: string;
+            /** Recorded By Name */
+            recorded_by_name: string | null;
+            /** Relationship */
+            relationship: ("father" | "mother" | "guardian") | null;
+            /** Seq */
+            seq: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "given" | "refused" | "pending" | "withdrawn";
+        };
+        /**
+         * ConsentIn
+         * @description A parent's decision as written on the returned form (FR-APC-001..003).
+         *
+         *     ``given`` needs the signed form (``evidence_document_id``: a document uploaded with purpose
+         *     ``evidence``); ``refused`` and ``withdrawn`` may carry it. Every decision names who decided
+         *     (``relationship``, and ``guardian_id`` when that guardian is on the student's record) and the
+         *     date on the form (``decided_on``). ``pending`` records that a form went home and is awaited.
+         */
+        ConsentIn: {
+            /** Decided On */
+            decided_on?: string | null;
+            /**
+             * Evidence Document Id
+             * @description The signed form, uploaded first as a document (evidence).
+             */
+            evidence_document_id?: string | null;
+            /**
+             * Form Language
+             * @description Language of the form the parent signed (en or te).
+             */
+            form_language?: ("en" | "te") | null;
+            /** Guardian Id */
+            guardian_id?: string | null;
+            /**
+             * Note
+             * @description Optional note (at most 500 characters; no Aadhaar numbers).
+             */
+            note?: string | null;
+            /** Relationship */
+            relationship?: ("father" | "mother" | "guardian") | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "given" | "refused" | "pending" | "withdrawn";
+        };
+        /**
+         * ConsentRowOut
+         * @description One student of the register list (FR-APC-005).
+         */
+        ConsentRowOut: {
+            /** Admission No */
+            admission_no: string | null;
+            /** Class Section */
+            class_section: string | null;
+            /** Decided On */
+            decided_on: string | null;
+            /** Display Name */
+            display_name: string | null;
+            /** Has Apaar Id */
+            has_apaar_id: boolean;
+            /** Has Form */
+            has_form: boolean;
+            /** Recorded At */
+            recorded_at: string | null;
+            /** Section Id */
+            section_id: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "given" | "refused" | "pending" | "withdrawn";
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * ConsentSummaryOut
+         * @description Given / refused / pending / withdrawn per section of the current academic year, for the
+         *     students the caller may see (FR-APC-005). Students with no decision count as pending.
+         */
+        ConsentSummaryOut: {
+            /** Sections */
+            sections: components["schemas"]["SectionSummaryOut"][];
+            totals: components["schemas"]["StatusCounts"];
+        };
         /** ContentLine */
         ContentLine: {
             /** Key */
@@ -8733,6 +9048,11 @@ export interface components {
             permission: string;
             /** Required Fields */
             required_fields: string[];
+            /**
+             * Verified
+             * @default false
+             */
+            verified: boolean;
             /** Version */
             version: number;
         };
@@ -9833,6 +10153,8 @@ export interface components {
             message_key: string;
             /** Ref */
             ref?: string | null;
+            /** Student Id */
+            student_id?: string | null;
         };
         /**
          * ItemConfirm
@@ -10338,6 +10660,63 @@ export interface components {
              */
             superseded: boolean;
         };
+        /**
+         * NationalIdCheckIn
+         * @description ``POST /students/national-id-check`` (FR-STU-018): is this PEN or APAAR ID already on a
+         *     record of this school? In the body, never the URL (SEC-008).
+         */
+        NationalIdCheckIn: {
+            /**
+             * Apaar Id
+             * @description 12 digits; spaces or hyphens are removed.
+             */
+            apaar_id?: string | null;
+            /**
+             * Udise Pen
+             * @description 11 digits; spaces or hyphens are removed.
+             */
+            udise_pen?: string | null;
+        };
+        /**
+         * NationalIdCheckOut
+         * @description ``matches``: records of this school holding the number (live or former). ``udise_action``:
+         *     what to do in UDISE+ for a new admission with this PEN: ``open_existing_record`` (the child
+         *     is already on this school's rolls: open that record, do not admit again),
+         *     ``readmit_existing_record`` (a former student of this school: re-admit that record),
+         *     ``import_by_pen`` (not in this school: create the record here with the PEN, then import the
+         *     child in UDISE+ by PEN; the previous school must release it), ``new_udise_record`` (no PEN
+         *     given: search UDISE+ by name and date of birth first).
+         */
+        NationalIdCheckOut: {
+            /** Matches */
+            matches: components["schemas"]["NationalIdMatch"][];
+            /**
+             * Udise Action
+             * @enum {string}
+             */
+            udise_action: "open_existing_record" | "readmit_existing_record" | "import_by_pen" | "new_udise_record";
+        };
+        /** NationalIdMatch */
+        NationalIdMatch: {
+            /** Admission No */
+            admission_no: string | null;
+            /**
+             * Attribute Key
+             * @enum {string}
+             */
+            attribute_key: "udise_pen" | "apaar_id";
+            /** Class Section */
+            class_section: string | null;
+            /** Display Name */
+            display_name: string | null;
+            /** Status */
+            status: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
         /** NoteIn */
         NoteIn: {
             /**
@@ -10764,6 +11143,13 @@ export interface components {
         Page_ClassOut_: {
             /** Data */
             data: components["schemas"]["ClassOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
+        /** Page[ConsentRowOut] */
+        Page_ConsentRowOut_: {
+            /** Data */
+            data: components["schemas"]["ConsentRowOut"][];
             /** Next Cursor */
             next_cursor: string | null;
         };
@@ -11468,6 +11854,16 @@ export interface components {
             needs_apaar: boolean;
             /** Required Fields */
             required_fields: string[];
+            /**
+             * Source
+             * @default []
+             */
+            source: string[];
+            /**
+             * Verified
+             * @default false
+             */
+            verified: boolean;
             /** Version */
             version: number;
         };
@@ -12406,6 +12802,17 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** SectionSummaryOut */
+        SectionSummaryOut: {
+            /** Class Section */
+            class_section: string;
+            counts: components["schemas"]["StatusCounts"];
+            /**
+             * Section Id
+             * Format: uuid
+             */
+            section_id: string;
+        };
         /**
          * SectionUpdate
          * @description Omit a field to keep it; send ``class_teacher_membership_id: null`` to clear it.
@@ -12646,6 +13053,41 @@ export interface components {
              */
             membership_id: string;
         };
+        /** StatusCounts */
+        StatusCounts: {
+            /** Given */
+            given: number;
+            /** Pending */
+            pending: number;
+            /** Refused */
+            refused: number;
+            /** Total */
+            total: number;
+            /** Withdrawn */
+            withdrawn: number;
+        };
+        /**
+         * StudentConsentOut
+         * @description Current state (``pending`` when nothing was recorded) and the full history, newest first.
+         *     ``version`` is the number of recorded decisions (send it back as ``If-Match``).
+         */
+        StudentConsentOut: {
+            current: components["schemas"]["ConsentEntryOut"] | null;
+            /** History */
+            history: components["schemas"]["ConsentEntryOut"][];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "given" | "refused" | "pending" | "withdrawn";
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Version */
+            version: number;
+        };
         /**
          * StudentCreate
          * @description New student with its first values (docs/09: source required per value).
@@ -12654,6 +13096,11 @@ export interface components {
          *     academic year.
          */
         StudentCreate: {
+            /**
+             * Admission Kind
+             * @description new: first school (UDISE+ creates a new record). transfer_in: the child comes from another school and already has a UDISE+ record: a udise_pen value (from the transfer certificate, tc_incoming, or the portal) is then required, so the office imports the child into UDISE+ by PEN instead of creating a second record (FR-STU-018; 422 pen_required_for_transfer_in).
+             */
+            admission_kind?: ("new" | "transfer_in") | null;
             /** Roll No */
             roll_no?: string | null;
             /** Section Id */
@@ -12817,6 +13264,11 @@ export interface components {
             section_id?: string | null;
             /** Status */
             status?: ("provisional" | "active" | "left" | "graduated") | null;
+            /**
+             * Udise Pen
+             * @description Exact UDISE+ PEN (FR-STU-019): 11 digits, spaces or hyphens allowed. Matches only the student's current PEN values (verified or recorded, not rejected), within the caller's scope; anything else answers 422 digits11_required.
+             */
+            udise_pen?: string | null;
         };
         /** StudentSummary */
         StudentSummary: {
@@ -14994,6 +15446,180 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AnnouncementBrief"][];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_consents_api_v1_apaar_consents_get: {
+        parameters: {
+            query?: {
+                class_id?: string | null;
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+                section_id?: string | null;
+                status?: ("given" | "refused" | "pending" | "withdrawn") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ConsentRowOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    consent_summary_api_v1_apaar_consents_summary_get: {
+        parameters: {
+            query?: {
+                class_id?: string | null;
+                section_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentSummaryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_settings_api_v1_apaar_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApaarSettingsOut"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    put_settings_api_v1_apaar_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApaarSettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApaarSettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
             /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
@@ -25913,6 +26539,55 @@ export interface operations {
             };
         };
     };
+    print_section_forms_api_v1_sections__section_id__apaar_consent_forms_get: {
+        parameters: {
+            query?: {
+                /** @description Language of the printed form; the school's setting when left out. */
+                language?: ("en" | "te") | null;
+                /** @description Print only students in this state, e.g. pending to send again. */
+                status?: ("given" | "refused" | "pending" | "withdrawn") | null;
+            };
+            header?: never;
+            path: {
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Print-ready A4 pages (one per student) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     archive_section_api_v1_sections__section_id__archive_post: {
         parameters: {
             query?: never;
@@ -26555,6 +27230,145 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StudentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_student_consent_api_v1_students__student_id__apaar_consent_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentConsentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    record_student_consent_api_v1_students__student_id__apaar_consent_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentConsentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    print_student_form_api_v1_students__student_id__apaar_consent_form_get: {
+        parameters: {
+            query?: {
+                /** @description Language of the printed form; the school's setting when left out. */
+                language?: ("en" | "te") | null;
+            };
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Print-ready A4 pages (one per student) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
                 };
             };
             /** @description Validation Error */
@@ -27398,6 +28212,52 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ValueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    check_national_ids_api_v1_students_national_id_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NationalIdCheckIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NationalIdCheckOut"];
                 };
             };
             /** @description Validation Error */
