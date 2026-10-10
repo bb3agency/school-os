@@ -319,6 +319,20 @@ Not built: the MSI installer and code signing; signed auto-update; exposure of `
 **Scope:** self-serve onboarding wizard · import templates library · online payment collection if ADR-0016 is accepted (basic billing already shipped in M0) · tenant admin improvements · support tooling beyond tickets · first dedicated-tier schools at scale (SEC-030 before the first one) · Stage 1 infrastructure (Multi-AZ, replicas, cross-account backups) · external pen test · published security overview for schools.
 **Exit:** 5 schools live with < 1 week onboarding effort each; SLOs met for 2 consecutive months.
 
+### R1 · Board and portal readiness (product plan 2026-27, docs/18; owner decisions 2026-10-10)
+**Scope:** AP SSC Class 9/10 readiness (exact diff, fix owner, parent verification slip, class dashboard) · UDISE+ 2026-27 profile with PEN and transfer-in-by-PEN guard · APAAR consent register and failure list · CBSE registration profile · CISCE profile refresh · import template library and "alongside your current ERP" mode.
+
+### R1 status (2026-10-10)
+
+**R1-A built on `wip/r1-ssc-readiness` (not yet merged; migration `0051_readiness` revises `0050_verified_answer_drafter` and may need re-chaining at merge):** US-503..US-505, FR-DQ-030..036, ADR-0040.
+- **Diff engine** (`app/dq/readiness.py`, pure): exact, NFC-first comparison of name, date of birth, gender and parents' names across register, Aadhaar-as-printed, UDISE+ and board records, with kinds in plain words and character-level diffs; fix owners from `app/dq/config/readiness.yaml` (register is the legal anchor unless a birth certificate or incoming TC contradicts it).
+- **Profiles** `bseap-ssc-2027` (Classes IX, X) and `apaar` (APAAR failure list), each with public `source` URLs and `verified: false` (D3).
+- **Findings**: rule DQ-030 per readiness profile; resolve, waive, `needs_confirmation` and change-request links apply; reads overlay waivers.
+- **API** `/api/v1/dq/readiness/...` (summary, section students, student detail, runs, A4 slips) with `dq.readiness.read` / `dq.readiness.manage` (07 §6.2); audits `dq.readiness.student_viewed`, `dq.readiness.slips_printed`, `dq.run.completed`.
+- **Web** `/findings/readiness` (profile picker, section progress, student list, slips) and `/findings/readiness/{student}` (highlighted diff, fix-owner badges), English and Telugu catalogues.
+
+Not built (other R1 stories): the APAAR consent register (another wave), UDISE+ 2026-27 field list and transfer-in by PEN, CBSE and refreshed CISCE profiles, the import template library. Not verified: every readiness format (D3), the BSEAP nominal-roll field list (parents' names, caste, medium are unconfirmed). Release note: existing schools need `python -m app.identity.sync_system_roles --apply` after `0051` (ADR-0022).
+
 ## 3. Pilot-ready gate (before any real student data)
 
 - [ ] SEC-001..017, SEC-021..024 and SEC-026..029 implemented and verified

@@ -16,5 +16,9 @@ Engine and workflow (M1 wave 2, database): :mod:`app.dq.engine` (bulk loading th
 runs, findings, resolve/waive, catalog, summary), ``repository``/``models`` (``sis.dq_runs``,
 ``sis.dq_findings``, migration 0013_dq), ``api`` (``/api/v1/dq``) and ``tasks`` (queue ``dq``).
 
+Board and portal readiness (ADR-0040, FR-DQ-030..036): :mod:`app.dq.readiness` (pure exact
+diff and fix owners), :mod:`app.dq.slip` (parent verification slip page) and
+:mod:`app.dq.readiness_service` (summary, student view, runs, slips; routes in ``api``).
+
 Configuration ships in ``app/dq/config/*.yaml`` and ``app/dq/config/profiles/*.yaml``.
 """

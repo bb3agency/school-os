@@ -141,6 +141,19 @@ Format: **US-ID · As a … I want … so that …** followed by acceptance crit
 - AC1a: A blocker (it stops certificates and submissions) closes when the change request that corrects the record is approved. Resolving or accepting it by hand needs `dq.findings.waive` and a fresh MFA sign-in (403 `blocker_needs_waive`, 428 otherwise); the app hides "Resolve" on a blocker from anyone else and says who can. So a clerk cannot resolve a blocker with a note and then print a certificate from the mismatched record (FR-CERT-002; owner decision 2026-10-04, audit DL-06).
 - AC2: Re-running the check reopens a finding if the underlying conflict returns.
 
+**US-503** · As an exam coordinator of an AP State Board school, I want to know months before the SSC window which Class 9 and 10 students' name, date of birth or gender do not match exactly across the admission register, Aadhaar and UDISE+, and who must fix each one, so that the nominal roll passes the first time. [FR-DQ-030..033, FR-DQ-036; ADR-0040; plan 2026-27 R1.1]
+- AC1: Each difference says exactly what differs (an extra space, initials instead of a full word, two letters swapped, day and month swapped …), compared letter for letter.
+- AC2: Each difference names who fixes it: the parent (Aadhaar at an Aadhaar centre), the school through the MEO/MIS coordinator (UDISE+), or the school's own register through a change request with evidence; never corrected automatically.
+- AC3: A class/section dashboard shows "142 of 160 ready" and how many wait for the parent, the school or a decision; class teachers see only their sections.
+- AC4: The board's format is marked "not yet confirmed" with its public sources until a school confirms it (owner decision D3).
+
+**US-504** · As an office clerk, I want to print a verification slip for each student (or a whole section) so that parents check the details and sign before the board window. [FR-DQ-035, FR-DQ-036]
+- AC1: The student view shows each record's value and highlights the exact characters that differ; Aadhaar values only for staff allowed to see them (audited).
+- AC2: The A4 slip lists each record's value, the differences and who fixes them, and has a signature line for the parent; it never shows an Aadhaar number; printing is audited.
+
+**US-505** · As an office admin, I want a list of students whose APAAR ID generation will fail and why, so that we fix UDISE+ or ask parents to fix Aadhaar first. [FR-DQ-034]
+- AC1: The APAAR check compares UDISE+ with Aadhaar-as-printed (name, date of birth, gender) and names who fixes each difference; students with a verified APAAR ID are ready.
+
 ### C6 · Change requests (maker-checker)
 
 **US-601** · As an office admin, I want to request a correction to a student's DOB with evidence so that the principal can approve it. [FR-CR-001..008, BR-04]

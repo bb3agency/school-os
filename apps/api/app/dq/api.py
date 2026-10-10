@@ -1,8 +1,11 @@
-"""Data-quality routes (docs/09 Data quality; US-501, US-502, FR-DQ-002, FR-DQ-020).
+"""Data-quality routes (docs/09 Data quality; US-501..US-505, FR-DQ-002, FR-DQ-020,
+FR-DQ-030..FR-DQ-036).
 
 Every route declares its permission with ``require()``; the service limits findings to the
 caller's students (class teachers: their sections this year) and answers 404 outside them.
-Values in findings are masked; C3 values are never returned in clear here.
+Values in findings are masked; C3 values are never returned in clear by the findings routes.
+The readiness student view and slips (ADR-0040) show C3 values only to holders of
+``student.read_sensitive`` for the student, and audit it.
 """
 
 from __future__ import annotations
