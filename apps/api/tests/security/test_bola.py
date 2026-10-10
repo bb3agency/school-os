@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import contextlib
 import importlib.util
+import re
 import sys
 import uuid
 from collections.abc import Callable
@@ -773,7 +774,9 @@ def _id_routes() -> list[tuple[str, str]]:
         # Control-plane routes are operator-only and not tenant scoped (tests/platform).
         if str(rc.path).startswith(("/api/v1/platform/", "/api/v1/fleet/")):
             continue
-        if isinstance(rc.original_route, APIRoute) and "{" in str(rc.path):
+        params = set(re.findall(r"{(\w+)}", str(rc.path)))
+        # A readiness profile key (ADR-0040) names configuration, not an object of the school.
+        if isinstance(rc.original_route, APIRoute) and params - {"profile_key"}:
             out.extend((m, str(rc.path)) for m in sorted(rc.methods or ()))
     return sorted(out)
 
@@ -790,7 +793,7 @@ QUERY: dict[tuple[str, str], dict[str, str]] = {
 
 
 # Path parameters that are not object ids (a row number inside the object in the path).
-PLAIN_PARAMS: dict[str, str] = {"row_no": "2"}
+PLAIN_PARAMS: dict[str, str] = {"row_no": "2", "profile_key": "bseap-ssc-2027"}
 
 
 def _fill(path: str, value: uuid.UUID) -> str:

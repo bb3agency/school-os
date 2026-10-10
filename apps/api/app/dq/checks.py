@@ -1,5 +1,5 @@
-"""Rule checks DQ-001..DQ-012, DQ-021, DQ-022 (docs/02 §5, FR-DQ-001, FR-DQ-003, FR-DQ-004,
-FR-DQ-006, FR-DQ-021, FR-DQ-022).
+"""Rule checks DQ-001..DQ-012, DQ-021, DQ-022, DQ-030, DQ-031 (docs/02 §5, FR-DQ-001,
+FR-DQ-003, FR-DQ-004, FR-DQ-006, FR-DQ-021, FR-DQ-022, FR-DQ-033, FR-DQ-040).
 
 Pure module: every check implements :class:`app.dq.rules.RuleCheck` over a
 :class:`CheckContext` of in-memory facts that the engine (:mod:`app.dq.engine`) loads in bulk
@@ -36,6 +36,9 @@ Check kinds and their rules:
                               student is checked, since only DQ-008 findings may pair students)
 ``apaar_demographics``        UDISE+ vs Aadhaar-as-printed (as ``cross_source``) for students
 (DQ-022)                      without a verified APAAR ID
+``readiness_diff`` (DQ-031)   per readiness profile: the profile's identity fields compared
+                              exactly across its sources (:mod:`app.dq.readiness`); one finding
+                              per difference with its fix owner (ADR-0040)
 ============================  =====================================================================
 
 The APAAR ID itself never appears in a finding: values are masked (``••••``) and a duplicate
@@ -50,9 +53,11 @@ import unicodedata
 import uuid
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Iterator, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Final
 
+from app.dq import readiness as rd
+from app.dq.explanations import load_explanations
 from app.dq.masking import mask_value
 from app.dq.matching import MatchClass, MatchPolicy, VariantDictionary, classify, match_key
 from app.dq.profiles import FORMAT_ISSUES, EngineConfig, NameFormat, Profile
@@ -757,6 +762,145 @@ class ApaarDemographicsCheck(CrossSourceCheck):
         ]
 
 
+# --- readiness (DQ-031, ADR-0040) ---------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class StudentReadiness:
+    """One student's readiness for one profile: the assessed fields and the facts compared
+    (plaintext in memory only; findings get masked values)."""
+
+    student_id: uuid.UUID
+    profile_key: str
+    applies: bool
+    fields: tuple[rd.FieldAssessment, ...] = ()
+    # attribute key -> source -> fact (the compared sources, the register, corroborating ones)
+    facts: Mapping[str, Mapping[str, SourceFact]] = field(default_factory=dict)
+
+    @property
+    def items(self) -> tuple[rd.Item, ...]:
+        return tuple(i for f in self.fields for i in f.items)
+
+
+def readiness_kind(attribute_key: str) -> rd.ValueKind:
+    kind = value_kind(attribute_key)
+    return "name" if kind == "name" else "date" if kind == "date" else "enum"
+
+
+def readiness_applies(facts: StudentFacts, profile: Profile) -> bool:
+    """The profile's classes (current-year enrolment) and its "verified" exemption."""
+    spec = profile.readiness
+    if spec is None:
+        return False
+    if spec.skip_when_verified and facts.has_verified(spec.skip_when_verified):
+        return False
+    if spec.classes:
+        return any(e.current and e.class_code in spec.classes for e in facts.enrolments)
+    return True
+
+
+def assess_readiness(
+    facts: StudentFacts,
+    profile: Profile,
+    config: EngineConfig,
+    classifier: rd.Classifier,
+    rcfg: rd.ReadinessConfig | None = None,
+) -> StudentReadiness:
+    """The exact cross-source comparison of ``profile.readiness`` for one student."""
+    spec = profile.readiness
+    if spec is None or not readiness_applies(facts, profile):
+        return StudentReadiness(facts.student_id, profile.key, applies=False)
+    cfg = rcfg or rd.load_readiness_config()
+    fields: list[rd.FieldAssessment] = []
+    held: dict[str, dict[str, SourceFact]] = {}
+    for item in spec.fields:
+        key = item.attribute
+        per_source: dict[str, SourceFact] = {}
+        for source in dict.fromkeys((*item.sources, cfg.referee, *cfg.corroborating_sources)):
+            fact = facts.value(config.physical_key(key, source), source)
+            if fact is not None:
+                per_source[source] = fact
+        held[key] = per_source
+        fields.append(
+            rd.assess_field(
+                item,
+                readiness_kind(key),
+                {s: f.value for s, f in per_source.items()},
+                cfg,
+                classifier,
+                advisory_kinds=spec.advisory_kinds,
+            )
+        )
+    return StudentReadiness(
+        facts.student_id, profile.key, applies=True, fields=tuple(fields), facts=held
+    )
+
+
+def readiness_finding(
+    rule: Rule,
+    assessment: StudentReadiness,
+    item: rd.Item,
+    config: EngineConfig,
+    rcfg: rd.ReadinessConfig | None = None,
+) -> Finding:
+    """The DQ-031 finding of one readiness item (masked values, codes; FR-DQ-043)."""
+    cfg = rcfg or rd.load_readiness_config()
+    key = item.attribute
+    held = assessment.facts.get(key, {})
+    values = [
+        value_entry(config.physical_key(key, s), s, held[s]) for s in item.sources if s in held
+    ]
+    # DQ-031-REGISTER names the record that contradicts the register; the others the record
+    # to correct (or the one with no value).
+    contradicted = item.owner == "school_register" and item.reason == "mismatch"
+    named = item.against if contradicted else item.source
+    params: dict[str, str | int] = {"field": key, "diff": rd.kinds_param(item.kinds)}
+    if named is not None:
+        params["source"] = named
+    code = rd.item_explanation(item, cfg)
+    wanted = load_explanations().get(code).placeholders
+    finding = make_finding(
+        rule,
+        assessment.student_id,
+        rd.item_severity(item, cfg),
+        attribute_key=key,
+        sources=item.sources,
+        details={
+            "owner": item.owner,
+            "reason": item.reason,
+            "kinds": list(item.kinds),
+            "advisory": item.advisory,
+            "source": item.source,
+            "against": item.against,
+            "values": values,
+        },
+        params={k: v for k, v in params.items() if k in wanted},
+        profile_key=assessment.profile_key,
+        explanation_code=code,
+    )
+    return replace(finding, route_codes=rd.item_routes(item, cfg))
+
+
+class ReadinessCheck(_Check):
+    """DQ-031 per readiness profile (bseap-ssc-2027, apaar): one finding per difference, with
+    the fix owner deciding severity, explanation and routes (ADR-0040)."""
+
+    def evaluate(self, context: CheckContext, /) -> Iterator[Finding]:
+        cfg = rd.load_readiness_config()
+
+        def classifier(a: str, b: str) -> MatchClass:
+            result: MatchClass = context.classify(a, b).match_class
+            return result
+
+        for profile in context.profiles:
+            if profile.readiness is None:
+                continue
+            for facts in context.students.values():
+                assessment = assess_readiness(facts, profile, context.config, classifier, cfg)
+                for item in assessment.items:
+                    yield readiness_finding(self.rule, assessment, item, context.config, cfg)
+
+
 CHECKS: Final[dict[CheckKind, Callable[[Rule], RuleCheck[CheckContext]]]] = {
     CheckKind.NAME_MATCH: NameMatchCheck,
     CheckKind.VALUE_EQUAL: ValueEqualCheck,
@@ -769,6 +913,7 @@ CHECKS: Final[dict[CheckKind, Callable[[Rule], RuleCheck[CheckContext]]]] = {
     CheckKind.ENROLMENT_OVERLAP: EnrolmentOverlapCheck,
     CheckKind.APAAR_ID: ApaarIdCheck,
     CheckKind.APAAR_DEMOGRAPHICS: ApaarDemographicsCheck,
+    CheckKind.READINESS_DIFF: ReadinessCheck,
 }
 
 
@@ -796,6 +941,7 @@ def attribute_keys_needed(config: EngineConfig, rules: RuleRegistry) -> dict[str
             CheckKind.CROSS_SOURCE,
             CheckKind.APAAR_ID,
             CheckKind.APAAR_DEMOGRAPHICS,
+            CheckKind.READINESS_DIFF,
         ):
             for source in rule.sources:
                 for key in rule.attribute_keys:

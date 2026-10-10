@@ -225,6 +225,7 @@ const DQ_PROFILES: Schemas["ProfileOut"][] = [
     needs_apaar: false,
     source: [],
     verified: false,
+    readiness: false,
     superseded: false,
     parent_verification_slip: false,
   },

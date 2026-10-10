@@ -276,6 +276,12 @@ NON_UUID_PATH_PARAMS = {
     ("DELETE", "/api/v1/platform/flags/{key}/tenants/{tenant_id}", "key"),
     # A spreadsheet row number inside an import the caller already reaches (bounded int).
     ("PATCH", "/api/v1/imports/{import_id}/sheet/rows/{row_no}", "row_no"),
+    # A readiness profile key: a bounded, pattern-checked configuration key (ADR-0040).
+    ("GET", "/api/v1/dq/readiness/{profile_key}", "profile_key"),
+    ("GET", "/api/v1/dq/readiness/{profile_key}/students", "profile_key"),
+    ("GET", "/api/v1/dq/readiness/{profile_key}/students/{student_id}", "profile_key"),
+    ("POST", "/api/v1/dq/readiness/{profile_key}/runs", "profile_key"),
+    ("GET", "/api/v1/dq/readiness/{profile_key}/slips", "profile_key"),
 }
 
 
@@ -323,6 +329,8 @@ RESPONSE_FIELD_ALLOWLIST = {
     "app.dq.schemas.ProfileOut.key": "DQ profile code",
     "app.dq.schemas.SummaryOut.profile_key": "DQ profile code",
     "app.dq.schemas.RunOut.profile_key": "DQ profile code",
+    "app.dq.schemas.ReadinessProfileOut.key": "DQ profile code",
+    "app.dq.schemas.ReadinessFieldOut.attribute_key": "attribute catalog key",
     "app.exports.schemas.ExportProfileOut.key": "export profile code",
     "app.exports.schemas.ExportOut.profile_key": "export profile code",
     "app.imports.schemas.Issue.message_key": "i18n message key",

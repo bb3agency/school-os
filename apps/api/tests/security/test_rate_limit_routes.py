@@ -44,6 +44,7 @@ EXPENSIVE = re.compile(
     r"(/exports?(/|$)|/export$|tenant-export$|/imports(/|$)|import-templates$|/uploads$|/sheet$"
     r"|/sheet/versions$|/search$|/render$|/print$|/preview$|promotions:preview$|/duplicates$"
     r"|/invitation-email$|owner-invite:resend$|/dq/runs$|/support/tickets$|support-session$"
+    r"|/readiness/\{profile_key\}/runs$|/slips$"
     r"|/login-event$)"
 )
 READ_ONLY_EXPENSIVE_OK = {

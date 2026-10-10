@@ -413,7 +413,7 @@ allow_indirect_imports = True
 # pure (no database, web or tenant modules), so the engine, imports and exports can reuse them
 # anywhere (FR-DQ-003). The engine, service, repository, tasks and routes use the database.
 [importlinter:contract:dq-pure-library]
-name = dq library modules (matching, rules, explanations, checks, masking, profiles) stay pure
+name = dq library modules (matching, rules, explanations, checks, masking, profiles, readiness, slip) stay pure
 type = forbidden
 source_modules =
     app.dq.matching
@@ -422,6 +422,8 @@ source_modules =
     app.dq.checks
     app.dq.masking
     app.dq.profiles
+    app.dq.readiness
+    app.dq.slip
 forbidden_modules =
     sqlalchemy
     fastapi

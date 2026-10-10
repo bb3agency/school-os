@@ -210,6 +210,28 @@ def load_context(
         if profile.name_format is not None:
             canonical_keys.update(profile.name_format.fields)
     source_keys.update(canonical_keys & {"full_name", "father_name", "mother_name", "dob"})
+    facts = load_facts(session, student_ids, source_keys, canonical_keys)
+    return CheckContext(
+        students=facts,
+        config=cfg,
+        policy=load_match_policy(),
+        variants=load_variant_dictionary(),
+        population=_population(session, facts, cfg.apaar_attribute),
+        profiles=tuple(profiles),
+        identity_keys=identity_keys,
+    )
+
+
+def load_facts(
+    session: Session,
+    student_ids: Sequence[uuid.UUID],
+    source_keys: Collection[str],
+    canonical_keys: Collection[str],
+) -> dict[uuid.UUID, StudentFacts]:
+    """Current values per source, canonical values and active enrolments of ``student_ids`` in
+    a fixed number of bulk reads (the checks; readiness, ADR-0040). ``student_ids`` must come
+    from ``app.students.service.list_students_in_scope``."""
+    canonical_keys = {*canonical_keys, "admission_no"}
     # C3 values (Aadhaar-as-printed, category) are decrypted in memory only; findings keep the
     # masked form (FR-DQ-006).
     by_source = students.source_values(session, student_ids, source_keys, include_sensitive=True)
@@ -257,15 +279,7 @@ def load_context(
             enrolments=tuple(enrolment_fact(e) for e in enrolments.get(sid, ())),
             apaar_refused=sid in refused,
         )
-    return CheckContext(
-        students=facts,
-        config=cfg,
-        policy=load_match_policy(),
-        variants=load_variant_dictionary(),
-        population=_population(session, facts, cfg.apaar_attribute),
-        profiles=tuple(profiles),
-        identity_keys=identity_keys,
-    )
+    return facts
 
 
 def _population(
@@ -615,10 +629,13 @@ __all__ = [
     "ChangeRequestLink",
     "RunStats",
     "Scope",
+    "conflict_hash",
     "execute",
     "load_context",
+    "load_facts",
     "profiles_for",
     "reconcile",
     "resolve_students",
+    "split_details",
     "system_context",
 ]

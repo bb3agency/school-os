@@ -1517,6 +1517,32 @@ SPECS: dict[tuple[str, str], Builder] = {
         None,
         {},
     ),
+    # Board and portal readiness (ADR-0040): the class teacher reaches 9A only.
+    ("GET", "/api/v1/dq/readiness/{profile_key}"): lambda w, r, a: (
+        "/api/v1/dq/readiness/bseap-ssc-2027",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/dq/readiness/{profile_key}/students"): lambda w, r, a: (
+        f"/api/v1/dq/readiness/bseap-ssc-2027/students?section_id={w.a.ids['section_9a']}",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/dq/readiness/{profile_key}/students/{student_id}"): lambda w, r, a: (
+        f"/api/v1/dq/readiness/bseap-ssc-2027/students/{_student(w, r)}",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/dq/readiness/{profile_key}/runs"): lambda w, r, a: (
+        "/api/v1/dq/readiness/bseap-ssc-2027/runs",
+        {"scope": {"student_ids": [str(_student(w, r))]}},
+        {},
+    ),
+    ("GET", "/api/v1/dq/readiness/{profile_key}/slips"): lambda w, r, a: (
+        f"/api/v1/dq/readiness/bseap-ssc-2027/slips?student_id={_student(w, r)}",
+        None,
+        {},
+    ),
     # SchoolOS support only (ADR-0023): every school role is refused (support principals are
     # tested in tests/breakglass/test_support_signin.py).
     ("POST", "/api/v1/breakglass/support-session"): lambda w, r, a: (
@@ -2046,6 +2072,7 @@ def _success(method: str, path: str) -> int:
         "/api/v1/imports/{import_id}/validate",
         "/api/v1/imports/{import_id}/commit",
         "/api/v1/dq/runs",
+        "/api/v1/dq/readiness/{profile_key}/runs",
         "/api/v1/extraction-batches",
         "/api/v1/exports",
         "/api/v1/exports/student-list",

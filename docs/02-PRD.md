@@ -168,6 +168,19 @@ Format: **US-ID · As a … I want … so that …** followed by acceptance crit
 - AC4: Profiles that ask parents to check printed details carry that flag (the per-student parent verification slip itself is built with the readiness check, R1.1).
 - AC5: The pre-check report (PDF/XLSX) and "ready to enter" sheet work for each profile as for UDISE+ (US-501).
 
+**US-504** · As an exam coordinator of an AP State Board school, I want to know months before the SSC window which Class 9 and 10 students' name, date of birth or gender do not match exactly across the admission register, Aadhaar and UDISE+, and who must fix each one, so that the nominal roll passes the first time. [FR-DQ-040..043, FR-DQ-046; ADR-0040; plan 2026-27 R1.1]
+- AC1: Each difference says exactly what differs (an extra space, initials instead of a full word, two letters swapped, day and month swapped …), compared letter for letter.
+- AC2: Each difference names who fixes it: the parent (Aadhaar at an Aadhaar centre), the school through the MEO/MIS coordinator (UDISE+), or the school's own register through a change request with evidence; never corrected automatically.
+- AC3: A class/section dashboard shows "142 of 160 ready" and how many wait for the parent, the school or a decision; class teachers see only their sections.
+- AC4: The board's format is marked "not yet confirmed" with its public sources until a school confirms it (owner decision D3).
+
+**US-505** · As an office clerk, I want to print a verification slip for each student (or a whole section) so that parents check the details and sign before the board window. [FR-DQ-045, FR-DQ-046]
+- AC1: The student view shows each record's value and highlights the exact characters that differ; Aadhaar values only for staff allowed to see them (audited).
+- AC2: The A4 slip lists each record's value, the differences and who fixes them, and has a signature line for the parent; it never shows an Aadhaar number; printing is audited.
+
+**US-506** · As an office admin, I want a list of students whose APAAR ID generation will fail and why, so that we fix UDISE+ or ask parents to fix Aadhaar first. [FR-DQ-044]
+- AC1: The APAAR check compares UDISE+ with Aadhaar-as-printed (name, date of birth, gender) and names who fixes each difference; students with a verified APAAR ID are ready.
+
 ### C6 · Change requests (maker-checker)
 
 **US-601** · As an office admin, I want to request a correction to a student's DOB with evidence so that the principal can approve it. [FR-CR-001..008, BR-04]
@@ -501,6 +514,7 @@ Stories of the 2026-27 plan (docs/18 §3 R1.2-R1.3; owner decisions D1, D3, D9 o
 | DQ-021 | APAAR ID not 12 digits, or one APAAR ID on two students of the school (FR-DQ-021; the second case reads "Same APAAR ID as {student}. One of them is wrong.") | blocker | "The APAAR ID is not 12 digits." |
 | DQ-022 | UDISE+ name, date of birth or gender differs from Aadhaar-as-printed, for a student without a verified APAAR ID (FR-DQ-022) | high | "UDISE+ details differ from Aadhaar. APAAR generation will fail until these match." |
 | DQ-030 | Office records (source `manual_entry`, including a refresh from the school's current ERP) differ from the register for name, date of birth, gender or a parent's name (FR-DQ-033, ADR-0041) | medium | "Office records (or your other school system) differ from the admission register." |
+| DQ-031 | Readiness profiles only (`bseap-ssc-2027`, `apaar`): name, date of birth, gender or a parent's name differs exactly (letter for letter, spaces count) between the register, Aadhaar-as-printed, UDISE+ and the board record; each difference names who fixes it, which sets its severity and text (FR-DQ-040..046, ADR-0040) | blocker | "Records must match exactly for {profile}." |
 
 Every finding stores: rule, severity, attribute, sources compared, masked values, match class, explanation (EN; TE deferred per ADR-0036), suggested route, status (`open`, `resolved`, `waived`, `reopened`), resolver, timestamps.
 

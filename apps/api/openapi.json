@@ -5756,6 +5756,36 @@
         "title": "DeviceOut",
         "type": "object"
       },
+      "DiffSegment": {
+        "description": "A piece of the character-level diff of the right value and another record.",
+        "properties": {
+          "op": {
+            "enum": [
+              "equal",
+              "insert",
+              "delete",
+              "replace"
+            ],
+            "title": "Op",
+            "type": "string"
+          },
+          "other": {
+            "title": "Other",
+            "type": "string"
+          },
+          "reference": {
+            "title": "Reference",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "reference",
+          "other"
+        ],
+        "title": "DiffSegment",
+        "type": "object"
+      },
       "DocSheetCellOut": {
         "description": "Display text (Aadhaar-like numbers masked; null when empty); ``formula`` marks a cell\nkept as inert formula text (never evaluated).",
         "properties": {
@@ -15939,6 +15969,11 @@
             "title": "Parent Verification Slip",
             "type": "boolean"
           },
+          "readiness": {
+            "default": false,
+            "title": "Readiness",
+            "type": "boolean"
+          },
           "required_fields": {
             "items": {
               "type": "string"
@@ -16716,6 +16751,571 @@
           "updated_at"
         ],
         "title": "ProvisioningOut",
+        "type": "object"
+      },
+      "ReadinessCounts": {
+        "properties": {
+          "blocked": {
+            "title": "Blocked",
+            "type": "integer"
+          },
+          "needs_parent": {
+            "title": "Needs Parent",
+            "type": "integer"
+          },
+          "needs_school": {
+            "title": "Needs School",
+            "type": "integer"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "integer"
+          },
+          "students": {
+            "title": "Students",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "students",
+          "ready",
+          "needs_parent",
+          "needs_school",
+          "blocked"
+        ],
+        "title": "ReadinessCounts",
+        "type": "object"
+      },
+      "ReadinessFieldOut": {
+        "properties": {
+          "attribute_key": {
+            "title": "Attribute Key",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReadinessItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference"
+          },
+          "values": {
+            "items": {
+              "$ref": "#/components/schemas/ReadinessValueOut"
+            },
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "attribute_key",
+          "reference",
+          "values",
+          "items"
+        ],
+        "title": "ReadinessFieldOut",
+        "type": "object"
+      },
+      "ReadinessItemOut": {
+        "properties": {
+          "advisory": {
+            "title": "Advisory",
+            "type": "boolean"
+          },
+          "against": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Against"
+          },
+          "changes": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Bilingual"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changes"
+          },
+          "explanation": {
+            "$ref": "#/components/schemas/Bilingual"
+          },
+          "finding_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finding Id"
+          },
+          "finding_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "open",
+                  "resolved",
+                  "waived",
+                  "reopened",
+                  "needs_confirmation"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finding Status"
+          },
+          "kinds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Kinds",
+            "type": "array"
+          },
+          "kinds_text": {
+            "$ref": "#/components/schemas/Bilingual"
+          },
+          "owner": {
+            "enum": [
+              "parent_aadhaar",
+              "school_udise",
+              "school_register",
+              "unknown"
+            ],
+            "title": "Owner",
+            "type": "string"
+          },
+          "owner_label": {
+            "$ref": "#/components/schemas/Bilingual"
+          },
+          "reason": {
+            "enum": [
+              "mismatch",
+              "undecided",
+              "missing",
+              "needs_confirmation"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "segments": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DiffSegment"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segments"
+          },
+          "severity": {
+            "enum": [
+              "blocker",
+              "high",
+              "medium",
+              "low",
+              "info"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "needs_parent",
+              "needs_school",
+              "blocked"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "waived": {
+            "title": "Waived",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "reason",
+          "owner",
+          "status",
+          "source",
+          "against",
+          "sources",
+          "kinds",
+          "advisory",
+          "waived",
+          "severity",
+          "explanation",
+          "owner_label",
+          "kinds_text",
+          "segments",
+          "changes",
+          "finding_id",
+          "finding_status"
+        ],
+        "title": "ReadinessItemOut",
+        "type": "object"
+      },
+      "ReadinessProfileOut": {
+        "properties": {
+          "classes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Classes",
+            "type": "array"
+          },
+          "fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Fields",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label_en": {
+            "title": "Label En",
+            "type": "string"
+          },
+          "label_te": {
+            "title": "Label Te",
+            "type": "string"
+          },
+          "source": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source",
+            "type": "array"
+          },
+          "verified": {
+            "title": "Verified",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "version",
+          "label_en",
+          "label_te",
+          "source",
+          "verified",
+          "classes",
+          "fields"
+        ],
+        "title": "ReadinessProfileOut",
+        "type": "object"
+      },
+      "ReadinessRunIn": {
+        "additionalProperties": false,
+        "description": "Sections, classes or students to check; empty = the profile's classes in your scope.",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/RunScopeIn"
+          }
+        },
+        "title": "ReadinessRunIn",
+        "type": "object"
+      },
+      "ReadinessSectionOut": {
+        "properties": {
+          "blocked": {
+            "title": "Blocked",
+            "type": "integer"
+          },
+          "class_id": {
+            "format": "uuid",
+            "title": "Class Id",
+            "type": "string"
+          },
+          "needs_parent": {
+            "title": "Needs Parent",
+            "type": "integer"
+          },
+          "needs_school": {
+            "title": "Needs School",
+            "type": "integer"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "integer"
+          },
+          "section_id": {
+            "format": "uuid",
+            "title": "Section Id",
+            "type": "string"
+          },
+          "students": {
+            "title": "Students",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "students",
+          "ready",
+          "needs_parent",
+          "needs_school",
+          "blocked",
+          "section_id",
+          "class_id"
+        ],
+        "title": "ReadinessSectionOut",
+        "type": "object"
+      },
+      "ReadinessStudentDetailOut": {
+        "properties": {
+          "applies": {
+            "title": "Applies",
+            "type": "boolean"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/ReadinessFieldOut"
+            },
+            "title": "Fields",
+            "type": "array"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ReadinessProfileOut"
+          },
+          "section_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Id"
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "needs_parent",
+              "needs_school",
+              "blocked"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student": {
+            "$ref": "#/components/schemas/StudentRef"
+          },
+          "values_shown": {
+            "title": "Values Shown",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "profile",
+          "student",
+          "section_id",
+          "applies",
+          "status",
+          "values_shown",
+          "fields"
+        ],
+        "title": "ReadinessStudentDetailOut",
+        "type": "object"
+      },
+      "ReadinessStudentOut": {
+        "description": "One student of a section: status and who must act (no values).",
+        "properties": {
+          "attribute_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Attribute Keys",
+            "type": "array"
+          },
+          "open_items": {
+            "title": "Open Items",
+            "type": "integer"
+          },
+          "owners": {
+            "items": {
+              "enum": [
+                "parent_aadhaar",
+                "school_udise",
+                "school_register",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            "title": "Owners",
+            "type": "array"
+          },
+          "section_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Id"
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "needs_parent",
+              "needs_school",
+              "blocked"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student": {
+            "$ref": "#/components/schemas/StudentRef"
+          }
+        },
+        "required": [
+          "student",
+          "section_id",
+          "status",
+          "owners",
+          "attribute_keys",
+          "open_items"
+        ],
+        "title": "ReadinessStudentOut",
+        "type": "object"
+      },
+      "ReadinessSummaryOut": {
+        "description": "Class/section readiness (\"142 of 160 ready\", US-504 AC3), limited to your scope.",
+        "properties": {
+          "last_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ReadinessProfileOut"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/ReadinessSectionOut"
+            },
+            "title": "Sections",
+            "type": "array"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/ReadinessCounts"
+          }
+        },
+        "required": [
+          "profile",
+          "totals",
+          "sections",
+          "last_run"
+        ],
+        "title": "ReadinessSummaryOut",
+        "type": "object"
+      },
+      "ReadinessValueOut": {
+        "description": "A record's current value: ``value`` in clear only for C2 values, or C3 values when you\nhold ``student.read_sensitive`` for the student (audited); ``masked`` always.",
+        "properties": {
+          "masked": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Masked"
+          },
+          "sensitive": {
+            "title": "Sensitive",
+            "type": "boolean"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "source",
+          "value",
+          "masked",
+          "sensitive"
+        ],
+        "title": "ReadinessValueOut",
         "type": "object"
       },
       "ReadingOut": {
@@ -30154,7 +30754,8 @@
                       "DQ-012",
                       "DQ-021",
                       "DQ-022",
-                      "DQ-030"
+                      "DQ-030",
+                      "DQ-031"
                     ],
                     "type": "string"
                   },
@@ -30640,6 +31241,485 @@
           }
         },
         "summary": "List Profiles",
+        "tags": [
+          "data-quality"
+        ]
+      }
+    },
+    "/api/v1/dq/readiness/{profile_key}": {
+      "get": {
+        "description": "Board or portal readiness by section (\"142 of 160 ready\"): ready, waiting for the\nparent (Aadhaar), waiting for the school (UDISE+ or the register) and blocked (needs a\ndecision), computed from the current records (permission ``dq.readiness.read``; class\nteachers see their sections). Unknown profile: 404.",
+        "operationId": "readiness_summary_api_v1_dq_readiness__profile_key__get",
+        "parameters": [
+          {
+            "description": "Readiness profile, e.g. bseap-ssc-2027, apaar",
+            "in": "path",
+            "name": "profile_key",
+            "required": true,
+            "schema": {
+              "description": "Readiness profile, e.g. bseap-ssc-2027, apaar",
+              "maxLength": 64,
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+              "title": "Profile Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "section_ids",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "maxItems": 100,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Section Ids"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessSummaryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Readiness Summary",
+        "tags": [
+          "data-quality"
+        ]
+      }
+    },
+    "/api/v1/dq/readiness/{profile_key}/runs": {
+      "post": {
+        "description": "Check sections, classes or students for the profile and store each difference as a\nDQ-031 finding, so it can be resolved, waived or linked to a change request (permission\n``dq.readiness.manage``). An empty scope means the profile's classes. Small scopes are\nchecked at once (``completed``), bigger ones are queued. Accepts ``Idempotency-Key``.",
+        "operationId": "start_readiness_run_api_v1_dq_readiness__profile_key__runs_post",
+        "parameters": [
+          {
+            "description": "Readiness profile, e.g. bseap-ssc-2027, apaar",
+            "in": "path",
+            "name": "profile_key",
+            "required": true,
+            "schema": {
+              "description": "Readiness profile, e.g. bseap-ssc-2027, apaar",
+              "maxLength": 64,
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+              "title": "Profile Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadinessRunIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Start Readiness Run",
+        "tags": [
+          "data-quality"
+        ]
+      }
+    },
+    "/api/v1/dq/readiness/{profile_key}/slips": {
+      "get": {
+        "description": "Parent verification slips (one A4 page per student) for one student or one section:\nthe value each record holds, the differences and who must fix them, and a signature line\nfor the parent (permission ``dq.readiness.read``). Aadhaar-as-printed values are shown\nonly with ``student.read_sensitive``; never an Aadhaar number. Printing is audited.",
+        "operationId": "readiness_slips_api_v1_dq_readiness__profile_key__slips_get",
+        "parameters": [
+          {
+            "description": "Readiness profile, e.g. bseap-ssc-2027, apaar",
+            "in": "path",
+            "name": "profile_key",
+            "required": true,
+            "schema": {
+              "description": "Readiness profile, e.g. bseap-ssc-2027, apaar",
+              "maxLength": 64,
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+              "title": "Profile Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "student_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Student Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "section_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Section Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_ready",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Include Ready",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Print-ready A4 slips"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Readiness Slips",
+        "tags": [
+          "data-quality"
+        ]
+      }
+    },
+    "/api/v1/dq/readiness/{profile_key}/students": {
+      "get": {
+        "description": "The students of one section with their readiness and who must act, worst first (no\nvalues; permission ``dq.readiness.read``). A section outside your scope: 404.",
+        "operationId": "readiness_students_api_v1_dq_readiness__profile_key__students_get",
+        "parameters": [
+          {
+            "description": "Readiness profile, e.g. bseap-ssc-2027, apaar",
+            "in": "path",
+            "name": "profile_key",
+            "required": true,
+            "schema": {
+              "description": "Readiness profile, e.g. bseap-ssc-2027, apaar",
+              "maxLength": 64,
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+              "title": "Profile Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "section_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Section Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "ready",
+                      "needs_parent",
+                      "needs_school",
+                      "blocked"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReadinessStudentOut"
+                  },
+                  "title": "Response Readiness Students Api V1 Dq Readiness  Profile Key  Students Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Readiness Students",
+        "tags": [
+          "data-quality"
+        ]
+      }
+    },
+    "/api/v1/dq/readiness/{profile_key}/students/{student_id}": {
+      "get": {
+        "description": "One student: the value every record holds, each exact difference (character by\ncharacter when you may see both values) and who must fix it (permission\n``dq.readiness.read``). Aadhaar-as-printed values appear only with\n``student.read_sensitive`` for the student, and that view is audited.",
+        "operationId": "readiness_student_api_v1_dq_readiness__profile_key__students__student_id__get",
+        "parameters": [
+          {
+            "description": "Readiness profile, e.g. bseap-ssc-2027, apaar",
+            "in": "path",
+            "name": "profile_key",
+            "required": true,
+            "schema": {
+              "description": "Readiness profile, e.g. bseap-ssc-2027, apaar",
+              "maxLength": 64,
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+              "title": "Profile Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessStudentDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Readiness Student",
         "tags": [
           "data-quality"
         ]

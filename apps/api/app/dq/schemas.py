@@ -16,7 +16,7 @@ PROFILE_PATTERN = r"^[a-z0-9][a-z0-9-]{0,63}$"
 RuleId = Literal[
     "DQ-001", "DQ-002", "DQ-003", "DQ-004", "DQ-005", "DQ-006",
     "DQ-007", "DQ-008", "DQ-009", "DQ-010", "DQ-011", "DQ-012",
-    "DQ-021", "DQ-022", "DQ-030",
+    "DQ-021", "DQ-022", "DQ-030", "DQ-031",
 ]  # fmt: skip
 
 
@@ -215,6 +215,8 @@ class ProfileOut(_Out):
     )
     parent_verification_slip: bool = False
     board_fields: list[BoardFieldOut] = Field(default_factory=list)
+    # A board/portal readiness check exists for this profile (GET /dq/readiness/{key}).
+    readiness: bool = False
 
 
 class RuleCount(_Out):
@@ -233,3 +235,116 @@ class SummaryOut(_Out):
     by_severity: dict[str, int]
     by_rule: list[RuleCount]
     last_run: RunOut | None
+
+
+# --- board and portal readiness (FR-DQ-040..FR-DQ-046, ADR-0040) ---------------------------------
+
+ReadinessStatus = Literal["ready", "needs_parent", "needs_school", "blocked"]
+FixOwner = Literal["parent_aadhaar", "school_udise", "school_register", "unknown"]
+ReadinessReason = Literal["mismatch", "undecided", "missing", "needs_confirmation"]
+
+
+class ReadinessProfileOut(_Out):
+    key: str
+    version: int
+    label_en: str
+    label_te: str
+    source: list[str]
+    verified: bool
+    classes: list[str]
+    fields: list[str]
+
+
+class ReadinessCounts(_Out):
+    students: int
+    ready: int
+    needs_parent: int
+    needs_school: int
+    blocked: int
+
+
+class ReadinessSectionOut(ReadinessCounts):
+    section_id: uuid.UUID
+    class_id: uuid.UUID
+
+
+class ReadinessSummaryOut(_Out):
+    """Class/section readiness ("142 of 160 ready", US-504 AC3), limited to your scope."""
+
+    profile: ReadinessProfileOut
+    totals: ReadinessCounts
+    sections: list[ReadinessSectionOut]
+    last_run: RunOut | None
+
+
+class ReadinessStudentOut(_Out):
+    """One student of a section: status and who must act (no values)."""
+
+    student: StudentRef
+    section_id: uuid.UUID | None
+    status: ReadinessStatus
+    owners: list[FixOwner]
+    attribute_keys: list[str]
+    open_items: int
+
+
+class DiffSegment(_Out):
+    """A piece of the character-level diff of the right value and another record."""
+
+    op: Literal["equal", "insert", "delete", "replace"]
+    reference: str
+    other: str
+
+
+class ReadinessValueOut(_Out):
+    """A record's current value: ``value`` in clear only for C2 values, or C3 values when you
+    hold ``student.read_sensitive`` for the student (audited); ``masked`` always."""
+
+    source: str
+    value: str | None
+    masked: str | None
+    sensitive: bool
+
+
+class ReadinessItemOut(_Out):
+    reason: ReadinessReason
+    owner: FixOwner
+    status: ReadinessStatus
+    source: str | None
+    against: str | None
+    sources: list[str]
+    kinds: list[str]
+    advisory: bool
+    waived: bool
+    severity: SeverityName
+    explanation: Bilingual
+    owner_label: Bilingual
+    kinds_text: Bilingual
+    # Character-level detail: only when every value involved may be shown to you.
+    segments: list[DiffSegment] | None
+    changes: list[Bilingual] | None
+    finding_id: uuid.UUID | None
+    finding_status: FindingStatus | None
+
+
+class ReadinessFieldOut(_Out):
+    attribute_key: str
+    reference: str | None
+    values: list[ReadinessValueOut]
+    items: list[ReadinessItemOut]
+
+
+class ReadinessStudentDetailOut(_Out):
+    profile: ReadinessProfileOut
+    student: StudentRef
+    section_id: uuid.UUID | None
+    applies: bool
+    status: ReadinessStatus
+    values_shown: bool
+    fields: list[ReadinessFieldOut]
+
+
+class ReadinessRunIn(_In):
+    """Sections, classes or students to check; empty = the profile's classes in your scope."""
+
+    scope: RunScopeIn = Field(default_factory=RunScopeIn)

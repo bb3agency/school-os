@@ -180,6 +180,8 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | dq.findings.read | ✓ | ✓ | ✓ | ✓ | — | ✓ | S | — | ✓ |
 | dq.findings.resolve | — | ✓ | ✓ | ✓ | — | ✓ | — | — | — |
 | dq.findings.waive | — | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — |
+| dq.readiness.read (board and portal readiness, parent verification slips; Aadhaar-as-printed values on them only with student.read_sensitive; ADR-0040) | ✓ | ✓ | ✓ | ✓ | — | ✓ | S | — | ✓ |
+| dq.readiness.manage (run readiness checks that store DQ-030 findings) | — | ✓ | ✓ | ✓ | — | ✓ | — | — | — |
 | document.upload (new versions and metadata edits only of documents the caller uploaded, unless they also hold document.manage_acl; AA-10) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | S | — | — |
 | document.read | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | S | S | ✓ |
 | document.manage_acl (also gates document delete) | ✓ | ✓ | ✓ | — | — | — | — | — | — |

@@ -110,6 +110,14 @@ permissions:
     description: Waive data-quality findings, including blockers
     sensitivity: critical
     step_up: true
+  dq.readiness.read:
+    description: See board and portal readiness and print parent verification slips
+    sensitivity: normal
+    step_up: false
+  dq.readiness.manage:
+    description: Run board and portal readiness checks
+    sensitivity: normal
+    step_up: false
 
   # --- documents and knowledge -------------------------------------------------------------
   document.upload:

@@ -177,3 +177,18 @@ rules:
     severity: {mode: fixed, level: medium}
     explanation_key: DQ-030
     routes: [ROUTE-ERP, ROUTE-SCHOOL-CR]
+  # ADR-0040 (FR-DQ-040..FR-DQ-043): board and portal readiness, only for profiles with a
+  # `readiness:` section (bseap-ssc-2027, apaar). The profile's identity fields are compared
+  # EXACTLY across its sources; each difference names who fixes it (config/readiness.yaml), which
+  # sets the finding's severity, explanation and routes (the catalog values here are defaults).
+  - id: DQ-031
+    version: 1
+    check: readiness_diff
+    scope: student
+    attribute_keys: [full_name, dob, gender, father_name, mother_name]
+    sources: [admission_register, aadhaar_as_printed, udise_plus, board_registration,
+              birth_certificate, tc_incoming]
+    requires_profile: true
+    severity: {mode: fixed, level: blocker}
+    explanation_key: DQ-031
+    routes: [ROUTE-SCHOOL-CR, ROUTE-UIDAI, ROUTE-UDISE]

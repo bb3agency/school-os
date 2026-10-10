@@ -116,3 +116,26 @@ rules:
   DQ-030:
     en: "Office records (or your other school system) differ from the admission register."
     te: "కార్యాలయ రికార్డులు (లేదా మీ ఇతర పాఠశాల వ్యవస్థ) అడ్మిషన్ రిజిస్టర్‌తో సరిపోలడం లేదు."
+  # ADR-0040 (FR-DQ-040..FR-DQ-043): board and portal readiness, one code per fix owner.
+  # {field} is the field label, {source} the record to correct, {diff} the kinds of difference.
+  DQ-031:
+    en: "Records must match exactly for {profile}."
+    te: "{profile} కోసం రికార్డులు అక్షరం అక్షరం సరిపోలాలి."
+  DQ-031-PARENT:
+    en: "{field} on Aadhaar differs from the right value ({diff}). The parent must correct Aadhaar at an Aadhaar centre."
+    te: "ఆధార్‌లోని {field} సరైన విలువతో సరిపోలడం లేదు ({diff}). తల్లిదండ్రులు ఆధార్ కేంద్రంలో ఆధార్‌ను సరిచేయించాలి."
+  DQ-031-UDISE:
+    en: "{field} in {source} differs from the right value ({diff}). Ask the MEO or MIS coordinator to correct UDISE+."
+    te: "{source} లోని {field} సరైన విలువతో సరిపోలడం లేదు ({diff}). UDISE+ సవరణ కోసం MEO లేదా MIS సమన్వయకర్తను కోరండి."
+  DQ-031-REGISTER:
+    en: "{field} in the admission register looks wrong: {source} and other documents agree on another value ({diff}). Raise a change request with evidence."
+    te: "ప్రవేశ రిజిస్టర్‌లోని {field} తప్పుగా ఉన్నట్లుంది: {source}, ఇతర పత్రాలు మరో విలువను చూపుతున్నాయి ({diff}). రుజువు పత్రంతో మార్పు అభ్యర్థన చేయండి."
+  DQ-031-UNKNOWN:
+    en: "{field} differs between records ({diff}) and it is not clear which is right. Check the documents."
+    te: "రికార్డులలో {field} వేరుగా ఉంది ({diff}), ఏది సరైనదో స్పష్టంగా లేదు. పత్రాలను సరిచూడండి."
+  DQ-031-MISSING:
+    en: "{field} is not recorded from {source}, so it cannot be checked."
+    te: "{source} నుండి {field} నమోదు కాలేదు, అందువల్ల సరిచూడలేము."
+  DQ-031-ADVISORY:
+    en: "{field} in {source} differs only slightly ({diff}). Check it, but it does not hold the student back."
+    te: "{source} లోని {field} కొద్దిగా మాత్రమే వేరుగా ఉంది ({diff}). సరిచూడండి, కానీ దీని వల్ల విద్యార్థి ఆగిపోరు."

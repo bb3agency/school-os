@@ -147,10 +147,12 @@ routes:
   GET /api/v1/certificates/{certificate_id}/print: [render]
   GET /api/v1/students/{student_id}/certificates/preview: [render]
   POST /api/v1/notices/{notice_id}/render: [render]
+  GET /api/v1/dq/readiness/{profile_key}/slips: [render]
   GET /api/v1/students/{student_id}/apaar-consent/form: [render]
   GET /api/v1/sections/{section_id}/apaar-consent-forms: [render]
   # queue-heavy school jobs
   POST /api/v1/dq/runs: [heavy_jobs]
+  POST /api/v1/dq/readiness/{profile_key}/runs: [heavy_jobs]
   POST /api/v1/academic-years/{year_id}/promotions:preview: [heavy_jobs]
   POST /api/v1/platform/invoice-runs: [platform_emergency]
   # audit-chain verification (R-19)

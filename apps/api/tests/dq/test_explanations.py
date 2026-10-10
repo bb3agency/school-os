@@ -64,7 +64,7 @@ def test_FR_DQ_006_four_correction_routes_match_the_prd(catalog: ExplanationCata
 def test_FR_DQ_001_rule_texts_match_the_prd_catalog(catalog: ExplanationCatalog) -> None:
     section = _prd_section("## 5. Data-quality rules catalog")
     rows = re.findall(r'^\| (DQ-\d{3}) \|.*\| "([^"]+)" \|$', section, flags=re.MULTILINE)
-    assert len(rows) == 15  # DQ-030 (ADR-0041)
+    assert len(rows) == 16  # DQ-030 (ADR-0041), DQ-031 (ADR-0040)
     for rule_id, english in rows:
         assert catalog.rules[rule_id].en == english
         assert has_telugu(catalog.rules[rule_id].te)
