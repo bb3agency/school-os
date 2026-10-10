@@ -1593,6 +1593,119 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dq/readiness/{profile_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Readiness Summary
+         * @description Board or portal readiness by section ("142 of 160 ready"): ready, waiting for the
+         *     parent (Aadhaar), waiting for the school (UDISE+ or the register) and blocked (needs a
+         *     decision), computed from the current records (permission ``dq.readiness.read``; class
+         *     teachers see their sections). Unknown profile: 404.
+         */
+        get: operations["readiness_summary_api_v1_dq_readiness__profile_key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dq/readiness/{profile_key}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Readiness Run
+         * @description Check sections, classes or students for the profile and store each difference as a
+         *     DQ-030 finding, so it can be resolved, waived or linked to a change request (permission
+         *     ``dq.readiness.manage``). An empty scope means the profile's classes. Small scopes are
+         *     checked at once (``completed``), bigger ones are queued. Accepts ``Idempotency-Key``.
+         */
+        post: operations["start_readiness_run_api_v1_dq_readiness__profile_key__runs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dq/readiness/{profile_key}/slips": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Readiness Slips
+         * @description Parent verification slips (one A4 page per student) for one student or one section:
+         *     the value each record holds, the differences and who must fix them, and a signature line
+         *     for the parent (permission ``dq.readiness.read``). Aadhaar-as-printed values are shown
+         *     only with ``student.read_sensitive``; never an Aadhaar number. Printing is audited.
+         */
+        get: operations["readiness_slips_api_v1_dq_readiness__profile_key__slips_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dq/readiness/{profile_key}/students": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Readiness Students
+         * @description The students of one section with their readiness and who must act, worst first (no
+         *     values; permission ``dq.readiness.read``). A section outside your scope: 404.
+         */
+        get: operations["readiness_students_api_v1_dq_readiness__profile_key__students_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dq/readiness/{profile_key}/students/{student_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Readiness Student
+         * @description One student: the value every record holds, each exact difference (character by
+         *     character when you may see both values) and who must fix it (permission
+         *     ``dq.readiness.read``). Aadhaar-as-printed values appear only with
+         *     ``student.read_sensitive`` for the student, and that view is audited.
+         */
+        get: operations["readiness_student_api_v1_dq_readiness__profile_key__students__student_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/dq/rules": {
         parameters: {
             query?: never;
@@ -8121,6 +8234,21 @@ export interface components {
             version: number;
         };
         /**
+         * DiffSegment
+         * @description A piece of the character-level diff of the right value and another record.
+         */
+        DiffSegment: {
+            /**
+             * Op
+             * @enum {string}
+             */
+            op: "equal" | "insert" | "delete" | "replace";
+            /** Other */
+            other: string;
+            /** Reference */
+            reference: string;
+        };
+        /**
          * DocSheetCellOut
          * @description Display text (Aadhaar-like numbers masked; null when empty); ``formula`` marks a cell
          *     kept as inert formula text (never evaluated).
@@ -11466,8 +11594,20 @@ export interface components {
             label_te: string;
             /** Needs Apaar */
             needs_apaar: boolean;
+            /**
+             * Readiness
+             * @default false
+             */
+            readiness: boolean;
             /** Required Fields */
             required_fields: string[];
+            /** Source */
+            source?: string[];
+            /**
+             * Verified
+             * @default false
+             */
+            verified: boolean;
             /** Version */
             version: number;
         };
@@ -11779,6 +11919,189 @@ export interface components {
              * @enum {string}
              */
             tier: "shared" | "dedicated";
+        };
+        /** ReadinessCounts */
+        ReadinessCounts: {
+            /** Blocked */
+            blocked: number;
+            /** Needs Parent */
+            needs_parent: number;
+            /** Needs School */
+            needs_school: number;
+            /** Ready */
+            ready: number;
+            /** Students */
+            students: number;
+        };
+        /** ReadinessFieldOut */
+        ReadinessFieldOut: {
+            /** Attribute Key */
+            attribute_key: string;
+            /** Items */
+            items: components["schemas"]["ReadinessItemOut"][];
+            /** Reference */
+            reference: string | null;
+            /** Values */
+            values: components["schemas"]["ReadinessValueOut"][];
+        };
+        /** ReadinessItemOut */
+        ReadinessItemOut: {
+            /** Advisory */
+            advisory: boolean;
+            /** Against */
+            against: string | null;
+            /** Changes */
+            changes: components["schemas"]["Bilingual"][] | null;
+            explanation: components["schemas"]["Bilingual"];
+            /** Finding Id */
+            finding_id: string | null;
+            /** Finding Status */
+            finding_status: ("open" | "resolved" | "waived" | "reopened" | "needs_confirmation") | null;
+            /** Kinds */
+            kinds: string[];
+            kinds_text: components["schemas"]["Bilingual"];
+            /**
+             * Owner
+             * @enum {string}
+             */
+            owner: "parent_aadhaar" | "school_udise" | "school_register" | "unknown";
+            owner_label: components["schemas"]["Bilingual"];
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "mismatch" | "undecided" | "missing" | "needs_confirmation";
+            /** Segments */
+            segments: components["schemas"]["DiffSegment"][] | null;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "blocker" | "high" | "medium" | "low" | "info";
+            /** Source */
+            source: string | null;
+            /** Sources */
+            sources: string[];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ready" | "needs_parent" | "needs_school" | "blocked";
+            /** Waived */
+            waived: boolean;
+        };
+        /** ReadinessProfileOut */
+        ReadinessProfileOut: {
+            /** Classes */
+            classes: string[];
+            /** Fields */
+            fields: string[];
+            /** Key */
+            key: string;
+            /** Label En */
+            label_en: string;
+            /** Label Te */
+            label_te: string;
+            /** Source */
+            source: string[];
+            /** Verified */
+            verified: boolean;
+            /** Version */
+            version: number;
+        };
+        /**
+         * ReadinessRunIn
+         * @description Sections, classes or students to check; empty = the profile's classes in your scope.
+         */
+        ReadinessRunIn: {
+            scope?: components["schemas"]["RunScopeIn"];
+        };
+        /** ReadinessSectionOut */
+        ReadinessSectionOut: {
+            /** Blocked */
+            blocked: number;
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
+            /** Needs Parent */
+            needs_parent: number;
+            /** Needs School */
+            needs_school: number;
+            /** Ready */
+            ready: number;
+            /**
+             * Section Id
+             * Format: uuid
+             */
+            section_id: string;
+            /** Students */
+            students: number;
+        };
+        /** ReadinessStudentDetailOut */
+        ReadinessStudentDetailOut: {
+            /** Applies */
+            applies: boolean;
+            /** Fields */
+            fields: components["schemas"]["ReadinessFieldOut"][];
+            profile: components["schemas"]["ReadinessProfileOut"];
+            /** Section Id */
+            section_id: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ready" | "needs_parent" | "needs_school" | "blocked";
+            student: components["schemas"]["StudentRef"];
+            /** Values Shown */
+            values_shown: boolean;
+        };
+        /**
+         * ReadinessStudentOut
+         * @description One student of a section: status and who must act (no values).
+         */
+        ReadinessStudentOut: {
+            /** Attribute Keys */
+            attribute_keys: string[];
+            /** Open Items */
+            open_items: number;
+            /** Owners */
+            owners: ("parent_aadhaar" | "school_udise" | "school_register" | "unknown")[];
+            /** Section Id */
+            section_id: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ready" | "needs_parent" | "needs_school" | "blocked";
+            student: components["schemas"]["StudentRef"];
+        };
+        /**
+         * ReadinessSummaryOut
+         * @description Class/section readiness ("142 of 160 ready", US-503 AC3), limited to your scope.
+         */
+        ReadinessSummaryOut: {
+            last_run: components["schemas"]["RunOut"] | null;
+            profile: components["schemas"]["ReadinessProfileOut"];
+            /** Sections */
+            sections: components["schemas"]["ReadinessSectionOut"][];
+            totals: components["schemas"]["ReadinessCounts"];
+        };
+        /**
+         * ReadinessValueOut
+         * @description A record's current value: ``value`` in clear only for C2 values, or C3 values when you
+         *     hold ``student.read_sensitive`` for the student (audited); ``masked`` always.
+         */
+        ReadinessValueOut: {
+            /** Masked */
+            masked: string | null;
+            /** Sensitive */
+            sensitive: boolean;
+            /** Source */
+            source: string;
+            /** Value */
+            value: string | null;
         };
         /**
          * ReadingOut
@@ -17618,7 +17941,7 @@ export interface operations {
                 /** @description Page size (max 200). */
                 limit?: number;
                 profile_key?: string | null;
-                rule_id?: ("DQ-001" | "DQ-002" | "DQ-003" | "DQ-004" | "DQ-005" | "DQ-006" | "DQ-007" | "DQ-008" | "DQ-009" | "DQ-010" | "DQ-011" | "DQ-012" | "DQ-021" | "DQ-022")[] | null;
+                rule_id?: ("DQ-001" | "DQ-002" | "DQ-003" | "DQ-004" | "DQ-005" | "DQ-006" | "DQ-007" | "DQ-008" | "DQ-009" | "DQ-010" | "DQ-011" | "DQ-012" | "DQ-021" | "DQ-022" | "DQ-030")[] | null;
                 section_id?: string | null;
                 severity?: ("blocker" | "high" | "medium" | "low" | "info")[] | null;
                 status?: ("open" | "resolved" | "waived" | "reopened" | "needs_confirmation")[] | null;
@@ -17819,6 +18142,245 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProfileOut"][];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readiness_summary_api_v1_dq_readiness__profile_key__get: {
+        parameters: {
+            query?: {
+                section_ids?: string[] | null;
+            };
+            header?: never;
+            path: {
+                /** @description Readiness profile, e.g. bseap-ssc-2027, apaar */
+                profile_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessSummaryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    start_readiness_run_api_v1_dq_readiness__profile_key__runs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Readiness profile, e.g. bseap-ssc-2027, apaar */
+                profile_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReadinessRunIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readiness_slips_api_v1_dq_readiness__profile_key__slips_get: {
+        parameters: {
+            query?: {
+                include_ready?: boolean;
+                section_id?: string | null;
+                student_id?: string | null;
+            };
+            header?: never;
+            path: {
+                /** @description Readiness profile, e.g. bseap-ssc-2027, apaar */
+                profile_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Print-ready A4 slips */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readiness_students_api_v1_dq_readiness__profile_key__students_get: {
+        parameters: {
+            query: {
+                section_id: string;
+                status?: ("ready" | "needs_parent" | "needs_school" | "blocked")[] | null;
+            };
+            header?: never;
+            path: {
+                /** @description Readiness profile, e.g. bseap-ssc-2027, apaar */
+                profile_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessStudentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readiness_student_api_v1_dq_readiness__profile_key__students__student_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Readiness profile, e.g. bseap-ssc-2027, apaar */
+                profile_key: string;
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessStudentDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
             /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
