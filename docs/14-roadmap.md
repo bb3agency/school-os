@@ -315,6 +315,17 @@ Not built: the MSI installer and code signing; signed auto-update; exposure of `
 
 **Questions for the PO and security review**: the ten questions of ADR-0032 (Tally version and ledger layout at the design partner, HMAC vs Ed25519, C2 vs C3 for fee data, who enrols, updates, an Excel fallback, bill-wise dues, the 48-hour silence window, class-teacher access).
 
+### R1 status: APAAR consent, UDISE+ 2026-27 profile, transfer-in by PEN (2026-10-10)
+
+Built on `wip/r1-apaar-udise` (docs/18 §3 R1.2-R1.3; ADR-0039; stories US-1901..US-1905 in 02-PRD C19; FR-APC-001..006, FR-STU-017..019, FR-IMP-010, FR-EXP-006 in 03-TRD; migration `0051_apaar_consent_pen`, to be re-chained at merge if another `0051` lands first):
+
+- **APAAR consent register** (`app/apaar`): append-only decisions with the signed form as evidence, printable A4 forms with a refusal option in English or Telugu per school (D9), section summary and pending follow-up list, refused students skipped by DQ-009/DQ-022. Permissions `apaar.consent.read` / `apaar.consent.record`; run the system-role sync after the migration (ADR-0022).
+- **PEN**: 11 digits, `tc_incoming` source, exact search, duplicate guard on create, values and imports, `POST /students/national-id-check` for transfer-ins.
+- **UDISE+ 2026-27 profile**: Student Module field list with `portal_fields`, `source` URLs, `verified: false` (D3); export layout version 3.
+- **Web**: `/apaar` consent screen, PEN check on the new-student form and detail page, PEN/APAAR import mapping.
+
+Open: the consent wording and the court order are from secondary sources (check the official revised form); the Telugu form text needs a native reviewer; the UDISE+ field list awaits a school's portal screen or the official 2026-27 DCF; the BSEAP readiness diff and the APAAR failure list are a separate R1 work item (`app/dq/readiness*`).
+
 ### M7 · Multi-school readiness
 **Scope:** self-serve onboarding wizard · import templates library · online payment collection if ADR-0016 is accepted (basic billing already shipped in M0) · tenant admin improvements · support tooling beyond tickets · first dedicated-tier schools at scale (SEC-030 before the first one) · Stage 1 infrastructure (Multi-AZ, replicas, cross-account backups) · external pen test · published security overview for schools.
 **Exit:** 5 schools live with < 1 week onboarding effort each; SLOs met for 2 consecutive months.

@@ -427,6 +427,34 @@ Purpose limit (08 §4): these features exist only for the school's educational a
 
 ---
 
+### C19 · Board and portal readiness: APAAR consent, PEN and transfer-in (R1)
+
+Stories of the 2026-27 plan (docs/18 §3 R1.2-R1.3; owner decisions D1, D3, D9 of 2026-10-10; ADR-0039).
+
+**US-1901** · As an office clerk, I want to record each parent's APAAR consent decision with the signed form so that the school can show who agreed, who refused and when. [FR-APC-001..003, PRV-021]
+- AC1: I record `given` (only with the signed form uploaded as evidence), `refused`, `withdrawn` (only after a given consent) or `pending` (form sent home), with who decided and the date on the form.
+- AC2: Every decision is added to the student's history; nothing is overwritten, and the history shows who recorded each entry and when.
+- AC3: Typing an Aadhaar number into the note is refused; the form never shows one.
+
+**US-1902** · As an office clerk or class teacher, I want to print the APAAR consent form for one student or a whole section, in the language our parents read, so that every parent gets a form that lets them say yes or no. [FR-APC-004]
+- AC1: The form offers "I give consent" and "I do not give consent" side by side and says admission and studies do not depend on the answer (Supreme Court order of 20 July 2026, as reported; to check against the official form).
+- AC2: The principal chooses English or Telugu for the printed form once for the school; the staff screens stay English.
+- AC3: I can print only the students whose answer is still pending. Each print is in the audit log.
+
+**US-1903** · As a principal or class teacher, I want given / refused / pending counts per section and the list of pending students so that I can follow up before the board and portal windows. [FR-APC-005, FR-APC-006]
+- AC1: Class teachers see only their sections.
+- AC2: A child whose parents refused is shown as refused, never as missing, and the APAAR readiness checks do not ask the office to generate an APAAR ID for that child.
+
+**US-1904** · As an office clerk admitting a child from another school, I want SchoolOS to stop me creating a second record for a child whose PEN or APAAR ID we already have, and to tell me to import the child into UDISE+ by PEN, so that the child is never "active in two schools". [FR-STU-017..019, FR-IMP-010]
+- AC1: The PEN is 11 digits (spaces allowed while typing); it can come from UDISE+, the transfer certificate or the office.
+- AC2: A PEN or APAAR ID already on another current record is refused with a link to that record (also in imports, as a row error); the same number twice in one file is an error on both rows.
+- AC3: A transfer-in admission needs the PEN; checking the number first tells me whether to open the existing record, re-admit a former student, import the child by PEN, or search UDISE+ by name and date of birth.
+- AC4: I can find a student by exact PEN, like the APAAR ID search.
+
+**US-1905** · As an exam coordinator, I want the UDISE+ check sheet to follow the 2026-27 Student Module so that I can type each child's details into the portal field by field. [FR-EXP-006]
+- AC1: The sheet lists, in the portal's order, every field SchoolOS holds, including PEN and APAAR ID; fields SchoolOS does not hold (and the Aadhaar number, which it never stores) are named for me to enter from the card or the form.
+- AC2: The profile says which public documents it came from and that it is not yet confirmed with a school (owner decision D3).
+
 ## 5. Data-quality rules catalog (initial)
 
 | Rule | Checks | Default severity | Explanation template (EN) |
