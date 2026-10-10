@@ -612,17 +612,20 @@ def _slip_student(
 ) -> slip_page.SlipStudent:
     spec = _spec(profile)
     cfg = load_engine_config()
+    # Where the check does not apply (another class, a verified APAAR ID) the slip shows the
+    # values only, with no differences to fix.
+    lines = student.lines if student.applies else []
     rows: list[slip_page.SlipRow] = []
     for compared in spec.fields:
         held = student.assessment.facts.get(compared.attribute, {})
         wrong = {
             line.item.source
-            for line in student.lines
+            for line in lines
             if line.item.attribute == compared.attribute and line.counts()
         }
         undecided = any(
             line.item.attribute == compared.attribute and line.item.reason == "undecided"
-            for line in student.lines
+            for line in lines
         )
         cells: list[str] = []
         differs: list[bool] = []
@@ -646,7 +649,7 @@ def _slip_student(
         label = labels.attributes.get(compared.attribute, (compared.attribute, ""))
         rows.append(slip_page.SlipRow(slip_page.SlipText(label[0], label[1]), cells, differs))
     issues: list[slip_page.SlipIssue] = []
-    for line in student.lines:
+    for line in lines:
         if not line.counts():
             continue
         finding = line.finding
@@ -716,7 +719,8 @@ def slips(
     elif section_id is not None:
         _section(session, ctx, section_id)
         ids, target = _in_reach(session, ctx, [section_id])[:MAX_SLIPS], section_id
-    assessed = _assess(session, profile, ids, force=student_id is not None)
+    # Slips always show what each record holds, even where the check does not apply.
+    assessed = _assess(session, profile, ids, force=True)
     refs = students.summaries(session, ctx, ids)
     ordered = sorted(ids, key=lambda s: ((refs[s].display_name or "") if s in refs else "", str(s)))
     if not include_ready:

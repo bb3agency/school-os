@@ -109,7 +109,7 @@ def test_SEC_003_readiness_permissions(world: Any, api: Any) -> None:
     for role in ("accountant", "teacher"):
         assert api.call(world.person(role), "GET", BASE).status_code == 403
     sid, _ = ssc_student(world.a)
-    assert run(api, world.person("principal"), sid).status_code == 403  # reads, does not run
+    assert run(api, world.person("auditor_readonly"), sid).status_code == 403  # reads only
     assert run(api, world.person("class_teacher"), sid).status_code == 403
 
 

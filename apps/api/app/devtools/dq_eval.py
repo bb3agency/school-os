@@ -192,9 +192,11 @@ def facts_for(school: SchoolStudents) -> dict[uuid.UUID, StudentFacts]:
 def evaluate_in_memory(
     school: SchoolStudents, *, profiles: Iterable[str] | None = None
 ) -> list[Finding]:
-    """Every finding the DQ checks raise for ``school`` (all export profiles by default)."""
+    """Every finding the DQ checks raise for ``school`` (all export pre-check profiles by
+    default; readiness profiles, DQ-030, are scored by their own tests: ADR-0040)."""
     known = load_profiles()
-    chosen = tuple(known[p] for p in (known if profiles is None else profiles))
+    default = [key for key, profile in known.items() if profile.readiness is None]
+    chosen = tuple(known[p] for p in (default if profiles is None else profiles))
     facts = facts_for(school)
     context = CheckContext(
         students=facts,

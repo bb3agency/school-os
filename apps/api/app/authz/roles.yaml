@@ -86,6 +86,7 @@ roles:
       dq.findings.resolve: school
       dq.findings.waive: school_step_up
       dq.readiness.read: school
+      dq.readiness.manage: school
       document.upload: school
       document.read: school
       document.manage_acl: school
