@@ -3711,7 +3711,8 @@
       "profileKind": {
         "board": "board",
         "portal": "portal"
-      }
+      },
+      "unverifiedFormat": "{label} (format not yet confirmed)"
     },
     "precheck": {
       "title": "New pre-check",

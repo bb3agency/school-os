@@ -3711,7 +3711,8 @@
       "profileKind": {
         "board": "బోర్డు",
         "portal": "పోర్టల్"
-      }
+      },
+      "unverifiedFormat": "{label} (ఆకృతి ఇంకా నిర్ధారించలేదు)"
     },
     "precheck": {
       "title": "కొత్త ముందస్తు తనిఖీ",
