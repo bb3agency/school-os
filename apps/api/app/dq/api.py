@@ -193,7 +193,12 @@ def get_summary(
 ReadinessReader = Annotated[UserContext, Depends(require(readiness.READ))]
 ReadinessManager = Annotated[UserContext, Depends(require(readiness.MANAGE))]
 ProfileKey = Annotated[
-    str, Path(pattern=PROFILE_PATTERN, description="Readiness profile, e.g. bseap-ssc-2027, apaar")
+    str,
+    Path(
+        pattern=PROFILE_PATTERN,
+        max_length=64,
+        description="Readiness profile, e.g. bseap-ssc-2027, apaar",
+    ),
 ]
 
 _SLIP_HEADERS = {
