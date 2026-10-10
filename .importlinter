@@ -466,6 +466,7 @@ source_modules =
     app.imports.values
     app.imports.validation
     app.imports.config
+    app.imports.presets
 forbidden_modules =
     sqlalchemy
     fastapi

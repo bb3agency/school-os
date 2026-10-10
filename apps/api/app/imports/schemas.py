@@ -266,6 +266,49 @@ class SheetEditOut(_Out):
     changed_rows: list[int]
 
 
+class PresetColumnOut(_Out):
+    header: str
+    target: str
+    aliases: list[str]
+    note: str
+
+
+class PresetOut(_Out):
+    """A packaged starting file of the import template library (FR-IMP-030)."""
+
+    key: str
+    version: int
+    label_en: str
+    label_te: str
+    description_en: str
+    import_source: Source
+    template: bool = Field(description="A blank Excel template can be downloaded.")
+    verified: bool = Field(
+        description="False for formats owned by someone else until confirmed (ADR-0041)."
+    )
+    source: list[str]
+    columns: list[PresetColumnOut]
+
+
+class PresetColumnMatch(_Out):
+    index: int
+    header: str
+    target: str | None
+
+
+class PresetMappingOut(_Out):
+    """A preset applied to an import's columns (FR-IMP-031): review it, then save it with
+    ``PUT /imports/{id}/mapping``. Nothing is changed by this read."""
+
+    preset: str
+    import_source: Source
+    source_matches: bool = Field(
+        description="Whether the import was started from the preset's usual source."
+    )
+    columns: list[PresetColumnMatch]
+    missing: list[str] = Field(description="Preset columns the file does not have.")
+
+
 class TemplateOut(_Out):
     id: uuid.UUID
     name: str

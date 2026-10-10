@@ -1,0 +1,27 @@
+# Import template library (FR-IMP-030..033, ADR-0041): the blank SchoolOS template.
+# Our own format, so it is verified by definition. Headers equal the import synonyms
+# (app/imports/config.yaml), so a filled-in copy also maps without this preset.
+key: schoolos-blank
+version: 1
+label_en: Blank SchoolOS template
+label_te: ఖాళీ SchoolOS టెంప్లేట్
+description_en: >-
+  One row per student, copied from the admission register. Fill in what you have; the
+  admission number and full name are needed to add a student.
+import_source: admission_register
+template: true
+verified: true
+columns:
+  - {header: Admission number, target: admission_no, note: "As written in the admission register."}
+  - {header: Full name, target: full_name, note: "As written in the admission register."}
+  - {header: Date of birth, target: dob, note: "DD/MM/YYYY."}
+  - {header: Gender, target: gender, note: "Male, Female or Transgender."}
+  - {header: Father's name, target: father_name}
+  - {header: Mother's name, target: mother_name}
+  - {header: Date of admission, target: admission_date, note: "DD/MM/YYYY."}
+  - {header: Class, target: class, note: "For example 9, IX or Class 9."}
+  - {header: Section, target: section, note: "For example A."}
+  - {header: Roll number, target: roll_no}
+  - {header: Mother tongue, target: mother_tongue}
+  - {header: Nationality, target: nationality}
+  - {header: Social category, target: category, note: "General, EWS, OBC/BC, SC or ST. Restricted."}

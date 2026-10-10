@@ -1388,6 +1388,18 @@ SPECS: dict[tuple[str, str], Builder] = {
         {},
     ),
     ("GET", "/api/v1/import-templates"): lambda w, r, a: ("/api/v1/import-templates", None, {}),
+    # Import template library (FR-IMP-030, FR-IMP-031): import.run.
+    ("GET", "/api/v1/import-presets"): lambda w, r, a: ("/api/v1/import-presets", None, {}),
+    ("GET", "/api/v1/import-presets/template"): lambda w, r, a: (
+        "/api/v1/import-presets/template?preset=schoolos-blank",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/imports/{import_id}/preset-mapping"): lambda w, r, a: (
+        f"/api/v1/imports/{_shared_import(w, a)}/preset-mapping?preset=register-excel",
+        None,
+        {},
+    ),
     ("POST", "/api/v1/import-templates"): lambda w, r, a: (
         "/api/v1/import-templates",
         {"name": f"Matrix layout {uuid.uuid4().hex[:8]}", "import_id": str(_shared_import(w, a))},
