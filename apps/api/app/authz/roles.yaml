@@ -38,6 +38,7 @@ roles:
       student.identity_change.approve: school_step_up
       student.export: school_step_up
       dq.findings.read: school
+      dq.readiness.read: school
       document.upload: school
       document.read: school
       document.manage_acl: school
@@ -84,6 +85,7 @@ roles:
       dq.findings.read: school
       dq.findings.resolve: school
       dq.findings.waive: school_step_up
+      dq.readiness.read: school
       document.upload: school
       document.read: school
       document.manage_acl: school
@@ -135,6 +137,8 @@ roles:
       dq.findings.read: school
       dq.findings.resolve: school
       dq.findings.waive: school_step_up
+      dq.readiness.read: school
+      dq.readiness.manage: school
       document.upload: school
       document.read: school
       document.manage_acl: school
@@ -167,6 +171,8 @@ roles:
       import.run: school
       dq.findings.read: school
       dq.findings.resolve: school
+      dq.readiness.read: school
+      dq.readiness.manage: school
       document.upload: school
       document.read: school
       kb.ask: school
@@ -202,6 +208,8 @@ roles:
       import.commit: school
       dq.findings.read: school
       dq.findings.resolve: school
+      dq.readiness.read: school
+      dq.readiness.manage: school
       document.upload: school
       document.read: school
       kb.ask: school
@@ -221,6 +229,7 @@ roles:
       student.read_basic: scoped
       student.read_sensitive: scoped
       dq.findings.read: scoped
+      dq.readiness.read: scoped
       document.upload: scoped
       document.read: scoped
       kb.ask: scoped
@@ -252,6 +261,7 @@ roles:
     grants:
       student.read_basic: school
       dq.findings.read: school
+      dq.readiness.read: school
       document.read: school
       audit.read: school
       finance.read: school
