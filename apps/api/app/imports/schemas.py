@@ -99,6 +99,8 @@ class Issue(_Out):
     code: str
     message_key: str
     ref: str | None = None
+    # FR-IMP-010: the existing record that already holds this PEN or APAAR ID.
+    student_id: str | None = None
 
 
 class ColumnOut(_Out):
