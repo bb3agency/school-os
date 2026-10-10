@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | **Draft for the product owner.** Nothing here is accepted until the questions in §7 are answered; accepted items then move into `docs/14-roadmap.md`, the PRD and ADRs. |
+| Status | **Accepted by the product owner 2026-10-10** (decisions in §8). Items move into `docs/14-roadmap.md`, the PRD and ADRs as each release starts. |
 | Date | 2026-10-10 |
 | Evidence | `docs/research/2026-10-market/report.md` (synthesis) and `docs/research/2026-10-market/notes/*.md` (sourced notes). Most figures there are secondary sources; estimates are marked as such. |
 
@@ -118,3 +118,28 @@ The same pattern as waves 1-6: small waves of agents on `wip/*` branches, each s
 8. **CBSE and RTE.** Include the CBSE registration profile and the RTE register in this year's scope, or State Board only?
 9. **Legal.** Who drafts the DPA, DPIA and privacy notice (a lawyer you use, or a draft from us for review)?
 10. **Build pace.** How many agents per wave, and do you want R0 and R1 in parallel?
+
+## 8. Owner decisions (2026-10-10)
+
+| # | Question | Decision | Effect on the plan |
+|---|---|---|---|
+| D1 | Wedge | **Lead with board and portal readiness**; aim pilots at the Feb 2027 SSC window | R1 first |
+| D2 | Go-live | **Code only, no cloud yet.** No AWS apply, no GCP/Vertex project, no GitHub settings changes until pilots are close | R0 shrinks to code-side work (CI workflow kept green locally, roadmap correction); cloud steps wait for the owner |
+| D3 | Pilots and formats | **Build from public sources**, mark each format as unverified, confirm with a school later | Every board/portal profile carries `source` and `verified: false` until confirmed |
+| D4 | Fees | **Fee ledger and receipts**: cash, school's own UPI QR (UTR matching), payment links; school is always the merchant | New ADR reverses BRD §7.3 "online fee collection" non-goal; R2 |
+| D5 | Aggregator | **Razorpay first**, behind a provider interface (fake provider in tests) | ADR-0016 to be accepted with Razorpay |
+| D6 | Messaging | **WhatsApp only** (no SMS, no DLT), **Meta Cloud API direct**, through a provider interface | New ADR; R2 |
+| D7 | Message cost | **The school pays Meta directly** (its own WhatsApp Business account, INR billing); SchoolOS charges nothing for messages | ADR-0038 unchanged |
+| D8 | Pricing | **Keep ADR-0038** (₹15,000 one-time + ₹4,999/month; AI answer bundles) | No entry tier for now |
+| D9 | Telugu | **English staff UI; parent-facing WhatsApp templates and parent pages may be Telugu or English per school**; Telugu-speaking support | ADR-0036 amendment: a parent-language setting separate from `SOS_TELUGU_ENABLED` for the staff UI |
+| D10 | Scope of boards | **AP State Board SSC, CBSE registration, CBSE Appendix IX page, and ICSE (CISCE) schools as per their norms and practices.** RTE register not selected this year | R1 covers BSEAP, CBSE and CISCE profiles; R3 drops the RTE register |
+| D11 | Pace | **Waves of 2-3 agents**, each merged and verified before the next | §6 |
+
+Still open: who drafts the DPA, DPIA and privacy notice (Q9) — not blocking R1.
+
+### Resulting release scope
+
+- **R0 (code side only):** fix the stale roadmap status; keep CI workflows passing locally; nothing that spends cloud money.
+- **R1:** BSEAP SSC Class 9/10 readiness (diff, fix-owner, parent verification slip, class dashboard); UDISE+ 2026-27 profile with PEN and transfer-in-by-PEN guard; APAAR consent register and failure list; CBSE registration profile (Class 9/11, LOC 10/12, APAAR mandatory); CISCE registration profile refreshed to current norms; import template library and "alongside your current ERP" mode.
+- **R2:** AP TC format and public certificate verification; fee ledger, receipts, UPI QR/UTR matching, Razorpay payment links; WhatsApp utility templates via Meta Cloud API with opt-in, parent language per school, mobile web landing pages; Ask-the-school conversation screens.
+- **R3:** DPDP processor pack; CBSE Appendix IX page; portal-calendar readiness reminders.
