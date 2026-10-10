@@ -112,6 +112,62 @@ class NameFormat(BaseModel):
         return self
 
 
+READINESS_SOURCES: Final = frozenset(
+    {"admission_register", "aadhaar_as_printed", "udise_plus", "board_registration"}
+)
+_CLASS_CODE_RE: Final = re.compile(r"^[A-Z0-9][A-Z0-9-]{0,15}$")
+
+
+class ReadinessField(BaseModel):
+    """One identity field a readiness profile compares, exactly, across ``sources``
+    (FR-DQ-030). ``required`` sources must hold a value (else the field cannot be checked)."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    attribute: str = Field(pattern=r"^[a-z][a-z0-9_]*$")
+    sources: tuple[str, ...] = Field(min_length=2)
+    required: tuple[str, ...] = ()
+
+    @model_validator(mode="after")
+    def _sources(self) -> ReadinessField:
+        if len(set(self.sources)) != len(self.sources):
+            raise ValueError(f"{self.attribute}: repeated readiness sources")
+        unknown = sorted(set(self.sources) - READINESS_SOURCES)
+        if unknown:
+            raise ValueError(f"{self.attribute}: unknown readiness sources {unknown}")
+        if not set(self.required) <= set(self.sources):
+            raise ValueError(f"{self.attribute}: required sources must be compared sources")
+        return self
+
+
+class ReadinessSpec(BaseModel):
+    """What "ready" means for one board or portal (FR-DQ-030, FR-DQ-032, FR-DQ-033)."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    # Class codes (core.classes.code) the profile applies to; empty = every class.
+    classes: tuple[str, ...] = ()
+    # Students with a verified value of this attribute are ready (ADR-0037: an APAAR ID).
+    skip_when_verified: str | None = Field(default=None, pattern=r"^[a-z][a-z0-9_]*$")
+    # Differences of only these kinds are shown but do not change readiness.
+    advisory_kinds: frozenset[str] = frozenset()
+    fields: tuple[ReadinessField, ...] = Field(min_length=1)
+
+    @field_validator("classes")
+    @classmethod
+    def _classes(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        if len(set(value)) != len(value) or not all(_CLASS_CODE_RE.match(c) for c in value):
+            raise ValueError("readiness classes are unique class codes such as IX or X")
+        return value
+
+    @model_validator(mode="after")
+    def _fields(self) -> ReadinessSpec:
+        keys = [f.attribute for f in self.fields]
+        if len(set(keys)) != len(keys):
+            raise ValueError("a readiness field is listed twice")
+        return self
+
+
 class Profile(BaseModel):
     """One board/portal submission format (the exports module reuses the key)."""
 
@@ -125,6 +181,19 @@ class Profile(BaseModel):
     unverified_identity_severity: Severity | None = None
     name_format: NameFormat | None = None
     needs_apaar: bool = False
+    # Owner decision D3 (2026-10-10): a format built from public sources names them and stays
+    # `verified: false` until a school confirms it against the official document.
+    source: tuple[str, ...] = ()
+    verified: bool = False
+    # Board and portal readiness (FR-DQ-030..036): the exact cross-source comparison.
+    readiness: ReadinessSpec | None = None
+
+    @field_validator("source")
+    @classmethod
+    def _source(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        if not all(re.match(r"^https://[^\s]+$", url) for url in value):
+            raise ValueError("profile sources are https URLs")
+        return value
 
     @field_validator("key")
     @classmethod
@@ -144,6 +213,8 @@ class Profile(BaseModel):
     def _telugu(self) -> Profile:
         if not has_telugu(self.label_te):
             raise ValueError("label_te must be written in Telugu script")
+        if self.readiness is not None and not self.source:
+            raise ValueError("a readiness profile names the public sources it was built from")
         return self
 
     def label(self, language: str) -> str:

@@ -1,0 +1,115 @@
+# Board and portal readiness: who fixes a difference, and what a student's readiness is
+# (FR-DQ-030..FR-DQ-036, US-503..US-505, ADR-0040; CLAUDE.md §6.6, §6.13).
+# Loaded and validated by app.dq.readiness.load_readiness_config(). Which fields and sources a
+# board or portal compares lives in its profile (config/profiles/*.yaml `readiness:`).
+#
+# How the right value is decided (BR-01: the admission register is the legal anchor):
+# - `referee` (the admission register) holds the right value, unless it is CONTRADICTED: no
+#   `corroborating_sources` value agrees with it, and exactly one value that a corroborating
+#   source holds is also held by one of the compared sources. The register is then the record to
+#   correct (owner `school_register`, through a change request with evidence; never
+#   auto-corrected, invariant 6).
+# - A register value that corroborating sources dispute without agreeing among themselves, or no
+#   register value at all, leaves the right value UNDECIDED: owner `undecided_owner`.
+# - Corroboration ignores capital letters and repeated spaces; the readiness comparison itself
+#   is exact (UDISE+ and Aadhaar validation need exact spelling and spacing).
+version: 1
+
+referee: admission_register
+corroborating_sources: [birth_certificate, tc_incoming]
+
+owners:
+  # A source whose value differs from the right value is fixed by:
+  by_source:
+    aadhaar_as_printed: parent_aadhaar     # the parent updates Aadhaar at an Aadhaar centre
+    udise_plus: school_udise               # the school asks the MEO / MIS coordinator
+    board_registration: school_udise       # the board takes its data from UDISE+ (BSEAP 2026)
+    admission_register: school_register    # change request with evidence (maker-checker)
+  undecided: unknown                       # a person must decide which record is right
+  # A required source with no value: who must record it.
+  missing:
+    admission_register: school_register
+    aadhaar_as_printed: unknown            # collect a copy of the Aadhaar card first
+    udise_plus: school_udise               # check the UDISE+ Student Module
+    board_registration: school_udise
+
+# Readiness of a student: the worst status among the differences that count (advisory ones and
+# waived ones do not). Order: worst first.
+status_of_owner:
+  parent_aadhaar: needs_parent
+  school_udise: needs_school
+  school_register: needs_school
+  unknown: blocked
+status_order: [blocked, needs_school, needs_parent, ready]
+
+# Severity of the dq finding each difference becomes (sis.dq_findings.severity).
+severity:
+  mismatch: blocker
+  undecided: blocker
+  missing: high
+  advisory: info
+
+# Explanation texts (explanations.yaml `rules`) and correction routes per finding.
+explanations:
+  parent_aadhaar: DQ-030-PARENT
+  school_udise: DQ-030-UDISE
+  school_register: DQ-030-REGISTER
+  unknown: DQ-030-UNKNOWN
+  missing: DQ-030-MISSING
+  advisory: DQ-030-ADVISORY
+routes:
+  parent_aadhaar: [ROUTE-UIDAI]
+  school_udise: [ROUTE-UDISE]
+  school_register: [ROUTE-SCHOOL-CR]
+  unknown: [ROUTE-SCHOOL-CR, ROUTE-UIDAI, ROUTE-UDISE]
+
+# Words for the sources and the kinds of difference, shown in explanations, on the readiness
+# screen and on the parent verification slip.
+sources:
+  admission_register: {en: "admission register", te: "ప్రవేశ రిజిస్టర్"}
+  aadhaar_as_printed: {en: "Aadhaar (as printed)", te: "ఆధార్ (ముద్రించినట్లు)"}
+  udise_plus: {en: "UDISE+", te: "UDISE+ రికార్డు"}
+  board_registration: {en: "board registration", te: "బోర్డు నమోదు"}
+  birth_certificate: {en: "birth certificate", te: "జనన ధృవీకరణ పత్రం"}
+  tc_incoming: {en: "transfer certificate (incoming)", te: "బదిలీ ధృవీకరణ పత్రం (వచ్చినది)"}
+
+kinds:
+  case: {en: "capital and small letters differ", te: "పెద్ద, చిన్న అక్షరాలు వేరుగా ఉన్నాయి"}
+  spacing: {en: "spaces differ", te: "ఖాళీలు (స్పేస్‌లు) వేరుగా ఉన్నాయి"}
+  punctuation: {en: "dots or other marks differ", te: "చుక్కలు లేదా ఇతర గుర్తులు వేరుగా ఉన్నాయి"}
+  order: {en: "the words are in a different order", te: "పదాల క్రమం వేరుగా ఉంది"}
+  word_missing: {en: "a word is missing in one record", te: "ఒక రికార్డులో ఒక పదం లేదు"}
+  initials: {en: "initials instead of full words", te: "పూర్తి పదాలకు బదులు పొడి అక్షరాలు ఉన్నాయి"}
+  transposed: {en: "two letters are swapped", te: "రెండు అక్షరాలు తారుమారయ్యాయి"}
+  variant: {en: "a different spelling of the same name", te: "అదే పేరు వేరే స్పెల్లింగ్‌లో ఉంది"}
+  spelling: {en: "letters differ", te: "అక్షరాలు వేరుగా ఉన్నాయి"}
+  script: {en: "written in Telugu letters in one record", te: "ఒక రికార్డులో తెలుగు అక్షరాలలో ఉంది"}
+  different: {en: "a different value", te: "వేరే విలువ ఉంది"}
+  day_month_swapped: {en: "day and month are swapped", te: "రోజు, నెల తారుమారయ్యాయి"}
+  day: {en: "the day differs", te: "రోజు వేరుగా ఉంది"}
+  month: {en: "the month differs", te: "నెల వేరుగా ఉంది"}
+  year: {en: "the year differs", te: "సంవత్సరం వేరుగా ఉంది"}
+  unreadable: {en: "the date cannot be read", te: "తేదీని చదవలేకపోతున్నాం"}
+  missing: {en: "not recorded", te: "నమోదు కాలేదు"}
+
+# Who fixes it, in the words of the readiness screen and the slip.
+owner_labels:
+  parent_aadhaar: {en: "Parent: correct Aadhaar at an Aadhaar centre",
+                   te: "తల్లిదండ్రులు: ఆధార్ కేంద్రంలో ఆధార్‌ను సరిచేయించాలి"}
+  school_udise: {en: "School: ask the MEO / MIS coordinator to correct UDISE+",
+                 te: "పాఠశాల: UDISE+ సవరణ కోసం MEO / MIS సమన్వయకర్తను కోరాలి"}
+  school_register: {en: "School: correct the admission register through a change request with evidence",
+                    te: "పాఠశాల: రుజువు పత్రంతో మార్పు అభ్యర్థన ద్వారా ప్రవేశ రిజిస్టర్‌ను సరిచేయాలి"}
+  unknown: {en: "Needs a decision: check the documents to see which record is right",
+            te: "నిర్ణయం అవసరం: ఏ రికార్డు సరైనదో పత్రాలు చూసి నిర్ధారించాలి"}
+
+# One sentence per character-level change, shown only to people who may see the values
+# (never stored in findings, never logged). {word} is the word of the right value where the
+# change is; {a} the characters of the right value, {b} those of the other record.
+changes:
+  space_added: {en: "extra space after “{word}”", te: "“{word}” తర్వాత అదనపు ఖాళీ ఉంది"}
+  space_missing: {en: "space missing after “{word}”", te: "“{word}” తర్వాత ఖాళీ లేదు"}
+  swapped: {en: "“{a}” written as “{b}” in “{word}”", te: "“{word}” లో “{a}” బదులు “{b}” అని రాసి ఉంది"}
+  replaced: {en: "“{b}” instead of “{a}” in “{word}”", te: "“{word}” లో “{a}” బదులు “{b}” ఉంది"}
+  added: {en: "extra “{b}” in “{word}”", te: "“{word}” లో అదనంగా “{b}” ఉంది"}
+  removed: {en: "“{a}” left out of “{word}”", te: "“{word}” లో “{a}” లేదు"}

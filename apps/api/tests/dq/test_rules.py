@@ -39,8 +39,8 @@ def _rule_data(registry: RuleRegistry, rule_id: str) -> dict[str, Any]:
 
 
 def test_FR_DQ_001_catalog_has_dq_001_to_012(registry: RuleRegistry) -> None:
-    # DQ-021 and DQ-022: APAAR ID rules (ADR-0037, FR-DQ-021, FR-DQ-022).
-    assert list(registry) == [f"DQ-{n:03d}" for n in (*range(1, 13), 21, 22)]
+    # DQ-021 and DQ-022: APAAR ID rules (ADR-0037); DQ-030: board and portal readiness (ADR-0040).
+    assert list(registry) == [f"DQ-{n:03d}" for n in (*range(1, 13), 21, 22, 30)]
     for rule in registry.values():
         assert rule.version >= 1
         assert rule.routes

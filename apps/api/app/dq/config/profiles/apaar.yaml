@@ -1,0 +1,40 @@
+# Readiness profile: APAAR ID generation (US-505, FR-DQ-034, ADR-0037, ADR-0040).
+# Loaded and validated by app.dq.profiles.load_profiles(); the file name is the profile key.
+#
+# APAAR IDs are generated through UDISE+ against the child's PEN, with "name as per Aadhaar" as
+# a mandatory field; generation fails when the UDISE+ name, date of birth or gender does not
+# match Aadhaar exactly. Where the error is in UDISE+ the school corrects it; where it is in
+# Aadhaar the parent fixes it at an Aadhaar centre first. The admission register decides which
+# side is right (BR-01). Students with a verified APAAR ID are ready (ADR-0037).
+#
+# Owner decision D3 (2026-10-10): built from public sources, not verified with an official
+# document. The consent register (given / refused / pending) is a separate story.
+key: apaar
+version: 1
+label_en: APAAR ID generation
+label_te: APAAR ఐడి రూపకల్పన
+source:
+  - https://apaar.education.gov.in/
+  - https://circin.ai/blog/udise-plus-2026-27-deadline-apaar-guide
+  - https://blog.chitti.app/apaar-id-school-students-why-schools-ask/
+  - https://educationforallinindia.com/udise-2026-27-answers-to-the-questions-parents-teachers-and-school-heads-are-actually-asking/
+verified: false
+
+required_fields: [full_name, dob, gender]
+unverified_identity_severity: null
+# DQ-009: Aadhaar details are needed for APAAR.
+needs_apaar: true
+
+readiness:
+  skip_when_verified: apaar_id
+  advisory_kinds: [case]
+  fields:
+    - attribute: full_name
+      sources: [udise_plus, aadhaar_as_printed]
+      required: [udise_plus, aadhaar_as_printed]
+    - attribute: dob
+      sources: [udise_plus, aadhaar_as_printed]
+      required: [udise_plus, aadhaar_as_printed]
+    - attribute: gender
+      sources: [udise_plus, aadhaar_as_printed]
+      required: [udise_plus, aadhaar_as_printed]
