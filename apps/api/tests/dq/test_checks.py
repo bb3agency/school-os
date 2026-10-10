@@ -59,7 +59,7 @@ def test_FR_DQ_001_every_catalog_rule_has_a_check() -> None:
     rules = load_rules()
     assert set(CHECKS) == set(CheckKind)
     assert [c.rule.id for c in CHECKS_ALL] == list(rules)
-    assert len(CHECKS_ALL) == 14
+    assert len(CHECKS_ALL) == 15  # DQ-030 (ADR-0041)
 
 
 # --- DQ-001 name: register vs Aadhaar-as-printed ------------------------------------------------

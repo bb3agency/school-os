@@ -1,0 +1,18 @@
+# School operating modes (FR-TEN-022, ADR-0041; CLAUDE.md §6.13: versioned config, not code).
+# Loaded and validated by app.tenancy.service.operating_modes().
+#
+#   full       SchoolOS is the school's office system.
+#   alongside  SchoolOS is the records-and-readiness layer next to the school's current ERP
+#              (owner decision 2026-10-10, docs/18 §3 R1.5): the ERP keeps fees and the other
+#              office work, so the modules listed here are hidden in the web app and cannot be
+#              newly set up through the API. Data already recorded is kept; switching back to
+#              `full` shows the modules again.
+#
+# Module keys: `tally` (read-only Tally connector, app/tally). Fee screens (R2) join the
+# alongside list when they exist.
+version: 1
+modes:
+  full:
+    hidden_modules: []
+  alongside:
+    hidden_modules: [tally]

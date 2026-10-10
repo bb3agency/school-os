@@ -95,6 +95,19 @@ Format: **US-ID · As a … I want … so that …** followed by acceptance crit
 - AC2 (**M1**, FR-TEN-011): Promotions at year end move enrolments forward in bulk with a preview and undo within 24 hours.
 - AC3: Given I lack `tenant.structure.manage`, the create and edit controls are hidden and the API returns 403.
 
+**US-203** · As the school owner, I want to say which boards my school prepares students for (AP State Board, CBSE, CISCE), class by class when we run more than one, so that SchoolOS shows only the board checks we need. [FR-TEN-020, FR-TEN-021; R1, ADR-0041]
+- Permission: `tenant.settings.manage` with a fresh MFA sign-in (owner, principal); everyone in the school sees the choice.
+- AC1: I tick one or more boards in school settings; a school that ticks none keeps seeing every board's checks.
+- AC2: When two boards are ticked I can say which board each of Classes IX-XII follows; a class can follow only a ticked board (422 `class_board_not_declared`).
+- AC3: Board pre-check lists show the ticked boards' profiles and the UDISE+ portal profile; each profile says which of its classes follow its board here.
+- AC4: Every change is audited with the boards chosen (codes only).
+
+**US-204** · As the school owner, I want to run SchoolOS alongside our current ERP so that we keep fees and the parent app where they are and use SchoolOS for records and portal readiness. [FR-TEN-022, FR-IMP-033; R1, ADR-0041]
+- Permission: `tenant.settings.manage` with a fresh MFA sign-in; the choice is audited.
+- AC1: In school settings I choose "Alongside our current ERP" and may name the ERP; the Tally connector (and fee screens when they exist) is hidden for everyone, and no new Tally agent can be set up (409 `module_hidden`). Data already recorded is kept; switching back shows the modules again.
+- AC2: The imports page offers "Refresh from your ERP export": the file is imported with the ERP preset as office records (`manual_entry`), never as the admission register.
+- AC3: A refresh never changes an admission-register value; a difference becomes a DQ-030 finding with the route "correct it in your ERP" first (invariant 6, BR-01).
+
 ### C3 · Student record
 
 **US-301** · As an office admin, I want each student's details stored with their source so that I can see where every value came from. [FR-STU-001..008]
@@ -128,6 +141,13 @@ Format: **US-ID · As a … I want … so that …** followed by acceptance crit
 - AC3: Any 12-digit Aadhaar-like number in the image text is masked before storage.
 - AC4: Low-confidence fields are highlighted; the queue shows progress per page.
 
+**US-403** · As an office admin, I want ready-made Excel templates and column presets for the files I already have so that my first import maps itself. [FR-IMP-030..032; R1, ADR-0041]
+- Permission: `import.run`.
+- AC1: The imports page lists the template library: blank SchoolOS template, admission register in Excel, UDISE+ student list, and a student export from my current ERP; each says which source it is recorded as and whether its format is confirmed.
+- AC2: I can download each as an Excel file with the header row only (no school data).
+- AC3: In the mapping step I can pick a preset; the columns it knows are filled in (aliases count, a field once, never a field the import's source may not record), the others stay for me to map, and nothing is saved until I save the mapping.
+- AC4: Formats owned by someone else (UDISE+, ERPs) are marked unconfirmed until a school checks them against a real file (owner decision D3). No vendor-specific ERP preset ships without a public column list.
+
 ### C5 · Data-quality engine
 
 **US-501** · As an exam coordinator, I want a pre-check report for my Class 9 batch so that I fix problems before board registration. [FR-DQ-001..012, FR-EXP-002]
@@ -140,6 +160,13 @@ Format: **US-ID · As a … I want … so that …** followed by acceptance crit
 - AC1: Resolving requires linking a change request or a note; waiving requires `dq.findings.waive` and a reason; both are audited.
 - AC1a: A blocker (it stops certificates and submissions) closes when the change request that corrects the record is approved. Resolving or accepting it by hand needs `dq.findings.waive` and a fresh MFA sign-in (403 `blocker_needs_waive`, 428 otherwise); the app hides "Resolve" on a blocker from anyone else and says who can. So a clerk cannot resolve a blocker with a note and then print a certificate from the mismatched record (FR-CERT-002; owner decision 2026-10-04, audit DL-06).
 - AC2: Re-running the check reopens a finding if the underlying conflict returns.
+
+**US-503** · As an exam coordinator at a CBSE or ICSE school, I want board pre-checks for registration and the list of candidates so that the details pass the board portal the first time. [FR-DQ-030..032, FR-EXP-007; R1, ADR-0041]
+- AC1: CBSE: "CBSE registration (Class IX and XI)" for Pariksha Sangam and "CBSE list of candidates (Class X and XII)"; both need name, mother's and father's names, date of birth, gender and category, and check APAAR readiness (APAAR is a mandatory field from 2026-27; a parent's written refusal is entered as REFUSED, so a missing APAAR ID is not a blocker).
+- AC2: CISCE: "CISCE ICSE/ISC candidates 2026-27" (CAREERS portal registration and entry confirmation) replaces the 2026 profile for new checks; the 2026 profile still works for existing findings and exports.
+- AC3: Each profile lists the board's form columns, marks the ones SchoolOS does not hold yet (subjects, minority, single girl child, photograph) for the clerk to enter on the portal, names its public sources and is shown as unconfirmed until a school checks it (owner decision D3).
+- AC4: Profiles that ask parents to check printed details carry that flag (the per-student parent verification slip itself is built with the readiness check, R1.1).
+- AC5: The pre-check report (PDF/XLSX) and "ready to enter" sheet work for each profile as for UDISE+ (US-501).
 
 ### C6 · Change requests (maker-checker)
 
@@ -473,10 +500,11 @@ Stories of the 2026-27 plan (docs/18 §3 R1.2-R1.3; owner decisions D1, D3, D9 o
 | DQ-012 | Enrolment gaps (student active in two sections/years) | high | "Student is enrolled twice." |
 | DQ-021 | APAAR ID not 12 digits, or one APAAR ID on two students of the school (FR-DQ-021; the second case reads "Same APAAR ID as {student}. One of them is wrong.") | blocker | "The APAAR ID is not 12 digits." |
 | DQ-022 | UDISE+ name, date of birth or gender differs from Aadhaar-as-printed, for a student without a verified APAAR ID (FR-DQ-022) | high | "UDISE+ details differ from Aadhaar. APAAR generation will fail until these match." |
+| DQ-030 | Office records (source `manual_entry`, including a refresh from the school's current ERP) differ from the register for name, date of birth, gender or a parent's name (FR-DQ-033, ADR-0041) | medium | "Office records (or your other school system) differ from the admission register." |
 
 Every finding stores: rule, severity, attribute, sources compared, masked values, match class, explanation (EN; TE deferred per ADR-0036), suggested route, status (`open`, `resolved`, `waived`, `reopened`), resolver, timestamps.
 
-**Suggested routes** (text shown to users): "Correct the school record (change request + evidence)", "Parent should correct Aadhaar with UIDAI", "Update UDISE+ after correcting the school record", "Raise a correction request on the board portal", "Check the APAAR ID on the UDISE+ portal or the APAAR card, then record and verify the right one".
+**Suggested routes** (text shown to users): "Correct the school record (change request + evidence)", "Parent should correct Aadhaar with UIDAI", "Update UDISE+ after correcting the school record", "Raise a correction request on the board portal", "Check the APAAR ID on the UDISE+ portal or the APAAR card, then record and verify the right one", "Correct the value in your other school system (ERP) to match the admission register, then refresh from its export".
 
 ## 6. Name-matching specification (AP naming conventions)
 

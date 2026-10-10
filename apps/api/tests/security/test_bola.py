@@ -276,6 +276,7 @@ ACTOR: dict[tuple[str, str], str] = dict.fromkeys(
         ("GET", "/api/v1/imports/{import_id}/sheet"),
         ("PATCH", "/api/v1/imports/{import_id}/sheet/rows/{row_no}"),
         ("GET", "/api/v1/imports/{import_id}/sheet/export"),
+        ("GET", "/api/v1/imports/{import_id}/preset-mapping"),
         # Cancelling needs student.identity_change.request (the owner only approves).
         ("POST", "/api/v1/change-requests/{change_request_id}/cancel"),
         # Issuing, previews, duplicates, withdrawals and PDF retries need certificate.issue
@@ -784,6 +785,7 @@ ID_ROUTES = _id_routes()
 QUERY: dict[tuple[str, str], dict[str, str]] = {
     ("GET", "/api/v1/students/{student_id}/certificates/preview"): {"certificate_type": "bonafide"},
     ("GET", "/api/v1/sections/{section_id}/attendance/month"): {"month": "2026-09"},
+    ("GET", "/api/v1/imports/{import_id}/preset-mapping"): {"preset": "register-excel"},
 }
 
 

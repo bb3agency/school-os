@@ -225,6 +225,8 @@ const DQ_PROFILES: Schemas["ProfileOut"][] = [
     needs_apaar: false,
     source: [],
     verified: false,
+    superseded: false,
+    parent_verification_slip: false,
   },
 ];
 const EXPORT_PROFILES: Schemas["ExportProfileOut"][] = [
@@ -240,6 +242,7 @@ const EXPORT_PROFILES: Schemas["ExportProfileOut"][] = [
     required_fields: PROFILE_FIELDS,
     allowed: true,
     verified: false,
+    superseded: false,
   },
 ];
 

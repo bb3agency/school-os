@@ -2373,6 +2373,42 @@
         "title": "Blocker",
         "type": "object"
       },
+      "BoardFieldOut": {
+        "description": "A column of the board's own form; ``attribute`` null when SchoolOS does not hold it.",
+        "properties": {
+          "attribute": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attribute"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "required": {
+            "title": "Required",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "attribute",
+          "required",
+          "note"
+        ],
+        "title": "BoardFieldOut",
+        "type": "object"
+      },
       "BreakGlassIn": {
         "additionalProperties": false,
         "properties": {
@@ -7354,6 +7390,17 @@
             "title": "Allowed",
             "type": "boolean"
           },
+          "board": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Board"
+          },
           "fields": {
             "items": {
               "type": "string"
@@ -7395,6 +7442,18 @@
             },
             "title": "Required Fields",
             "type": "array"
+          },
+          "source": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source",
+            "type": "array"
+          },
+          "superseded": {
+            "default": false,
+            "title": "Superseded",
+            "type": "boolean"
           },
           "verified": {
             "default": false,
@@ -15525,6 +15584,196 @@
         "title": "PrecheckCreate",
         "type": "object"
       },
+      "PresetColumnMatch": {
+        "properties": {
+          "header": {
+            "title": "Header",
+            "type": "string"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          }
+        },
+        "required": [
+          "index",
+          "header",
+          "target"
+        ],
+        "title": "PresetColumnMatch",
+        "type": "object"
+      },
+      "PresetColumnOut": {
+        "properties": {
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Aliases",
+            "type": "array"
+          },
+          "header": {
+            "title": "Header",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "header",
+          "target",
+          "aliases",
+          "note"
+        ],
+        "title": "PresetColumnOut",
+        "type": "object"
+      },
+      "PresetMappingOut": {
+        "description": "A preset applied to an import's columns (FR-IMP-031): review it, then save it with\n``PUT /imports/{id}/mapping``. Nothing is changed by this read.",
+        "properties": {
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/PresetColumnMatch"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "import_source": {
+            "enum": [
+              "admission_register",
+              "aadhaar_as_printed",
+              "udise_plus",
+              "board_registration",
+              "birth_certificate",
+              "parent_form",
+              "tc_incoming",
+              "manual_entry"
+            ],
+            "title": "Import Source",
+            "type": "string"
+          },
+          "missing": {
+            "description": "Preset columns the file does not have.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing",
+            "type": "array"
+          },
+          "preset": {
+            "title": "Preset",
+            "type": "string"
+          },
+          "source_matches": {
+            "description": "Whether the import was started from the preset's usual source.",
+            "title": "Source Matches",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "preset",
+          "import_source",
+          "source_matches",
+          "columns",
+          "missing"
+        ],
+        "title": "PresetMappingOut",
+        "type": "object"
+      },
+      "PresetOut": {
+        "description": "A packaged starting file of the import template library (FR-IMP-030).",
+        "properties": {
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/PresetColumnOut"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "description_en": {
+            "title": "Description En",
+            "type": "string"
+          },
+          "import_source": {
+            "enum": [
+              "admission_register",
+              "aadhaar_as_printed",
+              "udise_plus",
+              "board_registration",
+              "birth_certificate",
+              "parent_form",
+              "tc_incoming",
+              "manual_entry"
+            ],
+            "title": "Import Source",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label_en": {
+            "title": "Label En",
+            "type": "string"
+          },
+          "label_te": {
+            "title": "Label Te",
+            "type": "string"
+          },
+          "source": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source",
+            "type": "array"
+          },
+          "template": {
+            "description": "A blank Excel template can be downloaded.",
+            "title": "Template",
+            "type": "boolean"
+          },
+          "verified": {
+            "description": "False for formats owned by someone else until confirmed (ADR-0041).",
+            "title": "Verified",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "version",
+          "label_en",
+          "label_te",
+          "description_en",
+          "import_source",
+          "template",
+          "verified",
+          "source",
+          "columns"
+        ],
+        "title": "PresetOut",
+        "type": "object"
+      },
       "PreviewWarning": {
         "properties": {
           "attribute_key": {
@@ -15634,6 +15883,41 @@
       },
       "ProfileOut": {
         "properties": {
+          "applies_to_classes": {
+            "description": "The profile's classes that follow its board in this school (FR-TEN-021).",
+            "items": {
+              "type": "string"
+            },
+            "title": "Applies To Classes",
+            "type": "array"
+          },
+          "board": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Board code (BSEAP, CBSE, CISCE); null for a portal.",
+            "title": "Board"
+          },
+          "board_fields": {
+            "items": {
+              "$ref": "#/components/schemas/BoardFieldOut"
+            },
+            "title": "Board Fields",
+            "type": "array"
+          },
+          "classes": {
+            "description": "Class codes it registers.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Classes",
+            "type": "array"
+          },
           "key": {
             "title": "Key",
             "type": "string"
@@ -15650,6 +15934,11 @@
             "title": "Needs Apaar",
             "type": "boolean"
           },
+          "parent_verification_slip": {
+            "default": false,
+            "title": "Parent Verification Slip",
+            "type": "boolean"
+          },
           "required_fields": {
             "items": {
               "type": "string"
@@ -15658,15 +15947,33 @@
             "type": "array"
           },
           "source": {
-            "default": [],
+            "description": "Public sources of the format.",
             "items": {
               "type": "string"
             },
             "title": "Source",
             "type": "array"
           },
+          "superseded": {
+            "default": false,
+            "description": "A newer cycle replaces it; it still works for old checks.",
+            "title": "Superseded",
+            "type": "boolean"
+          },
+          "supersedes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes"
+          },
           "verified": {
             "default": false,
+            "description": "False until the format is confirmed against the official document (owner decision D3, ADR-0041).",
             "title": "Verified",
             "type": "boolean"
           },
@@ -21063,6 +21370,14 @@
             "title": "Id",
             "type": "string"
           },
+          "modules_hidden": {
+            "description": "Modules the school's operating mode hides, e.g. ``tally`` while SchoolOS runs alongside another ERP (FR-TEN-022).",
+            "items": {
+              "type": "string"
+            },
+            "title": "Modules Hidden",
+            "type": "array"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -21138,6 +21453,29 @@
           "certificate_letterhead": {
             "$ref": "#/components/schemas/CertificateLetterhead-Output"
           },
+          "class_boards": {
+            "description": "Board of each class code where the school runs more than one board (FR-TEN-021); classes not listed follow the school's only board.",
+            "maxProperties": 20,
+            "patternProperties": {
+              "^[A-Z0-9][A-Z0-9_-]{0,15}$": {
+                "enum": [
+                  "BSEAP",
+                  "CBSE",
+                  "CISCE"
+                ],
+                "type": "string"
+              }
+            },
+            "title": "Class Boards",
+            "type": "object"
+          },
+          "current_erp_name": {
+            "default": "",
+            "description": "Name of the school's current ERP, shown on the refresh-from-ERP path.",
+            "pattern": "^[^\\x00-\\x1f\\x7f<>]*$",
+            "title": "Current Erp Name",
+            "type": "string"
+          },
           "date_format": {
             "default": "DD/MM/YYYY",
             "enum": [
@@ -21167,6 +21505,16 @@
             "minItems": 1,
             "title": "Languages",
             "type": "array"
+          },
+          "operating_mode": {
+            "default": "full",
+            "description": "``alongside``: SchoolOS is the records-and-readiness layer next to the school's current ERP, which keeps fees and other office work (FR-TEN-022, ADR-0041).",
+            "enum": [
+              "full",
+              "alongside"
+            ],
+            "title": "Operating Mode",
+            "type": "string"
           }
         },
         "title": "TenantSettings",
@@ -21211,6 +21559,27 @@
             ],
             "title": "Ai Monthly Budget Inr"
           },
+          "boards": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "BSEAP",
+                    "CBSE",
+                    "CISCE"
+                  ],
+                  "type": "string"
+                },
+                "maxItems": 3,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The boards the school prepares students for (FR-TEN-020); stored in ``core.tenants.boards``. Board pre-check profiles are listed for these boards only.",
+            "title": "Boards"
+          },
           "certificate_letterhead": {
             "anyOf": [
               {
@@ -21220,6 +21589,38 @@
                 "type": "null"
               }
             ]
+          },
+          "class_boards": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "enum": [
+                    "BSEAP",
+                    "CBSE",
+                    "CISCE"
+                  ],
+                  "type": "string"
+                },
+                "maxProperties": 20,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Boards"
+          },
+          "current_erp_name": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Erp Name"
           },
           "date_format": {
             "anyOf": [
@@ -21269,6 +21670,21 @@
               }
             ],
             "title": "Languages"
+          },
+          "operating_mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "full",
+                  "alongside"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operating Mode"
           }
         },
         "title": "TenantSettingsPatch",
@@ -29737,7 +30153,8 @@
                       "DQ-011",
                       "DQ-012",
                       "DQ-021",
-                      "DQ-022"
+                      "DQ-022",
+                      "DQ-030"
                     ],
                     "type": "string"
                   },
@@ -30156,8 +30573,22 @@
     },
     "/api/v1/dq/profiles": {
       "get": {
-        "description": "Export pre-check profiles, e.g. CISCE registration and UDISE+ (permission\n``dq.findings.read``).",
+        "description": "Export pre-check profiles, e.g. UDISE+, CBSE registration and CISCE (permission\n``dq.findings.read``). Board profiles are listed for the school's declared boards only\n(FR-TEN-020; every profile while none is declared); each says which of its classes follow\nits board here, whether its format is verified, and its public sources (ADR-0041).",
         "operationId": "list_profiles_api_v1_dq_profiles_get",
+        "parameters": [
+          {
+            "description": "Also list profiles of boards the school did not declare.",
+            "in": "query",
+            "name": "all",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Also list profiles of boards the school did not declare.",
+              "title": "All",
+              "type": "boolean"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -30172,6 +30603,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           },
           "429": {
             "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
@@ -30191,7 +30632,7 @@
               "Retry-After": {
                 "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
                 "schema": {
-                  "minimum": 1.0,
+                  "minimum": 1,
                   "type": "integer"
                 }
               }
@@ -30921,8 +31362,22 @@
     },
     "/api/v1/export-profiles": {
       "get": {
-        "description": "Board and portal pre-check profiles (e.g. ``cisce-registration-2026``, ``udise-plus``)\nwith their field order for the \"ready to enter\" sheet (permission ``export.board`` or\n``export.portal``). ``allowed`` says whether you can run each one.",
+        "description": "Board and portal pre-check profiles (e.g. ``cbse-registration-2027``, ``udise-plus``)\nwith their field order for the \"ready to enter\" sheet (permission ``export.board`` or\n``export.portal``). ``allowed`` says whether you can run each one. Board profiles are\nlisted for the school's declared boards only (FR-TEN-020).",
         "operationId": "list_export_profiles_api_v1_export_profiles_get",
+        "parameters": [
+          {
+            "description": "Also list profiles of boards the school did not declare.",
+            "in": "query",
+            "name": "all",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Also list profiles of boards the school did not declare.",
+              "title": "All",
+              "type": "boolean"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -30937,6 +31392,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           },
           "429": {
             "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
@@ -30956,7 +31421,7 @@
               "Retry-After": {
                 "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
                 "schema": {
-                  "minimum": 1.0,
+                  "minimum": 1,
                   "type": "integer"
                 }
               }
@@ -31983,6 +32448,127 @@
         ]
       }
     },
+    "/api/v1/import-presets": {
+      "get": {
+        "description": "The import template library (FR-IMP-030): blank SchoolOS template, typical register\nExcel, UDISE+ student list, generic ERP export. Each says which import source it is\nusually recorded from and whether its format is verified (permission ``import.run``).",
+        "operationId": "list_presets_api_v1_import_presets_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PresetOut"
+                  },
+                  "title": "Response List Presets Api V1 Import Presets Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List Presets",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/v1/import-presets/template": {
+      "get": {
+        "description": "A preset's blank Excel template, header row only and no school data (FR-IMP-030;\npermission ``import.run``). 404 for an unknown preset.",
+        "operationId": "download_preset_template_api_v1_import_presets_template_get",
+        "parameters": [
+          {
+            "description": "Preset key, e.g. schoolos-blank",
+            "in": "query",
+            "name": "preset",
+            "required": true,
+            "schema": {
+              "description": "Preset key, e.g. schoolos-blank",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+              "title": "Preset",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Blank Excel template: the header row only"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Download Preset Template",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
     "/api/v1/import-templates": {
       "get": {
         "description": "Saved column mappings; a file with the same headers reuses one automatically\n(permission ``import.run``).",
@@ -32506,6 +33092,86 @@
           }
         },
         "summary": "Set Mapping",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/v1/imports/{import_id}/preset-mapping": {
+      "get": {
+        "description": "Apply a template-library preset to this import's columns (FR-IMP-031). Changes nothing:\nreview the columns, then save them with ``PUT /imports/{id}/mapping`` (permission\n``import.run``). Another school's import, someone else's import for a scoped holder, or an\nunknown preset answer 404.",
+        "operationId": "get_preset_mapping_api_v1_imports__import_id__preset_mapping_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "import_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Import Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Preset key, e.g. schoolos-blank",
+            "in": "query",
+            "name": "preset",
+            "required": true,
+            "schema": {
+              "description": "Preset key, e.g. schoolos-blank",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+              "title": "Preset",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresetMappingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get Preset Mapping",
         "tags": [
           "imports"
         ]
@@ -47669,7 +48335,7 @@
     },
     "/api/v1/tally/enrolment-codes": {
       "post": {
-        "description": "A one-time code for enrolling the Tally agent on the office PC (``tally.device.manage``,\nrecent MFA sign-in). Shown once; SchoolOS keeps only its hash; valid 30 minutes. 409\n``too_many_devices``.",
+        "description": "A one-time code for enrolling the Tally agent on the office PC (``tally.device.manage``,\nrecent MFA sign-in). Shown once; SchoolOS keeps only its hash; valid 30 minutes. 409\n``too_many_devices``; 409 ``module_hidden`` while the school runs alongside another ERP\n(FR-TEN-022).",
         "operationId": "create_enrolment_code_api_v1_tally_enrolment_codes_post",
         "requestBody": {
           "content": {
@@ -48891,7 +49557,7 @@
         ]
       },
       "patch": {
-        "description": "Change languages, date format, idle timeout (5-30 min), AI features and the monthly AI\nbudget (permission ``tenant.settings.manage``, step-up; ``If-Match`` required).",
+        "description": "Change languages, date format, idle timeout (5-30 min), AI features, the monthly AI\nbudget, the school's boards and class boards (FR-TEN-020, FR-TEN-021) and the operating\nmode (``alongside`` another ERP, FR-TEN-022) (permission ``tenant.settings.manage``,\nstep-up; ``If-Match`` required). Errors: 422 ``class_board_not_declared`` when a class is\ngiven a board the school did not declare.",
         "operationId": "update_tenant_settings_api_v1_tenant_patch",
         "requestBody": {
           "content": {

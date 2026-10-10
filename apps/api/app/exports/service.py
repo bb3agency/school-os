@@ -275,9 +275,13 @@ def _profile(profile_key: str) -> _Profile:
     return profile
 
 
-def list_profiles(ctx: UserContext) -> list[ExportProfileOut]:
+def list_profiles(
+    ctx: UserContext, session: Session, *, include_all: bool = False
+) -> list[ExportProfileOut]:
     """Pre-check profiles with their target field order; ``allowed`` says whether the caller
-    holds the profile's permission (``export.board`` or ``export.portal``)."""
+    holds the profile's permission (``export.board`` or ``export.portal``). Board profiles of
+    boards the school did not declare are left out unless ``include_all`` (FR-TEN-020)."""
+    shown = {p.key: p for p in dq.school_profiles(session, include_all=include_all)}
     return [
         ExportProfileOut(
             key=p.key,
@@ -290,9 +294,13 @@ def list_profiles(ctx: UserContext) -> list[ExportProfileOut]:
             fields=list(p.layout.fields),
             required_fields=list(p.required_fields),
             allowed=ctx.has(PERMISSION_OF_KIND[p.kind]),
-            verified=p.verified,
+            board=shown[p.key].board,
+            verified=shown[p.key].verified,
+            source=list(shown[p.key].source),
+            superseded=shown[p.key].superseded,
         )
         for p in _profiles().values()
+        if p.key in shown
     ]
 
 

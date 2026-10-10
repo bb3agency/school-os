@@ -114,3 +114,4 @@ FR-…, NFR-…, SEC-…, PRV-…; docs sections affected.
 | [ADR-0037](ADR-0037-apaar-id.md) | Store the APAAR ID (and UDISE+ PEN) as student attributes with provenance | Accepted · Amended by ADR-0039 |
 | [ADR-0038](ADR-0038-commercial-catalogue-one-time-fee-and-ai-answer-bundles.md) | Commercial catalogue: one-time fee and AI answer bundles with overage (amends ADR-0015) | Accepted |
 | [ADR-0039](ADR-0039-apaar-consent-register-and-pen.md) | APAAR consent register, the 11-digit PEN and the transfer-in duplicate guard (amends ADR-0037) | Accepted |
+| [ADR-0041](ADR-0041-boards-import-presets-and-alongside-mode.md) | Boards per school, CBSE/CISCE profiles from public sources, import presets and the "alongside your current ERP" mode | Proposed |

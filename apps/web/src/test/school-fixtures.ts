@@ -242,7 +242,9 @@ export function exportProfiles(): Schemas["ExportProfileOut"][] {
       fields: ["admission_no", "full_name", "gender", "dob", "father_name", "mother_name"],
       required_fields: ["full_name", "dob"],
       allowed: true,
+      board: "CISCE",
       verified: false,
+      superseded: false,
     },
     {
       key: "udise-plus",
@@ -256,6 +258,7 @@ export function exportProfiles(): Schemas["ExportProfileOut"][] {
       required_fields: ["full_name"],
       allowed: true,
       verified: false,
+      superseded: false,
     },
   ];
 }

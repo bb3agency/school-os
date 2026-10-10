@@ -326,6 +326,7 @@ RESPONSE_FIELD_ALLOWLIST = {
     "app.exports.schemas.ExportProfileOut.key": "export profile code",
     "app.exports.schemas.ExportOut.profile_key": "export profile code",
     "app.imports.schemas.Issue.message_key": "i18n message key",
+    "app.imports.schemas.PresetOut.key": "import template library code (ADR-0041)",
     "app.insights.schemas.RuleSettingOut.key": "rule code",
     "app.notifications.schemas.NotificationOut.template_key": "i18n template key",
     "app.identity.schemas.PermissionOut.key": "permission key",

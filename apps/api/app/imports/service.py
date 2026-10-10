@@ -48,6 +48,7 @@ from app.core import retention
 from app.core.db import tenant_session
 from app.core.errors import Conflict, DomainError, NotFound, PreconditionFailed, ValidationFailed
 from app.core.ids import new_id
+from app.core.languages import telugu_text
 from app.core.logging import get_context, get_logger
 from app.core.records import RecordTable
 from app.core.redaction import mask_aadhaar
@@ -72,6 +73,13 @@ from app.imports.mapping import (
     template_payload,
 )
 from app.imports.models import ImportBatch, ImportMappingTemplate, ImportRow
+from app.imports.presets import (
+    Preset,
+    load_presets,
+    missing_columns,
+    preset_mapping,
+    template_header,
+)
 from app.imports.schemas import (
     ColumnOut,
     CommitIn,
@@ -82,6 +90,10 @@ from app.imports.schemas import (
     ImportSummary,
     Issue,
     MappingIn,
+    PresetColumnMatch,
+    PresetColumnOut,
+    PresetMappingOut,
+    PresetOut,
     RowEditIn,
     SheetCellOut,
     SheetColumnOut,
@@ -1347,6 +1359,71 @@ def create_template(session: Session, ctx: UserContext, data: TemplateCreate) ->
         resource_type="import_template",
     )
     return _template_out(template)
+
+
+# --- import template library (FR-IMP-030..033, ADR-0041) ------------------------------------------
+
+
+def _preset_out(preset: Preset) -> PresetOut:
+    return PresetOut(
+        key=preset.key,
+        version=preset.version,
+        label_en=preset.label_en,
+        label_te=telugu_text(preset.label_te) or "",  # empty while Telugu is hidden (ADR-0036)
+        description_en=preset.description_en,
+        import_source=preset.import_source,
+        template=preset.template,
+        verified=preset.verified,
+        source=list(preset.source),
+        columns=[
+            PresetColumnOut(header=c.header, target=c.target, aliases=list(c.aliases), note=c.note)
+            for c in preset.columns
+        ],
+    )
+
+
+def _preset(key: str) -> Preset:
+    preset = load_presets().get(key)
+    if preset is None:
+        raise NotFound("Template not found")
+    return preset
+
+
+def list_presets() -> list[PresetOut]:
+    """The packaged starting files (no school data)."""
+    return [_preset_out(p) for p in load_presets().values()]
+
+
+def preset_template(key: str) -> SheetFile:
+    """The preset's blank Excel template: its header row only, no rows (FR-IMP-030). Contains
+    no school data, so it needs no step-up and writes no audit event."""
+    preset = _preset(key)
+    if not preset.template:
+        raise NotFound("Template not found")
+    content = write_xlsx(template_header(preset), [], title=preset.label_en)
+    return SheetFile(f"schoolos-{preset.key}-v{preset.version}.xlsx", XLSX_MIME, content)
+
+
+def preset_mapping_for(
+    session: Session, ctx: UserContext, batch_id: uuid.UUID, key: str
+) -> PresetMappingOut:
+    """Apply a preset to an import's columns (FR-IMP-031). Read-only: the clerk reviews the
+    result and saves it through :func:`set_mapping` (audited there). Targets the import's
+    source may not record stay unmapped."""
+    batch = _visible(session, ctx, batch_id, RUN)
+    preset = _preset(key)
+    headers = [str(c.get("header", "")) for c in batch.columns]
+    targets = allowed_targets(_specs(session), batch.source)
+    return PresetMappingOut(
+        preset=preset.key,
+        import_source=preset.import_source,
+        source_matches=batch.source == preset.import_source,
+        columns=[
+            PresetColumnMatch(index=m.index, header=m.header, target=m.target)
+            for m in preset_mapping(headers, preset, targets)
+        ],
+        missing=missing_columns(headers, preset),
+    )
 
 
 # --- worker: parse and validate -------------------------------------------------------------------

@@ -138,9 +138,10 @@ class ExportProfileOut(_Out):
     fields: list[str]
     required_fields: list[str]
     allowed: bool
-    # Owner decision D3: false until the format was confirmed with a school or the official
-    # template; the screen says so next to the profile.
+    board: str | None = None
     verified: bool = False
+    source: list[str] = Field(default_factory=list)
+    superseded: bool = False
 
 
 class ExportDownloadOut(_Out):
