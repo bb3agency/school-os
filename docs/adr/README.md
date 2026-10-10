@@ -113,3 +113,4 @@ FR-…, NFR-…, SEC-…, PRV-…; docs sections affected.
 | [ADR-0036](ADR-0036-english-first-telugu-hidden.md) | English first; Telugu hidden behind one switch (`SOS_TELUGU_ENABLED`, off) | Accepted |
 | [ADR-0037](ADR-0037-apaar-id.md) | Store the APAAR ID (and UDISE+ PEN) as student attributes with provenance | Accepted |
 | [ADR-0038](ADR-0038-commercial-catalogue-one-time-fee-and-ai-answer-bundles.md) | Commercial catalogue: one-time fee and AI answer bundles with overage (amends ADR-0015) | Accepted |
+| [ADR-0041](ADR-0041-boards-import-presets-and-alongside-mode.md) | Boards per school, CBSE/CISCE profiles from public sources, import presets and the "alongside your current ERP" mode | Proposed |

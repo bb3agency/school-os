@@ -63,6 +63,9 @@ A multi-tenant web application (Next.js BFF + FastAPI API + Celery workers) on A
 | FR-TEN-011 | **(M1)** Bulk promotion MUST offer preview, commit, and undo within 24 h. | T |
 | FR-TEN-012 | Tenant settings MUST include languages, date format, retention policy, AI features on/off, monthly AI budget. | T |
 | FR-TEN-013 | Multi-campus groups MAY be supported later via a `group_id` without schema breakage. | A |
+| FR-TEN-020 | A school MUST be able to declare its boards (`BSEAP`, `CBSE`, `CISCE`; several allowed) in its settings (`core.tenants.boards`, `tenant.settings.manage`ᴿ with step-up, audited with the codes). Board pre-check profiles MUST be listed for the declared boards only (portal profiles always; every profile while none is declared; `?all=true` lists the rest). *(R1, ADR-0041.)* | T |
+| FR-TEN-021 | A school with more than one board MUST be able to map class codes to one of its declared boards (`settings.class_boards`); a class mapped to an undeclared board is refused (422 `class_board_not_declared`). A profile reports the classes that follow its board in the school (`applies_to_classes`). *(R1, ADR-0041.)* | T |
+| FR-TEN-022 | A school MUST be able to run SchoolOS **alongside** its current ERP (`settings.operating_mode = alongside`, optional `current_erp_name`): the modules listed in `app/tenancy/operating_modes.yaml` (today `tally`) are reported in `modules_hidden`, hidden in the web app and cannot be newly set up (409 `module_hidden`); recorded data is kept. Changes are audited with the new mode. *(R1, ADR-0041.)* | T |
 
 ### 3.3 Student record (FR-STU)
 
@@ -102,6 +105,10 @@ A multi-tenant web application (Next.js BFF + FastAPI API + Celery workers) on A
 | FR-IMP-022 | Aadhaar-like 12-digit numbers (Verhoeff-valid) MUST be masked in extracted text before storage. | T |
 | FR-IMP-023 | Confirmed values MUST link the page image as evidence. | T |
 | FR-IMP-024 | Extraction providers MUST be pluggable (interface) and selected by evaluation. | I |
+| FR-IMP-030 | An import template library MUST ship as versioned files in the package (`app/imports/templates/*.yaml`: key, version, labels, usual import source, `verified`, public `source` URLs, columns with header, target and aliases) and be listed to `import.run` holders; each preset with `template: true` MUST be downloadable as an XLSX with its header row only (no school data, no audit). *(R1, ADR-0041.)* | T |
+| FR-IMP-031 | A preset MUST be applicable to an import's columns as a read-only suggestion (`GET /imports/{id}/preset-mapping`): exact header or alias match after header normalisation, each target once, never a target the import's source may not record; the clerk saves it through the normal mapping (audited there). | T |
+| FR-IMP-032 | Formats owned by others (UDISE+, ERP exports) MUST carry `verified: false` and their public sources until confirmed with a real file (owner decision D3). Vendor-specific ERP presets MUST NOT ship without a public column list. | I |
+| FR-IMP-033 | The "refresh from your ERP export" path MUST import as source `manual_entry` (office records): admission-register values are never replaced (BR-01) and differences become DQ-030 findings (FR-DQ-033). | T |
 
 ### 3.5 Data quality (FR-DQ)
 
@@ -116,6 +123,10 @@ A multi-tenant web application (Next.js BFF + FastAPI API + Celery workers) on A
 | FR-DQ-020 | Resolve requires a linked change request or note; waive requires `dq.findings.waive` and a reason. A **blocker** is resolved by hand only like it is waived: `dq.findings.waive`ᴿ with step-up MFA (`403 blocker_needs_waive`, `428 step_up_required`); the change request that corrects the record closes it when approved, without that. Other findings keep "resolve with a note" under `dq.findings.resolve`. *(Owner decision 2026-10-04, audit DL-06.)* | T |
 | FR-DQ-021 | DQ-021 MUST flag an `apaar_id` value that is not 12 digits (any source) and a student whose APAAR ID another student of the school also has (blocker; raised for each student when that student is checked, naming the first other record by admission number, masked outside the reader's scope as for DQ-008, and never showing the ID). | T |
 | FR-DQ-022 | DQ-022 MUST flag, for a student without a verified APAAR ID, a UDISE+ name, date of birth or gender that differs from the Aadhaar-as-printed value (names by match class, "APAAR generation will fail until these match"). DQ-009 MUST be raised only for students without a verified APAAR ID. | T |
+| FR-DQ-030 | Export pre-check profiles MUST be able to name their board and the class codes they register, their public `source` URLs and `verified` (false until confirmed, owner decision D3), the profile they supersede (the older one keeps working and is listed as superseded) and whether the board expects a parent verification slip. R1 ships `cbse-registration-2027` (IX, XI), `cbse-loc-2027` (X, XII) and `cisce-registration-2027` (IX-XII, supersedes `cisce-registration-2026`). *(ADR-0041.)* | T |
+| FR-DQ-031 | A profile MAY list the board form's columns (`board_fields`: name, the attribute that fills it or none, required, note); attributes named MUST exist in the student catalog. | T |
+| FR-DQ-032 | CBSE profiles MUST check APAAR readiness (`needs_apaar`, DQ-009) without making the APAAR ID a DQ-005 blocker, because a parent may refuse consent (the board column then takes REFUSED or NOGEN). | T |
+| FR-DQ-033 | DQ-030 MUST flag an office-records value (source `manual_entry`, including an ERP refresh) that differs from the admission register for full name, date of birth, gender, father's or mother's name (medium; routes ROUTE-ERP then ROUTE-SCHOOL-CR). | T |
 
 ### 3.6 Change requests (FR-CR)
 
@@ -170,6 +181,7 @@ A multi-tenant web application (Next.js BFF + FastAPI API + Celery workers) on A
 | FR-EXP-003 | Exports MUST be audited (who, when, which students, profile version) and watermarked. | T |
 | FR-EXP-004 | Bulk exports of personal data MUST require re-authentication. | T |
 | FR-EXP-005 | The UDISE+ pre-check "ready to enter" sheet MUST carry `udise_pen` and `apaar_id` columns (layout version 2), empty when unknown; the typed `apaar_id` column is written unmasked (ADR-0037 option (a)), every other cell still passes the Aadhaar mask. | T |
+| FR-EXP-006 | Each R1 board profile MUST have a pre-check layout (`app/exports/config.yaml`, kind `board`) with its required fields and an `apaar_id` column; column order and codes are unverified (owner decision D3) until a school confirms them. | T |
 
 ### 3.10 Audit (FR-AUD)
 

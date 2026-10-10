@@ -318,6 +318,17 @@ Not built: the MSI installer and code signing; signed auto-update; exposure of `
 ### M7 · Multi-school readiness
 **Scope:** self-serve onboarding wizard · import templates library · online payment collection if ADR-0016 is accepted (basic billing already shipped in M0) · tenant admin improvements · support tooling beyond tickets · first dedicated-tier schools at scale (SEC-030 before the first one) · Stage 1 infrastructure (Multi-AZ, replicas, cross-account backups) · external pen test · published security overview for schools.
 **Exit:** 5 schools live with < 1 week onboarding effort each; SLOs met for 2 consecutive months.
+*(The import templates library was pulled forward into R1.5, below.)*
+
+### R1 · Board and portal readiness (2026-27 plan, docs/18 §3)
+
+R1 status, part C (`wip/r1-boards-imports`, 2026-10-10; ADR-0041 Proposed):
+
+- [x] Boards per school (`BSEAP`, `CBSE`, `CISCE`) and per class in school settings; profile lists filtered by board (FR-TEN-020, FR-TEN-021, US-203). Migration `0051_boards_import_presets` (column grant only).
+- [x] CBSE registration (IX/XI) and LOC (X/XII) profiles and pre-check layouts; CISCE ICSE/ISC 2026-27 profile superseding the 2026 one (FR-DQ-030..032, FR-EXP-006, US-503). **All `verified: false`** (owner decision D3): field lists, lengths and codes come from secondary public sources; confirm with a pilot school.
+- [x] Import template library: blank SchoolOS template, register Excel, UDISE+ student list, generic ERP export; header-only XLSX downloads; preset picker in the mapping step (FR-IMP-030..032, US-403). No MyClassboard/Entab/Fedena presets (no usable public column lists).
+- [x] "Alongside your current ERP" mode: hides the Tally connector, refresh-from-ERP path as `manual_entry`, DQ-030 for differences from the register (FR-TEN-022, FR-IMP-033, FR-DQ-033, US-204).
+- [ ] Per-student parent verification slip (with the BSEAP readiness check, R1.1); subject/minority/single-girl-child attributes if pilots need them pre-checked; sync school boards to the control plane (protected windows).
 
 ## 3. Pilot-ready gate (before any real student data)
 
