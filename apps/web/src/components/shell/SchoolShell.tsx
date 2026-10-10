@@ -148,6 +148,13 @@ export function SchoolShell({
           icon: "clipboard",
         },
         {
+          // ADR-0039, US-1901..US-1903: parents' APAAR consent decisions and forms.
+          href: "/apaar",
+          label: t("apaar.nav"),
+          permission: ["apaar.consent.read", "apaar.consent.record"],
+          icon: "check",
+        },
+        {
           href: "/exports",
           label: t("exports.nav"),
           permission: ["export.board", "export.portal", "student.export", "export.read_all"],

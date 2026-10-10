@@ -48,6 +48,7 @@ import { ProblemAlert, problemCode } from "./ProblemAlert";
 import { SensitiveValue } from "./SensitiveValue";
 import { ValuesBySource, ValuesHistory } from "./SourceCompare";
 import { EnrolmentsCard } from "./Enrolments";
+import { penDigits } from "./StudentList";
 import {
   GuardianDialog,
   RemoveGuardianDialog,
@@ -91,6 +92,15 @@ function RelatedLinks({ studentId, permissions }: { studentId: string; permissio
     permissions.has(PERM.certificateIssue) ||
     permissions.has(PERM.certificateApprove)
       ? [{ href: `/certificates?${q}`, label: t("certificatesLink") }]
+      : []),
+    // ADR-0039 (US-1901): the parent's APAAR consent decision and form.
+    ...(permissions.has(PERM.apaarRead) || permissions.has(PERM.apaarRecord)
+      ? [
+          {
+            href: `/apaar/students/${encodeURIComponent(studentId)}`,
+            label: t("apaarConsentLink"),
+          },
+        ]
       : []),
   ];
   if (links.length === 0) return null;
@@ -293,6 +303,12 @@ function valueSchema(attribute: Attribute | undefined) {
   if (attribute?.data_type === "digits4") {
     return base.refine((value) => /^\d{4}$/.test(value), { error: "invalid" });
   }
+  if (attribute?.key === "udise_pen") {
+    // FR-STU-017 (ADR-0039): 11 digits; spaces and hyphens are removed first, as the API does.
+    return base
+      .refine((value) => penDigits(value) !== null, { error: "penInvalid" })
+      .transform((value) => penDigits(value) ?? value);
+  }
   return base;
 }
 
@@ -441,7 +457,9 @@ function RecordValueDialog({
                   ? ts("dateHint", dates.hint("2012-03-14"))
                   : attribute?.data_type === "digits4"
                     ? t("digits4Hint")
-                    : undefined
+                    : key === "udise_pen"
+                      ? t("penHint")
+                      : undefined
               }
               error={valueError(errors.value)}
               value={raw}
