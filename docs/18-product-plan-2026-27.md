@@ -143,3 +143,11 @@ Still open: who drafts the DPA, DPIA and privacy notice (Q9) — not blocking R1
 - **R1:** BSEAP SSC Class 9/10 readiness (diff, fix-owner, parent verification slip, class dashboard); UDISE+ 2026-27 profile with PEN and transfer-in-by-PEN guard; APAAR consent register and failure list; CBSE registration profile (Class 9/11, LOC 10/12, APAAR mandatory); CISCE registration profile refreshed to current norms; import template library and "alongside your current ERP" mode.
 - **R2:** AP TC format and public certificate verification; fee ledger, receipts, UPI QR/UTR matching, Razorpay payment links; WhatsApp utility templates via Meta Cloud API with opt-in, parent language per school, mobile web landing pages; Ask-the-school conversation screens.
 - **R3:** DPDP processor pack; CBSE Appendix IX page; portal-calendar readiness reminders.
+
+## 9. Progress
+
+| Release | Status (2026-10-10) |
+|---|---|
+| R1 | **Built** (wave 1): readiness diff engine with fix owner and parent slips, BSEAP SSC 2027 and APAAR readiness profiles (rule DQ-031, ADR-0040); APAAR consent register, UDISE+ 2026-27 profile, 11-digit PEN and transfer-in guard (ADR-0039); boards per school and class, CBSE registration/LOC and CISCE 2027 profiles, rule DQ-030 for ERP refreshes, import template library and "alongside your current ERP" mode (ADR-0041). Migrations 0051-0053. Every format `verified: false` (D3). Release note: run `python -m app.identity.sync_system_roles --apply` after migrating. Open: server-rendered PDF for slips/forms, e2e coverage of the new screens, Telugu form wording reviewed by a native speaker, SSC profile not yet limited to BSEAP schools (needs an export layout). |
+| R2 | Not started |
+| R3 | Not started |
