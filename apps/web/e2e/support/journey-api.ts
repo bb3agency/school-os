@@ -223,6 +223,9 @@ const DQ_PROFILES: Schemas["ProfileOut"][] = [
     label_te: "CISCE నమోదు 2026",
     required_fields: PROFILE_FIELDS,
     needs_apaar: false,
+    source: [],
+    verified: false,
+    readiness: false,
   },
 ];
 const EXPORT_PROFILES: Schemas["ExportProfileOut"][] = [
