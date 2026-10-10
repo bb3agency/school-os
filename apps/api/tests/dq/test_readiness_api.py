@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 from sqlalchemy import Engine
 
+from app.core.languages import contains_telugu
 from app.students.schemas import ValueIn
 
 pytestmark = pytest.mark.db
@@ -122,6 +123,7 @@ def test_US_504_student_detail_shows_the_exact_difference_and_who_fixes_it(
     res = api.call(office, "GET", f"{BASE}/students/{sid}")
     assert res.status_code == 200, res.text
     body = res.json()
+    assert not contains_telugu(res.text)  # ADR-0036
     assert body["status"] == "needs_parent"
     assert body["values_shown"] is True
     full_name = field(body, "full_name")
@@ -273,6 +275,7 @@ def test_US_504_parent_slip_is_printable_and_audited(
     assert res.headers["content-security-policy"].startswith("default-src 'none'")
     assert res.headers["cache-control"] == "no-store"
     page = res.text
+    assert not contains_telugu(page)  # English only while Telugu is hidden (ADR-0036)
     assert "Parent verification slip" in page
     assert "<script" not in page
     assert "4821" not in page  # never any part of an Aadhaar number (invariant 4)

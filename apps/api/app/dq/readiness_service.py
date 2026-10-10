@@ -725,12 +725,19 @@ def slips(
     columns = list(dict.fromkeys(s for f in spec.fields for s in f.sources))
     rcfg = rd.load_readiness_config()
     labels = dq._Labels.load(session)
+    # One scope read for the whole slip set (student.read_sensitive), not one per student.
+    sensitive_reach = (
+        frozenset(students.list_students_in_scope(session, ctx, permissions=(SENSITIVE,)))
+        if ctx.has(SENSITIVE)
+        else frozenset()
+    )
+    shown, hidden = _visible(session, True), _visible(session, False)
     revealed = 0
     printed: list[slip_page.SlipStudent] = []
     for sid in ordered:
-        reveal = _can_reveal(session, ctx, sid)
+        reveal = sid in sensitive_reach
         revealed += 1 if reveal else 0
-        vis = _visible(session, reveal)
+        vis = shown if reveal else hidden
         printed.append(
             _slip_student(
                 assessed[sid],
