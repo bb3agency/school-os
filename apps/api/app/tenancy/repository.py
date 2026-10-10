@@ -224,18 +224,23 @@ def insert_tenant_key(
 
 
 def update_tenant_settings(
-    session: Session, *, expected_version: int, settings: dict[str, Any]
+    session: Session,
+    *,
+    expected_version: int,
+    settings: dict[str, Any],
+    boards: Sequence[str] | None = None,
 ) -> Tenant | None:
-    """Replace the current tenant's settings (optimistic); ``None`` on a stale version.
+    """Replace the current tenant's settings, and ``boards`` when given (optimistic); ``None``
+    on a stale version.
 
-    ``sos_app`` may update only ``name``, ``settings`` and ``version`` (0003 grants); RLS
-    ``own_tenant`` limits the statement to the current tenant.
+    ``sos_app`` may update only ``name``, ``settings``, ``boards`` (0051) and ``version`` (0003
+    grants); RLS ``own_tenant`` limits the statement to the current tenant.
     """
+    values: dict[str, Any] = {"settings": settings, "version": Tenant.version + 1}
+    if boards is not None:
+        values["boards"] = list(boards)
     return session.scalars(
-        update(Tenant)
-        .where(Tenant.version == expected_version)
-        .values(settings=settings, version=Tenant.version + 1)
-        .returning(Tenant),
+        update(Tenant).where(Tenant.version == expected_version).values(**values).returning(Tenant),
         execution_options={"populate_existing": True, "synchronize_session": False},
     ).one_or_none()
 

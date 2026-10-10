@@ -175,8 +175,15 @@ def create_enrolment_code(
 ) -> EnrolmentCodeOut:
     """A one-time code for ``sos-tally-agent enrol`` (FR-TALLY-001). Shown once; only its hash is
     stored; valid ``code_ttl_minutes``. 409 ``too_many_devices`` when the school already has the
-    maximum of active agents."""
+    maximum of active agents; 409 ``module_hidden`` while the school runs SchoolOS alongside
+    another ERP (FR-TEN-022: no new agent is set up; enrolled agents keep working)."""
     _require_on(session, ctx)
+    if not tenancy.module_enabled(session, "tally"):
+        raise Conflict(
+            "The Tally connector is hidden while SchoolOS runs alongside your current ERP. "
+            "Change the operating mode in school settings to set it up.",
+            code="module_hidden",
+        )
     cfg = rules().enrolment
     repo.lock_device_slots(session)  # audit 2026-10-06: count and insert without a race
     if repo.count_active_devices(session) >= cfg.max_active_devices:

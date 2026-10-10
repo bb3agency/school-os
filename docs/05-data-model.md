@@ -102,7 +102,7 @@ Effective table privileges after migrations `0002`–`0007` (default privileges,
 
 | Role | Privileges |
 |---|---|
-| `sos_app` | DML on `sis`, `kb` and most of `core`/`ops`, **narrowed** in `0003`/`0006`: `core.tenants` SELECT + `UPDATE (name, settings, version)` only; `core.users` SELECT + `UPDATE (display_name, email, phone_ciphertext, preferred_language, last_login_at, version)` only (**no INSERT/DELETE**; users come from definer functions); `core.permissions` SELECT only; `core.tenant_keys` SELECT, INSERT + `UPDATE (retired_at)` only; `ops.outbox` SELECT, INSERT only. Audit: SELECT + INSERT on `audit.events`, SELECT + INSERT + UPDATE on `audit.chain_heads` and `audit.chain_verifications` (0047), nothing on partitions. Platform: SELECT on `platform.feature_flags` only. EXECUTE on the definer functions granted to it (§3.4) |
+| `sos_app` | DML on `sis`, `kb` and most of `core`/`ops`, **narrowed** in `0003`/`0006`: `core.tenants` SELECT + `UPDATE (name, settings, version)` only, plus `UPDATE (boards)` since `0051` (a school declares its boards, FR-TEN-020, ADR-0041); `core.users` SELECT + `UPDATE (display_name, email, phone_ciphertext, preferred_language, last_login_at, version)` only (**no INSERT/DELETE**; users come from definer functions); `core.permissions` SELECT only; `core.tenant_keys` SELECT, INSERT + `UPDATE (retired_at)` only; `ops.outbox` SELECT, INSERT only. Audit: SELECT + INSERT on `audit.events`, SELECT + INSERT + UPDATE on `audit.chain_heads` and `audit.chain_verifications` (0047), nothing on partitions. Platform: SELECT on `platform.feature_flags` only. EXECUTE on the definer functions granted to it (§3.4) |
 | `sos_platform` | DML on `platform` tables (audit tables: `platform.audit_events` SELECT + INSERT, `platform.audit_chain_head` SELECT + UPDATE); **no privileges on any table in `core`, `sis`, `kb`, `audit`, `ops`**; EXECUTE on the definer functions granted to it. It physically cannot read student data |
 | `sos_readonly` | SELECT on `core`, `sis`, `kb`, `audit` (RLS applies); nothing on `core.tenant_keys`, `ops` or `platform` |
 | `sos_definer` | Only what its functions need (§3.4); NOLOGIN; only `sos_migrator` and the bootstrap admin can `SET ROLE` to it (never a runtime role) |
@@ -511,6 +511,7 @@ CREATE POLICY users_in_tenant_update ON core.users FOR UPDATE
 -- sos_app grants narrowed from the default privileges (ADR-0013 Amendment A2)
 REVOKE INSERT, UPDATE, DELETE ON core.tenants FROM sos_app;
 GRANT UPDATE (name, settings, version) ON core.tenants TO sos_app;
+-- 0051_boards_import_presets (FR-TEN-020, ADR-0041): GRANT UPDATE (boards) ON core.tenants TO sos_app;
 REVOKE INSERT, UPDATE, DELETE ON core.users FROM sos_app;
 GRANT UPDATE (display_name, email, phone_ciphertext, preferred_language, last_login_at, version)
   ON core.users TO sos_app;

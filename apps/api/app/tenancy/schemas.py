@@ -289,6 +289,13 @@ class SectionOut(_Out):
 
 DateFormat = Literal["DD/MM/YYYY", "DD-MM-YYYY", "YYYY-MM-DD"]
 Language = Literal["en", "te"]
+# FR-TEN-020 (ADR-0041): the boards SchoolOS has profiles for (AP State Board, CBSE, CISCE).
+SupportedBoard = Literal["BSEAP", "CBSE", "CISCE"]
+SUPPORTED_BOARDS: tuple[str, ...] = ("BSEAP", "CBSE", "CISCE")
+OperatingMode = Literal["full", "alongside"]
+ErpName = Annotated[
+    str, BeforeValidator(nfc), StringConstraints(max_length=80, pattern=r"^[^\x00-\x1f\x7f<>]*$")
+]
 
 
 def _default_languages() -> list[Language]:
@@ -345,6 +352,21 @@ class TenantSettings(BaseModel):
         "(ADR-0034). Off: nothing is saved, suggested or used for anyone in the school.",
     )
     certificate_letterhead: CertificateLetterhead = Field(default_factory=CertificateLetterhead)
+    class_boards: dict[ClassCode, SupportedBoard] = Field(
+        default_factory=dict,
+        max_length=20,
+        description="Board of each class code where the school runs more than one board "
+        "(FR-TEN-021); classes not listed follow the school's only board.",
+    )
+    operating_mode: OperatingMode = Field(
+        default="full",
+        description="``alongside``: SchoolOS is the records-and-readiness layer next to the "
+        "school's current ERP, which keeps fees and other office work (FR-TEN-022, ADR-0041).",
+    )
+    current_erp_name: ErpName = Field(
+        default="",
+        description="Name of the school's current ERP, shown on the refresh-from-ERP path.",
+    )
 
     @field_validator("languages")
     @classmethod
@@ -363,11 +385,27 @@ class TenantSettingsPatch(_In):
     ai_monthly_budget_inr: int | None = Field(default=None, ge=0, le=10_000_000)
     ai_memory_enabled: bool | None = None
     certificate_letterhead: CertificateLetterhead | None = None
+    boards: list[SupportedBoard] | None = Field(
+        default=None,
+        max_length=3,
+        description="The boards the school prepares students for (FR-TEN-020); stored in "
+        "``core.tenants.boards``. Board pre-check profiles are listed for these boards only.",
+    )
+    class_boards: dict[ClassCode, SupportedBoard] | None = Field(default=None, max_length=20)
+    operating_mode: OperatingMode | None = None
+    current_erp_name: ErpName | None = None
 
     @field_validator("languages")
     @classmethod
     def _languages(cls, v: list[Language] | None) -> list[Language] | None:
         return _unique_languages(v)
+
+    @field_validator("boards")
+    @classmethod
+    def _unique_boards(cls, v: list[str] | None) -> list[str] | None:
+        if v is not None and len(set(v)) != len(v):
+            raise ValueError("boards must be unique")
+        return v
 
 
 class TenantOut(_Out):
@@ -380,4 +418,9 @@ class TenantOut(_Out):
     plan_tier: Tier
     deployment_mode: Tier
     settings: TenantSettings
+    modules_hidden: list[str] = Field(
+        default_factory=list,
+        description="Modules the school's operating mode hides, e.g. ``tally`` while SchoolOS "
+        "runs alongside another ERP (FR-TEN-022).",
+    )
     version: int

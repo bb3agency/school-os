@@ -937,6 +937,21 @@ def _shown_settings(settings: TenantSettings) -> TenantSettings:
     return settings.model_copy(update={"languages": languages, "certificate_letterhead": head})
 
 
+@lru_cache(maxsize=1)
+def operating_modes() -> dict[str, frozenset[str]]:
+    """``operating_modes.yaml``: mode -> hidden module keys (FR-TEN-022, ADR-0041)."""
+    raw = yaml.safe_load(
+        resources.files("app.tenancy").joinpath("operating_modes.yaml").read_text("utf-8")
+    )
+    modes = {
+        str(mode): frozenset(str(m) for m in (spec or {}).get("hidden_modules") or ())
+        for mode, spec in raw["modes"].items()
+    }
+    if set(modes) != {"full", "alongside"}:
+        raise ValueError("operating_modes.yaml must define exactly full and alongside")
+    return modes
+
+
 def _tenant_out(tenant: Any) -> TenantOut:
     settings = _shown_settings(_stored_settings(tenant))
     return TenantOut(
@@ -949,8 +964,27 @@ def _tenant_out(tenant: Any) -> TenantOut:
         plan_tier=tenant.plan_tier,
         deployment_mode=tenant.deployment_mode,
         settings=settings,
+        modules_hidden=sorted(operating_modes()[settings.operating_mode]),
         version=tenant.version,
     )
+
+
+def module_enabled(session: Session, module: str) -> bool:
+    """Whether the school's operating mode shows ``module`` (FR-TEN-022). Other modules call
+    this before setting up something the mode hides (e.g. a new Tally device)."""
+    tenant = repo.get_own_tenant(session)
+    if tenant is None:
+        raise NotFound("School not found")
+    return module not in operating_modes()[_stored_settings(tenant).operating_mode]
+
+
+def school_boards(session: Session) -> tuple[list[str], dict[str, str]]:
+    """The school's boards and its class -> board map (FR-TEN-020, FR-TEN-021). Classes not in
+    the map follow the school's only board when it has exactly one."""
+    tenant = repo.get_own_tenant(session)
+    if tenant is None:
+        raise NotFound("School not found")
+    return list(tenant.boards), dict(_stored_settings(tenant).class_boards)
 
 
 def get_tenant(session: Session) -> TenantOut:
@@ -966,13 +1000,29 @@ def update_tenant_settings(
 ) -> TenantOut:
     """Change school settings (``tenant.settings.manage``, step-up; optimistic locking).
 
-    Audit: ``tenant.settings_updated`` with the changed field names.
+    Audit: ``tenant.settings_updated`` with the changed field names; a change of boards or of
+    the operating mode also records the new value (codes only, FR-TEN-020, FR-TEN-022).
     """
     tenant = repo.get_own_tenant(session)
     if tenant is None:
         raise NotFound("School not found")
     current = _stored_settings(tenant).model_dump(mode="json")
     changes = data.model_dump(mode="json", exclude_unset=True, exclude_none=True)
+    current_boards = list(tenant.boards)
+    boards: list[str] | None = changes.pop("boards", None)
+    new_boards = current_boards if boards is None else boards
+    class_boards = changes.get("class_boards", current["class_boards"])
+    undeclared = sorted({b for b in class_boards.values() if b not in new_boards})
+    if undeclared:
+        raise ValidationFailed(
+            [
+                {
+                    "field": "class_boards",
+                    "code": "class_board_not_declared",
+                    "message_key": "errors.class_board_not_declared",
+                }
+            ]
+        )
     head = changes.get("certificate_letterhead")
     if head is not None and not telugu_enabled():
         # The form shows no Telugu lines while Telugu is hidden (ADR-0036): an empty one keeps
@@ -985,17 +1035,28 @@ def update_tenant_settings(
     except ValidationError as exc:
         raise _validation_failed(exc) from exc
     stored = {**dict(tenant.settings or {}), **merged.model_dump(mode="json")}
+    boards_changed = boards is not None and boards != current_boards
     updated = repo.update_tenant_settings(
-        session, expected_version=expected_version, settings=stored
+        session,
+        expected_version=expected_version,
+        settings=stored,
+        boards=boards if boards_changed else None,
     )
     if updated is None:
         raise PreconditionFailed("The settings were changed by someone else. Reload and try again.")
+    fields = {k for k in changes if changes[k] != current.get(k)}
+    summary: dict[str, Any] = {}
+    if boards_changed:
+        fields.add("boards")
+        summary["boards"] = list(new_boards)
+    if "operating_mode" in fields:
+        summary["operating_mode"] = merged.operating_mode
     _audit(
         session,
         action="tenant.settings_updated",
         resource_type="tenant",
         resource_id=updated.id,
-        summary={"fields": sorted(k for k in changes if changes[k] != current.get(k))},
+        summary={"fields": sorted(fields), **summary},
     )
     return _tenant_out(updated)
 
