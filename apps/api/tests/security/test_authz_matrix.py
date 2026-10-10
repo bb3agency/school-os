@@ -524,6 +524,16 @@ def _st(w: Any, role: str, suffix: str = "") -> str:
     return f"/api/v1/students/{_student(w, role)}{suffix}"
 
 
+def _apaar_settings(w: Any, r: str, a: Engine) -> Request:
+    """PUT the school's parent-form language with its current version (0 before the first)."""
+    with a.connect() as c:
+        version = c.execute(
+            text("SELECT version FROM sis.apaar_consent_settings WHERE tenant_id = :t"),
+            {"t": w.a.tenant_id},
+        ).scalar_one_or_none()
+    return "/api/v1/apaar/settings", {"form_language": "en"}, _if_match(int(version or 0))
+
+
 def _student_patch(w: Any, r: str, a: Engine) -> Request:
     sid = _student(w, r)
     return _st(w, r), {"status": "active"}, _if_match(SW.version(a, "sis.students", sid))
@@ -1282,6 +1292,40 @@ SPECS: dict[tuple[str, str], Builder] = {
         {"query": "Synthetica", "limit": 20},
         {},
     ),
+    ("POST", "/api/v1/students/national-id-check"): lambda w, r, a: (
+        "/api/v1/students/national-id-check",
+        {"udise_pen": "91345678901"},
+        {},
+    ),
+    # APAAR consent register (ADR-0039; app/apaar/api.py). The student is in the role's scope.
+    ("GET", "/api/v1/students/{student_id}/apaar-consent"): lambda w, r, a: (
+        _st(w, r, "/apaar-consent"),
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/students/{student_id}/apaar-consent"): lambda w, r, a: (
+        _st(w, r, "/apaar-consent"),
+        {"status": "refused", "relationship": "father", "decided_on": "2026-07-01"},
+        {},
+    ),
+    ("GET", "/api/v1/students/{student_id}/apaar-consent/form"): lambda w, r, a: (
+        _st(w, r, "/apaar-consent/form"),
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/sections/{section_id}/apaar-consent-forms"): lambda w, r, a: (
+        f"/api/v1/sections/{w.a.ids['section_9a']}/apaar-consent-forms",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/apaar/consents"): lambda w, r, a: ("/api/v1/apaar/consents", None, {}),
+    ("GET", "/api/v1/apaar/consents/summary"): lambda w, r, a: (
+        "/api/v1/apaar/consents/summary",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/apaar/settings"): lambda w, r, a: ("/api/v1/apaar/settings", None, {}),
+    ("PUT", "/api/v1/apaar/settings"): _apaar_settings,
     ("POST", "/api/v1/students"): lambda w, r, a: (
         "/api/v1/students",
         {
@@ -1980,6 +2024,7 @@ def _success(method: str, path: str) -> int:
         "/api/v1/students/{student_id}/behaviour-notes",
         "/api/v1/tally/enrolment-codes",
         "/api/v1/tally/parties/{party_id}/links",
+        "/api/v1/students/{student_id}/apaar-consent",
     }
     accepted = {
         "/api/v1/documents",

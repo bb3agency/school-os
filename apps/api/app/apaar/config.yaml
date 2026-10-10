@@ -1,0 +1,115 @@
+# APAAR consent register (ADR-0039; US-1901..US-1903; FR-APC-001..006; PRV-021).
+# Versioned configuration shipped inside the package. Read by app/apaar/config.py. Change
+# `form_version` whenever the printed form's text changes: every recorded decision keeps the
+# language of the form it was given on, and audit events name the version that was printed.
+version: 1
+form_version: "2026-10-v1"
+
+# Why the form offers refusal. SECONDARY SOURCE: a news summary of the order, not the order
+# itself (docs/research/2026-10-market/notes/regulation_portals.md §2). Verify against the
+# Supreme Court's order and the revised model form before relying on the wording (owner
+# decision D3: formats from public sources stay unverified until a school confirms them).
+legal_basis:
+  refusal: >-
+    Supreme Court of India, Abhishek Baxi & Ors. v. Union of India, WP(C) 832/2026, order of
+    20 July 2026: the model APAAR consent form must let parents expressly refuse; APAAR data
+    handling must comply with the DPDP Act 2023.
+  source_urls:
+    - https://educationforallinindia.com/supreme-court-on-apaar-what-parents-and-schools-need-to-know-july-2026/
+    - https://educationforallinindia.com/apaar-id-not-mandatory-for-school-admissions-ncert-clarification-parental-hardships-court-victory-revised-consent-form/
+    - https://apaar.education.gov.in/
+  secondary_source: true
+  verified: false
+
+# Notes on a decision: at most this many characters (no Aadhaar numbers; never logged).
+note_max_length: 500
+# The earliest date a form can carry (MoE APAAR consent circular, 11 Oct 2023).
+earliest_decision: 2023-10-01
+# One print of a section's forms covers at most this many students (one A4 page each).
+max_forms_per_print: 150
+
+# Printed parent form, English and Telugu (chosen per school; owner decision D9). Every
+# placeholder is filled by the service: {form_version}.
+form:
+  en:
+    title: Consent for creating an APAAR ID
+    subtitle: "APAAR: Automated Permanent Academic Account Registry (One Nation One Student ID)"
+    student_details: Student details
+    name: Name of the student
+    admission_no: Admission number
+    class_section: Class and section
+    dob: Date of birth
+    pen: UDISE+ PEN
+    what: >-
+      The APAAR ID is a 12-digit lifelong academic ID for your child. The school creates it in
+      the government's UDISE+ portal from your child's UDISE+ record (PEN). To create it, the
+      name, date of birth and gender in UDISE+ are checked against your child's Aadhaar.
+    voluntary: >-
+      Giving consent is your choice. You may refuse. Your child's admission and studies at this
+      school do not depend on your decision.
+    board: >-
+      Some boards ask for the APAAR ID when students register for board examinations. If you
+      refuse, the school will tell you what the board allows for students without one.
+    data: >-
+      The school does not keep your child's Aadhaar number. Your child's details are used only
+      to create and keep the APAAR ID and are not shared with private companies.
+    withdraw: You can withdraw your consent later by writing to the school.
+    choice: Your decision (tick one box)
+    give: >-
+      I GIVE consent. The school may create an APAAR ID for my child, using my child's details
+      in UDISE+ and authentication with Aadhaar.
+    refuse: I DO NOT GIVE consent. Do not create an APAAR ID for my child.
+    parent_name: Name of the parent or guardian
+    relationship: Relationship to the student
+    father: Father
+    mother: Mother
+    guardian: Guardian
+    signature: Signature
+    date: Date
+    office: For office use
+    received_on: Form received on
+    recorded_by: Recorded in SchoolOS by
+    footer: >-
+      Form {form_version}. This form lets you refuse. Please return it to the class teacher or
+      the school office.
+  te:
+    title: APAAR ఐడి సృష్టించడానికి సమ్మతి పత్రం
+    subtitle: "APAAR: ఆటోమేటెడ్ పర్మనెంట్ అకడమిక్ అకౌంట్ రిజిస్ట్రీ (ఒకే దేశం ఒకే విద్యార్థి ఐడి)"
+    student_details: విద్యార్థి వివరాలు
+    name: విద్యార్థి పేరు
+    admission_no: ప్రవేశ సంఖ్య
+    class_section: తరగతి, సెక్షన్
+    dob: పుట్టిన తేదీ
+    pen: UDISE+ PEN
+    what: >-
+      APAAR ఐడి మీ పిల్లల జీవితకాల విద్యా గుర్తింపు సంఖ్య (12 అంకెలు). పాఠశాల దీనిని
+      ప్రభుత్వ UDISE+ పోర్టల్‌లో మీ పిల్లల UDISE+ రికార్డు (PEN) నుండి సృష్టిస్తుంది. దీనిని
+      సృష్టించడానికి UDISE+ లోని పేరు, పుట్టిన తేదీ, లింగం మీ పిల్లల ఆధార్‌తో సరిపోల్చబడతాయి.
+    voluntary: >-
+      సమ్మతి ఇవ్వడం మీ ఇష్టం. మీరు నిరాకరించవచ్చు. ఈ పాఠశాలలో మీ పిల్లల ప్రవేశం, చదువు
+      మీ నిర్ణయంపై ఆధారపడవు.
+    board: >-
+      కొన్ని బోర్డులు పరీక్షల నమోదు సమయంలో APAAR ఐడి అడుగుతాయి. మీరు నిరాకరిస్తే, APAAR ఐడి
+      లేని విద్యార్థుల కోసం బోర్డు ఏమి అనుమతిస్తుందో పాఠశాల మీకు తెలియజేస్తుంది.
+    data: >-
+      పాఠశాల మీ పిల్లల ఆధార్ నంబర్‌ను నిల్వ చేయదు. మీ పిల్లల వివరాలు APAAR ఐడి సృష్టించడానికి,
+      నిర్వహించడానికి మాత్రమే ఉపయోగించబడతాయి; ప్రైవేట్ సంస్థలతో పంచుకోబడవు.
+    withdraw: తర్వాత పాఠశాలకు లిఖితపూర్వకంగా తెలియజేసి మీ సమ్మతిని ఉపసంహరించుకోవచ్చు.
+    choice: మీ నిర్ణయం (ఒక పెట్టెను టిక్ చేయండి)
+    give: >-
+      నేను సమ్మతి ఇస్తున్నాను. నా పిల్లల UDISE+ వివరాలు, ఆధార్ ధృవీకరణ ఉపయోగించి పాఠశాల
+      నా పిల్లలకు APAAR ఐడి సృష్టించవచ్చు.
+    refuse: నేను సమ్మతి ఇవ్వడం లేదు. నా పిల్లలకు APAAR ఐడి సృష్టించవద్దు.
+    parent_name: తల్లి, తండ్రి లేదా సంరక్షకుని పేరు
+    relationship: విద్యార్థితో సంబంధం
+    father: తండ్రి
+    mother: తల్లి
+    guardian: సంరక్షకులు
+    signature: సంతకం
+    date: తేదీ
+    office: కార్యాలయ ఉపయోగం కోసం
+    received_on: ఫారం అందిన తేదీ
+    recorded_by: SchoolOS లో నమోదు చేసినవారు
+    footer: >-
+      ఫారం {form_version}. ఈ ఫారంలో నిరాకరించే అవకాశం ఉంది. దయచేసి దీనిని తరగతి
+      ఉపాధ్యాయులకు లేదా పాఠశాల కార్యాలయానికి తిరిగి ఇవ్వండి.

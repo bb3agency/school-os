@@ -40,6 +40,7 @@ import app.identity.service  # isort: skip
 # app.tenancy at import; the purge refuses to run unless all of them are registered.
 import app.academics.service  # isort: skip
 import app.admin.service  # isort: skip
+import app.apaar.service  # isort: skip
 import app.breakglass.service  # isort: skip
 import app.changes.service  # isort: skip
 import app.circulars.service  # isort: skip

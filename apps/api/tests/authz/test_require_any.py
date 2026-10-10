@@ -218,6 +218,7 @@ def _any_of_guards() -> list[tuple[str, str, Any]]:
 
 
 CERT_READERS = ("certificate.read", ("certificate.issue", "certificate.approve"), False)
+APAAR_READERS = ("apaar.consent.read", ("apaar.consent.record",), False)
 
 
 def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
@@ -256,6 +257,17 @@ def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
         ("GET", "/api/v1/tally/status"): (
             "finance.read",
             ("tally.device.manage", "tally.configure"),
+            False,
+        ),
+        # APAAR consent (ADR-0039): readers and recorders share a student's state and the
+        # printed forms; the service applies the student or section scope.
+        ("GET", "/api/v1/students/{student_id}/apaar-consent"): APAAR_READERS,
+        ("GET", "/api/v1/students/{student_id}/apaar-consent/form"): APAAR_READERS,
+        ("GET", "/api/v1/sections/{section_id}/apaar-consent-forms"): APAAR_READERS,
+        # The form language is C1: readers, recorders and settings managers see it.
+        ("GET", "/api/v1/apaar/settings"): (
+            "apaar.consent.read",
+            ("apaar.consent.record", "tenant.settings.manage"),
             False,
         ),
     }
