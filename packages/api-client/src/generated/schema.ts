@@ -10700,15 +10700,15 @@ export interface components {
         NationalIdMatch: {
             /** Admission No */
             admission_no: string | null;
-            /**
-             * Attribute Key
-             * @enum {string}
-             */
-            attribute_key: "udise_pen" | "apaar_id";
             /** Class Section */
             class_section: string | null;
             /** Display Name */
             display_name: string | null;
+            /**
+             * Identifier
+             * @enum {string}
+             */
+            identifier: "udise_pen" | "apaar_id";
             /** Status */
             status: string;
             /**

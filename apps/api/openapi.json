@@ -11942,14 +11942,6 @@
             ],
             "title": "Admission No"
           },
-          "attribute_key": {
-            "enum": [
-              "udise_pen",
-              "apaar_id"
-            ],
-            "title": "Attribute Key",
-            "type": "string"
-          },
           "class_section": {
             "anyOf": [
               {
@@ -11972,6 +11964,14 @@
             ],
             "title": "Display Name"
           },
+          "identifier": {
+            "enum": [
+              "udise_pen",
+              "apaar_id"
+            ],
+            "title": "Identifier",
+            "type": "string"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -11983,7 +11983,7 @@
           }
         },
         "required": [
-          "attribute_key",
+          "identifier",
           "student_id",
           "display_name",
           "admission_no",

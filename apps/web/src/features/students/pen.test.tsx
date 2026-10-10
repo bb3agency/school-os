@@ -111,7 +111,7 @@ describe("FR-STU-018 transfer-in by PEN", () => {
       Response.json({
         matches: [
           {
-            attribute_key: "udise_pen",
+            identifier: "udise_pen",
             student_id: ID.student,
             display_name: "Synthetica Existing",
             admission_no: "A-9",

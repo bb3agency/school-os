@@ -69,7 +69,7 @@ export function PenCheck({ pen }: { pen: string }) {
             {result.matches.length > 0 ? (
               <ul className="mt-2 space-y-1">
                 {result.matches.map((match) => (
-                  <li key={`${match.attribute_key}-${match.student_id}`}>
+                  <li key={`${match.identifier}-${match.student_id}`}>
                     <Link
                       href={`/students/${match.student_id}`}
                       className="font-semibold underline"

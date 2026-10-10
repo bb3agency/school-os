@@ -178,7 +178,7 @@ class NationalIdCheckIn(_In):
 
 
 class NationalIdMatch(_Out):
-    attribute_key: NationalIdKey
+    identifier: NationalIdKey
     student_id: uuid.UUID
     display_name: str | None
     admission_no: str | None

@@ -833,7 +833,7 @@ def check_national_ids(
     rows = summaries(session, ctx, {sid for _, sid in found})
     matches = [
         NationalIdMatch(
-            attribute_key=key,
+            identifier=key,
             student_id=sid,
             display_name=rows[sid].display_name,
             admission_no=rows[sid].admission_no,

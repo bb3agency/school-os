@@ -130,7 +130,7 @@ def test_FR_STU_018_national_id_check_tells_the_udise_action(
     live = api.call(admin, "POST", url, json={"udise_pen": number}).json()
     assert live["udise_action"] == "open_existing_record"
     assert [m["student_id"] for m in live["matches"]] == [sid]
-    assert live["matches"][0]["attribute_key"] == "udise_pen"
+    assert live["matches"][0]["identifier"] == "udise_pen"
     new = api.call(admin, "POST", url, json={"udise_pen": fresh}).json()
     assert new == {"matches": [], "udise_action": "import_by_pen"}
     with admin_engine.begin() as c:
