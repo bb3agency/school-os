@@ -246,4 +246,11 @@ def test_export_profiles_route(school: Any, api: Any) -> None:
     res = api.call(school.people["exam_coordinator"], "GET", "/api/v1/export-profiles")
     assert res.status_code == 200
     keys = {p["key"] for p in res.json()}
-    assert keys == {"cisce-registration-2026", "udise-plus"}
+    # No board declared: every profile (FR-TEN-020, ADR-0041).
+    assert keys == {
+        "cisce-registration-2026",
+        "cisce-registration-2027",
+        "cbse-registration-2027",
+        "cbse-loc-2027",
+        "udise-plus",
+    }

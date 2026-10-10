@@ -43,6 +43,31 @@ profiles:
     fields: [admission_no, full_name, gender, dob, father_name, mother_name]
     value_maps:
       gender: {female: F, male: M, transgender: T}
+  # R1 board profiles (FR-EXP-006, ADR-0041). UNVERIFIED (owner decision D3): column order and
+  # codes follow public secondary sources; confirm against the portals before relying on them.
+  cisce-registration-2027:
+    kind: board
+    layout_version: 1
+    date_format: "%d/%m/%Y"
+    fields: [admission_no, full_name, dob, gender, father_name, mother_name, apaar_id]
+    value_maps:
+      gender: {female: F, male: M, transgender: T}
+  cbse-registration-2027:
+    kind: board
+    layout_version: 1
+    date_format: "%d/%m/%Y"
+    fields: [admission_no, full_name, mother_name, father_name, dob, gender, category, apaar_id]
+    value_maps:
+      gender: {female: Female, male: Male, transgender: Transgender}
+      category: {general: General, ews: General, obc: OBC, sc: SC, st: ST}
+  cbse-loc-2027:
+    kind: board
+    layout_version: 1
+    date_format: "%d/%m/%Y"
+    fields: [admission_no, full_name, mother_name, father_name, dob, gender, category, apaar_id]
+    value_maps:
+      gender: {female: Female, male: Male, transgender: Transgender}
+      category: {general: General, ews: General, obc: OBC, sc: SC, st: ST}
   # layout_version 2 (ADR-0037, FR-EXP-005): UDISE+ PEN and APAAR ID columns, empty when
   # unknown. The typed APAAR ID is written unmasked; every other cell keeps the Aadhaar mask.
   udise-plus:

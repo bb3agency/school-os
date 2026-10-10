@@ -158,10 +158,19 @@ def list_rules(ctx: Reader) -> list[RuleOut]:
 
 
 @router.get("/profiles", response_model=list[ProfileOut])
-def list_profiles(ctx: Reader) -> list[ProfileOut]:
-    """Export pre-check profiles, e.g. CISCE registration and UDISE+ (permission
-    ``dq.findings.read``)."""
-    return dq.profiles_catalog()
+def list_profiles(
+    ctx: Reader,
+    db: TenantDB,
+    include_all: Annotated[
+        bool,
+        Query(alias="all", description="Also list profiles of boards the school did not declare."),
+    ] = False,
+) -> list[ProfileOut]:
+    """Export pre-check profiles, e.g. UDISE+, CBSE registration and CISCE (permission
+    ``dq.findings.read``). Board profiles are listed for the school's declared boards only
+    (FR-TEN-020; every profile while none is declared); each says which of its classes follow
+    its board here, whether its format is verified, and its public sources (ADR-0041)."""
+    return dq.school_profiles(db, include_all=include_all)
 
 
 @router.get("/summary", response_model=SummaryOut)

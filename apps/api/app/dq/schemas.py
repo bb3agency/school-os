@@ -16,7 +16,7 @@ PROFILE_PATTERN = r"^[a-z0-9][a-z0-9-]{0,63}$"
 RuleId = Literal[
     "DQ-001", "DQ-002", "DQ-003", "DQ-004", "DQ-005", "DQ-006",
     "DQ-007", "DQ-008", "DQ-009", "DQ-010", "DQ-011", "DQ-012",
-    "DQ-021", "DQ-022",
+    "DQ-021", "DQ-022", "DQ-030",
 ]  # fmt: skip
 
 
@@ -179,6 +179,15 @@ class RuleOut(_Out):
     routes: list[Bilingual]
 
 
+class BoardFieldOut(_Out):
+    """A column of the board's own form; ``attribute`` null when SchoolOS does not hold it."""
+
+    name: str
+    attribute: str | None
+    required: bool
+    note: str
+
+
 class ProfileOut(_Out):
     key: str
     version: int
@@ -186,6 +195,26 @@ class ProfileOut(_Out):
     label_te: str
     required_fields: list[str]
     needs_apaar: bool
+    board: str | None = Field(
+        default=None, description="Board code (BSEAP, CBSE, CISCE); null for a portal."
+    )
+    classes: list[str] = Field(default_factory=list, description="Class codes it registers.")
+    applies_to_classes: list[str] = Field(
+        default_factory=list,
+        description="The profile's classes that follow its board in this school (FR-TEN-021).",
+    )
+    verified: bool = Field(
+        default=False,
+        description="False until the format is confirmed against the official document "
+        "(owner decision D3, ADR-0041).",
+    )
+    source: list[str] = Field(default_factory=list, description="Public sources of the format.")
+    supersedes: str | None = None
+    superseded: bool = Field(
+        default=False, description="A newer cycle replaces it; it still works for old checks."
+    )
+    parent_verification_slip: bool = False
+    board_fields: list[BoardFieldOut] = Field(default_factory=list)
 
 
 class RuleCount(_Out):

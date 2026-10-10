@@ -6,7 +6,9 @@ Pure module (no database): reads and validates the packaged YAML once.
   mapping (Aadhaar-as-printed values are their own C3 attributes), DQ-008 duplicate classes,
   DQ-007 age bands per class code and the DQ-006 format-issue labels (EN/TE).
 - ``config/profiles/<key>.yaml`` -> :class:`Profile`: what one board/portal submission needs
-  (DQ-005 required fields, DQ-006 name format, DQ-009 APAAR details).
+  (DQ-005 required fields, DQ-006 name format, DQ-009 APAAR details), which board and classes
+  it belongs to, the board's own form columns, and where the format came from (``source`` URLs,
+  ``verified``: owner decision D3, docs/18 §8; ADR-0041).
 """
 
 from __future__ import annotations
@@ -25,6 +27,9 @@ from app.dq.matching import MatchClass
 from app.dq.rules import Severity
 
 PROFILE_KEY_RE: Final = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
+BOARD_CODES: Final = ("BSEAP", "CBSE", "CISCE")  # FR-TEN-020 (ADR-0041)
+CLASS_CODE_RE: Final = re.compile(r"^[A-Z0-9][A-Z0-9_-]{0,15}$")
+_URL_RE: Final = re.compile(r"^https://\S{4,500}$")
 _ATTRIBUTE_RE: Final = re.compile(r"^[a-z][a-z0-9_]*$")
 FORMAT_ISSUES: Final = ("too_long", "too_short", "not_latin", "digits", "symbols")
 
@@ -112,6 +117,26 @@ class NameFormat(BaseModel):
         return self
 
 
+class BoardField(BaseModel):
+    """One column of the board's or portal's own form (FR-DQ-031). ``attribute`` names the
+    SchoolOS attribute that fills it; ``None`` when SchoolOS does not hold the value (the clerk
+    enters it on the portal)."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    name: str = Field(min_length=1, max_length=120)
+    attribute: str | None = None
+    required: bool = True
+    note: str = Field(default="", max_length=400)
+
+    @field_validator("attribute")
+    @classmethod
+    def _attribute(cls, value: str | None) -> str | None:
+        if value is not None and not _ATTRIBUTE_RE.match(value):
+            raise ValueError("attribute must be an attribute key")
+        return value
+
+
 class Profile(BaseModel):
     """One board/portal submission format (the exports module reuses the key)."""
 
@@ -125,6 +150,41 @@ class Profile(BaseModel):
     unverified_identity_severity: Severity | None = None
     name_format: NameFormat | None = None
     needs_apaar: bool = False
+    # FR-DQ-030 (ADR-0041): the board this profile belongs to (None: a portal such as UDISE+,
+    # shown to every school) and the class codes it registers.
+    board: str | None = None
+    classes: tuple[str, ...] = ()
+    # Owner decision D3 (docs/18 §8): every board/portal format names its public sources and
+    # stays ``verified: false`` until a school confirms it against the official document.
+    source: tuple[str, ...] = ()
+    verified: bool = False
+    # A newer cycle of the same submission names the profile it replaces; the old one keeps
+    # working (findings and exports store its key) and is listed as superseded.
+    supersedes: str | None = None
+    # The board expects parents to check and sign the printed details (FR-DQ-032).
+    parent_verification_slip: bool = False
+    board_fields: tuple[BoardField, ...] = ()
+
+    @field_validator("board")
+    @classmethod
+    def _board(cls, value: str | None) -> str | None:
+        if value is not None and value not in BOARD_CODES:
+            raise ValueError(f"board must be one of {list(BOARD_CODES)}")
+        return value
+
+    @field_validator("classes")
+    @classmethod
+    def _classes(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        if len(set(value)) != len(value) or not all(CLASS_CODE_RE.match(v) for v in value):
+            raise ValueError("classes must be unique class codes")
+        return value
+
+    @field_validator("source")
+    @classmethod
+    def _source(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        if not all(_URL_RE.match(v) for v in value):
+            raise ValueError("source entries must be https URLs")
+        return value
 
     @field_validator("key")
     @classmethod
@@ -172,7 +232,15 @@ def parse_profiles(raw: Mapping[str, Any]) -> dict[str, Profile]:
         if profile.key != stem:
             raise ValueError(f"profile file {stem}.yaml declares key {profile.key!r}")
         out[profile.key] = profile
+    for profile in out.values():
+        if profile.supersedes is not None and profile.supersedes not in out:
+            raise ValueError(f"{profile.key} supersedes unknown profile {profile.supersedes!r}")
     return dict(sorted(out.items()))
+
+
+def superseded_keys(profiles: Mapping[str, Profile]) -> frozenset[str]:
+    """Keys of profiles that a newer cycle replaces (still usable, listed as older)."""
+    return frozenset(p.supersedes for p in profiles.values() if p.supersedes is not None)
 
 
 @functools.cache

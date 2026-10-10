@@ -1,0 +1,60 @@
+# Export pre-check profile: CBSE List of Candidates (LOC) for Class X and XII, board
+# examinations 2027 (FR-DQ-030..032, US-503; DQ-005, DQ-006, DQ-009). Loaded and validated by
+# app.dq.profiles.load_profiles(); the file name is the profile key. The exports module
+# (FR-EXP-002) shares this key.
+#
+# UNVERIFIED (owner decision D3, docs/18 §8; ADR-0041): built from public, mostly secondary
+# sources listed under `source`. The 2026-27 LOC circular text was not readable to us (the
+# published PDF is a scan); field names and code lists are best guesses. Confirm with a CBSE
+# school's LOC screen, then set `verified: true` and bump `version`.
+key: cbse-loc-2027
+version: 1
+label_en: CBSE list of candidates (Class X and XII) 2027
+label_te: CBSE అభ్యర్థుల జాబితా (X, XII తరగతులు) 2027
+board: CBSE
+classes: [X, XII]
+verified: false
+source:
+  - https://www.cbse.gov.in/cbsenew/cbse.html
+  - https://news.careers360.com/cbse-board-exams-apaar-id-class-9-11-loc-registration-2026-27-two-level-10-maths-social-science-2028/amp
+  - https://righttoinformation.wiki/cbse-apaar-id-board-exam-registration-mandatory-2026-27
+  - https://www.freepressjournal.in/education/cbse-board-exams-2026-last-chance-to-submit-data-of-class-9-11-students-today-details-here
+
+# DQ-005: the canonical value must exist (blocker). LOC carries the registration details on.
+required_fields: [full_name, dob, gender, mother_name, father_name, admission_no, category]
+
+unverified_identity_severity: low
+
+name_format:
+  fields: [full_name, mother_name, father_name]
+  min_length: 2
+  max_length: 100
+  latin_only: true
+  allowed_punctuation: " .'"
+
+# APAAR ID is mandatory in the LOC from 2026-27 (reported); REFUSED / NOGEN as in registration.
+needs_apaar: true
+
+# Corrections after the LOC window are limited and need documentary proof; parents check the
+# printed details before the school submits (secondary sources above).
+parent_verification_slip: true
+
+board_fields:
+  - {name: "Registration number (from Class IX/XI)", attribute: null,
+     note: "Printed on the registration slip; SchoolOS does not hold it yet."}
+  - {name: "Candidate's name", attribute: full_name,
+     note: "Must match the Class IX/XI registration; no titles."}
+  - {name: "Mother's name", attribute: mother_name}
+  - {name: "Father's name", attribute: father_name}
+  - {name: "Date of birth", attribute: dob}
+  - {name: "Gender", attribute: gender}
+  - {name: "Category", attribute: category}
+  - {name: "APAAR ID", attribute: apaar_id,
+     note: "12 digits; REFUSED where the parent refused consent in writing; NOGEN where generation failed."}
+  - {name: "Admission number", attribute: admission_no}
+  - {name: "Subjects (codes)", attribute: null,
+     note: "Enter on the portal; Class X Maths, Science and Social Science get two levels from 2028."}
+  - {name: "Person with disability (PwD/CWSN) and exam concessions", attribute: disability,
+     required: false, note: "Restricted value; shown masked in the pre-check sheet."}
+  - {name: "Photograph and signature", attribute: null,
+     note: "Uploaded on the portal; SchoolOS does not hold them."}

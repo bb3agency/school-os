@@ -53,6 +53,10 @@ routes:
   ROUTE-APAAR:
     en: "Check the APAAR ID on the UDISE+ portal or the APAAR card, then record and verify the right one."
     te: "UDISE+ పోర్టల్‌లో లేదా APAAR కార్డులో APAAR ఐడిని సరిచూసి, సరైనదాన్ని నమోదు చేసి ధృవీకరించండి."
+  # ADR-0041: the school's other system (ERP) is corrected to the admission register.
+  ROUTE-ERP:
+    en: "Correct the value in your other school system (ERP) to match the admission register, then refresh from its export."
+    te: "మీ ఇతర పాఠశాల వ్యవస్థ (ERP)లో విలువను అడ్మిషన్ రిజిస్టర్‌కు సరిపోయేలా సరిచేసి, దాని ఎగుమతి నుండి మళ్లీ నవీకరించండి."
 
 # Rule explanation templates (rules.yaml `explanation_key`), English from docs/02 §5.
 rules:
@@ -108,3 +112,7 @@ rules:
   DQ-022:
     en: "UDISE+ details differ from Aadhaar. APAAR generation will fail until these match."
     te: "UDISE+ వివరాలు ఆధార్‌తో సరిపోలడం లేదు. ఇవి సరిపోలే వరకు APAAR రూపొందించడం విఫలమవుతుంది."
+  # ADR-0041 (FR-DQ-033): office records, e.g. a refresh from the school's current ERP.
+  DQ-030:
+    en: "Office records (or your other school system) differ from the admission register."
+    te: "కార్యాలయ రికార్డులు (లేదా మీ ఇతర పాఠశాల వ్యవస్థ) అడ్మిషన్ రిజిస్టర్‌తో సరిపోలడం లేదు."
