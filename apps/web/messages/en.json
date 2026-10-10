@@ -1671,7 +1671,12 @@
       "owner_not_active": "This person can no longer be given tasks. Choose someone else.",
       "aadhaar_last4_only": "Don't enter Aadhaar numbers. Use only the last 4 digits.",
       "not_approved": "This correction request is not approved yet. Resolve the finding after it is approved.",
-      "other_attribute": "This correction request is for another field. Choose one for this field."
+      "other_attribute": "This correction request is for another field. Choose one for this field.",
+      "digits11_required": "Enter the 11-digit PEN, for example 21345678901.",
+      "udise_pen_in_use": "This PEN is already on another student's record. Search by this PEN to open it.",
+      "apaar_id_in_use": "This APAAR ID is already on another student's record. Search by this APAAR ID to open it.",
+      "pen_required_for_transfer_in": "A child from another school needs the PEN from the transfer certificate.",
+      "signed_form_required": "Upload the signed form. Consent is recorded only with it."
     },
     "api": {
       "generic": {
@@ -2001,7 +2006,9 @@
     "tooManyAclEntries": "Choose at most 50, or choose \"Whole school\".",
     "invalidIssueDate": "Choose a date, or leave it empty.",
     "noAadhaar": "This looks like a full Aadhaar number. SchoolOS never stores one: remove it.",
-    "emergencyReason": "Emergency access is only for a security incident or a legal obligation. Choose one of those, or untick Emergency."
+    "emergencyReason": "Emergency access is only for a security incident or a legal obligation. Choose one of those, or untick Emergency.",
+    "penInvalid": "Enter the 11-digit PEN, for example 21345678901.",
+    "penRequiredForTransfer": "A child from another school needs the PEN from the transfer certificate."
   },
   "support": {
     "piiWarningTitle": "Do not include student personal data",
@@ -2149,7 +2156,10 @@
       "crumbHome": "Home",
       "apaarLabel": "APAAR ID",
       "apaarHint": "Finds the student with exactly this 12-digit APAAR ID.",
-      "apaarInvalid": "Enter the 12 digits of the APAAR ID, for example 1234 5678 9012."
+      "apaarInvalid": "Enter the 12 digits of the APAAR ID, for example 1234 5678 9012.",
+      "penLabel": "UDISE+ PEN",
+      "penHint": "11 digits",
+      "penInvalid": "Enter the 11-digit PEN, for example 21345678901."
     },
     "create": {
       "title": "Add a student",
@@ -2174,7 +2184,20 @@
       "rollNo": "Roll number",
       "status": "Record status",
       "statusHint": "Choose Provisional if the details still need checking.",
-      "submit": "Add student"
+      "submit": "Add student",
+      "udiseLegend": "UDISE+ and transfer from another school",
+      "admissionKind": "Admission",
+      "admissionKinds": {
+        "new": "First school",
+        "transfer_in": "From another school"
+      },
+      "transferHint": "A child from another school already has a UDISE+ record. Enter the PEN from the transfer certificate so the child is imported into UDISE+ by PEN, not entered twice.",
+      "pen": "UDISE+ PEN",
+      "penHint": "11 digits, from the transfer certificate or UDISE+.",
+      "penSource": "Where the PEN comes from",
+      "clashTitle": "This number is already on a record",
+      "clashBody": "Open the existing record instead of creating a second one.",
+      "openExisting": "Open the existing record"
     },
     "detail": {
       "loadingTitle": "Student",
@@ -2222,7 +2245,8 @@
       "historyCorrection": "Correction request",
       "issueCertificateLink": "Issue a certificate",
       "certificatesLink": "Certificates of this student",
-      "tabTimeline": "Timeline"
+      "tabTimeline": "Timeline",
+      "apaarConsentLink": "APAAR consent"
     },
     "record": {
       "open": "Record a value",
@@ -2238,7 +2262,8 @@
       "digits12Invalid": "Enter the 12 digits of the APAAR ID, for example 1234 5678 9012.",
       "identityNote": "This is an identity field. Once the admission register value is recorded, changing it needs a correction request with evidence, approved by the principal.",
       "submit": "Record value",
-      "goToChangeRequests": "Open correction requests for this student"
+      "goToChangeRequests": "Open correction requests for this student",
+      "penHint": "11 digits; spaces are fine."
     },
     "guardians": {
       "title": "Parents and guardians",
@@ -2391,6 +2416,35 @@
       "endedOnHint": "Use {format}. Leave it empty for today.",
       "endNote": "The record status does not change. If the student left the school, also use “Change status”.",
       "endSubmit": "End enrolment"
+    },
+    "penCheck": {
+      "check": "Check this PEN",
+      "invalid": "Enter the 11-digit PEN first.",
+      "unnamed": "A student without a name",
+      "status": {
+        "active": "current student",
+        "provisional": "provisional",
+        "left": "left the school",
+        "graduated": "graduated"
+      },
+      "actions": {
+        "open_existing_record": {
+          "title": "This child is already on our rolls",
+          "body": "Open the existing record. Don't admit the child again."
+        },
+        "readmit_existing_record": {
+          "title": "A former student of this school",
+          "body": "Re-admit the existing record instead of creating a new one."
+        },
+        "import_by_pen": {
+          "title": "Not in this school yet",
+          "body": "Create the record with this PEN, then import the child in UDISE+ by PEN. The previous school must release the child there."
+        },
+        "new_udise_record": {
+          "title": "No PEN given",
+          "body": "Search UDISE+ by name and date of birth before creating a new UDISE+ record."
+        }
+      }
     }
   },
   "imports": {
@@ -7226,6 +7280,155 @@
       "precondition_failed": {
         "title": "The agent changed",
         "body": "Someone changed this agent while you were looking. The list is now up to date; try again."
+      }
+    }
+  },
+  "apaar": {
+    "nav": "APAAR consent",
+    "title": "APAAR consent",
+    "description": "Parents' decisions on creating an APAAR ID: who agreed, who refused and who still has to answer.",
+    "crumbHome": "Home",
+    "noPermissionTitle": "You can't see APAAR consent",
+    "noPermissionBody": "Ask your principal or office admin if you need to record or follow up consent.",
+    "refusalTitle": "Parents may say no",
+    "refusalBody": "Creating an APAAR ID needs the parent's consent, and the form lets them refuse. Admission and studies never depend on the answer. A child whose parents refused is never asked for an APAAR ID.",
+    "refusalSource": "Based on the Supreme Court order of 20 July 2026, as reported in the news. Check the official revised form.",
+    "filtersTitle": "Show",
+    "section": "Class and section",
+    "allSections": "All sections you can see",
+    "filterStatus": "Decision",
+    "summaryTitle": "Decisions by section",
+    "totalStudents": "Students",
+    "colClass": "Class and section",
+    "colPrint": "Print forms",
+    "printPending": "Pending only",
+    "printAll": "Whole section",
+    "noSectionsTitle": "No sections to show",
+    "noSectionsBody": "Students appear here once they are enrolled in a section of this academic year.",
+    "studentsTitle": "Students",
+    "followUpTitle": "Students to follow up",
+    "colStudent": "Student",
+    "colStatus": "Decision",
+    "colDecidedOn": "Date on the form",
+    "colForm": "Signed form",
+    "colApaarId": "APAAR ID",
+    "formOnFile": "On file",
+    "noForm": "Not uploaded",
+    "apaarRecorded": "Recorded",
+    "apaarNone": "Not yet",
+    "emptyTitle": "No students here",
+    "emptyBody": "Choose another section or decision.",
+    "showMore": "Show more students",
+    "status": {
+      "given": "Consent given",
+      "refused": "Refused",
+      "pending": "Pending",
+      "withdrawn": "Withdrawn"
+    },
+    "relationships": {
+      "mother": "Mother",
+      "father": "Father",
+      "guardian": "Guardian"
+    },
+    "settings": {
+      "title": "Language of the printed form",
+      "description": "Parents get the form in the language your school chooses. The staff screens stay in English.",
+      "current": "Forms are printed in:",
+      "switchTo": "Print in {language} instead",
+      "saved": "Saved. New forms use this language.",
+      "languages": {
+        "en": "English",
+        "te": "Telugu"
+      }
+    },
+    "student": {
+      "title": "APAAR consent of a student",
+      "currentTitle": "Current decision",
+      "decidedOn": "Date on the form: {date}",
+      "refusedNote": "The parents did not agree. Do not create an APAAR ID for this child. The data checks will not ask for one.",
+      "printForm": "Print the consent form",
+      "printIn": {
+        "en": "Print in English",
+        "te": "Print in Telugu"
+      },
+      "historyTitle": "All recorded decisions",
+      "historyEmptyTitle": "Nothing recorded yet",
+      "historyEmptyBody": "Record the parent's decision when the signed form comes back.",
+      "colRecorded": "Recorded",
+      "colDecision": "Decision",
+      "colWho": "Decided by",
+      "colDate": "Date on the form",
+      "colForm": "Signed form",
+      "colRecordedBy": "Recorded by",
+      "colNote": "Note"
+    },
+    "record": {
+      "title": "Record the parent's decision",
+      "description": "Each decision is added to the history; nothing earlier is changed. Upload the signed form when the parent gives consent.",
+      "decision": "Decision",
+      "decisions": {
+        "pending": "Form sent home",
+        "given": "Consent given",
+        "refused": "Refused",
+        "withdrawn": "Consent withdrawn"
+      },
+      "refuseNote": "A refusal is a full answer. You may upload the signed form if the parent returned it.",
+      "guardian": "Parent or guardian on the record",
+      "guardianHint": "Choose them if they signed, or pick the relationship below.",
+      "guardianNone": "Not on the record",
+      "relationship": "Relationship to the student",
+      "decidedOn": "Date on the form",
+      "formLanguage": "Language of the form",
+      "signedForm": "Signed form (PDF, JPG or PNG)",
+      "signedFormOptional": "Signed form, if returned (PDF, JPG or PNG)",
+      "signedFormHint": "Scan or photograph the whole form. Up to 25 MB.",
+      "formTitle": "Signed APAAR consent form",
+      "note": "Note (optional)",
+      "noteHint": "For example, who returned the form. Never type an Aadhaar number.",
+      "submit": "Save the decision",
+      "savedTitle": "Decision saved",
+      "savedBody": "It is now the current decision and is kept in the history.",
+      "step": {
+        "idle": "Ready",
+        "presign": "Preparing the upload…",
+        "send": "Uploading the signed form…",
+        "register": "Checking the file…",
+        "submit": "Saving the decision…"
+      }
+    },
+    "validation": {
+      "invalid": "Check this value and try again.",
+      "chooseStatus": "Choose the parent's decision.",
+      "chooseRelationship": "Choose who decided.",
+      "dateRequired": "Enter the date written on the form.",
+      "invalidDate": "Enter the date as {format}, for example {example}.",
+      "dateInFuture": "The date on the form can't be in the future.",
+      "dateTooEarly": "APAAR consent forms date from October 2023 or later.",
+      "noteTooLong": "Keep the note under 500 characters.",
+      "noAadhaar": "Don't type Aadhaar numbers here.",
+      "formRequired": "Upload the signed form. Consent is recorded only with it.",
+      "fileRequired": "Choose the file of the signed form.",
+      "fileType": "Upload a PDF, JPG or PNG file.",
+      "fileTooLarge": "The file is larger than 25 MB. Scan it at a lower resolution.",
+      "fileEmpty": "The file is empty. Choose the scanned form again.",
+      "uploadFailed": "The upload didn't finish. Check the connection and try again."
+    },
+    "errors": {
+      "consent_not_given": {
+        "title": "Consent was not given",
+        "body": "Only a consent that was given can be withdrawn. Record the parent's decision instead."
+      },
+      "consent_already_decided": {
+        "title": "The parent already decided",
+        "body": "Record their new decision (consent given or refused) instead of sending the form again."
+      },
+      "no_forms": {
+        "title": "No forms to print",
+        "body": "No student of this section matches. Choose another section or decision."
+      },
+      "too_many_forms": {
+        "title": "Too many forms at once",
+        "body": "Print a section at a time, or only the pending students."
       }
     }
   }

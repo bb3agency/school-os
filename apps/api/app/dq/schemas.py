@@ -186,6 +186,10 @@ class ProfileOut(_Out):
     label_te: str
     required_fields: list[str]
     needs_apaar: bool
+    # Owner decision D3 (2026-10-10): built from these public sources; false until a school or
+    # the official template confirmed the format.
+    source: list[str] = []
+    verified: bool = False
 
 
 class RuleCount(_Out):

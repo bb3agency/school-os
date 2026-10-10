@@ -131,6 +131,9 @@ class StudentFacts:
     values: Mapping[str, Mapping[str, SourceFact]] = field(default_factory=dict)
     canonical: Mapping[str, CanonicalFact] = field(default_factory=dict)
     enrolments: tuple[EnrolmentFact, ...] = ()
+    # FR-APC-006 (ADR-0039): the parents refused (or withdrew) APAAR consent, so the APAAR
+    # readiness rules (DQ-009, DQ-022) never push this student to an APAAR action.
+    apaar_refused: bool = False
 
     def value(self, attribute_key: str, source: str) -> SourceFact | None:
         fact = self.values.get(attribute_key, {}).get(source)
@@ -647,6 +650,8 @@ class AadhaarDetailsCheck(_Check):
             for facts in context.students.values():
                 if facts.has_verified(context.config.apaar_attribute):
                     continue  # ADR-0037: the APAAR ID exists; readiness no longer matters
+                if facts.apaar_refused:
+                    continue  # ADR-0039: the parents refused consent; no APAAR action
                 missing = [k for k in keys if facts.value(k, source) is None]
                 if not missing:
                     continue
@@ -742,11 +747,14 @@ class ApaarIdCheck(_Check):
 
 class ApaarDemographicsCheck(CrossSourceCheck):
     """DQ-022 (ADR-0037): UDISE+ vs Aadhaar-as-printed, compared as DQ-010/011 do, for students
-    without a verified APAAR ID (generation authenticates against Aadhaar)."""
+    without a verified APAAR ID (generation authenticates against Aadhaar) whose parents did
+    not refuse APAAR consent (ADR-0039, FR-APC-006)."""
 
     def _students(self, context: CheckContext) -> Iterable[StudentFacts]:
         key = context.config.apaar_attribute
-        return [f for f in context.students.values() if not f.has_verified(key)]
+        return [
+            f for f in context.students.values() if not f.has_verified(key) and not f.apaar_refused
+        ]
 
 
 CHECKS: Final[dict[CheckKind, Callable[[Rule], RuleCheck[CheckContext]]]] = {

@@ -254,7 +254,7 @@ def test_portal_precheck_masks_c3_unless_included(
     requested = EX.audit_rows(admin_engine, school.tenant_id, shown.id)[0]["summary"]
     assert requested["include_sensitive"] is True
     # ADR-0021 decision 2: the audit event names the restricted columns, never their values.
-    assert requested["sensitive_columns"] == ["category"]
+    assert requested["sensitive_columns"] == ["category", "religion", "disability"]
     assert "obc" not in str(requested).lower()
     unmasked = EX.audit_rows(admin_engine, school.tenant_id, masked.id)[0]["summary"]
     assert (unmasked["include_sensitive"], unmasked["sensitive_columns"]) == (False, [])
@@ -884,7 +884,7 @@ def test_list_profiles(school: Any) -> None:
     assert keys["cisce-registration-2026"].permission == "export.board"
     assert keys["udise-plus"].permission == "export.portal"
     assert all(p.allowed for p in profiles)
-    assert keys["udise-plus"].fields[:2] == ["admission_no", "full_name"]
+    assert keys["udise-plus"].fields[:2] == ["full_name", "gender"]  # 2026-27 portal order
 
 
 def test_ADR_0036_profile_labels_and_list_watermark_are_english_while_telugu_is_hidden(

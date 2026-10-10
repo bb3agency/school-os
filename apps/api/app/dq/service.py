@@ -1109,6 +1109,8 @@ def profiles_catalog() -> list[ProfileOut]:
             label_te=telugu_text(p.label_te) or "",  # empty while Telugu is hidden (ADR-0036)
             required_fields=list(p.required_fields),
             needs_apaar=p.needs_apaar,
+            source=[str(u) for u in p.source],
+            verified=p.verified,
         )
         for p in load_profiles().values()
     ]

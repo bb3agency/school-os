@@ -1,19 +1,35 @@
-# Export pre-check profile: UDISE+ student profile (US-501, DQ-005, DQ-006, DQ-009).
+# Export pre-check profile: UDISE+ student profile 2026-27 (SDMS Student Module; US-501, US-1905,
+# DQ-005, DQ-006, DQ-009; FR-EXP-006; ADR-0039).
 # Loaded and validated by app.dq.profiles.load_profiles(); the file name is the profile key.
 #
-# TODO(portal formats): minimal field list for M1. Replace with the exact UDISE+ student data
-# capture format (field order, lengths, code lists) before the pilot; the exports module
-# (FR-EXP-002) will share this profile key.
+# Built from PUBLIC SECONDARY SOURCES (owner decision D3, 2026-10-10): the UDISE+ Data Capture
+# Formats published by the Ministry of Education (2022-23 on udiseplus.gov.in, 2023-24 and
+# 2025-26 mirrors), school-level SDMS data-collection forms and the research notes in
+# docs/research/2026-10-market/notes/regulation_portals.md §1. The 2026-27 student section was
+# not read from a primary document field by field, so `verified` stays false until a school's
+# portal screen or the official 2026-27 DCF confirms it.
 key: udise-plus
-version: 1
-label_en: UDISE+ student profile
-label_te: UDISE+ విద్యార్థి ప్రొఫైల్
+version: 2
+label_en: UDISE+ student profile 2026-27
+label_te: UDISE+ విద్యార్థి ప్రొఫైల్ 2026-27
 
+source:
+  - https://udiseplus.gov.in/assets/img/dcf2021/DCF_Final_2022_23_v15_1804.pdf
+  - https://educationforallinindia.com/wp-content/uploads/2023/09/data-capture-format-2023-24-DOSEL-MoE-India.pdf
+  - https://edudel.nic.in/upload/upload_2025_26/437_46_dt_13052025/AnnexureA.pdf
+  - https://educationforallinindia.com/udise-2026-27-answers-to-the-questions-parents-teachers-and-school-heads-are-actually-asking/
+  - https://gstmunshi.com/blog/udise-plus-student-module-progression-pen-login-guide
+  - https://kppha.in/news?id=395
+verified: false
+
+# DQ-005: the canonical value must exist (blocker). The PEN is not required: a child admitted
+# for the first time gets one when UDISE+ creates the record.
 required_fields: [full_name, dob, gender, father_name, mother_name, admission_no,
-                  mother_tongue, category]
+                  admission_date, mother_tongue, category]
 
 unverified_identity_severity: low
 
+# Student name: 2-100 characters (Kerala headmasters' association summary of the SDMS rules).
 name_format:
   fields: [full_name, father_name, mother_name]
   min_length: 2
@@ -23,3 +39,54 @@ name_format:
 
 # UDISE+ generates APAAR IDs from the Aadhaar-as-printed details.
 needs_apaar: true
+
+# The portal's own fields, in its order, and where SchoolOS holds each one. maps_to: null means
+# the clerk enters it in the portal (SchoolOS does not hold it yet); never_from_schoolos: the value
+# never leaves SchoolOS or is never stored in it (invariant 4: the Aadhaar number).
+portal_fields:
+  # General profile (GP)
+  - {label: Student's name (as per school record), section: general, maps_to: full_name, required: true}
+  - {label: Gender, section: general, maps_to: gender, required: true}
+  - {label: Date of birth, section: general, maps_to: dob, required: true}
+  - {label: Mother's name, section: general, maps_to: mother_name, required: true}
+  - {label: Father's name, section: general, maps_to: father_name, required: true}
+  - {label: Guardian's name, section: general, maps_to: null}
+  - {label: Aadhaar number of the student, section: general, maps_to: null, never_from_schoolos: true,
+     note: "SchoolOS stores only the last 4 digits; the clerk keys the number from the card."}
+  - {label: Name of the student as per Aadhaar, section: general, maps_to: null,
+     never_from_schoolos: true,
+     note: "Copied from the card. SchoolOS checks it against the record (DQ-010, DQ-022) but never exports it."}
+  - {label: Address, section: general, maps_to: address}
+  - {label: Pincode, section: general, maps_to: null}
+  - {label: Mobile number (parent or guardian), section: general, maps_to: null,
+     note: "On the guardian record in SchoolOS (restricted); not in the sheet."}
+  - {label: Email, section: general, maps_to: null}
+  - {label: Mother tongue, section: general, maps_to: mother_tongue, required: true}
+  - {label: Social category, section: general, maps_to: category, required: true}
+  - {label: Minority group, section: general, maps_to: religion,
+     note: "UDISE+ asks for the minority group; SchoolOS holds religion. The board does not accept a later change of religion (BSEAP 2026)."}
+  - {label: BPL beneficiary, section: general, maps_to: null}
+  - {label: Antyodaya (AAY) household, section: general, maps_to: null}
+  - {label: EWS or disadvantaged group, section: general, maps_to: null}
+  - {label: Child with special needs (CWSN) and type of impairment, section: general,
+     maps_to: disability}
+  - {label: Indian national, section: general, maps_to: nationality}
+  - {label: Blood group, section: general, maps_to: null}
+  # Enrolment profile (EP)
+  - {label: Admission number in the present school, section: enrolment, maps_to: admission_no,
+     required: true}
+  - {label: Date of admission, section: enrolment, maps_to: admission_date, required: true}
+  - {label: Class, section: enrolment, maps_to: class, required: true}
+  - {label: Section, section: enrolment, maps_to: section, required: true}
+  - {label: Roll number, section: enrolment, maps_to: roll_no}
+  - {label: Medium of instruction, section: enrolment, maps_to: null}
+  - {label: "Status in the previous academic year (class studied, result)", section: enrolment,
+     maps_to: null}
+  - {label: Admitted under RTE section 12(1)(c), section: enrolment, maps_to: null}
+  # Facility profile (FP): facilities, scholarships, CWSN support. Not held by SchoolOS.
+  - {label: Facilities and scholarships received, section: facility, maps_to: null}
+  # Identifiers
+  - {label: "PEN (Permanent Education Number, 11 digits)", section: identifier, maps_to: udise_pen,
+     note: "Created by UDISE+. A child from another school is imported by PEN, never created again."}
+  - {label: APAAR ID (12 digits), section: identifier, maps_to: apaar_id,
+     note: "Created in UDISE+ only with the parent's consent (APAAR consent register)."}

@@ -14,6 +14,7 @@ purge_order:
   - dq
   - changes
   - certificates
+  - apaar
   - students
   - imports
   - documents

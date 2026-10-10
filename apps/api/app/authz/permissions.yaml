@@ -257,6 +257,17 @@ permissions:
     sensitivity: sensitive
     step_up: true
 
+  # --- APAAR consent register (R1; ADR-0039, US-1901..US-1903, FR-APC-*) -------------------
+  # Migration 0051_apaar_consent_pen upserts these into core.permissions.
+  apaar.consent.read:
+    description: "See parents' APAAR consent decisions, the class summary and pending list, and print consent forms (class teachers: their sections)"
+    sensitivity: sensitive
+    step_up: false
+  apaar.consent.record:
+    description: Record a parent's APAAR consent decision (given, refused, pending or withdrawn) with the signed form, and print consent forms
+    sensitivity: sensitive
+    step_up: false
+
   # --- control plane (docs/07 §6.5, contract §5); never grantable to tenant roles ------------
   platform.tenants.read:
     description: See schools, their plan, status, deployment and usage (no student data)

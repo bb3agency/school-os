@@ -235,6 +235,7 @@ class _Profile:
     label_en: str
     label_te: str
     required_fields: tuple[str, ...]
+    verified: bool
     layout: ProfileLayout
 
     @property
@@ -261,6 +262,7 @@ def _profiles() -> dict[str, _Profile]:
             label_en=p.label_en,
             label_te=p.label_te,
             required_fields=tuple(p.required_fields),
+            verified=p.verified,
             layout=layout,
         )
     return out
@@ -288,6 +290,7 @@ def list_profiles(ctx: UserContext) -> list[ExportProfileOut]:
             fields=list(p.layout.fields),
             required_fields=list(p.required_fields),
             allowed=ctx.has(PERMISSION_OF_KIND[p.kind]),
+            verified=p.verified,
         )
         for p in _profiles().values()
     ]

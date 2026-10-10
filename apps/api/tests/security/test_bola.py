@@ -225,6 +225,12 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     },
     ("DELETE", "/api/v1/tally/parties/{party_id}/links/{student_id}"): None,
     ("POST", "/api/v1/notices/{notice_id}/draft"): {},
+    # APAAR consent register (ADR-0039): another school's student is 404 like a random id.
+    ("POST", "/api/v1/students/{student_id}/apaar-consent"): {
+        "status": "refused",
+        "relationship": "father",
+        "decided_on": "2026-07-01",
+    },
 }
 
 
@@ -298,6 +304,8 @@ ACTOR: dict[tuple[str, str], str] = dict.fromkeys(
         ("POST", "/api/v1/students/{student_id}/behaviour-notes"),
         ("POST", "/api/v1/behaviour-notes/{note_id}/erase"),
         ("GET", "/api/v1/students/{student_id}/timeline"),
+        # ADR-0039: recording APAAR consent is not an owner permission (docs/07 §6.2).
+        ("POST", "/api/v1/students/{student_id}/apaar-consent"),
     ),
     "principal",
 )

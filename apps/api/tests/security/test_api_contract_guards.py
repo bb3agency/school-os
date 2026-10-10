@@ -418,6 +418,9 @@ IDEMPOTENCY_EXEMPT = {
     "a per-member cool-down; nothing is created",
     ("POST", "/api/v1/circulars/{document_id}/read"): "a state transition (409 "
     "reading_in_progress on repeat)",
+    # FR-STU-018 (ADR-0039): a lookup like POST /students/search, numbers kept out of the URL.
+    ("POST", "/api/v1/students/national-id-check"): "read-only lookup (the PEN or APAAR ID "
+    "travels in the body, SEC-008); nothing is created",
 }
 
 

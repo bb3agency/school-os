@@ -105,6 +105,7 @@ from app.imports.validation import (
     AADHAAR_CODE,
     AADHAAR_MESSAGE_KEY,
     ANCHOR_SOURCE,
+    NATIONAL_ID_KEYS,
     AttributeSpec,
     ExistingStudent,
     RowResult,
@@ -353,6 +354,8 @@ def _specs(session: Session) -> dict[str, AttributeSpec]:
             max_length=a.max_length,
             pattern=a.pattern,
             not_future=a.not_future,
+            compact=a.compact,
+            format_code=a.format_code,
         )
         for a in students.attribute_rules(session)
     }
@@ -483,7 +486,29 @@ def _validation_context(
         ),
         config=import_config(),
         today=_today(),
+        national_ids=_national_ids(session, sheet, batch.mapping),
     )
+
+
+def _national_ids(
+    session: Session, sheet: Sheet, mapping: Mapping[str, str]
+) -> dict[str, dict[str, str]]:
+    """FR-IMP-010: PEN / APAAR ID values of the file already held by an active student of the
+    school (attribute key -> value -> student id), read in one query per attribute through
+    ``students.national_id_holders``. Values are never logged (PRV-020)."""
+    out: dict[str, dict[str, str]] = {}
+    for key in NATIONAL_ID_KEYS:
+        index = next((int(k) for k, v in mapping.items() if v == key), None)
+        if index is None:
+            continue
+        values = {
+            re.sub(r"[ -]", "", text)
+            for row in sheet.rows
+            if (text := cell_text(row.cell(index).value))
+        }
+        holders = students.national_id_holders(session, key, values)
+        out[key] = {value: str(sids[0]) for value, sids in holders.items() if sids}
+    return out
 
 
 def _row_values(result: RowResult, specs: Mapping[str, AttributeSpec]) -> dict[str, Any]:
