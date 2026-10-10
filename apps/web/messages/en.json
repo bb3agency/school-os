@@ -2744,6 +2744,36 @@
       "add": "Add",
       "done": "Done:",
       "stopped": "Stopped:"
+    },
+    "library": {
+      "title": "Template library",
+      "description": "Ready-made Excel templates for the files you already have. Download one, or pick it in the mapping step so the columns fill in by themselves.",
+      "verified": "Format confirmed",
+      "unverified": "Format not yet confirmed",
+      "unverifiedNote": "Formats owned by others (UDISE+, your ERP) are built from public information and not yet confirmed with a real file. Check the column mapping before you check the rows.",
+      "recordedAs": "Recorded as: {source}",
+      "download": "Download Excel template",
+      "downloadFor": "Download Excel template: {name}",
+      "downloading": "Downloading…",
+      "downloaded": "Saved {name}."
+    },
+    "presets": {
+      "label": "Fill in from a template",
+      "hint": "Pick the kind of file you uploaded. Columns it knows are filled in; check the others yourself.",
+      "placeholder": "Choose a template",
+      "unverifiedOption": "{name} (format not yet confirmed)",
+      "apply": "Fill in the columns",
+      "applying": "Filling in…",
+      "applied": "{count, plural, =0 {No column matched this template.} one {# column was filled in.} other {# columns were filled in.}}",
+      "missing": "Not in your file: {columns}.",
+      "otherSource": "This template is usually imported from another source than the one you chose. Check that the source is right before you add the rows."
+    },
+    "refresh": {
+      "title": "Refresh from your ERP export",
+      "titleNamed": "Refresh from your {name} export",
+      "description": "Upload the student export from your other school system. SchoolOS updates its office records and lists every difference from the admission register.",
+      "registerKept": "Admission register values are never replaced. Each difference becomes a finding for the office to check.",
+      "submit": "Upload the ERP export"
     }
   },
   "extraction": {
@@ -4169,6 +4199,38 @@
     "saveBar": {
       "title": "Save your changes",
       "body": "Changes apply to everyone in the school once you save."
+    },
+    "boards": {
+      "title": "Boards and how you use SchoolOS",
+      "description": "The boards your school prepares students for, and whether SchoolOS runs next to another school system.",
+      "boardsField": "Boards",
+      "boardsHint": "Board checks are shown for the boards you tick. Tick none to see every board's checks.",
+      "names": {
+        "BSEAP": "AP State Board (SSC)",
+        "CBSE": "CBSE",
+        "CISCE": "CISCE (ICSE and ISC)"
+      },
+      "classBoardsField": "Board for each class",
+      "classBoardsHint": "Your school runs more than one board. Say which board each class follows for registration.",
+      "classLabel": "Class {code}",
+      "classFollows": "Class {code}: {board}",
+      "notSet": "Not set",
+      "modeField": "How you use SchoolOS",
+      "modes": {
+        "full": {
+          "label": "SchoolOS is our office system",
+          "hint": "Records, portal checks, certificates and the other modules."
+        },
+        "alongside": {
+          "label": "Alongside our current ERP",
+          "hint": "Keep fees and the parent app in your other system. SchoolOS keeps the records and checks them for portals. The Tally connector is hidden."
+        }
+      },
+      "erpNameField": "Name of your current ERP (optional)",
+      "erpNameHint": "Shown on the imports page, for example on the refresh from your ERP export.",
+      "save": "Save boards and mode",
+      "saved": "Boards and mode saved.",
+      "unchanged": "Nothing changed, so nothing was saved."
     }
   },
   "documents": {
@@ -7226,6 +7288,10 @@
       "precondition_failed": {
         "title": "The agent changed",
         "body": "Someone changed this agent while you were looking. The list is now up to date; try again."
+      },
+      "module_hidden": {
+        "title": "The Tally connector is hidden",
+        "body": "Your school runs SchoolOS alongside another ERP. Change this in school settings to set up the connector."
       }
     }
   }
