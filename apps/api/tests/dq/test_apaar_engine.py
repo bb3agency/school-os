@@ -5,6 +5,7 @@ Synthetic data only: APAAR-like IDs from :func:`app.devtools.fake_ids.synthetic_
 
 from __future__ import annotations
 
+import datetime as dt
 import random
 import sys
 import uuid
@@ -46,17 +47,29 @@ def dumped(admin: Engine, *student_ids: uuid.UUID) -> str:
     return out
 
 
+def _set_status(admin: Engine, student_id: uuid.UUID, status: str) -> None:
+    with admin.begin() as c:
+        c.execute(
+            text("UPDATE sis.students SET status = :st WHERE id = :i"),
+            {"st": status, "i": student_id},
+        )
+
+
 def test_FR_DQ_021_one_apaar_id_on_two_students_across_sections(
     world: Any, admin_engine: Engine
 ) -> None:
     shared = synthetic_apaar_id(RNG)
     in_9a = DS.student(world.a, extra=[apaar(shared)], admission_no=f"A{uuid.uuid4().hex[:8]}")
+    # FR-STU-018 refuses a second live record with the same APAAR ID, so the pair is made the
+    # one way it still arises: a former student re-admitted after the number was reused.
+    _set_status(admin_engine, in_9a, "left")
     in_9c = DS.student(
         world.a,
         section_key="section_9c",
         extra=[apaar(shared, "parent_form")],
         admission_no=f"A{uuid.uuid4().hex[:8]}",
     )
+    _set_status(admin_engine, in_9a, "active")
     DS.run(world.a, in_9a)
     DS.run(world.a, in_9c)
     mine, theirs = DS.one(admin_engine, in_9a, "DQ-021"), DS.one(admin_engine, in_9c, "DQ-021")
@@ -132,6 +145,32 @@ def test_DQ_009_and_FR_DQ_022_clear_once_the_apaar_id_is_verified(
         row = DS.one(admin_engine, sid, rule)
         assert (row["status"], row["resolution"]) == ("resolved", "auto_cleared"), rule
     assert number not in dumped(admin_engine, sid)
+
+
+def test_FR_APC_006_refused_consent_is_never_pushed_to_apaar(
+    world: Any, admin_engine: Engine
+) -> None:
+    """ADR-0039: once the parents refused APAAR consent, the APAAR readiness rules (DQ-009,
+    DQ-022) leave the student alone; if they later give consent, the rules apply again."""
+    from app.apaar import service as apaar_service
+    from app.apaar.schemas import ConsentIn
+
+    sid = DS.student(
+        world.a,
+        extra=[
+            *DS.aadhaar(name="Yarlagadda Durga Bhavani", dob="2012-03-14"),
+            ValueIn(attribute_key="full_name", source="udise_plus", value="Kommineni Venkata Sai"),
+        ],
+    )
+    DS.run(world.a, sid, profile_key="udise-plus")
+    assert DS.one(admin_engine, sid, "DQ-009")["status"] == "open"
+    assert DS.one(admin_engine, sid, "DQ-022")["status"] == "open"
+    refused = ConsentIn(status="refused", relationship="father", decided_on=dt.date(2026, 7, 1))
+    DS.call(world.a, apaar_service.record_consent, sid, refused)
+    DS.run(world.a, sid, profile_key="udise-plus")
+    for rule in ("DQ-009", "DQ-022"):
+        row = DS.one(admin_engine, sid, rule)
+        assert (row["status"], row["resolution"]) == ("resolved", "auto_cleared"), rule
 
 
 def test_FR_DQ_021_other_school_apaar_ids_never_pair(world: Any, admin_engine: Engine) -> None:

@@ -77,6 +77,7 @@ from app.students import repository as repo
 from app.students.canonical import Resolution, resolve
 from app.students.definitions import (
     AADHAAR_DETAIL,
+    DIGITS11_CODE,
     DIGITS12_CODE,
     MASK,
     AttributeDef,
@@ -84,6 +85,7 @@ from app.students.definitions import (
     CleanValue,
     aadhaar_display,
     aadhaar_error,
+    digits11_value,
     digits12_value,
     error,
     is_full_aadhaar,
@@ -104,6 +106,9 @@ from app.students.schemas import (
     GuardianCreate,
     GuardianOut,
     GuardianPatch,
+    NationalIdCheckIn,
+    NationalIdCheckOut,
+    NationalIdMatch,
     PromotionCommitIn,
     PromotionCounts,
     PromotionGroupOut,
@@ -132,6 +137,15 @@ UPDATE: Final = "student.update_nonidentity"
 
 APAAR_SEARCH_FIELD: Final = "apaar_id"
 """Search-body field and typed attribute for the exact APAAR ID search (FR-STU-016, ADR-0037)."""
+PEN_KEY: Final = "udise_pen"
+"""Search-body field and attribute of the UDISE+ PEN (FR-STU-017..019, ADR-0039)."""
+NATIONAL_ID_KEYS: Final = (PEN_KEY, APAAR_SEARCH_FIELD)
+"""Identifiers unique among the school's active and provisional students (FR-STU-018)."""
+NATIONAL_ID_IN_USE: Final = "national_id_in_use"
+NATIONAL_ID_DETAIL: Final = (
+    "This number is already on another student's record in this school. Open that record "
+    "instead of creating a second one."
+)
 
 VALUES_TABLE: Final = "sis.attribute_values"
 VALUE_COLUMN: Final = "value_ciphertext"
@@ -471,6 +485,8 @@ class AttributeRules:
     max_length: int | None  # after cleaning (NFC, single spaces); None for dates
     pattern: str | None  # full-match regular expression
     not_future: bool  # dates
+    compact: bool = False  # spaces and hyphens removed before the checks (udise_pen)
+    format_code: str = "invalid_format"  # error code when the pattern does not match
 
 
 def attribute_rules(session: Session) -> list[AttributeRules]:
@@ -487,6 +503,8 @@ def attribute_rules(session: Session) -> list[AttributeRules]:
             max_length=d.max_length,
             pattern=d.pattern,
             not_future=d.not_future,
+            compact=d.compact,
+            format_code=d.format_code,
         )
         for d in _definitions(session).values()
     ]
@@ -736,6 +754,107 @@ def _insert_value(
         )
 
 
+def _guard_national_ids(
+    session: Session,
+    ctx: UserContext,
+    items: Sequence[tuple[str, str, str]],
+    *,
+    student_id: uuid.UUID | None,
+) -> None:
+    """FR-STU-018 (ADR-0039): a PEN or APAAR ID already held by another active or provisional
+    student of this school is refused (422 ``national_id_in_use`` on the field, message key
+    ``errors.<key>_in_use``), so a child who transfers in or is entered twice never gets a second
+    record ("active in two schools" starts here). ``items``: ``(field, attribute_key, value)``.
+    The error names the other record (``student_id``) only when the caller may read it. The
+    numbers are locked for the rest of the transaction (two clerks entering the same PEN at once
+    wait for each other). Never logged (PRV-020)."""
+    if not items:
+        return
+    structure: _Structure | None = None
+    problems: list[dict[str, str]] = []
+    for field_name, key, value in items:
+        repo.lock_national_id(session, key, value)
+        holders = [
+            sid for _, sid in repo.national_id_holders(session, key, [value]) if sid != student_id
+        ]
+        if not holders:
+            continue
+        problem = error(field_name, NATIONAL_ID_IN_USE, f"errors.{key}_in_use")
+        structure = structure or _structure(session)
+        visible = next((s for s in holders if _in_scope(session, ctx, s, READ, structure)), None)
+        if visible is not None:
+            problem["student_id"] = str(visible)
+        problems.append(problem)
+    if problems:
+        raise ValidationFailed(problems, detail=NATIONAL_ID_DETAIL)
+
+
+def national_id_holders(
+    session: Session, attribute_key: str, values: Collection[str]
+) -> dict[str, list[uuid.UUID]]:
+    """Value -> active or provisional students holding it as a current, not rejected
+    ``udise_pen`` / ``apaar_id`` (FR-STU-018). For imports, which show the clash as a row error
+    before commit. Values are never logged (PRV-020)."""
+    if attribute_key not in NATIONAL_ID_KEYS:
+        raise ValueError(f"not a national id attribute: {attribute_key}")
+    out: dict[str, list[uuid.UUID]] = {}
+    for value, sid in repo.national_id_holders(session, attribute_key, values):
+        out.setdefault(value, []).append(sid)
+    return out
+
+
+def check_national_ids(
+    session: Session, ctx: UserContext, data: NationalIdCheckIn
+) -> NationalIdCheckOut:
+    """Before admitting a child (FR-STU-018, transfer-in by PEN): which records of this school
+    already hold this PEN or APAAR ID, and what to do in UDISE+ (``udise_action``). Former
+    students (left, graduated) count too, so a returning child is re-admitted, not created
+    again. Permission ``student.create`` (school-wide). Read-only and not audited, like other
+    searches; the numbers are never logged (PRV-020)."""
+    wanted: list[tuple[str, str]] = []
+    if data.udise_pen is not None:
+        pen = digits11_value(data.udise_pen)
+        if pen is None:
+            raise ValidationFailed([error(PEN_KEY, DIGITS11_CODE)])
+        wanted.append((PEN_KEY, pen))
+    if data.apaar_id is not None:
+        apaar = digits12_value(data.apaar_id)
+        if apaar is None:
+            raise ValidationFailed([error(APAAR_SEARCH_FIELD, DIGITS12_CODE)])
+        wanted.append((APAAR_SEARCH_FIELD, apaar))
+    if not wanted:
+        raise ValidationFailed([error("udise_pen", "missing")])
+    found: list[tuple[str, uuid.UUID]] = []
+    for key, value in wanted:
+        found.extend(
+            (key, sid)
+            for _, sid in repo.national_id_holders(session, key, [value], live_only=False)
+        )
+    rows = summaries(session, ctx, {sid for _, sid in found})
+    matches = [
+        NationalIdMatch(
+            attribute_key=key,
+            student_id=sid,
+            display_name=rows[sid].display_name,
+            admission_no=rows[sid].admission_no,
+            status=rows[sid].status,
+            class_section=rows[sid].class_section,
+        )
+        for key, sid in sorted(set(found), key=lambda m: (m[0], str(m[1])))
+        if sid in rows
+    ]
+    action: Any
+    if any(m.status in repo.LIVE_STATUSES for m in matches):
+        action = "open_existing_record"
+    elif matches:
+        action = "readmit_existing_record"
+    elif data.udise_pen is not None:
+        action = "import_by_pen"
+    else:
+        action = "new_udise_record"
+    return NationalIdCheckOut(matches=matches, udise_action=action)
+
+
 def _section_or_422(session: Session, section_id: uuid.UUID) -> Any:
     try:
         return tenancy.get_section(session, section_id)
@@ -782,6 +901,20 @@ def create_student(
         cleaned.append((definition, item.source, clean, item.evidence_document_id))
     if not any(d.key == "full_name" for d, *_ in cleaned):
         raise ValidationFailed([error("values", "full_name_required")])
+    if data.admission_kind == "transfer_in" and not any(d.key == PEN_KEY for d, *_ in cleaned):
+        # FR-STU-018: a child from another school is imported into UDISE+ by PEN.
+        raise ValidationFailed([error("values", "pen_required_for_transfer_in")])
+    if data.status in repo.LIVE_STATUSES:
+        _guard_national_ids(
+            session,
+            ctx,
+            [
+                (f"values.{i}.value", d.key, clean.plain)
+                for i, (d, _, clean, _) in enumerate(cleaned)
+                if d.key in NATIONAL_ID_KEYS
+            ],
+            student_id=None,
+        )
     section = _enrolment_target(session, data.section_id) if data.section_id else None
     tenant_id = repo.current_tenant_id(session)
     with _db_errors():
@@ -823,6 +956,7 @@ def create_student(
             "value_count": len(cleaned),
             "section_id": section.id if section is not None else None,
             "enrollment_id": enrollment_id,
+            "admission_kind": data.admission_kind,
         },
     )
     log.info("student.created", resource_type="student", resource_id=student.id)
@@ -882,6 +1016,14 @@ def record_value(  # noqa: PLR0917 - signature fixed by the M1 build contract
             student_version=student.version,
         )
     _identity_guard(definition, source, verification, previous)
+    if (
+        attribute_key in NATIONAL_ID_KEYS
+        and verification != "rejected"
+        and student.status in repo.LIVE_STATUSES
+    ):
+        _guard_national_ids(
+            session, ctx, [("value", attribute_key, clean.plain)], student_id=student_id
+        )
     row = _insert_value(
         session,
         ctx,
@@ -1485,11 +1627,17 @@ def search(
     The value is never logged or audited (PRV-020)."""
     if filters.query and is_full_aadhaar(filters.query):
         raise ValidationFailed([aadhaar_error("query")], detail=AADHAAR_DETAIL)
-    apaar: str | None = None
+    exact: list[tuple[str, str]] = []
     if filters.apaar_id is not None:
         apaar = digits12_value(filters.apaar_id)
         if apaar is None:
             raise ValidationFailed([error(APAAR_SEARCH_FIELD, DIGITS12_CODE)])
+        exact.append((APAAR_SEARCH_FIELD, apaar))
+    if filters.udise_pen is not None:  # FR-STU-019: exact PEN, same rules as the APAAR ID
+        pen = digits11_value(filters.udise_pen)
+        if pen is None:
+            raise ValidationFailed([error(PEN_KEY, DIGITS11_CODE)])
+        exact.append((PEN_KEY, pen))
     cfg = search_config()
     offset = _offset(cursor, cfg.max_offset)
     structure = _structure(session, filters.academic_year_id)
@@ -1543,12 +1691,11 @@ def search(
             admission_bonus=cfg.admission_exact_bonus,
             offset=offset,
             limit=limit,
-            apaar_key=APAAR_SEARCH_FIELD if apaar is not None else None,
-            apaar_id=apaar,
+            exact_values=tuple(exact),
         ),
     )
     ranked = bool(parsed.name_key or parsed.admission_terms)
-    unranked_field = APAAR_SEARCH_FIELD if apaar is not None else None
+    unranked_field = exact[0][0] if exact else None
     items = [
         StudentSummary(
             id=r.id,

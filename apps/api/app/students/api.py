@@ -35,6 +35,8 @@ from app.students.schemas import (
     GuardianCreate,
     GuardianOut,
     GuardianPatch,
+    NationalIdCheckIn,
+    NationalIdCheckOut,
     PromotionCommitIn,
     PromotionIn,
     PromotionPreviewOut,
@@ -202,10 +204,28 @@ def search_students_by_body(
     ``GET /students``; send ``next_cursor`` back as ``cursor`` with the same filters. Read-only:
     nothing is written, so no ``Idempotency-Key``. ``apaar_id`` finds a student by exact APAAR
     ID (12 digits; current verified or recorded values of the typed ``apaar_id`` attribute only,
-    same scope; FR-STU-016, ADR-0037); it is the only field that accepts a 12-digit number. A
-    full Aadhaar number anywhere else in the body is refused (422
-    ``aadhaar_full_number_rejected``)."""
+    same scope; FR-STU-016, ADR-0037); it is the only field that accepts a 12-digit number.
+    ``udise_pen`` finds a student by exact UDISE+ PEN (11 digits, else 422 ``digits11_required``;
+    same rules and scope; FR-STU-019). A full Aadhaar number anywhere else in the body is
+    refused (422 ``aadhaar_full_number_rejected``)."""
     return students.search(db, ctx, body.filters(), limit=body.limit, cursor=body.cursor)
+
+
+@router.post("/students/national-id-check", response_model=NationalIdCheckOut)
+def check_national_ids(
+    ctx: Creator,
+    _aadhaar: SearchAadhaarGuard,
+    db: TenantDB,
+    body: NationalIdCheckIn,
+) -> NationalIdCheckOut:
+    """Before admitting a child, check whether this school already has a record with the PEN or
+    APAAR ID (FR-STU-018, transfer-in by PEN; permission ``student.create``). Answers the
+    matching records (current and former students) and ``udise_action``: what to do in UDISE+
+    (open or re-admit the existing record, import the child by PEN, or search UDISE+ by name and
+    date of birth when there is no PEN). Numbers travel in the body, never the URL (SEC-008);
+    read-only, nothing is written or audited; the numbers are never logged (PRV-020). Errors:
+    ``digits11_required`` / ``digits12_required`` (422)."""
+    return students.check_national_ids(db, ctx, body)
 
 
 @router.post("/students", response_model=StudentOut, status_code=201)
@@ -217,7 +237,10 @@ def create_student(
     idem: IdempotencyDep,
 ) -> Response:
     """Add a student with first values, each with its source; optionally enrol in a section
-    (permission ``student.create``). Accepts ``Idempotency-Key``."""
+    (permission ``student.create``). Accepts ``Idempotency-Key``. A PEN or APAAR ID already on
+    another active record of the school is refused (422 ``national_id_in_use``, with that
+    record's ``student_id`` when you may read it); ``admission_kind: transfer_in`` needs a PEN
+    (422 ``pen_required_for_transfer_in``; FR-STU-018)."""
     return idem.run(
         db, body, lambda: students.create_student(db, ctx, body), headers=_student_headers
     )

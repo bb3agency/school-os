@@ -23,8 +23,8 @@ from app.students.schemas import ValueIn
 EX = sys.modules["sos_test_exports_objects"]
 
 
-def verhoeff_number() -> str:
-    body = "67812345678"
+def verhoeff_number(body: str = "67812345678") -> str:
+    # FR-STU-018: one APAAR ID per live student, so each test uses its own number.
     number = body + verhoeff_check_digit(body)
     assert verhoeff_valid(number)
     return number
@@ -35,7 +35,7 @@ def verhoeff_number() -> str:
 
 def test_FR_EXP_005_udise_layout_has_pen_and_apaar_columns() -> None:
     layout = load_config().profiles["udise-plus"]
-    assert layout.layout_version == 2
+    assert layout.layout_version >= 2  # 3 since ADR-0039 (2026-27 portal order)
     assert layout.fields[-2:] == ("udise_pen", "apaar_id")
     assert "apaar_id" not in load_config().profiles["cisce-registration-2026"].fields
 
@@ -141,7 +141,7 @@ def test_FR_EXP_005_udise_precheck_ready_sheet_has_pen_and_unmasked_apaar(
 
 @pytest.mark.db
 def test_FR_EXP_005_student_list_apaar_column_is_typed(school: Any, section: str) -> None:
-    number = verhoeff_number()
+    number = verhoeff_number("67812345679")
     EX.student(
         school,
         section_key=section,
