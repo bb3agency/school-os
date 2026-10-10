@@ -10,11 +10,13 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, Path, Query, Request, Response
+from fastapi.responses import HTMLResponse
 
 from app.authz.context import UserContext
 from app.authz.dependencies import TenantDB, require
 from app.authz.http import Cursor, IdempotencyDep, Limit, Page, etag, if_match_version
+from app.dq import readiness_service as readiness
 from app.dq import service as dq
 from app.dq.schemas import (
     PROFILE_PATTERN,
@@ -22,6 +24,11 @@ from app.dq.schemas import (
     FindingOut,
     FindingStatus,
     ProfileOut,
+    ReadinessRunIn,
+    ReadinessStatus,
+    ReadinessStudentDetailOut,
+    ReadinessStudentOut,
+    ReadinessSummaryOut,
     ResolveIn,
     RuleId,
     RuleOut,
@@ -31,6 +38,7 @@ from app.dq.schemas import (
     SummaryOut,
     WaiveIn,
 )
+from app.dq.slip import STYLE_CSP as SLIP_CSP
 
 router = APIRouter(prefix="/api/v1/dq", tags=["data-quality"])
 
@@ -175,3 +183,113 @@ def get_summary(
     """Unresolved findings by severity and rule for the pre-check screen: blockers apart from
     warnings (permission ``dq.findings.read``)."""
     return dq.summary(db, ctx, profile_key=profile_key, section_ids=section_ids)
+
+
+# --- board and portal readiness (US-503..US-505, FR-DQ-030..FR-DQ-036, ADR-0040) ---------------
+
+ReadinessReader = Annotated[UserContext, Depends(require(readiness.READ))]
+ReadinessManager = Annotated[UserContext, Depends(require(readiness.MANAGE))]
+ProfileKey = Annotated[
+    str, Path(pattern=PROFILE_PATTERN, description="Readiness profile, e.g. bseap-ssc-2027, apaar")
+]
+
+_SLIP_HEADERS = {
+    "Cache-Control": "no-store",
+    "Content-Security-Policy": SLIP_CSP,
+    "X-Content-Type-Options": "nosniff",
+}
+
+
+@router.get("/readiness/{profile_key}", response_model=ReadinessSummaryOut)
+def readiness_summary(
+    *,
+    ctx: ReadinessReader,
+    db: TenantDB,
+    profile_key: ProfileKey,
+    section_ids: Annotated[list[uuid.UUID] | None, Query(max_length=100)] = None,
+) -> ReadinessSummaryOut:
+    """Board or portal readiness by section ("142 of 160 ready"): ready, waiting for the
+    parent (Aadhaar), waiting for the school (UDISE+ or the register) and blocked (needs a
+    decision), computed from the current records (permission ``dq.readiness.read``; class
+    teachers see their sections). Unknown profile: 404."""
+    return readiness.summary(db, ctx, profile_key, section_ids=section_ids)
+
+
+@router.get("/readiness/{profile_key}/students", response_model=list[ReadinessStudentOut])
+def readiness_students(
+    *,
+    ctx: ReadinessReader,
+    db: TenantDB,
+    profile_key: ProfileKey,
+    section_id: uuid.UUID,
+    status: Annotated[list[ReadinessStatus] | None, Query()] = None,
+) -> list[ReadinessStudentOut]:
+    """The students of one section with their readiness and who must act, worst first (no
+    values; permission ``dq.readiness.read``). A section outside your scope: 404."""
+    return readiness.section_students(db, ctx, profile_key, section_id, status=status)
+
+
+@router.get(
+    "/readiness/{profile_key}/students/{student_id}", response_model=ReadinessStudentDetailOut
+)
+def readiness_student(
+    ctx: ReadinessReader, db: TenantDB, profile_key: ProfileKey, student_id: uuid.UUID
+) -> ReadinessStudentDetailOut:
+    """One student: the value every record holds, each exact difference (character by
+    character when you may see both values) and who must fix it (permission
+    ``dq.readiness.read``). Aadhaar-as-printed values appear only with
+    ``student.read_sensitive`` for the student, and that view is audited."""
+    return readiness.student_detail(db, ctx, profile_key, student_id)
+
+
+@router.post("/readiness/{profile_key}/runs", response_model=RunOut, status_code=202)
+def start_readiness_run(
+    ctx: ReadinessManager,
+    db: TenantDB,
+    profile_key: ProfileKey,
+    body: ReadinessRunIn,
+    idem: IdempotencyDep,
+) -> Response:
+    """Check sections, classes or students for the profile and store each difference as a
+    DQ-030 finding, so it can be resolved, waived or linked to a change request (permission
+    ``dq.readiness.manage``). An empty scope means the profile's classes. Small scopes are
+    checked at once (``completed``), bigger ones are queued. Accepts ``Idempotency-Key``."""
+    return idem.run(
+        db,
+        body,
+        lambda: readiness.request_run(db, ctx, profile_key, body),
+        status_code=202,
+        headers=lambda r: {"Location": f"/api/v1/dq/runs/{r.id}"},
+    )
+
+
+@router.get(
+    "/readiness/{profile_key}/slips",
+    response_class=HTMLResponse,
+    responses={200: {"content": {"text/html": {}}, "description": "Print-ready A4 slips"}},
+)
+def readiness_slips(
+    *,
+    ctx: ReadinessReader,
+    db: TenantDB,
+    profile_key: ProfileKey,
+    student_id: uuid.UUID | None = None,
+    section_id: uuid.UUID | None = None,
+    include_ready: bool = True,
+) -> HTMLResponse:
+    """Parent verification slips (one A4 page per student) for one student or one section:
+    the value each record holds, the differences and who must fix them, and a signature line
+    for the parent (permission ``dq.readiness.read``). Aadhaar-as-printed values are shown
+    only with ``student.read_sensitive``; never an Aadhaar number. Printing is audited."""
+    page = readiness.slips(
+        db,
+        ctx,
+        profile_key,
+        student_id=student_id,
+        section_id=section_id,
+        include_ready=include_ready,
+    )
+    name = f"verification-slips-{profile_key}.html"
+    return HTMLResponse(
+        page, headers={**_SLIP_HEADERS, "Content-Disposition": f'inline; filename="{name}"'}
+    )

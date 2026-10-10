@@ -58,7 +58,7 @@ from app.core.languages import telugu_text
 from app.core.logging import get_context, get_logger
 from app.core.records import RecordTable
 from app.core.redaction import contains_full_aadhaar
-from app.dq import engine
+from app.dq import engine, readiness
 from app.dq import repository as repo
 from app.dq.explanations import Language, load_explanations
 from app.dq.masking import FULL_MASK
@@ -224,6 +224,10 @@ def _param_text(
         return issue.text(language.value) if issue is not None else text
     if name == "student" and not related_visible:
         return FULL_MASK
+    # DQ-030 (ADR-0040): the record to correct and the kinds of difference, as codes.
+    readiness_text = {"source": readiness.source_text, "diff": readiness.kinds_text}.get(name)
+    if readiness_text is not None:
+        return readiness_text(text, readiness.load_readiness_config(), language.value)
     return text
 
 
@@ -1109,6 +1113,9 @@ def profiles_catalog() -> list[ProfileOut]:
             label_te=telugu_text(p.label_te) or "",  # empty while Telugu is hidden (ADR-0036)
             required_fields=list(p.required_fields),
             needs_apaar=p.needs_apaar,
+            source=list(p.source),
+            verified=p.verified,
+            readiness=p.readiness is not None,
         )
         for p in load_profiles().values()
     ]
