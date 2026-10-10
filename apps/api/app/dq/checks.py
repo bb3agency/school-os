@@ -842,7 +842,10 @@ def readiness_finding(
     values = [
         value_entry(config.physical_key(key, s), s, held[s]) for s in item.sources if s in held
     ]
-    named = item.against if item.owner == "school_register" else item.source
+    # DQ-030-REGISTER names the record that contradicts the register; the others the record
+    # to correct (or the one with no value).
+    contradicted = item.owner == "school_register" and item.reason == "mismatch"
+    named = item.against if contradicted else item.source
     params: dict[str, str | int] = {"field": key, "diff": rd.kinds_param(item.kinds)}
     if named is not None:
         params["source"] = named

@@ -15,6 +15,7 @@ from pydantic import ValidationError
 
 from app.dq import readiness as rd
 from app.dq.checks import CanonicalFact, assess_readiness, build_checks, evaluate, fingerprint_of
+from app.dq.explanations import load_explanations
 from app.dq.matching import classify
 from app.dq.profiles import ReadinessField, load_engine_config, load_profiles
 from app.dq.rules import CheckKind, load_rules
@@ -339,3 +340,41 @@ def test_FR_DQ_034_apaar_skips_students_with_a_verified_apaar_id() -> None:
         canonical={"apaar_id": CanonicalFact("123456789012", "udise_plus", False, verified=True)},
     )
     assert not assess_readiness(done, profile, cfg, classifier).applies
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        {("full_name", REG): None},  # register missing: missing + undecided
+        {("aadhaar_name_as_printed", AAD): None},  # Aadhaar missing
+        {("full_name", BIRTH): "KOMMINENI VENKATASAI"},  # register contradicted
+        {("full_name", BIRTH): "SRINU", ("full_name", UDISE): "KOMMINENI V SAI"},  # undecided
+        {("aadhaar_name_as_printed", AAD): "Kommineni Venkata Sai"},  # advisory
+        {("full_name", UDISE): "KOMMINENI VENKATA SIA"},  # UDISE+
+    ],
+)
+def test_FR_DQ_033_every_readiness_finding_has_a_complete_explanation(
+    values: dict[tuple[str, str], str | None],
+) -> None:
+    raw: dict[tuple[str, str], str | None] = {
+        ("full_name", REG): "KOMMINENI VENKATA SAI",
+        ("aadhaar_name_as_printed", AAD): "KOMMINENI VENKATA SAI",
+        ("full_name", UDISE): "KOMMINENI VENKATA SAI",
+        **values,
+    }
+    facts = CS.facts(
+        values={k: v for k, v in raw.items() if v is not None}, enrolments=[CS.enrolment("X")]
+    )
+    found = [
+        f
+        for f in evaluate(
+            CS.context([facts], profiles=["bseap-ssc-2027"]), build_checks(load_rules())
+        )
+        if f.rule_id == "DQ-030"
+    ]
+    assert found
+    catalog = load_explanations()
+    for finding in found:
+        params = dict(finding.details["params"])  # type: ignore[call-overload]
+        # Raises when a placeholder is missing or extra (the API renders the same way).
+        assert catalog.render(finding.explanation_code, "en", **params)
