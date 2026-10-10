@@ -14,6 +14,7 @@ from collections.abc import Collection
 from typing import Any
 
 from sqlalchemy import func, select, text, update
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
@@ -75,7 +76,7 @@ def current(session: Session, student_ids: Collection[uuid.UUID]) -> dict[uuid.U
     stmt = (
         select(ApaarConsent)
         .where(ApaarConsent.student_id.in_(list(student_ids)))
-        .distinct(ApaarConsent.student_id)
+        .ext(distinct_on(ApaarConsent.student_id))
         .order_by(ApaarConsent.student_id, ApaarConsent.seq.desc())
     )
     return {row.student_id: row for row in session.scalars(stmt)}
