@@ -56,12 +56,13 @@ def _ssc_student(school: Any, *, section_key: str = "section_9a", ready: bool = 
     letters = "".join(chr(ord("a") + int(c, 16) % 26) for c in word).capitalize()
     name = f"Synthetica {letters} Sai Kumar"
     aadhaar_name = name if ready else name.replace("Sai Kumar", "Saikumar")
-    return EX.student(
+    sid: uuid.UUID = EX.student(
         school,
         section_key=section_key,
         name=name,
         extra=[*_aadhaar(aadhaar_name), *_udise(name)],
     )
+    return sid
 
 
 def _post(api: Any, who: Any, path: str, body: dict[str, Any], **kw: Any) -> Any:
