@@ -507,6 +507,11 @@ The product owner decided on 2026-09-30 to launch in English and hide Telugu eve
 Telugu is **hidden, not deleted**: catalogs, fields, previews, fonts and their tests stay in the
 code, dormant, so it returns by configuration.
 
+**Parent-facing surfaces are the exception (R2, ADR-0044, owner decision D9).** The public parent
+pages and verification page (§5.8), WhatsApp templates and printed parent slips and forms follow
+the school's `parent_language` (or the guardian's own choice), **not** this switch; they load Noto
+Sans Telugu only when their language is Telugu. Everything staff see stays as described below.
+
 **The switch.** `SOS_TELUGU_ENABLED` (default `false`), the same variable as the API's. The web app
 reads it **only** in `src/i18n/languages.ts` (`teluguEnabled()`, `enabledLocales()`,
 `uiLocale()`), at run time on the server: the proxy, layouts, pages, route handlers and the BFF.
@@ -852,6 +857,57 @@ pointers, focus ring always; motion per §5.5.
 exit), `features/sheets/sheets.test.tsx` (tap to edit), `features/ask/citations-touch.test.tsx`;
 e2e `responsive.spec.ts` "key screens" at 360, 390, 768 (touch) and 1366: no sideways scroll,
 stacked lists below 640px only, 44px touch targets, dialogs that fit (sheets on phones), axe.
+
+### 5.8 R2 screens (planned): fees, messaging, parent pages, verification, Ask usage
+
+**Status: planned (R2; docs/02 C20-C25).** Same shell, tokens, components and rules as the rest of the app; everything below must work at 1366×768 and keyboard-only (WCAG 2.2 AA), print on A4 where printed, and keep personal data out of URLs (searches are `POST`).
+
+**Sidebar.** A "Fees" item (visible with `fee.collect`, `finance.read` or `fee.manage`; hidden when fees are off or the school runs alongside its ERP) and a "Messages" item (`message.read`); WhatsApp and payments settings live under Settings.
+
+#### Fees screens
+
+| Route | Screen | Key interaction notes |
+|---|---|---|
+| `/fees/collect` | **Counter** (the most used R2 screen) | One column, no scrolling at 1366×768 for a typical student. Focus starts in the search box (`/` or `F2` focuses it from anywhere in Fees). Typing a name or admission number shows up to 8 matches as a listbox (arrow keys, Enter); the chosen student's dues table appears below (instalment, head, due date, due, late fee, paid) with the total; focus moves to **Amount**, pre-filled with the total due and selected so typing replaces it. **Mode** is a radio group with mnemonic keys (C cash, Q cheque, B bank transfer, U UPI QR); choosing cheque, bank or UPI reveals only its fields (cheque number/bank/date; reference; UTR, 12 digits, `inputmode="numeric"`). Allocation shows below as read-only lines (oldest first) with "Change allocation" (opens editable amounts; totals must match before saving). **Save receipt** = `Ctrl+Enter`; the button shows the number it will not know until saved ("Save and print"). After saving: a success panel with the receipt number in large type, "Print" (focused; `P`), "Send on WhatsApp" (if a guardian is opted in; `W`), "Next student" (`N`, returns focus to search). Errors say what to fix next to the field ("This UTR is already on receipt RCT/2026-27/000118 — open it"). No modal dialogs in the happy path. Amounts in Indian grouping (₹1,25,000.00) |
+| `/fees/receipts` | Receipts list | Filters (date, mode, collector, status) as query params of ids/codes only; cancelled receipts struck through with "Cancelled on …"; row actions: print, download, request cancellation, refund |
+| `/fees/receipts/{id}` | Receipt detail | Frozen content, status, cancellation and refunds history, messages sent, parent link status |
+| `/fees/accounts/{id}` | Student fee account | Statement with running balance; tabs: dues, statement, concessions, payment links, messages; actions: collect, send payment link, request concession |
+| `/fees/approvals` | Approvals inbox | Concessions, adjustments, cancellations, refunds waiting for me (never my own requests); approve requires step-up (the usual `428` flow), reject requires a reason |
+| `/fees/daily` | Daily collection report | Date picker (default today), totals by mode and collector, cash and cheque to hand over; Print (A4) and CSV (step-up); "Close day" (P) with a confirmation showing the totals |
+| `/fees/dues` | Dues list | Class/section filters; sort by oldest due; bulk "Send reminder" and "Send payment link" with a preview of recipients and skips; CSV (step-up) |
+| `/fees/reconcile` | Bank and online reconciliation | Tabs: Bank statement (upload, proposed matches with checkboxes, "Confirm N matches"), UPI exceptions, Online (yesterday's report; "Mark explained" with a note) |
+| `/fees/setup` | Heads, plans, late-fee rules | Plan editor as a sheet grid (§4.1) of heads × instalments with live totals; "Apply to class" shows a dry-run summary before the job; an active plan in use is read-only with "New version" |
+| `/settings/payments` | Razorpay connection | Owner only; plain statement "Money goes to the school's Razorpay account and bank. SchoolOS never holds it. Razorpay's fees apply."; Connect (redirect), status, token expiry, rotate webhook secret, disconnect (confirm) |
+| `/settings/upi` | UPI QR | Upload the bank's QR image, payee name, UPI ID; preview as parents will see it |
+
+**Receipt print.** A5 portrait (default) or A4 half-page with a counterfoil line; school letterhead, receipt number and date prominent, student name, class, admission number, table of heads and instalments, amount in figures and words, mode details (UTR last 4 shown in full on the receipt only, since the parent needs it), "Education services: exempt from GST", collector's name, "Computer-generated receipt; verify at <public link>" only when the parent link exists. A cancelled receipt reprints with a diagonal "CANCELLED" mark.
+
+#### Messages screens
+
+| Route | Screen | Key interaction notes |
+|---|---|---|
+| `/settings/whatsapp` | Connect WhatsApp | Embedded Signup button (Meta's popup; the only page that loads Meta's SDK); checklist after connecting: business verification, INR billing before 31 Dec 2026, template approvals (status chips), quality rating and limit; switches per purpose, absence alert time, quiet hours, office phone for auto-replies; Resume button when paused, with the reason |
+| `/messages` | Broadcasts and history | Recent broadcasts with live delivery bars (sent, delivered, read, failed); search history by student/guardian (POST); failure reasons in plain words ("Not on WhatsApp", "Number blocked the school", "Meta limit reached, will retry") |
+| `/notices/{id}` (existing) | "Send on WhatsApp" panel | Section picker → preview card: recipients, skipped by reason (each a link to the list), languages, estimated Meta cost incl. GST ("paid by the school to Meta"); Confirm sends; the panel then shows live progress |
+| `/students/{id}` → Guardians (existing) | Opt-in per guardian | Three category toggles show the current state and method; changing opens a small form (method, date, evidence upload for a signed form); "Opted out by parent (STOP) on …" is shown read-only with "Record a new signed opt-in"; language: English / Telugu / school default |
+| `/messages/slips` | Join slips | Pick a section → print A4 slips (two per page) in the parent language with the QR and the text "Send JOIN to … to get school messages on WhatsApp. Send STOP any time to stop." |
+
+#### Parent pages (public origin; ADR-0046)
+
+Mobile-first (designed at 360 px, scales up), no sidebar, no sign-in, the school's name at the top and "From <school>, sent through SchoolOS" at the bottom. One column, 16 px base text, 44 px touch targets, system font stack plus self-hosted Noto Sans Telugu only on Telugu pages. No third-party scripts, analytics or external fonts. Text in the parent language (ADR-0044); numbers and dates in Indian formats.
+- **Notice:** title, date, body, "Open the PDF" button.
+- **Receipt:** a receipt card (number, date, child, class, amounts, mode) and "Save as PDF"; cancelled receipts show a red "Cancelled on …" banner above the card.
+- **Dues:** list of instalments due with totals; primary button "Pay ₹X online" (when connected) that leaves to Razorpay; secondary "Pay by UPI" showing the school's QR and payee name; "Paid already? The school will send your receipt." Thank-you page after Razorpay returns.
+- **Expired/unknown:** one calm page: "This link has expired or is not valid. Ask the school office, or reply to the school's WhatsApp message, for a new one." No school name.
+- Every page footer: "Anyone with this link can see this page. Do not forward it."
+
+#### Certificate verification (public origin; ADR-0045)
+
+`/v` shows a single code box (16 characters, auto-groups as typed, paste-friendly) and "Check"; `/v/{code}` shows a status banner (green "Valid", amber "Duplicate copy n", red "Cancelled on …") and, for valid ones, the printed values as a two-column definition list in the certificate's order, with "This page shows only what the certificate prints." Works without JavaScript (server-rendered form).
+
+#### Ask usage (C25)
+
+On the Ask page header for `tenant.billing.read` holders: a small meter "312 of 1,000 answers this month" (no colour alarm below 80%; at ≥ 80% amber text "Near your monthly answers"). For everyone, when answers are search-only: a dismissible banner above the composer with the reason and what to do ("The school's AI answers for this month are used up. You still get matching passages. Ask the principal about a bigger bundle."). Each search-only answer repeats the reason in its outcome alert (§5.3).
 
 ## 6. Do and don't
 

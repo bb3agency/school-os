@@ -3,9 +3,9 @@
 | Field | Value |
 |---|---|
 | Product | SchoolOS (working name) |
-| Version | 0.2 · 2026-09-26 |
-| Date | 2026-09-26 |
-| Changes | 0.2: commercial model decided (managed SaaS, shared and dedicated tiers, recurring subscription; §11), platform operator team added to stakeholders (§6), related risk (§14). 0.1: baseline |
+| Version | 0.3 · 2026-10-14 |
+| Date | 2026-10-14 |
+| Changes | 0.3: owner decisions D4-D9 of 2026-10-10 (docs/18 §8) moved fee collection (school as merchant), WhatsApp parent messages, read-only parent pages and parent-facing Telugu into scope for R2 (§7.2.1, §7.3); business rules BR-16..BR-18; ADR-0042..0047. 0.2: commercial model decided (managed SaaS, shared and dedicated tiers, recurring subscription; §11), platform operator team added to stakeholders (§6), related risk (§14). 0.1: baseline |
 | Owner | Founder (solo student-developer, Andhra Pradesh) |
 | Status | Draft for design-partner validation |
 | Related | 02-PRD, 03-TRD, 08-Privacy, 16-Platform admin panel, ADR-0015 |
@@ -56,7 +56,7 @@ It is not another ERP. It works alongside the school's existing tools (paper reg
 
 **Positioning:** "The school's memory that the office actually uses." Enter once, check against every source, use everywhere.
 
-**What SchoolOS is not (now):** an accounting system (Tally stays), a full ERP replacement, a parent app, an LMS, or a replacement for legally required paper registers.
+**What SchoolOS is not (now):** an accounting system (Tally stays), a full ERP replacement, a parent app, an LMS, a payment aggregator (it never holds parents' money), or a replacement for legally required paper registers.
 
 ## 5. Business objectives
 
@@ -82,7 +82,7 @@ It is not another ERP. It works alongside the school's existing tools (paper reg
 | Accountant | Fees, Tally | Fee questions answered without re-entry | Secondary user |
 | Exam coordinator | Board registration | Clean candidate data before deadlines | Primary user (seasonal) |
 | Class teacher | Attendance, marks, student welfare | Quick student context, early warnings (M5) | Secondary user |
-| Parents | Receive notices/certificates | Correct documents, clear notices (English; bilingual deferred: hidden while `SOS_TELUGU_ENABLED` is off (ADR-0036)) | Indirect |
+| Parents | Receive notices/certificates; from R2 receive opted-in WhatsApp messages from the school's number, open link pages, pay fees | Correct documents, clear notices and receipts in the school's parent language (English or Telugu per school, ADR-0044), dues they can pay without queuing | Indirect (no login) |
 | Boards/authorities | Receive submissions | Correct data | Indirect |
 | Platform operator team (SchoolOS) | Builds and runs SchoolOS: owner, engineers, support, billing (roles in 16 §2) | Secure, low-ops platform; provisioning, billing and support tools without access to school data (BR-09) | Operator / supplier |
 
@@ -99,8 +99,23 @@ It is not another ERP. It works alongside the school's existing tools (paper reg
 ### 7.2 In scope: next modules (M3–M7, see 14-Roadmap)
 Certificates & registers · circulars→tasks and parent notices (English first, ADR-0036) · student timeline & early warning · Tally read connector · multi-school readiness.
 
+### 7.2.1 In scope: the 2026-27 plan (docs/18; releases R1-R3)
+R1 board and portal readiness (built) · **R2 office essentials**: AP transfer certificate format and public certificate verification; fee ledger, receipts, UPI QR matching and Razorpay payment links; WhatsApp parent messages with opt-in and parent link pages in the school's parent language; "Ask the school" finish-up (docs/14 R2) · R3 DPDP processor pack, CBSE Appendix IX page, portal-calendar reminders.
+
 ### 7.3 Out of scope (until an explicit decision)
-Replacing Tally or doing accounting · online fee collection from parents · parent mobile app · LMS/homework · timetable · transport/GPS · biometric attendance · automated submission into government portals (no APIs; exports only) · CCTV.
+Replacing Tally or doing accounting · parent mobile app and parent logins · LMS/homework · timetable · transport/GPS · hostel · payroll · biometric attendance · automated submission into government portals (no APIs; exports only) · CCTV · SMS (and TRAI DLT registration) · marketing or promotional messages to parents · two-way chat between the office and parents · fee financing or lender referrals · SchoolOS receiving, holding or settling any parent's money.
+
+**Moved into scope by owner decisions of 2026-10-10 (docs/18 §8; release R2):**
+
+| Was out of scope | Now | Decision | ADR |
+|---|---|---|---|
+| Online fee collection from parents | **Fee ledger and receipts** for cash, cheque, the school's own UPI QR (matched by UTR) and Razorpay payment links. **The school is always the merchant**: money goes to the school's own bank or Razorpay account and never through SchoolOS (RBI Payment Aggregator Directions, 15 Sep 2025). SchoolOS creates links, reads webhooks and reconciles; it does no accounting (Tally stays) | D4, D5 | ADR-0042 |
+| SchoolOS sending messages to parents | **WhatsApp utility messages** (approved notices, absence alerts, fee reminders and receipts) from the **school's own number** through the Meta Cloud API, with recorded opt-in and opt-out; the school pays Meta directly; no SMS | D6, D7 | ADR-0043 |
+| Parent-facing pages | **Read-only parent link pages** opened from a message (notice, receipt, dues with "Pay"), short-lived and unguessable; **no parent login** | R2 scope | ADR-0046 |
+| (Telugu hidden everywhere, ADR-0036) | Parent-facing messages, pages and forms in **Telugu or English per school**; staff screens stay English | D9 | ADR-0044 |
+| (new) | **Public certificate verification** by the code or QR printed on the certificate, showing only what the certificate shows | R2 scope | ADR-0045 |
+
+Fee work is optional per school: a school running SchoolOS "alongside its current ERP" (ADR-0041) keeps fees there and the fee screens stay hidden.
 
 ## 8. Business rules
 
@@ -121,6 +136,9 @@ Replacing Tally or doing accounting · online fee collection from parents · par
 | BR-13 | SchoolOS works alongside existing tools (Tally, Excel, paper). It imports and reads; it does not require the school to abandon them. |
 | BR-14 | Deletion of personal data follows the school's retention settings and law; audit/security logs are retained per 08-Privacy. |
 | BR-15 | No real student data is used for development, testing, demos or AI training. |
+| BR-16 | **Money never touches SchoolOS** (R2, ADR-0042). Fees are paid in cash or cheque to the school, by UPI to the school's own bank account, or through the school's own payment-aggregator account. SchoolOS records, links and reconciles; it never receives, holds, routes or settles funds and takes no cut. |
+| BR-17 | **Receipts are never edited** (R2). A wrong receipt is cancelled by a separate, approved cancellation that keeps its number; refunds are their own vouchers. Concessions and adjustments need a second person's approval. |
+| BR-18 | **Parents receive only school communication they opted into** (R2, ADR-0043): utility messages from the school's own WhatsApp number, per category, with "STOP" honoured at once; never marketing. |
 
 ## 9. Business process overview (as-is → to-be)
 

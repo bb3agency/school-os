@@ -5,7 +5,7 @@
 | Version | 0.4 · 2026-09-29 |
 | Laws/regimes | DPDP Act 2023 + DPDP Rules 2025 · IT Act 2000 / CERT-In Directions (Apr 2022) · UIDAI Aadhaar rules |
 | Related | 05-Data model §8–13, 07-Security, 11-Operations §7 (incident response), 16-Platform admin panel, ADR-0015, ADR-0016 |
-| Changes | 0.4: student insights (M5) purpose limits as built (§4), fixed retention for notes and closed flags (§7), DPIA inputs (§10), records of processing (§11). 0.3: circulars and parent notices privacy rules (§8). 0.2: data location for shared and dedicated tiers; payments provider listed as proposed (not active); platform, billing and support data (§14); records of processing and DPA clause updated. 0.1: baseline |
+| Changes | 0.5 (2026-10-14): R2 planned rules for fees, payments, WhatsApp parent messages, parent link pages and certificate verification (§15, PRV-022..PRV-029); providers the school contracts directly (§1). 0.4: student insights (M5) purpose limits as built (§4), fixed retention for notes and closed flags (§7), DPIA inputs (§10), records of processing (§11). 0.3: circulars and parent notices privacy rules (§8). 0.2: data location for shared and dedicated tiers; payments provider listed as proposed (not active); platform, billing and support data (§14); records of processing and DPA clause updated. 0.1: baseline |
 
 > **Not legal advice.** This document records engineering and product commitments based on public sources checked in September 2026. Have a qualified lawyer review the DPA, notices and incident process before handling real data.
 
@@ -30,6 +30,8 @@
 | Reranking provider (candidates: Voyage AI rerank, Google Vertex AI ranking) | **Proposed, not active** (ADR-0035; off by default). Ordering search candidates for a question | The question and the text of candidate passages the asking user may already read (Aadhaar-masked) | Provider-dependent; to confirm in the privacy review before activation |
 | OCR provider (chosen by evaluation) | Text extraction from scans/photos | Page images (after Aadhaar-region redaction where detectable) | Provider-dependent |
 | Payment provider (Razorpay candidate) | **Proposed, not active** (ADR-0016). Online collection of SchoolOS subscription payments | School billing contact and invoice amounts only; never student data | To confirm in the privacy review before activation |
+
+**Providers the school contracts directly (R2, planned; used by SchoolOS on the school's instruction, §15):** the school's own payment aggregator account (Razorpay first, ADR-0042: amount, intent reference and a description without names per link; payer details stay on Razorpay's page) and the school's own WhatsApp Business Account on Meta's Cloud API (ADR-0043: the guardian's WhatsApp number and the template variables per message). They are not SchoolOS sub-processors; they are listed so schools see every third party that receives data about them.
 
 The register above covers processing of school data. A payment provider would process SchoolOS's own billing data (§14); it is listed so schools see every third party that could receive data about them. It is added to the active register, and schools are notified per the DPA, only if ADR-0016 is accepted after a privacy review.
 
@@ -251,3 +253,38 @@ Rules:
 - **Heartbeats carry no personal data** (16 §12.3); the schema has no free-text fields.
 - **Dedicated tier location:** the school's host runs in ap-south-1; its bucket and backups (encrypted with its own KMS key) are in ap-south-1 and ap-south-2. The control plane receives only heartbeat data from it. A custom domain changes the web address, not where data is stored.
 - **After offboarding**, school data is deleted and keys destroyed (§7); billing records remain for their legal retention period because they contain no student data.
+
+## 15. Fees, payments, parent messages and public pages (R2, planned)
+
+**Status: planned (R2).** Decisions: ADR-0042 (fees and payments), ADR-0043 (WhatsApp), ADR-0044 (parent language), ADR-0045 (certificate verification), ADR-0046 (parent link pages). Not legal advice; the DPA, the school's privacy notice and the DPIA need the lawyer's review before a school uses these features (docs/18 Q9 is still open).
+
+### 15.1 Who is who
+
+| Party | Role for R2 data | Notes |
+|---|---|---|
+| School | Data fiduciary; **merchant** of its own Razorpay account; **owner** of its own WhatsApp Business Account | Decides to collect fees online and to message parents; signs Razorpay's and Meta's terms itself; pays Meta itself (D7) |
+| SchoolOS | Data processor | Records the ledger and messages, creates links and sends messages **on the school's instruction** through the school's own accounts; never holds money |
+| Razorpay | The school's own payment aggregator (RBI-authorised PA), contracted by the school | Not a SchoolOS sub-processor for fee data: SchoolOS transmits only what decision 8 of ADR-0042 lists (amount, intent reference, a description without names). Razorpay collects payer details on its own hosted page under its contract with the school |
+| Meta (WhatsApp) | The school's own messaging provider, contracted by the school | SchoolOS transmits the guardian's WhatsApp number and the template variables per message on the school's instruction. Listed in the school's notice as the channel the school uses |
+
+The sub-processor register (§1) lists them in a separate block **"Providers the school contracts directly (used by SchoolOS on the school's instruction)"**, so schools see every third party that receives data about them, and the DPA says SchoolOS sends them only what each message or link needs.
+
+### 15.2 Rules
+
+| ID | Rule |
+|---|---|
+| PRV-022 | **Money and payment data.** SchoolOS never receives, holds or settles parents' money (RBI PA Directions, ADR-0042). Payment links carry no student or parent name, phone or e-mail; Razorpay's own notifications to payers stay off. Payer identifiers that arrive in webhook payloads (contact, e-mail, VPA) are stored only inside the encrypted inbox and purged after 90 days; receipts keep the provider payment id and method only. |
+| PRV-023 | **Fee data purpose and access.** Fee accounts, ledger, receipts, concessions and refunds are C2 personal financial data used only to run the school's fees: visible only to fee permissions (07 §6.7), never to class teachers, never in Ask answers to anyone without `finance.read`, never shared with lenders, fee-financing companies or for marketing (invariant 14), no cross-school analytics. Hardship concession evidence is C3. |
+| PRV-024 | **Retention of financial records.** Receipts, vouchers, ledger and related records are kept 8 years after the financial year (P; school accounting obligations, confirm with a CA), even after the student leaves; bank statement files are deleted as soon as they are read and narrations erased after 90 days; offboarding deletes everything after the school's export (05 §13). |
+| PRV-025 | **WhatsApp opt-in and opt-out.** A guardian receives a business-initiated message only with a current opt-in for that category (notices, attendance, fees), recorded append-only with method, wording version, date, recorder and evidence (signed form, the parent's own join message, or an in-person record naming the staff member). Opt-in is never pre-ticked or bundled with admission; refusing does not affect the child. "STOP" (or ఆపు, or the button) opts out of all categories within 60 seconds and cannot be overridden by staff (WhatsApp Business Messaging Policy; DPDP withdrawal). |
+| PRV-026 | **Message content minimisation.** Templates carry only what the purpose needs: a notice title; a child's first name and the date for an absence; amount and due date for a reminder; receipt number and amount for a receipt. Never marks, attendance history, insights, health, caste, Aadhaar data or another child's data. Everything else is behind a short-lived link (ADR-0046). Marketing templates are never created; a template Meta moves to marketing is paused (FR-MSG-007). |
+| PRV-027 | **Phone numbers.** Guardian phone numbers stay C3 in `sis.guardians` (encrypted, blind index). Message rows keep the blind index and the last four digits only; numbers are decrypted only in the sending worker, never logged, never in URLs, never in audit summaries. Inbound message text is not stored; only its kind and time (90 days). |
+| PRV-028 | **Parent link pages.** Pages show only what their purpose needs (ADR-0046 decision 2), expire (7-90 days), are revocable per guardian, and say "Anyone with this link can see this page. Do not forward it." The DPIA records the residual risk of a forwarded link (comparable to a forwarded paper receipt). |
+| PRV-029 | **Public certificate verification.** The page shows only what the certificate itself prints, for whoever holds its code; cancelled certificates show no content; nothing from the live record is shown; checks are counted for the school, and the visitor's address is kept only as a keyed hash in the audit event. The certificate states that it can be checked online. |
+
+### 15.3 Notice, DPIA and records of processing (additions)
+
+- **School's notice to parents (PRV-001):** add fee collection (purpose, the school's payment provider, retention), WhatsApp messages (categories, how to join and stop, that the school's own number and Meta are used), parent links (lifetime, do not forward), certificate verification.
+- **DPIA (§10) inputs:** WhatsApp as a channel (Meta's processing, metadata, forwarding), parent link exposure, payment data flows (none through SchoolOS), opt-in evidence, the public verification page.
+- **Records of processing (§11):** new rows for fees and receipts (legal basis: the school's legitimate use for its services and accounting; retention 8 years), parent messaging (consent recorded per category), parent pages, certificate verification.
+- **Data-principal requests (PRV-010):** access reports include a guardian's opt-ins and messages (metadata) and a student's fee account; correction of financial records happens only through cancellation and re-issue (never edits); erasure of financial records is refused while the retention period runs (legal obligation), with the reason recorded.
