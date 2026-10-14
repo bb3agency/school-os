@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted |
+| Status | Accepted · Amended by ADR-0044 (parent-facing language per school) |
 | Date | 2026-09-30 |
 | Deciders | Product owner ("forget about Telugu in this whole thing for now; let's deal with English first; hide all Telugu and its related things from every nook and corner of this whole project", 2026-09-30) |
 | Amends / supersedes | Amends the bilingual (English + Telugu) requirement in CLAUDE.md §1, §3, §7, §8 and §10, docs/01, docs/02, docs/03 (FR-KB-006 and every "EN/TE" output), docs/06 and docs/17 for the time being. Does not supersede any ADR. |

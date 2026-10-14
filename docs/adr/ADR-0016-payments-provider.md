@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Status | **Proposed** |
+| Status | **Accepted** 2026-10-14 (owner decision D5 of 2026-10-10: Razorpay first; docs/18 §8). Decision 1 stands; decision 2's adapter is still built only after its listed reviews |
 | Date | 2026-09-26 |
 | Deciders | Founder (pending privacy review) |
-| Amends / supersedes | none |
+| Amends / supersedes | none · related: [ADR-0042](ADR-0042-fee-ledger-receipts-and-payment-links.md) (parents paying schools, a different payer and module) |
 
 ## Context
 
@@ -40,3 +40,8 @@ Billing data is **school business data**: the school's legal name, GSTIN, billin
 ## Related requirements
 
 FR-PLT-015..019, PRV-012; 08 §1, §9, §14; 16 §5.9, §10.
+
+## Amendments (2026-10-14)
+
+- **D5 recorded.** The product owner chose Razorpay first (docs/18 §8, D5). This ADR is accepted with Razorpay as the provider for **SchoolOS's own subscription invoices** (the school pays SchoolOS; SchoolOS is the merchant of its own Razorpay account; `platform` module only). Nothing else in the decision changes: manual payments stay the default, and the adapter waits for the privacy, RBI-authorisation, sub-processor and security reviews of decision 2.
+- **Not the fee module.** Parents paying fees to schools is decided separately in [ADR-0042](ADR-0042-fee-ledger-receipts-and-payment-links.md): the school is the merchant, the tenant module `app/fees` holds its own provider interface, and no code is shared with `platform` (CLAUDE.md §4: `platform` never imports tenant modules, and tenant modules never import `platform`).

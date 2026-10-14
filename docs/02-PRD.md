@@ -6,7 +6,7 @@
 | Scope | Core capabilities C1–C14 (milestones M0–M2) + extension points |
 | Related | 01-BRD (why), 03-TRD (how well), 06-RAG, 07-Security, 16-Platform admin panel |
 | Changes | 0.4: C15 certificates and registers (M3) with US-1101..US-1108, proposed from the roadmap scope (PO to confirm). 0.3: US-1305 invoice number example uses the implemented 16-character format. 0.2: C14 platform admin panel (M0) with US-1301..US-1310; C13 folded into C14; C12 "Plan & billing" page (US-1204); US-202 uses `tenant.structure.manage`; promotions moved to M1. 0.1: baseline |
-| Changes | 0.5: C17 student timeline and early warning (M5) with US-1701..US-1709, proposed from the roadmap scope (PO to confirm). 0.4: C16 circulars, tasks and parent notices (M4) with US-1601..US-1606, proposed from the roadmap scope for the product owner to confirm. 0.3: US-1305 invoice number example uses the implemented 16-character format. 0.2: C14 platform admin panel (M0) with US-1301..US-1310; C13 folded into C14; C12 "Plan & billing" page (US-1204); US-202 uses `tenant.structure.manage`; promotions moved to M1. 0.1: baseline |
+| Changes | 0.6 (2026-10-14): R2 stories C20-C25 (US-2001..US-2006, US-2101..US-2112, US-2201..US-2210, US-2301..US-2303, US-2401..US-2405, US-2501..US-2504) from owner decisions D4-D9 (docs/18 §8; ADR-0042..ADR-0047); R2 personas; capability map rows C18-C25; §9 non-goals updated. 0.5: C17 student timeline and early warning (M5) with US-1701..US-1709, proposed from the roadmap scope (PO to confirm). 0.4: C16 circulars, tasks and parent notices (M4) with US-1601..US-1606, proposed from the roadmap scope for the product owner to confirm. 0.3: US-1305 invoice number example uses the implemented 16-character format. 0.2: C14 platform admin panel (M0) with US-1301..US-1310; C13 folded into C14; C12 "Plan & billing" page (US-1204); US-202 uses `tenant.structure.manage`; promotions moved to M1. 0.1: baseline |
 
 ---
 
@@ -30,7 +30,8 @@
 | **Correspondent (management)** | Know the school's numbers; trust that data is safe |
 | **Exam coordinator** | Clean candidate lists before board deadlines |
 | **Class teacher** | Context on their students; follow up on flagged students (M5) |
-| **Accountant** | Answer fee questions from Tally data without re-entry (M6) |
+| **Accountant** | Answer fee questions from Tally data without re-entry (M6); from R2 run the fee ledger, receipts and reconciliation (R2 personas in §4) |
+| **Parent (receives WhatsApp)** | From R2: receive opted-in school messages, open notices and receipts, pay dues without an app or login (R2 personas in §4) |
 | **Platform operator team** (owner, engineer, support agent, billing admin, viewer; 16 §2) | Provision schools on the shared or dedicated tier, bill them, keep the fleet healthy, support safely, never see school data without approval |
 
 ## 3. Capability map
@@ -56,6 +57,14 @@
 Extension points for later modules: circulars→tasks & notices (M4), student timeline & early warning (M5), Tally connector (M6).
 | C16 | Circulars → tasks, reminders and parent notices, English (bilingual deferred per ADR-0036) (AI suggestions confirmed by staff) | M4 |
 | C17 | Student timeline and early warning: attendance and marks, behaviour notes, ABC indicators, flags with an owner and an intervention log (rules only, no AI) | M5 |
+| C18 | Tally read connector (fee ledgers read from the office PC) | M6 |
+| C19 | Board and portal readiness: APAAR consent, PEN, transfer-in, readiness diff | R1 |
+| C20 | Certificates: AP TC format and public verification by code or QR (ADR-0045) | R2 |
+| C21 | Fee ledger, receipts, UPI QR matching and Razorpay payment links; the school is the merchant (ADR-0042) | R2 |
+| C22 | WhatsApp parent messages from the school's own number, with opt-in and opt-out (ADR-0043) | R2 |
+| C23 | Parent language per school (ADR-0044) | R2 |
+| C24 | Parent link pages, no parent login (ADR-0046, ADR-0047) | R2 |
+| C25 | Ask the school finish-up: answer usage, search-only explanations, source resolution, e2e | R2 |
 
 Extension points for later modules: certificates & registers (M3), circulars→tasks & notices (M4, C16 below), student timeline & early warning (M5), Tally connector (M6).
 
@@ -376,7 +385,7 @@ Operators are SchoolOS staff with platform roles (16 §2, §6). None of these st
 **US-1606** · As a principal, I want to approve a notice and then copy its text or download it as a printable A4 page or an image. A principal may approve a notice they drafted themselves; the audit log marks it as self-approved. [FR-NOTICE-005, FR-NOTICE-006] *(Proposed from the roadmap scope; PO to confirm.)*
 - AC1: Only holders of `notice.approve` can approve; both languages must be filled; an approved notice cannot be edited.
 - AC2: After approval the A4 PDF and a PNG image are rendered (Telugu without clipped glyphs); download links last at most 5 minutes and every download is audited; the plain text can be copied for WhatsApp-style groups. *(Telugu part deferred: hidden while `SOS_TELUGU_ENABLED` is off, ADR-0036.)*
-- AC3: SchoolOS never sends the notice to parents itself (no parent logins or messaging in core, §9).
+- AC3: SchoolOS never sends the notice to parents itself (no parent logins or messaging in core, §9). *(From R2 an approved notice may also be sent on WhatsApp to opted-in guardians from the school's own number, US-2204, ADR-0043; copying and downloading stay.)*
 
 ### C17 · Student timeline and early warning (M5)
 
@@ -495,6 +504,211 @@ Stories of the 2026-27 plan (docs/18 §3 R1.2-R1.3; owner decisions D1, D3, D9 o
 - AC1: The sheet lists, in the portal's order, every field SchoolOS holds, including PEN and APAAR ID; fields SchoolOS does not hold (and the Aadhaar number, which it never stores) are named for me to enter from the card or the form.
 - AC2: The profile says which public documents it came from and that it is not yet confirmed with a school (owner decision D3).
 
+---
+
+### R2 · Office essentials around the wedge (C20-C25)
+
+Stories of the 2026-27 plan, release R2 (docs/18 §3 R2; owner decisions D4-D9 of 2026-10-10; ADR-0042..ADR-0047). Acceptance criteria marked *(P)* depend on an engineering choice that is still **Proposed** in its ADR; the rest follow owner decisions. Every story also carries the standing definition of done (CLAUDE.md §8): authz allowed / denied 403 / other school 404, audit in the same transaction, no personal data in logs or URLs, English strings (Telugu only on parent-facing surfaces, ADR-0044), usable at 1366×768 and keyboard-only.
+
+**R2 personas** (in addition to §2):
+
+| Persona | Who | Top jobs in R2 |
+|---|---|---|
+| **Ravi, office assistant at the fee counter** (`office_staff`) | Takes cash, cheques and UPI payments at the counter, often with a queue | Find the child in seconds, take the payment, print or send the receipt, never make an arithmetic mistake |
+| **Padma, accountant** (`accountant`) | Sets up fee plans with the principal, reconciles the bank and Razorpay, chases dues | One receipt book for every mode, a daily collection report that matches the cash box, bank and Razorpay matched without retyping |
+| **Principal** | Approves concessions, receipt cancellations, refunds, TCs; approves notices | Nothing changes money without a second person; parents get correct, timely messages |
+| **Owner / correspondent** | Signs the Razorpay and Meta agreements for the school | Money goes straight to the school's account; the school's own number; knows what messages cost |
+| **Srinivas, parent** | Father of a Class 7 child; reads WhatsApp on an Android phone, prefers Telugu | Gets notices, absence alerts, fee reminders and receipts from the school's number; opens a link and pays or reads without an app or password; can say STOP |
+| **Verifier** (receiving school, employer, office) | Holds a paper TC from another school | Checks in seconds that the TC is genuine and unchanged |
+
+#### C20 · Certificates: AP TC format and public verification (R2.1; ADR-0045)
+
+**US-2001** · As an office admin in an AP State Board school, I want transfer certificates in the AP TC layout so that receiving schools and offices accept them without retyping. [FR-CERT-015, FR-CERT-016, FR-CERT-017, FR-CERT-018]
+- AC1: Given the principal chose the `ap-tc-2027` format in certificate settings, when I prepare a TC, then the preview shows the AP fields in the AP order, each with its source (admission register, verified or provisional) or as a TC input I type (for example identification marks, languages studied, whether qualified for promotion, date of application).
+- AC2: The format says it is built from public sources and not yet confirmed with a school (owner decision D3); a school can switch back to the generic format; certificates already issued keep the format they were issued in.
+- AC3: The TC prints the UDISE+ PEN when the school holds a verified value; it prints the APAAR ID only when the parent consented and the ID is verified, never for a refused or withdrawn consent.
+- AC4: Religion and caste status print as labelled blanks to fill by hand, unless the owner decides otherwise (open question). No Aadhaar data is ever printed.
+
+**US-2002** · As an office admin, I want every certificate I issue to carry a verification code and a QR so that anyone holding it can check it is genuine. [FR-CERT-019, FR-CERT-020, FR-CERT-023]
+- AC1: When a certificate or a duplicate is issued, then it gets a 16-character code (printed in four groups) and a QR that opens the verification page; the code is not derived from the serial, the student or the school.
+- AC2: The PDF and the print view show the code, the QR and "Check this certificate at <address>/v".
+- AC3: Given a certificate issued before R2, when the principal chooses "Add verification code" (step-up, reason), then a code is created and audited; the original paper has none, so the next duplicate carries it.
+
+**US-2003** · As a verifier, I want to scan the QR or type the code on a public page so that I can see whether the certificate is genuine and what it says. [FR-CERT-021, FR-CERT-022, FR-PUB-004]
+- AC1: Given a valid code, the page shows "Valid", the school's printed name and place, the certificate type, serial, date of issue and exactly the values printed on that certificate, nothing from today's records.
+- AC2: Given a duplicate, the page also says "Duplicate copy n of serial …"; given a cancelled certificate, it shows school, type, serial and "Cancelled on <date>" without the printed values.
+- AC3: Given an unknown, mistyped or withdrawn code, the page says "We could not find a certificate with this code. Check the code or contact the school that issued it." with no hint of any school; dashes, spaces and letter case in a typed code do not matter.
+- AC4: There is no search by serial, name or date of birth. After 20 lookups in 10 minutes from one address the page asks to wait. The page is not indexed by search engines and sends no referrer.
+
+**US-2004** · As a principal, I want to see when our certificates were checked online and withdraw a code that was misused, so that verification stays under the school's control. [FR-CERT-023, FR-CERT-024]
+- AC1: The certificate detail shows how many times it was checked and when it was last checked (no visitor data beyond that).
+- AC2: Given I hold `certificate.approve` with step-up, I can withdraw a code with a reason; the page then answers "not found" for it; a duplicate issued later gets a new code.
+- AC3: Every successful check and every withdrawal is in the school's audit log.
+
+**US-2005** · As an office admin preparing a TC, I want to see the student's outstanding fees for information only, so that I can remind the parent, without the system ever holding the TC back. [FR-CERT-025, FR-FEE-030] *(P: owner to confirm with a lawyer)*
+- AC1: Given fees are on and I hold `finance.read`, the TC preview shows the outstanding balance as a note; it is never printed on the TC and never blocks issue or approval.
+
+**US-2006** · As an exam coordinator in a CBSE or CISCE school, I want the generic TC to stay available and later board formats to plug in without changing issued certificates. [FR-CERT-015]
+- AC1: Formats are versioned files; adding one needs no migration; the certificate stores the format key and version it was issued with.
+
+#### C21 · Fee ledger, receipts and payments (R2.2; ADR-0042)
+
+**US-2101** · As an accountant with the principal, I want to set fee heads and a fee plan per class for the year with instalments, so that every student's dues are calculated the same way. [FR-FEE-002..FR-FEE-005, FR-FEE-023]
+- AC1: Given I hold `fee.manage`, I can create fee heads (tuition, admission, exam, books, transport, other; each GST-exempt by default) and, per academic year and class (optionally per category such as "new admission"), a plan of heads with amounts and an instalment schedule (number, due date, amount per head).
+- AC2: When I apply a plan to a class, then each active student of the class gets a fee account for the year and one charge per instalment and head, in one job with a summary (accounts created, already present, skipped and why); applying again changes nothing.
+- AC3: A student admitted mid-year gets the instalments due from their admission date onwards unless I choose otherwise *(P)*.
+- AC4: Changing a plan after charges were posted does not rewrite them: the difference is proposed as adjustments that need approval (US-2104).
+- AC5: A head marked taxable cannot be collected through receipts *(P: the school invoices it in Tally)*; I am told why.
+
+**US-2102** · As an office assistant at the counter, I want to take a fee payment and print or send the receipt in under a minute, using only the keyboard. [FR-FEE-010, FR-FEE-011, FR-FEE-022, NFR-PERF-008]
+- AC1: Given I hold `fee.collect`, I open "Collect fees" (shortcut), type part of a name or the admission number and pick the child with the arrow keys; the dues show per instalment and head, oldest first, with late fees.
+- AC2: I type the amount (pre-filled with the total due), choose the mode (cash; cheque with number and bank; bank transfer with reference; UPI QR with the UTR), and see how the amount is allocated (oldest due first; I may change it before saving).
+- AC3: When I save, then in one transaction the receipt gets the next number of the school's single series for the financial year (for example `RCT/2026-27/000123`), the ledger records the payment, the content is frozen, and the receipt prints (A5 or A4, configurable) and, if a guardian opted in for fees, is sent on WhatsApp (US-2206).
+- AC4: Two assistants saving at the same moment get consecutive numbers, never the same one, and a failed save leaves no gap.
+- AC5: The receipt date is today (IST); there is no backdating *(P)*. An amount above the total due is refused *(P: no advances in R2)*.
+- AC6: A UTR already on another issued receipt is refused with a link to that receipt. A full Aadhaar number typed into any note is refused.
+
+**US-2103** · As a principal, I want concessions to need my approval so that no fee is reduced by one person. [FR-FEE-008]
+- AC1: Given I hold `fee.concession.request`, I request a concession for a student (type such as sibling, staff ward, merit, hardship, RTE, other; an amount or a percentage of chosen heads and instalments; a reason; an optional evidence document).
+- AC2: A different person holding `fee.concession.approve` approves (step-up) or rejects with a reason; I cannot approve my own request (service check and database `CHECK`). On approval the ledger records the concession entries and the student's dues change at once.
+- AC3: An approved concession is never edited; to undo it, a reversing adjustment is requested and approved the same way.
+
+**US-2104** · As an accountant, I want late fees added automatically by the school's rule, and waivers and adjustments approved by someone else. [FR-FEE-007, FR-FEE-009]
+- AC1: Given the plan has a late-fee rule (a flat amount per overdue instalment after a grace period, or an amount per day with a cap; *P*), the nightly job adds each late fee once (running it again adds nothing) and never compounds.
+- AC2: A waiver of a late fee or any manual adjustment is requested and approved by two different people, with a reason, and recorded in the ledger as its own entry.
+
+**US-2105** · As an accountant, I want a wrong receipt cancelled only with a second person's approval, keeping its number, so that the receipt book always reconciles. [FR-FEE-012]
+- AC1: Given I hold `fee.collect` or `fee.manage`, I request cancellation with a reason (wrong student, wrong amount, cheque dishonoured, duplicate entry, other).
+- AC2: A different person holding `fee.receipt.cancel` approves (step-up); then in one transaction a cancellation record is written, the ledger reverses the payment, the receipt shows "Cancelled on <date>" everywhere, and its number is never reused.
+- AC3: A cancelled receipt's parent link still opens and says it was cancelled. Nothing ever edits a receipt.
+
+**US-2106** · As an accountant, I want to refund a payment with a voucher and a second person's approval. [FR-FEE-013, FR-PAY-011]
+- AC1: I request a refund against a receipt (amount up to what was paid and not yet refunded, reason, mode). A different person holding `fee.refund.approve` approves with step-up.
+- AC2: For a Razorpay payment, SchoolOS asks Razorpay to refund to the payer; the refund voucher (`RFD/2026-27/0001`) and the ledger entry are written when Razorpay confirms. For cash or cheque, the voucher is written on approval.
+
+**US-2107** · As an owner, I want to connect the school's own Razorpay account so that online fees go straight to our bank account. [FR-PAY-002..FR-PAY-004, FR-PAY-012, FR-PAY-013, FR-PAY-016]
+- AC1: Given I hold `payments.configure` with step-up, "Connect Razorpay" takes me to Razorpay to sign in to **our** account and allow SchoolOS; back in SchoolOS the account shows as connected with its Razorpay account id, and a webhook is set up for us.
+- AC2: The page says plainly: money goes to the school's Razorpay account and bank; SchoolOS never holds it; Razorpay's own fees apply.
+- AC3: *(P)* Before SchoolOS is an approved Razorpay partner, an operator can help us paste a key id and key secret from our own dashboard instead; the secret is stored encrypted and never shown again.
+- AC4: Disconnecting stops new links at once, keeps all receipts and history, and is in the audit log. If we revoke SchoolOS in Razorpay's dashboard, SchoolOS marks the account disconnected and tells the owner.
+
+**US-2108** · As an office assistant or accountant, I want to send a parent a payment link for what is due, so that the parent can pay from the phone and the receipt appears by itself. [FR-PAY-005..FR-PAY-009, FR-PAY-015]
+- AC1: Given online payments are connected, from the student's fee page I choose instalments and "Send payment link"; SchoolOS creates a Razorpay link for that amount (no name, phone or email sent to Razorpay) and sends the dues page to opted-in guardians on WhatsApp, or shows the link for me to share.
+- AC2: When the parent pays, then within a minute of Razorpay's webhook a receipt is issued in the same series (mode "Razorpay", with the payment id), the ledger records it, and the guardian gets the receipt message if opted in.
+- AC3: The same payment reported twice creates one receipt. A payment whose amount differs from the link, or that SchoolOS cannot match, appears on the reconciliation list, never as a guessed receipt.
+- AC4: I can see each link's status (created, paid, expired, cancelled) and cancel an unpaid link.
+
+**US-2109** · As an accountant, I want UPI payments to our own QR matched with the bank statement, so that I know every UPI receipt really reached the bank. [FR-FEE-014..FR-FEE-017]
+- AC1: Given I hold `fee.manage`, I upload the school's bank UPI QR image and payee name once; the counter and the parent dues page show it.
+- AC2: Given I hold `fee.reconcile`, I upload a bank statement (CSV or XLSX); the file is read and deleted, credits are listed, and every exact UTR-and-amount match with a UPI receipt is proposed; I confirm the matches in one step *(P: never automatically)*.
+- AC3: UPI receipts not seen in a statement after 7 days (configurable) are listed as exceptions; unmatched credits are listed too, so I can record a payment the counter missed.
+
+**US-2110** · As an accountant or principal, I want the daily collection report and the dues list, so that the cash box, the bank and Razorpay match the receipt book. [FR-FEE-018..FR-FEE-021, FR-FEE-024]
+- AC1: The daily report shows receipts by mode and by collector, cancellations and refunds of the day, and the cash and cheque totals to hand over; it prints on A4 and downloads as CSV (the "day book" for entry into Tally).
+- AC2: *(P)* The accountant can close a day; after that no receipt or cancellation can be dated that day.
+- AC3: The dues list per class or section shows students with overdue amounts, oldest first, with "Send reminder" and "Send payment link"; downloading it needs step-up (bulk personal financial data).
+- AC4: A student's fee page shows the full account statement (charges, concessions, late fees, payments, cancellations, refunds) with the running balance.
+- AC5: Class teachers and teachers see no fee data. Fee screens are hidden for a school running alongside its ERP unless the owner turns fees on.
+
+**US-2111** · As an accountant, I want the reconciliation report for online payments every morning. [FR-PAY-010]
+- AC1: At 06:00 IST SchoolOS compares yesterday's Razorpay payments, refunds and settlements with our receipts and lists: paid but no receipt, receipt but not captured, amount mismatch, refunded, settlement not seen after three working days.
+- AC2: Each line links to the receipt or the Razorpay payment id; I can mark a line explained with a note (audited). Nothing is changed automatically.
+
+**US-2112** · As management, I want to ask "How much is due from Class 9?" in Ask the school and get the ledger figure with a source chip, when fees are on. [FR-KB-044]
+- AC1: Given fees are on and I hold `finance.read`, the fee tool reads the SchoolOS ledger (as of now) instead of Tally; the source chip opens the dues list.
+- AC2: Without `finance.read` the tool is not offered.
+
+#### C22 · WhatsApp parent messages (R2.3; ADR-0043)
+
+**US-2201** · As an owner, I want to connect the school's own WhatsApp Business number in a few steps, so that parents get messages from our name and number and we pay Meta directly. [FR-MSG-002..FR-MSG-006, FR-MSG-024]
+- AC1: Given I hold `messaging.configure` with step-up, "Connect WhatsApp" opens Meta's sign-up window where I sign in with the school's Meta business login, choose or create the business account and verify the school's number; back in SchoolOS the number, display name, quality rating, messaging limit and billing currency show.
+- AC2: The page tells me: the school pays Meta directly with its own payment method; INR billing must be set before 31 Dec 2026 (Meta stops delivering for non-INR accounts after that); new accounts can message 250 people a day until Meta verifies the business, so verify the business first.
+- AC3: SchoolOS then submits its message templates to our account; I see each template's status (pending, approved, rejected, paused).
+- AC4: Disconnecting stops all sending at once, revokes open parent links sent through it, and is audited. On the dedicated tier the WhatsApp page says it is not available yet.
+
+**US-2202** · As an office assistant, I want to record each guardian's WhatsApp opt-in with evidence, so that we message only parents who agreed. [FR-MSG-008, FR-MSG-009]
+- AC1: Given I hold `messaging.optin.record`, on a guardian I record opt-in or opt-out for notices, attendance alerts and fees, with the method (signed form uploaded as evidence, parent's join message, in person) and the date; every decision is a new entry and the history shows who recorded it.
+- AC2: I can print a slip per student or section with the school's QR "Send JOIN to get school messages on WhatsApp" in the school's parent language; a parent who sends the join message is opted in for the categories on the slip and gets a confirmation message.
+- AC3: A guardian without a valid mobile number cannot be opted in. Section counts show opted in, not yet asked, opted out.
+
+**US-2203** · As a parent, I want to stop messages by replying STOP. [FR-MSG-010]
+- AC1: When I reply STOP (or tap "Stop messages", or send ఆపు), then within a minute I am opted out of every category, I get one confirmation, and no further message is sent to me until I join again.
+- AC2: The school sees the opt-out with its date on the guardian; staff cannot override it; re-joining needs a new opt-in.
+
+**US-2204** · As an office admin, I want to send an approved notice to the parents of chosen classes on WhatsApp, so that every opted-in parent gets it from the school's number. [FR-MSG-011, FR-MSG-012, FR-MSG-017]
+- AC1: Given the notice is approved (M4) and I hold `message.send`, I choose classes or sections and see before sending: recipients, skipped and why (no opt-in, no number, opted out), languages, and the estimated Meta cost (for example "412 messages, about ₹56 incl. GST, paid by the school to Meta").
+- AC2: When I confirm, messages are queued and sent outside quiet hours (21:00-07:00 IST); each carries the notice title and a link to the full notice page; the delivery report shows sent, delivered, read, failed per class, updating live.
+- AC3: A notice is sent at most once to the same guardian unless I choose "Send again" with a reason.
+
+**US-2205** · As an accountant, I want fee reminders sent automatically before and after due dates to opted-in guardians, with a pay link. [FR-MSG-014]
+- AC1: Given fee reminders are on, at 10:00 IST on the school's offsets (default 3 days before, on the due date, 7 days after), each guardian opted in for fees gets one reminder per account and offset with the amount due and a link to the dues page (with "Pay online" when connected).
+- AC2: No reminder is sent for an instalment already paid, for amounts under the school's minimum, or on a day the school marked as a no-message day *(P)*.
+
+**US-2206** · As a parent, I want the receipt on WhatsApp right after I pay, so that I do not need to keep paper. [FR-MSG-015]
+- AC1: When a receipt is issued (counter or online) and a guardian is opted in for fees, they get a message with the receipt number, amount and a link to the receipt page.
+
+**US-2207** · As a principal, I want parents told the same morning when their child is marked absent. [FR-MSG-013]
+- AC1: Given absence alerts are on, at the school's time (default 11:00 IST) each guardian opted in for attendance whose child is marked absent today gets one message with the child's first name and the date; late and leave are not alerts.
+- AC2: A later correction sends nothing more; the message says "marked absent at the time of this message".
+
+**US-2208** · As an office admin, I want to see what was sent to a guardian and whether it arrived. [FR-MSG-016, FR-MSG-017, FR-MSG-022]
+- AC1: On a student or guardian I see each message: purpose, template, language, time, status (queued, sent, delivered, read, failed with a plain reason, skipped with why), and the linked notice or receipt; never the parent's phone in a URL.
+- AC2: Permanent failures are not retried; temporary ones are retried up to three times within an hour.
+
+**US-2209** · As an owner, I want sending to pause by itself when Meta lowers our quality or restricts the account, so that the school's number is not blocked. [FR-MSG-007, FR-MSG-021]
+- AC1: When Meta reports a red or flagged quality rating, a restriction, or moves a template to marketing, sending of the affected messages stops, the owner and principal get an in-app notice explaining what happened and what to do, and a person resumes when it is safe.
+
+**US-2210** · As a parent who writes to the school's number, I want a polite answer telling me how to reach the office, since nobody reads messages there. [FR-MSG-018]
+- AC1: Any message that is not a keyword gets at most one automatic reply a day with the office phone number; the message text is not stored.
+
+#### C23 · Parent language per school (R2.3; ADR-0044)
+
+**US-2301** · As a principal, I want to choose English or Telugu for everything parents receive, while our staff screens stay English. [FR-LANG-001, FR-LANG-002, FR-LANG-005, FR-LANG-006]
+- AC1: Given I hold `tenant.settings.manage` with step-up, I choose the parent language; messages, parent pages, opt-in slips, verification slips and the APAAR form use it; staff screens, receipts and certificates as documents stay English.
+- AC2: While any Telugu text we would use is not yet reviewed by a fluent reviewer, the setting shows that warning *(P)*.
+
+**US-2302** · As an office assistant, I want to set one guardian's language when it differs from the school's. [FR-LANG-003]
+- AC1: On a guardian I choose English, Telugu or "school default"; a parent can also choose on the opt-in page.
+
+**US-2303** · As an office admin sending a notice in Telugu, I want SchoolOS to ask for the Telugu text before sending and tell me if any parent got English instead. [FR-LANG-004]
+- AC1: When the parent language is Telugu, sending a notice needs its Telugu title and text (an AI draft may propose them; I confirm). If a Telugu template is not approved by Meta, English is sent and the delivery report says so.
+
+#### C24 · Parent link pages (R2.3; ADR-0046)
+
+**US-2401** · As a parent, I want to open the full notice from the WhatsApp message on my phone without installing anything or signing in. [FR-PUB-005, FR-PUB-006, FR-PUB-008..FR-PUB-010]
+- AC1: Tapping the message button opens a fast mobile page in my language with the school's name, the notice title, date, text and its PDF.
+- AC2: The link works for 30 days *(P)*; after that the page says it has expired and how to get a new one. The same page appears for a wrong or revoked link, naming no school.
+
+**US-2402** · As a parent, I want to open my receipt from the message and keep it. [FR-PUB-009]
+- AC1: The receipt page shows the school, receipt number and date, my child's name, class and admission number, amounts per head and mode; it can be saved as PDF; it says "Cancelled on …" if the school cancelled it. The link works for 90 days *(P)*.
+
+**US-2403** · As a parent, I want to see what is due and pay online or by the school's UPI QR. [FR-PUB-009, FR-PAY-005]
+- AC1: The dues page (link valid 7 days, *P*) shows outstanding instalments with due dates and late fees, the school's UPI QR and payee name if set, and "Pay online" if the school connected Razorpay; paying online opens Razorpay's page for the school's account and returns to a "Thank you, the school will send your receipt" page.
+- AC2: The page never asks for card or bank details itself and lets me change nothing else.
+
+**US-2404** · As an office admin, I want to revoke a link sent to the wrong parent. [FR-PUB-007, FR-PUB-012]
+- AC1: Given I hold `message.send`, from the message history I revoke the link; it stops working at once; this is audited. Links are revoked automatically when a guardian is unlinked, changes number or opts out.
+
+**US-2405** · As a principal, I want to know parent pages cannot be used to find other children or schools. [FR-PUB-011]
+- AC1: Links cannot be guessed; repeated wrong links from one address are slowed and then refused; no page shows another child, a phone number, an address or a date of birth.
+
+#### C25 · Ask the school: finish-up (R2.4)
+
+The conversation screens, source chips, follow-ups, feedback, verified answers, history and memory are **built** (docs/17 §5.3, `apps/web/src/features/ask/`; docs/14 M2 status). docs/18 §2 listed them as "not built"; that was stale. R2 adds what is missing.
+
+**US-2501** · As a principal or owner, I want to see how many AI answers the school used this month against our bundle, so that we are not surprised by overage. [FR-KB-040]
+- AC1: Given I hold `tenant.billing.read`, the Ask page and "Plan & billing" show "Answers this month: 312 of 1,000 included" (calendar month, IST), and from 80% a quiet notice; extra answers are billed at the bundle's rate (ADR-0038).
+- AC2: Other staff see no numbers; they see a banner only when answers are limited (budget used up: search-only results until the month resets, and whom to ask).
+
+**US-2502** · As staff, I want a clear explanation when Ask answers only with search results, so that I know it is not broken. [FR-KB-041]
+- AC1: When an answer is search-only because the budget is used up, AI is off for the school, or the AI service is unavailable, the answer says which, in plain words, with what to do next.
+
+**US-2503** · As staff, I want every `sos://` source link in an answer or verified answer to open the right screen, or say plainly that I can no longer open it. [FR-KB-042]
+- AC1: Source links resolve through `GET /knowledge/resolve`; a source I may not open answers 404 and the chip reads "Source you can no longer open".
+
+**US-2504** · As the product owner, I want end-to-end tests of the Ask journeys so that releases do not break them. [FR-KB-043]
+- AC1: Playwright covers ask and stream, citations and popovers, feedback, follow-ups, rename/pin/delete, memory add/confirm/forget, search-only and budget banners, keyboard-only use at 1366×768 and a 375 px phone.
+
 ## 5. Data-quality rules catalog (initial)
 
 | Rule | Checks | Default severity | Explanation template (EN) |
@@ -576,7 +790,7 @@ Each class produces an explanation code (bilingual text deferred per ADR-0036) (
 
 ## 9. Non-goals for core
 
-Dashboards for their own sake · parent logins · parent fee payments · automated portal submission · free-form AI actions. (Billing schools for SchoolOS itself is part of C14.)
+Dashboards for their own sake · parent logins and parent accounts · SchoolOS receiving or holding parents' money · SMS · marketing messages to parents · a two-way chat inbox · automated portal submission · free-form AI actions. (Billing schools for SchoolOS itself is part of C14. From R2, parents paying fees **to the school's own account**, WhatsApp messages from the school's own number and read-only parent link pages are in scope: C21, C22, C24; owner decisions D4-D7; ADR-0042, ADR-0043, ADR-0046.)
 
 ## 10. Pilot release criteria (design partner)
 

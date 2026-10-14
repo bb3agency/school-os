@@ -36,14 +36,14 @@ Gaps against the research (from the code inventory):
 | CBSE registration | Absent | Only a CISCE profile exists |
 | Transfer-in by PEN / duplicate guard | Absent | |
 | Official AP TC format, public QR verification | Absent | M3 follow-ups |
-| Fee ledger / receipts / collection | Absent (Tally read-only) | BRD §7.3 non-goal; ADR-0016 Proposed |
-| WhatsApp / SMS sending | Absent | Notices are copied into existing groups; SchoolOS never sends |
-| Parent-facing pages | Absent | BRD §7.3 non-goal |
+| Fee ledger / receipts / collection | Absent (Tally read-only) | BRD §7.3 non-goal reversed by D4 (2026-10-10); designed in ADR-0042 (R2) |
+| WhatsApp / SMS sending | Absent | Notices are copied into existing groups; WhatsApp only from R2 (D6, ADR-0043); no SMS |
+| Parent-facing pages | Absent | Read-only link pages from R2 (ADR-0046); no parent login |
 | DPDP consent register, data-principal requests, grievance log | Spec only | PRV-006 / PRV-010 in docs/08 |
 | CBSE Appendix IX disclosure page | Absent | |
 | RTE 25% register | Absent | |
 | Real LLM / embeddings / OCR providers | Not wired live | Fakes in tests; no Vertex evaluation |
-| Ask-the-school conversation screens | Not built | API exists |
+| Ask-the-school conversation screens | **Built** (correction 2026-10-14: docs/17 §5.3, `apps/web/src/features/ask/`) | Missing: answer usage display, search-only explanations, `/knowledge/resolve`, e2e (R2.4) |
 | Usage meters, AI answer count | Partly 0 | |
 
 ## 3. Proposed build order
@@ -72,6 +72,15 @@ Each release is a set of user stories that ships whole (tests, authz/BOLA, audit
 2. **Fee ledger and receipts** *(needs owner decision Q4)*: fee heads, instalments, concessions, late fees; receipts from one series for cash, the school's own UPI QR (matched by UTR) and licensed-aggregator payment links (school is the merchant; SchoolOS reconciles from webhooks; ADR-0016 to be decided). Coexists with the Tally connector.
 3. **Parent messages over WhatsApp utility templates with SMS fallback** *(needs owner decision Q5)*: from the school's own number, opt-in recorded, each message links to a short-lived mobile web page for the notice or receipt; audit trail; fair-use allowance in the plan.
 4. **Ask the school, visible:** conversation screens in the web app, live evaluation on Vertex, the contextual retrieval and reranking switched on if `make eval` says so.
+
+**R2 as decided and designed (2026-10-14; supersedes the wording above where they differ).** Items 2 and 3 follow owner decisions D4-D7 and D9 (§8): payment links are **Razorpay** links in the school's own account (ADR-0016 accepted with Razorpay for SchoolOS's own invoices; fees in ADR-0042); messages are **WhatsApp only** (no SMS fallback), through the **Meta Cloud API** from the school's own WhatsApp Business Account, and **the school pays Meta directly** (no fair-use allowance in the plan; ADR-0038 unchanged; ADR-0043); parent-facing text is English or Telugu per school (ADR-0044). Item 1 is ADR-0045 (verification by an 80-bit code printed with a QR, not by serial). Item 4 is a finish-up: the conversation screens already exist (§2 correction); live evaluation on Vertex stays blocked by D2. Parent pages: ADR-0046; routing of public requests and webhooks: ADR-0047 (Proposed). Stories: docs/02 C20-C25; requirements: docs/03 §3.18-§3.25; **build waves, test plan, definition of done and the owner's open questions: docs/14 "R2"**.
+
+| Wave | Agents in parallel | Content |
+|---|---|---|
+| R2-0 | 1 | Public handles and resolver (ADR-0047), schemas `fin`/`msg`, parent language setting, `(public)` web shell |
+| R2-1 | 3 | A certificates (AP TC, verification) · B fees core (ledger, receipts, concessions, late fees, reports) · C messaging core (connect, templates, opt-in, STOP) |
+| R2-2 | 3 | D Razorpay online payments and reconciliation · E UPI QR and bank statements · F Ask finish-up |
+| R2-3 | 2, then 1 | G sending (notices, absence alerts, fee reminders, receipts) · H parent pages; then I hardening |
 
 ### R3 · Compliance pack and differentiation (Apr-Jun 2027, before DPDP's May 2027 duties)
 
@@ -141,7 +150,7 @@ Still open: who drafts the DPA, DPIA and privacy notice (Q9) — not blocking R1
 
 - **R0 (code side only):** fix the stale roadmap status; keep CI workflows passing locally; nothing that spends cloud money.
 - **R1:** BSEAP SSC Class 9/10 readiness (diff, fix-owner, parent verification slip, class dashboard); UDISE+ 2026-27 profile with PEN and transfer-in-by-PEN guard; APAAR consent register and failure list; CBSE registration profile (Class 9/11, LOC 10/12, APAAR mandatory); CISCE registration profile refreshed to current norms; import template library and "alongside your current ERP" mode.
-- **R2:** AP TC format and public certificate verification; fee ledger, receipts, UPI QR/UTR matching, Razorpay payment links; WhatsApp utility templates via Meta Cloud API with opt-in, parent language per school, mobile web landing pages; Ask-the-school conversation screens.
+- **R2:** AP TC format and public certificate verification; fee ledger, receipts, UPI QR/UTR matching, Razorpay payment links; WhatsApp utility templates via Meta Cloud API with opt-in, parent language per school, mobile web landing pages; Ask-the-school finish-up (the conversation screens were already built; see §2).
 - **R3:** DPDP processor pack; CBSE Appendix IX page; portal-calendar readiness reminders.
 
 ## 9. Progress
@@ -149,5 +158,5 @@ Still open: who drafts the DPA, DPIA and privacy notice (Q9) — not blocking R1
 | Release | Status (2026-10-10) |
 |---|---|
 | R1 | **Built** (wave 1): readiness diff engine with fix owner and parent slips, BSEAP SSC 2027 and APAAR readiness profiles (rule DQ-031, ADR-0040); APAAR consent register, UDISE+ 2026-27 profile, 11-digit PEN and transfer-in guard (ADR-0039); boards per school and class, CBSE registration/LOC and CISCE 2027 profiles, rule DQ-030 for ERP refreshes, import template library and "alongside your current ERP" mode (ADR-0041). Migrations 0051-0053. Every format `verified: false` (D3). Release note: run `python -m app.identity.sync_system_roles --apply` after migrating. Open: server-rendered PDF for slips/forms, e2e coverage of the new screens, Telugu form wording reviewed by a native speaker, SSC profile not yet limited to BSEAP schools (needs an export layout). |
-| R2 | Not started |
+| R2 | **Documented 2026-10-14** (`wip/r2-docs`): ADR-0042 fees and payment links, ADR-0043 WhatsApp via Meta Cloud API, ADR-0044 parent language, ADR-0045 AP TC and verification, ADR-0046 parent link pages, ADR-0047 public handles (Proposed); ADR-0016 accepted with Razorpay; PRD C20-C25 (US-2001..US-2504); TRD §3.18-§3.25; data model docs/05 §15; security docs/07 §6.7, §11.2, SEC-034..040; privacy docs/08 §15, PRV-022..029; API docs/09 R2 endpoints; settings docs/10 §11.2; screens docs/17 §5.8; build waves R2-0..R2-3I and 20 owner questions in docs/14 R2. No code yet: R2-0 waits for the owner's approval of ADR-0047 and questions Q1-Q4 of docs/14 R2 |
 | R3 | Not started |
