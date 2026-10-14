@@ -256,7 +256,7 @@ def test_docs_04_print_jobs_go_to_the_pdf_workers(
     assert slips.status_code == forms.status_code == 202
     ids = [slips.json()["id"], forms.json()["id"]]
     with admin_engine.connect() as c:
-        events = dict(
+        events: dict[str, str] = dict(
             c.execute(
                 text(
                     "SELECT payload ->> 'export_id', event_type FROM ops.outbox "
