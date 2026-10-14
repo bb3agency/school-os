@@ -115,6 +115,9 @@ routes:
   # exports and data export
   POST /api/v1/exports: [exports]
   POST /api/v1/exports/student-list: [exports]
+  # print jobs: slips and consent forms printed to PDF by Chromium (FR-DQ-047, FR-APC-007)
+  POST /api/v1/exports/readiness-slips: [exports, render]
+  POST /api/v1/exports/apaar-consent-forms: [exports, render]
   GET /api/v1/audit/export: [exports]
   POST /api/v1/documents/{document_id}/sheet/export: [exports]
   GET /api/v1/imports/{import_id}/sheet/export: [exports]

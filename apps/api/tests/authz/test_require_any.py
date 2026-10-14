@@ -223,7 +223,9 @@ APAAR_READERS = ("apaar.consent.read", ("apaar.consent.record",), False)
 
 def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
     guards = _any_of_guards()
-    readers = (PORTAL, STUDENT_EXPORT, READ_ALL)
+    # Print jobs (FR-DQ-047, FR-APC-007): their makers list and download their own exports.
+    printers = ("dq.readiness.read", "apaar.consent.read", "apaar.consent.record")
+    readers = (PORTAL, STUDENT_EXPORT, *printers, READ_ALL)
     expected = {
         ("GET", "/api/v1/change-requests"): (REQUEST, (APPROVE,), False),
         ("GET", "/api/v1/change-requests/{change_request_id}"): (REQUEST, (APPROVE,), False),
@@ -235,9 +237,11 @@ def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
         ("GET", "/api/v1/exports/{export_id}"): (BOARD, readers, False),
         ("GET", "/api/v1/exports/{export_id}/download-url"): (
             BOARD,
-            (PORTAL, STUDENT_EXPORT, DOWNLOAD_ANY),
+            (PORTAL, STUDENT_EXPORT, *printers, DOWNLOAD_ANY),
             False,
         ),
+        # Consent forms as a PDF: the print views' permissions (step-up checked in the service).
+        ("POST", "/api/v1/exports/apaar-consent-forms"): APAAR_READERS,
         # Staff directory (FR-TEN-010): the service requires a school-wide grant of either.
         ("GET", "/api/v1/staff"): ("tenant.structure.manage", ("user.manage",), False),
         # Certificates (US-1101..US-1105): the reader, the maker and the checker share the

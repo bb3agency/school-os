@@ -24,7 +24,13 @@ from app.authz.context import UserContext
 from app.core.db import tenant_session
 from app.exports import pdf
 from app.exports import service as exports
-from app.exports.schemas import ExportOut, ExportScopeIn, PrecheckCreate, StudentListCreate
+from app.exports.schemas import (
+    ConsentFormsCreate,
+    ExportOut,
+    ExportScopeIn,
+    PrecheckCreate,
+    StudentListCreate,
+)
 from app.students import service as students
 from app.students.schemas import StudentCreate, ValueIn
 
@@ -211,7 +217,36 @@ def queued_export(
         return request_precheck(
             school, who, role, formats=("xlsx",), section_keys=section_keys, as_ctx=c
         ).id
-    return request_list(school, who, role, section_keys=section_keys, as_ctx=c).id
+    if c.has("student.export"):
+        return request_list(school, who, role, section_keys=section_keys, as_ctx=c).id
+    # Roles that only make print jobs (office staff, class teachers, auditors): the consent
+    # forms of one student of the first section (FR-APC-007).
+    c = ctx(school, who, role, section_ids=frozenset({school.ids[section_keys[0]]}))
+    return request_consent_forms(school, who, role, section_key=section_keys[0], as_ctx=c).id
+
+
+def request_consent_forms(
+    school: Any,
+    person: Any,
+    role: str,
+    *,
+    section_key: str = "section_9a",
+    student_id: uuid.UUID | None = None,
+    language: str | None = None,
+    as_ctx: UserContext | None = None,
+) -> ExportOut:
+    """APAAR consent forms of one student as a PDF print job (FR-APC-007)."""
+    install()
+    c = as_ctx or ctx(school, person, role)
+    with tenant_session(school.tenant_id, person.user_id) as db:
+        if student_id is None:
+            reach = students.list_students_in_scope(
+                db, c, section_ids=[school.ids[section_key]], permissions=("apaar.consent.read",)
+            )
+            assert reach, "make a student of the section first"
+            student_id = sorted(reach)[0]
+        body = ConsentFormsCreate(student_id=student_id, language=language)
+        return exports.request_consent_forms(db, c, body)
 
 
 def export_row(admin: Engine, export_id: uuid.UUID) -> dict[str, Any]:

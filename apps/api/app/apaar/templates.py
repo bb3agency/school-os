@@ -8,7 +8,8 @@ class, date of birth and the UDISE+ PEN). Pages have no scripts, links, images o
 only style block is allowed by hash in :data:`STYLE_CSP`. Telugu forms use the system's Telugu
 font (Nirmala UI on Windows, Noto Sans Telugu on Android) with line heights of 1.7 or more so
 vowel signs are never clipped. The parent form's language is the school's choice (owner decision
-D9), not ``SOS_TELUGU_ENABLED``.
+D9), not ``SOS_TELUGU_ENABLED``. The worker prints the same page to PDF (FR-APC-007) with the
+bundled Noto Sans Telugu declared for a Telugu form only (:func:`pdf_style`).
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from app.apaar.config import ApaarConfig, FormLanguage
+from app.core.pdf import font_face_css, font_stack
 from app.core.redaction import mask_aadhaar
 
 _FONTS: Final = '"Noto Sans", Arial, sans-serif'
@@ -137,11 +139,27 @@ def _form(cfg: ApaarConfig, language: FormLanguage, school: str, student: FormSt
     )
 
 
+def pdf_style(language: FormLanguage) -> str:
+    """The style of the PDF print (FR-APC-007). A Telugu form declares the bundled Telugu font
+    first (the worker has no system Telugu font; the renderer serves it to this page whatever
+    ``SOS_TELUGU_ENABLED`` says, owner decision D9). An English form loads no font."""
+    if language != "te":
+        return STYLE
+    return font_face_css(telugu=True) + _style(font_stack(_FONTS_TE, telugu=True))
+
+
 def render_forms(
-    cfg: ApaarConfig, *, language: FormLanguage, school: str, students: Sequence[FormStudent]
+    cfg: ApaarConfig,
+    *,
+    language: FormLanguage,
+    school: str,
+    students: Sequence[FormStudent],
+    for_pdf: bool = False,
 ) -> str:
-    """One A4 page per student, in the order given."""
-    style = STYLE_TE if language == "te" else STYLE
+    """One A4 page per student, in the order given. ``for_pdf``: the page the worker prints
+    with headless Chromium (:func:`pdf_style`); the browser view keeps the hashed styles."""
+    browser_style = STYLE_TE if language == "te" else STYLE
+    style = pdf_style(language) if for_pdf else browser_style
     pages = "".join(_form(cfg, language, school, s) for s in students)
     title = _e(cfg.text(language, "title"))
     return (
@@ -150,4 +168,4 @@ def render_forms(
     )
 
 
-__all__ = ["STYLE_CSP", "FormStudent", "format_date", "render_forms"]
+__all__ = ["STYLE_CSP", "FormStudent", "format_date", "pdf_style", "render_forms"]

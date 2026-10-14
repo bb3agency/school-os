@@ -56,6 +56,7 @@ from app.core.errors import (
 from app.core.ids import new_id
 from app.core.languages import telugu_text
 from app.core.logging import get_context, get_logger
+from app.core.pdf import PrintDocument
 from app.core.records import RecordTable
 from app.core.redaction import contains_full_aadhaar
 from app.dq import engine, readiness
@@ -1234,6 +1235,53 @@ def open_blockers(
     ]
 
 
+# --- parent verification slips as PDF (FR-DQ-047; printed by app.exports) ----------------------
+# app.dq.readiness_service imports this module, so it is imported where it is used.
+
+READINESS_READ: Final = "dq.readiness.read"
+
+
+def readiness_slip_students(
+    session: Session,
+    ctx: UserContext,
+    profile_key: str,
+    *,
+    student_id: uuid.UUID | None = None,
+    section_id: uuid.UUID | None = None,
+    include_ready: bool = True,
+) -> tuple[int, list[uuid.UUID]]:
+    """The readiness profile's version and the students a print of parent verification slips
+    covers (one student or one section, as ``GET /dq/readiness/{key}/slips``; 404 outside the
+    caller's ``dq.readiness.read`` reach). For ``app.exports``, which freezes and audits them."""
+    from app.dq import readiness_service  # noqa: PLC0415 - imports this module
+
+    return readiness_service.slip_students(
+        session,
+        ctx,
+        profile_key,
+        student_id=student_id,
+        section_id=section_id,
+        include_ready=include_ready,
+    )
+
+
+def readiness_slips_document(
+    session: Session,
+    ctx: UserContext,
+    profile_key: str,
+    student_ids: Sequence[uuid.UUID],
+    *,
+    include_sensitive: bool,
+) -> tuple[PrintDocument, int]:
+    """Worker: the parent verification slips page of ``student_ids`` to print to PDF (the
+    students the caller still reaches), and the number of slips. For ``app.exports``."""
+    from app.dq import readiness_service  # noqa: PLC0415 - imports this module
+
+    return readiness_service.slips_document(
+        session, ctx, profile_key, student_ids, include_sensitive=include_sensitive
+    )
+
+
 def export_records(session: Session) -> list[RecordTable]:
     """Worker only: every data-quality run and finding of the current school for its full data
     export (``app.admin``; the caller checked ``tenant.export_all`` and audits the export).
@@ -1247,6 +1295,7 @@ __all__ = [
     "INCREMENTAL_TASK",
     "LINK_TASK",
     "READ",
+    "READINESS_READ",
     "RESOLVE",
     "RUN_REQUESTED_EVENT",
     "UNLINK_TASK",
@@ -1263,6 +1312,8 @@ __all__ = [
     "open_blockers",
     "profiles_catalog",
     "purge_tenant_data",
+    "readiness_slip_students",
+    "readiness_slips_document",
     "request_run",
     "resolve_finding",
     "resolve_with_change_request",

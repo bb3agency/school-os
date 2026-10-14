@@ -24,11 +24,13 @@ from app.authz.dependencies import TenantDB, require, require_any
 from app.authz.http import Cursor, IdempotencyDep, Limit, Page
 from app.exports import service
 from app.exports.schemas import (
+    ConsentFormsCreate,
     ExportDownloadOut,
     ExportOut,
     ExportProfileOut,
     FileFormat,
     PrecheckCreate,
+    ReadinessSlipsCreate,
     RequestedBy,
     StudentListCreate,
 )
@@ -41,15 +43,20 @@ PrecheckMaker = Annotated[
     UserContext, Depends(require_any(service.BOARD, service.PORTAL, step_up=True))
 ]
 ListMaker = Annotated[UserContext, Depends(require(service.STUDENT_EXPORT, step_up=True))]
+# Print jobs (R1): the permissions of the print views, which are not step-up permissions in the
+# catalog; the service asks for the recent MFA sign-in every export needs (ADR-0021).
+SlipsMaker = Annotated[UserContext, Depends(require(service.READINESS_READ))]
+FormsMaker = Annotated[
+    UserContext,
+    Depends(require_any(service.CONSENT_READ, service.CONSENT_RECORD)),
+]
 Reader = Annotated[
     UserContext,
-    Depends(require_any(service.BOARD, service.PORTAL, service.STUDENT_EXPORT, service.READ_ALL)),
+    Depends(require_any(*service.OWN_EXPORT_PERMISSIONS, service.READ_ALL)),
 ]
 Downloader = Annotated[
     UserContext,
-    Depends(
-        require_any(service.BOARD, service.PORTAL, service.STUDENT_EXPORT, service.DOWNLOAD_ANY)
-    ),
+    Depends(require_any(*service.OWN_EXPORT_PERMISSIONS, service.DOWNLOAD_ANY)),
 ]
 
 
@@ -110,6 +117,49 @@ def create_student_list_export(
         db,
         body,
         lambda: service.request_student_list(db, ctx, body),
+        status_code=202,
+        headers=_headers,
+    )
+
+
+@router.post("/exports/readiness-slips", response_model=ExportOut, status_code=202)
+def create_readiness_slips_export(
+    ctx: SlipsMaker, db: TenantDB, body: ReadinessSlipsCreate, idem: IdempotencyDep
+) -> Response:
+    """Print the parent verification slips of one student or one section to a PDF (FR-DQ-047;
+    the same slips as ``GET /dq/readiness/{profile_key}/slips``). Permission
+    ``dq.readiness.read`` in the student's or section's scope (404 outside it) and
+    ``student.read_basic``, with a recent sign-in with MFA (428). Aadhaar-as-printed values
+    are masked unless ``include_sensitive`` (needs ``student.read_sensitive`` for every
+    student, else 403 ``sensitive_not_allowed``); an Aadhaar number never appears. The PDF is
+    made in the background (202); the export at ``Location`` shows its status and gives a
+    download link like other exports. Errors: 422 ``no_students``. Accepts
+    ``Idempotency-Key``."""
+    return idem.run(
+        db,
+        body,
+        lambda: service.request_readiness_slips(db, ctx, body),
+        status_code=202,
+        headers=_headers,
+    )
+
+
+@router.post("/exports/apaar-consent-forms", response_model=ExportOut, status_code=202)
+def create_consent_forms_export(
+    ctx: FormsMaker, db: TenantDB, body: ConsentFormsCreate, idem: IdempotencyDep
+) -> Response:
+    """Print the APAAR consent forms of one student or one section to a PDF (FR-APC-007; the
+    same forms as the print views). Permission ``apaar.consent.read`` or
+    ``apaar.consent.record`` in scope (404 outside it) and ``student.read_basic``, with a
+    recent sign-in with MFA (428). ``status`` (sections only) prints only those students;
+    ``language`` defaults to the school's parent-form language, and Telugu forms work while
+    the staff screens are English (owner decision D9). The PDF is made in the background
+    (202). Errors: 409 ``no_forms``, ``too_many_forms``; 422 ``section_only``. Accepts
+    ``Idempotency-Key``."""
+    return idem.run(
+        db,
+        body,
+        lambda: service.request_consent_forms(db, ctx, body),
         status_code=202,
         headers=_headers,
     )

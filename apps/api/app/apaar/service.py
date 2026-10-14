@@ -63,6 +63,7 @@ from app.core import purge as purging
 from app.core.errors import Conflict, NotFound, PreconditionFailed, ValidationFailed
 from app.core.ids import new_id
 from app.core.logging import get_context, get_logger
+from app.core.pdf import PrintDocument
 from app.core.records import RecordTable
 from app.core.redaction import contains_full_aadhaar
 from app.documents import service as documents
@@ -458,6 +459,12 @@ def summary(
 # --- printed forms ----------------------------------------------------------------------------
 
 
+def parent_language(session: Session) -> FormLanguage:
+    """The language the school prints parent forms in (``en`` until set; owner decision D9).
+    Parent verification slips (``app.dq``) follow it too."""
+    return _form_language(session, None)
+
+
 def _form_language(session: Session, language: FormLanguage | None) -> FormLanguage:
     if language is not None:
         return language
@@ -522,20 +529,12 @@ def student_form(
     return page
 
 
-def section_forms(
-    session: Session,
-    ctx: UserContext,
-    section_id: uuid.UUID,
-    *,
-    status: ConsentStatus | None,
-    language: FormLanguage | None,
-) -> str:
-    """Printable consent forms for a section of the current year, one page per student, in
-    class-list order; ``status`` prints only those students (e.g. ``pending`` to send again)
-    (FR-APC-004; permission ``apaar.consent.read`` or ``apaar.consent.record``; class teachers:
-    their sections; a section outside the caller's reach is 404). 409 ``too_many_forms`` above
-    ``max_forms_per_print``; 409 ``no_forms`` when nobody matches. Audit
-    ``apaar.consent_form.printed`` (section and count)."""
+def _section_rows(
+    session: Session, ctx: UserContext, section_id: uuid.UUID, status: ConsentStatus | None
+) -> list[ConsentRowOut]:
+    """The section's students (current year) the caller reaches with ``apaar.consent.read`` or
+    ``apaar.consent.record``, in class-list order, filtered by ``status``. 404 for a section
+    outside reach; 409 ``no_forms`` / ``too_many_forms``."""
     try:
         tenancy.get_section(session, section_id)
     except NotFound:
@@ -560,6 +559,25 @@ def section_forms(
         raise Conflict(
             f"Print at most {cfg.max_forms_per_print} forms at a time.", code="too_many_forms"
         )
+    return rows
+
+
+def section_forms(
+    session: Session,
+    ctx: UserContext,
+    section_id: uuid.UUID,
+    *,
+    status: ConsentStatus | None,
+    language: FormLanguage | None,
+) -> str:
+    """Printable consent forms for a section of the current year, one page per student, in
+    class-list order; ``status`` prints only those students (e.g. ``pending`` to send again)
+    (FR-APC-004; permission ``apaar.consent.read`` or ``apaar.consent.record``; class teachers:
+    their sections; a section outside the caller's reach is 404). 409 ``too_many_forms`` above
+    ``max_forms_per_print``; 409 ``no_forms`` when nobody matches. Audit
+    ``apaar.consent_form.printed`` (section and count)."""
+    rows = _section_rows(session, ctx, section_id, status)
+    cfg = settings()
     lang = _form_language(session, language)
     page = _page(session, lang, _form_students(session, ctx, [r.student_id for r in rows]))
     _audit(
@@ -575,6 +593,62 @@ def section_forms(
         },
     )
     return page
+
+
+def form_targets(
+    session: Session,
+    ctx: UserContext,
+    *,
+    student_id: uuid.UUID | None = None,
+    section_id: uuid.UUID | None = None,
+    status: ConsentStatus | None = None,
+    language: FormLanguage | None = None,
+) -> tuple[FormLanguage, list[uuid.UUID]]:
+    """For a PDF of consent forms (FR-APC-007): the form's language (the school's setting
+    unless given) and the students one print covers, in class-list order, with the same checks
+    as :func:`student_form` and :func:`section_forms` (``apaar.consent.read`` or
+    ``apaar.consent.record`` in scope; 404 outside it; 409 ``no_forms`` / ``too_many_forms``).
+    Nothing is printed or audited here: the export that freezes these ids is."""
+    if (student_id is None) == (section_id is None):
+        raise ValidationFailed(
+            [_error("student_id", "one_of", "errors.apaar.form_target")],
+            detail="Choose one student or one section.",
+        )
+    if student_id is not None:
+        _reach_student(session, ctx, student_id, (READ, RECORD))
+        ids = [student_id]
+    elif section_id is not None:
+        ids = [r.student_id for r in _section_rows(session, ctx, section_id, status)]
+    return _form_language(session, language), ids
+
+
+def forms_document(
+    session: Session,
+    ctx: UserContext,
+    student_ids: Sequence[uuid.UUID],
+    *,
+    language: FormLanguage,
+) -> tuple[PrintDocument, int]:
+    """Worker (FR-APC-007): the consent forms of ``student_ids`` for printing to PDF, in the
+    given order and limited to the students the caller still reaches with
+    ``apaar.consent.read`` or ``apaar.consent.record``. A Telugu form asks the renderer for the
+    bundled Telugu font whatever ``SOS_TELUGU_ENABLED`` says (owner decision D9). Never an
+    Aadhaar number (invariant 4). Returns the page and the number of forms."""
+    cfg = settings()
+    reach: set[uuid.UUID] = set()
+    for permission in (READ, RECORD):
+        if ctx.has(permission):
+            reach.update(students.list_students_in_scope(session, ctx, permissions=(permission,)))
+    ids = [i for i in student_ids if i in reach][: cfg.max_forms_per_print]
+    forms = _form_students(session, ctx, ids)
+    page = templates.render_forms(
+        cfg,
+        language=language,
+        school=tenancy.get_tenant(session).name,
+        students=forms,
+        for_pdf=True,
+    )
+    return PrintDocument(page, telugu_font=language == "te"), len(forms)
 
 
 def _section_in_reach(session: Session, ctx: UserContext, section_id: uuid.UUID) -> bool:

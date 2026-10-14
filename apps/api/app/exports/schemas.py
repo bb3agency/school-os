@@ -16,7 +16,15 @@ from pydantic import (
     model_validator,
 )
 
-ExportKind = Literal["board_precheck", "portal_precheck", "student_list"]
+ExportKind = Literal[
+    "board_precheck",
+    "portal_precheck",
+    "student_list",
+    # Print jobs (R1): parent verification slips (FR-DQ-047) and APAAR consent forms
+    # (FR-APC-007) printed to PDF by the worker, kept and downloaded like other exports.
+    "readiness_slips",
+    "apaar_consent_forms",
+]
 ExportStatus = Literal["queued", "running", "ready", "failed", "expired"]
 PrecheckFormat = Literal["xlsx", "pdf"]
 ListFormat = Literal["csv", "xlsx"]
@@ -25,6 +33,7 @@ Language = Literal["en", "te"]
 # GET /exports?requested_by=: your own exports (default) or every export of the school
 # (export.read_all, ADR-0021).
 RequestedBy = Literal["me", "all"]
+ConsentFormStatus = Literal["given", "refused", "pending", "withdrawn"]
 PROFILE_PATTERN = r"^[a-z0-9][a-z0-9-]{0,63}$"
 COLUMN_PATTERN = r"^[a-z][a-z0-9_]{0,63}$"
 
@@ -85,6 +94,39 @@ class StudentListCreate(_In):
         if not all(re.match(COLUMN_PATTERN, c) for c in value):
             raise ValueError("columns are attribute keys or class, section, roll_no")
         return _unique(value)
+
+
+class _PrintTarget(_In):
+    """One student or one section of the current academic year (exactly one of the two)."""
+
+    student_id: uuid.UUID | None = None
+    section_id: uuid.UUID | None = None
+
+    @model_validator(mode="after")
+    def _one_target(self) -> _PrintTarget:
+        if (self.student_id is None) == (self.section_id is None):
+            raise ValueError("choose one student or one section")
+        return self
+
+
+class ReadinessSlipsCreate(_PrintTarget):
+    """FR-DQ-047: parent verification slips of a readiness profile as one PDF (the same slips as
+    ``GET /dq/readiness/{profile_key}/slips``). ``include_sensitive`` prints the
+    Aadhaar-as-printed values (needs ``student.read_sensitive`` for every student); otherwise
+    they are masked. Never an Aadhaar number."""
+
+    profile_key: str = Field(pattern=PROFILE_PATTERN)
+    include_ready: bool = True
+    include_sensitive: bool = False
+
+
+class ConsentFormsCreate(_PrintTarget):
+    """FR-APC-007: APAAR consent forms as one PDF (the same forms as the print views).
+    ``status`` (section only) prints only those students, e.g. ``pending``; ``language`` is the
+    school's parent-form language when left out (owner decision D9)."""
+
+    status: ConsentFormStatus | None = None
+    language: Language | None = None
 
 
 class ExportFileOut(_Out):
