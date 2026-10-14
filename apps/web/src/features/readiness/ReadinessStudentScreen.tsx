@@ -11,6 +11,7 @@ import { Value } from "@/components/ui/Value";
 import { attributeLabel, useAttributes } from "@/features/findings/data";
 import { FindingStatusBadge } from "@/features/findings/parts";
 import { isSourceKey, pick } from "@/features/findings/types";
+import { PdfJobButton } from "@/features/exports/PdfJobButton";
 import { Link } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
 import { useStudentReadiness } from "./data";
@@ -172,14 +173,28 @@ function Detail({ data, profileKey }: { data: ReadinessDetail; profileKey: strin
           { label: data.student.display_name ?? t("student") },
         ]}
         actions={
-          <a
-            href={slipHref(profileKey, { studentId: data.student.id })}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex min-h-10 items-center rounded-lg border border-border-soft px-4 text-sm font-semibold text-primary print:hidden"
-          >
-            {t("printSlip")}
-          </a>
+          <span className="flex flex-wrap items-start gap-2 print:hidden">
+            <a
+              href={slipHref(profileKey, { studentId: data.student.id })}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-10 items-center rounded-lg border border-border-soft px-4 text-sm font-semibold text-primary"
+            >
+              {t("printSlip")}
+            </a>
+            <PdfJobButton
+              label={t("pdfSlip")}
+              request={{
+                kind: "readiness_slips",
+                body: {
+                  profile_key: profileKey,
+                  student_id: data.student.id,
+                  include_ready: true,
+                  include_sensitive: false,
+                },
+              }}
+            />
+          </span>
         }
       />
       {data.student.admission_no ? (

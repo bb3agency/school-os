@@ -11,6 +11,7 @@ import type { components } from "@schoolos/api-client";
 import { createFakeIdp, type FakeIdp } from "../../src/test/fake-idp";
 import { askAnswer, askEvents, resetAsk } from "./ask-api";
 import { FILES_PREFIX, journeyAnswer, resetJourney } from "./journey-api";
+import { r1Answer, resetR1 } from "./r1-api";
 import { resetSheets, sheetAnswer } from "./sheet-api";
 
 export const IDP_PORT = Number(process.env.E2E_IDP_PORT ?? 8089);
@@ -804,6 +805,7 @@ async function startApi(): Promise<Server> {
     // Test control and the files behind canned download links (not API paths).
     if (url.pathname === "/__e2e/reset" && method === "POST") {
       resetJourney();
+      resetR1();
       resetAsk();
       resetSheets();
       return send(response, 204, "");
@@ -857,6 +859,7 @@ async function startApi(): Promise<Server> {
     const subject = subjectOf(request);
     const [status, answer] =
       askAnswer(method, url.pathname, body) ??
+      r1Answer(method, url, subject, body) ??
       journeyAnswer(method, url, subject, body) ??
       apiAnswer(method, url.pathname, subject);
     if (status === 204) {

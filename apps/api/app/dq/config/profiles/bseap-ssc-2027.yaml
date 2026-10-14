@@ -9,10 +9,18 @@
 # schools were told to verify surname, name and date of birth. The full nominal-roll field list
 # (parents' names, caste, medium, languages, photo) was not found; parents' names are compared
 # where the records hold them. Confirm with a pilot school before relying on it.
+#
+# R1 finish (FR-DQ-048): the profile belongs to the AP State Board, so it is listed only for
+# schools that declared BSEAP (and for schools that declared no board, FR-TEN-020), and it has
+# a nominal-roll pre-check sheet in app/exports/config.yaml (`verified: false` there too). The
+# file keeps version 1: board, classes and board_fields change where the profile is listed and
+# what the pre-check sheet shows, not what DQ-005 or DQ-031 check.
 key: bseap-ssc-2027
 version: 1
 label_en: AP SSC 2027 (BSEAP)
 label_te: AP SSC 2027 (BSEAP) పరీక్షలు
+board: BSEAP
+classes: [IX, X]
 source:
   - https://www.tlm4all.com/2026/02/ap-ssc-pe--2026-nominal-rolls-correction.html
   - https://www.latestly.com/india/education/ap-ssc-hall-ticket-2026-released-at-bse-ap-gov-in-heres-how-to-download-7337557.html
@@ -25,6 +33,36 @@ verified: false
 required_fields: [full_name, dob, gender, father_name, mother_name, admission_no]
 unverified_identity_severity: null
 needs_apaar: false
+
+# The board asks heads of schools to verify every student before the exam fee is paid; the
+# parent verification slip (FR-DQ-045) is how parents check name, date of birth and gender.
+parent_verification_slip: true
+
+# The nominal roll's columns as far as public guides describe them (research notes,
+# regulation_portals.md §3: name, surname, parents' names, date of birth, gender, caste,
+# religion, medium, languages, photo and signature, Aadhaar, PEN; unverified, D3). The data
+# comes from UDISE+ / Child Info; corrections are made there and accepted only where they match
+# Aadhaar.
+board_fields:
+  - {name: "Candidate's name (with surname)", attribute: full_name,
+     note: "Must match Aadhaar letter for letter, including spaces (BSEAP 2026)."}
+  - {name: "Father's name", attribute: father_name}
+  - {name: "Mother's name", attribute: mother_name}
+  - {name: "Date of birth", attribute: dob, note: "Must match Aadhaar."}
+  - {name: "Gender", attribute: gender, note: "Must match Aadhaar."}
+  - {name: "Category", attribute: category, required: false}
+  - {name: "Caste", attribute: caste, required: false,
+     note: "Restricted value; shown masked in the pre-check sheet unless included."}
+  - {name: "Religion", attribute: religion, required: false,
+     note: "Not editable at the board (BSEAP 2026); correct it in UDISE+ before the window."}
+  - {name: "Mother tongue", attribute: mother_tongue, required: false}
+  - {name: "Medium of instruction and languages", attribute: null,
+     note: "SchoolOS does not hold them; check on the board portal."}
+  - {name: "UDISE+ PEN", attribute: udise_pen, required: false}
+  - {name: "Aadhaar", attribute: aadhaar_last4, required: false,
+     note: "SchoolOS keeps only the last four digits; the number itself is never stored."}
+  - {name: "Photograph and signature", attribute: null,
+     note: "Uploaded on the board portal; SchoolOS does not hold them."}
 
 readiness:
   classes: [IX, X]

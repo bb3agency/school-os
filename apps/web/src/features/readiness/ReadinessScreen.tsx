@@ -20,7 +20,8 @@ import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { useSectionOptions } from "@/features/findings/data";
 import { isRunFinished, RunProgress } from "@/features/findings/RunChecks";
 import type { DqRun } from "@/features/findings/types";
-import { Link } from "@/i18n/navigation";
+import { PdfJobButton } from "@/features/exports/PdfJobButton";
+import { Link, useRouter } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan } from "@/lib/bff/staff-me";
@@ -93,9 +94,12 @@ function RunReadinessDialog({ profile, sectionId }: { profile: string; sectionId
 export function ReadinessScreen({
   profileKey,
   sectionId,
+  chosen = true,
 }: {
   profileKey: string;
   sectionId: string | null;
+  /** The profile came from the URL; otherwise it is the default and may not apply here. */
+  chosen?: boolean;
 }) {
   const t = useTranslations("readiness");
   const tf = useTranslations("findings");
@@ -103,6 +107,15 @@ export function ReadinessScreen({
   const locale = useLocale() as Locale;
   const can = useStaffCan();
   const profiles = useReadinessProfiles();
+  const router = useRouter();
+  // FR-DQ-048: the AP SSC check is listed only for BSEAP schools (and schools with no board).
+  // When the default is not one of this school's checks, open the first one it has.
+  const listed = profiles.data;
+  useEffect(() => {
+    if (chosen || !listed || listed.length === 0) return;
+    if (listed.some((profile) => profile.key === profileKey)) return;
+    router.replace(`/findings/readiness?profile=${listed[0]!.key}`);
+  }, [chosen, listed, profileKey, router]);
   const summary = useReadinessSummary(profileKey);
   const { sections } = useSectionOptions();
   const students = useSectionReadiness(profileKey, sectionId);
@@ -364,14 +377,28 @@ export function ReadinessScreen({
           title={t("studentsTitle", { section: sectionLabel(sectionId) })}
           description={t("studentsHint")}
           actions={
-            <a
-              href={slipHref(profileKey, { sectionId })}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm font-semibold text-primary underline print:hidden"
-            >
-              {t("printSectionSlips")}
-            </a>
+            <span className="flex flex-wrap items-center gap-x-4 gap-y-2 print:hidden">
+              <a
+                href={slipHref(profileKey, { sectionId })}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm font-semibold text-primary underline"
+              >
+                {t("printSectionSlips")}
+              </a>
+              <PdfJobButton
+                label={t("pdfSectionSlips")}
+                request={{
+                  kind: "readiness_slips",
+                  body: {
+                    profile_key: profileKey,
+                    section_id: sectionId,
+                    include_ready: true,
+                    include_sensitive: false,
+                  },
+                }}
+              />
+            </span>
           }
         >
           {students.isError ? (

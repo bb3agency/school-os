@@ -353,6 +353,14 @@ Migration `0053_readiness` revises `0052_boards_import_presets`; US-504..US-506,
 
 Not verified: every readiness format (D3), the BSEAP nominal-roll field list (parents' names, caste, medium are unconfirmed). Release note: existing schools need `python -m app.identity.sync_system_roles --apply` after `0053` (ADR-0022).
 
+R1 status, finish (`wip/r1-finish`, 2026-10-14; migration `0054_r1_finish` revises `0053_readiness`):
+
+- [x] Server-rendered PDFs of the parent verification slips and the APAAR consent forms, per student and per section, as print-job exports (`POST /exports/readiness-slips`, `/exports/apaar-consent-forms`; queue `pdf`; FR-DQ-047, FR-APC-007). Same permissions and reach as the print views, step-up, presigned downloads, audited; Telugu parent forms embed the bundled font while the staff UI stays English (D9). "Make PDF" buttons on the readiness and APAAR screens.
+- [x] AP SSC readiness tied to BSEAP schools, with a nominal-roll pre-check sheet (`verified: false`; FR-DQ-048, FR-EXP-008); APAAR stays shown to every school.
+- [x] e2e coverage of the R1 screens through the stand-in API (`e2e/r1.spec.ts`, a11y, responsive): readiness and a student's differences, APAAR consent and a student's consent, PDF downloads, PEN check, school boards, import templates.
+- [x] Boards card keeps its "saved" message after reloading the school; unused i18n key `schoolSettings.profile.boards` removed.
+- [ ] Telugu form and slip wording reviewed by a native speaker; formats confirmed with a pilot school (D3).
+
 ### R2 · Office essentials around the wedge (2026-27 plan, docs/18 §3; planned Jan-Apr 2027)
 
 **Scope (owner-accepted 2026-10-10, D4-D9):** AP TC format and public certificate verification (C20, ADR-0045); fee ledger and receipts with UPI QR matching and Razorpay payment links, the school always the merchant (C21, ADR-0042); WhatsApp utility messages from the school's own number through the Meta Cloud API with opt-in and short-lived parent link pages (C22, C24; ADR-0043, ADR-0046); parent language per school (C23, ADR-0044); Ask the school finish-up (C25). Requirements: docs/03 §3.18-§3.25. Tables: docs/05 §15. Security: docs/07 §6.7, §11.2, SEC-034..040. Privacy: docs/08 §15. Endpoints: docs/09 §4 "R2 planned endpoints". Settings: docs/10 §11.2. Screens: docs/17 §5.8.

@@ -30,10 +30,12 @@ from typing import Any, Final
 from sqlalchemy import RowMapping
 from sqlalchemy.orm import Session
 
+from app.apaar import service as apaar
 from app.authz.context import UserContext
 from app.core.errors import NotFound, ValidationFailed
-from app.core.languages import telugu_text
+from app.core.languages import telugu_enabled, telugu_text
 from app.core.logging import get_logger
+from app.core.pdf import PrintDocument
 from app.dq import checks, engine
 from app.dq import readiness as rd
 from app.dq import repository as repo
@@ -694,18 +696,17 @@ def _slip_student(
     )
 
 
-def slips(
+def _slip_targets(
     session: Session,
     ctx: UserContext,
-    profile_key: str,
+    profile: Profile,
     *,
-    student_id: uuid.UUID | None = None,
-    section_id: uuid.UUID | None = None,
-    include_ready: bool = True,
-) -> str:
-    """Printable parent verification slips (A4 HTML), for one student or one section
-    (US-505 AC2). Audit ``dq.readiness.slips_printed`` (counts and ids only)."""
-    profile = readiness_profile(profile_key)
+    student_id: uuid.UUID | None,
+    section_id: uuid.UUID | None,
+    include_ready: bool,
+) -> tuple[list[uuid.UUID], uuid.UUID, dict[uuid.UUID, _Student], dict[uuid.UUID, Any]]:
+    """The students one slip print covers, in print order (by name), with their assessment
+    and references, and the target id (the student or the section)."""
     if (student_id is None) == (section_id is None):
         raise ValidationFailed(
             [{"field": "student_id", "code": "one_of", "message_key": "errors.dq.slip_target"}],
@@ -721,32 +722,40 @@ def slips(
         ids, target = _in_reach(session, ctx, [section_id])[:MAX_SLIPS], section_id
     # Slips always show what each record holds, even where the check does not apply.
     assessed = _assess(session, profile, ids, force=True)
-    refs = students.summaries(session, ctx, ids)
+    refs = dict(students.summaries(session, ctx, ids))
     ordered = sorted(ids, key=lambda s: ((refs[s].display_name or "") if s in refs else "", str(s)))
     if not include_ready:
         ordered = [s for s in ordered if assessed[s].status != "ready"]
+    return ordered, target, assessed, refs
+
+
+def _slip_page(
+    session: Session,
+    profile: Profile,
+    ordered: Sequence[uuid.UUID],
+    assessed: Mapping[uuid.UUID, _Student],
+    refs: Mapping[uuid.UUID, Any],
+    *,
+    reveal_ids: Collection[uuid.UUID],
+    for_pdf: bool,
+) -> tuple[str, int, bool]:
+    """The slips page, how many slips show restricted (C3) values and whether the page has
+    Telugu lines (the school prints parent forms in Telugu, D9, or Telugu is shown)."""
     spec = _spec(profile)
     columns = list(dict.fromkeys(s for f in spec.fields for s in f.sources))
     rcfg = rd.load_readiness_config()
     labels = dq._Labels.load(session)
-    # One scope read for the whole slip set (student.read_sensitive), not one per student.
-    sensitive_reach = (
-        frozenset(students.list_students_in_scope(session, ctx, permissions=(SENSITIVE,)))
-        if ctx.has(SENSITIVE)
-        else frozenset()
-    )
     shown, hidden = _visible(session, True), _visible(session, False)
     revealed = 0
     printed: list[slip_page.SlipStudent] = []
     for sid in ordered:
-        reveal = sid in sensitive_reach
+        reveal = sid in reveal_ids
         revealed += 1 if reveal else 0
-        vis = shown if reveal else hidden
         printed.append(
             _slip_student(
                 assessed[sid],
                 profile=profile,
-                vis=vis,
+                vis=shown if reveal else hidden,
                 labels=labels,
                 rcfg=rcfg,
                 ref=refs.get(sid),
@@ -763,10 +772,49 @@ def slips(
         students=printed,
         printed_at=dt.datetime.now(dt.UTC),
     )
-    page = slip_page.render(data)
+    telugu = telugu_enabled() or apaar.parent_language(session) == "te"
+    return slip_page.render(data, telugu=telugu, for_pdf=for_pdf), revealed, telugu
+
+
+def _sensitive_reach(session: Session, ctx: UserContext) -> frozenset[uuid.UUID]:
+    """Students whose restricted values the caller may see (one scope read per slip set)."""
+    if not ctx.has(SENSITIVE):
+        return frozenset()
+    return frozenset(students.list_students_in_scope(session, ctx, permissions=(SENSITIVE,)))
+
+
+def slips(
+    session: Session,
+    ctx: UserContext,
+    profile_key: str,
+    *,
+    student_id: uuid.UUID | None = None,
+    section_id: uuid.UUID | None = None,
+    include_ready: bool = True,
+) -> str:
+    """Printable parent verification slips (A4 HTML), for one student or one section
+    (US-505 AC2). Audit ``dq.readiness.slips_printed`` (counts and ids only)."""
+    profile = readiness_profile(profile_key)
+    ordered, target, assessed, refs = _slip_targets(
+        session,
+        ctx,
+        profile,
+        student_id=student_id,
+        section_id=section_id,
+        include_ready=include_ready,
+    )
+    page, revealed, _ = _slip_page(
+        session,
+        profile,
+        ordered,
+        assessed,
+        refs,
+        reveal_ids=_sensitive_reach(session, ctx),
+        for_pdf=False,
+    )
     summary: dict[str, Any] = {
         "profile_key": profile.key,
-        "students": len(printed),
+        "students": len(ordered),
         "sensitive_shown": revealed,
     }
     if section_id is not None:
@@ -778,17 +826,70 @@ def slips(
         resource_id=target,
         summary=summary,
     )
-    log.info("dq.readiness.slips_printed", count=len(printed))
+    log.info("dq.readiness.slips_printed", count=len(ordered))
     return page
+
+
+def slip_students(
+    session: Session,
+    ctx: UserContext,
+    profile_key: str,
+    *,
+    student_id: uuid.UUID | None = None,
+    section_id: uuid.UUID | None = None,
+    include_ready: bool = True,
+) -> tuple[int, list[uuid.UUID]]:
+    """For a slip PDF (FR-DQ-047): the profile's version and the students one print of slips
+    covers, in print order, with the same checks as :func:`slips` (permission
+    ``dq.readiness.read``; a student or section outside the caller's reach is 404). Nothing is
+    printed or audited here: the export that freezes these ids is."""
+    profile = readiness_profile(profile_key)
+    ordered, _, _, _ = _slip_targets(
+        session,
+        ctx,
+        profile,
+        student_id=student_id,
+        section_id=section_id,
+        include_ready=include_ready,
+    )
+    return profile.version, ordered
+
+
+def slips_document(
+    session: Session,
+    ctx: UserContext,
+    profile_key: str,
+    student_ids: Sequence[uuid.UUID],
+    *,
+    include_sensitive: bool,
+) -> tuple[PrintDocument, int]:
+    """Worker (FR-DQ-047): the slips page of ``student_ids`` for printing to PDF, in the given
+    order and limited to the students the caller still reaches with ``dq.readiness.read``.
+    Aadhaar-as-printed values appear only when ``include_sensitive`` and the caller holds
+    ``student.read_sensitive`` for that student; never an Aadhaar number. Returns the page (a
+    Telugu parent page asks for the bundled font, D9) and the number of slips."""
+    profile = readiness_profile(profile_key)
+    reach = set(_in_reach(session, ctx, None))
+    ordered = [s for s in student_ids if s in reach][:MAX_SLIPS]
+    assessed = _assess(session, profile, ordered, force=True)
+    refs = dict(students.summaries(session, ctx, ordered))
+    reveal = _sensitive_reach(session, ctx) if include_sensitive else frozenset()
+    page, _, telugu = _slip_page(
+        session, profile, ordered, assessed, refs, reveal_ids=reveal, for_pdf=True
+    )
+    return PrintDocument(page, telugu_font=telugu), len(ordered)
 
 
 __all__ = [
     "MANAGE",
+    "MAX_SLIPS",
     "READ",
     "readiness_profile",
     "request_run",
     "section_students",
+    "slip_students",
     "slips",
+    "slips_document",
     "student_detail",
     "summary",
 ]

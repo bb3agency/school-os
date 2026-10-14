@@ -29,6 +29,9 @@ export type PrecheckFormat = Schemas["PrecheckCreate"]["format"][number];
 export type ListFormat = Schemas["StudentListCreate"]["format"];
 export type ExportLanguage = Export["language"];
 export type ExportScope = Schemas["ExportScopeIn"];
+/** Print jobs (FR-DQ-047, FR-APC-007): slips and consent forms printed to PDF by the worker. */
+export type ReadinessSlipsCreate = Schemas["ReadinessSlipsCreate"];
+export type ConsentFormsCreate = Schemas["ConsentFormsCreate"];
 export type RequestedBy = NonNullable<ListQuery["requested_by"]>;
 
 type Exhaustive<T extends string, L extends readonly T[]> = [T] extends [L[number]] ? L : never;
@@ -46,6 +49,8 @@ const kinds = [
   "board_precheck",
   "portal_precheck",
   "student_list",
+  "readiness_slips",
+  "apaar_consent_forms",
 ] as const satisfies readonly ExportKind[];
 export const EXPORT_KINDS: Exhaustive<ExportKind, typeof kinds> = kinds;
 

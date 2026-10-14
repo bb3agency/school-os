@@ -77,11 +77,19 @@ def test_FR_EXP_004_student_list_needs_recent_mfa(school: Any, api: Any) -> None
     assert res.json()["kind"] == "student_list"
 
 
+# Office staff and class teachers make print jobs (slips, consent forms: FR-DQ-047, FR-APC-007),
+# so they may list their own exports; the others hold no permission that makes one.
+LISTS_OWN = {"office_staff": 200, "class_teacher": 200, "accountant": 403, "teacher": 403}
+
+
 @pytest.mark.parametrize("role", ["office_staff", "accountant", "class_teacher", "teacher"])
 def test_SEC_003_roles_without_export_permissions_get_403(school: Any, api: Any, role: str) -> None:
     who = school.people[role]
     assert api.call(who, "POST", BASE, json=_precheck_body(school)).status_code == 403
-    assert api.call(who, "GET", BASE).status_code == 403
+    listed = api.call(who, "GET", BASE)
+    assert listed.status_code == LISTS_OWN[role]
+    if listed.status_code == 200:
+        assert all(e["own"] for e in listed.json()["data"])
     assert api.call(who, "GET", "/api/v1/export-profiles").status_code == 403
     res = api.call(who, "POST", f"{BASE}/student-list", json={"columns": ["full_name"]})
     assert res.status_code == 403
@@ -252,5 +260,6 @@ def test_export_profiles_route(school: Any, api: Any) -> None:
         "cisce-registration-2027",
         "cbse-registration-2027",
         "cbse-loc-2027",
+        "bseap-ssc-2027",  # the SSC nominal-roll pre-check (FR-EXP-008)
         "udise-plus",
     }

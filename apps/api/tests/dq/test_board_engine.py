@@ -81,6 +81,28 @@ def test_FR_TEN_020_profiles_are_listed_for_the_schools_boards(
         assert "cisce-registration-2027" in _profiles(world), "no board declared: all listed"
 
 
+def test_FR_DQ_048_ssc_readiness_is_listed_only_for_bseap_schools(
+    world: Any, admin_engine: Engine
+) -> None:
+    """The AP SSC check belongs to the State Board: a CBSE-only school does not see it; a
+    BSEAP school (or a school with no board declared) does. APAAR is a portal check: every
+    school sees it."""
+    with _boards(admin_engine, world.a.tenant_id, ["CBSE"], {}):
+        shown = _profiles(world)
+        assert "bseap-ssc-2027" not in shown
+        assert {"apaar", "udise-plus"} <= set(shown)
+        assert "bseap-ssc-2027" in _profiles(world, include_all=True)
+    with _boards(admin_engine, world.a.tenant_id, ["BSEAP", "CBSE"], {"X": "CBSE"}):
+        shown = _profiles(world)
+        assert shown["bseap-ssc-2027"].board == "BSEAP"
+        assert shown["bseap-ssc-2027"].readiness is True
+        # FR-TEN-021: Class X follows CBSE here, so the SSC check names only Class IX.
+        assert shown["bseap-ssc-2027"].applies_to_classes == ["IX"]
+        assert "apaar" in shown
+    with _boards(admin_engine, world.a.tenant_id, [], {}):
+        assert {"bseap-ssc-2027", "apaar"} <= set(_profiles(world))
+
+
 def test_FR_DQ_030_cbse_profile_run_needs_category_and_apaar_details(
     world: Any, admin_engine: Engine
 ) -> None:

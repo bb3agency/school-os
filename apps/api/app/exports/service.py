@@ -21,6 +21,15 @@ Flow (docs/04 §6, §8.2)::
                                                         (or the school's shorter retention
                                                         setting, FR-ADM-002)
 
+Print jobs (R1; FR-DQ-047, FR-APC-007): ``POST /exports/readiness-slips`` and
+``POST /exports/apaar-consent-forms`` freeze the students of one student or one section with
+the permissions and reach of the browser print views (``dq.readiness.read``;
+``apaar.consent.read`` or ``apaar.consent.record``) plus ``student.read_basic`` and step-up;
+the worker (queue ``pdf``) asks ``app.dq`` / ``app.apaar`` for the page with the requester's
+current reach and prints it with :func:`app.core.pdf.render_document` (a parent-facing Telugu
+page gets the bundled font, owner decision D9). Files, downloads, retention and audit are the
+exports' own.
+
 Rules:
 
 - **Reach (SEC-015, invariant 3).** Students come only from ``students.list_students_in_scope``
@@ -58,6 +67,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
+from app.apaar import service as apaar
 from app.audit import service as audit
 from app.authz.context import UserContext
 from app.authz.http import Page, decode_cursor, encode_cursor
@@ -70,7 +80,7 @@ from app.core.errors import Conflict, Forbidden, NotFound, StepUpRequired, Valid
 from app.core.ids import new_id
 from app.core.languages import output_language, telugu_text
 from app.core.logging import get_context, get_logger
-from app.core.pdf import PdfRenderer, get_renderer
+from app.core.pdf import PdfRenderer, get_renderer, render_document
 from app.documents import service as documents
 from app.dq import service as dq
 from app.exports import repository as repo
@@ -84,6 +94,7 @@ from app.exports.report import (
     render_precheck_html,
 )
 from app.exports.schemas import (
+    ConsentFormsCreate,
     ExportDownloadOut,
     ExportFileOut,
     ExportOut,
@@ -91,6 +102,7 @@ from app.exports.schemas import (
     ExportRequesterOut,
     ExportScopeIn,
     PrecheckCreate,
+    ReadinessSlipsCreate,
     RequestedBy,
     StudentListCreate,
 )
@@ -122,12 +134,35 @@ READ_ALL: Final = "export.read_all"
 DOWNLOAD_ANY: Final = "export.download_any"
 EXPORT_PERMISSIONS: Final = (BOARD, PORTAL, STUDENT_EXPORT)
 
+READINESS_READ: Final = "dq.readiness.read"
+CONSENT_READ: Final = "apaar.consent.read"
+CONSENT_RECORD: Final = "apaar.consent.record"
+SLIPS: Final = "readiness_slips"
+CONSENT_FORMS: Final = "apaar_consent_forms"
+# Print jobs (R1): pages that also have a browser print view, printed to one PDF by the worker.
+PRINT_KINDS: Final = (SLIPS, CONSENT_FORMS)
+PRINT_LAYOUT_VERSION: Final = 1
+
 KIND_OF_LAYOUT: Final = {"board": "board_precheck", "portal": "portal_precheck"}
 PERMISSION_OF_KIND: Final = {
     "board_precheck": BOARD,
     "portal_precheck": PORTAL,
     "student_list": STUDENT_EXPORT,
+    SLIPS: READINESS_READ,
+    CONSENT_FORMS: CONSENT_READ,
 }
+# Any one of these permits the kind (the consent forms' print views take read or record).
+PERMISSIONS_OF_KIND: Final[dict[str, tuple[str, ...]]] = {
+    **{kind: (permission,) for kind, permission in PERMISSION_OF_KIND.items()},
+    CONSENT_FORMS: (CONSENT_READ, CONSENT_RECORD),
+}
+# Every permission that lets someone make, see and download their own exports.
+OWN_EXPORT_PERMISSIONS: Final = (
+    *EXPORT_PERMISSIONS,
+    READINESS_READ,
+    CONSENT_READ,
+    CONSENT_RECORD,
+)
 
 GENERATE_EVENT: Final = "export.requested"
 RENDER_EVENT: Final = "export.render_requested"
@@ -362,17 +397,27 @@ def _create(
     kind: str,
     formats: Sequence[str],
     language: str,
-    scope: ExportScopeIn,
+    scope: Mapping[str, list[str]],
     student_ids: Sequence[uuid.UUID],
     layout_version: int,
     profile: _Profile | None = None,
+    profile_ref: tuple[str, int] | None = None,
     columns: Sequence[str] | None = None,
     include_sensitive: bool = False,
     sensitive_columns: Sequence[str] = (),
+    details: Mapping[str, Any] | None = None,
 ) -> ExportOut:
     export_id = new_id()
-    # ``te`` is accepted (backward compatible) but gives English while Telugu is hidden.
-    language = output_language(language)
+    if kind != CONSENT_FORMS:
+        # ``te`` is accepted (backward compatible) but gives English while Telugu is hidden.
+        # Consent forms are parent-facing: their language is the school's choice (D9).
+        language = output_language(language)
+    profile_key: str | None = None
+    profile_version: int | None = None
+    if profile is not None:
+        profile_key, profile_version = profile.key, profile.version
+    elif profile_ref is not None:
+        profile_key, profile_version = profile_ref
     task = RENDER_TASK if "pdf" in formats else GENERATE_TASK
     job = ops.start_job(
         session, task_name=task, idempotency_key=f"{task}:{export_id}", created_by=ctx.user_id
@@ -382,12 +427,12 @@ def _create(
         id=export_id,
         tenant_id=ctx.tenant_id,
         kind=kind,
-        profile_key=profile.key if profile else None,
-        profile_version=profile.version if profile else None,
+        profile_key=profile_key,
+        profile_version=profile_version,
         layout_version=layout_version,
         formats=list(formats),
         language=language,
-        scope=_scope_json(scope),
+        scope=dict(scope),
         columns=list(columns) if columns is not None else None,
         include_sensitive=include_sensitive,
         student_ids=list(student_ids),
@@ -403,17 +448,18 @@ def _create(
         export_id,
         {
             "kind": kind,
-            "profile_key": profile.key if profile else None,
-            "profile_version": profile.version if profile else None,
+            "profile_key": profile_key,
+            "profile_version": profile_version,
             "layout_version": layout_version,
             "formats": list(formats),
             "language": language,
-            "scope": _scope_json(scope),
+            "scope": dict(scope),
             "columns": list(columns) if columns is not None else None,
             "include_sensitive": include_sensitive,
             "sensitive_columns": list(sensitive_columns),
             "students": len(student_ids),
             "student_ids_digest": student_ids_digest(student_ids),
+            **(details or {}),
         },
     )
     ops.enqueue_event(
@@ -466,7 +512,7 @@ def request_precheck(session: Session, ctx: UserContext, data: PrecheckCreate) -
         kind=profile.kind,
         formats=data.format,
         language=data.language,
-        scope=data.scope,
+        scope=_scope_json(data.scope),
         student_ids=ids,
         layout_version=profile.layout.layout_version,
         profile=profile,
@@ -521,12 +567,123 @@ def request_student_list(session: Session, ctx: UserContext, data: StudentListCr
         kind="student_list",
         formats=[data.format],
         language=data.language,
-        scope=data.scope,
+        scope=_scope_json(data.scope),
         student_ids=ids,
         layout_version=cfg.student_list.layout_version,
         columns=data.columns,
         include_sensitive=bool(sensitive),
         sensitive_columns=sensitive,
+    )
+
+
+# --- print jobs (R1: slips and consent forms as PDF) ----------------------------------------------
+
+
+def _print_scope(
+    student_id: uuid.UUID | None, section_id: uuid.UUID | None
+) -> dict[str, list[str]]:
+    if student_id is not None:
+        return {"student_ids": [str(student_id)]}
+    return {"section_ids": [str(section_id)]}
+
+
+def _check_print_size(ids: Sequence[uuid.UUID]) -> None:
+    if not ids:
+        raise _invalid("scope", "no_students")
+    if len(ids) > load_config().max_students:
+        raise _invalid("scope", "too_many_students")
+
+
+def request_readiness_slips(
+    session: Session, ctx: UserContext, data: ReadinessSlipsCreate
+) -> ExportOut:
+    """``POST /exports/readiness-slips`` (FR-DQ-047): the parent verification slips of one
+    student or one section as one A4 PDF, printed by the worker. The same permission and reach
+    as the slips print view (``dq.readiness.read``, class teachers their sections; 404
+    outside), plus ``student.read_basic`` and step-up like every export (ADR-0021).
+    ``include_sensitive`` prints Aadhaar-as-printed values and needs ``student.read_sensitive``
+    reaching every student (403 ``sensitive_not_allowed``); never an Aadhaar number. The
+    students are frozen in print order. Audit ``export.requested``."""
+    _need(ctx, READINESS_READ, detail="You cannot see board and portal readiness.")
+    _need(ctx, STUDENT_READ, detail="You cannot see student records.")
+    if data.include_sensitive:
+        _need(
+            ctx,
+            SENSITIVE,
+            code="sensitive_not_allowed",
+            detail="Restricted details can be included only by staff allowed to see them.",
+        )
+    _require_step_up(ctx)
+    version, ids = dq.readiness_slip_students(
+        session,
+        ctx,
+        data.profile_key,
+        student_id=data.student_id,
+        section_id=data.section_id,
+        include_ready=data.include_ready,
+    )
+    _check_print_size(ids)
+    if data.include_sensitive:
+        reach = set(students.list_students_in_scope(session, ctx, permissions=(SENSITIVE,)))
+        if not set(ids) <= reach:
+            raise Forbidden(
+                "Some of these students' restricted details are outside what you may see.",
+                code="sensitive_not_allowed",
+            )
+    return _create(
+        session,
+        ctx,
+        kind=SLIPS,
+        formats=["pdf"],
+        language="en",
+        scope=_print_scope(data.student_id, data.section_id),
+        student_ids=ids,
+        layout_version=PRINT_LAYOUT_VERSION,
+        profile_ref=(data.profile_key, version),
+        include_sensitive=data.include_sensitive,
+        sensitive_columns=["aadhaar_as_printed"] if data.include_sensitive else [],
+        details={"include_ready": data.include_ready},
+    )
+
+
+def request_consent_forms(
+    session: Session, ctx: UserContext, data: ConsentFormsCreate
+) -> ExportOut:
+    """``POST /exports/apaar-consent-forms`` (FR-APC-007): the APAAR consent forms of one
+    student or one section (optionally only one consent state) as one A4 PDF, printed by the
+    worker in the school's parent-form language (or ``language``; Telugu works whatever
+    ``SOS_TELUGU_ENABLED`` says, owner decision D9). The same permissions and reach as the
+    print views (``apaar.consent.read`` or ``apaar.consent.record``; 404 outside; 409
+    ``no_forms`` / ``too_many_forms``), plus ``student.read_basic`` and step-up (ADR-0021).
+    The form never carries an Aadhaar number. Audit ``export.requested``."""
+    if not (ctx.has(CONSENT_READ) or ctx.has(CONSENT_RECORD)):
+        raise Forbidden("You cannot see the APAAR consent register.")
+    _need(ctx, STUDENT_READ, detail="You cannot see student records.")
+    _require_step_up(ctx)
+    if data.student_id is not None and data.status is not None:
+        raise _invalid("status", "section_only")
+    language, ids = apaar.form_targets(
+        session,
+        ctx,
+        student_id=data.student_id,
+        section_id=data.section_id,
+        status=data.status,
+        language=data.language,
+    )
+    _check_print_size(ids)
+    return _create(
+        session,
+        ctx,
+        kind=CONSENT_FORMS,
+        formats=["pdf"],
+        language=language,
+        scope=_print_scope(data.student_id, data.section_id),
+        student_ids=ids,
+        layout_version=PRINT_LAYOUT_VERSION,
+        details={
+            "status_filter": data.status,
+            "form_version": apaar.settings().form_version,
+        },
     )
 
 
@@ -543,8 +700,12 @@ def _download_problem(ctx: UserContext, row: Export) -> Forbidden | None:
     return _own_problem(ctx, row) if _own(ctx, row) else _others_problem(ctx, row)
 
 
+def _holds_kind(ctx: UserContext, kind: str) -> bool:
+    return any(ctx.has(p) for p in PERMISSIONS_OF_KIND[kind])
+
+
 def _own_problem(ctx: UserContext, row: Export) -> Forbidden | None:
-    if not ctx.has(PERMISSION_OF_KIND[row.kind]):
+    if not _holds_kind(ctx, row.kind):
         return Forbidden("You can no longer download this export.")
     # AA-12: the files hold student records; reading them still needs read_basic.
     if not ctx.has(STUDENT_READ):
@@ -563,7 +724,11 @@ def _reach_of(row: Export) -> tuple[str, ...]:
     """The grants whose scope had to reach every frozen student when ``row`` was requested
     (besides ``student.read_basic``), as :func:`request_precheck` and
     :func:`request_student_list` check them."""
-    reach: list[str] = [DQ_READ] if row.kind != "student_list" else []
+    reach: list[str] = []
+    if row.kind == SLIPS:
+        reach.append(READINESS_READ)
+    elif row.kind not in ("student_list", CONSENT_FORMS):
+        reach.append(DQ_READ)
     if row.include_sensitive:
         reach.append(SENSITIVE)
     return tuple(reach)
@@ -576,7 +741,16 @@ def _frozen_out_of_scope(session: Session, ctx: UserContext, row: Export) -> For
     frozen = set(row.student_ids or ())
     if not frozen:
         return None
-    reach = set(students.list_students_in_scope(session, ctx, permissions=_reach_of(row)))
+    reach: set[uuid.UUID] = set()
+    if row.kind == CONSENT_FORMS:
+        # The forms' print views take either consent permission, each with its own scope.
+        for permission in PERMISSIONS_OF_KIND[CONSENT_FORMS]:
+            if ctx.has(permission):
+                reach.update(
+                    students.list_students_in_scope(session, ctx, permissions=(permission,))
+                )
+    else:
+        reach.update(students.list_students_in_scope(session, ctx, permissions=_reach_of(row)))
     if frozen <= reach:
         return None
     return Forbidden(
@@ -704,6 +878,10 @@ def _needs_step_up(ctx: UserContext, row: Export) -> bool:
 
 
 def _stem(row: Export) -> str:
+    if row.kind == SLIPS:
+        return f"verification-slips-{row.profile_key}"
+    if row.kind == CONSENT_FORMS:
+        return "apaar-consent-forms"
     return f"precheck-{row.profile_key}" if row.profile_key else "students"
 
 
@@ -804,6 +982,12 @@ class _Stop(Exception):
         self.code = code
 
 
+def _snapshot_language(row: Export) -> Language:
+    if row.kind == CONSENT_FORMS and row.language == "te":
+        return "te"
+    return output_language(row.language)
+
+
 @dataclass(frozen=True, slots=True)
 class _Snapshot:
     id: uuid.UUID
@@ -826,8 +1010,9 @@ class _Snapshot:
             kind=row.kind,
             profile_key=row.profile_key,
             formats=tuple(row.formats),
-            # English while Telugu is hidden, also for a Telugu export queued before (ADR-0036).
-            language=output_language(row.language),
+            # English while Telugu is hidden, also for a Telugu export queued before (ADR-0036);
+            # consent forms are parent-facing and keep the school's language (D9).
+            language=_snapshot_language(row),
             scope=dict(row.scope or {}),
             columns=tuple(row.columns or ()),
             include_sensitive=row.include_sensitive,
@@ -858,12 +1043,13 @@ class _Built:
 
 
 def _permission_problem(ctx: UserContext, snap: _Snapshot) -> str | None:
-    needed = [PERMISSION_OF_KIND[snap.kind], STUDENT_READ]
-    if snap.kind != "student_list":
+    needed = [STUDENT_READ]
+    if snap.kind not in ("student_list", *PRINT_KINDS):
         needed.append(DQ_READ)
     if snap.include_sensitive:
         needed.append(SENSITIVE)
-    return None if all(ctx.has(p) for p in needed) else "permission_revoked"
+    allowed = _holds_kind(ctx, snap.kind) and all(ctx.has(p) for p in needed)
+    return None if allowed else "permission_revoked"
 
 
 @dataclass(frozen=True, slots=True)
@@ -1132,6 +1318,8 @@ def _build(session: Session, ctx: UserContext, snap: _Snapshot) -> Callable[[Pdf
     ids = [i for i in snap.student_ids if i in reach]
     if not ids:
         raise _Stop("no_students")
+    if snap.kind in PRINT_KINDS:
+        return _build_print(session, ctx, snap, ids)
     if snap.kind == "student_list":
         table, summary, cfg = _student_list(session, snap, ids)
         title = cfg.label("title_student_list", snap.language)
@@ -1168,6 +1356,30 @@ def _build(session: Session, ctx: UserContext, snap: _Snapshot) -> Callable[[Pdf
         )
 
     return make_precheck
+
+
+def _build_print(
+    session: Session, ctx: UserContext, snap: _Snapshot, ids: Sequence[uuid.UUID]
+) -> Callable[[PdfRenderer], _Built]:
+    """Slips (FR-DQ-047) or consent forms (FR-APC-007): the owning module builds the page with
+    the requester's current reach (students who left it are left out); it is printed to one
+    PDF outside the transaction. A Telugu parent page brings its own font (D9)."""
+    if snap.kind == SLIPS:
+        document, count = dq.readiness_slips_document(
+            session, ctx, snap.profile_key or "", ids, include_sensitive=snap.include_sensitive
+        )
+        filename = f"verification-slips-{snap.profile_key}.pdf"
+    else:
+        document, count = apaar.forms_document(session, ctx, ids, language=snap.language)
+        filename = "apaar-consent-forms.pdf"
+    if count == 0:
+        raise _Stop("no_students")
+
+    def make_print(renderer: PdfRenderer) -> _Built:
+        blob = render_document(document, renderer)
+        return _Built(files=(_File("pdf", filename, blob),), students=count)
+
+    return make_print
 
 
 def _fail(tenant_id: uuid.UUID, export_id: uuid.UUID, code: str) -> bool:
@@ -1240,7 +1452,7 @@ def run_export(
         _fail(tenant_id, export_id, problem)
         return "failed"
     try:
-        if snap.kind != "student_list":
+        if snap.kind not in ("student_list", *PRINT_KINDS):
             # US-501: the report shows the result of checking now, not of the last run.
             with _worker_session(tenant_id, snap.requested_by) as session:
                 dq.run_checks(
