@@ -224,6 +224,11 @@ export function ScopeSummary({ scope }: { scope: Export["scope"] }) {
       </>
     );
   }
+  // Print jobs of one student (FR-DQ-047, FR-APC-007): no names here, only the count.
+  const studentIds = scope.student_ids ?? [];
+  if (studentIds.length > 0) {
+    return <>{t("studentsCount", { count: studentIds.length })}</>;
+  }
   if (classIds.length > 0) {
     const names = classIds
       .map((id) => classesOf(sections).find((item) => item.id === id)?.label)

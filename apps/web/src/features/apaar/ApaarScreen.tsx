@@ -14,6 +14,7 @@ import { SelectField } from "@/components/ui/Select";
 import { StatCard } from "@/components/ui/StatCard";
 import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
+import { PdfJobButton } from "@/features/exports/PdfJobButton";
 import { useSchoolStructure, useSectionOptions } from "@/features/students/StudentList";
 import { Link } from "@/i18n/navigation";
 import { toLoadable, unwrap, useBffClient } from "@/lib/bff/query";
@@ -292,6 +293,19 @@ function SectionTable({
             {t("printAll")}
             <span className="sr-only">: {row.class_section}</span>
           </a>
+          {row.counts.pending > 0 ? (
+            <PdfJobButton
+              label={`${t("pdfPending")}: ${row.class_section}`}
+              request={{
+                kind: "apaar_consent_forms",
+                body: { section_id: row.section_id, status: "pending" },
+              }}
+            />
+          ) : null}
+          <PdfJobButton
+            label={`${t("pdfAll")}: ${row.class_section}`}
+            request={{ kind: "apaar_consent_forms", body: { section_id: row.section_id } }}
+          />
         </span>
       ),
     },

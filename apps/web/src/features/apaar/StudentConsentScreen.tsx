@@ -15,6 +15,7 @@ import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SelectField } from "@/components/ui/Select";
 import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
+import { PdfJobButton } from "@/features/exports/PdfJobButton";
 import { todayInIndia } from "@/features/change-requests/dates";
 import {
   checkEvidence,
@@ -175,6 +176,10 @@ export function StudentConsentScreen({ studentId }: { studentId: string }) {
                 {t(`printIn.${language}`)}
               </a>
             ))}
+            <PdfJobButton
+              label={t("pdfForm")}
+              request={{ kind: "apaar_consent_forms", body: { student_id: studentId } }}
+            />
           </p>
         ) : null}
       </Card>
