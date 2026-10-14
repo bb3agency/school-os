@@ -173,10 +173,12 @@ Format: **US-ID · As a … I want … so that …** followed by acceptance crit
 - AC2: Each difference names who fixes it: the parent (Aadhaar at an Aadhaar centre), the school through the MEO/MIS coordinator (UDISE+), or the school's own register through a change request with evidence; never corrected automatically.
 - AC3: A class/section dashboard shows "142 of 160 ready" and how many wait for the parent, the school or a decision; class teachers see only their sections.
 - AC4: The board's format is marked "not yet confirmed" with its public sources until a school confirms it (owner decision D3).
+- AC5: The SSC check is shown to schools that declared the AP State Board (or no board yet), and it has a nominal-roll pre-check sheet like the other boards. [FR-DQ-048, FR-EXP-008]
 
 **US-505** · As an office clerk, I want to print a verification slip for each student (or a whole section) so that parents check the details and sign before the board window. [FR-DQ-045, FR-DQ-046]
 - AC1: The student view shows each record's value and highlights the exact characters that differ; Aadhaar values only for staff allowed to see them (audited).
 - AC2: The A4 slip lists each record's value, the differences and who fixes them, and has a signature line for the parent; it never shows an Aadhaar number; printing is audited.
+- AC3: I can also get the slips of a student or a section as one PDF made by SchoolOS (to save, share or print later); it is kept for a few days like other exports, and in Telugu too when our parents read Telugu. [FR-DQ-047]
 
 **US-506** · As an office admin, I want a list of students whose APAAR ID generation will fail and why, so that we fix UDISE+ or ask parents to fix Aadhaar first. [FR-DQ-044]
 - AC1: The APAAR check compares UDISE+ with Aadhaar-as-printed (name, date of birth, gender) and names who fixes each difference; students with a verified APAAR ID are ready.
@@ -480,6 +482,7 @@ Stories of the 2026-27 plan (docs/18 §3 R1.2-R1.3; owner decisions D1, D3, D9 o
 - AC1: The form offers "I give consent" and "I do not give consent" side by side and says admission and studies do not depend on the answer (Supreme Court order of 20 July 2026, as reported; to check against the official form).
 - AC2: The principal chooses English or Telugu for the printed form once for the school; the staff screens stay English.
 - AC3: I can print only the students whose answer is still pending. Each print is in the audit log.
+- AC4: I can also get the forms of a student or a section as one PDF made by SchoolOS, in the parent language (Telugu forms print correctly even though the staff screens are English). [FR-APC-007]
 
 **US-1903** · As a principal or class teacher, I want given / refused / pending counts per section and the list of pending students so that I can follow up before the board and portal windows. [FR-APC-005, FR-APC-006]
 - AC1: Class teachers see only their sections.
