@@ -2,9 +2,9 @@
 
 | Field | Value |
 |---|---|
-| Status | **Proposed** (2026-10-14). Adds a `SECURITY DEFINER` function and a `definer_access` policy, which CLAUDE.md §11 allows only with an ADR; needs the owner's approval before any code |
+| Status | **Accepted** 2026-10-14 (owner decision D12, docs/18 §8). Adds a `SECURITY DEFINER` function and a `definer_access` policy, which CLAUDE.md §11 allows only with an ADR |
 | Date | 2026-10-14 |
-| Deciders | Engineering (proposal); product owner (approval) |
+| Deciders | Engineering (proposal); product owner (approved 2026-10-14) |
 | Amends / supersedes | Amends [ADR-0013](ADR-0013-cross-tenant-access-and-platform-privilege-separation.md) (adds one allowlisted definer function and one `definer_access` table) |
 
 ## Context

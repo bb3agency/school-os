@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | **Accepted in part** (2026-10-14): "each message links to a short-lived mobile web page for the notice or receipt; no parent login" is the owner's (docs/18 §3 R2.3 and §8 R2 scope). Token design, lifetimes and limits **(P)** stay **Proposed** |
+| Status | **Accepted** 2026-10-14: the scope is the owner's (docs/18 §3 R2.3); token design, lifetimes (30/90/7 days), page content (the receipt page shows the child's name, class and admission number) and limits **(P)** were accepted by the owner on 2026-10-14 (D22, D29, docs/18 §8) |
 | Date | 2026-10-14 |
 | Deciders | Product owner (scope); engineering (design) |
 | Amends / supersedes | Reverses the BRD §7.3 non-goal "parent-facing pages" in part: read-only pages reached from a message, **no parent accounts or logins** (PRD §9 "parent logins" stays a non-goal). Relies on ADR-0047 |
@@ -13,7 +13,7 @@ WhatsApp templates should be short and utility-only (ADR-0043). A parent still n
 
 ## Decision
 
-1. **Read-only pages on a separate public origin (owner scope).** Shared tier: `SOS_PUBLIC_BASE_URL` (for example `https://my.schoolos.in`), a different origin from the staff app, with no staff cookies and its own strict CSP; served by the web app's `(public)` route group, which calls the API's public routes through the BFF with the service token (no user token). Dedicated tier: the school's own host under `/p/` and `/v/`. Pages are mobile-first, work on Android Chrome over slow connections, and contain no third-party scripts, analytics or fonts from CDNs.
+1. **Read-only pages on a separate public origin (owner scope).** Shared tier: `SOS_PUBLIC_BASE_URL` (for example `https://my.schoolos.in`, D29), a different origin from the staff app, with no staff cookies and its own strict CSP; served by the web app's `(public)` route group, which calls the API's public routes through the BFF with the service token (no user token). Dedicated tier: the school's own host under `/p/` and `/v/`. Pages are mobile-first, work on Android Chrome over slow connections, and contain no third-party scripts, analytics or fonts from CDNs.
 2. **What a page may show (P).** Only the minimum for its purpose:
    - *Notice*: school name, title, date, body and the approved notice's PDF (notices never carry student data, 08 §8).
    - *Receipt*: school name, receipt number and date, student name, class and section, admission number, amounts per head, mode, and "Cancelled on …" if cancelled.

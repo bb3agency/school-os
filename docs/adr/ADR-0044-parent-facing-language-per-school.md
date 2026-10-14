@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Status | **Accepted in part** (2026-10-14): decisions 1-3 are the owner's (D9 of 2026-10-10, docs/18 §8). Decisions marked **(P)** stay **Proposed** until the owner confirms them |
+| Status | **Accepted** 2026-10-14: decisions 1-3 are the owner's (D9 of 2026-10-10); decisions marked **(P)** were accepted by the owner on 2026-10-14 (D23, docs/18 §8: per-guardian override yes; a fluent Telugu reviewer signs off before any Telugu school goes live) |
 | Date | 2026-10-14 |
 | Deciders | Product owner (D9: "English staff UI; parent-facing WhatsApp templates and parent pages may be Telugu or English per school"); engineering (design) |
-| Amends / supersedes | **Amends [ADR-0036](ADR-0036-english-first-telugu-hidden.md)** decision 2 ("with the switch off nobody sees Telugu") for parent-facing output only. **Amends [ADR-0039](ADR-0039-apaar-consent-register-and-pen.md)** decision 4 (the APAAR form language becomes an override of the school's parent language). ADR-0036 stays in force for everything staff see |
+| Amends / supersedes | **Amends [ADR-0036](ADR-0036-english-first-telugu-hidden.md)** decision 2 ("with the switch off nobody sees Telugu") for parent-facing output only. **Amends [ADR-0039](ADR-0039-apaar-consent-register-and-pen.md)** decision 4 (the APAAR form language becomes an override of the school's parent language; decision 7 below). ADR-0036 stays in force for everything staff see |
 
 ## Context
 

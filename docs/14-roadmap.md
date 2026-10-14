@@ -5,7 +5,7 @@
 | Version | 0.9 · 2026-09-30 |
 | Approach | Module by module on a shared core; real school needs decide order after M1; no calendar commitments |
 | Related | 01-BRD §7, §11, 02-PRD §3, 03-TRD, 12-Testing strategy, 16-Platform admin panel |
-| Changes | 0.10 (2026-10-14): R2 plan (scope, five build waves with file ownership and migrations, test plan, definition of done, owner questions); correction that the Ask screens are built; M7 online payment item superseded by R2 (ADR-0042). 0.9: M2 addendum: Ask conversations, context and per-user memory (ADR-0034; PO questions). 0.8: M5 status (attendance, marks, early-warning flags, notes and timeline built on the M5 branch; PO questions). 0.7: M4 status (circulars, tasks, parent notices built on the M4 branch; PO questions). 0.6: M1 status updated for everything merged up to `cc818b3` (promotions, DEK rotation, break-glass support sign-in, synthetic students, test gates, SEC-023 Terraform, worker image and Chromium sandbox); new M2 status; owner decisions for SEC-012 and SEC-023 (2026-09-27) recorded. 0.5: M1 status (built per scope item, M1 security controls, remaining work, decisions needed, pilot-gate items checkable in code) after §2 M1, verified against code and tests. 0.4: M0 decisions 1, 3, 4 and 5 settled by the product owner (ADR-0020); decision 2 stays open. 0.3: M0 status (built per task, remaining work, decisions needed, pilot-gate status) after §2 M0; Task 5 lists all definer functions. 0.2: M0 adds the platform admin panel with minimal billing (C14), school setup and user admin UI, synthetic data as tasks; M0 task order changed; M0 exit criteria and pilot gate add platform checks; promotions and invoice PDFs in M1; M7 no longer carries basic billing. 0.1: baseline |
+| Changes | 0.10 (2026-10-14): R2 plan (scope, five build waves with file ownership and migrations, test plan, definition of done, owner questions and the owner's decisions D12-D30 of 2026-10-14); correction that the Ask screens are built; M7 online payment item superseded by R2 (ADR-0042). 0.9: M2 addendum: Ask conversations, context and per-user memory (ADR-0034; PO questions). 0.8: M5 status (attendance, marks, early-warning flags, notes and timeline built on the M5 branch; PO questions). 0.7: M4 status (circulars, tasks, parent notices built on the M4 branch; PO questions). 0.6: M1 status updated for everything merged up to `cc818b3` (promotions, DEK rotation, break-glass support sign-in, synthetic students, test gates, SEC-023 Terraform, worker image and Chromium sandbox); new M2 status; owner decisions for SEC-012 and SEC-023 (2026-09-27) recorded. 0.5: M1 status (built per scope item, M1 security controls, remaining work, decisions needed, pilot-gate items checkable in code) after §2 M1, verified against code and tests. 0.4: M0 decisions 1, 3, 4 and 5 settled by the product owner (ADR-0020); decision 2 stays open. 0.3: M0 status (built per task, remaining work, decisions needed, pilot-gate status) after §2 M0; Task 5 lists all definer functions. 0.2: M0 adds the platform admin panel with minimal billing (C14), school setup and user admin UI, synthetic data as tasks; M0 task order changed; M0 exit criteria and pilot gate add platform checks; promotions and invoice PDFs in M1; M7 no longer carries basic billing. 0.1: baseline |
 
 ---
 
@@ -359,7 +359,7 @@ Not verified: every readiness format (D3), the BSEAP nominal-roll field list (pa
 
 **Correction (2026-10-14).** docs/18 §2 listed the Ask conversation screens as "not built"; they are built (docs/17 §5.3, `apps/web/src/features/ask/`, M2 addendum above). R2.4 is therefore a finish-up (usage display, search-only explanations, `/knowledge/resolve`, e2e), not a new screen set.
 
-**Gate before any R2 code:** the owner approves ADR-0047 (one new definer function and `definer_access` table) and the Proposed choices the waves rely on (open questions below; at least Q1-Q4 for wave R2-0/R2-1).
+**Decisions settled (2026-10-14).** The owner approved ADR-0047 and accepted every proposed answer (table "Owner decisions on the R2 questions" below; docs/18 §8 D12-D30). No gate remains before wave R2-0.
 
 #### Build waves (2-3 parallel agents per wave, each merged `--no-ff` and verified before the next; owner decision D11)
 
@@ -394,30 +394,35 @@ Every wave branch starts from the merged result of the previous wave. Migrations
 
 #### Definition of done (R2)
 
-Each wave: its stories' ACs pass as automated tests; `make check`-equivalent green (ruff, mypy strict, import-linter, full pytest, web lint/typecheck/vitest/build); migrations round-trip on a populated DB; permissions in `permissions.yaml`, `roles.yaml` and docs/07 §6.2 (moved from §6.7) together; OpenAPI regenerated; docs sections switched from "planned" to "as built"; release note naming the system-role sync. R2 as a whole: hardening wave done; penetration test of the public surface scheduled before the first school uses it (NFR-SEC-007); privacy review and DPA/notice wording (docs/08 §15.3) agreed; Razorpay partner and Meta Tech Provider approvals obtained (or the owner accepts the manual pilot modes); no real student, parent or phone data in any environment (invariant 11).
+Each wave: its stories' ACs pass as automated tests; `make check`-equivalent green (ruff, mypy strict, import-linter, full pytest, web lint/typecheck/vitest/build); migrations round-trip on a populated DB; permissions in `permissions.yaml`, `roles.yaml` and docs/07 §6.2 (moved from §6.7) together; OpenAPI regenerated; docs sections switched from "planned" to "as built"; release note naming the system-role sync. R2 as a whole: hardening wave done; penetration test of the public surface scheduled before the first school uses it (NFR-SEC-007); privacy review and the DPA/notice wording (docs/08 §15.3) drafted by SchoolOS as templates (D30); pilots connected with manual per-school keys and tokens until the Razorpay Technology Partner and Meta Tech Provider approvals (applied for once a staging demo exists, D13); no real student, parent or phone data in any environment (invariant 11).
 
-#### Open questions for the owner (R2)
+#### Owner decisions on the R2 questions (2026-10-14)
 
-1. **ADR-0047**: approve the public handle table and the one new `SECURITY DEFINER` resolver (blocks R2-0).
-2. **Partner programmes**: SchoolOS (legal entity) to apply as a Razorpay Technology Partner and a Meta Tech Provider (business verification, App Review with a demo); who applies and when? Both need a public privacy policy and terms page; App Review needs a working staging demo, which conflicts with D2 (no cloud yet).
-3. **Pilot fallbacks**: allow manual Razorpay keys and manual Meta tokens for pilots before approval (ADR-0042 P1, ADR-0043 decision 5)?
-4. **New schemas** `fin` and `msg` (ADR-0042 P10), or keep everything in `ops`?
-5. **AP TC**: print religion and caste status (C3) when a school asks, or always leave blanks (ADR-0045 decision 3)? Show the full printed content on the public verification page (decision 5; proposed yes)?
-6. **TC and dues**: confirm with a lawyer that SchoolOS must never withhold or annotate a TC for unpaid fees (proposed).
-7. **Receipts**: one series per financial year for all modes (P2); A5 or A4; who approves cancellations (P3), concessions (P4), refunds; same-day self-cancel never allowed?
-8. **Late fees** (P5): flat per instalment and per day with cap enough? Advances (paying more than due) not supported in R2?
-9. **Taxable heads** (P6): refuse in R2 (school invoices in Tally)?
-10. **UPI** (P7): issue the receipt at once and confirm from the bank statement later (proposed), or only after confirmation?
-11. **Backdating and day close** (P8, FR-FEE-019): no backdating; is day close wanted?
-12. **Retention**: 8 years for financial records (confirm with a CA).
-13. **Parent pages**: lifetimes 30/90/7 days; the receipt page shows the child's name, class and admission number; acceptable?
-14. **Language**: per-guardian override (ADR-0044 decision 4)? Who reviews the Telugu templates and pages (a fluent reviewer before any Telugu school goes live)?
-15. **Dedicated tier**: no WhatsApp in R2 (ADR-0043 decision 12); later a signed relay through the shared tier, or never?
-16. **Defaults**: absence alerts off by default with 11:00 IST; quiet hours 21:00-07:00; daily cap = Meta limit − 10%; reminder offsets −3/0/+7 days.
-17. **Opt-in evidence**: is "recorded in person by staff" acceptable, or only signed forms and the parent's own join message?
-18. **Cost display**: show an estimated Meta cost before each broadcast (rate kept in config by us; actual billing is Meta's)?
-19. **Razorpay partner commission**: decline any commission (proposed; D8 says SchoolOS charges nothing for payments), or accept it with disclosure under a new ADR?
-20. **Public domain**: the public origin's name (for example `my.schoolos.in`) and whether certificate QR links should use a separate `verify.` host.
+The owner accepted every proposed answer to the twenty R2 questions exactly as proposed (recorded as D12-D30 in docs/18 §8). There is no remaining gate on R2 code: wave R2-0 may start.
+
+| # | Question | Decision (2026-10-14) | docs/18 |
+|---|---|---|---|
+| Q1 | ADR-0047 public handles and the definer resolver | **Approved**; ADR-0047 Accepted | D12 |
+| Q2 | Partner programmes | SchoolOS applies as a Razorpay Technology Partner and a Meta Tech Provider **once a staging demo exists** | D13 |
+| Q3 | Pilot fallbacks | **Manual per-school Razorpay keys and Meta tokens for pilots** until those approvals | D13 |
+| Q4 | Schemas | New tenant schemas **`fin` and `msg`** | D14 |
+| Q5 | AP TC restricted fields; verification content | Religion and caste stay **blank unless the school asks** (per-school setting, step-up, audited); the verification page shows the **full printed content** | D15 |
+| Q6 | TC and dues | A TC is **never withheld or annotated** for unpaid fees | D16 |
+| Q7 | Receipts and approvals | **One receipt series per financial year** for all modes, **A5** by default; cancellations, concessions, adjustments and refunds need a **second approver (principal or accountant)**; never self-approval | D17 |
+| Q8 | Late fees and advances | Flat per instalment after a grace period, or per day with a cap; **no advances in R2** | D18 |
+| Q9 | Taxable heads | **Refused in R2** (the school invoices them in Tally) | D18 |
+| Q10 | UPI | Receipt **issued at once**, confirmed from the bank statement later by a person | D19 |
+| Q11 | Backdating, day close | **No backdating; day close included** | D20 |
+| Q12 | Retention | **8 years** after the financial year for financial records (a CA confirms when available) | D21 |
+| Q13 | Parent pages | Lifetimes **30 / 90 / 7 days** (notice / receipt / dues); the receipt page shows the child's name, class and admission number | D22 |
+| Q14 | Language | **Per-guardian override: yes**; a fluent Telugu reviewer signs off before any Telugu school goes live | D23 |
+| Q15 | Dedicated tier | **No WhatsApp on the dedicated tier in R2** | D24 |
+| Q16 | Defaults | Absence alerts **off** by default, 11:00 IST; quiet hours 21:00-07:00; daily cap = Meta limit − 10%; reminders −3 / 0 / +7 days | D25 |
+| Q17 | Opt-in evidence | **"Recorded in person by staff" accepted** alongside signed forms and the parent's own join message | D26 |
+| Q18 | Cost display | **Show the estimated Meta cost** before each broadcast | D27 |
+| Q19 | Razorpay commission | **Decline** any partner commission | D28 |
+| Q20 | Public hosts | Parent origin such as **`my.schoolos.in`**; a **separate `verify.` host** (for example `verify.schoolos.in`) for certificate QR links (`SOS_VERIFY_BASE_URL`) | D29 |
+| — | Legal documents (was docs/18 Q9) | The owner has no lawyer. **SchoolOS drafts the DPA, privacy notice, terms and DPIA itself** as templates based on the DPDP Act 2023 and DPDP Rules 2025 (R3 DPDP processor pack), clearly marked "not legal advice". Residual risk accepted: a one-time professional review is recommended before the first paid school signs, but it does **not** block pilots on synthetic data | D30 |
 
 ## 3. Pilot-ready gate (before any real student data)
 

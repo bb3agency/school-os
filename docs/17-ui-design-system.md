@@ -873,7 +873,7 @@ stacked lists below 640px only, 44px touch targets, dialogs that fit (sheets on 
 | `/fees/receipts/{id}` | Receipt detail | Frozen content, status, cancellation and refunds history, messages sent, parent link status |
 | `/fees/accounts/{id}` | Student fee account | Statement with running balance; tabs: dues, statement, concessions, payment links, messages; actions: collect, send payment link, request concession |
 | `/fees/approvals` | Approvals inbox | Concessions, adjustments, cancellations, refunds waiting for me (never my own requests); approve requires step-up (the usual `428` flow), reject requires a reason |
-| `/fees/daily` | Daily collection report | Date picker (default today), totals by mode and collector, cash and cheque to hand over; Print (A4) and CSV (step-up); "Close day" (P) with a confirmation showing the totals |
+| `/fees/daily` | Daily collection report | Date picker (default today), totals by mode and collector, cash and cheque to hand over; Print (A4) and CSV (step-up); "Close day" with a confirmation showing the totals |
 | `/fees/dues` | Dues list | Class/section filters; sort by oldest due; bulk "Send reminder" and "Send payment link" with a preview of recipients and skips; CSV (step-up) |
 | `/fees/reconcile` | Bank and online reconciliation | Tabs: Bank statement (upload, proposed matches with checkboxes, "Confirm N matches"), UPI exceptions, Online (yesterday's report; "Mark explained" with a note) |
 | `/fees/setup` | Heads, plans, late-fee rules | Plan editor as a sheet grid (§4.1) of heads × instalments with live totals; "Apply to class" shows a dry-run summary before the job; an active plan in use is read-only with "New version" |
@@ -886,7 +886,7 @@ stacked lists below 640px only, 44px touch targets, dialogs that fit (sheets on 
 
 | Route | Screen | Key interaction notes |
 |---|---|---|
-| `/settings/whatsapp` | Connect WhatsApp | Embedded Signup button (Meta's popup; the only page that loads Meta's SDK); checklist after connecting: business verification, INR billing before 31 Dec 2026, template approvals (status chips), quality rating and limit; switches per purpose, absence alert time, quiet hours, office phone for auto-replies; Resume button when paused, with the reason |
+| `/settings/whatsapp` | Connect WhatsApp | Embedded Signup button (Meta's popup; the only page that loads Meta's SDK), or the manual token form for pilots until SchoolOS is a Meta Tech Provider (D13); checklist after connecting: business verification, INR billing before 31 Dec 2026, template approvals (status chips), quality rating and limit; switches per purpose, absence alert time, quiet hours, office phone for auto-replies; Resume button when paused, with the reason |
 | `/messages` | Broadcasts and history | Recent broadcasts with live delivery bars (sent, delivered, read, failed); search history by student/guardian (POST); failure reasons in plain words ("Not on WhatsApp", "Number blocked the school", "Meta limit reached, will retry") |
 | `/notices/{id}` (existing) | "Send on WhatsApp" panel | Section picker → preview card: recipients, skipped by reason (each a link to the list), languages, estimated Meta cost incl. GST ("paid by the school to Meta"); Confirm sends; the panel then shows live progress |
 | `/students/{id}` → Guardians (existing) | Opt-in per guardian | Three category toggles show the current state and method; changing opens a small form (method, date, evidence upload for a signed form); "Opted out by parent (STOP) on …" is shown read-only with "Record a new signed opt-in"; language: English / Telugu / school default |
@@ -903,7 +903,7 @@ Mobile-first (designed at 360 px, scales up), no sidebar, no sign-in, the school
 
 #### Certificate verification (public origin; ADR-0045)
 
-`/v` shows a single code box (16 characters, auto-groups as typed, paste-friendly) and "Check"; `/v/{code}` shows a status banner (green "Valid", amber "Duplicate copy n", red "Cancelled on …") and, for valid ones, the printed values as a two-column definition list in the certificate's order, with "This page shows only what the certificate prints." Works without JavaScript (server-rendered form).
+On the separate verification host (`SOS_VERIFY_BASE_URL`, for example `verify.schoolos.in`; D29), `/v` shows a single code box (16 characters, auto-groups as typed, paste-friendly) and "Check"; `/v/{code}` shows a status banner (green "Valid", amber "Duplicate copy n", red "Cancelled on …") and, for valid ones, the printed values as a two-column definition list in the certificate's order, with "This page shows only what the certificate prints." Works without JavaScript (server-rendered form).
 
 #### Ask usage (C25)
 

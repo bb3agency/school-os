@@ -73,7 +73,7 @@ Each release is a set of user stories that ships whole (tests, authz/BOLA, audit
 3. **Parent messages over WhatsApp utility templates with SMS fallback** *(needs owner decision Q5)*: from the school's own number, opt-in recorded, each message links to a short-lived mobile web page for the notice or receipt; audit trail; fair-use allowance in the plan.
 4. **Ask the school, visible:** conversation screens in the web app, live evaluation on Vertex, the contextual retrieval and reranking switched on if `make eval` says so.
 
-**R2 as decided and designed (2026-10-14; supersedes the wording above where they differ).** Items 2 and 3 follow owner decisions D4-D7 and D9 (§8): payment links are **Razorpay** links in the school's own account (ADR-0016 accepted with Razorpay for SchoolOS's own invoices; fees in ADR-0042); messages are **WhatsApp only** (no SMS fallback), through the **Meta Cloud API** from the school's own WhatsApp Business Account, and **the school pays Meta directly** (no fair-use allowance in the plan; ADR-0038 unchanged; ADR-0043); parent-facing text is English or Telugu per school (ADR-0044). Item 1 is ADR-0045 (verification by an 80-bit code printed with a QR, not by serial). Item 4 is a finish-up: the conversation screens already exist (§2 correction); live evaluation on Vertex stays blocked by D2. Parent pages: ADR-0046; routing of public requests and webhooks: ADR-0047 (Proposed). Stories: docs/02 C20-C25; requirements: docs/03 §3.18-§3.25; **build waves, test plan, definition of done and the owner's open questions: docs/14 "R2"**.
+**R2 as decided and designed (2026-10-14; supersedes the wording above where they differ).** Items 2 and 3 follow owner decisions D4-D7 and D9 (§8): payment links are **Razorpay** links in the school's own account (ADR-0016 accepted with Razorpay for SchoolOS's own invoices; fees in ADR-0042); messages are **WhatsApp only** (no SMS fallback), through the **Meta Cloud API** from the school's own WhatsApp Business Account, and **the school pays Meta directly** (no fair-use allowance in the plan; ADR-0038 unchanged; ADR-0043); parent-facing text is English or Telugu per school (ADR-0044). Item 1 is ADR-0045 (verification by an 80-bit code printed with a QR, not by serial). Item 4 is a finish-up: the conversation screens already exist (§2 correction); live evaluation on Vertex stays blocked by D2. Parent pages: ADR-0046; routing of public requests and webhooks: ADR-0047. All six ADRs were accepted on 2026-10-14 with the owner's decisions D12-D30 (§8). Stories: docs/02 C20-C25; requirements: docs/03 §3.18-§3.25; **build waves, test plan, definition of done and the owner's open questions: docs/14 "R2"**.
 
 | Wave | Agents in parallel | Content |
 |---|---|---|
@@ -84,7 +84,7 @@ Each release is a set of user stories that ships whole (tests, authz/BOLA, audit
 
 ### R3 · Compliance pack and differentiation (Apr-Jun 2027, before DPDP's May 2027 duties)
 
-1. **DPDP processor pack:** DPA template, consent register (shared with APAAR consent), data-principal requests (access, correction via changes, erasure where lawful), grievance log, the 72-hour breach runbook and notification templates, retention per record class (PRV-006, PRV-010).
+1. **DPDP processor pack:** DPA template, privacy notice and terms templates and a DPIA template, drafted by SchoolOS and marked "not legal advice" (D30), consent register (shared with APAAR consent), data-principal requests (access, correction via changes, erasure where lawful), grievance log, the 72-hour breach runbook and notification templates, retention per record class (PRV-006, PRV-010).
 2. **CBSE Appendix IX public disclosure page** generated from data SchoolOS already holds (no student PII).
 3. **RTE 25% register:** lottery reference, documents, reimbursement claim tracking.
 4. **Readiness reminders** tied to the portal calendar (UDISE+ freeze, SSC window, CBSE registration).
@@ -143,8 +143,27 @@ The same pattern as waves 1-6: small waves of agents on `wip/*` branches, each s
 | D9 | Telugu | **English staff UI; parent-facing WhatsApp templates and parent pages may be Telugu or English per school**; Telugu-speaking support | ADR-0036 amendment: a parent-language setting separate from `SOS_TELUGU_ENABLED` for the staff UI |
 | D10 | Scope of boards | **AP State Board SSC, CBSE registration, CBSE Appendix IX page, and ICSE (CISCE) schools as per their norms and practices.** RTE register not selected this year | R1 covers BSEAP, CBSE and CISCE profiles; R3 drops the RTE register |
 | D11 | Pace | **Waves of 2-3 agents**, each merged and verified before the next | §6 |
+| D12 | R2: public handles and resolver (ADR-0047) | **Approved** (2026-10-14) | ADR-0047 Accepted; wave R2-0 may start |
+| D13 | R2: Razorpay and Meta partner programmes | Apply as Razorpay Technology Partner and Meta Tech Provider **once a staging demo exists**; **manual per-school keys and tokens for pilots** until then | ADR-0042 P1, ADR-0043 decision 5 |
+| D14 | R2: schemas | New tenant schemas **`fin`** and **`msg`** | docs/05 §15 |
+| D15 | R2: AP TC and verification | Religion and caste **blank unless the school asks**; the public verification page shows the **full printed content** | ADR-0045 decisions 3, 5 |
+| D16 | R2: TC and dues | A TC is **never withheld or annotated** for dues | ADR-0042 decision 13 |
+| D17 | R2: receipts and approvals | One receipt series per financial year for all modes, **A5**; cancellations, concessions, adjustments and refunds need a **second approver (principal or accountant)** | ADR-0042 P2-P4; docs/07 §6.7 |
+| D18 | R2: late fees, advances, taxable heads | Flat per instalment or per day with a cap; **no advances**; **taxable heads refused** in R2 | ADR-0042 P5, P6 |
+| D19 | R2: UPI | Receipt **at once**, confirmed later from the bank statement | ADR-0042 P7 |
+| D20 | R2: dates | **No backdating; day close included** | ADR-0042 P8; FR-FEE-019 |
+| D21 | R2: retention | Financial records **8 years** after the financial year (a CA confirms when available) | docs/05 §13, PRV-024 |
+| D22 | R2: parent pages | Lifetimes **30/90/7 days**; the receipt page shows the child's name, class and admission number | ADR-0046 |
+| D23 | R2: parent language | **Per-guardian override**; a **fluent Telugu reviewer** before any Telugu school goes live | ADR-0044 |
+| D24 | R2: dedicated tier | **No WhatsApp** on the dedicated tier in R2 | ADR-0043 decision 12 |
+| D25 | R2: messaging defaults | Absence alerts **off**, 11:00 IST; quiet hours 21:00-07:00; cap = Meta limit − 10%; reminders −3/0/+7 days | ADR-0043 decisions 10-11 |
+| D26 | R2: opt-in evidence | **In person by staff** accepted, with signed forms and the parent's join message | ADR-0043 decision 7 |
+| D27 | R2: message cost | **Show the estimated Meta cost** before broadcasts | FR-MSG-012 |
+| D28 | R2: Razorpay commission | **Decline** any partner commission | ADR-0042 decision 2 |
+| D29 | R2: public hosts | Parent origin such as **`my.schoolos.in`**; a separate **`verify.`** host for certificate QR links | ADR-0045 decision 9, ADR-0046; docs/10 §11.2 |
+| D30 | Legal documents (was Q9) | No lawyer: **SchoolOS drafts the DPA, privacy notice, terms and DPIA itself** as templates based on the DPDP Act 2023 and DPDP Rules 2025, clearly marked "not legal advice" (R3). Residual risk noted: a one-time professional review is recommended before the first paid school signs; **not blocking pilots on synthetic data** | docs/08 §15; R3 item 1 |
 
-Still open: who drafts the DPA, DPIA and privacy notice (Q9) — not blocking R1.
+D12-D30 were given on 2026-10-14 by accepting every proposed answer to the R2 questions (docs/14 "Owner decisions on the R2 questions"). Nothing is open.
 
 ### Resulting release scope
 
@@ -158,5 +177,5 @@ Still open: who drafts the DPA, DPIA and privacy notice (Q9) — not blocking R1
 | Release | Status (2026-10-10) |
 |---|---|
 | R1 | **Built** (wave 1): readiness diff engine with fix owner and parent slips, BSEAP SSC 2027 and APAAR readiness profiles (rule DQ-031, ADR-0040); APAAR consent register, UDISE+ 2026-27 profile, 11-digit PEN and transfer-in guard (ADR-0039); boards per school and class, CBSE registration/LOC and CISCE 2027 profiles, rule DQ-030 for ERP refreshes, import template library and "alongside your current ERP" mode (ADR-0041). Migrations 0051-0053. Every format `verified: false` (D3). Release note: run `python -m app.identity.sync_system_roles --apply` after migrating. Open: server-rendered PDF for slips/forms, e2e coverage of the new screens, Telugu form wording reviewed by a native speaker, SSC profile not yet limited to BSEAP schools (needs an export layout). |
-| R2 | **Documented 2026-10-14** (`wip/r2-docs`): ADR-0042 fees and payment links, ADR-0043 WhatsApp via Meta Cloud API, ADR-0044 parent language, ADR-0045 AP TC and verification, ADR-0046 parent link pages, ADR-0047 public handles (Proposed); ADR-0016 accepted with Razorpay; PRD C20-C25 (US-2001..US-2504); TRD §3.18-§3.25; data model docs/05 §15; security docs/07 §6.7, §11.2, SEC-034..040; privacy docs/08 §15, PRV-022..029; API docs/09 R2 endpoints; settings docs/10 §11.2; screens docs/17 §5.8; build waves R2-0..R2-3I and 20 owner questions in docs/14 R2. No code yet: R2-0 waits for the owner's approval of ADR-0047 and questions Q1-Q4 of docs/14 R2 |
+| R2 | **Documented 2026-10-14** (`wip/r2-docs`): ADR-0042 fees and payment links, ADR-0043 WhatsApp via Meta Cloud API, ADR-0044 parent language, ADR-0045 AP TC and verification, ADR-0046 parent link pages, ADR-0047 public handles (Proposed); ADR-0016 accepted with Razorpay; PRD C20-C25 (US-2001..US-2504); TRD §3.18-§3.25; data model docs/05 §15; security docs/07 §6.7, §11.2, SEC-034..040; privacy docs/08 §15, PRV-022..029; API docs/09 R2 endpoints; settings docs/10 §11.2; screens docs/17 §5.8; build waves R2-0..R2-3I and 20 owner questions in docs/14 R2. Owner decisions D12-D30 recorded 2026-10-14 (all proposals accepted; ADR-0042..0047 Accepted). No code yet; wave R2-0 may start |
 | R3 | Not started |

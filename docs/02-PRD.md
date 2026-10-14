@@ -508,7 +508,7 @@ Stories of the 2026-27 plan (docs/18 §3 R1.2-R1.3; owner decisions D1, D3, D9 o
 
 ### R2 · Office essentials around the wedge (C20-C25)
 
-Stories of the 2026-27 plan, release R2 (docs/18 §3 R2; owner decisions D4-D9 of 2026-10-10; ADR-0042..ADR-0047). Acceptance criteria marked *(P)* depend on an engineering choice that is still **Proposed** in its ADR; the rest follow owner decisions. Every story also carries the standing definition of done (CLAUDE.md §8): authz allowed / denied 403 / other school 404, audit in the same transaction, no personal data in logs or URLs, English strings (Telugu only on parent-facing surfaces, ADR-0044), usable at 1366×768 and keyboard-only.
+Stories of the 2026-27 plan, release R2 (docs/18 §3 R2; owner decisions D4-D9 of 2026-10-10; ADR-0042..ADR-0047). The engineering choices these stories rely on were proposed in the ADRs and **accepted by the owner on 2026-10-14** (owner decisions D12-D30 of 2026-10-14, docs/18 §8); none is open. Every story also carries the standing definition of done (CLAUDE.md §8): authz allowed / denied 403 / other school 404, audit in the same transaction, no personal data in logs or URLs, English strings (Telugu only on parent-facing surfaces, ADR-0044), usable at 1366×768 and keyboard-only.
 
 **R2 personas** (in addition to §2):
 
@@ -527,7 +527,7 @@ Stories of the 2026-27 plan, release R2 (docs/18 §3 R2; owner decisions D4-D9 o
 - AC1: Given the principal chose the `ap-tc-2027` format in certificate settings, when I prepare a TC, then the preview shows the AP fields in the AP order, each with its source (admission register, verified or provisional) or as a TC input I type (for example identification marks, languages studied, whether qualified for promotion, date of application).
 - AC2: The format says it is built from public sources and not yet confirmed with a school (owner decision D3); a school can switch back to the generic format; certificates already issued keep the format they were issued in.
 - AC3: The TC prints the UDISE+ PEN when the school holds a verified value; it prints the APAAR ID only when the parent consented and the ID is verified, never for a refused or withdrawn consent.
-- AC4: Religion and caste status print as labelled blanks to fill by hand, unless the owner decides otherwise (open question). No Aadhaar data is ever printed.
+- AC4: Religion and caste status print as labelled blanks to fill by hand, unless the school asks for them to be printed (a principal's setting with step-up, audited; owner decision D15 of 2026-10-14). No Aadhaar data is ever printed.
 
 **US-2002** · As an office admin, I want every certificate I issue to carry a verification code and a QR so that anyone holding it can check it is genuine. [FR-CERT-019, FR-CERT-020, FR-CERT-023]
 - AC1: When a certificate or a duplicate is issued, then it gets a 16-character code (printed in four groups) and a QR that opens the verification page; the code is not derived from the serial, the student or the school.
@@ -545,7 +545,7 @@ Stories of the 2026-27 plan, release R2 (docs/18 §3 R2; owner decisions D4-D9 o
 - AC2: Given I hold `certificate.approve` with step-up, I can withdraw a code with a reason; the page then answers "not found" for it; a duplicate issued later gets a new code.
 - AC3: Every successful check and every withdrawal is in the school's audit log.
 
-**US-2005** · As an office admin preparing a TC, I want to see the student's outstanding fees for information only, so that I can remind the parent, without the system ever holding the TC back. [FR-CERT-025, FR-FEE-030] *(P: owner to confirm with a lawyer)*
+**US-2005** · As an office admin preparing a TC, I want to see the student's outstanding fees for information only, so that I can remind the parent, without the system ever holding the TC back. [FR-CERT-025, FR-FEE-030] *(owner decision D16 of 2026-10-14)*
 - AC1: Given fees are on and I hold `finance.read`, the TC preview shows the outstanding balance as a note; it is never printed on the TC and never blocks issue or approval.
 
 **US-2006** · As an exam coordinator in a CBSE or CISCE school, I want the generic TC to stay available and later board formats to plug in without changing issued certificates. [FR-CERT-015]
@@ -556,25 +556,25 @@ Stories of the 2026-27 plan, release R2 (docs/18 §3 R2; owner decisions D4-D9 o
 **US-2101** · As an accountant with the principal, I want to set fee heads and a fee plan per class for the year with instalments, so that every student's dues are calculated the same way. [FR-FEE-002..FR-FEE-005, FR-FEE-023]
 - AC1: Given I hold `fee.manage`, I can create fee heads (tuition, admission, exam, books, transport, other; each GST-exempt by default) and, per academic year and class (optionally per category such as "new admission"), a plan of heads with amounts and an instalment schedule (number, due date, amount per head).
 - AC2: When I apply a plan to a class, then each active student of the class gets a fee account for the year and one charge per instalment and head, in one job with a summary (accounts created, already present, skipped and why); applying again changes nothing.
-- AC3: A student admitted mid-year gets the instalments due from their admission date onwards unless I choose otherwise *(P)*.
+- AC3: A student admitted mid-year gets the instalments due from their admission date onwards unless I choose otherwise.
 - AC4: Changing a plan after charges were posted does not rewrite them: the difference is proposed as adjustments that need approval (US-2104).
-- AC5: A head marked taxable cannot be collected through receipts *(P: the school invoices it in Tally)*; I am told why.
+- AC5: A head marked taxable cannot be collected through receipts (the school invoices it in Tally); I am told why.
 
 **US-2102** · As an office assistant at the counter, I want to take a fee payment and print or send the receipt in under a minute, using only the keyboard. [FR-FEE-010, FR-FEE-011, FR-FEE-022, NFR-PERF-008]
 - AC1: Given I hold `fee.collect`, I open "Collect fees" (shortcut), type part of a name or the admission number and pick the child with the arrow keys; the dues show per instalment and head, oldest first, with late fees.
 - AC2: I type the amount (pre-filled with the total due), choose the mode (cash; cheque with number and bank; bank transfer with reference; UPI QR with the UTR), and see how the amount is allocated (oldest due first; I may change it before saving).
-- AC3: When I save, then in one transaction the receipt gets the next number of the school's single series for the financial year (for example `RCT/2026-27/000123`), the ledger records the payment, the content is frozen, and the receipt prints (A5 or A4, configurable) and, if a guardian opted in for fees, is sent on WhatsApp (US-2206).
+- AC3: When I save, then in one transaction the receipt gets the next number of the school's single series for the financial year (for example `RCT/2026-27/000123`), the ledger records the payment, the content is frozen, and the receipt prints (A5 by default; A4 configurable) and, if a guardian opted in for fees, is sent on WhatsApp (US-2206).
 - AC4: Two assistants saving at the same moment get consecutive numbers, never the same one, and a failed save leaves no gap.
-- AC5: The receipt date is today (IST); there is no backdating *(P)*. An amount above the total due is refused *(P: no advances in R2)*.
+- AC5: The receipt date is today (IST); there is no backdating. An amount above the total due is refused (no advances in R2).
 - AC6: A UTR already on another issued receipt is refused with a link to that receipt. A full Aadhaar number typed into any note is refused.
 
 **US-2103** · As a principal, I want concessions to need my approval so that no fee is reduced by one person. [FR-FEE-008]
 - AC1: Given I hold `fee.concession.request`, I request a concession for a student (type such as sibling, staff ward, merit, hardship, RTE, other; an amount or a percentage of chosen heads and instalments; a reason; an optional evidence document).
-- AC2: A different person holding `fee.concession.approve` approves (step-up) or rejects with a reason; I cannot approve my own request (service check and database `CHECK`). On approval the ledger records the concession entries and the student's dues change at once.
+- AC2: A different person holding `fee.concession.approve` (principal or accountant) approves (step-up) or rejects with a reason; I cannot approve my own request (service check and database `CHECK`). On approval the ledger records the concession entries and the student's dues change at once.
 - AC3: An approved concession is never edited; to undo it, a reversing adjustment is requested and approved the same way.
 
 **US-2104** · As an accountant, I want late fees added automatically by the school's rule, and waivers and adjustments approved by someone else. [FR-FEE-007, FR-FEE-009]
-- AC1: Given the plan has a late-fee rule (a flat amount per overdue instalment after a grace period, or an amount per day with a cap; *P*), the nightly job adds each late fee once (running it again adds nothing) and never compounds.
+- AC1: Given the plan has a late-fee rule (a flat amount per overdue instalment after a grace period, or an amount per day with a cap), the nightly job adds each late fee once (running it again adds nothing) and never compounds.
 - AC2: A waiver of a late fee or any manual adjustment is requested and approved by two different people, with a reason, and recorded in the ledger as its own entry.
 
 **US-2105** · As an accountant, I want a wrong receipt cancelled only with a second person's approval, keeping its number, so that the receipt book always reconciles. [FR-FEE-012]
@@ -583,13 +583,13 @@ Stories of the 2026-27 plan, release R2 (docs/18 §3 R2; owner decisions D4-D9 o
 - AC3: A cancelled receipt's parent link still opens and says it was cancelled. Nothing ever edits a receipt.
 
 **US-2106** · As an accountant, I want to refund a payment with a voucher and a second person's approval. [FR-FEE-013, FR-PAY-011]
-- AC1: I request a refund against a receipt (amount up to what was paid and not yet refunded, reason, mode). A different person holding `fee.refund.approve` approves with step-up.
+- AC1: I request a refund against a receipt (amount up to what was paid and not yet refunded, reason, mode). A different person holding `fee.refund.approve` (principal or accountant) approves with step-up.
 - AC2: For a Razorpay payment, SchoolOS asks Razorpay to refund to the payer; the refund voucher (`RFD/2026-27/0001`) and the ledger entry are written when Razorpay confirms. For cash or cheque, the voucher is written on approval.
 
 **US-2107** · As an owner, I want to connect the school's own Razorpay account so that online fees go straight to our bank account. [FR-PAY-002..FR-PAY-004, FR-PAY-012, FR-PAY-013, FR-PAY-016]
 - AC1: Given I hold `payments.configure` with step-up, "Connect Razorpay" takes me to Razorpay to sign in to **our** account and allow SchoolOS; back in SchoolOS the account shows as connected with its Razorpay account id, and a webhook is set up for us.
 - AC2: The page says plainly: money goes to the school's Razorpay account and bank; SchoolOS never holds it; Razorpay's own fees apply.
-- AC3: *(P)* Before SchoolOS is an approved Razorpay partner, an operator can help us paste a key id and key secret from our own dashboard instead; the secret is stored encrypted and never shown again.
+- AC3: Until SchoolOS is an approved Razorpay partner (it applies once a staging demo exists; D13), an operator can help us paste a key id and key secret from our own dashboard instead; the secret is stored encrypted and never shown again.
 - AC4: Disconnecting stops new links at once, keeps all receipts and history, and is in the audit log. If we revoke SchoolOS in Razorpay's dashboard, SchoolOS marks the account disconnected and tells the owner.
 
 **US-2108** · As an office assistant or accountant, I want to send a parent a payment link for what is due, so that the parent can pay from the phone and the receipt appears by itself. [FR-PAY-005..FR-PAY-009, FR-PAY-015]
@@ -600,12 +600,12 @@ Stories of the 2026-27 plan, release R2 (docs/18 §3 R2; owner decisions D4-D9 o
 
 **US-2109** · As an accountant, I want UPI payments to our own QR matched with the bank statement, so that I know every UPI receipt really reached the bank. [FR-FEE-014..FR-FEE-017]
 - AC1: Given I hold `fee.manage`, I upload the school's bank UPI QR image and payee name once; the counter and the parent dues page show it.
-- AC2: Given I hold `fee.reconcile`, I upload a bank statement (CSV or XLSX); the file is read and deleted, credits are listed, and every exact UTR-and-amount match with a UPI receipt is proposed; I confirm the matches in one step *(P: never automatically)*.
+- AC2: Given I hold `fee.reconcile`, I upload a bank statement (CSV or XLSX); the file is read and deleted, credits are listed, and every exact UTR-and-amount match with a UPI receipt is proposed; I confirm the matches in one step (never automatically).
 - AC3: UPI receipts not seen in a statement after 7 days (configurable) are listed as exceptions; unmatched credits are listed too, so I can record a payment the counter missed.
 
 **US-2110** · As an accountant or principal, I want the daily collection report and the dues list, so that the cash box, the bank and Razorpay match the receipt book. [FR-FEE-018..FR-FEE-021, FR-FEE-024]
 - AC1: The daily report shows receipts by mode and by collector, cancellations and refunds of the day, and the cash and cheque totals to hand over; it prints on A4 and downloads as CSV (the "day book" for entry into Tally).
-- AC2: *(P)* The accountant can close a day; after that no receipt or cancellation can be dated that day.
+- AC2: The accountant can close a day; after that no receipt or cancellation can be dated that day.
 - AC3: The dues list per class or section shows students with overdue amounts, oldest first, with "Send reminder" and "Send payment link"; downloading it needs step-up (bulk personal financial data).
 - AC4: A student's fee page shows the full account statement (charges, concessions, late fees, payments, cancellations, refunds) with the running balance.
 - AC5: Class teachers and teachers see no fee data. Fee screens are hidden for a school running alongside its ERP unless the owner turns fees on.
@@ -642,7 +642,7 @@ Stories of the 2026-27 plan, release R2 (docs/18 §3 R2; owner decisions D4-D9 o
 
 **US-2205** · As an accountant, I want fee reminders sent automatically before and after due dates to opted-in guardians, with a pay link. [FR-MSG-014]
 - AC1: Given fee reminders are on, at 10:00 IST on the school's offsets (default 3 days before, on the due date, 7 days after), each guardian opted in for fees gets one reminder per account and offset with the amount due and a link to the dues page (with "Pay online" when connected).
-- AC2: No reminder is sent for an instalment already paid, for amounts under the school's minimum, or on a day the school marked as a no-message day *(P)*.
+- AC2: No reminder is sent for an instalment already paid, for amounts under the school's minimum, or on a day the school marked as a no-message day.
 
 **US-2206** · As a parent, I want the receipt on WhatsApp right after I pay, so that I do not need to keep paper. [FR-MSG-015]
 - AC1: When a receipt is issued (counter or online) and a guardian is opted in for fees, they get a message with the receipt number, amount and a link to the receipt page.
@@ -665,7 +665,7 @@ Stories of the 2026-27 plan, release R2 (docs/18 §3 R2; owner decisions D4-D9 o
 
 **US-2301** · As a principal, I want to choose English or Telugu for everything parents receive, while our staff screens stay English. [FR-LANG-001, FR-LANG-002, FR-LANG-005, FR-LANG-006]
 - AC1: Given I hold `tenant.settings.manage` with step-up, I choose the parent language; messages, parent pages, opt-in slips, verification slips and the APAAR form use it; staff screens, receipts and certificates as documents stay English.
-- AC2: While any Telugu text we would use is not yet reviewed by a fluent reviewer, the setting shows that warning *(P)*.
+- AC2: While any Telugu text we would use is not yet reviewed by a fluent reviewer, the setting shows that warning.
 
 **US-2302** · As an office assistant, I want to set one guardian's language when it differs from the school's. [FR-LANG-003]
 - AC1: On a guardian I choose English, Telugu or "school default"; a parent can also choose on the opt-in page.
@@ -677,13 +677,13 @@ Stories of the 2026-27 plan, release R2 (docs/18 §3 R2; owner decisions D4-D9 o
 
 **US-2401** · As a parent, I want to open the full notice from the WhatsApp message on my phone without installing anything or signing in. [FR-PUB-005, FR-PUB-006, FR-PUB-008..FR-PUB-010]
 - AC1: Tapping the message button opens a fast mobile page in my language with the school's name, the notice title, date, text and its PDF.
-- AC2: The link works for 30 days *(P)*; after that the page says it has expired and how to get a new one. The same page appears for a wrong or revoked link, naming no school.
+- AC2: The link works for 30 days; after that the page says it has expired and how to get a new one. The same page appears for a wrong or revoked link, naming no school.
 
 **US-2402** · As a parent, I want to open my receipt from the message and keep it. [FR-PUB-009]
-- AC1: The receipt page shows the school, receipt number and date, my child's name, class and admission number, amounts per head and mode; it can be saved as PDF; it says "Cancelled on …" if the school cancelled it. The link works for 90 days *(P)*.
+- AC1: The receipt page shows the school, receipt number and date, my child's name, class and admission number, amounts per head and mode; it can be saved as PDF; it says "Cancelled on …" if the school cancelled it. The link works for 90 days.
 
 **US-2403** · As a parent, I want to see what is due and pay online or by the school's UPI QR. [FR-PUB-009, FR-PAY-005]
-- AC1: The dues page (link valid 7 days, *P*) shows outstanding instalments with due dates and late fees, the school's UPI QR and payee name if set, and "Pay online" if the school connected Razorpay; paying online opens Razorpay's page for the school's account and returns to a "Thank you, the school will send your receipt" page.
+- AC1: The dues page (link valid 7 days) shows outstanding instalments with due dates and late fees, the school's UPI QR and payee name if set, and "Pay online" if the school connected Razorpay; paying online opens Razorpay's page for the school's account and returns to a "Thank you, the school will send your receipt" page.
 - AC2: The page never asks for card or bank details itself and lets me change nothing else.
 
 **US-2404** · As an office admin, I want to revoke a link sent to the wrong parent. [FR-PUB-007, FR-PUB-012]
