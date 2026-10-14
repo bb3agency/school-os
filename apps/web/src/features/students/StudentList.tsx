@@ -57,6 +57,8 @@ export interface StudentFilters {
   yearId?: string | undefined;
   /** Exact APAAR ID as typed (FR-STU-016); sent only when it is 12 digits. */
   apaar?: string | undefined;
+  /** Exact UDISE+ PEN as typed (FR-STU-019); sent only when it is 11 digits. */
+  pen?: string | undefined;
 }
 
 interface CleanFilters {
@@ -66,6 +68,7 @@ interface CleanFilters {
   status?: StudentStatus;
   academic_year_id?: string;
   apaar_id?: string;
+  udise_pen?: string;
 }
 
 const filtersSchema = z.object({
@@ -75,7 +78,14 @@ const filtersSchema = z.object({
   status: z.string().optional(),
   academic_year_id: z.string().optional(),
   apaar_id: z.string().optional(),
+  udise_pen: z.string().optional(),
 });
+
+/** FR-STU-017: the 11 digits of a typed PEN (spaces and hyphens removed), or null. */
+export function penDigits(text: string): string | null {
+  const value = text.trim().replace(/[ -]/g, "");
+  return /^\d{11}$/.test(value) ? value : null;
+}
 
 /** FR-STU-015/016: 12 digits, optionally grouped 4-4-4 by a space or hyphen (as the API). */
 const DIGITS12 = /^\d{4}[ -]?\d{4}[ -]?\d{4}$/;
@@ -96,6 +106,7 @@ export function filtersFromForm(form: HTMLFormElement): StudentFilters {
     status: parsed.status || undefined,
     yearId: parsed.academic_year_id || undefined,
     apaar: parsed.apaar_id?.trim() || undefined,
+    pen: parsed.udise_pen?.trim() || undefined,
   };
 }
 
@@ -103,9 +114,11 @@ export function filtersFromForm(form: HTMLFormElement): StudentFilters {
 export function cleanFilters(filters: StudentFilters): CleanFilters {
   const q = filters.q?.trim().slice(0, 200) ?? "";
   const apaar = filters.apaar ? apaarDigits(filters.apaar) : null;
+  const pen = filters.pen ? penDigits(filters.pen) : null;
   return {
     ...(q ? { query: q } : {}),
     ...(apaar ? { apaar_id: apaar } : {}),
+    ...(pen ? { udise_pen: pen } : {}),
     ...(filters.classId && UUID_PATTERN.test(filters.classId) ? { class_id: filters.classId } : {}),
     ...(filters.sectionId && UUID_PATTERN.test(filters.sectionId)
       ? { section_id: filters.sectionId }
@@ -196,6 +209,8 @@ export interface StudentListViewProps {
   aadhaarBlocked?: boolean;
   /** The APAAR ID was not 12 digits: it was not sent. */
   apaarInvalid?: boolean;
+  /** The PEN was not 11 digits: it was not sent. */
+  penInvalid?: boolean;
   /** New search (kept in memory only: names never go into the page URL or history). */
   onSearch: (filters: StudentFilters) => void;
   onClear: () => void;
@@ -212,6 +227,7 @@ export function StudentListView({
   onPrevious,
   aadhaarBlocked = false,
   apaarInvalid = false,
+  penInvalid = false,
   onSearch,
   onClear,
 }: StudentListViewProps) {
@@ -250,7 +266,8 @@ export function StudentListView({
     filters.sectionId ||
     filters.status ||
     filters.yearId ||
-    filters.apaar,
+    filters.apaar ||
+    filters.pen,
   );
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -375,6 +392,20 @@ export function StudentListView({
                     spellCheck={false}
                   />
                 </div>
+                {/* FR-STU-019 / ADR-0039: exact UDISE+ PEN, 11 digits. */}
+                <div className="w-full sm:w-52">
+                  <TextField
+                    name="udise_pen"
+                    label={t("penLabel")}
+                    hint={t("penHint")}
+                    error={penInvalid ? t("penInvalid") : undefined}
+                    defaultValue={filters.pen ?? ""}
+                    maxLength={15}
+                    inputMode="numeric"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {hasFilters ? (
@@ -427,7 +458,9 @@ export function StudentListView({
 /** "Found by: Father's name" when the match was not on the name or admission number. */
 function matchedField(row: StudentSummary, label: (key: string) => string): string | null {
   const field = row.match.field;
-  if (!field || ["full_name", "admission_no", "apaar_id"].includes(field)) return null;
+  if (!field || ["full_name", "admission_no", "apaar_id", "udise_pen"].includes(field)) {
+    return null;
+  }
   return label(field);
 }
 
@@ -595,7 +628,8 @@ export function StudentsScreen() {
   const cursor = pages.cursor;
   const aadhaarBlocked = Boolean(clean.query && containsFullAadhaar(clean.query));
   const apaarInvalid = Boolean(filters.apaar && !clean.apaar_id);
-  const blocked = aadhaarBlocked || apaarInvalid;
+  const penInvalid = Boolean(filters.pen && !clean.udise_pen);
+  const blocked = aadhaarBlocked || apaarInvalid || penInvalid;
   const body = {
     ...clean,
     limit: PAGE_SIZE,
@@ -621,6 +655,7 @@ export function StudentsScreen() {
       pageNumber={pages.page}
       aadhaarBlocked={aadhaarBlocked}
       apaarInvalid={apaarInvalid}
+      penInvalid={penInvalid}
       onNext={next ? () => pages.next(next) : undefined}
       onPrevious={pages.hasPrevious ? pages.previous : undefined}
       onSearch={search}

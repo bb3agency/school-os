@@ -12,6 +12,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
 import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
+import { TENANT_KEY } from "@/features/settings/data";
 import { PERM, useStaffPermissions, type Permissions } from "@/features/students/me";
 import { Pager, useCursorStack } from "@/features/students/paging";
 import { ProblemAlert } from "@/features/students/ProblemAlert";
@@ -30,6 +31,7 @@ import {
   type ImportTemplate,
 } from "./types";
 import { FileDropZone, fileInputClasses, Stepper } from "./parts";
+import { ERP_PRESET, TemplateLibrary } from "./presets";
 import { extensionOf, uploadDocument, type UploadProgress } from "./upload";
 
 export const IMPORTS_KEY = ["staff", "imports"] as const;
@@ -118,7 +120,16 @@ export function setNotReadyRetryForTesting(ms: number): void {
 }
 
 /** US-401 AC1: upload a spreadsheet and start reading it (documents upload → POST /imports). */
-export function UploadSpreadsheet({ onStarted }: { onStarted: (batch: ImportBatch) => void }) {
+export function UploadSpreadsheet({
+  onStarted,
+  defaultSource = "admission_register",
+  submitLabel,
+}: {
+  onStarted: (batch: ImportBatch) => void;
+  /** The source pre-selected (the ERP refresh starts with office records, US-204). */
+  defaultSource?: ImportSource;
+  submitLabel?: string;
+}) {
   const t = useTranslations("imports.upload");
   const ts = useTranslations("students");
   const tv = useTranslations("validation");
@@ -212,7 +223,7 @@ export function UploadSpreadsheet({ onStarted }: { onStarted: (batch: ImportBatc
         name="source"
         label={t("source")}
         hint={t("sourceHint")}
-        defaultValue="admission_register"
+        defaultValue={defaultSource}
         disabled={busy}
         error={sourceError}
         options={VALUE_SOURCES.map((value) => ({
@@ -243,7 +254,7 @@ export function UploadSpreadsheet({ onStarted }: { onStarted: (batch: ImportBatc
       <ProblemAlert error={error} namespace="imports.errors" />
       <div className="flex justify-end">
         <Button type="submit" disabled={busy} aria-describedby={statusId}>
-          {busy ? t("working") : t("submit")}
+          {busy ? t("working") : (submitLabel ?? t("submit"))}
         </Button>
       </div>
     </form>
@@ -258,6 +269,40 @@ export interface ImportsViewProps {
   onNext?: (() => void) | undefined;
   onPrevious?: (() => void) | undefined;
   onStarted: (batch: ImportBatch) => void;
+  /** FR-TEN-022: the school runs SchoolOS alongside its current ERP (US-204). */
+  alongside?: { erpName: string } | null;
+  /** US-204: an ERP refresh was started (opens the mapping with the ERP preset). */
+  onRefreshStarted?: (batch: ImportBatch) => void;
+}
+
+/**
+ * US-204 / FR-IMP-033: "Refresh from your ERP export". The file is imported as office records
+ * (`manual_entry`) with the ERP preset; admission-register values are never replaced and every
+ * difference becomes a DQ-030 finding.
+ */
+export function ErpRefreshCard({
+  erpName,
+  onStarted,
+}: {
+  erpName: string;
+  onStarted: (batch: ImportBatch) => void;
+}) {
+  const t = useTranslations("imports.refresh");
+  return (
+    <Card
+      title={erpName ? t("titleNamed", { name: erpName }) : t("title")}
+      description={t("description")}
+    >
+      <div className="space-y-4">
+        <Alert tone="info">{t("registerKept")}</Alert>
+        <UploadSpreadsheet
+          onStarted={onStarted}
+          defaultSource="manual_entry"
+          submitLabel={t("submit")}
+        />
+      </div>
+    </Card>
+  );
 }
 
 /** US-401 / FR-IMP-001..007: the school's spreadsheet imports and saved column templates. */
@@ -269,6 +314,8 @@ export function ImportsView({
   onNext,
   onPrevious,
   onStarted,
+  alongside = null,
+  onRefreshStarted,
 }: ImportsViewProps) {
   const t = useTranslations("imports.list");
   const tn = useTranslations("school.nav");
@@ -338,6 +385,9 @@ export function ImportsView({
         description={t("description")}
         breadcrumb={[{ label: tn("home"), href: "/" }, { label: t("title") }]}
       />
+      {canUpload && alongside ? (
+        <ErpRefreshCard erpName={alongside.erpName} onStarted={onRefreshStarted ?? onStarted} />
+      ) : null}
       {canUpload ? (
         <Card title={t("uploadTitle")} description={t("uploadDescription")}>
           <div className="space-y-6">
@@ -346,6 +396,7 @@ export function ImportsView({
           </div>
         </Card>
       ) : null}
+      {permissions.has(PERM.importRun) ? <TemplateLibrary /> : null}
       <Card title={t("historyTitle")}>
         <div className="space-y-3">
           <DataTable
@@ -390,6 +441,12 @@ export function ImportsScreen() {
   const templates = useApiQuery([...IMPORTS_KEY, "templates"], () =>
     unwrap(api.GET("/api/v1/import-templates")),
   );
+  // FR-TEN-022: the school's operating mode decides whether the ERP refresh is offered.
+  const tenant = useApiQuery(TENANT_KEY, () => unwrap(api.GET("/api/v1/tenant")));
+  const alongside =
+    tenant.status === "ready" && tenant.data.settings.operating_mode === "alongside"
+      ? { erpName: tenant.data.settings.current_erp_name ?? "" }
+      : null;
   const imports: Loadable<readonly ImportSummary[]> =
     list.status === "ready" ? { status: "ready", data: list.data.data } : list;
   const next = list.status === "ready" ? list.data.next_cursor : null;
@@ -402,6 +459,8 @@ export function ImportsScreen() {
       onNext={next ? () => pages.next(next) : undefined}
       onPrevious={pages.hasPrevious ? pages.previous : undefined}
       onStarted={(batch) => router.push(`/imports/${batch.id}`)}
+      alongside={alongside}
+      onRefreshStarted={(batch) => router.push(`/imports/${batch.id}?preset=${ERP_PRESET}`)}
     />
   );
 }

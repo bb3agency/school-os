@@ -77,11 +77,11 @@ def test_FR_STU_014_udise_pen_is_a_c2_non_identity_attribute_needing_verificatio
     assert spec["is_identity"] is False
     policy = spec["canonical_policy"]
     assert isinstance(policy, dict)
-    assert policy["precedence"] == ["udise_plus", "manual_entry"]
+    assert policy["precedence"] == ["udise_plus", "tc_incoming", "manual_entry"]  # ADR-0039
     assert policy["require_verified"] is True
     validation = spec["validation"]
     assert isinstance(validation, dict)
-    assert validation["sources"] == ["udise_plus", "manual_entry"]
+    assert validation["sources"] == ["udise_plus", "tc_incoming", "manual_entry"]
 
 
 def test_FR_STU_015_only_apaar_id_is_a_typed_digits12_key() -> None:

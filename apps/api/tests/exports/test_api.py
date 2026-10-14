@@ -162,7 +162,7 @@ def test_ADR_0021_udise_category_opt_in_over_http(
     assert res.status_code == 202, res.text
     assert res.json()["include_sensitive"] is True
     requested = EX.audit_rows(admin_engine, school.tenant_id, uuid.UUID(res.json()["id"]))[0]
-    assert requested["summary"]["sensitive_columns"] == ["category"]
+    assert requested["summary"]["sensitive_columns"] == ["category", "religion", "disability"]
 
 
 # --- ADR-0021 decision 3: who sees whose exports ---------------------------------------------
@@ -246,4 +246,11 @@ def test_export_profiles_route(school: Any, api: Any) -> None:
     res = api.call(school.people["exam_coordinator"], "GET", "/api/v1/export-profiles")
     assert res.status_code == 200
     keys = {p["key"] for p in res.json()}
-    assert keys == {"cisce-registration-2026", "udise-plus"}
+    # No board declared: every profile (FR-TEN-020, ADR-0041).
+    assert keys == {
+        "cisce-registration-2026",
+        "cisce-registration-2027",
+        "cbse-registration-2027",
+        "cbse-loc-2027",
+        "udise-plus",
+    }

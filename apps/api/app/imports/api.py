@@ -28,6 +28,8 @@ from app.imports.schemas import (
     ImportSheetOut,
     ImportSummary,
     MappingIn,
+    PresetMappingOut,
+    PresetOut,
     RowEditIn,
     RowFilter,
     SheetEditOut,
@@ -249,6 +251,58 @@ def revert_import(ctx: Committer, db: TenantDB, import_id: uuid.UUID) -> ImportO
     ``import_has_dependents`` when records from it were changed or are used since, and 409
     ``revert_window_closed`` after 24 hours."""
     return service.revert(db, ctx, import_id)
+
+
+PresetKey = Annotated[
+    str, Query(pattern=r"^[a-z0-9][a-z0-9-]{0,63}$", description="Preset key, e.g. schoolos-blank")
+]
+_TEMPLATE_FILE_DOC: dict[int | str, dict[str, Any]] = {
+    200: {
+        "description": "Blank Excel template: the header row only",
+        "content": {
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {"type": "string", "format": "binary"}
+            }
+        },
+    }
+}
+
+
+@router.get("/import-presets", response_model=list[PresetOut])
+def list_presets(ctx: Runner) -> list[PresetOut]:
+    """The import template library (FR-IMP-030): blank SchoolOS template, typical register
+    Excel, UDISE+ student list, generic ERP export. Each says which import source it is
+    usually recorded from and whether its format is verified (permission ``import.run``)."""
+    return service.list_presets()
+
+
+@router.get("/import-presets/template", response_class=Response, responses=_TEMPLATE_FILE_DOC)
+def download_preset_template(ctx: Runner, preset: PresetKey) -> Response:
+    """A preset's blank Excel template, header row only and no school data (FR-IMP-030;
+    permission ``import.run``). 404 for an unknown preset."""
+    out = service.preset_template(preset)
+    return Response(
+        content=out.content,
+        media_type=out.media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{out.filename}"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@router.get("/imports/{import_id}/preset-mapping", response_model=PresetMappingOut)
+def get_preset_mapping(
+    ctx: Runner,
+    db: TenantDB,
+    import_id: uuid.UUID,
+    preset: PresetKey,
+) -> PresetMappingOut:
+    """Apply a template-library preset to this import's columns (FR-IMP-031). Changes nothing:
+    review the columns, then save them with ``PUT /imports/{id}/mapping`` (permission
+    ``import.run``). Another school's import, someone else's import for a scoped holder, or an
+    unknown preset answer 404."""
+    return service.preset_mapping_for(db, ctx, import_id, preset)
 
 
 @router.get("/import-templates", response_model=list[TemplateOut])

@@ -32,6 +32,8 @@ const SETTINGS = {
   ai_features_enabled: true,
   ai_memory_enabled: true,
   ai_monthly_budget_inr: 5000,
+  operating_mode: "full" as const,
+  current_erp_name: "",
 };
 const TENANT = {
   id: "0192f3a4-0000-7000-8000-000000000001",

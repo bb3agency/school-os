@@ -56,7 +56,7 @@ const pages: Array<{
   {
     name: "one import",
     title: (m) => m.imports.detail.loadingTitle,
-    render: () => ImportPage({ params: params("importId") }),
+    render: () => ImportPage({ params: params("importId"), searchParams: noSearch() }),
   },
   {
     name: "register photos",
@@ -108,7 +108,9 @@ describe("student, import and register-photo pages render in both languages (NFR
     await expect(StudentPage({ params: params("studentId", "../me") })).rejects.toThrow(
       "NEXT_NOT_FOUND",
     );
-    await expect(ImportPage({ params: params("importId", "x") })).rejects.toThrow("NEXT_NOT_FOUND");
+    await expect(
+      ImportPage({ params: params("importId", "x"), searchParams: noSearch() }),
+    ).rejects.toThrow("NEXT_NOT_FOUND");
     await expect(
       RegisterRowPage({ params: params("itemId", "1"), searchParams: noSearch() }),
     ).rejects.toThrow("NEXT_NOT_FOUND");

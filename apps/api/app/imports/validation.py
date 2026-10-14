@@ -42,6 +42,8 @@ from app.imports.values import (
 AADHAAR_CODE: Final = "aadhaar_full_number_rejected"
 AADHAAR_MESSAGE_KEY: Final = "errors.aadhaar_last4_only"
 FORMULA_CODE: Final = "formula_not_evaluated"
+NATIONAL_ID_CODE: Final = "national_id_in_use"
+NATIONAL_ID_KEYS: Final = ("udise_pen", "apaar_id")
 ANCHOR_SOURCE: Final = "admission_register"  # BR-01: the legal anchor of identity values
 MIN_DATE: Final = dt.date(1900, 1, 1)
 _EXPLICIT_PHONE_RE: Final = re.compile(r"\+91[ \u00a0-]?[6-9][0-9]{4}[ \u00a0-]?[0-9]{5}")
@@ -83,6 +85,8 @@ class AttributeSpec:
     max_length: int | None = None
     pattern: str | None = None
     not_future: bool = True
+    compact: bool = False  # remove spaces and hyphens first (udise_pen)
+    format_code: str = "invalid_format"  # error code when the pattern does not match
 
     @property
     def sensitive(self) -> bool:
@@ -122,6 +126,9 @@ class ValidationContext:
     # A-10: writing a C3 value to an EXISTING student needs student.read_sensitive (import.commit
     # includes updates of non-sensitive values; docs/07 §6.2). Fails closed when not given.
     can_update_sensitive: bool = False
+    # FR-IMP-010 / FR-STU-018: PEN and APAAR ID values of the file already held by an active
+    # student of the school: attribute key -> value -> student id.
+    national_ids: Mapping[str, Mapping[str, str]] = field(default_factory=dict)
 
     @property
     def creates(self) -> bool:
@@ -329,9 +336,11 @@ class _RowValidator:
                 result.errors.append(issue(key, "digits12_required"))
                 return None
             return re.sub(r"[ -]", "", text)
+        if spec.compact:
+            text = re.sub(r"[ -]", "", text)
         pattern = self.patterns.get(key)
         if pattern is not None and pattern.fullmatch(text) is None:
-            result.errors.append(issue(key, "invalid_format"))
+            result.errors.append(issue(key, spec.format_code))
             return None
         return text
 
@@ -413,6 +422,7 @@ class _RowValidator:
             self._update_row(existing, result)
         elif admission is not None:
             self._create_row(result)
+        self._national_ids(result)
         if not ctx.creates and "admission_no" in result.values:
             # Match key only: the admission number cannot be recorded from this source.
             result.values.pop("admission_no")
@@ -420,6 +430,18 @@ class _RowValidator:
             if key != "admission_no" and key not in result.values and not _has_error(result, key):
                 result.errors.append(issue(key, "missing"))
         return result
+
+    def _national_ids(self, result: RowResult) -> None:
+        """FR-IMP-010: a PEN or APAAR ID already on another active record of the school is a row
+        error naming that record (``student_id``): open it, or import the child into UDISE+ by
+        PEN, instead of creating a second record (FR-STU-018)."""
+        for key in NATIONAL_ID_KEYS:
+            value = result.values.get(key)
+            holder = self.ctx.national_ids.get(key, {}).get(value) if value else None
+            if holder is not None and holder != result.student_id:
+                problem = issue(key, NATIONAL_ID_CODE, f"errors.{key}_in_use")
+                problem["student_id"] = holder
+                result.errors.append(problem)
 
     def _create_row(self, result: RowResult) -> None:
         ctx = self.ctx
@@ -487,6 +509,17 @@ def validate_sheet(
         for result in members:
             other = next(m.row_no for m in members if m.row_no != result.row_no)
             result.errors.append(issue("admission_no", "duplicate_in_file", ref=other))
+    # FR-IMP-010: one PEN or APAAR ID on two rows is one child entered twice.
+    for key in NATIONAL_ID_KEYS:
+        by_value: dict[str, list[RowResult]] = {}
+        for result in rows:
+            value = result.values.get(key)
+            if value:
+                by_value.setdefault(value, []).append(result)
+        for members in by_value.values():
+            for result in members if len(members) > 1 else ():
+                other = next(m.row_no for m in members if m.row_no != result.row_no)
+                result.errors.append(issue(key, "duplicate_in_file", ref=other))
     stats = {
         "rows": len(rows),
         "valid": 0,
@@ -513,6 +546,8 @@ __all__ = [
     "AADHAAR_CODE",
     "ANCHOR_SOURCE",
     "FORMULA_CODE",
+    "NATIONAL_ID_CODE",
+    "NATIONAL_ID_KEYS",
     "AttributeSpec",
     "ExistingStudent",
     "RowResult",

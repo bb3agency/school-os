@@ -142,10 +142,24 @@ export function SchoolShell({
           icon: "shieldCheck",
         },
         {
+          // US-504..US-506 (ADR-0040): board and portal readiness (AP SSC 2027, APAAR).
+          href: "/findings/readiness",
+          label: t("readiness.nav"),
+          permission: "dq.readiness.read",
+          icon: "checkCircle",
+        },
+        {
           href: "/change-requests",
           label: t("changeRequests.nav"),
           permission: ["student.identity_change.request", "student.identity_change.approve"],
           icon: "clipboard",
+        },
+        {
+          // ADR-0039, US-1901..US-1903: parents' APAAR consent decisions and forms.
+          href: "/apaar",
+          label: t("apaar.nav"),
+          permission: ["apaar.consent.read", "apaar.consent.record"],
+          icon: "check",
         },
         {
           href: "/exports",

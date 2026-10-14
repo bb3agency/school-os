@@ -276,6 +276,12 @@ NON_UUID_PATH_PARAMS = {
     ("DELETE", "/api/v1/platform/flags/{key}/tenants/{tenant_id}", "key"),
     # A spreadsheet row number inside an import the caller already reaches (bounded int).
     ("PATCH", "/api/v1/imports/{import_id}/sheet/rows/{row_no}", "row_no"),
+    # A readiness profile key: a bounded, pattern-checked configuration key (ADR-0040).
+    ("GET", "/api/v1/dq/readiness/{profile_key}", "profile_key"),
+    ("GET", "/api/v1/dq/readiness/{profile_key}/students", "profile_key"),
+    ("GET", "/api/v1/dq/readiness/{profile_key}/students/{student_id}", "profile_key"),
+    ("POST", "/api/v1/dq/readiness/{profile_key}/runs", "profile_key"),
+    ("GET", "/api/v1/dq/readiness/{profile_key}/slips", "profile_key"),
 }
 
 
@@ -323,9 +329,12 @@ RESPONSE_FIELD_ALLOWLIST = {
     "app.dq.schemas.ProfileOut.key": "DQ profile code",
     "app.dq.schemas.SummaryOut.profile_key": "DQ profile code",
     "app.dq.schemas.RunOut.profile_key": "DQ profile code",
+    "app.dq.schemas.ReadinessProfileOut.key": "DQ profile code",
+    "app.dq.schemas.ReadinessFieldOut.attribute_key": "attribute catalog key",
     "app.exports.schemas.ExportProfileOut.key": "export profile code",
     "app.exports.schemas.ExportOut.profile_key": "export profile code",
     "app.imports.schemas.Issue.message_key": "i18n message key",
+    "app.imports.schemas.PresetOut.key": "import template library code (ADR-0041)",
     "app.insights.schemas.RuleSettingOut.key": "rule code",
     "app.notifications.schemas.NotificationOut.template_key": "i18n template key",
     "app.identity.schemas.PermissionOut.key": "permission key",
@@ -418,6 +427,9 @@ IDEMPOTENCY_EXEMPT = {
     "a per-member cool-down; nothing is created",
     ("POST", "/api/v1/circulars/{document_id}/read"): "a state transition (409 "
     "reading_in_progress on repeat)",
+    # FR-STU-018 (ADR-0039): a lookup like POST /students/search, numbers kept out of the URL.
+    ("POST", "/api/v1/students/national-id-check"): "read-only lookup (the PEN or APAAR ID "
+    "travels in the body, SEC-008); nothing is created",
 }
 
 

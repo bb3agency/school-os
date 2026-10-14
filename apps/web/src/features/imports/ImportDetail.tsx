@@ -40,6 +40,7 @@ import {
   SourceName,
 } from "./ImportsScreen";
 import { POLL_MS, usePolledQuery } from "./poll";
+import { PresetPicker, type PresetResult } from "./presets";
 import {
   IMPORT_BUSY,
   MAPPING_EDITABLE,
@@ -126,6 +127,8 @@ interface MappingFormProps {
   attributes: readonly Attribute[];
   label: (key: string) => string;
   onChecked: () => void;
+  /** Template-library preset to offer first (US-403; e.g. the ERP refresh path). */
+  initialPreset?: string | undefined;
 }
 
 const mappingSchema = z.record(z.string(), z.string());
@@ -150,12 +153,17 @@ export function duplicateTargets(targets: Record<number, string>): Set<number> {
  * Telugu headers are pre-selected and marked), then check every row. PUT /mapping (If-Match)
  * → POST /validate. Nothing is saved to student records here.
  */
-function MappingForm({ batch, attributes, label, onChecked }: MappingFormProps) {
+function MappingForm({ batch, attributes, label, onChecked, initialPreset }: MappingFormProps) {
   const t = useTranslations("imports.mapping");
   const ti = useTranslations("imports.issues");
   const api = useBffClient("staff");
   const queryClient = useQueryClient();
   const errorId = useId();
+  // A preset (US-403, FR-IMP-031) pre-selects fields; the selects remount with the new choices.
+  const [preset, setPreset] = useState<{ targets: Record<number, string>; generation: number }>({
+    targets: {},
+    generation: 0,
+  });
   const [errors, setErrors] = useState<Record<number, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [failure, setFailure] = useState<unknown>(undefined);
@@ -236,8 +244,19 @@ function MappingForm({ batch, attributes, label, onChecked }: MappingFormProps) 
       .finally(() => setPending(false));
   }
 
+  const applyPreset = (result: PresetResult) => {
+    setErrors({});
+    setPreset((current) => ({ targets: result.targets, generation: current.generation + 1 }));
+  };
+
   return (
     <form noValidate onSubmit={onSubmit} className="space-y-4">
+      <PresetPicker
+        batch={batch}
+        initialPreset={initialPreset}
+        disabled={pending}
+        onApply={applyPreset}
+      />
       {formError ? (
         <div data-mapping-error tabIndex={-1} id={errorId}>
           <Alert tone="danger" live>
@@ -270,11 +289,12 @@ function MappingForm({ batch, attributes, label, onChecked }: MappingFormProps) 
                   ) : null}
                 </div>
                 <SelectField
+                  key={`${column.index}-${preset.generation}`}
                   name={`col-${column.index}`}
                   label={t("targetFor", { header })}
                   className="[&>label]:sr-only"
                   options={options}
-                  defaultValue={initialTarget(column)}
+                  defaultValue={preset.targets[column.index] ?? initialTarget(column)}
                   error={errors[column.index]}
                   disabled={pending}
                 />
@@ -716,10 +736,17 @@ export interface ImportDetailViewProps {
   batch: Loadable<ImportBatch>;
   attributes: Loadable<readonly Attribute[]>;
   permissions: Permissions;
+  /** Preset offered first in the mapping step (`?preset=`, US-403). */
+  initialPreset?: string | undefined;
 }
 
 /** US-401 / FR-IMP-002..005: one import from mapping to check, add and (within 24 h) undo. */
-export function ImportDetailView({ batch, attributes, permissions }: ImportDetailViewProps) {
+export function ImportDetailView({
+  batch,
+  attributes,
+  permissions,
+  initialPreset,
+}: ImportDetailViewProps) {
   const t = useTranslations("imports.detail");
   const tl = useTranslations("imports.list");
   const tn = useTranslations("school.nav");
@@ -815,6 +842,7 @@ export function ImportDetailView({ batch, attributes, permissions }: ImportDetai
             attributes={attributes.data}
             label={label}
             onChecked={() => setChecked((value) => value + 1)}
+            initialPreset={initialPreset}
           />
         </Card>
       ) : editable ? (
@@ -842,7 +870,13 @@ export function ImportDetailView({ batch, attributes, permissions }: ImportDetai
 }
 
 /** GET /imports/{id}, asked again every few seconds while a worker reads, checks or adds it. */
-export function ImportDetailScreen({ importId }: { importId: string }) {
+export function ImportDetailScreen({
+  importId,
+  initialPreset,
+}: {
+  importId: string;
+  initialPreset?: string | undefined;
+}) {
   const api = useBffClient("staff");
   const permissions = useStaffPermissions();
   const batch = usePolledQuery(
@@ -852,5 +886,12 @@ export function ImportDetailScreen({ importId }: { importId: string }) {
     (data) => (data && IMPORT_BUSY.has(data.status) ? POLL_MS : false),
   );
   const attributes = useAttributes();
-  return <ImportDetailView batch={batch} attributes={attributes} permissions={permissions} />;
+  return (
+    <ImportDetailView
+      batch={batch}
+      attributes={attributes}
+      permissions={permissions}
+      initialPreset={initialPreset}
+    />
+  );
 }

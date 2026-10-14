@@ -180,6 +180,8 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | dq.findings.read | ✓ | ✓ | ✓ | ✓ | — | ✓ | S | — | ✓ |
 | dq.findings.resolve | — | ✓ | ✓ | ✓ | — | ✓ | — | — | — |
 | dq.findings.waive | — | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — |
+| dq.readiness.read (board and portal readiness, parent verification slips; Aadhaar-as-printed values on them only with student.read_sensitive; ADR-0040) | ✓ | ✓ | ✓ | ✓ | — | ✓ | S | — | ✓ |
+| dq.readiness.manage (run readiness checks that store DQ-030 findings) | — | ✓ | ✓ | ✓ | — | ✓ | — | — | — |
 | document.upload (new versions and metadata edits only of documents the caller uploaded, unless they also hold document.manage_acl; AA-10) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | S | — | — |
 | document.read | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | S | S | ✓ |
 | document.manage_acl (also gates document delete) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
@@ -208,6 +210,8 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | certificate.issue (prepare and issue certificates; M3) | — | ✓ | ✓ | ✓ | — | — | — | — | — |
 | certificate.approve (approve TCs, cancel certificates; maker-checker; M3) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
 | register.read (print the TC, certificate and admission and withdrawal registers; M3) | ✓ᴿ | ✓ᴿ | ✓ᴿ | — | — | — | — | — | ✓ᴿ |
+| apaar.consent.read (R1: parents' APAAR consent decisions, class summary, pending list, print consent forms; ADR-0039) | ✓ | ✓ | ✓ | ✓ | — | ✓ | S | — | ✓ |
+| apaar.consent.record (R1: record a parent's APAAR consent decision with the signed form; ADR-0039) | — | ✓ | ✓ | ✓ | — | — | — | — | — |
 | circular.review (M4: read circulars again with AI, confirm or dismiss suggested deadlines, mark reviewed; proposed, PO to confirm) | ✓ | ✓ | ✓ | ✓ | — | — | — | — | — |
 | task.read (M4: see and update your own tasks) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
 | task.read_all (M4: every task of the school) | ✓ | ✓ | ✓ | — | — | — | — | — | — |

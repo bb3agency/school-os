@@ -346,9 +346,10 @@ def test_FR_STU_015_apaar_column_takes_twelve_digits_and_never_an_aadhaar_number
         None,
         None,
     ]
+    # FR-IMP-010: the same APAAR ID on two rows is one child entered twice.
     assert [sorted(e["code"] for e in r.errors) for r in result.rows] == [
-        [],
-        [],
+        ["duplicate_in_file"],
+        ["duplicate_in_file"],
         ["digits12_required"],
         ["aadhaar_full_number_rejected"],
     ]
@@ -451,3 +452,72 @@ def test_FR_IMP_003_length_format_and_date_rules_come_from_the_attribute_spec() 
     )
     result = validate_sheet(sheet, MAPPING, _ctx(specs=specs))
     assert _codes(result) == [{"admission_no:invalid_format", "full_name:too_long"}, set()]
+
+
+PEN_SPEC = AttributeSpec(
+    "udise_pen",
+    "text",
+    "C2",
+    False,
+    ("udise_plus", "tc_incoming", "manual_entry"),
+    None,
+    max_length=15,
+    pattern="^[0-9]{11}$",
+    compact=True,
+    format_code="digits11_required",
+)
+
+
+def test_FR_IMP_010_pen_column_is_compacted_checked_and_guarded() -> None:
+    """ADR-0039: a PEN column takes 11 digits (spaces and hyphens removed); a PEN already on
+    another active record is a row error naming that record; two rows with one PEN are both
+    errors; a student's own PEN is fine."""
+    sheet = read_sheet(
+        S.csv_bytes(
+            [
+                ["Adm No", "PEN", "Name"],
+                ["A-1", "2134 5678 901", "x"],
+                ["A-2", "31345678901", "x"],
+                ["A-3", "41345678901", "x"],
+                ["A-4", "41345678901", "x"],
+                ["A-5", "1234", "x"],
+            ]
+        ),
+        "csv",
+        CFG.limits,
+    )
+    existing = {f"a-{i}": ExistingStudent(f"sid-{i}", None, {}) for i in range(1, 6)}
+    result = validate_sheet(
+        sheet,
+        {"0": "admission_no", "1": "udise_pen"},
+        _ctx(
+            source="udise_plus",
+            existing=existing,
+            specs={**SPECS, "udise_pen": PEN_SPEC},
+            national_ids={"udise_pen": {"21345678901": "sid-1", "31345678901": "sid-other"}},
+        ),
+    )
+    assert result.rows[0].values["udise_pen"] == "21345678901"
+    assert [sorted(e["code"] for e in r.errors) for r in result.rows] == [
+        [],  # its own PEN
+        ["national_id_in_use"],
+        ["duplicate_in_file"],
+        ["duplicate_in_file"],
+        ["digits11_required"],
+    ]
+    clash = result.rows[1].errors[0]
+    assert clash["student_id"] == "sid-other"
+    assert clash["message_key"] == "errors.udise_pen_in_use"
+
+
+def test_FR_IMP_010_header_synonyms_map_pen_and_apaar() -> None:
+    from app.imports.mapping import suggest
+
+    headers = ["Adm No", "Student PEN", "APAAR ID", "Name"]
+    suggested = suggest(
+        headers,
+        CFG.synonyms,
+        allowed_targets={"admission_no", "udise_pen", "apaar_id", "full_name"},
+        threshold=CFG.suggest_threshold,
+    )
+    assert [s.target for s in suggested] == ["admission_no", "udise_pen", "apaar_id", "full_name"]

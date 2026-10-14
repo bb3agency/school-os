@@ -99,6 +99,44 @@ def last_manual_run(session: Session, profile_key: str | None) -> RowMapping | N
     )
 
 
+def last_profile_run(session: Session, profile_key: str) -> RowMapping | None:
+    """The latest finished run of any kind that checked ``profile_key`` (readiness screen)."""
+    stmt = select(R).where(R.c.status == "completed", R.c.profile_key == profile_key)
+    return (
+        session.execute(stmt.order_by(R.c.created_at.desc(), R.c.id.desc()).limit(1))
+        .mappings()
+        .one_or_none()
+    )
+
+
+def profile_findings(
+    session: Session, student_ids: Collection[uuid.UUID], profile_key: str, rule_id: str
+) -> list[RowMapping]:
+    """Findings of one rule and profile for these students, any status (readiness overlay:
+    waived differences and confirmations still owed; ADR-0040)."""
+    ids = list(student_ids)
+    if not ids:
+        return []
+    stmt = select(
+        F.c.id,
+        F.c.student_id,
+        F.c.fingerprint,
+        F.c.status,
+        F.c.conflict_hash,
+        F.c.attribute_key,
+        F.c.sources,
+        F.c.severity,
+        F.c.details,
+        F.c.explanation_code,
+        F.c.explanation_params,
+    ).where(F.c.rule_id == rule_id, F.c.profile_key == profile_key)
+    out: list[RowMapping] = []
+    for start in range(0, len(ids), 1000):
+        chunk = ids[start : start + 1000]
+        out.extend(session.execute(stmt.where(F.c.student_id.in_(chunk))).mappings())
+    return out
+
+
 # --- findings: reconcile ---------------------------------------------------------------------
 
 

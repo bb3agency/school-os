@@ -48,6 +48,7 @@ from app.core import retention
 from app.core.db import tenant_session
 from app.core.errors import Conflict, DomainError, NotFound, PreconditionFailed, ValidationFailed
 from app.core.ids import new_id
+from app.core.languages import telugu_text
 from app.core.logging import get_context, get_logger
 from app.core.records import RecordTable
 from app.core.redaction import mask_aadhaar
@@ -72,6 +73,13 @@ from app.imports.mapping import (
     template_payload,
 )
 from app.imports.models import ImportBatch, ImportMappingTemplate, ImportRow
+from app.imports.presets import (
+    Preset,
+    load_presets,
+    missing_columns,
+    preset_mapping,
+    template_header,
+)
 from app.imports.schemas import (
     ColumnOut,
     CommitIn,
@@ -82,6 +90,10 @@ from app.imports.schemas import (
     ImportSummary,
     Issue,
     MappingIn,
+    PresetColumnMatch,
+    PresetColumnOut,
+    PresetMappingOut,
+    PresetOut,
     RowEditIn,
     SheetCellOut,
     SheetColumnOut,
@@ -105,6 +117,7 @@ from app.imports.validation import (
     AADHAAR_CODE,
     AADHAAR_MESSAGE_KEY,
     ANCHOR_SOURCE,
+    NATIONAL_ID_KEYS,
     AttributeSpec,
     ExistingStudent,
     RowResult,
@@ -353,6 +366,8 @@ def _specs(session: Session) -> dict[str, AttributeSpec]:
             max_length=a.max_length,
             pattern=a.pattern,
             not_future=a.not_future,
+            compact=a.compact,
+            format_code=a.format_code,
         )
         for a in students.attribute_rules(session)
     }
@@ -483,7 +498,29 @@ def _validation_context(
         ),
         config=import_config(),
         today=_today(),
+        national_ids=_national_ids(session, sheet, batch.mapping),
     )
+
+
+def _national_ids(
+    session: Session, sheet: Sheet, mapping: Mapping[str, str]
+) -> dict[str, dict[str, str]]:
+    """FR-IMP-010: PEN / APAAR ID values of the file already held by an active student of the
+    school (attribute key -> value -> student id), read in one query per attribute through
+    ``students.national_id_holders``. Values are never logged (PRV-020)."""
+    out: dict[str, dict[str, str]] = {}
+    for key in NATIONAL_ID_KEYS:
+        index = next((int(k) for k, v in mapping.items() if v == key), None)
+        if index is None:
+            continue
+        values = {
+            re.sub(r"[ -]", "", text)
+            for row in sheet.rows
+            if (text := cell_text(row.cell(index).value))
+        }
+        holders = students.national_id_holders(session, key, values)
+        out[key] = {value: str(sids[0]) for value, sids in holders.items() if sids}
+    return out
 
 
 def _row_values(result: RowResult, specs: Mapping[str, AttributeSpec]) -> dict[str, Any]:
@@ -1322,6 +1359,71 @@ def create_template(session: Session, ctx: UserContext, data: TemplateCreate) ->
         resource_type="import_template",
     )
     return _template_out(template)
+
+
+# --- import template library (FR-IMP-030..033, ADR-0041) ------------------------------------------
+
+
+def _preset_out(preset: Preset) -> PresetOut:
+    return PresetOut(
+        key=preset.key,
+        version=preset.version,
+        label_en=preset.label_en,
+        label_te=telugu_text(preset.label_te) or "",  # empty while Telugu is hidden (ADR-0036)
+        description_en=preset.description_en,
+        import_source=preset.import_source,
+        template=preset.template,
+        verified=preset.verified,
+        source=list(preset.source),
+        columns=[
+            PresetColumnOut(header=c.header, target=c.target, aliases=list(c.aliases), note=c.note)
+            for c in preset.columns
+        ],
+    )
+
+
+def _preset(key: str) -> Preset:
+    preset = load_presets().get(key)
+    if preset is None:
+        raise NotFound("Template not found")
+    return preset
+
+
+def list_presets() -> list[PresetOut]:
+    """The packaged starting files (no school data)."""
+    return [_preset_out(p) for p in load_presets().values()]
+
+
+def preset_template(key: str) -> SheetFile:
+    """The preset's blank Excel template: its header row only, no rows (FR-IMP-030). Contains
+    no school data, so it needs no step-up and writes no audit event."""
+    preset = _preset(key)
+    if not preset.template:
+        raise NotFound("Template not found")
+    content = write_xlsx(template_header(preset), [], title=preset.label_en)
+    return SheetFile(f"schoolos-{preset.key}-v{preset.version}.xlsx", XLSX_MIME, content)
+
+
+def preset_mapping_for(
+    session: Session, ctx: UserContext, batch_id: uuid.UUID, key: str
+) -> PresetMappingOut:
+    """Apply a preset to an import's columns (FR-IMP-031). Read-only: the clerk reviews the
+    result and saves it through :func:`set_mapping` (audited there). Targets the import's
+    source may not record stay unmapped."""
+    batch = _visible(session, ctx, batch_id, RUN)
+    preset = _preset(key)
+    headers = [str(c.get("header", "")) for c in batch.columns]
+    targets = allowed_targets(_specs(session), batch.source)
+    return PresetMappingOut(
+        preset=preset.key,
+        import_source=preset.import_source,
+        source_matches=batch.source == preset.import_source,
+        columns=[
+            PresetColumnMatch(index=m.index, header=m.header, target=m.target)
+            for m in preset_mapping(headers, preset, targets)
+        ],
+        missing=missing_columns(headers, preset),
+    )
 
 
 # --- worker: parse and validate -------------------------------------------------------------------

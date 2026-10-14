@@ -1,0 +1,29 @@
+# Import template library (FR-IMP-030..033, ADR-0041): a typical admission register kept in
+# Excel by an AP school office. Column names are the common register headings (Adm. No., Name of
+# the Pupil, ...); there is no official format, so the preset is a convenience and unverified.
+key: register-excel
+version: 1
+label_en: Admission register in Excel (typical columns)
+label_te: Excelలో అడ్మిషన్ రిజిస్టర్ (సాధారణ నిలువు వరుసలు)
+description_en: >-
+  For a register typed into Excel with the usual headings (Adm. No., Name of the Pupil, Father's
+  Name, Date of Birth, ...). Columns with other headings are matched in the next step.
+import_source: admission_register
+template: true
+verified: false
+columns:
+  - {header: Adm. No., target: admission_no, aliases: [Admn. No., Admission No., S.No. / Adm. No.]}
+  - {header: Name of the Pupil, target: full_name, aliases: [Name of the Student, Pupil's Name]}
+  - {header: Father's Name, target: father_name, aliases: [Name of the Father, Father / Guardian Name]}
+  - {header: Mother's Name, target: mother_name, aliases: [Name of the Mother]}
+  - {header: Date of Birth, target: dob, aliases: [D.O.B., Date of Birth (in figures)]}
+  - {header: Sex, target: gender, aliases: [Boy / Girl]}
+  - {header: Date of Admission, target: admission_date, aliases: [D.O.A.]}
+  - {header: Class Admitted, target: class, aliases: [Class in which admitted, Class]}
+  - {header: Section, target: section}
+  - {header: Mother Tongue, target: mother_tongue}
+  - {header: Nationality, target: nationality}
+  - {header: Religion, target: religion, note: "Restricted."}
+  - {header: Caste, target: caste, note: "Restricted."}
+  - {header: Category, target: category, aliases: [Caste Category], note: "Restricted."}
+  - {header: Address, target: address, aliases: [Residential Address], note: "Restricted."}

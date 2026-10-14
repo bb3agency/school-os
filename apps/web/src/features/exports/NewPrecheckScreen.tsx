@@ -169,8 +169,11 @@ export function NewPrecheckScreen({ params }: { params: NewPrecheckParams }) {
   }
 
   const { errors } = form;
-  const profileLabel = (item: ExportProfile) =>
-    `${locale === "te" && item.label_te ? item.label_te : item.label_en} (${t(`profileKind.${item.kind}`)})`;
+  // ADR-0041 (owner decision D3): a board format built from public sources says so.
+  const profileLabel = (item: ExportProfile) => {
+    const label = `${locale === "te" && item.label_te ? item.label_te : item.label_en} (${t(`profileKind.${item.kind}`)})`;
+    return item.verified ? label : t("unverifiedFormat", { label });
+  };
 
   return (
     <div className="space-y-6">

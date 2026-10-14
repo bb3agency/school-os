@@ -21,7 +21,7 @@ export const DQ_KEYS = {
 
 const CATALOG_STALE_MS = 10 * 60_000;
 
-/** Rule catalog DQ-001..DQ-012, DQ-021, DQ-022 (texts from the API). */
+/** Rule catalog DQ-001..DQ-012, DQ-021, DQ-022, DQ-030, DQ-031 (texts from the API). */
 export function useRules() {
   const api = useBffClient("staff");
   return useQuery({

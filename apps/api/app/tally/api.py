@@ -93,7 +93,8 @@ def create_enrolment_code(
 ) -> EnrolmentCodeOut:
     """A one-time code for enrolling the Tally agent on the office PC (``tally.device.manage``,
     recent MFA sign-in). Shown once; SchoolOS keeps only its hash; valid 30 minutes. 409
-    ``too_many_devices``."""
+    ``too_many_devices``; 409 ``module_hidden`` while the school runs alongside another ERP
+    (FR-TEN-022)."""
     return service.create_enrolment_code(db, ctx, body)
 
 

@@ -558,6 +558,28 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             inputs='{"leaving_date": "2026-06-01"}',
             m=ids["m1"],
         )
+        # --- APAAR consent register (0051_apaar_consent_pen, ADR-0039) -----------------------
+        _run(
+            c,
+            "INSERT INTO sis.apaar_consents (id, tenant_id, student_id, seq, status, "
+            "relationship, guardian_id, decided_on, form_language, evidence_document_id, "
+            "recorded_by, recorded_by_membership) VALUES (:i, :t, :s, 1, 'given', 'mother', :g, "
+            "'2026-07-01', 'te', :d, :u, :m)",
+            i=uuid.uuid4(),
+            t=t,
+            s=ids["student"],
+            g=ids["guardian"],
+            d=ids["doc"],
+            u=u["user"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO sis.apaar_consent_settings (id, tenant_id, form_language) "
+            "VALUES (:i, :t, 'te')",
+            i=uuid.uuid4(),
+            t=t,
+        )
         # --- register-photo extraction -------------------------------------------------------
         _run(
             c,

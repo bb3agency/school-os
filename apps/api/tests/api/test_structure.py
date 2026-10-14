@@ -229,6 +229,10 @@ def test_FR_TEN_012_settings_read_and_update(school: Any, api: Any, admin_engine
             "affiliation": "",
             "place": "",
         },
+        # FR-TEN-021, FR-TEN-022 (ADR-0041): no class boards, full SchoolOS until changed.
+        "class_boards": {},
+        "operating_mode": "full",
+        "current_erp_name": "",
     }
     owner = school.people["owner"]
     etag = got.headers["ETag"]

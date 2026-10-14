@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from app.academics.api import router as academics_router
 from app.admin.api import router as admin_router
+from app.apaar.api import router as apaar_router
 from app.audit.api import router as audit_router
 from app.breakglass.api import router as breakglass_router
 from app.certificates.api import router as certificates_router
@@ -76,6 +77,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(exports_router)
     app.include_router(admin_router)
     app.include_router(certificates_router)
+    app.include_router(apaar_router)
     app.include_router(knowledge_router)
     app.include_router(circulars_router)
     app.include_router(academics_router)

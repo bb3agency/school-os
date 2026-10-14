@@ -138,6 +138,10 @@ class ExportProfileOut(_Out):
     fields: list[str]
     required_fields: list[str]
     allowed: bool
+    board: str | None = None
+    verified: bool = False
+    source: list[str] = Field(default_factory=list)
+    superseded: bool = False
 
 
 class ExportDownloadOut(_Out):

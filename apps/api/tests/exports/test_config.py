@@ -30,7 +30,9 @@ def test_FR_EXP_001_config_loads_with_versions() -> None:
 def test_FR_EXP_001_every_layout_matches_a_dq_profile_and_lists_its_required_fields() -> None:
     cfg = load_config()
     catalog = {p.key: p for p in dq.profiles_catalog()}
-    assert set(cfg.profiles) == set(catalog), "one layout per DQ profile"
+    # Readiness-only profiles (ADR-0040: bseap-ssc-2027, apaar) have no pre-check sheet yet.
+    exported = {k for k, p in catalog.items() if not p.readiness}
+    assert set(cfg.profiles) == exported, "one layout per export pre-check profile"
     for key, layout in cfg.profiles.items():
         missing = set(catalog[key].required_fields) - set(layout.fields)
         assert not missing, (key, missing)

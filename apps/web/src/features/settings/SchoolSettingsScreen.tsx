@@ -15,6 +15,7 @@ import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Value } from "@/components/ui/Value";
 import { LetterheadCard } from "@/features/certificates/LetterheadCard";
+import { BoardsCard } from "./BoardsCard";
 import { known, schoolTone } from "@/features/status";
 import { ApiError, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { refreshSessionInfo } from "@/lib/bff/session-client";
@@ -38,8 +39,8 @@ import {
  * School profile and settings (FR-TEN-012). Everyone in the school can read them; holders of
  * `tenant.settings.manage` can change languages, date format, idle timeout and the AI switch
  * and budget. Saving sends only what changed, with If-Match (412 → reload) and may ask for
- * step-up (428 is handled globally). Name, code, boards and state are set by SchoolOS when
- * the school is provisioned: the API offers no school-side edit for them.
+ * step-up (428 is handled globally). Name, code and state are set by SchoolOS when the school
+ * is provisioned; the boards and the operating mode are chosen in the boards card (US-203).
  */
 export function SchoolSettingsScreen() {
   const t = useTranslations("schoolSettings");
@@ -82,6 +83,13 @@ export function SchoolSettingsScreen() {
             <SettingsList settings={tenant.data.settings} />
           </Card>
         )}
+        {/* US-203, US-204 (FR-TEN-020..022): boards, class boards and the operating mode. */}
+        <BoardsCard
+          key={`boards-${tenant.data.version}`}
+          tenant={tenant.data}
+          manage={manage}
+          tenantKey={TENANT_KEY}
+        />
         {/* US-1108, FR-CERT-013: what certificates print at the top and at the signature. */}
         <LetterheadCard
           key={tenant.data.version}
@@ -135,9 +143,6 @@ function ProfileCard({ tenant }: { tenant: TenantProfile }) {
         <Fact label={t("name")}>{tenant.name}</Fact>
         <Fact label={t("code")}>
           <span className="font-mono text-sm">{tenant.code}</span>
-        </Fact>
-        <Fact label={t("boards")}>
-          <Value>{tenant.boards.join(", ")}</Value>
         </Fact>
         <Fact label={t("stateCode")}>{tenant.state_code}</Fact>
         <Fact label={t("status")}>

@@ -1,0 +1,36 @@
+# Import template library (FR-IMP-030..033, ADR-0041): the student list a school downloads
+# from the UDISE+ Student Module ("Download Excel").
+#
+# UNVERIFIED (owner decision D3): no official column list was found. Public captures show name,
+# gender, date of birth, class, section and parents' names; the PEN and APAAR headings are
+# guesses. Confirm with a real download, then set `verified: true` and bump `version`.
+# Values are recorded as source `udise_plus` and compared with the admission register by
+# DQ-011; they never replace register values.
+key: udise-plus-student-list
+version: 1
+label_en: UDISE+ student list (Excel download)
+label_te: UDISE+ విద్యార్థుల జాబితా (Excel డౌన్‌లోడ్)
+description_en: >-
+  The Excel file from the UDISE+ Student Module. Add a column with the school's admission
+  number first: UDISE+ rows are matched to students by admission number.
+import_source: udise_plus
+template: true
+verified: false
+source:
+  - https://www.scribd.com/document/640690563/UDISE-Student-Module
+  - https://educationforallinindia.com/udiseplus-2025-26-modules-user-manual/
+  - https://udiseplus.gov.in/
+columns:
+  - {header: Admission No, target: admission_no, aliases: [Admission Number, School Admission No],
+     note: "Not in the UDISE+ download; add it before importing."}
+  - {header: Student Name, target: full_name, aliases: [Name of Student, Student's Name]}
+  - {header: Gender, target: gender}
+  - {header: Date of Birth, target: dob, aliases: [DOB, Date Of Birth (DD/MM/YYYY)]}
+  - {header: Father Name, target: father_name, aliases: [Father's Name]}
+  - {header: Mother Name, target: mother_name, aliases: [Mother's Name]}
+  - {header: Class, target: class, aliases: [Present Class]}
+  - {header: Section, target: section}
+  - {header: PEN, target: udise_pen, aliases: [Student PEN, PEN No, Permanent Education Number]}
+  - {header: APAAR ID, target: apaar_id, aliases: [APAAR, APAAR No]}
+  - {header: Social Category, target: category, aliases: [Category], note: "Restricted."}
+  - {header: Mother Tongue, target: mother_tongue}

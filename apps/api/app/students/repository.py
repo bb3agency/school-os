@@ -667,6 +667,53 @@ def current_value(
     ).one_or_none()
 
 
+LIVE_STATUSES: tuple[str, ...] = ("active", "provisional")
+
+
+def lock_national_id(session: Session, attribute_key: str, value: str) -> None:
+    """Transaction-level advisory lock on (school, attribute, value), so two writes of the same
+    PEN or APAAR ID run one after the other and the second sees the first (FR-STU-018)."""
+    session.execute(
+        text(
+            "SELECT pg_advisory_xact_lock(hashtextextended("
+            "'sis.national_id:' || core.current_tenant()::text || ':' || :k || ':' || :v, 0))"
+        ),
+        {"k": attribute_key, "v": value},
+    )
+
+
+def national_id_holders(
+    session: Session, attribute_key: str, values: Collection[str], *, live_only: bool = True
+) -> list[tuple[str, uuid.UUID]]:
+    """``(value, student_id)`` for every current, not rejected value of ``attribute_key`` among
+    ``values`` held by an active or provisional student (FR-STU-018: PEN and APAAR ID are unique
+    among the school's live records), or by any student when not ``live_only``. Exact match on
+    ``value_text`` (C2 typed values)."""
+    if not values:
+        return []
+    statuses = LIVE_STATUSES if live_only else ("active", "provisional", "left", "graduated")
+    rows = session.execute(
+        select(AttributeValue.value_text, AttributeValue.student_id)
+        .join(
+            Student,
+            and_(
+                Student.tenant_id == AttributeValue.tenant_id,
+                Student.id == AttributeValue.student_id,
+            ),
+        )
+        .where(
+            AttributeValue.attribute_key == attribute_key,
+            AttributeValue.superseded_by.is_(None),
+            AttributeValue.verification_status != "rejected",
+            AttributeValue.value_text.in_(sorted(set(values))),
+            Student.status.in_(statuses),
+        )
+        .distinct()
+        .order_by(AttributeValue.value_text, AttributeValue.student_id)
+    )
+    return [(str(v), sid) for v, sid in rows]
+
+
 def get_value(session: Session, value_id: uuid.UUID) -> AttributeValue | None:
     return session.scalars(
         select(AttributeValue).where(AttributeValue.id == value_id),
@@ -792,9 +839,9 @@ class SearchSpec:
     admission_bonus: float
     offset: int
     limit: int
-    # FR-STU-016: exact match on one typed attribute (``apaar_id``), current and not rejected.
-    apaar_key: str | None = None
-    apaar_id: str | None = None
+    # FR-STU-016 / FR-STU-019: exact match on typed attributes (``apaar_id``, ``udise_pen``):
+    # ``(attribute_key, value)`` pairs, each a current, not rejected value of the student.
+    exact_values: tuple[tuple[str, str], ...] = ()
 
 
 def _ws(query: str, column: Any) -> ColumnElement[float]:
@@ -832,16 +879,16 @@ def search(session: Session, spec: SearchSpec) -> list[Row[Any]]:
         conditions.append(Student.status == spec.status)
     if spec.admission_no is not None:
         conditions.append(func.upper(Student.admission_no) == spec.admission_no.upper())
-    if spec.apaar_key is not None and spec.apaar_id is not None:
+    for exact_key, exact_value in spec.exact_values:
         v = aliased(AttributeValue)
         conditions.append(
             exists().where(
                 v.tenant_id == Student.tenant_id,
                 v.student_id == Student.id,
-                v.attribute_key == spec.apaar_key,
+                v.attribute_key == exact_key,
                 v.superseded_by.is_(None),
                 v.verification_status != "rejected",
-                v.value_text == spec.apaar_id,
+                v.value_text == exact_value,
             )
         )
     if spec.admission_terms:

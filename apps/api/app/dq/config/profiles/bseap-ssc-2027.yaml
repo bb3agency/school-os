@@ -1,0 +1,48 @@
+# Readiness profile: AP State Board (BSEAP) SSC public examinations, March 2027, Classes IX and X
+# (US-504, FR-DQ-040..FR-DQ-043, ADR-0040). Loaded and validated by
+# app.dq.profiles.load_profiles(); the file name is the profile key.
+#
+# Owner decision D3 (2026-10-10): built from public, mostly secondary sources and NOT verified
+# against an official BSEAP document. For March 2026 the board took the nominal roll from UDISE+
+# and accepted corrections to name, date of birth, gender and Aadhaar only where they matched
+# Aadhaar ("if school records and Aadhaar differ, students should update Aadhaar"). Heads of
+# schools were told to verify surname, name and date of birth. The full nominal-roll field list
+# (parents' names, caste, medium, languages, photo) was not found; parents' names are compared
+# where the records hold them. Confirm with a pilot school before relying on it.
+key: bseap-ssc-2027
+version: 1
+label_en: AP SSC 2027 (BSEAP)
+label_te: AP SSC 2027 (BSEAP) పరీక్షలు
+source:
+  - https://www.tlm4all.com/2026/02/ap-ssc-pe--2026-nominal-rolls-correction.html
+  - https://www.latestly.com/india/education/ap-ssc-hall-ticket-2026-released-at-bse-ap-gov-in-heres-how-to-download-7337557.html
+  - https://teachernews.in/submission-nominal-rolls-for-ssc-public/
+  - https://www.eduinfo4all.com/ssc-public-examinations-march-2026-nominal-roll-link-fee-due-dates-fee-pariculars-age-condonation-forms-how-to-submit-nominal-roll-online-891
+  - https://educationforallinindia.com/udise-2026-27-answers-to-the-questions-parents-teachers-and-school-heads-are-actually-asking/
+verified: false
+
+# DQ-005: the canonical value must exist (blocker).
+required_fields: [full_name, dob, gender, father_name, mother_name, admission_no]
+unverified_identity_severity: null
+needs_apaar: false
+
+readiness:
+  classes: [IX, X]
+  # A difference of capital letters only is shown but does not hold a student back (UIDAI
+  # demographic matching ignores case; unverified, D3).
+  advisory_kinds: [case]
+  fields:
+    - attribute: full_name
+      sources: [admission_register, aadhaar_as_printed, udise_plus, board_registration]
+      required: [admission_register, aadhaar_as_printed, udise_plus]
+    - attribute: dob
+      sources: [admission_register, aadhaar_as_printed, udise_plus, board_registration]
+      required: [admission_register, aadhaar_as_printed, udise_plus]
+    - attribute: gender
+      sources: [admission_register, aadhaar_as_printed, udise_plus, board_registration]
+      required: [admission_register, aadhaar_as_printed, udise_plus]
+    # Aadhaar does not hold parents' names: register vs UDISE+ and the board, where present.
+    - attribute: father_name
+      sources: [admission_register, udise_plus, board_registration]
+    - attribute: mother_name
+      sources: [admission_register, udise_plus, board_registration]

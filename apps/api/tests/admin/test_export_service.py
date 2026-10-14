@@ -166,6 +166,9 @@ EXPECTED_TABLES = {
     "document_acl",
     "certificates",
     "certificate_counters",
+    # R1 (0051_apaar_consent_pen, ADR-0039): the APAAR consent register and form language.
+    "apaar_consents",
+    "apaar_consent_settings",
     "circular_readings",
     "circular_suggestions",
     "tasks",

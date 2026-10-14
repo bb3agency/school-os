@@ -1,0 +1,38 @@
+# Import template library (FR-IMP-030..033, ADR-0041): a student export from the school's
+# current ERP, used by the "alongside your current ERP" refresh (FR-IMP-033).
+#
+# Generic: column names common to Indian school ERP exports. No vendor-specific preset is
+# shipped: no public column list was found for MyClassboard or Entab, and Fedena's published
+# admission import splits the name into first/middle/last name, which the import cannot join
+# (ADR-0041). Values are recorded as source `manual_entry` (office records): the admission
+# register keeps its values and every difference becomes a DQ-030 finding (invariant 6).
+key: erp-student-export
+version: 1
+label_en: Student export from your current ERP
+label_te: మీ ప్రస్తుత ERP నుండి విద్యార్థుల ఎగుమతి
+description_en: >-
+  Refresh SchoolOS from your other school software's student export. Register values are
+  never overwritten; differences are listed as findings for the office to check.
+import_source: manual_entry
+template: true
+verified: false
+columns:
+  - {header: Admission No, target: admission_no,
+     aliases: [Admission Number, Adm No, Admn No, Enrollment No, Enrolment No, Scholar No]}
+  - {header: Student Name, target: full_name, aliases: [Name, Full Name, Student Full Name]}
+  - {header: Father Name, target: father_name, aliases: [Father's Name, Father]}
+  - {header: Mother Name, target: mother_name, aliases: [Mother's Name, Mother]}
+  - {header: Date of Birth, target: dob, aliases: [DOB, Birth Date]}
+  - {header: Gender, target: gender, aliases: [Sex]}
+  - {header: Admission Date, target: admission_date, aliases: [Date of Admission, Joining Date, DOJ]}
+  - {header: Class, target: class, aliases: [Grade, Standard, Course]}
+  - {header: Section, target: section, aliases: [Batch, Division]}
+  - {header: Roll No, target: roll_no, aliases: [Roll Number]}
+  - {header: Mother Tongue, target: mother_tongue}
+  - {header: Nationality, target: nationality}
+  - {header: Religion, target: religion, note: "Restricted."}
+  - {header: Caste, target: caste, note: "Restricted."}
+  - {header: Category, target: category, aliases: [Social Category], note: "Restricted."}
+  - {header: Address, target: address, aliases: [Permanent Address, Present Address], note: "Restricted."}
+  - {header: PEN, target: udise_pen, aliases: [UDISE PEN, Student PEN]}
+  - {header: APAAR ID, target: apaar_id, aliases: [APAAR]}

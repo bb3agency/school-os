@@ -41,6 +41,7 @@ ROUTE_CODES: Final[tuple[str, ...]] = (
     "ROUTE-UDISE",
     "ROUTE-BOARD",
     "ROUTE-APAAR",
+    "ROUTE-ERP",
 )
 
 _IDENTIFIER: Final = re.compile(r"^[a-z][a-z0-9_]*$")

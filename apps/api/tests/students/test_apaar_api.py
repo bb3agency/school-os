@@ -96,7 +96,7 @@ def test_FR_STU_014_udise_pen_from_udise_plus_or_office(world: Any, api: Any) ->
     assert refused.json()["errors"][0]["code"] == "source_not_allowed"
     bad = record(api, admin, sid, "udise_pen", "manual_entry", "2134 5678")
     assert bad.status_code == 422
-    assert bad.json()["errors"][0]["code"] == "invalid_format"
+    assert bad.json()["errors"][0]["code"] == "digits11_required"  # ADR-0039: 11 digits
 
 
 def test_FR_STU_013_apaar_id_correction_is_a_new_verified_value_not_a_change_request(

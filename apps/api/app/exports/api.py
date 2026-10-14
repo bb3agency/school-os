@@ -58,11 +58,19 @@ def _headers(out: ExportOut) -> dict[str, str]:
 
 
 @router.get("/export-profiles", response_model=list[ExportProfileOut])
-def list_export_profiles(ctx: ProfileReader) -> list[ExportProfileOut]:
-    """Board and portal pre-check profiles (e.g. ``cisce-registration-2026``, ``udise-plus``)
+def list_export_profiles(
+    ctx: ProfileReader,
+    db: TenantDB,
+    include_all: Annotated[
+        bool,
+        Query(alias="all", description="Also list profiles of boards the school did not declare."),
+    ] = False,
+) -> list[ExportProfileOut]:
+    """Board and portal pre-check profiles (e.g. ``cbse-registration-2027``, ``udise-plus``)
     with their field order for the "ready to enter" sheet (permission ``export.board`` or
-    ``export.portal``). ``allowed`` says whether you can run each one."""
-    return service.list_profiles(ctx)
+    ``export.portal``). ``allowed`` says whether you can run each one. Board profiles are
+    listed for the school's declared boards only (FR-TEN-020)."""
+    return service.list_profiles(ctx, db, include_all=include_all)
 
 
 @router.post("/exports", response_model=ExportOut, status_code=202)

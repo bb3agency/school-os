@@ -83,6 +83,11 @@ synonyms:
   aadhaar_dob_as_printed: [dob as per aadhaar, date of birth as per aadhaar, aadhaar dob,
                            ఆధార్ ప్రకారం పుట్టిన తేదీ]
   aadhaar_gender_as_printed: [gender as per aadhaar, aadhaar gender, ఆధార్ ప్రకారం లింగం]
+  # National student IDs (ADR-0037, ADR-0039; FR-IMP-010): kept apart from the Aadhaar headers.
+  udise_pen: [pen, pen no, pen number, student pen, udise pen, udise plus pen, udise pen no,
+              permanent education number, పెన్, పెన్ నంబర్]
+  apaar_id: [apaar, apaar id, apaar no, apaar number, apaar id no,
+ apaar ఐడి, అపార్ ఐడి]
   class: [class, std, standard, grade, class name, తరగతి]
   section: [section, sec, div, division, సెక్షన్, విభాగం]
   class_section: [class section, class and section, class sec, class div, తరగతి సెక్షన్,

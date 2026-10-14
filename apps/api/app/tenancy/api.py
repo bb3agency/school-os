@@ -109,8 +109,11 @@ def update_tenant_settings(
     version: IfMatch,
     response: Response,
 ) -> TenantOut:
-    """Change languages, date format, idle timeout (5-30 min), AI features and the monthly AI
-    budget (permission ``tenant.settings.manage``, step-up; ``If-Match`` required)."""
+    """Change languages, date format, idle timeout (5-30 min), AI features, the monthly AI
+    budget, the school's boards and class boards (FR-TEN-020, FR-TEN-021) and the operating
+    mode (``alongside`` another ERP, FR-TEN-022) (permission ``tenant.settings.manage``,
+    step-up; ``If-Match`` required). Errors: 422 ``class_board_not_declared`` when a class is
+    given a board the school did not declare."""
     tenant = tenancy.update_tenant_settings(db, body, expected_version=version)
     _with_etag(response, tenant.version)
     return tenant

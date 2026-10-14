@@ -1,0 +1,56 @@
+# Export pre-check profile: CISCE ICSE (Class X) and ISC (Class XII) candidates on the CAREERS
+# portal, cycle 2026-27: entry confirmation for the 2027 examinations (Classes X and XII) and
+# registration for the 2028 examinations (Classes IX and XI) (FR-DQ-030..032, US-503; DQ-005,
+# DQ-006, DQ-009). Replaces cisce-registration-2026 for new checks; that profile stays as it was
+# (findings and exports store its key).
+#
+# UNVERIFIED (owner decision D3, docs/18 §8; ADR-0041): built from public news reports listed
+# under `source`. The council's circular and the CAREERS portal field list were not obtained;
+# field names, lengths and the APAAR position are best guesses. Confirm with an ICSE school's
+# CAREERS screen, then set `verified: true` and bump `version`.
+key: cisce-registration-2027
+version: 1
+label_en: CISCE ICSE/ISC candidates 2026-27
+label_te: CISCE ICSE/ISC అభ్యర్థులు 2026-27
+board: CISCE
+classes: [IX, X, XI, XII]
+verified: false
+supersedes: cisce-registration-2026
+source:
+  - https://www.freepressjournal.in/education/cisce-icse-isc-exams-2027-28-registration-begins-on-careers-portal-check-details-here
+  - https://news.careers360.com/isc-icse-exams-2027-entry-confirmation-begins-at-careers-cisce-org-registration-starts-for-2028-students-schools-board-candidates
+  - https://www.careerindia.com/news/cisce-icse-isc-2027-2028-registration-begins-check-dates-063637.html
+
+# DQ-005: the canonical value must exist (blocker).
+required_fields: [full_name, dob, gender, father_name, mother_name, admission_no]
+
+unverified_identity_severity: low
+
+# DQ-006: the 50-character limit of the 2026 profile is kept (unverified).
+name_format:
+  fields: [full_name, father_name, mother_name]
+  min_length: 2
+  max_length: 50
+  latin_only: true
+  allowed_punctuation: " .'"
+
+# No public source found that CISCE requires APAAR IDs; the column is offered, not checked.
+needs_apaar: false
+
+# Schools check and confirm candidate and subject details on the portal; corrections need
+# supporting documents (news reports above). A parent check before confirmation is good
+# practice, not a reported council rule.
+parent_verification_slip: true
+
+board_fields:
+  - {name: "Candidate's name", attribute: full_name, note: "As in the admission register."}
+  - {name: "Date of birth", attribute: dob}
+  - {name: "Gender", attribute: gender}
+  - {name: "Father's name", attribute: father_name}
+  - {name: "Mother's name", attribute: mother_name}
+  - {name: "Admission number", attribute: admission_no}
+  - {name: "APAAR ID", attribute: apaar_id, required: false,
+     note: "Not confirmed as a CISCE field; offered for schools asked to provide it."}
+  - {name: "Subjects", attribute: null,
+     note: "SchoolOS does not hold subject choices yet; confirm them on the CAREERS portal."}
+  - {name: "Photograph", attribute: null, note: "Uploaded on the portal."}

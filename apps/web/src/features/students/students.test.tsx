@@ -318,6 +318,7 @@ describe("US-301 / US-303: add a student", () => {
         { attribute_key: "gender", source: "admission_register", value: "male" },
       ],
       status: "active",
+      admission_kind: "new",
       section_id: ID.section,
       roll_no: "12",
     });
