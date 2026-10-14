@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted (owner decisions D1, D3 and D9 of 2026-10-10, docs/18 §8; built on `wip/r1-apaar-udise`) |
+| Status | Accepted (owner decisions D1, D3 and D9 of 2026-10-10, docs/18 §8; built on `wip/r1-apaar-udise`) · Amended by ADR-0044 |
 | Date | 2026-10-10 |
 | Deciders | Product owner (R1 scope, D3 public sources, D9 parent language); engineering (design) |
 | Amends / supersedes | Amends ADR-0037 (decision 6 "no consent tracker"; the PEN format "to confirm"); relies on ADR-0036 with the D9 exception for one parent-facing form |

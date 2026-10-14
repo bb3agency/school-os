@@ -5,7 +5,7 @@
 | Version | 0.4 · 2026-09-27 |
 | Target | OWASP ASVS (current version) Level 2 · OWASP API Security Top 10 · OWASP Top 10 for LLM Applications (2025) |
 | Related | 05-Data model (RLS, encryption), 06-RAG, 08-Privacy, 10-Infrastructure, 11-Operations (incident response), 16-Platform admin panel, ADR-0013, ADR-0015, ADR-0017, ADR-0018 |
-| Changes | 0.5 (2026-10-14): R2 planned controls: trust boundaries TB10-TB12 (§3), threats T28-T35 (§4), planned permissions and non-member guards (§6.7), public endpoints and webhooks (§11.2), SEC-034..SEC-040 (§16); ADR-0042..ADR-0047. 0.4: logging and URLs (§11): personal data never in query strings because ALB access logs keep full URLs; `POST /students/search`; Caddy and WAF log redaction (SEC-008). 0.3: platform catalog files as built (§6.5); non-atomic school-chain copies of platform actions and suspended-school behaviour noted (§6.6); CODEOWNERS paths (§14). 0.2: role keys fixed and permissions split in the matrix (§6.2) with `tenant.structure.manage` and `tenant.billing.read`; platform roles × permissions (§6.5); privilege separation (§6.6); isolation layers incl. composite FKs and `definer_access` (§7); actors, trust boundaries and threats for the control plane, dedicated hosts and heartbeat (§2–4); SEC-026..030 (§16); MFA enforcement and step-up with Cognito (§5.1–5.2, ADR-0018). 0.1: baseline |
+| Changes | 0.5 (2026-10-14): R2 planned controls (approvers and hosts per owner decisions D17, D29 of 2026-10-14): trust boundaries TB10-TB12 (§3), threats T28-T35 (§4), planned permissions and non-member guards (§6.7), public endpoints and webhooks (§11.2), SEC-034..SEC-040 (§16); ADR-0042..ADR-0047. 0.4: logging and URLs (§11): personal data never in query strings because ALB access logs keep full URLs; `POST /students/search`; Caddy and WAF log redaction (SEC-008). 0.3: platform catalog files as built (§6.5); non-atomic school-chain copies of platform actions and suspended-school behaviour noted (§6.6); CODEOWNERS paths (§14). 0.2: role keys fixed and permissions split in the matrix (§6.2) with `tenant.structure.manage` and `tenant.billing.read`; platform roles × permissions (§6.5); privilege separation (§6.6); isolation layers incl. composite FKs and `definer_access` (§7); actors, trust boundaries and threats for the control plane, dedicated hosts and heartbeat (§2–4); SEC-026..030 (§16); MFA enforcement and step-up with Cognito (§5.1–5.2, ADR-0018). 0.1: baseline |
 
 ---
 
@@ -310,10 +310,10 @@ Platform roles belong to SchoolOS staff (operators), not to schools (ADR-0013). 
 | fee.collect (take payments, issue receipts, request cancellations, send payment links) | — | ✓ | ✓ | ✓ | ✓ | — | — | — | — |
 | fee.manage (fee heads, plans, applying plans, UPI settings, adjustments requests, day close) | — | ✓ | — | — | ✓ | — | — | — | — |
 | fee.concession.request | — | ✓ | ✓ | — | ✓ | — | — | — | — |
-| fee.concession.approve (concessions and adjustments; maker-checker) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
-| fee.receipt.cancel (approve a receipt cancellation; maker-checker) | — | ✓ᴿ | — | — | ✓ᴿ | — | — | — | — |
+| fee.concession.approve (concessions and adjustments; maker-checker; principal or accountant, D17) | — | ✓ᴿ | — | — | ✓ᴿ | — | — | — | — |
+| fee.receipt.cancel (approve a receipt cancellation; maker-checker; principal or accountant, D17) | — | ✓ᴿ | — | — | ✓ᴿ | — | — | — | — |
 | fee.refund.request | — | ✓ | — | — | ✓ | — | — | — | — |
-| fee.refund.approve (maker-checker) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
+| fee.refund.approve (maker-checker; principal or accountant, D17) | — | ✓ᴿ | — | — | ✓ᴿ | — | — | — | — |
 | fee.reconcile (bank statement import, UPI confirmations, reconciliation items) | — | ✓ | — | — | ✓ | — | — | — | — |
 | fee.report (download the day book and dues lists: bulk personal financial data) | ✓ᴿ | ✓ᴿ | — | — | ✓ᴿ | — | — | — | ✓ᴿ |
 | payments.configure (connect, rotate, disconnect the school's Razorpay account) | ✓ᴿ | — | — | — | — | — | — | — | — |
@@ -426,7 +426,7 @@ Therefore: **No personal data in URLs.** Names (student, parent, staff), phone n
 
 R2 adds the first internet-facing routes that take no staff session: parent link pages (`/p/*`), certificate verification (`/v/*`), and provider webhooks (`/api/v1/webhooks/razorpay/{route}`, `/api/v1/webhooks/meta`).
 
-**Topology.** Parent and verification pages: browser → `SOS_PUBLIC_BASE_URL` (a separate origin from the staff app; no staff cookies) → web `(public)` route group → BFF → API `/api/v1/public/*` with the service token and no user token. Webhooks: provider → ALB path rule `/api/v1/webhooks/*` → API directly (like `/api/v1/fleet/*`); the BFF refuses `/api/v1/webhooks/*`. On a dedicated host the same paths live on the school's host; Meta webhooks are not offered there in R2 (ADR-0043 decision 12).
+**Topology.** Parent pages: browser → `SOS_PUBLIC_BASE_URL` (for example `my.schoolos.in`); certificate verification: browser → `SOS_VERIFY_BASE_URL` (a separate `verify.` host, D29); both separate origins from the staff app with no staff cookies → web `(public)` route group → BFF → API `/api/v1/public/*` with the service token and no user token. Webhooks: provider → ALB path rule `/api/v1/webhooks/*` → API directly (like `/api/v1/fleet/*`); the BFF refuses `/api/v1/webhooks/*`. On a dedicated host the same paths live on the school's host; Meta webhooks are not offered there in R2 (ADR-0043 decision 12).
 
 **Threats and controls**
 

@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted · Amended by ADR-0018, ADR-0019, ADR-0020, ADR-0023, ADR-0028, ADR-0029 · implementation amendments 2026-09-26, 2026-09-27 (see [Amendments](#amendments-2026-09-26)) |
+| Status | Accepted · Amended by ADR-0018, ADR-0019, ADR-0020, ADR-0023, ADR-0028, ADR-0029, ADR-0047 · implementation amendments 2026-09-26, 2026-09-27 (see [Amendments](#amendments-2026-09-26)) |
 | Date | 2026-09-26 |
 | Deciders | Founder (product owner approval of build proposals B1–B25) |
 | Amends / supersedes | Amends [ADR-0003](ADR-0003-pool-tenancy-rls.md), [ADR-0011](ADR-0011-hash-chained-audit.md), [ADR-0012](ADR-0012-managed-oidc-identity.md) |

@@ -1408,7 +1408,7 @@ A school's owner or principal (`tenant.settings.manage`, step-up) changes the pe
 | Usage aggregates (`platform.usage_daily`) | 3 years | Counts only |
 | Platform audit events | ≥ 1 year online; archive 3 years | Same as tenant audit |
 | Operator accounts | Life of account + 1 year after deactivation | Audit references keep the ID only |
-| **Planned (R2, §15)** · Receipts, refunds, cancellations, ledger entries, concessions, adjustments, fee accounts, provider payments, UPI confirmations (`fin`) | 8 years after the end of the financial year (P; confirm with a CA) | School accounting records; kept after a student leaves; offboarding deletes them after the school's export |
+| **Planned (R2, §15)** · Receipts, refunds, cancellations, ledger entries, concessions, adjustments, fee accounts, provider payments, UPI confirmations (`fin`) | 8 years after the end of the financial year (owner decision D21, 2026-10-14; a CA confirms when available) | School accounting records; kept after a student leaves; offboarding deletes them after the school's export |
 | Bank statement lines (`fin`) | 8 years (amounts, dates, references); narration ciphertext erased after 90 days | The uploaded statement file is deleted as soon as it is parsed |
 | Provider webhook inboxes (`fin.provider_events`, `msg.provider_events`) | 90 days (payments) / 30 days (messaging) after processing | Encrypted raw payloads; facts are already in receipts and messages |
 | Messages (`msg.messages`) | 13 months; encrypted variables erased after 180 days | Delivery evidence for disputes; no message text stored |
@@ -1433,11 +1433,11 @@ A school's owner or principal (`tenant.settings.manage`, step-up) changes the pe
 
 ## 15. Planned (R2): fees, payments, messaging, public handles, verification
 
-**Status: planned (R2), not built.** Decisions: ADR-0042 (fees, payments), ADR-0043 (messaging), ADR-0044 (parent language), ADR-0045 (verification), ADR-0046 (parent links), ADR-0047 (public handles; Proposed). Requirements: docs/03 §3.18-§3.25. Column lists are the design; the migrations may refine names, and each migration's docs section moves to "as built" when it lands.
+**Status: planned (R2), not built.** Decisions: ADR-0042 (fees, payments), ADR-0043 (messaging), ADR-0044 (parent language), ADR-0045 (verification), ADR-0046 (parent links), ADR-0047 (public handles); all accepted with the owner decisions of 2026-10-14. Requirements: docs/03 §3.18-§3.25. Column lists are the design; the migrations may refine names, and each migration's docs section moves to "as built" when it lands.
 
 **Rules for every table below** (as for every tenant table): `id uuid` (UUIDv7) primary key, `tenant_id uuid NOT NULL` first in every composite index, `UNIQUE (tenant_id, id)`, RLS ENABLE + FORCE with `tenant_isolation`, composite FKs `(tenant_id, x_id)`, the restrictive `offboarding_purge` policy and `SELECT, DELETE` for `sos_purger` (ADR-0029), no `definer_access` (except `core.public_handles`, ADR-0047), nothing for `sos_platform`, money `numeric(14,2)`, `created_at`/`updated_at` `timestamptz`, `version` on mutable rows (ETag). Append-only tables: `sos_app` has SELECT and INSERT only, a trigger refuses UPDATE/DELETE except in the offboarding purge (`core.tenant_purge_allowed()`), and column-level UPDATE grants list the few workflow columns that may change.
 
-**New schemas (P, ADR-0042 P10).** `fin` (fees and payments) and `msg` (messaging), created by `infra/db/bootstrap.sql` with the same grants pattern as `sis`/`ops`; `rls_allowlist.yaml` `tenant_schemas` gains both so the RLS catalog test covers them; `sos_readonly` gets no privileges on `fin.provider_events`, `fin.payment_connections`, `msg.accounts`, `msg.provider_events` (secrets and raw payloads). Alternative if the owner prefers fewer schemas: the same tables in `ops` with `fee_`/`msg_` prefixes.
+**New schemas (ADR-0042 P10, owner decision D14 of 2026-10-14).** `fin` (fees and payments) and `msg` (messaging), created by `infra/db/bootstrap.sql` with the same grants pattern as `sis`/`ops`; `rls_allowlist.yaml` `tenant_schemas` gains both so the RLS catalog test covers them; `sos_readonly` gets no privileges on `fin.provider_events`, `fin.payment_connections`, `msg.accounts`, `msg.provider_events` (secrets and raw payloads).
 
 **Migrations (planned order; numbers re-chained at merge as in R1):** `0054_public_handles` (wave R2-0: `core.public_handles`, `core.resolve_public_handle`, schemas `fin`/`msg`, `parent_language` setting, `sis.guardians.preferred_language`, `sis.apaar_consent_settings.form_language` nullable), `0055_certificate_verification` (R2-1A), `0056_fees` (R2-1B), `0057_messaging` (R2-1C), `0058_payments_online` (R2-2D), `0059_fees_upi` (R2-2E), `0060_messaging_sends` (R2-3G). Each ships its permissions (docs/07 §6.7) and needs the system-role sync after migrating (ADR-0022).
 
@@ -1462,7 +1462,7 @@ A school's owner or principal (`tenant.settings.manage`, step-up) changes the pe
 | `fin.bank_statement_imports` | C1 | `period_from`, `period_to`, `line_count`, `credit_count`, `imported_by`, `file_deleted_at` (the file is deleted after parsing) |
 | `fin.bank_statement_lines` | C2 | `import_id`, `value_date`, `amount`, `utr_or_ref`, `narration_ciphertext` (payer names; AES-GCM with the school's DEK, AAD `fin.bank_statement_lines|narration_ciphertext|<id>`; erased after 90 days), `match_status` (`unmatched`,`proposed`,`confirmed`,`ignored`), `receipt_id` |
 | `fin.upi_confirmations` | C2 | **Append-only.** `receipt_id` (unique), `statement_line_id` (unique), `confirmed_by`, `confirmed_at` |
-| `fin.day_closes` | C1 | (P) `close_date` (unique per school), totals by mode (counts and sums), `closed_by` |
+| `fin.day_closes` | C1 | `close_date` (unique per school), totals by mode (counts and sums), `closed_by` |
 | `fin.fee_settings` | C1 | One row: receipt paper size, GST note text, reminder offsets, minimum reminder amount, `version` |
 
 ### 15.2 Online payments (`fin`; ADR-0042, FR-PAY-*)

@@ -590,7 +590,7 @@ Conventions as above: `Idempotency-Key` on creating POSTs, `If-Match` on changes
 | GET | `/fees/upi-exceptions` · `/fees/reconciliation` (`?date=&status=`) · POST `/fees/reconciliation/items/{id}/explain` (`note`) | `fee.reconcile` |
 | GET | `/fees/reports/daily?date=` (JSON; `/print` HTML) · `/fees/reports/daily.csv?date=` | view `finance.read`; CSV `fee.report`ᴿ (audited like an export; rate limit `exports`) |
 | GET | `/fees/dues?section_id=&class_id=` · `/fees/dues.csv?…` | view `finance.read`; CSV `fee.report`ᴿ |
-| POST | `/fees/days/{date}/close` (P) | `fee.manage` |
+| POST | `/fees/days/{date}/close` | `fee.manage` |
 | GET/PUT | `/fees/settings` | read `finance.read`; write `fee.manage` |
 
 #### Online payments (R2.2; FR-PAY-*)
@@ -600,7 +600,7 @@ Conventions as above: `Idempotency-Key` on creating POSTs, `If-Match` on changes
 | GET | `/payments/connection` (provider, mode, account id, status, expiry dates; never secrets) | `payments.configure` or `finance.read` (`require_any`) |
 | POST | `/payments/connection/oauth/start` → `{authorize_url}` (single-use `state`, 10 min) | `payments.configure`ᴿ |
 | GET | `/payments/connection/oauth/callback?code=&state=` (BFF route; the BFF forwards to the API with the member's token; `code` never logged; Caddy/ALB redaction of `code`/`state` already applies) | `payments.configure`ᴿ + `state` bound to the session |
-| POST | `/payments/connection/manual` (`key_id`, `key_secret`) (P) → 201 with the webhook URL and secret **shown once** | `payments.configure`ᴿ (`Idempotency-Key`) |
+| POST | `/payments/connection/manual` (`key_id`, `key_secret`; pilots until partner approval, D13) → 201 with the webhook URL and secret **shown once** | `payments.configure`ᴿ (`Idempotency-Key`) |
 | POST | `/payments/connection/rotate-webhook-secret` · DELETE `/payments/connection` | `payments.configure`ᴿ |
 | POST | `/fees/accounts/{account_id}/payment-intents` (`instalments`) → 201 `{intent_id, short_url, expires_at}` | `fee.collect` (`Idempotency-Key`) |
 | GET | `/fees/accounts/{account_id}/payment-intents` · POST `/fees/payment-intents/{id}/cancel` | `fee.collect` |
@@ -611,7 +611,7 @@ Conventions as above: `Idempotency-Key` on creating POSTs, `If-Match` on changes
 |---|---|---|
 | GET | `/messaging/account` (number, display name, status, quality, limit, currency state, pause reason) · `/messaging/templates` (status per key, version, language, `reviewed`) | `messaging.configure` or `message.read` (`require_any`) |
 | POST | `/messaging/account/embedded-signup` (`code`, `waba_id`, `phone_number_id`) → 201 | `messaging.configure`ᴿ (`Idempotency-Key`) |
-| POST | `/messaging/account/manual` (P; `token`, `waba_id`, `phone_number_id`) → 201 | `messaging.configure`ᴿ |
+| POST | `/messaging/account/manual` (pilots until Tech Provider approval, D13; `token`, `waba_id`, `phone_number_id`) → 201 | `messaging.configure`ᴿ |
 | POST | `/messaging/account/resume` · DELETE `/messaging/account` · POST `/messaging/templates/sync` | `messaging.configure`ᴿ |
 | GET/PUT | `/messaging/settings` (switches, absence time, quiet hours, daily cap, office phone, reminder offsets) | read `message.read`; write `messaging.configure`ᴿ |
 | GET | `/guardians/{guardian_id}/optins` (current state per category + history) | `message.read` or `messaging.optin.record` (student in scope) |
@@ -629,7 +629,7 @@ Conventions as above: `Idempotency-Key` on creating POSTs, `If-Match` on changes
 | Method | Path | Guard |
 |---|---|---|
 | PATCH | `/tenant` with `settings.parent_language` (`en`/`te`); response adds `parent_language_unreviewed` (keys of unreviewed Telugu entries the school would use) | `tenant.settings.manage`ᴿ (existing route) |
-| PATCH | `/guardians/{guardian_id}` with `preferred_language` (`en`/`te`/null) (P) | `student.update_nonidentity` (student in scope) |
+| PATCH | `/guardians/{guardian_id}` with `preferred_language` (`en`/`te`/null) | `student.update_nonidentity` (student in scope) |
 
 #### Ask finish-up (R2.4; FR-KB-040..045)
 

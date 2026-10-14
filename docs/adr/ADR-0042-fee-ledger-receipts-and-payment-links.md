@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | **Accepted in part** (2026-10-14): decisions 1-5 are the owner's (D4, D5 and D8 of 2026-10-10, docs/18 §8). Decisions marked **(P)** are engineering choices that stay **Proposed** until the owner confirms them (list in §"Proposed choices") |
+| Status | **Accepted** 2026-10-14: decisions 1-5 are the owner's (D4, D5, D8 of 2026-10-10); the engineering choices marked **(P)** and P1-P10 below were accepted by the owner on 2026-10-14 (D12-D30, docs/18 §8) |
 | Date | 2026-10-14 |
 | Deciders | Product owner (D4 fees, D5 Razorpay first, D8 pricing unchanged); engineering (design) |
 | Amends / supersedes | Reverses the BRD §7.3 non-goal "online fee collection from parents" and PRD §9 "parent fee payments". Settles the provider choice left open by [ADR-0016](ADR-0016-payments-provider.md) (Razorpay), for a different payer: ADR-0016 is about schools paying SchoolOS; this ADR is about parents paying schools. Relies on ADR-0010 (maker-checker), ADR-0013 and ADR-0047 (public routing), ADR-0029 (offboarding), ADR-0032 (Tally), ADR-0041 (alongside mode) |
@@ -23,7 +23,7 @@ Facts checked on 2026-10-14 (sources at the end):
 ## Decision
 
 1. **A fee ledger and receipts in a new module `app/fees` (owner D4).** Fee heads, fee plans per academic year and class with instalment schedules, concessions, late fees, one fee account per student and academic year, an **append-only ledger**, and receipts. The ledger is the school's record of what is due and what was received; SchoolOS does not do accounting (Tally stays, BRD §7.3) and does not issue GST invoices for fees.
-2. **SchoolOS never touches money (owner D4; RBI PA Directions).** Cash and cheques are counted by the school; UPI QR payments go to the school's own bank account through the bank's QR; online payments go to the school's **own Razorpay account** (the school is Razorpay's merchant, with its own KYC and settlement to its own bank account). SchoolOS creates payment links in the school's account, reads its webhooks and API to reconcile, and asks it for refunds. SchoolOS has no merchant account of its own for fees, no escrow, no split settlement (Razorpay Route) and no payout capability, and takes no commission or convenience fee (D8). Any future partner commission paid by Razorpay to SchoolOS needs a new ADR and disclosure to schools.
+2. **SchoolOS never touches money (owner D4; RBI PA Directions).** Cash and cheques are counted by the school; UPI QR payments go to the school's own bank account through the bank's QR; online payments go to the school's **own Razorpay account** (the school is Razorpay's merchant, with its own KYC and settlement to its own bank account). SchoolOS creates payment links in the school's account, reads its webhooks and API to reconcile, and asks it for refunds. SchoolOS has no merchant account of its own for fees, no escrow, no split settlement (Razorpay Route) and no payout capability, and takes no commission or convenience fee (D8). SchoolOS declines any partner commission from Razorpay (owner decision D28 of 2026-10-14); changing that needs a new ADR and disclosure to schools.
 3. **Razorpay first, behind a provider interface (owner D5).** `app/fees/providers/` defines `PaymentProvider` (create and cancel a payment link, fetch a payment or link, list a day's payments and settlements, refund, verify and parse a webhook, connect and disconnect an account). Implementations: `razorpay` and `fake` (deterministic, local and CI only; refused in staging and prod like the extraction fake). Only `app/fees/providers/*` may call a payment provider (import-linter contract and egress allowlist), the same rule as the LLM gateway (ADR-0005).
 4. **One receipt series per school, for every mode (owner D4).** Cash, cheque, bank transfer, UPI QR and Razorpay receipts share one gap-free series per school and **financial year** (April-March), default `RCT/2026-27/000001` (format in `app/fees/config.yaml`). Numbers are allocated in the issuing transaction from a locked counter row, like certificate serials (FR-CERT-006). A receipt's printed content is frozen with a SHA-256 at issue.
 5. **Receipts are never edited; a cancellation is a new document (owner D4).** A wrong receipt is cancelled through a cancellation record (reason, requester, approver ≠ requester, DB `CHECK`), which posts a reversing ledger entry; the receipt keeps its number and shows "Cancelled" in every list, print and parent page. Money returned to a payer is a **refund voucher** in its own series (`RFD/2026-27/0001`), never a negative receipt. Concessions and manual adjustments are maker-checker too (ADR-0010 pattern).
@@ -34,23 +34,24 @@ Facts checked on 2026-10-14 (sources at the end):
 10. **(P) Reconciliation and refunds.** A daily job (06:00 IST) lists the previous day's Razorpay payments and settlements for each connected school and compares them with receipts: paid-but-not-receipted, receipted-but-not-captured, amount mismatch, refunded, settlement missing after T+3. A refund of an online payment is requested by the accountant, approved by a second person (`fee.refund.approve`, step-up) and sent to Razorpay; the voucher and ledger entry are posted when `refund.processed` arrives. Cash refunds are recorded as vouchers only.
 11. **(P) GST note.** Receipts state "Education services: exempt from GST" (configurable text). A head marked `taxable` cannot be collected through SchoolOS receipts in R2 (the school invoices it in Tally); this keeps SchoolOS out of GST invoicing for fees.
 12. **(P) Coexistence.** The "alongside" mode (ADR-0041) hides `fees` by default (added to `operating_modes.yaml`), and a school may also simply leave fees off (feature flag `fees.enabled`). When fees are on, the Ask tool `get_fee_dues` reads the fee ledger instead of Tally (finance permission unchanged); the Tally connector keeps working as a read-only view and is not reconciled against the ledger in R2. A daily receipts CSV ("day book") is exportable for entry into Tally; a Tally XML voucher export is a follow-up.
-13. **(P) Never withhold a TC for dues.** The TC flow may show the student's outstanding balance to the clerk as information but MUST NOT block, delay or print dues on a TC (RTE Act and state practice; owner to confirm with a lawyer). No fee data is ever shown to class teachers or in Ask answers to anyone without `finance.read`.
+13. **(P) Never withhold a TC for dues.** The TC flow may show the student's outstanding balance to the clerk as information but MUST NOT block, delay or print dues on a TC (RTE Act and state practice; owner decision D16 of 2026-10-14). No fee data is ever shown to class teachers or in Ask answers to anyone without `finance.read`.
 14. **Purpose limit (invariant 14).** Fee data is used only to run the school's fees. No referrals to lenders or fee-financing partners, no sharing with Razorpay beyond decision 8, no cross-school analytics.
 
-### Proposed choices (need the owner)
+### Engineering choices (accepted by the owner 2026-10-14)
 
-| # | Choice | Proposed default |
+| # | Choice | Decision (2026-10-14) |
 |---|---|---|
-| P1 | OAuth Technology Partner onboarding (decision 6) and manual keys for pilots | Yes; apply to Razorpay's partner programme before the first pilot |
-| P2 | Receipt series per financial year (not academic year) | Financial year April-March, one series for all modes |
-| P3 | Who cancels a receipt | Requested by the collector or accountant, approved by a different person holding `fee.receipt.cancel` (accountant, principal); no same-day self-cancel |
-| P4 | Concession approval | Requested by office admin or accountant, approved by principal or owner (step-up) |
-| P5 | Late fee rules | Flat amount per overdue instalment after a grace period, or per day with a cap; never compounding; waivers need approval |
+| P1 | OAuth Technology Partner onboarding (decision 6) and manual keys for pilots | SchoolOS applies to Razorpay's Technology Partner programme once a staging demo exists (D13); until approval, pilots connect with manual per-school keys |
+| P2 | Receipt series per financial year (not academic year) | Financial year April-March, one series for all modes; A5 receipts by default (D17) |
+| P3 | Who cancels a receipt | Requested by the collector or accountant, approved by a different person (principal or accountant, `fee.receipt.cancel`); never self-cancel (D17) |
+| P4 | Concession, adjustment and refund approval | Requested by office admin or accountant, approved by a different person: principal or accountant (step-up) (D17) |
+| P5 | Late fee rules | Flat amount per overdue instalment after a grace period, or per day with a cap; never compounding; waivers need approval; no advances in R2 (D18) |
 | P6 | Taxable heads | Not collectable through SchoolOS in R2 |
 | P7 | UPI verification | Receipt at once; bank-statement confirmation by a person later |
-| P8 | Backdated receipts | Not allowed (receipt date = today, IST); online receipts dated by capture time |
+| P8 | Backdated receipts | Not allowed (receipt date = today, IST); online receipts dated by capture time; day close included (D20) |
 | P9 | Cheques | Allowed as a mode; a dishonoured cheque is a cancellation with reason `cheque_dishonoured` |
-| P10 | Schema | New tenant schema `fin` (bootstrap, RLS allowlist `tenant_schemas`) rather than adding to `sis` or `ops` |
+| P10 | Schema | New tenant schema `fin` (bootstrap, RLS allowlist `tenant_schemas`) rather than adding to `sis` or `ops` (D14) |
+| — | Retention and commission | Financial records 8 years after the financial year (D21; a CA confirms when available); SchoolOS declines any Razorpay partner commission (D28) |
 
 ## Consequences
 
