@@ -94,6 +94,9 @@ def _check_date_format(value: str) -> str:
 class ProfileLayout(_Model):
     kind: LayoutKind
     layout_version: int = Field(ge=1)
+    # Owner decision D3: a layout built from public sources stays unverified until a school
+    # confirms the board's or portal's own template.
+    verified: bool = False
     date_format: str
     fields: tuple[str, ...] = Field(min_length=1, max_length=60)
     value_maps: dict[str, dict[str, str]] = Field(default_factory=dict)

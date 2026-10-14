@@ -68,6 +68,21 @@ profiles:
     value_maps:
       gender: {female: Female, male: Male, transgender: Transgender}
       category: {general: General, ews: General, obc: OBC, sc: SC, st: ST}
+  # AP State Board SSC nominal roll (FR-EXP-008, FR-DQ-048; ADR-0040 follow-up). UNVERIFIED
+  # (owner decision D3): no official column list was found; the order follows the public guides
+  # in docs/research/2026-10-market/notes/regulation_portals.md §3 (name, parents' names, date of
+  # birth, gender, caste and category, religion, mother tongue, PEN, Aadhaar reference).
+  # aadhaar_last4 is shown only as "XXXX XXXX 1234" (PRV-014) and, like caste and religion, is
+  # restricted (C3): masked unless the export includes restricted values.
+  bseap-ssc-2027:
+    kind: board
+    layout_version: 1
+    verified: false
+    date_format: "%d/%m/%Y"
+    fields: [admission_no, full_name, father_name, mother_name, dob, gender, category, caste,
+             religion, mother_tongue, udise_pen, aadhaar_last4]
+    value_maps:
+      gender: {female: Female, male: Male, transgender: Transgender}
   # layout_version 2 (ADR-0037, FR-EXP-005): UDISE+ PEN and APAAR ID columns, empty when
   # unknown. The typed APAAR ID is written unmasked; every other cell keeps the Aadhaar mask.
   # layout_version 3 (ADR-0039, FR-EXP-006): the 2026-27 Student Module order (general profile,
