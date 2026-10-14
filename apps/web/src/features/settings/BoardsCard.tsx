@@ -71,10 +71,16 @@ export function BoardsCard({
   tenant,
   manage,
   tenantKey,
+  saved = false,
+  onSaved,
 }: {
   tenant: TenantProfile;
   manage: boolean;
   tenantKey: readonly unknown[];
+  /** This version of the school was just saved here: say so (the card remounts per version). */
+  saved?: boolean;
+  /** Called with the saved school's version before the school is loaded again. */
+  onSaved?: (version: number) => void;
 }) {
   const t = useTranslations("schoolSettings.boards");
   const tc = useTranslations("common");
@@ -89,7 +95,7 @@ export function BoardsCard({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<unknown>(undefined);
   const [nameError, setNameError] = useState<string | undefined>(undefined);
-  const [outcome, setOutcome] = useState<"saved" | "unchanged" | null>(null);
+  const [outcome, setOutcome] = useState<"saved" | "unchanged" | null>(saved ? "saved" : null);
   const classBoards = settings.class_boards ?? {};
   const boardName = (code: string) => (isBoard(code) ? t(`names.${code}`) : code);
 
@@ -163,8 +169,9 @@ export function BoardsCard({
         body: patch,
       }),
     )
-      .then(async () => {
+      .then(async (updated) => {
         setOutcome("saved");
+        onSaved?.(updated.version);
         await queryClient.invalidateQueries({ queryKey: tenantKey });
       })
       .catch((failure: unknown) => setError(failure))

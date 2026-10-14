@@ -52,6 +52,8 @@ export function SchoolSettingsScreen() {
   const meLoaded = useStaffMe() !== undefined;
   const manage = can(SETTINGS_MANAGE);
   const tenant = useApiQuery(TENANT_KEY, () => unwrap(api.GET("/api/v1/tenant")));
+  // The boards card remounts with each new version of the school; this keeps its "saved".
+  const [boardsSaved, setBoardsSaved] = useState<number | null>(null);
 
   let body: ReactNode;
   if (tenant.status === "loading") body = <LoadingState label={tc("loading")} />;
@@ -89,6 +91,8 @@ export function SchoolSettingsScreen() {
           tenant={tenant.data}
           manage={manage}
           tenantKey={TENANT_KEY}
+          saved={boardsSaved === tenant.data.version}
+          onSaved={setBoardsSaved}
         />
         {/* US-1108, FR-CERT-013: what certificates print at the top and at the signature. */}
         <LetterheadCard
