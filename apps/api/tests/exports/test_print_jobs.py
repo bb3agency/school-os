@@ -244,6 +244,42 @@ def test_FR_DQ_047_worker_fails_when_permission_was_revoked(
     assert EX.files(admin_engine, export_id) == []
 
 
+def test_docs_04_print_jobs_go_to_the_pdf_workers(
+    school: Any, api: Any, admin_engine: Engine
+) -> None:
+    """Both print jobs are rendered by the Chromium workers: outbox ``export.render_requested``
+    (task ``exports.render``, queue ``pdf``), never the spreadsheet queue."""
+    sid = _ssc_student(school)
+    office = school.people["office_admin"]
+    slips = _post(api, office, SLIPS, {"profile_key": SSC, "student_id": str(sid)})
+    forms = _post(api, office, FORMS, {"student_id": str(sid)})
+    assert slips.status_code == forms.status_code == 202
+    ids = [slips.json()["id"], forms.json()["id"]]
+    with admin_engine.connect() as c:
+        events = dict(
+            c.execute(
+                text(
+                    "SELECT payload ->> 'export_id', event_type FROM ops.outbox "
+                    "WHERE tenant_id = :t AND payload ->> 'export_id' = ANY(:ids)"
+                ),
+                {"t": school.tenant_id, "ids": ids},
+            ).all()
+        )
+        tasks = {
+            str(r[0]): r[1]
+            for r in c.execute(
+                text(
+                    "SELECT e.id, j.task_name FROM ops.exports e "
+                    "JOIN ops.job_runs j ON j.tenant_id = e.tenant_id AND j.id = e.job_id "
+                    "WHERE e.tenant_id = :t AND e.id::text = ANY(:ids)"
+                ),
+                {"t": school.tenant_id, "ids": ids},
+            )
+        }
+    assert events == dict.fromkeys(ids, "export.render_requested")
+    assert tasks == dict.fromkeys(ids, "exports.render")
+
+
 # --- APAAR consent forms (FR-APC-007) ----------------------------------------------------------
 
 
