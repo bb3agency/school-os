@@ -2109,6 +2109,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/exports/apaar-consent-forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Consent Forms Export
+         * @description Print the APAAR consent forms of one student or one section to a PDF (FR-APC-007; the
+         *     same forms as the print views). Permission ``apaar.consent.read`` or
+         *     ``apaar.consent.record`` in scope (404 outside it) and ``student.read_basic``, with a
+         *     recent sign-in with MFA (428). ``status`` (sections only) prints only those students;
+         *     ``language`` defaults to the school's parent-form language, and Telugu forms work while
+         *     the staff screens are English (owner decision D9). The PDF is made in the background
+         *     (202). Errors: 409 ``no_forms``, ``too_many_forms``; 422 ``section_only``. Accepts
+         *     ``Idempotency-Key``.
+         */
+        post: operations["create_consent_forms_export_api_v1_exports_apaar_consent_forms_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exports/readiness-slips": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Readiness Slips Export
+         * @description Print the parent verification slips of one student or one section to a PDF (FR-DQ-047;
+         *     the same slips as ``GET /dq/readiness/{profile_key}/slips``). Permission
+         *     ``dq.readiness.read`` in the student's or section's scope (404 outside it) and
+         *     ``student.read_basic``, with a recent sign-in with MFA (428). Aadhaar-as-printed values
+         *     are masked unless ``include_sensitive`` (needs ``student.read_sensitive`` for every
+         *     student, else 403 ``sensitive_not_allowed``); an Aadhaar number never appears. The PDF is
+         *     made in the background (202); the export at ``Location`` shows its status and gives a
+         *     download link like other exports. Errors: 422 ``no_students``. Accepts
+         *     ``Idempotency-Key``.
+         */
+        post: operations["create_readiness_slips_export_api_v1_exports_readiness_slips_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/exports/student-list": {
         parameters: {
             query?: never;
@@ -8285,6 +8340,22 @@ export interface components {
             status: "given" | "refused" | "pending" | "withdrawn";
         };
         /**
+         * ConsentFormsCreate
+         * @description FR-APC-007: APAAR consent forms as one PDF (the same forms as the print views).
+         *     ``status`` (section only) prints only those students, e.g. ``pending``; ``language`` is the
+         *     school's parent-form language when left out (owner decision D9).
+         */
+        ConsentFormsCreate: {
+            /** Language */
+            language?: ("en" | "te") | null;
+            /** Section Id */
+            section_id?: string | null;
+            /** Status */
+            status?: ("given" | "refused" | "pending" | "withdrawn") | null;
+            /** Student Id */
+            student_id?: string | null;
+        };
+        /**
          * ConsentIn
          * @description A parent's decision as written on the returned form (FR-APC-001..003).
          *
@@ -9211,7 +9282,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "board_precheck" | "portal_precheck" | "student_list";
+            kind: "board_precheck" | "portal_precheck" | "student_list" | "readiness_slips" | "apaar_consent_forms";
             /**
              * Language
              * @enum {string}
@@ -12635,6 +12706,31 @@ export interface components {
             section_id: string;
             /** Students */
             students: number;
+        };
+        /**
+         * ReadinessSlipsCreate
+         * @description FR-DQ-047: parent verification slips of a readiness profile as one PDF (the same slips as
+         *     ``GET /dq/readiness/{profile_key}/slips``). ``include_sensitive`` prints the
+         *     Aadhaar-as-printed values (needs ``student.read_sensitive`` for every student); otherwise
+         *     they are masked. Never an Aadhaar number.
+         */
+        ReadinessSlipsCreate: {
+            /**
+             * Include Ready
+             * @default true
+             */
+            include_ready: boolean;
+            /**
+             * Include Sensitive
+             * @default false
+             */
+            include_sensitive: boolean;
+            /** Profile Key */
+            profile_key: string;
+            /** Section Id */
+            section_id?: string | null;
+            /** Student Id */
+            student_id?: string | null;
         };
         /** ReadinessStudentDetailOut */
         ReadinessStudentDetailOut: {
@@ -19941,6 +20037,98 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExportDownloadOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_consent_forms_export_api_v1_exports_apaar_consent_forms_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsentFormsCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_readiness_slips_export_api_v1_exports_readiness_slips_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReadinessSlipsCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportOut"];
                 };
             };
             /** @description Validation Error */

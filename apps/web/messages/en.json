@@ -3358,7 +3358,9 @@
       "descriptionSection": "Checks the students of this section and stores each difference as a finding, so it can be resolved, accepted or corrected through a change request.",
       "descriptionProfile": "Checks every student in the classes this check covers and stores each difference as a finding. Big schools are checked in the background.",
       "start": "Start the check"
-    }
+    },
+    "pdfSlip": "Make PDF",
+    "pdfSectionSlips": "Make PDF of this section's slips"
   },
   "changeRequests": {
     "nav": "Correction requests",
@@ -3764,7 +3766,9 @@
     "kind": {
       "board_precheck": "Board pre-check",
       "portal_precheck": "Portal pre-check",
-      "student_list": "Student list"
+      "student_list": "Student list",
+      "readiness_slips": "Parent verification slips",
+      "apaar_consent_forms": "APAAR consent forms"
     },
     "format": {
       "xlsx": "Excel (XLSX)",
@@ -3826,7 +3830,8 @@
       "chooseSections": "Choose sections",
       "sectionsCount": "{count, plural, one {# section} other {# sections}}",
       "classesCount": "{count, plural, one {# class} other {# classes}}",
-      "everyone": "All students the requester could see"
+      "everyone": "All students the requester could see",
+      "studentsCount": "{count, plural, one {# student} other {# students}}"
     },
     "new": {
       "stepUpTitle": "You will be asked to confirm it's you",
@@ -3947,6 +3952,15 @@
         "title": "Restricted details are not allowed for you",
         "body": "Only staff allowed to see restricted details (such as category) can include or download them. Leave them out, or ask your school's office admin."
       }
+    },
+    "pdfJob": {
+      "making": "Making the PDF. This updates by itself.",
+      "ready": "The PDF is ready.",
+      "download": "Download PDF",
+      "failed": "The PDF could not be made.",
+      "expired": "The PDF was deleted. Make it again.",
+      "again": "Make it again",
+      "lost": "We could not check on the PDF."
     }
   },
   "devSignIn": {
@@ -4278,7 +4292,6 @@
       "description": "SchoolOS sets these when your school joins. To change them, contact SchoolOS support.",
       "name": "School name",
       "code": "School code",
-      "boards": "Boards",
       "stateCode": "State code",
       "status": "Status",
       "tier": "Plan type"
@@ -7502,7 +7515,8 @@
       "colDate": "Date on the form",
       "colForm": "Signed form",
       "colRecordedBy": "Recorded by",
-      "colNote": "Note"
+      "colNote": "Note",
+      "pdfForm": "Make PDF of the form"
     },
     "record": {
       "title": "Record the parent's decision",
@@ -7572,6 +7586,8 @@
         "title": "Too many forms at once",
         "body": "Print a section at a time, or only the pending students."
       }
-    }
+    },
+    "pdfPending": "PDF of pending forms",
+    "pdfAll": "PDF of all forms"
   }
 }

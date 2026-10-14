@@ -10,8 +10,9 @@ type Props = { searchParams: Promise<Record<string, string | string[] | undefine
 /** US-504, US-506: board and portal readiness by section (profile and section in the URL). */
 export default async function ReadinessPage({ searchParams }: Props) {
   const query = await searchParams;
-  const profile = isProfileKey(query.profile) ? query.profile : DEFAULT_PROFILE;
+  const chosen = isProfileKey(query.profile);
+  const profile = chosen ? (query.profile as string) : DEFAULT_PROFILE;
   const section =
     typeof query.section === "string" && UUID_PATTERN.test(query.section) ? query.section : null;
-  return <ReadinessScreen profileKey={profile} sectionId={section} />;
+  return <ReadinessScreen profileKey={profile} sectionId={section} chosen={chosen} />;
 }

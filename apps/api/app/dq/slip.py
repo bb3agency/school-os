@@ -5,11 +5,14 @@ every value goes through :func:`html.escape` and the Aadhaar mask (invariant 4, 
 depth: the slip shows Aadhaar-as-printed name, date of birth and gender, never an Aadhaar
 number, not even the last four digits). The page has no scripts, links, images or external
 fonts; its only style block is allowed by hash (:data:`STYLE_CSP`), like the correction memo
-(``app.changes.memo``). The same HTML prints to PDF with :mod:`app.core.pdf` when a worker job
-needs it; the browser's print dialog is the first-class path (CLAUDE.md §10).
+(``app.changes.memo``). The same page prints to PDF in the worker (FR-DQ-047, ``exports.render``
+through :mod:`app.core.pdf`, with :func:`pdf_style`); the browser's print dialog stays the
+first-class path (CLAUDE.md §10).
 
-English first (ADR-0036): while Telugu is hidden the slip is English only; the Telugu lines
-stay in the template (``<span class="te">``), dormant.
+Language: the slip is parent-facing (owner decision D9). It keeps its Telugu lines (a
+bilingual slip) when the school prints parent forms in Telugu (the APAAR consent form language
+setting, ADR-0039) or while Telugu is shown in the staff UI; otherwise the Telugu lines
+(``<span class="te">``) are dropped and the slip is English only (ADR-0036).
 """
 
 from __future__ import annotations
@@ -26,9 +29,11 @@ from typing import Final
 from zoneinfo import ZoneInfo
 
 from app.core.languages import telugu_enabled
+from app.core.pdf import font_face_css, font_stack
 from app.core.redaction import mask_aadhaar
 
 IST: Final = ZoneInfo("Asia/Kolkata")
+_PDF_FALLBACK_FONTS: Final = '"Noto Sans", Arial, sans-serif'
 
 STATUS_LABELS: Final[dict[str, tuple[str, str]]] = {
     "ready": ("Ready: all records match", "సిద్ధం: అన్ని రికార్డులు సరిపోలుతున్నాయి"),
@@ -41,8 +46,8 @@ STYLE: Final = """
 @page { size: A4; margin: 14mm 14mm 16mm; }
 * { box-sizing: border-box; }
 body { margin: 0; color: #111; background: #fff;
-  font-family: "Noto Sans", "Noto Sans Telugu", Arial, sans-serif; font-size: 10.5pt;
-  line-height: 1.6; }
+  font-family: "Noto Sans", "Noto Sans Telugu", "Nirmala UI", Arial, sans-serif;
+  font-size: 10.5pt; line-height: 1.6; }
 main { max-width: 182mm; margin: 0 auto; }
 section.slip { padding: 4mm 0; break-after: page; page-break-after: always; }
 section.slip:last-child { break-after: auto; page-break-after: auto; }
@@ -254,11 +259,27 @@ def _student(data: SlipData, student: SlipStudent) -> str:
 _TE_SPAN: Final = re.compile(r'\s*<span class="te">[^<]*</span>')
 
 
-def render(data: SlipData) -> str:
-    """The slips page (one ``section.slip`` per student, a page break between them)."""
+def pdf_style(*, telugu: bool) -> str:
+    """The style of the PDF print (FR-DQ-047): :data:`STYLE` plus, for a page with Telugu lines,
+    the bundled Telugu font that the renderer serves (the worker has no system Telugu font).
+    The browser view keeps :data:`STYLE` alone, the only style its CSP allows."""
+    if not telugu:
+        return STYLE
+    stack = font_stack(_PDF_FALLBACK_FONTS, telugu=True)
+    return f"{font_face_css(telugu=True)}{STYLE}body {{ font-family: {stack}; }}\n"
+
+
+def render(data: SlipData, *, telugu: bool | None = None, for_pdf: bool = False) -> str:
+    """The slips page (one ``section.slip`` per student, a page break between them).
+
+    ``telugu``: keep the Telugu lines (the school prints parent pages in Telugu, D9); by
+    default only while Telugu is shown in the staff UI (ADR-0036). ``for_pdf``: the page
+    printed by the worker's headless Chromium (:func:`pdf_style`)."""
+    show_te = telugu_enabled() if telugu is None else telugu
     slips = "\n".join(_student(data, s) for s in data.students)
-    page = _PAGE.substitute(profile_en=_e(data.profile.en), style=STYLE, slips=slips)
-    return page if telugu_enabled() else _TE_SPAN.sub("", page)
+    style = pdf_style(telugu=show_te) if for_pdf else STYLE
+    page = _PAGE.substitute(profile_en=_e(data.profile.en), style=style, slips=slips)
+    return page if show_te else _TE_SPAN.sub("", page)
 
 
 __all__ = [
@@ -269,5 +290,6 @@ __all__ = [
     "SlipRow",
     "SlipStudent",
     "SlipText",
+    "pdf_style",
     "render",
 ]

@@ -5,7 +5,7 @@
 | Version | 0.9 · 2026-09-30 |
 | Approach | Module by module on a shared core; real school needs decide order after M1; no calendar commitments |
 | Related | 01-BRD §7, §11, 02-PRD §3, 03-TRD, 12-Testing strategy, 16-Platform admin panel |
-| Changes | 0.9: M2 addendum: Ask conversations, context and per-user memory (ADR-0034; PO questions). 0.8: M5 status (attendance, marks, early-warning flags, notes and timeline built on the M5 branch; PO questions). 0.7: M4 status (circulars, tasks, parent notices built on the M4 branch; PO questions). 0.6: M1 status updated for everything merged up to `cc818b3` (promotions, DEK rotation, break-glass support sign-in, synthetic students, test gates, SEC-023 Terraform, worker image and Chromium sandbox); new M2 status; owner decisions for SEC-012 and SEC-023 (2026-09-27) recorded. 0.5: M1 status (built per scope item, M1 security controls, remaining work, decisions needed, pilot-gate items checkable in code) after §2 M1, verified against code and tests. 0.4: M0 decisions 1, 3, 4 and 5 settled by the product owner (ADR-0020); decision 2 stays open. 0.3: M0 status (built per task, remaining work, decisions needed, pilot-gate status) after §2 M0; Task 5 lists all definer functions. 0.2: M0 adds the platform admin panel with minimal billing (C14), school setup and user admin UI, synthetic data as tasks; M0 task order changed; M0 exit criteria and pilot gate add platform checks; promotions and invoice PDFs in M1; M7 no longer carries basic billing. 0.1: baseline |
+| Changes | 0.10 (2026-10-14): R2 plan (scope, five build waves with file ownership and migrations, test plan, definition of done, owner questions and the owner's decisions D12-D30 of 2026-10-14); correction that the Ask screens are built; M7 online payment item superseded by R2 (ADR-0042). 0.9: M2 addendum: Ask conversations, context and per-user memory (ADR-0034; PO questions). 0.8: M5 status (attendance, marks, early-warning flags, notes and timeline built on the M5 branch; PO questions). 0.7: M4 status (circulars, tasks, parent notices built on the M4 branch; PO questions). 0.6: M1 status updated for everything merged up to `cc818b3` (promotions, DEK rotation, break-glass support sign-in, synthetic students, test gates, SEC-023 Terraform, worker image and Chromium sandbox); new M2 status; owner decisions for SEC-012 and SEC-023 (2026-09-27) recorded. 0.5: M1 status (built per scope item, M1 security controls, remaining work, decisions needed, pilot-gate items checkable in code) after §2 M1, verified against code and tests. 0.4: M0 decisions 1, 3, 4 and 5 settled by the product owner (ADR-0020); decision 2 stays open. 0.3: M0 status (built per task, remaining work, decisions needed, pilot-gate status) after §2 M0; Task 5 lists all definer functions. 0.2: M0 adds the platform admin panel with minimal billing (C14), school setup and user admin UI, synthetic data as tasks; M0 task order changed; M0 exit criteria and pilot gate add platform checks; promotions and invoice PDFs in M1; M7 no longer carries basic billing. 0.1: baseline |
 
 ---
 
@@ -327,7 +327,7 @@ Built on `wip/r1-apaar-udise` (docs/18 §3 R1.2-R1.3; ADR-0039; stories US-1901.
 Open: the consent wording and the court order are from secondary sources (check the official revised form); the Telugu form text needs a native reviewer; the UDISE+ field list awaits a school's portal screen or the official 2026-27 DCF; the BSEAP readiness diff and the APAAR failure list are a separate R1 work item (`app/dq/readiness*`).
 
 ### M7 · Multi-school readiness
-**Scope:** self-serve onboarding wizard · import templates library · online payment collection if ADR-0016 is accepted (basic billing already shipped in M0) · tenant admin improvements · support tooling beyond tickets · first dedicated-tier schools at scale (SEC-030 before the first one) · Stage 1 infrastructure (Multi-AZ, replicas, cross-account backups) · external pen test · published security overview for schools.
+**Scope:** self-serve onboarding wizard · import templates library · online payment of SchoolOS invoices (ADR-0016, accepted with Razorpay 2026-10-14; parents paying schools is R2, ADR-0042) (basic billing already shipped in M0) · tenant admin improvements · support tooling beyond tickets · first dedicated-tier schools at scale (SEC-030 before the first one) · Stage 1 infrastructure (Multi-AZ, replicas, cross-account backups) · external pen test · published security overview for schools.
 **Exit:** 5 schools live with < 1 week onboarding effort each; SLOs met for 2 consecutive months.
 *(The import templates library was pulled forward into R1.5, below.)*
 
@@ -352,6 +352,85 @@ Migration `0053_readiness` revises `0052_boards_import_presets`; US-504..US-506,
 - **Web** `/findings/readiness` (profile picker, section progress, student list, slips) and `/findings/readiness/{student}` (highlighted diff, fix-owner badges), English and Telugu catalogues.
 
 Not verified: every readiness format (D3), the BSEAP nominal-roll field list (parents' names, caste, medium are unconfirmed). Release note: existing schools need `python -m app.identity.sync_system_roles --apply` after `0053` (ADR-0022).
+
+R1 status, finish (`wip/r1-finish`, 2026-10-14; migration `0054_r1_finish` revises `0053_readiness`):
+
+- [x] Server-rendered PDFs of the parent verification slips and the APAAR consent forms, per student and per section, as print-job exports (`POST /exports/readiness-slips`, `/exports/apaar-consent-forms`; queue `pdf`; FR-DQ-047, FR-APC-007). Same permissions and reach as the print views, step-up, presigned downloads, audited; Telugu parent forms embed the bundled font while the staff UI stays English (D9). "Make PDF" buttons on the readiness and APAAR screens.
+- [x] AP SSC readiness tied to BSEAP schools, with a nominal-roll pre-check sheet (`verified: false`; FR-DQ-048, FR-EXP-008); APAAR stays shown to every school.
+- [x] e2e coverage of the R1 screens through the stand-in API (`e2e/r1.spec.ts`, a11y, responsive): readiness and a student's differences, APAAR consent and a student's consent, PDF downloads, PEN check, school boards, import templates.
+- [x] Boards card keeps its "saved" message after reloading the school; unused i18n key `schoolSettings.profile.boards` removed.
+- [ ] Telugu form and slip wording reviewed by a native speaker; formats confirmed with a pilot school (D3).
+
+### R2 · Office essentials around the wedge (2026-27 plan, docs/18 §3; planned Jan-Apr 2027)
+
+**Scope (owner-accepted 2026-10-10, D4-D9):** AP TC format and public certificate verification (C20, ADR-0045); fee ledger and receipts with UPI QR matching and Razorpay payment links, the school always the merchant (C21, ADR-0042); WhatsApp utility messages from the school's own number through the Meta Cloud API with opt-in and short-lived parent link pages (C22, C24; ADR-0043, ADR-0046); parent language per school (C23, ADR-0044); Ask the school finish-up (C25). Requirements: docs/03 §3.18-§3.25. Tables: docs/05 §15. Security: docs/07 §6.7, §11.2, SEC-034..040. Privacy: docs/08 §15. Endpoints: docs/09 §4 "R2 planned endpoints". Settings: docs/10 §11.2. Screens: docs/17 §5.8.
+
+**Correction (2026-10-14).** docs/18 §2 listed the Ask conversation screens as "not built"; they are built (docs/17 §5.3, `apps/web/src/features/ask/`, M2 addendum above). R2.4 is therefore a finish-up (usage display, search-only explanations, `/knowledge/resolve`, e2e), not a new screen set.
+
+**Decisions settled (2026-10-14).** The owner approved ADR-0047 and accepted every proposed answer (table "Owner decisions on the R2 questions" below; docs/18 §8 D12-D30). No gate remains before wave R2-0.
+
+#### Build waves (2-3 parallel agents per wave, each merged `--no-ff` and verified before the next; owner decision D11)
+
+Every wave branch starts from the merged result of the previous wave. Migrations are numbered in the plan below and **re-chained at merge** if another revision lands first (as in R1). Shared catalogue files (`app/authz/permissions.yaml`, `app/authz/roles.yaml`, docs/07 §6.2, `app/tenancy/offboarding.yaml`, `app/tenancy/operating_modes.yaml`, `app/core/rate_limits.yaml`) are touched by several agents: each agent adds **only its own keys in its own block** with a comment naming the wave, and the merger resolves line conflicts. Each new module gets its own import-linter contract (no other module imports its repository or models; it calls others only through `service.py`).
+
+| Wave | Branch | Owns (files and modules) | Depends on | Migration |
+|---|---|---|---|---|
+| **R2-0 Foundation** (1 agent) | `wip/r2-foundation` | New `app/public/` (handles: models, repository, service `issue_handle`/`revoke`/`resolve`; guards `require_public_handle`, the webhook-guard registry `require_webhook_signature(provider)` with pluggable verifiers, `require_meta_verify_token`; `public_routes.yaml`; purge job); `core.public_handles` + `core.resolve_public_handle`; schemas `fin` and `msg` in `infra/db/bootstrap.sql`; `tests/security/rls_allowlist.yaml` and route-enumeration test updates; `app.core.languages.parent_language()` + tenant setting `parent_language`; `sis.guardians.preferred_language` (via `students.service`); `apaar_consent_settings.form_language` nullable; planned rate-limit policies; web `(public)` route group shell on `PUBLIC_BASE_URL`, BFF public proxy, `/p/{token}` exchange-and-redirect, uniform expired page; settings `SOS_PUBLIC_BASE_URL` | ADR-0047 accepted | `0054_public_handles` |
+| **R2-1A Certificates** | `wip/r2-certificates` | `app/certificates/` (formats directory, `ap-tc-2027.yaml`, new TC inputs, PEN/APAAR printing rule, verification codes, add/withdraw, check counts), `sis.certificate_verifications`, certificate PDF template v2 with QR (QR generation library: licence check, CLAUDE.md §11), web certificate screens and `(public)/v` pages | R2-0 | `0055_certificate_verification` |
+| **R2-1B Fees core** | `wip/r2-fees-core` | New `app/fees/` **except** `providers/`, `online*.py`, `upi*.py`, `statements*.py`: heads, plans, instalments, accounts, ledger, concessions, adjustments, late fees, receipts (counter, PDF, frozen content), cancellations, refunds (cash/cheque), daily report, dues, day close, settings; `fees.service` public functions for others (`account_summary`, `dues_for_student`, `create_payment_intent` stub raising `payments_not_connected`, receipt events); operating mode `alongside` hides `fees`; permissions `fee.*`; web `apps/web/src/features/fees/` (counter, receipts, approvals, daily, dues, setup) | R2-0 | `0056_fees` |
+| **R2-1C Messaging core** | `wip/r2-messaging-core` | New `app/messaging/` **except** `sends/`: providers (`meta_cloud`, `fake`), Embedded Signup and manual token connect, account sync, `templates.yaml` and provisioning per WABA and language, template status/category sync and auto-pause, opt-ins and join codes, inbound keywords (JOIN, STOP), `optin_confirm`/`optin_stopped`, Meta webhook verifier registered in the R2-0 guard, inbox processing for account/template/inbound events; permissions `messaging.*`, `message.read`; web `/settings/whatsapp`, guardian opt-in panel, join slips | R2-0 | `0057_messaging` |
+| **R2-2D Online payments** | `wip/r2-payments-online` | `app/fees/providers/` (`razorpay`, `fake`, recorded synthetic fixtures), `app/fees/online.py`, `app/fees/api_online.py`, Razorpay webhook verifier, inbox processing, intents and links, reconciliation job, online refunds, token refresh and revocation; `payments.configure`; web `/settings/payments`, payment-link actions, Online reconciliation tab | R2-1B | `0058_payments_online` |
+| **R2-2E UPI and bank statements** | `wip/r2-fees-upi` | `app/fees/upi.py`, `app/fees/statements.py`, `app/fees/api_upi.py`: UPI settings and QR, UTR rules, statement import (parse then delete), proposals, confirmations, exceptions; `fee.reconcile`; web `/settings/upi`, Bank tab of `/fees/reconcile` | R2-1B | `0059_fees_upi` |
+| **R2-2F Ask finish-up** | `wip/r2-ask-finish` | `app/knowledge/` (`GET /knowledge/usage`, `GET /knowledge/resolve`, `get_fee_dues` reading `fees.service` when fees are on), `apps/web/src/features/ask/` (meter, banners, search-only reasons), Playwright Ask journeys | R2-1B (fee tool only; the rest is independent) | none expected |
+| **R2-3G Sending** | `wip/r2-messaging-sends` | `app/messaging/sends/`: notice broadcasts (preview token, cost estimate, fan-out), absence alerts (reads `academics.service`), fee reminders and receipt messages (reads `fees.service`, outbox events), delivery status processing, retries, caps, quiet hours, pause rules, message history; issues parent handles through `public.service`; web `/messages`, notice "Send on WhatsApp" panel, delivery reports | R2-1C, R2-1B, R2-0 | `0060_messaging_sends` |
+| **R2-3H Parent pages** | `wip/r2-parent-pages` | `app/public/pages.py` (content assemblers through `circulars.service`, `fees.service`), `/public/links/*` routes, pay flow (`fees.service.create_payment_intent`), opt-in page; web `(public)/p/*` pages, parent catalogue `messages/parent.en.json` and `parent.te.json` (Telugu marked unreviewed) | R2-0, R2-1B, R2-2D (pay button) | none expected |
+| **R2-3I Hardening** (after G and H merge) | `wip/r2-hardening` | Cross-cutting tests only plus fixes found: public-surface security suite (enumeration, uniform 404, rate limits, token leakage in logs), webhook forgery/replay suite, log redaction for phone/UTR/tokens, e2e counter and parent journeys (1366×768 keyboard-only; 375 px), docs moved from "planned" to "as built", penetration-test scope (NFR-SEC-007) | all | none |
+
+**Order and parallelism.** R2-0 → (R2-1A ∥ R2-1B ∥ R2-1C) → (R2-2D ∥ R2-2E ∥ R2-2F) → (R2-3G ∥ R2-3H) → R2-3I. If the owner wants WhatsApp earlier than online payments, swap R2-2D and R2-3G (G then sends receipts without pay buttons).
+
+#### Test plan (all waves)
+
+- **Unit and API** per story (docs/02 C20-C25 ACs as test names with the requirement ids), authz allowed / denied 403 / other school 404 for every route, BOLA for receipts, accounts, intents, messages, opt-ins, verifications; fee permissions never section-scoped.
+- **Money integrity:** concurrent receipt issue (gap-free, no duplicates), cancellation/refund maker-checker with DB `CHECK`, ledger append-only trigger, allocation sums, late-fee idempotence, receipt frozen-content hash, UTR uniqueness under concurrency, paise conversion exactness (property tests).
+- **Webhooks:** valid/invalid/wrong-school/rotated-secret signatures, replayed event ids, out-of-order events, re-fetch mismatch → exception (never a receipt), payload size limits; all with synthetic recorded fixtures through the fake providers.
+- **Messaging:** eligibility matrix (opt-in, phone, template status, quiet hours, caps, pause), STOP within 60 s and link revocation, status monotonicity, utility-only catalogue test, no inbound text stored.
+- **Public surface:** resolver catalog and isolation, uniform 404 shape, rate limits, cookie exchange and headers, field-allowlist snapshots of every public response, no token/phone/UTR in captured logs.
+- **Migrations:** upgrade/downgrade round trips on the populated synthetic database (`make migration-check`), RLS catalog with the new schemas, composite-FK catalog, definer allowlist.
+- **Language:** with `SOS_TELUGU_ENABLED` off and `parent_language = te`, parent surfaces are Telugu and no staff surface contains Telugu (ADR-0044); Telugu font loaded only on Telugu public pages.
+- **E2E (Playwright):** counter flow keyboard-only at 1366×768 under 60 s with synthetic data; parent pages at 375 px; verification page without JavaScript; Ask journeys.
+- **Evals:** `make eval` hard gates green after the Ask finish-up and the fee-tool switch.
+
+#### Definition of done (R2)
+
+Each wave: its stories' ACs pass as automated tests; `make check`-equivalent green (ruff, mypy strict, import-linter, full pytest, web lint/typecheck/vitest/build); migrations round-trip on a populated DB; permissions in `permissions.yaml`, `roles.yaml` and docs/07 §6.2 (moved from §6.7) together; OpenAPI regenerated; docs sections switched from "planned" to "as built"; release note naming the system-role sync. R2 as a whole: hardening wave done; penetration test of the public surface scheduled before the first school uses it (NFR-SEC-007); privacy review and the DPA/notice wording (docs/08 §15.3) drafted by SchoolOS as templates (D30); pilots connected with manual per-school keys and tokens until the Razorpay Technology Partner and Meta Tech Provider approvals (applied for once a staging demo exists, D13); no real student, parent or phone data in any environment (invariant 11).
+
+#### Owner decisions on the R2 questions (2026-10-14)
+
+The owner accepted every proposed answer to the twenty R2 questions exactly as proposed (recorded as D12-D30 in docs/18 §8). There is no remaining gate on R2 code: wave R2-0 may start.
+
+| # | Question | Decision (2026-10-14) | docs/18 |
+|---|---|---|---|
+| Q1 | ADR-0047 public handles and the definer resolver | **Approved**; ADR-0047 Accepted | D12 |
+| Q2 | Partner programmes | SchoolOS applies as a Razorpay Technology Partner and a Meta Tech Provider **once a staging demo exists** | D13 |
+| Q3 | Pilot fallbacks | **Manual per-school Razorpay keys and Meta tokens for pilots** until those approvals | D13 |
+| Q4 | Schemas | New tenant schemas **`fin` and `msg`** | D14 |
+| Q5 | AP TC restricted fields; verification content | Religion and caste stay **blank unless the school asks** (per-school setting, step-up, audited); the verification page shows the **full printed content** | D15 |
+| Q6 | TC and dues | A TC is **never withheld or annotated** for unpaid fees | D16 |
+| Q7 | Receipts and approvals | **One receipt series per financial year** for all modes, **A5** by default; cancellations, concessions, adjustments and refunds need a **second approver (principal or accountant)**; never self-approval | D17 |
+| Q8 | Late fees and advances | Flat per instalment after a grace period, or per day with a cap; **no advances in R2** | D18 |
+| Q9 | Taxable heads | **Refused in R2** (the school invoices them in Tally) | D18 |
+| Q10 | UPI | Receipt **issued at once**, confirmed from the bank statement later by a person | D19 |
+| Q11 | Backdating, day close | **No backdating; day close included** | D20 |
+| Q12 | Retention | **8 years** after the financial year for financial records (a CA confirms when available) | D21 |
+| Q13 | Parent pages | Lifetimes **30 / 90 / 7 days** (notice / receipt / dues); the receipt page shows the child's name, class and admission number | D22 |
+| Q14 | Language | **Per-guardian override: yes**; a fluent Telugu reviewer signs off before any Telugu school goes live | D23 |
+| Q15 | Dedicated tier | **No WhatsApp on the dedicated tier in R2** | D24 |
+| Q16 | Defaults | Absence alerts **off** by default, 11:00 IST; quiet hours 21:00-07:00; daily cap = Meta limit − 10%; reminders −3 / 0 / +7 days | D25 |
+| Q17 | Opt-in evidence | **"Recorded in person by staff" accepted** alongside signed forms and the parent's own join message | D26 |
+| Q18 | Cost display | **Show the estimated Meta cost** before each broadcast | D27 |
+| Q19 | Razorpay commission | **Decline** any partner commission | D28 |
+| Q20 | Public hosts | Parent origin such as **`my.schoolos.in`**; a **separate `verify.` host** (for example `verify.schoolos.in`) for certificate QR links (`SOS_VERIFY_BASE_URL`) | D29 |
+| — | Legal documents (was docs/18 Q9) | The owner has no lawyer. **SchoolOS drafts the DPA, privacy notice, terms and DPIA itself** as templates based on the DPDP Act 2023 and DPDP Rules 2025 (R3 DPDP processor pack), clearly marked "not legal advice". Residual risk accepted: a one-time professional review is recommended before the first paid school signs, but it does **not** block pilots on synthetic data | D30 |
 
 ## 3. Pilot-ready gate (before any real student data)
 

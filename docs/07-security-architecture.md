@@ -5,7 +5,7 @@
 | Version | 0.4 · 2026-09-27 |
 | Target | OWASP ASVS (current version) Level 2 · OWASP API Security Top 10 · OWASP Top 10 for LLM Applications (2025) |
 | Related | 05-Data model (RLS, encryption), 06-RAG, 08-Privacy, 10-Infrastructure, 11-Operations (incident response), 16-Platform admin panel, ADR-0013, ADR-0015, ADR-0017, ADR-0018 |
-| Changes | 0.4: logging and URLs (§11): personal data never in query strings because ALB access logs keep full URLs; `POST /students/search`; Caddy and WAF log redaction (SEC-008). 0.3: platform catalog files as built (§6.5); non-atomic school-chain copies of platform actions and suspended-school behaviour noted (§6.6); CODEOWNERS paths (§14). 0.2: role keys fixed and permissions split in the matrix (§6.2) with `tenant.structure.manage` and `tenant.billing.read`; platform roles × permissions (§6.5); privilege separation (§6.6); isolation layers incl. composite FKs and `definer_access` (§7); actors, trust boundaries and threats for the control plane, dedicated hosts and heartbeat (§2–4); SEC-026..030 (§16); MFA enforcement and step-up with Cognito (§5.1–5.2, ADR-0018). 0.1: baseline |
+| Changes | 0.5 (2026-10-14): R2 planned controls (approvers and hosts per owner decisions D17, D29 of 2026-10-14): trust boundaries TB10-TB12 (§3), threats T28-T35 (§4), planned permissions and non-member guards (§6.7), public endpoints and webhooks (§11.2), SEC-034..SEC-040 (§16); ADR-0042..ADR-0047. 0.4: logging and URLs (§11): personal data never in query strings because ALB access logs keep full URLs; `POST /students/search`; Caddy and WAF log redaction (SEC-008). 0.3: platform catalog files as built (§6.5); non-atomic school-chain copies of platform actions and suspended-school behaviour noted (§6.6); CODEOWNERS paths (§14). 0.2: role keys fixed and permissions split in the matrix (§6.2) with `tenant.structure.manage` and `tenant.billing.read`; platform roles × permissions (§6.5); privilege separation (§6.6); isolation layers incl. composite FKs and `definer_access` (§7); actors, trust boundaries and threats for the control plane, dedicated hosts and heartbeat (§2–4); SEC-026..030 (§16); MFA enforcement and step-up with Cognito (§5.1–5.2, ADR-0018). 0.1: baseline |
 
 ---
 
@@ -81,6 +81,9 @@ flowchart LR
 | TB7 Dedicated host → control plane (heartbeat) | Outbound only; HMAC-SHA256 per deployment, ±5 min timestamp window, nonce replay cache, strict schema without free text, rate limit; the control plane never connects into a host |
 | TB8 Internet → dedicated host | Caddy TLS (ACME), security headers, only 80/443 open, no SSH (SSM), same app controls as the shared tier |
 | TB9 Office PC edge agent → API (M6; behind flag; ADR Proposed, ADR-0032) | Outbound only; the agent sends only Tally `Export` requests to `localhost` and SchoolOS never connects to the PC. Enrolment by a one-time code (owner, step-up; hash stored, 30 minutes, once; refused with the same 401 as a wrong code when the school is not active). Enrolment limits (AA-15, owner decision 2026-10-07; `app/tally/config.yaml`), fixed hour windows in Valkey under hashed addresses, fail closed (503): 20 attempts per client address (any school, any outcome, charged first); then only **wrong codes** count, 10 per school per client address and 50 per school from all addresses (429). One outsider who knows a tenant id thus locks out only their own address, never the office PC; the school-wide cap bounds guessing from many addresses (a 12-character code from a 32-character alphabet, valid 30 minutes, cannot be guessed within it) at the cost that an attacker with five or more addresses can delay enrolment by up to an hour. Every later request HMAC-SHA256 signed (`require_edge_agent_signature()`): flag, active device and key read inside the school's `tenant_session` (no definer function), ±300 s, body ≤ 1 MB, constant-time compare, nonce replay cache (10 minutes), per-device rate limits; secret wrapped by the school's key wrapper, rotation with ≤ 7 days overlap, revocation erases keys. Server enforces the accountant's group selection; ≤ 5,000 ledgers per snapshot. The BFF refuses `/api/v1/edge/*`. The credential on the PC is DPAPI-protected (service-account scope); nothing personal is written to disk or logs |
+| TB10 Payment provider → API (R2, planned; ADR-0042) | Razorpay calls `/api/v1/webhooks/razorpay/{route}` straight to the API (ALB path rule); per-school route handle and secret; HMAC-SHA256 of the raw body; event-id dedupe; stored before 200; payments re-read from the provider API before any receipt. Outbound: only `app/fees/providers/*` to `api.razorpay.com` / `auth.razorpay.com` with the school's OAuth token (egress allowlist). No money flows through SchoolOS |
+| TB11 Meta → API and API → Meta (R2, planned; ADR-0043) | One callback `/api/v1/webhooks/meta`: verify-token challenge, `X-Hub-Signature-256` (app secret), WABA-id routing handle, stored before 200. Outbound: only `app/messaging/providers/*` to `graph.facebook.com` with the school's business token; phone numbers decrypted only in the sending worker |
+| TB12 Internet → public parent origin (R2, planned; ADR-0045..0047) | Separate origin `SOS_PUBLIC_BASE_URL`; no staff cookies; BFF → API with the service token only; handle resolver as the only cross-tenant step; strict CSP, `no-referrer`, `no-store`, `noindex`; per-IP and per-handle limits, uniform 404 (§11.2) |
 
 ## 4. Threat model (STRIDE)
 
@@ -113,6 +116,14 @@ flowchart LR
 | T25 | Dedicated host compromised or left unpatched | I/T/E | Hardening baseline (SEC-030), no SSH, monthly OS patching, fleet version tracking, own KMS key and bucket per host, backups off-host in ap-south-2 | Medium |
 | T26 | Wrongful suspension cuts off a school during exams | D | Suspension never automatic; step-up + reason; exam-window rule with owner approval; audited | Low |
 | T27 | Cross-tenant reference via foreign key (FK checks bypass RLS) | I/T | Composite `(tenant_id, x_id)` FKs on every tenant→tenant reference; test | Low |
+| T28 | (R2) Forged "payment received" webhook creates a receipt for unpaid fees | S/T | Per-school webhook secret, signature over the raw body, re-fetch of the payment from the provider before posting, amount and reference checks, unique provider payment id (SEC-034) | Low |
+| T29 | (R2) Replayed or duplicated webhook posts a payment twice | T | Event-id inbox unique key, unique provider payment id on receipts, idempotent processing (SEC-034) | Low |
+| T30 | (R2) Staff member pockets cash and cancels or edits the receipt | T/R | Receipts never edited; cancellation and refunds need a second person with step-up; gap-free series; daily collection report by collector; audit (SEC-038) | Low–medium |
+| T31 | (R2) Theft of a school's Razorpay or Meta token | I/E | Row-bound KMS wrapping, no API returns secrets, rotation, revocation on disconnect, provider-side revocation webhook (SEC-035) | Low |
+| T32 | (R2) Guessing or harvesting parent links or certificate codes to read children's data | I | 256-bit tokens / 80-bit codes, hash-only storage, failed-lookup limits, uniform 404, minimal page content, expiry and revocation (SEC-036, SEC-037) | Low |
+| T33 | (R2) Enumerating schools using SchoolOS through public URLs | I | No school identifier in URLs; resolver returns only ids; identical errors (SEC-036, SEC-039) | Low |
+| T34 | (R2) Messages sent to parents who did not opt in, or after STOP; marketing sent as utility | R/I | Append-only opt-in with evidence, send-time eligibility check, STOP within 60 s, utility-only catalogue test, automatic pause on recategorisation (SEC-040; PRV-025) | Low |
+| T35 | (R2) Phone numbers or payer details leak through logs, webhooks payload stores or link previews | I | Phone only in `sis.guardians` (C3), blind index elsewhere; webhook payloads encrypted and purged; preview fetchers get a generic page; log redaction tests for phone, UTR and tokens (SEC-008) | Low |
 
 Review the model at each milestone and after any incident.
 
@@ -289,6 +300,32 @@ Platform roles belong to SchoolOS staff (operators), not to schools (ADR-0013). 
 | Dedicated hosts | `SOS_DEPLOYMENT_MODE=dedicated` removes control-plane routes; the control plane never connects into a host |
 | Verified by | Catalog tests (12 §4.8–4.9), platform authz matrix (12 §4.12), alert on any `permission denied` from the platform path (11 §12) |
 
+### 6.7 Planned permissions (R2; not in the catalog yet)
+
+**Status: planned (R2).** These keys are not in `app/authz/permissions.yaml` or `roles.yaml` yet, so they are deliberately **not** in the §6.2 matrix (which `tests/authz/test_catalog.py` compares with `roles.yaml` exactly). Each R2 wave adds its keys to the catalog, `roles.yaml` and the §6.2 table in the same change, and the release runs the system-role sync (ADR-0022). Same legend as §6.2. Fee permissions are school-wide only (never section-scoped): a class teacher sees no fee data (FR-FEE-024).
+
+| Permission | owner | principal | office_admin | office_staff | accountant | exam_coord | class_teacher | teacher | auditor_ro |
+|---|---|---|---|---|---|---|---|---|---|
+| finance.read (existing; from R2 also fee accounts, dues, daily report, message history of fee messages) | ✓ | ✓ | — | — | ✓ | — | — | — | ✓ |
+| fee.collect (take payments, issue receipts, request cancellations, send payment links) | — | ✓ | ✓ | ✓ | ✓ | — | — | — | — |
+| fee.manage (fee heads, plans, applying plans, UPI settings, adjustments requests, day close) | — | ✓ | — | — | ✓ | — | — | — | — |
+| fee.concession.request | — | ✓ | ✓ | — | ✓ | — | — | — | — |
+| fee.concession.approve (concessions and adjustments; maker-checker; principal or accountant, D17) | — | ✓ᴿ | — | — | ✓ᴿ | — | — | — | — |
+| fee.receipt.cancel (approve a receipt cancellation; maker-checker; principal or accountant, D17) | — | ✓ᴿ | — | — | ✓ᴿ | — | — | — | — |
+| fee.refund.request | — | ✓ | — | — | ✓ | — | — | — | — |
+| fee.refund.approve (maker-checker; principal or accountant, D17) | — | ✓ᴿ | — | — | ✓ᴿ | — | — | — | — |
+| fee.reconcile (bank statement import, UPI confirmations, reconciliation items) | — | ✓ | — | — | ✓ | — | — | — | — |
+| fee.report (download the day book and dues lists: bulk personal financial data) | ✓ᴿ | ✓ᴿ | — | — | ✓ᴿ | — | — | — | ✓ᴿ |
+| payments.configure (connect, rotate, disconnect the school's Razorpay account) | ✓ᴿ | — | — | — | — | — | — | — | — |
+| messaging.configure (connect WhatsApp, switches, times, resume after a pause) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
+| messaging.optin.record (record opt-in/opt-out with evidence, print join slips) | — | ✓ | ✓ | ✓ | — | — | S | — | — |
+| message.send (send an approved notice, resend, revoke a parent link) | — | ✓ | ✓ | — | — | — | — | — | — |
+| message.read (delivery reports and message history) | ✓ | ✓ | ✓ | ✓ | ✓ | — | S | — | ✓ |
+
+Unchanged keys used by R2: `certificate.approve`ᴿ (add or withdraw a verification code), `tenant.settings.manage`ᴿ (parent language, TC format), `student.update_nonidentity` (guardian language), `tenant.billing.read` (AI answer usage numbers).
+
+**Machine and public guards (R2; not permissions).** Routes without a member use only these dependencies, each pinned to its paths in `app/public/public_routes.yaml` by the route-enumeration test (invariant 2; ADR-0047): `require_public_handle(kind)` (parent and verification pages through the BFF's service token), `require_webhook_signature("razorpay")`, `require_webhook_signature("meta")`, `require_meta_verify_token()`. They join `require_fleet_signature()` and the Tally agent guards as the only non-member guards.
+
 ## 7. Tenant isolation (four layers)
 
 | Layer | Control | Verified by |
@@ -385,6 +422,29 @@ Therefore: **No personal data in URLs.** Names (student, parent, staff), phone n
 - **Soft lockout, not hard lockout:** failures are counted per IP and per person + IP, never per account alone, with an exponential delay capped at 15 minutes, so an attacker cannot lock a victim out (ASVS 2.2.1). Cognito's own lockout still applies to passwords typed into its managed login; Cognito threat protection (PLUS tier) and a WAF on the user pools remain an owner decision (P2-07).
 - **Monitoring:** `security.rate_limited`, `security.auth.failed`, `security.rate_limit.unavailable` (API) and `signin_failed`, `step_up_failed`, `auth_rate_limited` (BFF) carry IDs and `ip_hash` (keyed HMAC of the address) only. CloudWatch metric filters turn them into `SchoolOS/Security/<env>` metrics with alarms (docs/10 §12); the event names are pinned by `tests/deploy/test_security_log_events.py`.
 
+### 11.2 Public endpoints and webhooks (R2, planned; ADR-0042, ADR-0043, ADR-0045, ADR-0046, ADR-0047)
+
+R2 adds the first internet-facing routes that take no staff session: parent link pages (`/p/*`), certificate verification (`/v/*`), and provider webhooks (`/api/v1/webhooks/razorpay/{route}`, `/api/v1/webhooks/meta`).
+
+**Topology.** Parent pages: browser → `SOS_PUBLIC_BASE_URL` (for example `my.schoolos.in`); certificate verification: browser → `SOS_VERIFY_BASE_URL` (a separate `verify.` host, D29); both separate origins from the staff app with no staff cookies → web `(public)` route group → BFF → API `/api/v1/public/*` with the service token and no user token. Webhooks: provider → ALB path rule `/api/v1/webhooks/*` → API directly (like `/api/v1/fleet/*`); the BFF refuses `/api/v1/webhooks/*`. On a dedicated host the same paths live on the school's host; Meta webhooks are not offered there in R2 (ADR-0043 decision 12).
+
+**Threats and controls**
+
+| Threat | Control |
+|---|---|
+| Guessing parent tokens or verification codes | 256-bit parent tokens and 80-bit certificate codes from the OS CSPRNG; only SHA-256 stored; per-IP failed-lookup budget 20 per 10 minutes, fail closed (docs/09 §2.7 `public_lookup_fail`); global alarm on failed lookups; WAF rate rule on `/p/` and `/v/` |
+| Enumerating schools or students | No school id, code or name in any public URL; one resolver (ADR-0047) that returns only a school id and handle id; identical 404 body for unknown, expired, revoked and suspended; no search by serial, name or date of birth; pages show only the handle's own target |
+| Token leakage (logs, referrers, history, forwarding) | Token only in the path, exchanged for a `__Host-` cookie and redirected (303) to a token-free URL; `Referrer-Policy: no-referrer`; `Cache-Control: private, no-store`; `noindex`; short lifetimes and revocation (ADR-0046); minimal page content; the shared ALB log line with the token is accepted (restricted bucket, 13 months, expiring token) |
+| Forged or replayed webhooks | Razorpay: per-school secret, hex HMAC-SHA256 of the raw body (`X-Razorpay-Signature`), event id dedupe; Meta: app secret, `X-Hub-Signature-256` over the raw body, dedupe per event key; constant-time compare; body limits (256 KB / 3 MB); events stored before 200; processing re-reads payments from the provider API before any receipt (a forged "paid" event alone can never create a receipt) |
+| Webhook routed to the wrong school | Razorpay route handle per school (random, revocable); Meta WABA id handle; processing re-checks that the payment's account id or WABA id equals the school's connection |
+| Secret theft (per-school provider tokens) | Wrapped with the school's key wrapper bound to the row (`wrap_bound`, KMS encryption context `{tenant_id, resource}`); never returned by an API, exported, logged or readable by `sos_readonly`; rotation and revocation (FR-PAY-012..014, FR-MSG-002); platform secrets (Meta app secret, Razorpay partner client secret, verify token) only in Secrets Manager |
+| Cross-site attacks on the public origin | Own origin, strict CSP (`default-src 'self'`, no third-party scripts; Meta's SDK only on the staff WhatsApp settings route; Razorpay only as a navigation target), `frame-ancestors 'none'`, no state-changing GET except the "Pay online" POST with a CSRF token bound to the parent cookie |
+| Abuse of "Pay online" to spam links | 5 new intents per token per day; intents reused while valid; links carry no personal data |
+| Denial of service on public routes | Per-IP layer before any database work, resolver is one indexed lookup, pages cached nowhere but rendered cheaply; WAF rules (shared tier) |
+| Opt-in fraud (someone opts in another parent's number) | Join code is single-use and accepted only from the guardian's own number (blind-index match); `in_person` opt-ins name the recorder; STOP always wins |
+
+Tests (planned, `apps/api/tests/security/`): route enumeration with the new guards and allowlist; uniform 404 shape and timing band for unknown/expired/revoked handles; rate-limit behaviour; signature tests (valid, invalid, wrong school's secret, rotated secret, replayed event id, oversized body); resolver catalog and isolation tests; no token in any log line (log capture test); public responses are field allowlists (snapshot tests).
+
 ## 12. LLM application security (OWASP Top 10 for LLM Applications, 2025)
 
 | Risk | Controls in SchoolOS |
@@ -466,3 +526,10 @@ Therefore: **No personal data in URLs.** Names (student, parent, staff), phone n
 | SEC-028 | Heartbeat authentication: per-deployment HMAC-SHA256 keys (KMS-wrapped, rotatable), ±5 min timestamp window, nonce replay cache, strict schema without personal data, rate limit | M0 |
 | SEC-029 | Two-person rule for tenant offboarding (M0) and emergency break-glass (M1), enforced in service and DB | M0 / M1 |
 | SEC-030 | Dedicated host hardening baseline (§13), patching SLAs, off-host encrypted backups, restore test before go-live | Before first dedicated-tier school |
+| SEC-034 | (R2, planned) Webhook authentication: per-school Razorpay secrets and the Meta app secret, HMAC-SHA256 over the raw body in constant time, body limits, event-id dedupe, store-before-acknowledge, provider re-fetch before money is recorded; signature and replay tests | R2 wave 1-2 |
+| SEC-035 | (R2, planned) Per-school provider secrets (Razorpay OAuth tokens or keys, webhook secrets, Meta business token, number PIN) wrapped bound to their row; never returned, exported or logged; refresh, rotation and revocation jobs; platform secrets in Secrets Manager | R2 wave 1-2 |
+| SEC-036 | (R2, planned) Public surface: separate origin, strict CSP, no staff cookies, BFF service token, uniform 404, `no-referrer`, `no-store`, `noindex`, per-IP and per-handle rate limits, WAF rules on `/p/` and `/v/`; penetration test before first use (NFR-SEC-007) | R2 wave 0-3 |
+| SEC-037 | (R2, planned) Parent link tokens: 256-bit random, SHA-256 only stored, per guardian, expiry, automatic and manual revocation, exchange-and-redirect to a cookie, minimal content | R2 wave 0, 3 |
+| SEC-038 | (R2, planned) Financial integrity: append-only ledger, frozen receipts, gap-free receipt and refund series, maker-checker with DB `CHECK` on concessions, adjustments, cancellations and refunds, step-up on approvals, daily collection report per collector | R2 wave 1 |
+| SEC-039 | (R2, planned) Public handle resolver `core.resolve_public_handle` pinned in the definer allowlist, two return columns, `definer_access` only on `core.public_handles` and `core.tenants` (ADR-0047) | R2 wave 0 |
+| SEC-040 | (R2, planned) Provider egress and code boundaries: only `app/fees/providers/*` and `app/messaging/providers/*` call payment and messaging hosts (import-linter, egress allowlist); fake providers refused in staging/prod; utility-only template catalogue test | R2 wave 1-2 |

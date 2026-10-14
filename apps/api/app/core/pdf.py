@@ -19,6 +19,11 @@ tests may install a fake with :func:`set_renderer`. Hardening:
 - English first (ADR-0036): while Telugu is hidden (``SOS_TELUGU_ENABLED`` off, read through
   :mod:`app.core.languages`) the font is neither declared (:func:`font_face_css` is empty,
   :func:`font_stack` leaves it out) nor served, so no PDF or PNG loads or embeds it.
+- Parent-facing forms (owner decision D9, ADR-0039): a school may print parent forms in Telugu
+  while the staff UI stays English. Such a page is a :class:`PrintDocument` with
+  ``telugu_font=True``: its template declares the font with ``font_face_css(telugu=True)`` and
+  :func:`render_document` asks the renderer to serve the font to that one page. Nothing else
+  changes (the bundled, checksum-verified file only; every other request is still refused).
 - The Chromium sandbox is on in staging and prod (``chromium_sandbox`` in ``app/core/pdf.yaml``);
   local and CI containers run as root, where Chromium cannot sandbox itself.
 - Templates escape every value (the callers: :mod:`app.exports.report`,
@@ -33,6 +38,7 @@ from __future__ import annotations
 import hashlib
 import threading
 from collections.abc import Callable
+from dataclasses import dataclass
 from functools import lru_cache
 from importlib import resources
 from pathlib import Path
@@ -99,10 +105,15 @@ def font_bytes() -> bytes:
     return data
 
 
-def font_face_css() -> str:
+def _telugu(telugu: bool | None) -> bool:
+    return telugu_enabled() if telugu is None else telugu
+
+
+def font_face_css(*, telugu: bool | None = None) -> str:
     """The ``@font-face`` rule of the bundled Telugu font for a print template, or ``""`` while
-    Telugu is hidden (ADR-0036): the font is then never requested, loaded or embedded."""
-    if not telugu_enabled():
+    Telugu is hidden (ADR-0036): the font is then never requested, loaded or embedded.
+    ``telugu=True``: a parent-facing page the school prints in Telugu (D9)."""
+    if not _telugu(telugu):
         return ""
     return (
         f'@font-face {{ font-family: "{FONT_FAMILY}"; src: url("{FONT_URL}") format("truetype");\n'
@@ -110,10 +121,10 @@ def font_face_css() -> str:
     )
 
 
-def font_stack(fallback: str = "sans-serif") -> str:
-    """A CSS ``font-family`` value: the bundled Telugu font first while Telugu is shown,
-    otherwise only ``fallback`` (ADR-0036)."""
-    return f'"{FONT_FAMILY}", {fallback}' if telugu_enabled() else fallback
+def font_stack(fallback: str = "sans-serif", *, telugu: bool | None = None) -> str:
+    """A CSS ``font-family`` value: the bundled Telugu font first while Telugu is shown (or for
+    a parent-facing Telugu page, ``telugu=True``), otherwise only ``fallback`` (ADR-0036)."""
+    return f'"{FONT_FAMILY}", {fallback}' if _telugu(telugu) else fallback
 
 
 # Chromium resolves <link rel="dns-prefetch"> hosts (and runs background networking) outside the
@@ -141,13 +152,22 @@ def _no_dns_prefetch(html: str) -> str:
     return NO_DNS_PREFETCH_META + html
 
 
-def _route(route: Route) -> None:
-    # The font is served only while Telugu is shown (ADR-0036); otherwise it is refused like
-    # any other request, so it cannot be embedded even if a page asks for it.
-    if route.request.url == FONT_URL and telugu_enabled():
+def _serve(route: Route, *, font: bool) -> None:
+    if route.request.url == FONT_URL and font:
         route.fulfill(status=200, body=font_bytes(), content_type="font/ttf")
     else:
         route.abort("blockedbyclient")
+
+
+def _route(route: Route) -> None:
+    # The font is served only while Telugu is shown (ADR-0036); otherwise it is refused like
+    # any other request, so it cannot be embedded even if a page asks for it.
+    _serve(route, font=telugu_enabled())
+
+
+def _route_telugu_page(route: Route) -> None:
+    # A parent-facing page the school prints in Telugu (D9): the font, and nothing else.
+    _serve(route, font=True)
 
 
 class ChromiumRenderer:
@@ -157,8 +177,10 @@ class ChromiumRenderer:
         self.sandbox = sandbox
         self.timeout_ms = timeout_ms
 
-    def render(self, html: str) -> bytes:
-        return self._run(html, self._pdf)
+    def render(self, html: str, *, telugu_font: bool = False) -> bytes:
+        """``telugu_font``: serve the bundled Telugu font to this page even while Telugu is
+        hidden in the staff UI (a parent-facing Telugu form, D9; see :func:`render_document`)."""
+        return self._run(html, self._pdf, handler=_route_telugu_page if telugu_font else _route)
 
     def render_png(self, html: str, *, width_px: int) -> bytes:
         """Screenshot of the whole page (M4 parent notices as images; same hardening)."""
@@ -183,7 +205,14 @@ class ChromiumRenderer:
             footer_template=FOOTER_TEMPLATE,
         )
 
-    def _run(self, html: str, work: Callable[[Page], bytes], *, load: bool = True) -> bytes:
+    def _run(
+        self,
+        html: str,
+        work: Callable[[Page], bytes],
+        *,
+        load: bool = True,
+        handler: Callable[[Route], None] = _route,
+    ) -> bytes:
         try:
             with sync_playwright() as p:
                 browser = p.chromium.launch(
@@ -197,7 +226,7 @@ class ChromiumRenderer:
                         accept_downloads=False,
                         service_workers="block",
                     )
-                    context.route("**/*", _route)
+                    context.route("**/*", handler)
                     page = context.new_page()
                     page.set_default_timeout(self.timeout_ms)
                     if load:
@@ -208,6 +237,25 @@ class ChromiumRenderer:
         except PlaywrightError as exc:
             log.error("pdf.render_failed", error_type=type(exc).__name__)
             raise RenderError("pdf_render_failed") from exc
+
+
+@dataclass(frozen=True, slots=True)
+class PrintDocument:
+    """A finished, escaped page to print, and whether it is a parent-facing Telugu page that
+    needs the bundled Telugu font whatever ``SOS_TELUGU_ENABLED`` says (D9, ADR-0039)."""
+
+    html: str
+    telugu_font: bool = False
+
+
+def render_document(document: PrintDocument, renderer: PdfRenderer | None = None) -> bytes:
+    """Print ``document`` to PDF with ``renderer`` (default: :func:`get_renderer`). Only the
+    Chromium renderer is asked to serve the font to a Telugu parent page; other renderers (test
+    fakes) get the page as it is."""
+    chosen = renderer or get_renderer()
+    if document.telugu_font and isinstance(chosen, ChromiumRenderer):
+        return chosen.render(document.html, telugu_font=True)
+    return chosen.render(document.html)
 
 
 def default_renderer() -> PdfRenderer:
@@ -265,6 +313,7 @@ __all__ = [
     "ImageRenderer",
     "PdfConfig",
     "PdfRenderer",
+    "PrintDocument",
     "RenderError",
     "default_renderer",
     "font_bytes",
@@ -273,6 +322,7 @@ __all__ = [
     "get_image_renderer",
     "get_renderer",
     "load_config",
+    "render_document",
     "set_image_renderer",
     "set_renderer",
 ]

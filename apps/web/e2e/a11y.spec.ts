@@ -91,6 +91,36 @@ test.describe("accessibility and keyboard: signed in (stand-in IdP)", () => {
     }
   });
 
+  test(`R1 screens: readiness, APAAR consent, PEN check, boards, templates (NFR-A11Y-001) ${TELUGU}`, async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(120_000);
+    // The office admin of a BSEAP school (e2e/support/r1-api.ts; synthetic data only).
+    await signIn(page, "/findings/readiness", "office");
+    await expect(page).toHaveURL((url) => url.pathname === "/findings/readiness");
+    const student = "0192f3a4-0000-7000-8000-00000000f601";
+    // [language, page, text that proves the data (not only the shell or an error) is shown]
+    const pages: Array<[UiLocale, string, string]> = [
+      ["en", "/findings/readiness", "AP SSC 2027 (BSEAP)"],
+      ["en", `/findings/readiness/${student}?profile=bseap-ssc-2027`, "Synthetica Ravi Sai Kumar"],
+      ["en", "/apaar", "Decisions by section"],
+      ["en", `/apaar/students/${student}`, "Synthetica Ravi Sai Kumar"],
+      ["en", "/students/new", "UDISE+ PEN"],
+      ["en", "/settings/school", "Boards and how you use SchoolOS"],
+      ["en", "/imports", "Template library"],
+      ["te", "/findings/readiness", "AP SSC 2027 (BSEAP)"],
+      ["te", "/apaar", "Synthetica Anjali Devi"],
+    ];
+    for (const [locale, path, proof] of pages) {
+      if (!(await openIn(page, locale, path, testInfo))) continue;
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await expect(page.getByText(proof).filter({ visible: true }).first()).toBeVisible();
+      await expectNoAxeViolations(page, `${path} ${locale}`);
+      await expectNoHorizontalOverflow(page, `${path} ${locale}`);
+      if (locale === "en") await expectVisibleFocusOnEveryStop(page, `${path} ${locale}`, 80);
+    }
+  });
+
   test("several schools: the picker, keyboard only, then 'Switch school'", async ({ page }) => {
     await signIn(page, "/support", "multi");
     await expect(page).toHaveURL(

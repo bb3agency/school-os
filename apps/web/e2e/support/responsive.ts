@@ -25,6 +25,9 @@ const YEAR = "0192f3a4-0000-7000-8000-0000000000a1";
 const USER = "0192f3a4-0000-7000-8000-0000000000d1";
 const CERTIFICATE = "0192f3a4-0000-7000-8000-0000000ce001";
 const FLAG = "0192f3a4-0000-7000-8000-00000000f501";
+/** R1 stand-in (r1-api.ts): a student who needs the parent, and section A. */
+const R1_STUDENT = "0192f3a4-0000-7000-8000-00000000f601";
+const R1_SECTION = "0192f3a4-0000-7000-8000-000000000500";
 /** Ask conversation with long, mixed-script content (layout-fixtures.ts). */
 const ASK_CHAT = "0192f3a4-0000-7000-8000-00000000e9a1";
 
@@ -114,6 +117,22 @@ export const SCREEN_GROUPS: Record<string, ScreenGroup> = {
       "/settings/data-export",
       "/support",
       "/break-glass",
+    ],
+  },
+  // R1 (board and portal readiness, APAAR consent, PEN check, boards, import templates) as
+  // the office admin of a BSEAP school (e2e/support/r1-api.ts).
+  r1: {
+    subject: "office",
+    signInPath: "/support",
+    pages: [
+      "/findings/readiness",
+      `/findings/readiness?profile=bseap-ssc-2027&section=${R1_SECTION}`,
+      `/findings/readiness/${R1_STUDENT}?profile=bseap-ssc-2027`,
+      "/apaar",
+      `/apaar/students/${R1_STUDENT}`,
+      "/students/new",
+      "/settings/school",
+      "/imports",
     ],
   },
   platform: {

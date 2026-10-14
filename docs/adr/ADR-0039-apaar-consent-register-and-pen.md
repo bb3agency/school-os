@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted (owner decisions D1, D3 and D9 of 2026-10-10, docs/18 §8; built on `wip/r1-apaar-udise`) |
+| Status | Accepted (owner decisions D1, D3 and D9 of 2026-10-10, docs/18 §8; built on `wip/r1-apaar-udise`) · Amended by ADR-0044 |
 | Date | 2026-10-10 |
 | Deciders | Product owner (R1 scope, D3 public sources, D9 parent language); engineering (design) |
 | Amends / supersedes | Amends ADR-0037 (decision 6 "no consent tracker"; the PEN format "to confirm"); relies on ADR-0036 with the D9 exception for one parent-facing form |
@@ -47,3 +47,19 @@ R1 of the 2026-27 plan (docs/18 §3) leads with board and portal readiness. Thre
 ## Related requirements
 
 FR-APC-001..006 (new, docs/03 §3.17), FR-STU-017..019, FR-IMP-010, FR-EXP-006, PRV-021 (new); US-1901..US-1905 (docs/02 C19). Existing: FR-STU-013..016, FR-DQ-021/022, DQ-009, PRV-013/014/020, invariants 1, 4, 5, 7.
+
+## Follow-up notes (R1 finish, 2026-10-14, `wip/r1-finish`)
+
+- **Consent forms as PDF (FR-APC-007).** The "server-rendered PDF" alternative is now offered
+  next to the browser print: `POST /exports/apaar-consent-forms` (export kind
+  `apaar_consent_forms`, migration `0054_r1_finish`) prints the same A4 forms in the worker with
+  headless Chromium, with the print views' permissions and reach plus `student.read_basic` and
+  step-up, stored and downloaded like other exports. The export keeps the form's language.
+- **Telugu font for parent forms (D9).** `app.core.pdf` serves the bundled Noto Sans Telugu
+  (checksum-verified, never fetched) only while `SOS_TELUGU_ENABLED` is on. A parent-facing page
+  the school prints in Telugu is now a `PrintDocument(telugu_font=True)`: its template declares
+  the font with `font_face_css(telugu=True)` and the renderer serves it to that one page whatever
+  the staff switch says; every other request is still refused. An English form loads no font.
+  The browser print view keeps using the system's Telugu font (Nirmala UI, Noto Sans Telugu).
+- **Still open:** the Telugu form wording needs a native reviewer; the consent text and court
+  order are still from secondary sources.

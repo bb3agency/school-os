@@ -920,7 +920,16 @@ def _ex() -> ModuleType:
     return sys.modules[name]
 
 
-_EXPORT_PERMISSIONS = ("export.board", "export.portal", "student.export")
+# Every permission that makes (and so lists and downloads) one's own exports: the pre-checks and
+# student lists, and the print jobs (slips: dq.readiness.read; consent forms: apaar.consent.*).
+_EXPORT_PERMISSIONS = (
+    "export.board",
+    "export.portal",
+    "student.export",
+    "dq.readiness.read",
+    "apaar.consent.read",
+    "apaar.consent.record",
+)
 
 
 def _exporter(role: str) -> bool:
@@ -1607,6 +1616,17 @@ SPECS: dict[tuple[str, str], Builder] = {
         _list_body(w),
         {},
     ),
+    # Print jobs (FR-DQ-047, FR-APC-007): one student in the role's scope.
+    ("POST", "/api/v1/exports/readiness-slips"): lambda w, r, a: (
+        "/api/v1/exports/readiness-slips",
+        {"profile_key": "bseap-ssc-2027", "student_id": str(_student(w, r))},
+        {},
+    ),
+    ("POST", "/api/v1/exports/apaar-consent-forms"): lambda w, r, a: (
+        "/api/v1/exports/apaar-consent-forms",
+        {"student_id": str(_student(w, r))},
+        {},
+    ),
     ("GET", "/api/v1/exports"): lambda w, r, a: ("/api/v1/exports", None, {}),
     ("GET", "/api/v1/exports/{export_id}"): lambda w, r, a: (
         f"/api/v1/exports/{_export_id(w, r, ready=False)}",
@@ -2076,6 +2096,8 @@ def _success(method: str, path: str) -> int:
         "/api/v1/extraction-batches",
         "/api/v1/exports",
         "/api/v1/exports/student-list",
+        "/api/v1/exports/readiness-slips",
+        "/api/v1/exports/apaar-consent-forms",
         "/api/v1/admin/tenant-export",
         "/api/v1/circulars/{document_id}/read",
         # FR-NOTICE-003: a notice is accepted at once and drafted in the background.

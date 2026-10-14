@@ -41,3 +41,29 @@ SchoolOS already keeps every value per source (FR-STU-002) and compares them wit
 - Confirm the BSEAP nominal-roll format, the UDISE+ correction route and the APAAR failure messages with a pilot school, then set `verified: true` with the document reference.
 - APAAR consent register (separate story) and the CBSE registration profile reuse the same engine.
 - Portal-calendar reminders (R3) can read the readiness counts.
+
+## Follow-up notes (R1 finish, 2026-10-14, `wip/r1-finish`)
+
+- **Slips as PDF (FR-DQ-047).** Decision 7's "if a worker job is added later" is now built, but
+  through the export pipeline rather than a new job table: `POST /exports/readiness-slips`
+  creates an export of kind `readiness_slips` (migration `0054_r1_finish` widens the
+  `ops.exports` kind CHECK and adds `exports_print_formats`). The request freezes one student or
+  one section's students with the print view's permission and reach (`dq.readiness.read`, plus
+  `student.read_basic` and step-up like every export, ADR-0021); the worker (queue `pdf`) asks
+  `app.dq` for the same page with the requester's current reach and prints it with
+  `app.core.pdf.render_document`. Files live under the school's `exports/` prefix (private,
+  SSE-KMS, presigned downloads, deleted after the export retention period), so a slip with
+  Aadhaar-as-printed values is never indexed or listed as a document, unlike certificate PDFs.
+  Aadhaar-as-printed values appear only with `include_sensitive` and `student.read_sensitive`
+  over every student; downloading those needs step-up. The HTML print view stays.
+- **Parent language (owner decision D9).** Slips are parent-facing: they keep their Telugu lines
+  when the school prints parent forms in Telugu (`apaar.parent_language()`, the ADR-0039
+  setting) or while Telugu is shown, both in the print view and the PDF (which then embeds the
+  bundled font, below). Until the school-wide parent-language setting of R2 lands, the APAAR
+  form-language setting is that switch.
+- **SSC tied to BSEAP schools (FR-DQ-048, FR-EXP-008).** `bseap-ssc-2027` now has `board: BSEAP`,
+  `classes: [IX, X]`, `parent_verification_slip: true`, nominal-roll `board_fields` and a
+  pre-check layout in `app/exports/config.yaml` (`verified: false`). It is listed only for
+  schools that declared BSEAP or no board (FR-TEN-020) and follows the class boards
+  (FR-TEN-021); the profile file keeps version 1 (what DQ-005 and DQ-031 check did not change).
+  `apaar` stays a portal check listed for every school, without a pre-check sheet.

@@ -88,10 +88,10 @@ FR-…, NFR-…, SEC-…, PRV-…; docs sections affected.
 | [ADR-0010](ADR-0010-maker-checker.md) | Maker-checker for identity changes | Accepted (recorded retroactively 2026-09-26) |
 | [ADR-0011](ADR-0011-hash-chained-audit.md) | Hash-chained, append-only audit log | Accepted (recorded retroactively 2026-09-26) · Amended by ADR-0013 |
 | [ADR-0012](ADR-0012-managed-oidc-identity.md) | Managed OIDC identity provider | Accepted (recorded retroactively 2026-09-26) · Amended by ADR-0013, ADR-0018, ADR-0023 |
-| [ADR-0013](ADR-0013-cross-tenant-access-and-platform-privilege-separation.md) | Cross-tenant access paths, platform privilege separation and platform identity | Accepted · Amended by ADR-0018, ADR-0019, ADR-0020, ADR-0023, ADR-0028 · implementation amendments 2026-09-26, 2026-09-27 |
+| [ADR-0013](ADR-0013-cross-tenant-access-and-platform-privilege-separation.md) | Cross-tenant access paths, platform privilege separation and platform identity | Accepted · Amended by ADR-0018, ADR-0019, ADR-0020, ADR-0023, ADR-0028, ADR-0047 · implementation amendments 2026-09-26, 2026-09-27 |
 | [ADR-0014](ADR-0014-local-ci-service-images.md) | Local and CI service images: SeaweedFS and Valkey | Accepted |
 | [ADR-0015](ADR-0015-deployment-and-commercial-model.md) | Deployment and commercial model: managed SaaS, shared and dedicated tiers | Accepted · Amended by ADR-0038 |
-| [ADR-0016](ADR-0016-payments-provider.md) | Payments provider | Proposed |
+| [ADR-0016](ADR-0016-payments-provider.md) | Payments provider (SchoolOS's own invoices; Razorpay, owner D5) | Accepted 2026-10-14 · amendment 2026-10-14 |
 | [ADR-0017](ADR-0017-platform-admin-panel-architecture.md) | Platform admin panel (control plane) architecture | Accepted · Amended by ADR-0020 |
 | [ADR-0018](ADR-0018-mfa-and-step-up-with-cognito.md) | MFA enforcement and step-up with Amazon Cognito | Accepted · Amended by ADR-0023 |
 | [ADR-0019](ADR-0019-invitation-acceptance-on-first-sign-in.md) | Invitation acceptance on first sign-in | Accepted |
@@ -110,9 +110,15 @@ FR-…, NFR-…, SEC-…, PRV-…; docs sections affected.
 | [ADR-0033](ADR-0033-gemini-on-vertex-ai-for-all-llm-roles.md) | Google Gemini on Vertex AI for every LLM role (amends ADR-0005) | Accepted |
 | [ADR-0034](ADR-0034-ask-conversations-and-memory.md) | Ask conversations, context and per-user memory (amends FR-KB-012 and ADR-0008) | Accepted |
 | [ADR-0035](ADR-0035-contextual-retrieval-and-reranking.md) | Contextual chunk headers and a reranker for "Ask the school" (behind switches, off) | Proposed |
-| [ADR-0036](ADR-0036-english-first-telugu-hidden.md) | English first; Telugu hidden behind one switch (`SOS_TELUGU_ENABLED`, off) | Accepted |
+| [ADR-0036](ADR-0036-english-first-telugu-hidden.md) | English first; Telugu hidden behind one switch (`SOS_TELUGU_ENABLED`, off) | Accepted · Amended by ADR-0044 |
 | [ADR-0037](ADR-0037-apaar-id.md) | Store the APAAR ID (and UDISE+ PEN) as student attributes with provenance | Accepted · Amended by ADR-0039 |
 | [ADR-0038](ADR-0038-commercial-catalogue-one-time-fee-and-ai-answer-bundles.md) | Commercial catalogue: one-time fee and AI answer bundles with overage (amends ADR-0015) | Accepted |
-| [ADR-0039](ADR-0039-apaar-consent-register-and-pen.md) | APAAR consent register, the 11-digit PEN and the transfer-in duplicate guard (amends ADR-0037) | Accepted |
+| [ADR-0039](ADR-0039-apaar-consent-register-and-pen.md) | APAAR consent register, the 11-digit PEN and the transfer-in duplicate guard (amends ADR-0037) | Accepted · Amended by ADR-0044 |
 | [ADR-0040](ADR-0040-board-and-portal-readiness.md) | Board and portal readiness: exact cross-source diff with fix owners | Proposed |
 | [ADR-0041](ADR-0041-boards-import-presets-and-alongside-mode.md) | Boards per school, CBSE/CISCE profiles from public sources, import presets and the "alongside your current ERP" mode | Proposed |
+| [ADR-0042](ADR-0042-fee-ledger-receipts-and-payment-links.md) | Fee ledger, receipts and payment links (school is the merchant; Razorpay first; reverses the BRD §7.3 fee non-goal) | Accepted 2026-10-14 (owner D4, D5; P1-P10 by D12-D30) |
+| [ADR-0043](ADR-0043-whatsapp-parent-messages-via-meta-cloud-api.md) | WhatsApp parent messages through the Meta Cloud API (school's own number; school pays Meta) | Accepted 2026-10-14 (owner D6, D7, D13, D22-D27) |
+| [ADR-0044](ADR-0044-parent-facing-language-per-school.md) | Parent-facing language per school (amends ADR-0036 and ADR-0039) | Accepted 2026-10-14 (owner D9, D23) |
+| [ADR-0045](ADR-0045-ap-transfer-certificate-and-public-verification.md) | AP transfer certificate format and public certificate verification | Accepted 2026-10-14 (R2 scope; D15, D29) |
+| [ADR-0046](ADR-0046-parent-link-pages-and-tokens.md) | Parent link pages: short-lived, unguessable pages without a parent login | Accepted 2026-10-14 (R2 scope; D22, D29) |
+| [ADR-0047](ADR-0047-routing-public-requests-and-webhooks-to-a-school.md) | Routing public requests and webhooks to a school (`core.public_handles`, `core.resolve_public_handle`; amends ADR-0013) | Accepted 2026-10-14 (D12) |

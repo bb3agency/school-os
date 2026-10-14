@@ -86,6 +86,29 @@ def test_FR_EXP_007_every_board_profile_has_an_export_layout_with_its_required_f
         assert "apaar_id" in layout.fields
 
 
+def test_FR_DQ_048_ssc_profile_belongs_to_bseap_with_a_nominal_roll_layout() -> None:
+    profile = load_profiles()["bseap-ssc-2027"]
+    assert profile.board == "BSEAP"
+    assert profile.classes == ("IX", "X")
+    assert profile.readiness is not None
+    assert profile.readiness.classes == profile.classes
+    assert profile.verified is False
+    assert profile.parent_verification_slip is True
+    columns = {f.attribute for f in profile.board_fields}
+    assert {"full_name", "father_name", "mother_name", "dob", "gender"} <= columns
+    # Never an Aadhaar number: only the last four digits are held (invariant 4).
+    assert not {"aadhaar_number", "aadhaar"} & columns
+    layout = load_config().profiles["bseap-ssc-2027"]
+    assert layout.kind == "board"
+    assert layout.verified is False
+    assert set(profile.required_fields) <= set(layout.fields)
+    assert {a for a in columns if a is not None} <= set(layout.fields)
+    # APAAR stays a portal check for every school (no board, no pre-check sheet).
+    apaar = load_profiles()["apaar"]
+    assert apaar.board is None
+    assert "apaar" not in load_config().profiles
+
+
 def _raw(key: str) -> dict[str, Any]:
     text = resources.files("app.dq").joinpath(f"config/profiles/{key}.yaml").read_text("utf-8")
     data: dict[str, Any] = yaml.safe_load(text)

@@ -440,6 +440,44 @@ Every LLM role runs on Google Gemini through Vertex AI in `asia-south1` (ADR-003
 
    Not in the table: `gemini-3.1-pro-preview` (`eval_judge`, `offline_only: true`, `location: global`) sees only synthetic evaluation data and is never used for product traffic, so it needs no paperwork; if it (or any role) ever gets real data, it needs these rows first and must move to a regional endpoint. Also confirm, once per project: (a) request-response logging is off for every model (4b; nothing in the project enables it); (b) no Google-side grounding, search or other tool that could send prompts outside the region is enabled (the gateway sends none); (c) the Vertex AI terms that cover no training on customer data apply to the project's billing account. **Until every box of a model is ticked for prod, do not set `SOS_LLM_ZDR_CONFIRMED=true` in prod**; while the abuse-logging exception is pending (4c), the DPIA and the school notice must say that Google may keep prompts for abuse detection for a limited period. The Anthropic fallback has its own precondition (docs/08 §8): it may not carry student data until an Anthropic Zero Data Retention agreement and DPA are in place. The application enforces it: staging and prod refuse to start while any role uses `anthropic` without `SOS_ANTHROPIC_ZDR_CONFIRMED=true` (the Claude safety lock, §11 settings table).
 
+### 11.2 R2 planned settings, secrets and infrastructure (not read by any code yet)
+
+**Status: planned (R2; ADR-0042..ADR-0047).** When each wave lands, its settings move into the main table above (the settings test, `tests/core/test_config.py`, requires every `SOS_*` field of `Settings` to be listed in this section). Platform secrets live in AWS Secrets Manager (07 §9) and reach the tasks as environment variables like the others; **per-school** provider secrets are never settings: they are stored wrapped in the school's rows (05 §15; 07 §8, SEC-035).
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `SOS_PUBLIC_BASE_URL` | none (public pages off) | Origin of parent link pages (`https://my.schoolos.in` on the shared tier, D29; the school's `https://<public_host>` on a dedicated host). Staging/prod refuse a non-https value, a value equal to the staff app origin, or one with a path |
+| `SOS_VERIFY_BASE_URL` | none (verification off) | Origin of the certificate verification page and of the QR links printed on certificates: a separate `verify.` host on the shared tier (for example `https://verify.schoolos.in`; owner decision D29); the school's `https://<public_host>` on a dedicated host. Same checks as `SOS_PUBLIC_BASE_URL` and must differ from it on the shared tier |
+| `SOS_PUBLIC_LINK_LIFETIMES` | unset: `app/public/config.yaml` (notice 30 d, receipt 90 d, dues 7 d, opt-in 7 d) | Override for tests only; refused in staging/prod |
+| `SOS_FEES_ENABLED` | `false` | Master switch for the fees module (each school also needs the flag `fees.enabled` and its setting) |
+| `SOS_PAYMENTS_PROVIDER_MODE` | unset: `fake` in local/ci, `live` in staging/prod | `fake` = deterministic offline provider (refused in staging/prod); `live` = Razorpay |
+| `SOS_RAZORPAY_PARTNER_CLIENT_ID` | none | Razorpay Technology Partner OAuth application client id (Secrets Manager) |
+| `SOS_RAZORPAY_PARTNER_CLIENT_SECRET` | none | OAuth client secret (Secrets Manager; `dev-only` values refused in staging/prod) |
+| `SOS_RAZORPAY_OAUTH_REDIRECT_URI` | none | Whitelisted callback on the staff app (`https://<app_domain>/bff/payments/oauth/callback`) |
+| `SOS_RAZORPAY_OAUTH_MODE` | `live` | `test` for Razorpay test mode in staging (OAuth token `mode`) |
+| `SOS_RAZORPAY_MANUAL_KEYS_ALLOWED` | `false` | Allows the "manual keys" connection mode; set `true` for pilots until SchoolOS is an approved Razorpay Technology Partner (ADR-0042 P1, D13) |
+| `SOS_MESSAGING_ENABLED` | `false` | Master switch for WhatsApp messaging (shared tier only in R2; refused with `SOS_DEPLOYMENT_MODE=dedicated`) |
+| `SOS_MESSAGING_PROVIDER_MODE` | unset: `fake` in local/ci, `live` in staging/prod | `fake` (refused in staging/prod) or `live` (Meta Cloud API) |
+| `SOS_META_APP_ID` | none | SchoolOS's Meta app id (Tech Provider) |
+| `SOS_META_APP_SECRET` | none | Meta app secret: verifies `X-Hub-Signature-256` and exchanges Embedded Signup codes (Secrets Manager; never on dedicated hosts) |
+| `SOS_META_WEBHOOK_VERIFY_TOKEN` | none | Random string for the webhook `GET` challenge (Secrets Manager) |
+| `SOS_META_EMBEDDED_SIGNUP_CONFIG_ID` | none | Embedded Signup v4 configuration id (public; also given to the web app) |
+| `SOS_META_GRAPH_API_VERSION` | from `app/messaging/config.yaml` | Pinned Graph API version; override only for a tested upgrade |
+| `SOS_MESSAGING_MANUAL_TOKEN_ALLOWED` | `false` | Allows the manual-token connection; set `true` for pilots until SchoolOS is a Meta Tech Provider (ADR-0043 decision 5, D13) |
+| `SOS_WEBHOOK_MAX_BODY_BYTES_RAZORPAY`, `SOS_WEBHOOK_MAX_BODY_BYTES_META` | 262144, 3145728 | Body limits before signature checks |
+
+**Web (BFF) additions:** `PUBLIC_BASE_URL` (the public origin; the `(public)` route group answers only on it and the staff routes never do), `META_APP_ID` and `META_EMBEDDED_SIGNUP_CONFIG_ID` (public values for the settings page), CSP additions scoped to `/settings/whatsapp`: `script-src https://connect.facebook.net`, `frame-src https://www.facebook.com https://web.facebook.com`, `connect-src https://graph.facebook.com`.
+
+**Infrastructure (Terraform, when applied; owner decision D2: no cloud yet):**
+- ALB listener rule: `/api/v1/webhooks/*` → API target group (like `/api/v1/fleet/*`); WAF rate rules for `/api/v1/webhooks/*` (per IP), `/p/*` and `/v/*` (per IP, stricter); WAF must not block large Meta payloads (body inspection limit set for that path).
+- Public origins: ACM certificates and host header rules on the shared ALB for `my.schoolos.in` (parent pages) and `verify.schoolos.in` (certificate verification) → web target group; the web app distinguishes the hosts (D29).
+- Egress allowlist (NAT/proxy, when introduced): `api.razorpay.com`, `auth.razorpay.com`, `graph.facebook.com`.
+- Secrets Manager entries: `sos/<env>/razorpay-partner`, `sos/<env>/meta-app` (app secret, verify token); rotation runbook: Razorpay client secret on demand; Meta app secret on suspicion (then re-verify webhooks).
+- Dedicated hosts: Caddy serves `/p/*` and `/v/*` on the school's host; `query` filter already redacts `code` and `state`; add a path redaction for `/p/<token>` (replace the token with `REDACTED`) so the host's own logs never keep parent tokens; Razorpay webhooks reach the host directly (per-school secret); no Meta secrets on hosts.
+- Alarms (docs/11): webhook signature failures, failed public lookups, provider event backlog > 15 minutes, token refresh failures, messaging paused, reconciliation exceptions count.
+
+**Local development:** the fake providers need no network; `scripts/dev.py` sets `SOS_PUBLIC_BASE_URL=http://localhost:3000` under `next dev` (http allowed only locally, like `FILES_ORIGIN`) and the web serves the `(public)` group on `/p` and `/v` of the same origin locally only. Razorpay and Meta sandbox testing uses Razorpay test mode and Meta's test numbers in staging, never real parent numbers (invariant 11).
+
 ## 12. Cost management
 
 - AWS Budgets with alerts at 50/80/100% per account; anomaly detection on.

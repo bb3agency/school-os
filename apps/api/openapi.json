@@ -4697,6 +4697,70 @@
         "title": "ConsentEntryOut",
         "type": "object"
       },
+      "ConsentFormsCreate": {
+        "additionalProperties": false,
+        "description": "FR-APC-007: APAAR consent forms as one PDF (the same forms as the print views).\n``status`` (section only) prints only those students, e.g. ``pending``; ``language`` is the\nschool's parent-form language when left out (owner decision D9).",
+        "properties": {
+          "language": {
+            "anyOf": [
+              {
+                "enum": [
+                  "en",
+                  "te"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "section_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Id"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "given",
+                  "refused",
+                  "pending",
+                  "withdrawn"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "student_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Id"
+          }
+        },
+        "title": "ConsentFormsCreate",
+        "type": "object"
+      },
       "ConsentIn": {
         "additionalProperties": false,
         "description": "A parent's decision as written on the returned form (FR-APC-001..003).\n\n``given`` needs the signed form (``evidence_document_id``: a document uploaded with purpose\n``evidence``); ``refused`` and ``withdrawn`` may carry it. Every decision names who decided\n(``relationship``, and ``guardian_id`` when that guardian is on the student's record) and the\ndate on the form (``decided_on``). ``pending`` records that a form went home and is awaited.",
@@ -7303,7 +7367,9 @@
             "enum": [
               "board_precheck",
               "portal_precheck",
-              "student_list"
+              "student_list",
+              "readiness_slips",
+              "apaar_consent_forms"
             ],
             "title": "Kind",
             "type": "string"
@@ -17115,6 +17181,56 @@
           "class_id"
         ],
         "title": "ReadinessSectionOut",
+        "type": "object"
+      },
+      "ReadinessSlipsCreate": {
+        "additionalProperties": false,
+        "description": "FR-DQ-047: parent verification slips of a readiness profile as one PDF (the same slips as\n``GET /dq/readiness/{profile_key}/slips``). ``include_sensitive`` prints the\nAadhaar-as-printed values (needs ``student.read_sensitive`` for every student); otherwise\nthey are masked. Never an Aadhaar number.",
+        "properties": {
+          "include_ready": {
+            "default": true,
+            "title": "Include Ready",
+            "type": "boolean"
+          },
+          "include_sensitive": {
+            "default": false,
+            "title": "Include Sensitive",
+            "type": "boolean"
+          },
+          "profile_key": {
+            "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+            "title": "Profile Key",
+            "type": "string"
+          },
+          "section_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Id"
+          },
+          "student_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Id"
+          }
+        },
+        "required": [
+          "profile_key"
+        ],
+        "title": "ReadinessSlipsCreate",
         "type": "object"
       },
       "ReadinessStudentDetailOut": {
@@ -32678,6 +32794,138 @@
           }
         },
         "summary": "Create Precheck Export",
+        "tags": [
+          "exports"
+        ]
+      }
+    },
+    "/api/v1/exports/apaar-consent-forms": {
+      "post": {
+        "description": "Print the APAAR consent forms of one student or one section to a PDF (FR-APC-007; the\nsame forms as the print views). Permission ``apaar.consent.read`` or\n``apaar.consent.record`` in scope (404 outside it) and ``student.read_basic``, with a\nrecent sign-in with MFA (428). ``status`` (sections only) prints only those students;\n``language`` defaults to the school's parent-form language, and Telugu forms work while\nthe staff screens are English (owner decision D9). The PDF is made in the background\n(202). Errors: 409 ``no_forms``, ``too_many_forms``; 422 ``section_only``. Accepts\n``Idempotency-Key``.",
+        "operationId": "create_consent_forms_export_api_v1_exports_apaar_consent_forms_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentFormsCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create Consent Forms Export",
+        "tags": [
+          "exports"
+        ]
+      }
+    },
+    "/api/v1/exports/readiness-slips": {
+      "post": {
+        "description": "Print the parent verification slips of one student or one section to a PDF (FR-DQ-047;\nthe same slips as ``GET /dq/readiness/{profile_key}/slips``). Permission\n``dq.readiness.read`` in the student's or section's scope (404 outside it) and\n``student.read_basic``, with a recent sign-in with MFA (428). Aadhaar-as-printed values\nare masked unless ``include_sensitive`` (needs ``student.read_sensitive`` for every\nstudent, else 403 ``sensitive_not_allowed``); an Aadhaar number never appears. The PDF is\nmade in the background (202); the export at ``Location`` shows its status and gives a\ndownload link like other exports. Errors: 422 ``no_students``. Accepts\n``Idempotency-Key``.",
+        "operationId": "create_readiness_slips_export_api_v1_exports_readiness_slips_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadinessSlipsCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create Readiness Slips Export",
         "tags": [
           "exports"
         ]
