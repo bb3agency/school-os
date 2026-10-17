@@ -10,13 +10,13 @@ export const sidebarThemes: Record<
   { surface: string; brand: string; control: string; divider: string }
 > = {
   school: {
-    surface: "bg-surface text-ink",
-    brand: "text-ink hover:bg-surface-muted",
-    control: "text-ink-muted hover:bg-surface-muted hover:text-ink",
+    surface: "bg-canvas text-ink",
+    brand: "text-ink hover:bg-surface-sunken",
+    control: "text-ink-muted hover:bg-surface-sunken hover:text-ink",
     divider: "border-border",
   },
   platform: {
-    // .platform-chrome switches the focus ring to yellow on the dark violet.
+    // .platform-chrome switches the focus ring to amber on the dark neutral chrome.
     surface: "platform-chrome bg-platform text-platform-ink",
     brand: "text-platform-ink hover:bg-platform-hover",
     control: "text-platform-muted hover:bg-platform-hover hover:text-platform-ink",
@@ -24,11 +24,11 @@ export const sidebarThemes: Record<
   },
 };
 
-/** Square 40px (or 44px) icon button for the sidebar header (collapse toggle, drawer close). */
+/** Square 36px (or 44px) icon button for the sidebar header (collapse toggle, drawer close). */
 export function sidebarControlClasses(theme: SidebarTheme, size: "md" | "lg" = "md"): string {
   return cn(
     "pressable inline-flex shrink-0 items-center justify-center rounded-md",
-    size === "lg" ? "size-11" : "size-10",
+    size === "lg" ? "size-11" : "size-9 pointer-coarse:size-11",
     sidebarThemes[theme].control,
   );
 }

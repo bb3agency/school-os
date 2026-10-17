@@ -1,4 +1,5 @@
 import { useId, type ReactNode } from "react";
+import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
 import { DeltaPill, type DeltaDirection } from "./Badge";
 import { cardClasses } from "./Card";
@@ -31,7 +32,7 @@ export function StatCard({
   return (
     <div className={cardClasses({ padding: "sm" })}>
       <dt className="text-sm text-ink-muted">{label}</dt>
-      <dd className="mt-1 font-display text-4xl leading-tight text-ink tabular-nums">
+      <dd className="num mt-1 text-[1.75rem] leading-8 font-semibold text-ink">
         <TickValue value={value}>{value ?? <Unavailable label={unavailableLabel} />}</TickValue>
       </dd>
       {hint ? <dd className="mt-1 text-xs text-ink-subtle">{hint}</dd> : null}
@@ -60,11 +61,13 @@ export interface KpiCardProps {
   sparkline?: ReactNode;
   /** Optional icon or action in the top-right corner. */
   aside?: ReactNode;
+  /** The filtered list behind the number: the label becomes its link (docs/17 §7.4). */
+  href?: string;
   className?: string;
 }
 
 /**
- * KPI tile: label, big serif number, dark delta pill, comparison line and an optional
+ * KPI tile: label, a 28px figure (SOS Figures, tabular), dark delta pill, comparison line and an optional
  * sparkline. A `role="group"` named by the label, so the number is read with its label.
  */
 export function KpiCard({
@@ -75,6 +78,7 @@ export function KpiCard({
   comparison,
   sparkline,
   aside,
+  href,
   className,
 }: KpiCardProps) {
   const labelId = useId();
@@ -86,12 +90,18 @@ export function KpiCard({
     >
       <div className="flex items-start justify-between gap-3">
         <p id={labelId} className="text-sm text-ink-muted">
-          {label}
+          {href ? (
+            <Link href={href} className="underline-offset-4 hover:text-ink hover:underline">
+              {label}
+            </Link>
+          ) : (
+            label
+          )}
         </p>
         {aside}
       </div>
       <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
-        <p className="font-display text-5xl leading-none text-ink tabular-nums">
+        <p className="num text-[1.75rem] leading-8 font-semibold text-ink">
           <TickValue value={value}>{value ?? <Unavailable label={unavailableLabel} />}</TickValue>
         </p>
         {delta && value !== null ? (

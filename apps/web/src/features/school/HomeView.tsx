@@ -71,32 +71,27 @@ function WorkCard({
 }: {
   title: string;
   icon: IconName;
-  /** The card's numbers are still loading (the text fades in when they arrive). */
+  /** The row's numbers are still loading (the text fades in when they arrive). */
   loading: boolean;
   children: ReactNode;
   action: ReactNode;
 }) {
+  // One row of "Work waiting" (docs/17 §7.4): icon, what it is, the numbers, one action.
   return (
-    <Card
-      title={
-        <span className="inline-flex items-center gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary">
-            <Icon name={icon} className="size-4.5" />
-          </span>
-          {title}
-        </span>
-      }
-      className="flex flex-col"
-    >
-      <div className="flex-1 space-y-3 text-sm text-ink-muted">
-        <LoadFade loading={loading} className="space-y-3">
+    <li className="flex flex-wrap items-start gap-x-4 gap-y-3 px-4 py-4 sm:px-5">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-surface-muted text-ink-muted">
+        <Icon name={icon} className="size-4.5" />
+      </span>
+      <div className="min-w-0 flex-[1_1_16rem] space-y-1.5 text-sm text-ink-muted">
+        <h3 className="text-base font-semibold text-ink">{title}</h3>
+        <LoadFade loading={loading} className="space-y-1.5">
           {children}
         </LoadFade>
       </div>
-      <div className="mt-5" data-print="hide">
+      <div className="shrink-0" data-print="hide">
         {action}
       </div>
-    </Card>
+    </li>
   );
 }
 
@@ -133,6 +128,7 @@ export function HomeView({ data }: { data: HomeData }) {
     kpis.push(
       <KpiCard
         key="blockers"
+        href="/findings"
         label={t("kpi.blockers")}
         value={count(blockers)}
         unavailableLabel={tc("notAvailable")}
@@ -140,6 +136,7 @@ export function HomeView({ data }: { data: HomeData }) {
       />,
       <KpiCard
         key="warnings"
+        href="/findings"
         label={t("kpi.warnings")}
         value={count(warnings)}
         unavailableLabel={tc("notAvailable")}
@@ -158,6 +155,7 @@ export function HomeView({ data }: { data: HomeData }) {
     kpis.push(
       <KpiCard
         key="pending"
+        href="/change-requests"
         label={t("changesWaiting")}
         value={pendingText}
         unavailableLabel={tc("notAvailable")}
@@ -307,7 +305,7 @@ export function HomeView({ data }: { data: HomeData }) {
   }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={t("title")}
         eyebrow={t("eyebrow")}
@@ -323,15 +321,18 @@ export function HomeView({ data }: { data: HomeData }) {
       />
       {kpis.length > 0 ? (
         <section aria-label={t("kpi.label")}>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{kpis}</div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{kpis}</div>
         </section>
       ) : null}
       {work.length > 0 ? (
-        <section aria-labelledby="home-work" className="space-y-3">
-          <h2 id="home-work" className="text-lg font-semibold text-ink">
+        <section aria-labelledby="home-work" className="rounded-xl border border-border bg-surface">
+          <h2
+            id="home-work"
+            className="border-b border-border px-4 py-3 text-base font-semibold text-ink sm:px-5"
+          >
             {t("work.title")}
           </h2>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{work}</div>
+          <ul className="divide-y divide-border">{work}</ul>
         </section>
       ) : null}
       {isNew ? (

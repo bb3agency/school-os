@@ -1,7 +1,7 @@
 import "./marketing.css";
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
-import { BrandMark } from "@/components/shell/Brand";
+import { Wordmark } from "@/components/shell/Brand";
 import { SkipLink } from "@/components/shell/SkipLink";
 import { Link } from "@/i18n/navigation";
 import { MARKETING_PAGES, PAGE_HREF, SIGN_IN_HREF, mailtoHref, type MarketingPage } from "./links";
@@ -44,8 +44,7 @@ export function MarketingShell({
         <Container className="grid gap-10 py-14 md:grid-cols-[1.4fr_1fr_1fr_1fr] md:py-16">
           <div className="max-w-sm">
             <p className="inline-flex items-center gap-2.5">
-              <BrandMark />
-              <span className="text-lg font-semibold tracking-tight text-ink">{tc("appName")}</span>
+              <Wordmark size="lg" />
             </p>
             <p className="mt-4 text-ink-muted">{t("footer.tagline")}</p>
           </div>

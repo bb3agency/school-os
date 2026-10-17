@@ -3,7 +3,7 @@
 import { AnimatePresence, LazyMotion, MotionConfig, m } from "motion/react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
-import { BrandMark } from "@/components/shell/Brand";
+import { Wordmark } from "@/components/shell/Brand";
 import { buttonClasses } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Link } from "@/i18n/navigation";
@@ -48,7 +48,6 @@ export function SiteHeader({
   whatsappNumber?: string | null;
 }) {
   const t = useTranslations("marketing");
-  const tc = useTranslations("common");
   const [open, setOpen] = useState(false);
   const scrolled = useSyncExternalStore(subscribeScroll, scrolledSnapshot, serverSnapshot);
   const headerRef = useRef<HTMLElement>(null);
@@ -127,8 +126,7 @@ export function SiteHeader({
               className="mk-press inline-flex min-h-11 items-center gap-2.5 rounded-full pe-2"
               aria-current={current === "home" ? "page" : undefined}
             >
-              <BrandMark />
-              <span className="text-lg font-semibold tracking-tight text-ink">{tc("appName")}</span>
+              <Wordmark size="lg" />
             </Link>
 
             <nav aria-label={t("nav.label")} className="hidden lg:block" data-print="hide">

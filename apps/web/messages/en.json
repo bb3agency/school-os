@@ -58,6 +58,89 @@
     "currentSchool": "Current school",
     "account": "Your account"
   },
+  "ui": {
+    "palette": {
+      "label": "Search or jump to",
+      "placeholder": "Type a page or an action…",
+      "empty": "Nothing matches. Try another word.",
+      "results": "{count, plural, =0 {No results} one {# result} other {# results}}",
+      "hintMove": "to move",
+      "hintOpen": "to open",
+      "hintClose": "to close",
+      "trigger": "Search or jump to…",
+      "groupPages": "Go to",
+      "groupActions": "Actions",
+      "groupPreferences": "Preferences",
+      "densityCompact": "Use compact rows",
+      "densityComfortable": "Use comfortable rows",
+      "toggleSidebar": "Collapse or expand the menu",
+      "addStudent": "Add a student",
+      "newChangeRequest": "New change request",
+      "uploadDocument": "Upload a document",
+      "collectFee": "Collect fees",
+      "takeAttendance": "Take attendance",
+      "enterMarks": "Enter marks",
+      "askSchool": "Ask the school",
+      "inviteUser": "Invite a staff member",
+      "studentList": "Download a student list",
+      "provisionSchool": "Set up a new school"
+    },
+    "shell": {
+      "breadcrumb": "Where you are",
+      "search": "Search",
+      "preferences": "Your preferences",
+      "density": "Row density",
+      "comfortable": "Comfortable",
+      "compact": "Compact",
+      "shortcutPalette": "Search or jump to (Ctrl+K)",
+      "quickLinks": "Quick links",
+      "signedInAs": "Signed in as {name}"
+    },
+    "toast": {
+      "region": "Notifications from SchoolOS",
+      "dismiss": "Dismiss"
+    },
+    "pagination": {
+      "label": "Pages",
+      "none": "No rows",
+      "range": "{from}–{to}",
+      "rangeOf": "{from}–{to} of {total}",
+      "rowsPerPage": "Rows per page",
+      "previous": "Previous",
+      "next": "Next"
+    },
+    "errorSummary": {
+      "title": "There is a problem"
+    },
+    "steps": {
+      "done": "Done",
+      "current": "Current step",
+      "upcoming": "Not started"
+    },
+    "saveBar": {
+      "unsaved": "Changes not saved",
+      "noChanges": "No changes"
+    },
+    "filters": {
+      "active": "Active filters",
+      "remove": "Remove filter {label}: {value}",
+      "clearAll": "Clear all"
+    },
+    "table": {
+      "columns": "Columns",
+      "showColumns": "Show columns",
+      "density": "Rows",
+      "comfortable": "Comfortable",
+      "compact": "Compact",
+      "noResults": "No rows match these filters",
+      "noResultsBody": "Remove a filter or clear them all to see more.",
+      "clearFilters": "Clear filters",
+      "selectAll": "Select all rows on this page",
+      "selected": "{count, plural, one {# selected} other {# selected}}",
+      "bulkActions": "Actions for the selected rows",
+      "clearSelection": "Clear selection"
+    }
+  },
   "language": {
     "label": "Language",
     "en": "English",

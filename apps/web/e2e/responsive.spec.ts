@@ -231,7 +231,7 @@ test.describe("app shell on the office PC: one sidebar, compact mode (NFR-A11Y-0
       await toggle.focus();
       await page.keyboard.press("Enter");
       await expect(sidebar.getByRole("button", { name: expandName })).toBeFocused();
-      expect((await sidebar.boundingBox())?.width).toBe(72);
+      expect((await sidebar.boundingBox())?.width).toBe(56);
       const current = nav.locator("a[aria-current='page']");
       await expect(current).toHaveAccessibleName(locale === "en" ? "Students" : /.+/);
       // Its label shows beside it on focus (visual only), and Escape dismisses it.
@@ -240,7 +240,7 @@ test.describe("app shell on the office PC: one sidebar, compact mode (NFR-A11Y-0
       await expect(tip).toBeVisible();
       expect(await tip.getAttribute("aria-hidden")).toBe("true");
       const tipBox = await tip.locator(".sidebar-tip-bubble").boundingBox();
-      expect(tipBox?.x ?? 0).toBeGreaterThanOrEqual(72);
+      expect(tipBox?.x ?? 0).toBeGreaterThanOrEqual(56);
       await page.keyboard.press("Escape");
       await expect(tip).toBeHidden();
       expect(problems(await measure(page))).toEqual([]);
@@ -251,10 +251,10 @@ test.describe("app shell on the office PC: one sidebar, compact mode (NFR-A11Y-0
       expect(await page.evaluate(() => document.documentElement.getAttribute("data-sidebar"))).toBe(
         "collapsed",
       );
-      expect((await sidebar.boundingBox())?.width).toBe(72);
+      expect((await sidebar.boundingBox())?.width).toBe(56);
       await settle(page);
       await sidebar.getByRole("button", { name: expandName }).click();
-      expect((await sidebar.boundingBox())?.width).toBe(272);
+      expect((await sidebar.boundingBox())?.width).toBe(240);
     });
   }
 });
