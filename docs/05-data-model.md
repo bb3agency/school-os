@@ -1439,7 +1439,7 @@ A school's owner or principal (`tenant.settings.manage`, step-up) changes the pe
 
 **New schemas (ADR-0042 P10, owner decision D14 of 2026-10-14).** `fin` (fees and payments) and `msg` (messaging), created by `infra/db/bootstrap.sql` with the same grants pattern as `sis`/`ops`; `rls_allowlist.yaml` `tenant_schemas` gains both so the RLS catalog test covers them; `sos_readonly` gets no privileges on `fin.provider_events`, `fin.payment_connections`, `msg.accounts`, `msg.provider_events` (secrets and raw payloads).
 
-**Migrations (planned order; numbers re-chained at merge as in R1):** `0054_public_handles` (wave R2-0: `core.public_handles`, `core.resolve_public_handle`, schemas `fin`/`msg`, `parent_language` setting, `sis.guardians.preferred_language`, `sis.apaar_consent_settings.form_language` nullable), `0055_certificate_verification` (R2-1A), `0056_fees` (R2-1B), `0057_messaging` (R2-1C), `0058_payments_online` (R2-2D), `0059_fees_upi` (R2-2E), `0060_messaging_sends` (R2-3G). Each ships its permissions (docs/07 §6.7) and needs the system-role sync after migrating (ADR-0022).
+**Migrations (numbers re-chained at merge as in R1):** `0055_public_handles` (wave R2-0, **built**: `core.public_handles`, `core.resolve_public_handle`, `parent_language` setting (JSON, no DDL), `sis.guardians.preferred_language`, `sis.apaar_consent_settings.form_language` nullable; schemas `fin`/`msg` come from `bootstrap.sql` and the migration refuses to run without them), `0056_certificate_verification` (R2-1A), `0057_fees` (R2-1B), `0058_messaging` (R2-1C), `0059_payments_online` (R2-2D), `0060_fees_upi` (R2-2E), `0061_messaging_sends` (R2-3G). (`0054` went to `0054_r1_finish`.) Each ships its permissions (docs/07 §6.7) and needs the system-role sync after migrating (ADR-0022).
 
 ### 15.1 Fee ledger and receipts (`fin`; ADR-0042, FR-FEE-*)
 
@@ -1515,6 +1515,8 @@ CREATE TABLE core.public_handles (
 -- RLS ENABLE + FORCE, tenant_isolation, definer_access (ADR-0047), offboarding_purge.
 -- sos_app: SELECT, INSERT; UPDATE (revoked_at, revoked_reason, first_viewed_at, last_viewed_at, view_count).
 ```
+
+**As built (0055, 2026-10-17).** As above, plus: CHECKs that parent kinds always expire and provider/certificate kinds never do, that only parent kinds name a guardian, that a revocation has a reason code, and that the view counters agree; a `BEFORE UPDATE` trigger (`core.tg_public_handles_guard`) refuses un-revoking, rewinding view counters and changing identity columns (the guardian FK's `SET NULL` passes); `sos_app` also has `DELETE`, limited by the restrictive policy `purge_expired_only` (`FOR DELETE TO sos_app USING (expires_at < now() - interval '30 days')`), so the daily purge needs no other role; `sos_readonly` has nothing on the table; `created_by` references `core.users`. Parent tokens do not say which parent kind they are, so the service asks the resolver for all candidate kinds in one statement (`unnest(kinds) CROSS JOIN LATERAL core.resolve_public_handle(...)`), keeping a miss the same cost for any key.
 
 `core.resolve_public_handle(p_kind text, p_key_hash bytea) RETURNS TABLE (tenant_id uuid, handle_id uuid)`: owned by `sos_definer`, `EXECUTE` to `sos_app` only, active handles of `active` schools (receipt and certificate kinds also `suspended`), no other columns. `rls_allowlist.yaml`: `definer_access_tables` += `core.public_handles`; `definer_functions` += `core.resolve_public_handle`. Purge: expired parent handles 30 days after `expires_at` (daily `public.purge_handles`).
 
