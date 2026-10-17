@@ -1,4 +1,4 @@
-"""``fin`` tables of the fee ledger and receipts (migration 0057_fees_core, docs/05 §15.1).
+"""``fin`` tables of the fee ledger and receipts (migration 0058_fees_core, docs/05 §15.1).
 
 Describes the tables for typed queries only; DDL (RLS, CHECKs, the append-only, frozen-receipt
 and deferred allocation-sum triggers, column grants) lives in the migration. FKs into other

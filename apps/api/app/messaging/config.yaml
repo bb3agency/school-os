@@ -1,0 +1,89 @@
+# WhatsApp messaging configuration (ADR-0043; FR-MSG-001..024; docs/05 §15.3). Versioned
+# configuration shipped inside the package, read by app/messaging/config.py. Endpoints, versions,
+# limits, keywords, retention periods and rates live here, never inline (invariant 13).
+version: 1
+
+# Meta Cloud API (FR-MSG-001). Only app/messaging/providers/ calls it (import-linter contract,
+# egress allowlist graph.facebook.com). SOS_META_GRAPH_API_VERSION may override the version for
+# a tested upgrade only.
+graph:
+  base_url: https://graph.facebook.com
+  api_version: v23.0
+  timeout_s: 10
+  # Embedded Signup v4 (v2 is deprecated on 15 Oct 2026; ADR-0043 context).
+  embedded_signup_version: v4
+  templates_page_size: 100
+
+# Opt-in (ADR-0043 decision 7, owner decision D26; FR-MSG-008, FR-MSG-009).
+optin:
+  categories: [notices, attendance, fees]
+  # The wording a parent agreed to; bump when the slip, form or confirmation text changes.
+  wording_version: optin-2026-10
+  # Printed join slips: 8 characters from an alphabet without look-alikes (no 0/O, 1/I/L),
+  # single use, valid 30 days (FR-MSG-009).
+  join_code_length: 8
+  join_code_alphabet: ABCDEFGHJKMNPQRSTUVWXYZ23456789
+  join_code_days: 30
+  # At most this many slips in one print (a section is far smaller).
+  max_slips_per_print: 400
+  # Decisions may be dated at most this long ago (paper forms collected before connecting).
+  max_decision_age_days: 400
+
+# Inbound keywords (ADR-0043 decision 7, ADR-0044 decision 8; FR-MSG-010). Case, spaces and
+# punctuation are ignored; English keywords always work, Telugu ones whatever the school's
+# language. "start" is not a re-join: a new opt-in needs the join code (ADR-0043 decision 7).
+keywords:
+  stop: [STOP, UNSUBSCRIBE, ఆపు]
+  join: [JOIN, చేరండి]
+  # The quick-reply button "Stop messages" on every business-initiated template sends this
+  # payload (FR-MSG-010).
+  stop_button_payload: SOS_STOP
+
+# Automatic reply to any other inbound message: at most one per number per IST day, inside the
+# open service window; the inbound text is never stored (ADR-0043 decision 9, FR-MSG-018).
+auto_reply_per_day: 1
+
+# Sending rules this wave owns (FR-MSG-011 partly; wave R2-3G adds quiet hours and caps).
+sending:
+  # Messages from Indian WABAs need INR billing from this date (FR-MSG-004).
+  inr_required_from: 2027-01-01
+  # Owner decision D25: the school's daily cap defaults to Meta's messaging limit minus 10%.
+  daily_cap_margin_percent: 10
+  # Quality ratings and account states that pause sending until a person resumes (FR-MSG-021).
+  pausing_quality: [FLAGGED, RED]
+  # Meta error codes that are permanent (the number is not on WhatsApp, re-engagement needed,
+  # the user blocked the business, ...): never retried (FR-MSG-016).
+  permanent_error_codes: [131026, 131047, 131050, 131051, 131052, 132000, 132001, 132005, 132007, 132012, 132015, 132016, 133010]
+  transient_error_codes: [4, 80007, 130429, 131000, 131016, 131048, 131056, 133004]
+  max_attempts: 3
+
+# Messaging limits Meta reports per business portfolio (unique users per moving 24 hours).
+messaging_limits:
+  TIER_50: 50
+  TIER_250: 250
+  TIER_1K: 1000
+  TIER_2K: 2000
+  TIER_10K: 10000
+  TIER_100K: 100000
+  TIER_UNLIMITED: 1000000
+
+# Displayed estimate only (owner decision D27; the school pays Meta directly, D7): utility
+# template per delivered message in India, before GST (research notes §1; confirm against Meta's
+# INR rate card).
+cost:
+  utility_rate_inr: "0.115"
+  gst_percent: 18
+
+# Retention (docs/05 §13, FR-MSG-023). Days.
+retention:
+  provider_events_days: 30
+  inbound_events_days: 90
+  messages_days: 395
+  message_vars_days: 180
+  join_codes_after_expiry_days: 30
+  purge_batch_size: 1000
+
+# Inbox processing: events not processed after this many attempts are marked failed.
+inbox:
+  max_attempts: 5
+  batch_size: 200

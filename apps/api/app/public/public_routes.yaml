@@ -30,5 +30,10 @@ routes:
     kinds: [cert_verify]
   # --- end R2-1A ------------------------------------------------------------------------------
   # --- R2-1C messaging: GET and POST /api/v1/webhooks/meta -----------------------------------
+  GET /api/v1/webhooks/meta:
+    guard: meta_verify_token
+  POST /api/v1/webhooks/meta:
+    guard: webhook_signature
+    provider: meta
   # --- R2-2D online payments: POST /api/v1/webhooks/razorpay/{route} -------------------------
   # --- R2-3H parent pages: the other /api/v1/public/links/current/* routes ------------------

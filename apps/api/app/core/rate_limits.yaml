@@ -220,6 +220,10 @@ routes:
   # support tickets
   POST /api/v1/support/tickets: [support_tickets]
   POST /api/v1/platform/support/tickets: [support_tickets]
+  # --- R2-1C messaging (ADR-0043): delivery-log search and printed join slips ---------------
+  POST /api/v1/messages/search: [search]
+  POST /api/v1/messaging/join-slips: [render]
+  GET /api/v1/sections/{section_id}/join-slips: [render]
   # break-glass (generous)
   POST /api/v1/breakglass/support-session: [emergency]
   POST /api/v1/breakglass/grants/{grant_id}/revoke: [emergency]

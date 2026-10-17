@@ -13,6 +13,7 @@ import {
 } from "@/lib/public-surface";
 import {
   applySecurityHeaders,
+  EMBEDDED_SIGNUP_PATH,
   buildContentSecurityPolicy,
   generateNonce,
   isHttpsDeployment,
@@ -153,11 +154,14 @@ export function proxy(request: NextRequest): NextResponse {
   }
   const nonce = generateNonce();
   const https = isHttpsDeployment(process.env.APP_BASE_URL);
+  // R2-1C: Meta's Embedded Signup is allowed on the WhatsApp settings page only.
+  const embeddedSignup = EMBEDDED_SIGNUP_PATH.test(request.nextUrl.pathname);
   const csp = buildContentSecurityPolicy({
     nonce,
     isDev: process.env.NODE_ENV === "development",
     filesOrigin: process.env.FILES_ORIGIN,
     upgradeInsecureRequests: https,
+    embeddedSignup,
   });
 
   // Next.js reads the nonce from the request's CSP header while rendering. next-intl
@@ -172,7 +176,7 @@ export function proxy(request: NextRequest): NextResponse {
     ? NextResponse.next({ request: { headers: request.headers } })
     : localise(request);
 
-  applySecurityHeaders(response.headers, { csp, hsts: https });
+  applySecurityHeaders(response.headers, { csp, hsts: https, allowPopups: embeddedSignup });
   if (OWN_CSP_PATHS.some((pattern) => pattern.test(request.nextUrl.pathname))) {
     response.headers.delete("Content-Security-Policy");
   }

@@ -75,7 +75,7 @@ Facts checked on 2026-10-14 (sources at the end):
 
 ## Follow-up (R2-1B, built 2026-10-18)
 
-Decisions 1, 4, 5, 11, 12, 13 and 14 and choices P2-P6, P8, P9 and P10 are implemented in `app/fees` (migration `0057_fees_core`); the provider interface, online payments and UPI statements (decisions 3, 6-10) follow in waves R2-2D and R2-2E. Choices the build made (owner-visible ones in docs/03 §3.20 "as built"):
+Decisions 1, 4, 5, 11, 12, 13 and 14 and choices P2-P6, P8, P9 and P10 are implemented in `app/fees` (migration `0058_fees_core`); the provider interface, online payments and UPI statements (decisions 3, 6-10) follow in waves R2-2D and R2-2E. Choices the build made (owner-visible ones in docs/03 §3.20 "as built"):
 
 - **Fees on/off (decision 12).** Besides the flag `fees.enabled`, the school setting `fees_enabled` must be true; in `alongside` mode it is the owner's way to turn fees on despite the ERP.
 - **Frozen plans (P-none).** Every active plan is frozen, not only one with posted charges; changes are new versions whose per-student differences become adjustment requests (FR-FEE-004).

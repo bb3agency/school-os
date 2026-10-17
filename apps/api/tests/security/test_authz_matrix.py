@@ -2110,7 +2110,173 @@ SPECS.update(
 )
 
 
-# --- R2-1B fees (ADR-0042): fees on for school A around each call ---------------------------------
+# --- R2-1C WhatsApp messaging (ADR-0043): fake provider, school A connected as needed -------------
+
+
+def _msg() -> ModuleType:
+    """tests/messaging/support.py (connect with the fake provider, synthetic guardians)."""
+    name = "sos_test_messaging_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "messaging" / "support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+def _msg_unconnect(w: Any, a: Engine) -> None:
+    """Retire school A's live account (setup only) so a connect call has a free slot."""
+    with a.begin() as c:
+        c.execute(
+            text(
+                "UPDATE msg.accounts SET status = 'disconnected', disconnected_at = now(), "
+                "token_ciphertext = NULL, pin_ciphertext = NULL "
+                "WHERE tenant_id = :t AND status <> 'disconnected'"
+            ),
+            {"t": w.a.tenant_id},
+        )
+
+
+def _msg_ids() -> tuple[str, str]:
+    m = _msg()
+    return "7" + m.digits(14), "8" + m.digits(14)
+
+
+def _msg_signup(w: Any, r: str, a: Engine) -> Request:
+    _msg_unconnect(w, a)
+    waba, number = _msg_ids()
+    body = {"code": "matrix-signup-code-" + r, "waba_id": waba, "phone_number_id": number}
+    return "/api/v1/messaging/account/embedded-signup", body, {}
+
+
+def _msg_manual(w: Any, r: str, a: Engine) -> Request:
+    _msg_unconnect(w, a)
+    waba, number = _msg_ids()
+    body = {"token": "matrix-pilot-token-0000-" + r, "waba_id": waba, "phone_number_id": number}
+    return "/api/v1/messaging/account/manual", body, {}
+
+
+def _msg_resume(w: Any, r: str, a: Engine) -> Request:
+    _msg().connect(w.a)
+    with a.begin() as c:
+        c.execute(
+            text(
+                "UPDATE msg.accounts SET status = 'paused', pause_reason = 'quality_flagged' "
+                "WHERE tenant_id = :t AND status <> 'disconnected'"
+            ),
+            {"t": w.a.tenant_id},
+        )
+    return "/api/v1/messaging/account/resume", None, {}
+
+
+def _msg_connected(path: str, body: dict[str, Any] | None = None) -> Builder:
+    def build(w: Any, r: str, a: Engine) -> Request:
+        _msg().connect(w.a)
+        return path, body, {}
+
+    return build
+
+
+def _msg_settings(w: Any, r: str, a: Engine) -> Request:
+    with a.connect() as c:
+        version = c.execute(
+            text("SELECT version FROM msg.settings WHERE tenant_id = :t"), {"t": w.a.tenant_id}
+        ).scalar_one_or_none()
+    body = {
+        "notices_enabled": False,
+        "absence_alerts_enabled": False,
+        "fee_reminders_enabled": False,
+        "fee_receipts_enabled": False,
+        "absence_alert_time": "11:00:00",
+        "quiet_start": "21:00:00",
+        "quiet_end": "07:00:00",
+        "daily_cap": None,
+        "office_phone": None,
+    }
+    return "/api/v1/messaging/settings", body, _if_match(int(version or 0))
+
+
+def _msg_guardian(w: Any) -> uuid.UUID:
+    value: uuid.UUID = SW.ensure_students(w)["g9a"]
+    return value
+
+
+def _msg_slips(w: Any, r: str, a: Engine) -> Request:
+    _msg().connect(w.a)
+    student = SW.ensure_students(w)["s9a"]
+    return (
+        "/api/v1/messaging/join-slips",
+        {"student_ids": [str(student)], "categories": ["notices"]},
+        {},
+    )
+
+
+def _msg_section_slips(w: Any, r: str, a: Engine) -> Request:
+    _msg().connect(w.a)
+    section = w.a.ids["section_9a"]
+    return f"/api/v1/sections/{section}/join-slips?categories=notices", None, {}
+
+
+SPECS.update(
+    {
+        ("GET", "/api/v1/messaging/account"): lambda w, r, a: (
+            "/api/v1/messaging/account",
+            None,
+            {},
+        ),
+        ("POST", "/api/v1/messaging/account/embedded-signup"): _msg_signup,
+        ("POST", "/api/v1/messaging/account/manual"): _msg_manual,
+        ("POST", "/api/v1/messaging/account/resume"): _msg_resume,
+        ("DELETE", "/api/v1/messaging/account"): _msg_connected("/api/v1/messaging/account"),
+        ("GET", "/api/v1/messaging/templates"): lambda w, r, a: (
+            "/api/v1/messaging/templates",
+            None,
+            {},
+        ),
+        ("POST", "/api/v1/messaging/templates/sync"): _msg_connected(
+            "/api/v1/messaging/templates/sync"
+        ),
+        ("GET", "/api/v1/messaging/settings"): lambda w, r, a: (
+            "/api/v1/messaging/settings",
+            None,
+            {},
+        ),
+        ("PUT", "/api/v1/messaging/settings"): _msg_settings,
+        ("GET", "/api/v1/guardians/{guardian_id}/optins"): lambda w, r, a: (
+            f"/api/v1/guardians/{_msg_guardian(w)}/optins",
+            None,
+            {},
+        ),
+        ("POST", "/api/v1/guardians/{guardian_id}/optins"): lambda w, r, a: (
+            f"/api/v1/guardians/{_msg_guardian(w)}/optins",
+            {
+                "category": "notices",
+                "status": "opted_in",
+                "method": "in_person",
+                "decided_on": "2026-10-01",
+            },
+            {},
+        ),
+        ("POST", "/api/v1/messaging/join-slips"): _msg_slips,
+        ("GET", "/api/v1/sections/{section_id}/join-slips"): _msg_section_slips,
+        ("GET", "/api/v1/sections/{section_id}/optins/summary"): lambda w, r, a: (
+            f"/api/v1/sections/{w.a.ids['section_9a']}/optins/summary",
+            None,
+            {},
+        ),
+        ("POST", "/api/v1/messages/search"): lambda w, r, a: (
+            "/api/v1/messages/search",
+            {"guardian_id": str(_msg_guardian(w))},
+            {},
+        ),
+    }
+)
+
+
+# --- R2-1B fees (ADR-0042): fees on for school A around each call -------------------------------
 
 
 def _fees() -> ModuleType:
@@ -2159,6 +2325,10 @@ def _success(method: str, path: str) -> int:
         "/api/v1/tally/enrolment-codes",
         "/api/v1/tally/parties/{party_id}/links",
         "/api/v1/students/{student_id}/apaar-consent",
+        # R2-1C WhatsApp (ADR-0043)
+        "/api/v1/messaging/account/embedded-signup",
+        "/api/v1/messaging/account/manual",
+        "/api/v1/guardians/{guardian_id}/optins",
     }
     accepted = {
         "/api/v1/documents",
@@ -2182,6 +2352,8 @@ def _success(method: str, path: str) -> int:
         "/api/v1/notices/{notice_id}/render",
         # R-19: a chain check is queued; the result is read with GET /audit/verify.
         "/api/v1/audit/verify",
+        # R2-1C: template provisioning and sync run in the worker.
+        "/api/v1/messaging/templates/sync",
     }
     if method == "POST" and path in accepted:
         return 202
@@ -2198,6 +2370,7 @@ def _success(method: str, path: str) -> int:
         "/api/v1/documents/{document_id}",
         "/api/v1/students/{student_id}/guardians/{guardian_id}",
         "/api/v1/tally/parties/{party_id}/links/{student_id}",
+        "/api/v1/messaging/account",
     ):
         return 204
     return 201 if method == "POST" and path in creates else 200

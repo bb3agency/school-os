@@ -25,6 +25,8 @@ const FEE_PERMISSIONS = [
   "fee.refund.approve",
   "fee.report",
 ];
+/** Permissions that use the WhatsApp screens (R2-1C, ADR-0043). */
+const MESSAGING_PERMISSIONS = ["message.read", "messaging.configure"];
 
 /** Codes that mean "this session has no usable school right now: pick one". */
 const CHOOSE_AGAIN = new Set(["active_tenant_required", "no_membership", "invalid_active_tenant"]);
@@ -80,6 +82,14 @@ export default async function SchoolLayout({ children }: { children: ReactNode }
     !suspended && (profile?.permissions ?? []).some((key) => FEE_PERMISSIONS.includes(key));
   const feeStatus = feeUser ? await apiGetAsSession<unknown>("staff", "/api/v1/fees/status") : null;
   const fees = feeStatus?.status === 200;
+  // R2-1C (FR-MSG-024): the WhatsApp items show only where messaging is offered (shared tier,
+  // SOS_MESSAGING_ENABLED); the settings route answers 404 module_unavailable otherwise.
+  const messagingUser =
+    !suspended && (profile?.permissions ?? []).some((key) => MESSAGING_PERMISSIONS.includes(key));
+  const messagingSettings = messagingUser
+    ? await apiGetAsSession<unknown>("staff", "/api/v1/messaging/settings")
+    : null;
+  const messaging = messagingSettings?.status === 200;
 
   const activeTenantId = profile?.tenant_id ?? session.activeTenantId;
   const schoolName =
@@ -97,7 +107,7 @@ export default async function SchoolLayout({ children }: { children: ReactNode }
       permissions={profile?.permissions ?? (suspended ? [] : null)}
       canSwitchSchool={(profile?.tenant_ids.length ?? 0) > 1}
       languages={settings?.languages ?? null}
-      features={{ tally, fees }}
+      features={{ tally, fees, messaging }}
       banner={
         <>
           {support ? <SupportAccessBanner /> : null}

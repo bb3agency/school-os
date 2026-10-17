@@ -15,7 +15,7 @@ import json
 
 from app.authz.catalog import system_roles
 
-PINNED = "5988b59d701ea6851e00ed755f52b6042aaadf9c9471e2c110a95011cf745edb"
+PINNED = "15196d52f97b23bb80b433044843440a1e589b06bf7b01836c3a785aa65dc170"  # R2-1C + R2-1B grants
 
 
 def fingerprint() -> str:

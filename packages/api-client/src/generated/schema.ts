@@ -3272,6 +3272,37 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/guardians/{guardian_id}/optins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Optins
+         * @description A guardian's WhatsApp opt-in state per category (notices, attendance, fees), whether it
+         *     is for the guardian's current number, the full history with methods and recorders, and the
+         *     guardian's message language (``message.read`` or ``messaging.optin.record``; class
+         *     teachers: guardians of their sections' students). ``ETag``: the number of decisions.
+         */
+        get: operations["get_optins_api_v1_guardians__guardian_id__optins_get"];
+        put?: never;
+        /**
+         * Record Optin
+         * @description Record a guardian's opt-in or opt-out for one category with its method and date: a signed
+         *     form (evidence document required), in person (the caller is the recorder) or a stop request
+         *     (FR-MSG-008; ``messaging.optin.record``; ``Idempotency-Key``, ``If-Match``). Errors: 409
+         *     ``opted_out_by_parent``; 412; 422 ``no_mobile_number``, ``evidence_required``,
+         *     ``method_does_not_match_status``, ``date_in_future``.
+         */
+        post: operations["record_optin_api_v1_guardians__guardian_id__optins_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/import-presets": {
         parameters: {
             query?: never;
@@ -4333,6 +4364,220 @@ export interface paths {
         get: operations["list_my_schools_api_v1_me_schools_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/messages/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Search Messages
+         * @description Message history and delivery log, newest first: purpose, template, language, status
+         *     (queued, sent, delivered, read, failed with a plain reason, skipped with why) and the
+         *     phone's last four digits only (US-2208, FR-MSG-017; ``message.read``). Class teachers name a
+         *     student or guardian of their sections (422 ``filter_required``).
+         */
+        post: operations["search_messages_api_v1_messages_search_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/messaging/account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Account
+         * @description The school's WhatsApp connection: number, display name, status and pause reason, quality
+         *     rating, messaging limit (and the default daily cap, Meta's limit minus 10%), billing currency
+         *     state (INR required from 1 Jan 2027) and each template's status (FR-MSG-004; permission
+         *     ``messaging.configure`` or ``message.read``). ``connected`` false before connecting.
+         */
+        get: operations["get_account_api_v1_messaging_account_get"];
+        put?: never;
+        post?: never;
+        /**
+         * Disconnect
+         * @description Disconnect WhatsApp: sending stops at once, the token is erased and open parent links
+         *     sent through messages stop working (US-2201 AC4; ``messaging.configure``, MFA within 5
+         *     minutes; optional ``If-Match``). Audited.
+         */
+        delete: operations["disconnect_api_v1_messaging_account_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/messaging/account/embedded-signup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Connect Embedded Signup
+         * @description Finish Meta's Embedded Signup: exchange the code for the school's business token,
+         *     register the number, subscribe SchoolOS's app to the WABA and submit the message templates
+         *     (FR-MSG-002; ``messaging.configure``, MFA within 5 minutes; ``Idempotency-Key``). The school
+         *     pays Meta directly with its own payment method (owner decision D7). Errors: 409
+         *     ``messaging_already_connected``; 502 ``messaging_auth_failed`` or
+         *     ``messaging_provider_error``.
+         */
+        post: operations["connect_embedded_signup_api_v1_messaging_account_embedded_signup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/messaging/account/manual": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Connect Manual
+         * @description Connect with a system-user token from the school's own Business Manager, for pilots until
+         *     SchoolOS is a Meta Tech Provider (FR-MSG-003, owner decision D13; ``messaging.configure``,
+         *     MFA within 5 minutes). The token is checked with a read call, stored wrapped and never shown
+         *     again. Errors: 403 ``manual_token_not_allowed``; 409 ``messaging_already_connected``; 502.
+         */
+        post: operations["connect_manual_api_v1_messaging_account_manual_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/messaging/account/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resume
+         * @description Resume sending after a pause (FR-MSG-021; ``messaging.configure``, MFA within 5 minutes).
+         *     Errors: 409 ``messaging_not_paused``, ``messaging_still_restricted``,
+         *     ``messaging_not_connected``.
+         */
+        post: operations["resume_api_v1_messaging_account_resume_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/messaging/join-slips": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Join Slips
+         * @description Printable join slips for the guardians (with a mobile number) of chosen students or a
+         *     section, in each guardian's parent language, each with a new single-use code and a QR code
+         *     for the school's WhatsApp number (FR-MSG-009; ``messaging.optin.record``, scope). Errors: 409
+         *     ``messaging_not_connected``, ``no_slips``, ``too_many_slips``. Audited (count).
+         */
+        post: operations["join_slips_api_v1_messaging_join_slips_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/messaging/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Settings
+         * @description Messaging switches per purpose, absence-alert time, quiet hours, daily cap and the office
+         *     phone for automatic replies, with the estimated Meta rate used for cost previews
+         *     (``message.read`` or ``messaging.configure``).
+         */
+        get: operations["get_settings_api_v1_messaging_settings_get"];
+        /**
+         * Put Settings
+         * @description Change the messaging settings (``messaging.configure``, MFA within 5 minutes;
+         *     ``If-Match``, ``W/"0"`` before the first save). Audited (field names).
+         */
+        put: operations["put_settings_api_v1_messaging_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/messaging/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Templates
+         * @description Each catalogue template per language with Meta's status and category, whether Telugu
+         *     text is reviewed and whether it can be used now (FR-MSG-005..007).
+         */
+        get: operations["list_templates_api_v1_messaging_templates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/messaging/templates/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sync Templates
+         * @description Submit templates not created yet and read every status back (in the background;
+         *     ``messaging.configure``, MFA within 5 minutes).
+         */
+        post: operations["sync_templates_api_v1_messaging_templates_sync_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6252,6 +6497,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sections/{section_id}/join-slips": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Section Join Slips
+         * @description The same slips for a whole section (the web's print link; ids and codes only in the URL,
+         *     no personal data). ``messaging.optin.record``, scope; errors as
+         *     ``POST /messaging/join-slips``.
+         */
+        get: operations["section_join_slips_api_v1_sections__section_id__join_slips_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sections/{section_id}/optins/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Section Summary
+         * @description Opted in / opted out / not asked per category for a section's guardians, and how many
+         *     have no mobile number (US-2202 AC3; ``message.read``, scope). Counts only.
+         */
+        get: operations["section_summary_api_v1_sections__section_id__optins_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sections/{section_id}/unarchive": {
         parameters: {
             query?: never;
@@ -7403,6 +7691,34 @@ export interface paths {
          */
         put: operations["replace_user_scopes_api_v1_users__user_id__scopes_put"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webhooks/meta": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Meta Challenge
+         * @description Meta's subscription check: ``hub.challenge`` back when ``hub.mode = subscribe`` and
+         *     ``hub.verify_token`` matches ``SOS_META_WEBHOOK_VERIFY_TOKEN`` (403 otherwise).
+         */
+        get: operations["meta_challenge_api_v1_webhooks_meta_get"];
+        put?: never;
+        /**
+         * Meta Webhook
+         * @description Meta's events for every connected school. The signature (app secret over the raw body)
+         *     was checked by the guard; each entry is routed by its WABA id to one school, its events are
+         *     stored (encrypted, deduplicated) and the worker applies them. A replayed delivery and events
+         *     of unknown or disconnected accounts are acknowledged without effect.
+         */
+        post: operations["meta_webhook_api_v1_webhooks_meta_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -8974,6 +9290,39 @@ export interface components {
             groups: number;
             /** Selected */
             selected: number;
+        };
+        /** CategoryCounts */
+        CategoryCounts: {
+            /** Not Asked */
+            not_asked: number;
+            /** Opted In */
+            opted_in: number;
+            /** Opted Out */
+            opted_out: number;
+        };
+        /** CategoryStateOut */
+        CategoryStateOut: {
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "notices" | "attendance" | "fees";
+            /** Decided On */
+            decided_on: string | null;
+            /**
+             * For Current Number
+             * @description False when the guardian's number changed after the opt-in (a new opt-in is needed) or there is no number.
+             */
+            for_current_number: boolean;
+            /** Method */
+            method: ("whatsapp_join" | "signed_form" | "in_person" | "whatsapp_stop" | "staff_recorded_stop") | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "opted_in" | "opted_out" | "not_asked";
+            /** Stopped By Parent */
+            stopped_by_parent: boolean;
         };
         /**
          * CellEditIn
@@ -10790,6 +11139,20 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /**
+         * EmbeddedSignupIn
+         * @description What Meta's Embedded Signup window returned to the settings page (FR-MSG-002).
+         */
+        EmbeddedSignupIn: {
+            /** Business Id */
+            business_id?: string | null;
+            /** Code */
+            code: string;
+            /** Phone Number Id */
+            phone_number_id: string;
+            /** Waba Id */
+            waba_id: string;
+        };
         /** EnrolIn */
         EnrolIn: {
             /** Agent Version */
@@ -11631,6 +11994,37 @@ export interface components {
              * @enum {string}
              */
             relationship: "father" | "mother" | "guardian";
+        };
+        /** GuardianOptinsOut */
+        GuardianOptinsOut: {
+            /** Categories */
+            categories: components["schemas"]["CategoryStateOut"][];
+            /**
+             * Effective Language
+             * @enum {string}
+             */
+            effective_language: "en" | "te";
+            /**
+             * Guardian Id
+             * Format: uuid
+             */
+            guardian_id: string;
+            /** Has Mobile */
+            has_mobile: boolean;
+            /** History */
+            history: components["schemas"]["OptinEntryOut"][];
+            /**
+             * Id
+             * Format: uuid
+             * @description The guardian's id (same as guardian_id).
+             */
+            id: string;
+            /** Phone Last4 */
+            phone_last4: string | null;
+            /** Preferred Language */
+            preferred_language: ("en" | "te") | null;
+            /** Version */
+            version: number;
         };
         /** GuardianOut */
         GuardianOut: {
@@ -12708,6 +13102,18 @@ export interface components {
             task_name: string;
         };
         /**
+         * JoinSlipsIn
+         * @description Students or one section of the current year; the categories the slip opts into.
+         */
+        JoinSlipsIn: {
+            /** Categories */
+            categories: ("notices" | "attendance" | "fees")[];
+            /** Section Id */
+            section_id?: string | null;
+            /** Student Ids */
+            student_ids?: string[] | null;
+        };
+        /**
          * KeyRotationOut
          * @description The new key, returned ONCE. The old key works until the new one is first used, or for
          *     the rotation overlap at most.
@@ -12823,6 +13229,23 @@ export interface components {
              * Format: uuid
              */
             tenant_id: string;
+        };
+        /**
+         * ManualConnectIn
+         * @description Pilots until SchoolOS is a Meta Tech Provider (D13; FR-MSG-003): a system-user token
+         *     created in the school's own Business Manager, its WABA id and phone number id.
+         */
+        ManualConnectIn: {
+            /** Phone Number Id */
+            phone_number_id: string;
+            /**
+             * Token
+             * Format: password
+             * @description Never returned, logged or exported.
+             */
+            token: string;
+            /** Waba Id */
+            waba_id: string;
         };
         /** ManualFlagIn */
         ManualFlagIn: {
@@ -13100,6 +13523,288 @@ export interface components {
              * @description Replaced by a regenerate or an edit.
              */
             superseded: boolean;
+        };
+        /**
+         * MessagingAccountOut
+         * @description The school's WhatsApp connection (FR-MSG-004). ``connected`` false: nothing below is set.
+         */
+        MessagingAccountOut: {
+            /**
+             * Available
+             * @default true
+             */
+            available: boolean;
+            /** Connected */
+            connected: boolean;
+            /** Connected At */
+            connected_at?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Currency State */
+            currency_state?: ("confirmed_inr" | "not_inr" | "unknown") | null;
+            /** Default Daily Cap */
+            default_daily_cap?: number | null;
+            /** Display Name */
+            display_name?: string | null;
+            /** Display Phone */
+            display_phone?: string | null;
+            /**
+             * Embedded Signup
+             * @description Public Embedded Signup values (app id, configuration id).
+             */
+            embedded_signup?: {
+                [key: string]: string;
+            } | null;
+            /** Id */
+            id?: string | null;
+            /**
+             * Inr Required From
+             * Format: date
+             */
+            inr_required_from: string;
+            /** Last Synced At */
+            last_synced_at?: string | null;
+            /** Manual Token Allowed */
+            manual_token_allowed: boolean;
+            /** Messaging Limit */
+            messaging_limit?: string | null;
+            /** Messaging Limit Count */
+            messaging_limit_count?: number | null;
+            /** Mode */
+            mode?: ("embedded_signup" | "manual_token") | null;
+            /** Pause Reason */
+            pause_reason?: string | null;
+            /** Paused At */
+            paused_at?: string | null;
+            /** Phone Number Id */
+            phone_number_id?: string | null;
+            /** Quality Rating */
+            quality_rating?: string | null;
+            /** Status */
+            status?: ("connecting" | "active" | "paused" | "disconnected") | null;
+            /** Templates */
+            templates?: components["schemas"]["MessagingTemplateOut"][];
+            /** Unreviewed Texts */
+            unreviewed_texts?: string[];
+            /**
+             * Version
+             * @default 0
+             */
+            version: number;
+            /** Waba Id */
+            waba_id?: string | null;
+        };
+        /** MessagingMessageOut */
+        MessagingMessageOut: {
+            /** Attempts */
+            attempts: number;
+            /** Delivered At */
+            delivered_at: string | null;
+            /** Error Code */
+            error_code: string | null;
+            /** Error Reason */
+            error_reason: string | null;
+            /** Failed At */
+            failed_at: string | null;
+            /** Guardian Id */
+            guardian_id: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "template" | "text";
+            /**
+             * Language
+             * @enum {string}
+             */
+            language: "en" | "te";
+            /** Language Fallback */
+            language_fallback: boolean;
+            /** Phone Last4 */
+            phone_last4: string | null;
+            /**
+             * Purpose
+             * @enum {string}
+             */
+            purpose: "optin_confirm" | "school_notice" | "absence_alert" | "fee_reminder" | "fee_receipt" | "optin_stopped";
+            /**
+             * Queued At
+             * Format: date-time
+             */
+            queued_at: string;
+            /** Read At */
+            read_at: string | null;
+            /** Sent At */
+            sent_at: string | null;
+            /** Skip Reason */
+            skip_reason: string | null;
+            /**
+             * Source Id
+             * Format: uuid
+             */
+            source_id: string;
+            /** Source Type */
+            source_type: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "skipped" | "sent" | "delivered" | "read" | "failed";
+            /** Student Id */
+            student_id: string | null;
+            /** Template Key */
+            template_key: string | null;
+            /** Template Version */
+            template_version: number | null;
+        };
+        /** MessagingMessagePage */
+        MessagingMessagePage: {
+            /** Items */
+            items: components["schemas"]["MessagingMessageOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
+        /**
+         * MessagingSearchIn
+         * @description Delivery log filters (POST: no personal data in URLs). Scoped callers (class teachers)
+         *     must name a student or guardian in their sections.
+         */
+        MessagingSearchIn: {
+            /** Cursor */
+            cursor?: string | null;
+            /** Guardian Id */
+            guardian_id?: string | null;
+            /**
+             * Limit
+             * @default 50
+             */
+            limit: number;
+            /** Purpose */
+            purpose?: ("optin_confirm" | "school_notice" | "absence_alert" | "fee_reminder" | "fee_receipt" | "optin_stopped") | null;
+            /** Since */
+            since?: string | null;
+            /** Status */
+            status?: ("queued" | "skipped" | "sent" | "delivered" | "read" | "failed") | null;
+            /** Student Id */
+            student_id?: string | null;
+            /** Until */
+            until?: string | null;
+        };
+        /**
+         * MessagingSettingsIn
+         * @description Switches and times (ADR-0043 decisions 10-11, owner decision D25). The switches are read
+         *     by the sending wave (R2-3G); absence alerts stay off until the school turns them on.
+         */
+        MessagingSettingsIn: {
+            /**
+             * Absence Alert Time
+             * Format: time
+             */
+            absence_alert_time: string;
+            /** Absence Alerts Enabled */
+            absence_alerts_enabled: boolean;
+            /** Daily Cap */
+            daily_cap?: number | null;
+            /** Fee Receipts Enabled */
+            fee_receipts_enabled: boolean;
+            /** Fee Reminders Enabled */
+            fee_reminders_enabled: boolean;
+            /** Notices Enabled */
+            notices_enabled: boolean;
+            /**
+             * Office Phone
+             * @description The school office's phone, given in automatic replies.
+             */
+            office_phone?: string | null;
+            /**
+             * Quiet End
+             * Format: time
+             */
+            quiet_end: string;
+            /**
+             * Quiet Start
+             * Format: time
+             */
+            quiet_start: string;
+        };
+        /** MessagingSettingsOut */
+        MessagingSettingsOut: {
+            /**
+             * Absence Alert Time
+             * Format: time
+             */
+            absence_alert_time: string;
+            /** Absence Alerts Enabled */
+            absence_alerts_enabled: boolean;
+            /** Daily Cap */
+            daily_cap: number | null;
+            /** Default Daily Cap */
+            default_daily_cap: number | null;
+            /** Fee Receipts Enabled */
+            fee_receipts_enabled: boolean;
+            /** Fee Reminders Enabled */
+            fee_reminders_enabled: boolean;
+            /** Gst Percent */
+            gst_percent: string;
+            /** Notices Enabled */
+            notices_enabled: boolean;
+            /** Office Phone */
+            office_phone: string | null;
+            /**
+             * Quiet End
+             * Format: time
+             */
+            quiet_end: string;
+            /**
+             * Quiet Start
+             * Format: time
+             */
+            quiet_start: string;
+            /** Utility Rate Inr */
+            utility_rate_inr: string;
+            /** Version */
+            version: number;
+        };
+        /** MessagingTemplateOut */
+        MessagingTemplateOut: {
+            /**
+             * Language
+             * @enum {string}
+             */
+            language: "en" | "te";
+            /** Last Synced At */
+            last_synced_at: string | null;
+            /** Paused By Sos */
+            paused_by_sos: boolean;
+            /** Provider Category */
+            provider_category: string | null;
+            /** Provider Name */
+            provider_name: string;
+            /** Rejected Reason */
+            rejected_reason: string | null;
+            /** Reviewed */
+            reviewed: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "not_created" | "pending" | "approved" | "rejected" | "paused" | "disabled";
+            /** Template Key */
+            template_key: string;
+            /** Template Version */
+            template_version: number;
+            /** Usable */
+            usable: boolean;
+        };
+        /** MessagingTemplatesOut */
+        MessagingTemplatesOut: {
+            /** Items */
+            items: components["schemas"]["MessagingTemplateOut"][];
         };
         /**
          * ModeDetailsIn
@@ -13516,6 +14221,77 @@ export interface components {
         OperatorRolesIn: {
             /** Roles */
             roles: ("platform_owner" | "platform_engineer" | "support_agent" | "billing_admin" | "platform_viewer")[];
+        };
+        /** OptinEntryOut */
+        OptinEntryOut: {
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "notices" | "attendance" | "fees";
+            /**
+             * Decided On
+             * Format: date
+             */
+            decided_on: string;
+            /** Evidence Document Id */
+            evidence_document_id: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "whatsapp_join" | "signed_form" | "in_person" | "whatsapp_stop" | "staff_recorded_stop";
+            /**
+             * Recorded At
+             * Format: date-time
+             */
+            recorded_at: string;
+            /** Recorded By Name */
+            recorded_by_name: string | null;
+            /** Seq */
+            seq: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "opted_in" | "opted_out";
+            /** Wording Version */
+            wording_version: string;
+        };
+        /**
+         * OptinIn
+         * @description A decision recorded by staff (FR-MSG-008). ``signed_form`` needs the signed form as an
+         *     evidence document; ``in_person`` names the recorder (the caller); ``staff_recorded_stop``
+         *     records a parent's request to stop.
+         */
+        OptinIn: {
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "notices" | "attendance" | "fees";
+            /**
+             * Decided On
+             * Format: date
+             */
+            decided_on: string;
+            /** Evidence Document Id */
+            evidence_document_id?: string | null;
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "signed_form" | "in_person" | "staff_recorded_stop";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "opted_in" | "opted_out";
         };
         /** OwnerIn */
         OwnerIn: {
@@ -16009,6 +16785,24 @@ export interface components {
              * Format: uuid
              */
             to_section_id: string;
+        };
+        /** SectionOptinSummaryOut */
+        SectionOptinSummaryOut: {
+            /** Categories */
+            categories: {
+                [key: string]: components["schemas"]["CategoryCounts"];
+            };
+            /** Guardians */
+            guardians: number;
+            /** Guardians Without Mobile */
+            guardians_without_mobile: number;
+            /**
+             * Section Id
+             * Format: uuid
+             */
+            section_id: string;
+            /** Students */
+            students: number;
         };
         /** SectionOut */
         SectionOut: {
@@ -25754,6 +26548,112 @@ export interface operations {
             };
         };
     };
+    get_optins_api_v1_guardians__guardian_id__optins_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                guardian_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuardianOptinsOut"];
+                };
+            };
+            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    record_optin_api_v1_guardians__guardian_id__optins_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                guardian_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OptinIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuardianOptinsOut"];
+                };
+            };
+            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     list_presets_api_v1_import_presets_get: {
         parameters: {
             query?: never;
@@ -28162,6 +29062,509 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SchoolChoicesOut"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    search_messages_api_v1_messages_search_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MessagingSearchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessagingMessagePage"];
+                };
+            };
+            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_account_api_v1_messaging_account_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessagingAccountOut"];
+                };
+            };
+            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    disconnect_api_v1_messaging_account_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    connect_embedded_signup_api_v1_messaging_account_embedded_signup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmbeddedSignupIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessagingAccountOut"];
+                };
+            };
+            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    connect_manual_api_v1_messaging_account_manual_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualConnectIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessagingAccountOut"];
+                };
+            };
+            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    resume_api_v1_messaging_account_resume_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessagingAccountOut"];
+                };
+            };
+            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    join_slips_api_v1_messaging_join_slips_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JoinSlipsIn"];
+            };
+        };
+        responses: {
+            /** @description Print-ready A4 slips (two a page) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_settings_api_v1_messaging_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessagingSettingsOut"];
+                };
+            };
+            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    put_settings_api_v1_messaging_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MessagingSettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessagingSettingsOut"];
+                };
+            };
+            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_templates_api_v1_messaging_templates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessagingTemplatesOut"];
+                };
+            };
+            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    sync_templates_api_v1_messaging_templates_sync_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessagingAccountOut"];
+                };
+            };
+            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
             429: {
@@ -33500,6 +34903,111 @@ export interface operations {
             };
         };
     };
+    section_join_slips_api_v1_sections__section_id__join_slips_get: {
+        parameters: {
+            query: {
+                /** @description Categories the slips opt into. */
+                categories: ("notices" | "attendance" | "fees")[];
+            };
+            header?: never;
+            path: {
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Print-ready A4 slips (two a page) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    section_summary_api_v1_sections__section_id__optins_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SectionOptinSummaryOut"];
+                };
+            };
+            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     unarchive_section_api_v1_sections__section_id__unarchive_post: {
         parameters: {
             query?: never;
@@ -36337,6 +37845,93 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    meta_challenge_api_v1_webhooks_meta_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Token mismatch */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    meta_webhook_api_v1_webhooks_meta_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Bad or missing X-Hub-Signature-256 (no detail). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Larger than Meta's 3 MB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
             429: {

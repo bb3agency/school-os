@@ -276,8 +276,23 @@ permissions:
     sensitivity: sensitive
     step_up: false
 
+  # --- R2-1C WhatsApp messaging (ADR-0043, US-2201..US-2210, FR-MSG-*) ----------------------
+  # Migration 0057_messaging_core upserts these into core.permissions. message.send arrives with
+  # wave R2-3G (sending).
+  messaging.configure:
+    description: Connect or disconnect the school's WhatsApp number, sync templates, change messaging switches and times, and resume sending after a pause
+    sensitivity: critical
+    step_up: true
+  messaging.optin.record:
+    description: "Record a guardian's WhatsApp opt-in or opt-out with its evidence, and print join slips (class teachers: their sections)"
+    sensitivity: sensitive
+    step_up: false
+  message.read:
+    description: "See WhatsApp delivery reports, message history and opt-in states (class teachers: their sections)"
+    sensitivity: sensitive
+    step_up: false
 
-  # --- R2-1B fees (ADR-0042; docs/07 §6.2; FR-FEE-*). Migration 0057_fees_core upserts these
+  # --- R2-1B fees (ADR-0042; docs/07 §6.2; FR-FEE-*). Migration 0058_fees_core upserts these
   # into core.permissions. School-wide only: a class teacher sees no fee data (FR-FEE-024).
   fee.collect:
     description: Take fee payments at the counter, issue receipts and request receipt cancellations

@@ -228,7 +228,7 @@ def export_records(session: Session) -> list[RecordTable]:
     return repo.export_tables(session)
 
 
-# Children before parents (migration 0057_fees_core). Registered with app.tenancy at import;
+# Children before parents (migration 0058_fees_core). Registered with app.tenancy at import;
 # purged before students, documents, the academic structure and the members they reference.
 _PURGE = purging.PurgeTables(
     deleted=(

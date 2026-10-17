@@ -2,7 +2,7 @@
 invariant 13).
 
 Pure: reads and validates the versioned file next to this module; no database. The database
-CHECKs of migration ``0057_fees_core`` are the second line of defence.
+CHECKs of migration ``0058_fees_core`` are the second line of defence.
 """
 
 from __future__ import annotations

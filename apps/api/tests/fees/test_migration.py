@@ -1,4 +1,4 @@
-"""0057_fees_core: model/database agreement and a populated round trip (CLAUDE.md §6.1, §6.12;
+"""0058_fees_core: model/database agreement and a populated round trip (CLAUDE.md §6.1, §6.12;
 docs/05 §15.1; ADR-0042; FR-FEE-006).
 
 A fresh database is migrated to head, seeded with a synthetic school (``seed-synthetic``) and
@@ -34,8 +34,8 @@ from app.fees.models import ALL_MODELS
 
 pytestmark = pytest.mark.db
 DB = "schoolos_fees_migration"
-REVISION = "0057_fees_core"
-PREVIOUS = "0056_certificate_verifications"  # re-chained at merge (docs/14 R2)
+REVISION = "0058_fees_core"
+PREVIOUS = "0057_messaging_core"  # re-chained at merge (docs/14 R2)
 SETTINGS = Settings(
     env=Environment.CI,
     key_wrapper=KeyWrapperKind.LOCAL_DEV,

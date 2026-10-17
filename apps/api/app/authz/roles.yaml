@@ -57,6 +57,9 @@ roles:
       certificate.approve: school_step_up
       register.read: school_step_up
       apaar.consent.read: school
+      # R2-1C messaging (ADR-0043)
+      messaging.configure: school_step_up
+      message.read: school
       # R2-1B fees (ADR-0042; docs/07 §6.2): school-wide only, never scoped (FR-FEE-024)
       fee.report: school_step_up
 
@@ -119,6 +122,10 @@ roles:
       register.read: school_step_up
       apaar.consent.read: school
       apaar.consent.record: school
+      # R2-1C messaging (ADR-0043)
+      messaging.configure: school_step_up
+      messaging.optin.record: school
+      message.read: school
       # R2-1B fees (ADR-0042; docs/07 §6.2): school-wide only, never scoped (FR-FEE-024)
       fee.collect: school
       fee.manage: school
@@ -172,6 +179,9 @@ roles:
       attendance.read: school
       apaar.consent.read: school
       apaar.consent.record: school
+      # R2-1C messaging (ADR-0043)
+      messaging.optin.record: school
+      message.read: school
       # R2-1B fees (ADR-0042; docs/07 §6.2): school-wide only, never scoped (FR-FEE-024)
       fee.collect: school
       fee.concession.request: school
@@ -201,6 +211,9 @@ roles:
       certificate.issue: school
       apaar.consent.read: school
       apaar.consent.record: school
+      # R2-1C messaging (ADR-0043)
+      messaging.optin.record: school
+      message.read: school
       # R2-1B fees (ADR-0042; docs/07 §6.2): school-wide only, never scoped (FR-FEE-024)
       fee.collect: school
 
@@ -218,6 +231,8 @@ roles:
       finance.read: school
       tally.configure: school
       support.ticket.create: school
+      # R2-1C messaging (ADR-0043)
+      message.read: school
       # R2-1B fees (ADR-0042; docs/07 §6.2): school-wide only, never scoped (FR-FEE-024)
       fee.collect: school
       fee.manage: school
@@ -276,6 +291,9 @@ roles:
       marks.read: scoped
       support.ticket.create: school
       apaar.consent.read: scoped
+      # R2-1C messaging (ADR-0043)
+      messaging.optin.record: scoped
+      message.read: scoped
 
   teacher:
     name_en: Teacher
@@ -303,6 +321,8 @@ roles:
       certificate.read: school
       register.read: school_step_up
       apaar.consent.read: school
+      # R2-1C messaging (ADR-0043)
+      message.read: school
       # R2-1B fees (ADR-0042; docs/07 §6.2): school-wide only, never scoped (FR-FEE-024)
       fee.report: school_step_up
 

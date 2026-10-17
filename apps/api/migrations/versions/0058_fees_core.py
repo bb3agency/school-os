@@ -44,8 +44,8 @@ Expand-only (invariant 12). Downgrade drops every ``fin`` table of this revision
 ledger and receipt book are removed; receipt PDFs stay as documents), re-adds the old documents
 purpose CHECK as ``NOT VALID`` and deletes the permission keys unless a role still holds them.
 
-Revision ID: 0057_fees_core
-Revises: 0056_certificate_verifications
+Revision ID: 0058_fees_core
+Revises: 0057_messaging_core
 Create Date: 2026-10-17
 """
 
@@ -54,8 +54,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0057_fees_core"
-down_revision = "0056_certificate_verifications"
+revision = "0058_fees_core"
+down_revision = "0057_messaging_core"
 branch_labels = None
 depends_on = None
 

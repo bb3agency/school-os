@@ -110,6 +110,7 @@ from app.identity.principal import STEP_UP_MAX_AGE
 from app.imports import service as imports
 from app.insights import service as insights
 from app.knowledge import service as knowledge
+from app.messaging import service as messaging
 from app.notifications import service as notifications
 from app.ops import service as ops
 from app.students import service as students
@@ -128,6 +129,9 @@ PURGE_TASK: Final = "admin.purge_tenant_exports"
 ops.register_outbox_route(EXPORT_EVENT, EXPORT_TASK)
 
 READY_TEMPLATE: Final = "admin.tenant_export.ready"
+# Audit summaries take at most 50 keys (audit.schemas); the completed-export event lists the
+# non-empty tables, largest first.
+AUDIT_TABLE_KEYS: Final = 50
 FAILED_TEMPLATE: Final = "admin.tenant_export.failed"
 RESOURCE: Final = "tenant_export"
 IST: Final = ZoneInfo("Asia/Kolkata")
@@ -540,21 +544,6 @@ def _staff_tables(session: Session) -> list[RecordTable]:
     return out
 
 
-# Audit summaries hold at most 50 keys (app.audit.schemas.MAX_KEYS). From R2 the archive has more
-# record tables than that (fees: 15 tables), so the completion event names the tables that hold
-# rows (the empty ones add nothing to the record) and folds any beyond the limit into one count.
-_AUDITED_TABLES_MAX = 45
-
-
-def _audited_table_counts(counts: dict[str, int]) -> dict[str, int]:
-    filled = {name: rows for name, rows in sorted(counts.items()) if rows}
-    if len(filled) <= _AUDITED_TABLES_MAX:
-        return filled
-    kept = dict(list(filled.items())[: _AUDITED_TABLES_MAX - 1])
-    kept["other_tables_rows"] = sum(filled.values()) - sum(kept.values())
-    return kept
-
-
 def _collect(session: Session, snap: _Snapshot) -> tuple[list[RecordTable], dict[str, Any]]:
     """Every module's record tables, through their public services (CLAUDE.md §4)."""
     withheld = _never_exported()
@@ -579,6 +568,9 @@ def _collect(session: Session, snap: _Snapshot) -> tuple[list[RecordTable], dict
         *academics.export_records(session),
         *insights.export_records(session, include_sensitive=snap.include_sensitive),
         *tally.export_records(session),
+        # R2-1C (ADR-0043): WhatsApp account (no secrets), templates, settings, opt-ins and
+        # message history (no phone indexes or variables).
+        *messaging.export_records(session),
         # R2-1B (FR-FEE-027): fee heads, plans, accounts, ledger, receipts and requests.
         *fees.export_records(session),
         # ADR-0034: each person's Ask memory items and switch (their own work context; the
@@ -813,7 +805,14 @@ def _complete(
             snap.id,
             {
                 "include_sensitive": snap.include_sensitive,
-                "tables": _audited_table_counts(built.counts.tables),
+                # Audit summaries take at most 50 keys; the archive has more tables since R2:
+                # the non-empty ones, largest first (the full list is in the manifest).
+                "tables": dict(
+                    sorted(
+                        ((k, v) for k, v in built.counts.tables.items() if v),
+                        key=lambda item: (-item[1], item[0]),
+                    )[:AUDIT_TABLE_KEYS]
+                ),
                 "documents": built.counts.documents,
                 "document_kib": -(-built.counts.document_bytes // 1024),
                 "audit_events": built.counts.audit_events,

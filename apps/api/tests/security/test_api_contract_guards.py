@@ -345,6 +345,9 @@ RESPONSE_FIELD_ALLOWLIST = {
     "app.imports.schemas.PresetOut.key": "import template library code (ADR-0041)",
     "app.insights.schemas.RuleSettingOut.key": "rule code",
     "app.notifications.schemas.NotificationOut.template_key": "i18n template key",
+    # R2-1C (ADR-0043): catalogue template codes of WhatsApp messages, not secrets.
+    "app.messaging.schemas.MessagingTemplateOut.template_key": "message catalogue code",
+    "app.messaging.schemas.MessagingMessageOut.template_key": "message catalogue code",
     "app.identity.schemas.PermissionOut.key": "permission key",
     "app.identity.schemas.RoleOut.key": "role key",
     "app.platform.schemas.FlagOut.key": "feature flag key",
@@ -412,6 +415,15 @@ IDEMPOTENCY_EXEMPT = {
     ("POST", "/api/v1/platform/audit/verify"): "re-runs a read-only verification",
     ("POST", "/api/v1/audit/verify"): "queues a read-only verification; a queued one is not "
     "queued twice (R-19)",
+    # R2-1C WhatsApp (ADR-0043).
+    ("POST", "/api/v1/webhooks/meta"): "machine route; signed, replayed bodies and event keys "
+    "are deduplicated",
+    ("POST", "/api/v1/messaging/account/resume"): "a state transition (409 when not paused)",
+    ("POST", "/api/v1/messaging/templates/sync"): "re-reads Meta; creating is idempotent per "
+    "template name",
+    ("POST", "/api/v1/messaging/join-slips"): "a print view; each print makes new single-use "
+    "codes by design",
+    ("POST", "/api/v1/messages/search"): "a read (POST keeps ids out of URLs)",
     ("POST", "/api/v1/platform/tenants/{tenant_id}/offboarding"): "a state transition (409 on "
     "repeat)",
     ("POST", "/api/v1/platform/tenants/{tenant_id}/owner-invite:resend"): "re-sends the same "

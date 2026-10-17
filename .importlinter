@@ -60,6 +60,7 @@ source_modules =
     app.tally
     app.public
     app.fees
+    app.messaging
 forbidden_modules =
     app.identity.repository
     app.identity.models
@@ -96,6 +97,7 @@ source_modules =
     app.tally
     app.public
     app.fees
+    app.messaging
 forbidden_modules =
     app.tenancy.repository
     app.tenancy.models
@@ -132,6 +134,7 @@ source_modules =
     app.tally
     app.public
     app.fees
+    app.messaging
 forbidden_modules =
     app.platform.repository
     app.platform.models
@@ -171,6 +174,7 @@ forbidden_modules =
     app.tally
     app.public
     app.fees
+    app.messaging
 
 # The HTML -> PDF renderer (headless Chromium, bundled font, sandbox setting) is app.core.pdf,
 # a neutral building block. The control plane prints its invoices through it and never through
@@ -212,6 +216,7 @@ source_modules =
     app.tally
     app.public
     app.fees
+    app.messaging
 forbidden_modules =
     app.platform
 
@@ -246,6 +251,7 @@ source_modules =
     app.tally
     app.public
     app.fees
+    app.messaging
 forbidden_modules =
     app.ops.repository
     app.ops.models
@@ -282,6 +288,7 @@ source_modules =
     app.tally
     app.public
     app.fees
+    app.messaging
 forbidden_modules =
     app.dq.repository
     app.dq.models
@@ -318,6 +325,7 @@ source_modules =
     app.tally
     app.public
     app.fees
+    app.messaging
 forbidden_modules =
     app.students.repository
     app.students.models
@@ -354,6 +362,7 @@ source_modules =
     app.tally
     app.public
     app.fees
+    app.messaging
 forbidden_modules =
     app.documents.repository
     app.documents.models
@@ -390,6 +399,7 @@ source_modules =
     app.tally
     app.public
     app.fees
+    app.messaging
 forbidden_modules =
     app.notifications.repository
     app.notifications.models
@@ -426,6 +436,7 @@ source_modules =
     app.tally
     app.public
     app.fees
+    app.messaging
 forbidden_modules =
     app.breakglass.repository
     app.breakglass.models
@@ -488,6 +499,7 @@ source_modules =
     app.tally
     app.public
     app.fees
+    app.messaging
 forbidden_modules =
     app.imports.repository
     app.imports.models
@@ -549,6 +561,7 @@ source_modules =
     app.tally
     app.public
     app.fees
+    app.messaging
 forbidden_modules =
     app.changes.repository
     app.changes.models
@@ -585,6 +598,7 @@ source_modules =
     app.tally
     app.public
     app.fees
+    app.messaging
 forbidden_modules =
     app.extraction.repository
     app.extraction.models
@@ -620,6 +634,7 @@ source_modules =
     app.tally
     app.public
     app.fees
+    app.messaging
 forbidden_modules =
     app.exports.repository
     app.exports.models
@@ -677,6 +692,7 @@ source_modules =
     app.tally
     app.public
     app.fees
+    app.messaging
 forbidden_modules =
     app.admin.repository
     app.admin.models
@@ -715,6 +731,7 @@ source_modules =
     app.tally
     app.public
     app.fees
+    app.messaging
 forbidden_modules =
     app.admin
 
@@ -774,6 +791,7 @@ source_modules =
     app.tally
     app.public
     app.fees
+    app.messaging
 forbidden_modules =
     app.knowledge.gateway
     app.knowledge.embeddings
@@ -959,6 +977,7 @@ source_modules =
     app.tally
     app.public
     app.fees
+    app.messaging
 forbidden_modules =
     app.circulars.repository
     app.circulars.models
@@ -1016,6 +1035,7 @@ source_modules =
     app.tally
     app.public
     app.fees
+    app.messaging
 forbidden_modules =
     app.certificates.repository
     app.certificates.models
@@ -1083,6 +1103,7 @@ source_modules =
     app.tally
     app.public
     app.fees
+    app.messaging
 forbidden_modules =
     app.academics.repository
     app.academics.models
@@ -1119,6 +1140,7 @@ source_modules =
     app.tally
     app.public
     app.fees
+    app.messaging
 forbidden_modules =
     app.insights.repository
     app.insights.models
@@ -1200,6 +1222,7 @@ source_modules =
     app.insights
     app.public
     app.fees
+    app.messaging
 forbidden_modules =
     app.tally.repository
     app.tally.models
@@ -1261,6 +1284,7 @@ source_modules =
     app.tally
     app.public
     app.fees
+    app.messaging
 forbidden_modules =
     app.apaar.repository
     app.apaar.models
@@ -1318,6 +1342,7 @@ source_modules =
     app.academics
     app.insights
     app.tally
+    app.messaging
     app.fees
 forbidden_modules =
     app.public.repository
@@ -1343,6 +1368,94 @@ forbidden_modules =
     app.tenancy
     app.platform
     app.students
+
+# --- 8. WhatsApp messaging (R2-1C; ADR-0043) -------------------------------------------------
+# Other modules use only app.messaging.service (the sending wave R2-3G lives inside the package).
+# It reaches guardians, students, documents, sections, notifications and public handles through
+# their services.
+
+[importlinter:contract:messaging-internals]
+name = messaging: repository/models are private (use app.messaging.service)
+type = forbidden
+source_modules =
+    app.main
+    app.core
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.ops
+    app.devtools
+    app.dq
+    app.students
+    app.documents
+    app.notifications
+    app.breakglass
+    app.imports
+    app.changes
+    app.extraction
+    app.exports
+    app.knowledge
+    app.admin
+    app.circulars
+    app.certificates
+    app.apaar
+    app.academics
+    app.insights
+    app.tally
+    app.public
+    app.fees
+forbidden_modules =
+    app.messaging.repository
+    app.messaging.models
+allow_indirect_imports = True
+
+# Only app.messaging.providers talks to Meta (ADR-0043 decision 1; egress allowlist
+# graph.facebook.com): the rest of the module never imports an HTTP client.
+[importlinter:contract:messaging-provider-egress]
+name = messaging: only providers/ make HTTP calls
+type = forbidden
+source_modules =
+    app.messaging.api
+    app.messaging.service
+    app.messaging.repository
+    app.messaging.models
+    app.messaging.schemas
+    app.messaging.webhook
+    app.messaging.tasks
+    app.messaging.catalogue
+    app.messaging.config
+    app.messaging.eligibility
+    app.messaging.slips
+forbidden_modules =
+    httpx
+    requests
+allow_indirect_imports = True
+
+# The configuration, catalogue, eligibility rules and slip renderer stay pure (no database, web
+# or feature modules), so the catalogue and the rules are tested without a database.
+[importlinter:contract:messaging-pure-library]
+name = messaging config/catalogue/eligibility/slips stay pure (no DB, web or feature modules)
+type = forbidden
+source_modules =
+    app.messaging.config
+    app.messaging.catalogue
+    app.messaging.eligibility
+    app.messaging.slips
+forbidden_modules =
+    sqlalchemy
+    fastapi
+    app.core.db
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.students
+    app.documents
+    app.public
+    app.fees
 
 # --- R2-1B fees (ADR-0042): other modules use only app.fees.service --------------------------
 
@@ -1377,6 +1490,7 @@ source_modules =
     app.insights
     app.tally
     app.public
+    app.messaging
 forbidden_modules =
     app.fees.repository
     app.fees.models

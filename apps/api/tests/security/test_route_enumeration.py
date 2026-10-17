@@ -272,7 +272,8 @@ def test_FR_PUB_003_check_fails_for_unlisted_and_misplaced_public_guards() -> No
         def exchange() -> None: ...
 
     def verify_token_unlisted(app: FastAPI) -> None:
-        @app.get("/api/v1/webhooks/meta", dependencies=[Depends(require_meta_verify_token())])
+        # GET /api/v1/webhooks/meta is listed since R2-1C: an unlisted twin path must fail.
+        @app.get("/api/v1/webhooks/meta/again", dependencies=[Depends(require_meta_verify_token())])
         def challenge() -> None: ...
 
     cases = {

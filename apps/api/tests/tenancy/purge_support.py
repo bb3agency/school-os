@@ -594,6 +594,73 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             ti=uuid.uuid4(),
             g=ids["guardian"],
         )
+        # --- WhatsApp messaging (R2-1C, 0057_messaging_core, ADR-0043) ------------------------
+        msg_account, msg_event = uuid.uuid4(), uuid.uuid4()
+        _run(
+            c,
+            "INSERT INTO msg.accounts (id, tenant_id, mode, waba_id, phone_number_id, status, "
+            "token_ciphertext) VALUES (:i, :t, 'manual_token', '1001', '2002', 'active', "
+            "'\\x00')",
+            i=msg_account,
+            t=t,
+        )
+        _run(
+            c,
+            "INSERT INTO msg.templates (id, tenant_id, account_id, template_key, "
+            "template_version, language, provider_name, status) VALUES (:i, :t, :a, "
+            "'school_notice', 1, 'en', 'sos_school_notice_v1_en', 'approved')",
+            i=uuid.uuid4(),
+            t=t,
+            a=msg_account,
+        )
+        _run(c, "INSERT INTO msg.settings (id, tenant_id) VALUES (:i, :t)", i=uuid.uuid4(), t=t)
+        _run(
+            c,
+            "INSERT INTO msg.optins (id, tenant_id, guardian_id, category, seq, status, method, "
+            "wording_version, decided_on) VALUES (:i, :t, :g, 'notices', 1, 'opted_out', "
+            "'whatsapp_stop', 'optin-2026-10', current_date)",
+            i=uuid.uuid4(),
+            t=t,
+            g=ids["guardian"],
+        )
+        _run(
+            c,
+            "INSERT INTO msg.join_codes (id, tenant_id, code_hash, guardian_id, categories, "
+            "expires_at) VALUES (:i, :t, sha256(convert_to(:k, 'UTF8')), :g, "
+            "ARRAY['notices'], now() + interval '30 days')",
+            i=uuid.uuid4(),
+            t=t,
+            k=uuid.uuid4().hex,
+            g=ids["guardian"],
+        )
+        _run(
+            c,
+            "INSERT INTO msg.messages (id, tenant_id, purpose, kind, language, guardian_id, "
+            "student_id, source_type, source_id, dedupe_key, status) VALUES (:i, :t, "
+            "'optin_stopped', 'text', 'en', :g, :s, 'inbound', :e, 'stop', 'sent')",
+            i=uuid.uuid4(),
+            t=t,
+            g=ids["guardian"],
+            s=ids["student"],
+            e=msg_event,
+        )
+        _run(
+            c,
+            "INSERT INTO msg.inbound_events (id, tenant_id, phone_bidx, phone_key_version, kind, "
+            "received_at) VALUES (:i, :t, sha256(convert_to(:k, 'UTF8')), 1, 'stop', now())",
+            i=msg_event,
+            t=t,
+            k=uuid.uuid4().hex,
+        )
+        _run(
+            c,
+            "INSERT INTO msg.provider_events (id, tenant_id, account_id, event_key, event_type) "
+            "VALUES (:i, :t, :a, :k, 'inbound_message')",
+            i=uuid.uuid4(),
+            t=t,
+            a=msg_account,
+            k="in:wamid." + uuid.uuid4().hex,
+        )
         # --- certificate verification code and its handle (R2-1A, 0056; ADR-0045) -------------
         verify_code = new_code()
         handle_id = uuid.uuid4()
@@ -900,7 +967,7 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             s=ids["student"],
             u=u["user"],
         )
-        # --- R2-1B fees (0057_fees_core): one row in every fin table --------------------------
+        # --- R2-1B fees (0058_fees_core): one row in every fin table --------------------------
         f = {
             k: uuid.uuid4() for k in ("head", "plan", "acct", "rcpt", "conc", "adj", "canc", "rfd")
         }

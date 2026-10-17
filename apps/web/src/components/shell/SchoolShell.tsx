@@ -20,6 +20,8 @@ interface SchoolNavItem extends NavItem {
 export interface SchoolFeatures {
   /** M6 Tally connector (`tally.connector.enabled`, ADR-0032 Proposed). */
   tally?: boolean;
+  /** R2-1C WhatsApp messages (ADR-0043): shared tier with SOS_MESSAGING_ENABLED only. */
+  messaging?: boolean;
   /** R2-1B fee ledger and receipts (`fees.enabled` plus the school's own switch, FR-FEE-001). */
   fees?: boolean;
 }
@@ -203,6 +205,14 @@ export function SchoolShell({
           icon: "megaphone",
         },
         {
+          // R2-1C (US-2208): WhatsApp message history and delivery log.
+          href: "/messages",
+          label: t("messaging.nav.messages"),
+          permission: "message.read",
+          feature: "messaging",
+          icon: "inbox",
+        },
+        {
           // M6 (US-1804, FR-TALLY-007): fee dues synced from Tally; behind the school's flag.
           href: "/fees",
           label: t("tally.nav.dues"),
@@ -321,6 +331,14 @@ export function SchoolShell({
           permission: ["tally.device.manage", "tally.configure", "finance.read"],
           feature: "tally",
           icon: "server",
+        },
+        {
+          // R2-1C (US-2201, ADR-0043): the school's own WhatsApp number and its settings.
+          href: "/settings/whatsapp",
+          label: t("messaging.nav.settings"),
+          permission: ["messaging.configure", "message.read"],
+          feature: "messaging",
+          icon: "megaphone",
         },
         {
           href: "/break-glass",

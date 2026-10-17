@@ -3654,6 +3654,100 @@
         "title": "CatalogOut",
         "type": "object"
       },
+      "CategoryCounts": {
+        "properties": {
+          "not_asked": {
+            "title": "Not Asked",
+            "type": "integer"
+          },
+          "opted_in": {
+            "title": "Opted In",
+            "type": "integer"
+          },
+          "opted_out": {
+            "title": "Opted Out",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "opted_in",
+          "opted_out",
+          "not_asked"
+        ],
+        "title": "CategoryCounts",
+        "type": "object"
+      },
+      "CategoryStateOut": {
+        "properties": {
+          "category": {
+            "enum": [
+              "notices",
+              "attendance",
+              "fees"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "decided_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided On"
+          },
+          "for_current_number": {
+            "description": "False when the guardian's number changed after the opt-in (a new opt-in is needed) or there is no number.",
+            "title": "For Current Number",
+            "type": "boolean"
+          },
+          "method": {
+            "anyOf": [
+              {
+                "enum": [
+                  "whatsapp_join",
+                  "signed_form",
+                  "in_person",
+                  "whatsapp_stop",
+                  "staff_recorded_stop"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method"
+          },
+          "status": {
+            "enum": [
+              "opted_in",
+              "opted_out",
+              "not_asked"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "stopped_by_parent": {
+            "title": "Stopped By Parent",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "category",
+          "status",
+          "method",
+          "decided_on",
+          "stopped_by_parent",
+          "for_current_number"
+        ],
+        "title": "CategoryStateOut",
+        "type": "object"
+      },
       "CellEditIn": {
         "additionalProperties": false,
         "description": "One cell of a staged row: ``column`` is the 0-based column index, ``value`` the new text\n(``null`` or blank clears the cell). Up to 1,000 characters, no line breaks or control\ncharacters, never a full Aadhaar number.",
@@ -8751,6 +8845,45 @@
         "title": "DuplicateRequest",
         "type": "object"
       },
+      "EmbeddedSignupIn": {
+        "additionalProperties": false,
+        "description": "What Meta's Embedded Signup window returned to the settings page (FR-MSG-002).",
+        "properties": {
+          "business_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Business Id"
+          },
+          "code": {
+            "maxLength": 1024,
+            "minLength": 8,
+            "pattern": "^[\\x21-\\x7e]+$",
+            "title": "Code",
+            "type": "string"
+          },
+          "phone_number_id": {
+            "title": "Phone Number Id",
+            "type": "string"
+          },
+          "waba_id": {
+            "title": "Waba Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "waba_id",
+          "phone_number_id"
+        ],
+        "title": "EmbeddedSignupIn",
+        "type": "object"
+      },
       "EnrolIn": {
         "additionalProperties": false,
         "properties": {
@@ -11110,6 +11243,90 @@
           "relationship"
         ],
         "title": "GuardianCreate",
+        "type": "object"
+      },
+      "GuardianOptinsOut": {
+        "properties": {
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryStateOut"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "effective_language": {
+            "enum": [
+              "en",
+              "te"
+            ],
+            "title": "Effective Language",
+            "type": "string"
+          },
+          "guardian_id": {
+            "format": "uuid",
+            "title": "Guardian Id",
+            "type": "string"
+          },
+          "has_mobile": {
+            "title": "Has Mobile",
+            "type": "boolean"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/OptinEntryOut"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "id": {
+            "description": "The guardian's id (same as guardian_id).",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "phone_last4": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone Last4"
+          },
+          "preferred_language": {
+            "anyOf": [
+              {
+                "enum": [
+                  "en",
+                  "te"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Language"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "guardian_id",
+          "has_mobile",
+          "phone_last4",
+          "preferred_language",
+          "effective_language",
+          "categories",
+          "history",
+          "version"
+        ],
+        "title": "GuardianOptinsOut",
         "type": "object"
       },
       "GuardianOut": {
@@ -14030,6 +14247,60 @@
         "title": "JobOut",
         "type": "object"
       },
+      "JoinSlipsIn": {
+        "additionalProperties": false,
+        "description": "Students or one section of the current year; the categories the slip opts into.",
+        "properties": {
+          "categories": {
+            "items": {
+              "enum": [
+                "notices",
+                "attendance",
+                "fees"
+              ],
+              "type": "string"
+            },
+            "maxItems": 3,
+            "minItems": 1,
+            "title": "Categories",
+            "type": "array"
+          },
+          "section_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Id"
+          },
+          "student_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "maxItems": 400,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Ids"
+          }
+        },
+        "required": [
+          "categories"
+        ],
+        "title": "JoinSlipsIn",
+        "type": "object"
+      },
       "KeyRotationOut": {
         "description": "The new key, returned ONCE. The old key works until the new one is first used, or for\nthe rotation overlap at most.",
         "properties": {
@@ -14273,6 +14544,34 @@
           "tenant_id"
         ],
         "title": "LoginEventOut",
+        "type": "object"
+      },
+      "ManualConnectIn": {
+        "additionalProperties": false,
+        "description": "Pilots until SchoolOS is a Meta Tech Provider (D13; FR-MSG-003): a system-user token\ncreated in the school's own Business Manager, its WABA id and phone number id.",
+        "properties": {
+          "phone_number_id": {
+            "title": "Phone Number Id",
+            "type": "string"
+          },
+          "token": {
+            "description": "Never returned, logged or exported.",
+            "format": "password",
+            "title": "Token",
+            "type": "string",
+            "writeOnly": true
+          },
+          "waba_id": {
+            "title": "Waba Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "waba_id",
+          "phone_number_id"
+        ],
+        "title": "ManualConnectIn",
         "type": "object"
       },
       "ManualFlagIn": {
@@ -14951,6 +15250,937 @@
           "superseded"
         ],
         "title": "MessageOut",
+        "type": "object"
+      },
+      "MessagingAccountOut": {
+        "description": "The school's WhatsApp connection (FR-MSG-004). ``connected`` false: nothing below is set.",
+        "properties": {
+          "available": {
+            "default": true,
+            "title": "Available",
+            "type": "boolean"
+          },
+          "connected": {
+            "title": "Connected",
+            "type": "boolean"
+          },
+          "connected_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connected At"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "currency_state": {
+            "anyOf": [
+              {
+                "enum": [
+                  "confirmed_inr",
+                  "not_inr",
+                  "unknown"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency State"
+          },
+          "default_daily_cap": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Daily Cap"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "display_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Phone"
+          },
+          "embedded_signup": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Public Embedded Signup values (app id, configuration id).",
+            "title": "Embedded Signup"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "inr_required_from": {
+            "format": "date",
+            "title": "Inr Required From",
+            "type": "string"
+          },
+          "last_synced_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Synced At"
+          },
+          "manual_token_allowed": {
+            "title": "Manual Token Allowed",
+            "type": "boolean"
+          },
+          "messaging_limit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Messaging Limit"
+          },
+          "messaging_limit_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Messaging Limit Count"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "embedded_signup",
+                  "manual_token"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
+          "pause_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pause Reason"
+          },
+          "paused_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused At"
+          },
+          "phone_number_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone Number Id"
+          },
+          "quality_rating": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality Rating"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "connecting",
+                  "active",
+                  "paused",
+                  "disconnected"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "templates": {
+            "items": {
+              "$ref": "#/components/schemas/MessagingTemplateOut"
+            },
+            "title": "Templates",
+            "type": "array"
+          },
+          "unreviewed_texts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unreviewed Texts",
+            "type": "array"
+          },
+          "version": {
+            "default": 0,
+            "title": "Version",
+            "type": "integer"
+          },
+          "waba_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Waba Id"
+          }
+        },
+        "required": [
+          "connected",
+          "manual_token_allowed",
+          "inr_required_from"
+        ],
+        "title": "MessagingAccountOut",
+        "type": "object"
+      },
+      "MessagingMessageOut": {
+        "properties": {
+          "attempts": {
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "delivered_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivered At"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Reason"
+          },
+          "failed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failed At"
+          },
+          "guardian_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guardian Id"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "template",
+              "text"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "language": {
+            "enum": [
+              "en",
+              "te"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "language_fallback": {
+            "title": "Language Fallback",
+            "type": "boolean"
+          },
+          "phone_last4": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone Last4"
+          },
+          "purpose": {
+            "enum": [
+              "optin_confirm",
+              "school_notice",
+              "absence_alert",
+              "fee_reminder",
+              "fee_receipt",
+              "optin_stopped"
+            ],
+            "title": "Purpose",
+            "type": "string"
+          },
+          "queued_at": {
+            "format": "date-time",
+            "title": "Queued At",
+            "type": "string"
+          },
+          "read_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read At"
+          },
+          "sent_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent At"
+          },
+          "skip_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skip Reason"
+          },
+          "source_id": {
+            "format": "uuid",
+            "title": "Source Id",
+            "type": "string"
+          },
+          "source_type": {
+            "title": "Source Type",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "skipped",
+              "sent",
+              "delivered",
+              "read",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Id"
+          },
+          "template_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Key"
+          },
+          "template_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Version"
+          }
+        },
+        "required": [
+          "id",
+          "purpose",
+          "kind",
+          "template_key",
+          "template_version",
+          "language",
+          "language_fallback",
+          "guardian_id",
+          "student_id",
+          "source_type",
+          "source_id",
+          "phone_last4",
+          "status",
+          "skip_reason",
+          "error_code",
+          "error_reason",
+          "attempts",
+          "queued_at",
+          "sent_at",
+          "delivered_at",
+          "read_at",
+          "failed_at"
+        ],
+        "title": "MessagingMessageOut",
+        "type": "object"
+      },
+      "MessagingMessagePage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MessagingMessageOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "MessagingMessagePage",
+        "type": "object"
+      },
+      "MessagingSearchIn": {
+        "additionalProperties": false,
+        "description": "Delivery log filters (POST: no personal data in URLs). Scoped callers (class teachers)\nmust name a student or guardian in their sections.",
+        "properties": {
+          "cursor": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor"
+          },
+          "guardian_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guardian Id"
+          },
+          "limit": {
+            "default": 50,
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "purpose": {
+            "anyOf": [
+              {
+                "enum": [
+                  "optin_confirm",
+                  "school_notice",
+                  "absence_alert",
+                  "fee_reminder",
+                  "fee_receipt",
+                  "optin_stopped"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purpose"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "queued",
+                  "skipped",
+                  "sent",
+                  "delivered",
+                  "read",
+                  "failed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "student_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Id"
+          },
+          "until": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Until"
+          }
+        },
+        "title": "MessagingSearchIn",
+        "type": "object"
+      },
+      "MessagingSettingsIn": {
+        "additionalProperties": false,
+        "description": "Switches and times (ADR-0043 decisions 10-11, owner decision D25). The switches are read\nby the sending wave (R2-3G); absence alerts stay off until the school turns them on.",
+        "properties": {
+          "absence_alert_time": {
+            "format": "time",
+            "title": "Absence Alert Time",
+            "type": "string"
+          },
+          "absence_alerts_enabled": {
+            "title": "Absence Alerts Enabled",
+            "type": "boolean"
+          },
+          "daily_cap": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Cap"
+          },
+          "fee_receipts_enabled": {
+            "title": "Fee Receipts Enabled",
+            "type": "boolean"
+          },
+          "fee_reminders_enabled": {
+            "title": "Fee Reminders Enabled",
+            "type": "boolean"
+          },
+          "notices_enabled": {
+            "title": "Notices Enabled",
+            "type": "boolean"
+          },
+          "office_phone": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "minLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The school office's phone, given in automatic replies.",
+            "title": "Office Phone"
+          },
+          "quiet_end": {
+            "format": "time",
+            "title": "Quiet End",
+            "type": "string"
+          },
+          "quiet_start": {
+            "format": "time",
+            "title": "Quiet Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "notices_enabled",
+          "absence_alerts_enabled",
+          "fee_reminders_enabled",
+          "fee_receipts_enabled",
+          "absence_alert_time",
+          "quiet_start",
+          "quiet_end"
+        ],
+        "title": "MessagingSettingsIn",
+        "type": "object"
+      },
+      "MessagingSettingsOut": {
+        "properties": {
+          "absence_alert_time": {
+            "format": "time",
+            "title": "Absence Alert Time",
+            "type": "string"
+          },
+          "absence_alerts_enabled": {
+            "title": "Absence Alerts Enabled",
+            "type": "boolean"
+          },
+          "daily_cap": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Cap"
+          },
+          "default_daily_cap": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Daily Cap"
+          },
+          "fee_receipts_enabled": {
+            "title": "Fee Receipts Enabled",
+            "type": "boolean"
+          },
+          "fee_reminders_enabled": {
+            "title": "Fee Reminders Enabled",
+            "type": "boolean"
+          },
+          "gst_percent": {
+            "title": "Gst Percent",
+            "type": "string"
+          },
+          "notices_enabled": {
+            "title": "Notices Enabled",
+            "type": "boolean"
+          },
+          "office_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Phone"
+          },
+          "quiet_end": {
+            "format": "time",
+            "title": "Quiet End",
+            "type": "string"
+          },
+          "quiet_start": {
+            "format": "time",
+            "title": "Quiet Start",
+            "type": "string"
+          },
+          "utility_rate_inr": {
+            "title": "Utility Rate Inr",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "notices_enabled",
+          "absence_alerts_enabled",
+          "fee_reminders_enabled",
+          "fee_receipts_enabled",
+          "absence_alert_time",
+          "quiet_start",
+          "quiet_end",
+          "daily_cap",
+          "default_daily_cap",
+          "office_phone",
+          "utility_rate_inr",
+          "gst_percent",
+          "version"
+        ],
+        "title": "MessagingSettingsOut",
+        "type": "object"
+      },
+      "MessagingTemplateOut": {
+        "properties": {
+          "language": {
+            "enum": [
+              "en",
+              "te"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "last_synced_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Synced At"
+          },
+          "paused_by_sos": {
+            "title": "Paused By Sos",
+            "type": "boolean"
+          },
+          "provider_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Category"
+          },
+          "provider_name": {
+            "title": "Provider Name",
+            "type": "string"
+          },
+          "rejected_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejected Reason"
+          },
+          "reviewed": {
+            "title": "Reviewed",
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "not_created",
+              "pending",
+              "approved",
+              "rejected",
+              "paused",
+              "disabled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "template_key": {
+            "title": "Template Key",
+            "type": "string"
+          },
+          "template_version": {
+            "title": "Template Version",
+            "type": "integer"
+          },
+          "usable": {
+            "title": "Usable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "template_key",
+          "template_version",
+          "language",
+          "provider_name",
+          "status",
+          "provider_category",
+          "paused_by_sos",
+          "rejected_reason",
+          "reviewed",
+          "usable",
+          "last_synced_at"
+        ],
+        "title": "MessagingTemplateOut",
+        "type": "object"
+      },
+      "MessagingTemplatesOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MessagingTemplateOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "MessagingTemplatesOut",
         "type": "object"
       },
       "ModeDetailsIn": {
@@ -16188,6 +17418,155 @@
           "roles"
         ],
         "title": "OperatorRolesIn",
+        "type": "object"
+      },
+      "OptinEntryOut": {
+        "properties": {
+          "category": {
+            "enum": [
+              "notices",
+              "attendance",
+              "fees"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "decided_on": {
+            "format": "date",
+            "title": "Decided On",
+            "type": "string"
+          },
+          "evidence_document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Document Id"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "method": {
+            "enum": [
+              "whatsapp_join",
+              "signed_form",
+              "in_person",
+              "whatsapp_stop",
+              "staff_recorded_stop"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "recorded_at": {
+            "format": "date-time",
+            "title": "Recorded At",
+            "type": "string"
+          },
+          "recorded_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recorded By Name"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "opted_in",
+              "opted_out"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "wording_version": {
+            "title": "Wording Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "category",
+          "seq",
+          "status",
+          "method",
+          "wording_version",
+          "decided_on",
+          "evidence_document_id",
+          "recorded_by_name",
+          "recorded_at"
+        ],
+        "title": "OptinEntryOut",
+        "type": "object"
+      },
+      "OptinIn": {
+        "additionalProperties": false,
+        "description": "A decision recorded by staff (FR-MSG-008). ``signed_form`` needs the signed form as an\nevidence document; ``in_person`` names the recorder (the caller); ``staff_recorded_stop``\nrecords a parent's request to stop.",
+        "properties": {
+          "category": {
+            "enum": [
+              "notices",
+              "attendance",
+              "fees"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "decided_on": {
+            "format": "date",
+            "title": "Decided On",
+            "type": "string"
+          },
+          "evidence_document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Document Id"
+          },
+          "method": {
+            "enum": [
+              "signed_form",
+              "in_person",
+              "staff_recorded_stop"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "opted_in",
+              "opted_out"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category",
+          "status",
+          "method",
+          "decided_on"
+        ],
+        "title": "OptinIn",
         "type": "object"
       },
       "OwnerIn": {
@@ -23198,6 +24577,50 @@
           "to_section_id"
         ],
         "title": "SectionMapEntry",
+        "type": "object"
+      },
+      "SectionOptinSummaryOut": {
+        "properties": {
+          "categories": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CategoryCounts"
+            },
+            "propertyNames": {
+              "enum": [
+                "notices",
+                "attendance",
+                "fees"
+              ]
+            },
+            "title": "Categories",
+            "type": "object"
+          },
+          "guardians": {
+            "title": "Guardians",
+            "type": "integer"
+          },
+          "guardians_without_mobile": {
+            "title": "Guardians Without Mobile",
+            "type": "integer"
+          },
+          "section_id": {
+            "format": "uuid",
+            "title": "Section Id",
+            "type": "string"
+          },
+          "students": {
+            "title": "Students",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "section_id",
+          "students",
+          "guardians",
+          "guardians_without_mobile",
+          "categories"
+        ],
+        "title": "SectionOptinSummaryOut",
         "type": "object"
       },
       "SectionOut": {
@@ -42289,6 +43712,156 @@
         ]
       }
     },
+    "/api/v1/guardians/{guardian_id}/optins": {
+      "get": {
+        "description": "A guardian's WhatsApp opt-in state per category (notices, attendance, fees), whether it\nis for the guardian's current number, the full history with methods and recorders, and the\nguardian's message language (``message.read`` or ``messaging.optin.record``; class\nteachers: guardians of their sections' students). ``ETag``: the number of decisions.",
+        "operationId": "get_optins_api_v1_guardians__guardian_id__optins_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guardian_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Guardian Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuardianOptinsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get Optins",
+        "tags": [
+          "messaging"
+        ]
+      },
+      "post": {
+        "description": "Record a guardian's opt-in or opt-out for one category with its method and date: a signed\nform (evidence document required), in person (the caller is the recorder) or a stop request\n(FR-MSG-008; ``messaging.optin.record``; ``Idempotency-Key``, ``If-Match``). Errors: 409\n``opted_out_by_parent``; 412; 422 ``no_mobile_number``, ``evidence_required``,\n``method_does_not_match_status``, ``date_in_future``.",
+        "operationId": "record_optin_api_v1_guardians__guardian_id__optins_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guardian_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Guardian Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OptinIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuardianOptinsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Record Optin",
+        "tags": [
+          "messaging"
+        ]
+      }
+    },
     "/api/v1/import-presets": {
       "get": {
         "description": "The import template library (FR-IMP-030): blank SchoolOS template, typical register\nExcel, UDISE+ student list, generic ERP export. Each says which import source it is\nusually recorded from and whether its format is verified (permission ``import.run``).",
@@ -46237,6 +47810,634 @@
         "summary": "List My Schools",
         "tags": [
           "identity"
+        ]
+      }
+    },
+    "/api/v1/messages/search": {
+      "post": {
+        "description": "Message history and delivery log, newest first: purpose, template, language, status\n(queued, sent, delivered, read, failed with a plain reason, skipped with why) and the\nphone's last four digits only (US-2208, FR-MSG-017; ``message.read``). Class teachers name a\nstudent or guardian of their sections (422 ``filter_required``).",
+        "operationId": "search_messages_api_v1_messages_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MessagingSearchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagingMessagePage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Search Messages",
+        "tags": [
+          "messaging"
+        ]
+      }
+    },
+    "/api/v1/messaging/account": {
+      "delete": {
+        "description": "Disconnect WhatsApp: sending stops at once, the token is erased and open parent links\nsent through messages stop working (US-2201 AC4; ``messaging.configure``, MFA within 5\nminutes; optional ``If-Match``). Audited.",
+        "operationId": "disconnect_api_v1_messaging_account_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Disconnect",
+        "tags": [
+          "messaging"
+        ]
+      },
+      "get": {
+        "description": "The school's WhatsApp connection: number, display name, status and pause reason, quality\nrating, messaging limit (and the default daily cap, Meta's limit minus 10%), billing currency\nstate (INR required from 1 Jan 2027) and each template's status (FR-MSG-004; permission\n``messaging.configure`` or ``message.read``). ``connected`` false before connecting.",
+        "operationId": "get_account_api_v1_messaging_account_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagingAccountOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get Account",
+        "tags": [
+          "messaging"
+        ]
+      }
+    },
+    "/api/v1/messaging/account/embedded-signup": {
+      "post": {
+        "description": "Finish Meta's Embedded Signup: exchange the code for the school's business token,\nregister the number, subscribe SchoolOS's app to the WABA and submit the message templates\n(FR-MSG-002; ``messaging.configure``, MFA within 5 minutes; ``Idempotency-Key``). The school\npays Meta directly with its own payment method (owner decision D7). Errors: 409\n``messaging_already_connected``; 502 ``messaging_auth_failed`` or\n``messaging_provider_error``.",
+        "operationId": "connect_embedded_signup_api_v1_messaging_account_embedded_signup_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmbeddedSignupIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagingAccountOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Connect Embedded Signup",
+        "tags": [
+          "messaging"
+        ]
+      }
+    },
+    "/api/v1/messaging/account/manual": {
+      "post": {
+        "description": "Connect with a system-user token from the school's own Business Manager, for pilots until\nSchoolOS is a Meta Tech Provider (FR-MSG-003, owner decision D13; ``messaging.configure``,\nMFA within 5 minutes). The token is checked with a read call, stored wrapped and never shown\nagain. Errors: 403 ``manual_token_not_allowed``; 409 ``messaging_already_connected``; 502.",
+        "operationId": "connect_manual_api_v1_messaging_account_manual_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualConnectIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagingAccountOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Connect Manual",
+        "tags": [
+          "messaging"
+        ]
+      }
+    },
+    "/api/v1/messaging/account/resume": {
+      "post": {
+        "description": "Resume sending after a pause (FR-MSG-021; ``messaging.configure``, MFA within 5 minutes).\nErrors: 409 ``messaging_not_paused``, ``messaging_still_restricted``,\n``messaging_not_connected``.",
+        "operationId": "resume_api_v1_messaging_account_resume_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagingAccountOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Resume",
+        "tags": [
+          "messaging"
+        ]
+      }
+    },
+    "/api/v1/messaging/join-slips": {
+      "post": {
+        "description": "Printable join slips for the guardians (with a mobile number) of chosen students or a\nsection, in each guardian's parent language, each with a new single-use code and a QR code\nfor the school's WhatsApp number (FR-MSG-009; ``messaging.optin.record``, scope). Errors: 409\n``messaging_not_connected``, ``no_slips``, ``too_many_slips``. Audited (count).",
+        "operationId": "join_slips_api_v1_messaging_join_slips_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JoinSlipsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Print-ready A4 slips (two a page)"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Join Slips",
+        "tags": [
+          "messaging"
+        ]
+      }
+    },
+    "/api/v1/messaging/settings": {
+      "get": {
+        "description": "Messaging switches per purpose, absence-alert time, quiet hours, daily cap and the office\nphone for automatic replies, with the estimated Meta rate used for cost previews\n(``message.read`` or ``messaging.configure``).",
+        "operationId": "get_settings_api_v1_messaging_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagingSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get Settings",
+        "tags": [
+          "messaging"
+        ]
+      },
+      "put": {
+        "description": "Change the messaging settings (``messaging.configure``, MFA within 5 minutes;\n``If-Match``, ``W/\"0\"`` before the first save). Audited (field names).",
+        "operationId": "put_settings_api_v1_messaging_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MessagingSettingsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagingSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Put Settings",
+        "tags": [
+          "messaging"
+        ]
+      }
+    },
+    "/api/v1/messaging/templates": {
+      "get": {
+        "description": "Each catalogue template per language with Meta's status and category, whether Telugu\ntext is reviewed and whether it can be used now (FR-MSG-005..007).",
+        "operationId": "list_templates_api_v1_messaging_templates_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagingTemplatesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List Templates",
+        "tags": [
+          "messaging"
+        ]
+      }
+    },
+    "/api/v1/messaging/templates/sync": {
+      "post": {
+        "description": "Submit templates not created yet and read every status back (in the background;\n``messaging.configure``, MFA within 5 minutes).",
+        "operationId": "sync_templates_api_v1_messaging_templates_sync_post",
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagingAccountOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Sync Templates",
+        "tags": [
+          "messaging"
         ]
       }
     },
@@ -55536,6 +57737,169 @@
         ]
       }
     },
+    "/api/v1/sections/{section_id}/join-slips": {
+      "get": {
+        "description": "The same slips for a whole section (the web's print link; ids and codes only in the URL,\nno personal data). ``messaging.optin.record``, scope; errors as\n``POST /messaging/join-slips``.",
+        "operationId": "section_join_slips_api_v1_sections__section_id__join_slips_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "section_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Section Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Categories the slips opt into.",
+            "in": "query",
+            "name": "categories",
+            "required": true,
+            "schema": {
+              "description": "Categories the slips opt into.",
+              "items": {
+                "enum": [
+                  "notices",
+                  "attendance",
+                  "fees"
+                ],
+                "type": "string"
+              },
+              "maxItems": 3,
+              "minItems": 1,
+              "title": "Categories",
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Print-ready A4 slips (two a page)"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Section Join Slips",
+        "tags": [
+          "messaging"
+        ]
+      }
+    },
+    "/api/v1/sections/{section_id}/optins/summary": {
+      "get": {
+        "description": "Opted in / opted out / not asked per category for a section's guardians, and how many\nhave no mobile number (US-2202 AC3; ``message.read``, scope). Counts only.",
+        "operationId": "section_summary_api_v1_sections__section_id__optins_summary_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "section_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Section Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SectionOptinSummaryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Section Summary",
+        "tags": [
+          "messaging"
+        ]
+      }
+    },
     "/api/v1/sections/{section_id}/unarchive": {
       "post": {
         "description": "Bring an archived section back into the lists (permission ``tenant.structure.manage``;\n``If-Match``).",
@@ -60388,6 +62752,103 @@
         "summary": "Replace User Scopes",
         "tags": [
           "identity"
+        ]
+      }
+    },
+    "/api/v1/webhooks/meta": {
+      "get": {
+        "description": "Meta's subscription check: ``hub.challenge`` back when ``hub.mode = subscribe`` and\n``hub.verify_token`` matches ``SOS_META_WEBHOOK_VERIFY_TOKEN`` (403 otherwise).",
+        "operationId": "meta_challenge_api_v1_webhooks_meta_get",
+        "responses": {
+          "200": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Token mismatch"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Meta Challenge",
+        "tags": [
+          "webhooks"
+        ]
+      },
+      "post": {
+        "description": "Meta's events for every connected school. The signature (app secret over the raw body)\nwas checked by the guard; each entry is routed by its WABA id to one school, its events are\nstored (encrypted, deduplicated) and the worker applies them. A replayed delivery and events\nof unknown or disconnected accounts are acknowledged without effect.",
+        "operationId": "meta_webhook_api_v1_webhooks_meta_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Bad or missing X-Hub-Signature-256 (no detail)."
+          },
+          "413": {
+            "description": "Larger than Meta's 3 MB."
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Meta Webhook",
+        "tags": [
+          "webhooks"
         ]
       }
     },
