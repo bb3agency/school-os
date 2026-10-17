@@ -478,6 +478,7 @@ def _validation_context(
             if uuid.UUID(s.id) in grant.section_ids or uuid.UUID(s.class_id) in grant.class_ids
         )
     targets = set(batch.mapping.values())
+    national_ids = _national_ids(session, sheet, batch.mapping)
     return ValidationContext(
         source=batch.source,
         specs=specs,
@@ -498,7 +499,8 @@ def _validation_context(
         ),
         config=import_config(),
         today=_today(),
-        national_ids=_national_ids(session, sheet, batch.mapping),
+        national_ids=national_ids,
+        visible_holders=_visible_holders(session, ctx, national_ids),
     )
 
 
@@ -521,6 +523,17 @@ def _national_ids(
         holders = students.national_id_holders(session, key, values)
         out[key] = {value: str(sids[0]) for value, sids in holders.items() if sids}
     return out
+
+
+def _visible_holders(
+    session: Session, ctx: UserContext, national_ids: Mapping[str, Mapping[str, str]]
+) -> frozenset[str]:
+    """SEC-042: the holders of the file's PEN / APAAR ID values that the importer may read
+    (``student.read_basic`` and its scope). A row error names only these records."""
+    holders = {uuid.UUID(sid) for by_value in national_ids.values() for sid in by_value.values()}
+    if not holders:
+        return frozenset()
+    return frozenset(str(sid) for sid in students.summaries(session, ctx, holders))
 
 
 def _row_values(result: RowResult, specs: Mapping[str, AttributeSpec]) -> dict[str, Any]:
