@@ -1248,13 +1248,29 @@ def update_student_status(
 ) -> StudentOut:
     """Change the record status (active, left, graduated, provisional); ``If-Match`` required.
 
-    Audit: ``student.status_changed`` with {from, to}.
+    Making a left or graduated record active or provisional again is refused with 422
+    ``national_id_in_use`` (field ``status``) while another live record holds its PEN or APAAR
+    ID (FR-STU-018). Audit: ``student.status_changed`` with {from, to}.
     """
     structure = _structure(session)
     student = _visible_student(
         session, ctx, student_id, permission=UPDATE, structure=structure, lock=True
     )
     previous = student.status
+    if status in repo.LIVE_STATUSES and previous not in repo.LIVE_STATUSES:
+        # FR-STU-018 (audit L-02): a left or graduated record freed its PEN and APAAR ID;
+        # making it live again must not give the school two live records with one number.
+        held = {
+            (row.attribute_key, plain)
+            for row in repo.current_values(session, [student_id], NATIONAL_ID_KEYS)
+            if row.verification_status != "rejected" and (plain := _plain(session, row))
+        }
+        _guard_national_ids(
+            session,
+            ctx,
+            [("status", key, value) for key, value in sorted(held)],
+            student_id=student_id,
+        )
     with _db_errors():
         updated = repo.update_student(
             session, student_id, values={"status": status}, expected_version=expected_version
