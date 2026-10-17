@@ -3,7 +3,8 @@
 Counts only, never records. Shared tier: a daily job fans out over ``core.list_tenant_ids``
 and, per school, reads ``core.tenant_usage_summary`` (definer, counts only) plus aggregate
 counts in the school's own ``tenant_session`` (RLS applies): distinct active users from its
-audit log, and its Ask questions and billable AI answers from ``kb.queries`` (ADR-0020 B2).
+audit log, its Ask questions and billable AI answers from ``kb.queries`` (ADR-0020 B2), and its
+active students, active documents and stored bytes (audit 2026-10-17 L-09).
 Dedicated tier: the heartbeat carries the same counts. Limits never block school work in M0;
 crossing 80% / 100% is recorded once per metric per billing period and audited.
 """
@@ -55,6 +56,28 @@ _AI_COUNTS_SQL = text(
 )
 
 
+# Students, documents and stored bytes at collection time (audit 2026-10-17 L-09). Counts only,
+# in the school's own session: active students (``status`` only), active documents, and the size
+# of every stored document version (quarantined versions are discarded, not stored).
+_HOLDINGS_SQL = text(
+    "SELECT "
+    "(SELECT count(*) FROM sis.students AS st WHERE st.tenant_id = :t "
+    "AND st.status = 'active') AS students, "
+    "(SELECT count(*) FROM kb.documents AS d WHERE d.tenant_id = :t "
+    "AND d.status = 'active') AS documents, "
+    "(SELECT coalesce(sum(v.size_bytes), 0) FROM kb.document_versions AS v "
+    "WHERE v.tenant_id = :t AND v.status <> 'quarantined') AS storage"
+)
+
+
+def holdings(tenant_id: uuid.UUID) -> tuple[int, int, int]:
+    """(active students, active documents, stored bytes) of one school, counted in its own
+    ``tenant_session`` (RLS applies; only the numbers leave; ADR-0020 amendment B2 pattern)."""
+    with tenant_session(tenant_id) as s:
+        row = s.execute(_HOLDINGS_SQL, {"t": tenant_id}).one()
+    return int(row.students), int(row.documents), int(row.storage)
+
+
 def _day_bounds(day: dt.date) -> tuple[dt.datetime, dt.datetime]:
     start = dt.datetime.combine(day, dt.time(), IST)
     return start, start + dt.timedelta(days=1)
@@ -85,18 +108,17 @@ def snapshot(tenant_id: uuid.UUID, day: dt.date) -> dict[str, Any]:
     with platform_session() as s:
         counts = tenancy.tenant_usage(s, tenant_id)
     ai_queries, ai_answers = ai_counts_on(tenant_id, day)
+    students_active, documents, storage_bytes = holdings(tenant_id)
     values: dict[str, Any] = {
         "tenant_id": tenant_id,
         "usage_date": day,
         "source": "shared_collector",
         "active_users": active_users_on(tenant_id, day),
         "staff_users": counts.active_memberships,
-        # Student, storage and document meters and the AI tokens and cost join
-        # core.tenant_usage_summary as the sis/kb modules land (definer function extended in
-        # their migrations).
-        "students_active": 0,
-        "storage_bytes": 0,
-        "documents": 0,
+        # The AI tokens and cost stay 0 until the gateway meters join the snapshot.
+        "students_active": students_active,
+        "storage_bytes": storage_bytes,
+        "documents": documents,
         "ai_queries": ai_queries,
         "ai_answers": ai_answers,
         "ai_input_tokens": 0,

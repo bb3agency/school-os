@@ -88,7 +88,7 @@ TENANT_SIDE_IMPORTS: dict[str, frozenset[str] | None] = {
 TENANT_SESSION_FILES = frozenset(
     {
         "tenant_audit.py",  # deliver school-chain copies (audit.record) + dedupe check
-        "usage.py",  # aggregate counts per school per day (active users, AI answers)
+        "usage.py",  # aggregate counts per school (active users, AI answers, students, files)
     }
 )
 
@@ -99,6 +99,11 @@ SQL_ALLOWED = frozenset(
         ("usage.py", "audit.events"),  # count(DISTINCT actor_id) for one day
         # questions and billable AI answers for one day (counts only; ADR-0020 B2, ADR-0038)
         ("usage.py", "kb.queries"),
+        # active students, active documents and stored bytes (counts only, audit 2026-10-17 L-09:
+        # per-student billing and the students/documents/storage limits need real numbers)
+        ("usage.py", "sis.students"),
+        ("usage.py", "kb.documents"),
+        ("usage.py", "kb.document_versions"),
         ("service.py", "core.current_subscription"),  # definer, own school's billing
         ("repository.py", "core.create_owner_invite"),  # definer, first owner invite
     }
