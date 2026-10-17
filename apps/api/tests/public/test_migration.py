@@ -107,7 +107,7 @@ def populated(test_database: Any, make_alembic_config: Callable[[str], Config]) 
 def _seed_r2(admin: Engine) -> tuple[uuid.UUID, uuid.UUID]:
     """A handle, a guardian language, a Telugu school and a following consent form."""
     with admin.begin() as c:
-        tenant_id = c.execute(
+        tenant_id: uuid.UUID = c.execute(
             text("SELECT id FROM core.tenants WHERE status = 'active' ORDER BY created_at LIMIT 1")
         ).scalar_one()
         guardian_id = uuid.uuid4()

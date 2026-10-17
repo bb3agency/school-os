@@ -580,6 +580,18 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             i=uuid.uuid4(),
             t=t,
         )
+        # --- public handles (R2-0, ADR-0047) ----------------------------------------------------
+        _run(
+            c,
+            "INSERT INTO core.public_handles (id, tenant_id, kind, key_hash, target_type, "
+            "target_id, guardian_id, expires_at) VALUES (:i, :t, 'parent_notice', "
+            "sha256(convert_to(:k, 'UTF8')), 'notice', :ti, :g, now() + interval '30 days')",
+            i=uuid.uuid4(),
+            t=t,
+            k=uuid.uuid4().hex,
+            ti=uuid.uuid4(),
+            g=ids["guardian"],
+        )
         # --- register-photo extraction -------------------------------------------------------
         _run(
             c,

@@ -107,7 +107,7 @@ def test_SEC_037_app_role_grants_are_narrow_and_readonly_sees_nothing(
                 )
             )
         }
-        columns = set(
+        columns: set[str] = set(
             c.execute(
                 text(
                     "SELECT column_name FROM information_schema.column_privileges "
@@ -426,7 +426,7 @@ def test_FR_PUB_006_purge_deletes_only_handles_expired_over_30_days(
     assert totals["failed"] == 0
     assert totals["deleted"] >= 1
     with admin_engine.connect() as c:
-        left = set(
+        left: set[uuid.UUID] = set(
             c.execute(
                 text("SELECT id FROM core.public_handles WHERE id = ANY(:i)"),
                 {"i": [old, recent, route.handle_id]},
