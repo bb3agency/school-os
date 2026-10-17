@@ -1682,7 +1682,13 @@
       "udise_pen_in_use": "This PEN is already on another student's record. Search by this PEN to open it.",
       "apaar_id_in_use": "This APAAR ID is already on another student's record. Search by this APAAR ID to open it.",
       "pen_required_for_transfer_in": "A child from another school needs the PEN from the transfer certificate.",
-      "signed_form_required": "Upload the signed form. Consent is recorded only with it."
+      "signed_form_required": "Upload the signed form. Consent is recorded only with it.",
+      "evidence_required": "Upload the signed form and give its document ID.",
+      "no_mobile_number": "This guardian has no mobile number. Add one before recording an opt-in.",
+      "method_does_not_match_status": "Choose a decision that matches: agreed, or asked to stop.",
+      "date_in_future": "The date can't be in the future.",
+      "date_too_early": "This date is too long ago. Check the date on the form.",
+      "filter_required": "Choose a student or a guardian first."
     },
     "api": {
       "generic": {
@@ -7634,6 +7640,335 @@
     "busy": {
       "title": "Please try again in a few minutes",
       "body": "Too many tries from this connection, or the page is busy. Wait a few minutes and open the link again."
+    }
+  },
+  "messaging": {
+    "nav": {
+      "messages": "Messages",
+      "settings": "WhatsApp"
+    },
+    "settingsTitle": "WhatsApp messages",
+    "settingsDescription": "Send school messages to parents from the school's own WhatsApp number. The school pays Meta directly for them.",
+    "logTitle": "Messages",
+    "logDescription": "What was sent to parents on WhatsApp and whether it arrived.",
+    "noAccessTitle": "You can't see WhatsApp messages",
+    "noAccessBody": "Ask the principal if you need access to WhatsApp messages.",
+    "off": {
+      "title": "WhatsApp messages are not available here",
+      "body": "This SchoolOS does not send WhatsApp messages yet. Copy approved notices to parents as before."
+    },
+    "unreviewedTitle": "Parent message texts have not been reviewed yet",
+    "unreviewedBody": "The school writes to parents in their own language, but a fluent reader has not checked these message texts yet. Until then, check each message with the office before sending.",
+    "connect": {
+      "title": "Connect the school's WhatsApp number",
+      "description": "Use the school's own WhatsApp Business number. Parents see the school's name.",
+      "checklistTitle": "Before you connect",
+      "paysMeta": "The school pays Meta directly with its own payment method. SchoolOS does not charge for messages.",
+      "inr": "Set the account's billing currency to Indian rupees before 31 December 2026. Meta stops delivering messages from other currencies after that.",
+      "limit": "A new account can message 250 people a day until Meta verifies the business. Verify the business with Meta first.",
+      "optin": "Messages go only to parents who agreed (opt-in). Print join slips or record signed forms after connecting.",
+      "askOwner": "The owner or principal connects the number.",
+      "signup": "Connect WhatsApp",
+      "signupPending": "Waiting for Meta…",
+      "signupHint": "A Meta window opens. Sign in with the school's Meta business login, choose the business account and verify the number.",
+      "signupCancelled": "The Meta window was closed before it finished. Nothing was changed.",
+      "manual": "Connect with a token",
+      "manualHint": "For pilot schools: paste the token your SchoolOS contact helped you create in the school's Meta Business Manager.",
+      "manualTitle": "Connect with a token",
+      "manualDescription": "SchoolOS checks the token with Meta, stores it locked and never shows it again.",
+      "token": "Access token",
+      "tokenHint": "The system-user token from Meta Business Manager.",
+      "wabaId": "WhatsApp Business account ID",
+      "phoneNumberId": "Phone number ID",
+      "connect": "Connect",
+      "notConfigured": "Connecting is not set up on this SchoolOS yet. Contact SchoolOS support."
+    },
+    "account": {
+      "title": "Connected number",
+      "description": "Synced with Meta every hour.",
+      "none": "Not known yet",
+      "number": "Number",
+      "name": "Display name",
+      "status": "Sending",
+      "quality": "Quality rating",
+      "limit": "Messaging limit",
+      "limitValue": "{count} people a day (SchoolOS stops at {cap})",
+      "currency": "Billing currency",
+      "mode": "Connected with",
+      "connectedAt": "Connected on",
+      "syncedAt": "Last synced",
+      "statuses": {
+        "active": "Sending",
+        "paused": "Paused",
+        "connecting": "Connecting",
+        "disconnected": "Disconnected"
+      },
+      "qualities": {
+        "GREEN": "High",
+        "YELLOW": "Medium",
+        "RED": "Low",
+        "FLAGGED": "Flagged by Meta",
+        "UNKNOWN": "Not rated yet"
+      },
+      "currencies": {
+        "confirmed_inr": "Indian rupees",
+        "not_inr": "Not Indian rupees",
+        "unknown": "Not known yet"
+      },
+      "modes": {
+        "embedded_signup": "Meta sign-up",
+        "manual_token": "Token (pilot)"
+      },
+      "pausedTitle": "Sending is paused",
+      "pause": {
+        "quality_flagged": "Meta flagged the number's quality. Wait until Meta's quality rating improves, then resume.",
+        "quality_red": "Meta rates the number's quality low. Wait until it improves, then resume.",
+        "account_restricted": "Meta restricted the account. Check the account in Meta Business Manager, then resume.",
+        "number_disabled": "Meta disabled the number. Check it in Meta Business Manager, then resume.",
+        "account_deleted": "Meta reports the account was deleted. Disconnect and connect again.",
+        "other": "Sending was paused. Check the account in Meta Business Manager, then resume."
+      },
+      "inrTitle": "Billing currency is not Indian rupees",
+      "inrBody": "From {date} Meta delivers messages only from accounts billed in Indian rupees. Change the currency in Meta Business Manager.",
+      "resume": "Resume sending",
+      "resumeTitle": "Resume sending?",
+      "resumeBody": "SchoolOS checks the number with Meta first. Messages start going out again.",
+      "disconnect": "Disconnect",
+      "disconnectTitle": "Disconnect WhatsApp?",
+      "disconnectBody": "Sending stops at once, and links already sent to parents stop working. You can connect again later."
+    },
+    "templates": {
+      "title": "Message templates",
+      "description": "Meta approves each message and language before it can be sent.",
+      "sync": "Check with Meta",
+      "syncTitle": "Check templates with Meta?",
+      "syncBody": "SchoolOS submits any template not sent yet and reads every status back. This takes a minute.",
+      "pausedBySchoolOs": "Paused by SchoolOS",
+      "reviewed": "Checked",
+      "notReviewed": "Not checked by a fluent reader",
+      "columns": {
+        "purpose": "Message",
+        "language": "Language",
+        "status": "Meta status",
+        "review": "Text review"
+      },
+      "purposes": {
+        "optin_confirm": "Joining confirmation",
+        "school_notice": "School notice",
+        "absence_alert": "Absence alert",
+        "fee_reminder": "Fee reminder",
+        "fee_receipt": "Fee receipt"
+      },
+      "languages": {
+        "en": "English",
+        "te": "Telugu"
+      },
+      "statuses": {
+        "not_created": "Not submitted",
+        "pending": "Waiting for Meta",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "paused": "Paused by Meta",
+        "disabled": "Disabled by Meta"
+      }
+    },
+    "settings": {
+      "title": "When messages are sent",
+      "description": "Switches are read by the sending features as they arrive.",
+      "switches": "Messages the school sends",
+      "switch": {
+        "notices_enabled": "School notices",
+        "absence_alerts_enabled": "Absence alerts",
+        "fee_reminders_enabled": "Fee reminders",
+        "fee_receipts_enabled": "Fee receipts"
+      },
+      "switchHint": {
+        "notices_enabled": "Approved notices, when the office chooses to send one.",
+        "absence_alerts_enabled": "Once a day, for children marked absent.",
+        "fee_reminders_enabled": "Before and after due dates.",
+        "fee_receipts_enabled": "Right after a receipt is issued."
+      },
+      "allOff": "All off",
+      "absenceTime": "Absence alerts at",
+      "quietStart": "No messages from",
+      "quietEnd": "Until",
+      "quiet": "Quiet hours",
+      "quietValue": "{start} to {end}",
+      "dailyCap": "Most messages a day",
+      "dailyCapHint": "Leave empty for {cap} (Meta's limit minus 10%).",
+      "dailyCapHintUnknown": "Leave empty for Meta's limit minus 10%.",
+      "officePhone": "Office phone for replies",
+      "officePhoneHint": "Parents who write to the WhatsApp number are told to call this number.",
+      "save": "Save settings",
+      "saved": "Saved."
+    },
+    "optins": {
+      "title": "WhatsApp messages",
+      "description": "Which messages each guardian agreed to get, and in which language.",
+      "ruleTitle": "Only with the parent's agreement",
+      "ruleBody": "Record an opt-in only with a signed form or when the parent agreed in person. A parent who sent STOP can join again only with a new signed form or the join message.",
+      "loading": "Loading…",
+      "mobileEnding": "mobile ending {last4}",
+      "noMobile": "no mobile number",
+      "record": "Record a decision",
+      "recordTitle": "Record a WhatsApp decision",
+      "recordDescription": "Every decision is kept with who recorded it. Nothing is overwritten.",
+      "category": "Messages about",
+      "method": "Decision",
+      "choices": {
+        "in_person": "Agreed in person",
+        "signed_form": "Signed form (upload it first)",
+        "staff_recorded_stop": "Asked to stop"
+      },
+      "decidedOn": "Date of the decision",
+      "evidence": "Signed form document ID",
+      "evidenceHint": "Needed for a signed form: upload the form under Documents (purpose: evidence) and paste its ID.",
+      "save": "Save",
+      "categories": {
+        "notices": "Notices",
+        "attendance": "Attendance",
+        "fees": "Fees"
+      },
+      "states": {
+        "opted_in": "Agreed",
+        "opted_out": "Stopped",
+        "not_asked": "Not asked"
+      },
+      "methods": {
+        "whatsapp_join": "joined on WhatsApp",
+        "signed_form": "signed form",
+        "in_person": "in person",
+        "whatsapp_stop": "sent STOP",
+        "staff_recorded_stop": "asked the office to stop"
+      },
+      "stoppedByParent": "Stopped by the parent",
+      "numberChanged": "The number changed after this: ask again",
+      "language": "Message language",
+      "languageTitle": "Language of WhatsApp messages",
+      "languageDescription": "Messages and parent pages for this guardian use this language. Staff screens stay English.",
+      "languageLabel": "Language",
+      "languageNow": "Messages in: {language}",
+      "languages": {
+        "school": "The school's choice",
+        "en": "English",
+        "te": "Telugu"
+      }
+    },
+    "log": {
+      "purpose": "Message",
+      "status": "Status",
+      "all": "All",
+      "emptyTitle": "No messages yet",
+      "emptyBody": "Messages to parents appear here once the school sends them.",
+      "more": "Show more",
+      "fallback": "Sent in English: the message in the parent's language is not approved",
+      "phoneEnding": "ending {last4}",
+      "columns": {
+        "time": "Queued",
+        "purpose": "Message",
+        "language": "Language",
+        "phone": "Mobile",
+        "status": "Status"
+      },
+      "purposes": {
+        "optin_confirm": "Joining confirmation",
+        "school_notice": "School notice",
+        "absence_alert": "Absence alert",
+        "fee_reminder": "Fee reminder",
+        "fee_receipt": "Fee receipt",
+        "optin_stopped": "Stop confirmation"
+      },
+      "languages": {
+        "en": "English",
+        "te": "Telugu"
+      },
+      "statuses": {
+        "queued": "Waiting",
+        "sent": "Sent",
+        "delivered": "Delivered",
+        "read": "Read",
+        "failed": "Failed",
+        "skipped": "Not sent"
+      },
+      "reasons": {
+        "no_optin": "The guardian has not agreed to these messages",
+        "opted_out": "The guardian stopped these messages",
+        "optin_for_other_number": "The number changed after the guardian agreed",
+        "no_mobile_number": "No mobile number on record",
+        "messaging_paused": "Sending was paused",
+        "messaging_not_connected": "WhatsApp was not connected",
+        "messaging_currency_not_inr": "The account is not billed in Indian rupees",
+        "template_not_approved": "Meta has not approved this message yet",
+        "template_paused": "This message is paused",
+        "not_on_whatsapp": "Not on WhatsApp",
+        "window_closed": "The parent's reply window had closed",
+        "number_not_registered": "The school's number is not registered",
+        "template_parameters": "The message text did not fit",
+        "provider_error": "WhatsApp did not accept the message",
+        "other": "WhatsApp did not deliver it"
+      }
+    },
+    "slips": {
+      "open": "Print join slips",
+      "title": "WhatsApp join slips",
+      "description": "Slips for parents to join the school's WhatsApp messages, each in the parent's language.",
+      "section": "Section",
+      "chooseSection": "Choose a section",
+      "categories": "Parents join for",
+      "category": {
+        "notices": "Notices",
+        "attendance": "Attendance alerts",
+        "fees": "Fees"
+      },
+      "hint": "Each guardian with a mobile number gets a slip with a new code that works once, for 30 days.",
+      "print": "Open the slips to print",
+      "chooseFirst": "Choose a section and at least one kind of message."
+    },
+    "errors": {
+      "messaging_already_connected": {
+        "title": "Already connected",
+        "body": "WhatsApp is already connected. Disconnect it first."
+      },
+      "messaging_not_connected": {
+        "title": "WhatsApp is not connected",
+        "body": "Connect WhatsApp first."
+      },
+      "messaging_still_restricted": {
+        "title": "Still restricted by Meta",
+        "body": "Meta still rates the number low. Wait until it improves before resuming."
+      },
+      "messaging_not_paused": {
+        "title": "Sending is not paused",
+        "body": "Sending is not paused."
+      },
+      "messaging_auth_failed": {
+        "title": "Meta did not accept the connection",
+        "body": "Meta did not accept the connection. Check the token or start the sign-up again."
+      },
+      "messaging_provider_error": {
+        "title": "WhatsApp did not answer",
+        "body": "WhatsApp did not answer. Try again in a few minutes."
+      },
+      "manual_token_not_allowed": {
+        "title": "Token connection is off",
+        "body": "Connecting with a token is switched off. Use Connect WhatsApp."
+      },
+      "opted_out_by_parent": {
+        "title": "The parent stopped these messages",
+        "body": "The parent stopped these messages on WhatsApp. Record a new signed form, or ask the parent to send the join message."
+      },
+      "module_unavailable": {
+        "title": "Not available here",
+        "body": "WhatsApp messages are not available on this SchoolOS."
+      },
+      "no_slips": {
+        "title": "No slips to print",
+        "body": "No guardian in this section has a mobile number."
+      },
+      "too_many_slips": {
+        "title": "Too many slips at once",
+        "body": "Too many slips at once. Print one section at a time."
+      }
     }
   }
 }

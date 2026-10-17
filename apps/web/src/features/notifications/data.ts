@@ -49,6 +49,8 @@ const LINKS: Record<string, (id: string) => string> = {
   insight_flag: (id) => `/flags/${id}`,
   // M6 (FR-TALLY-009): a Tally agent went silent; the connector screen shows its status.
   tally_device: () => "/settings/tally",
+  // R2-1C (FR-MSG-007, FR-MSG-021): sending paused, or a template moved out of utility.
+  messaging_account: () => "/settings/whatsapp",
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
