@@ -83,6 +83,7 @@ IST: Final = ZoneInfo("Asia/Kolkata")
 AADHAAR_CODE: Final = "aadhaar_full_number_rejected"
 AADHAAR_DETAIL: Final = "Don't enter Aadhaar numbers. Enter only the last 4 digits."
 _FORM_KEYS: Final = ("full_name", "admission_no", "dob", "udise_pen")
+_NO_APAAR_ACTION: Final = frozenset({"refused", "withdrawn"})  # see refused_student_ids
 
 log = get_logger(__name__)
 
@@ -275,7 +276,8 @@ def record_consent(
     ``consent_already_decided`` (pending after a decision); 422 per field (``relationship`` /
     ``decided_on`` missing, ``signed_form_required``, ``evidence_document_id`` / ``guardian_id``
     ``not_found``, ``date_in_future``, ``aadhaar_full_number_rejected``). Audit
-    ``apaar.consent.recorded`` (ids, statuses and codes only). A change to or from ``refused``
+    ``apaar.consent.recorded`` (ids, statuses and codes only). A change into or out of ``refused``
+    or ``withdrawn``
     re-checks the student's APAAR readiness findings (data-quality event)."""
     _reach_student(session, ctx, student_id, (RECORD,))
     students.lock_student_for_change(session, ctx, student_id)
@@ -323,8 +325,9 @@ def record_consent(
             "has_note": note is not None,
         },
     )
-    if "refused" in (data.status, previous_status):
-        # DQ-009 / DQ-022 skip students whose parents refused (FR-APC-006): re-check now.
+    if (data.status in _NO_APAAR_ACTION) != (previous_status in _NO_APAAR_ACTION):
+        # DQ-009 / DQ-022 skip students whose parents refused or withdrew (FR-APC-006): a
+        # decision that changes whether the student is skipped re-checks them now.
         ops.enqueue_event(
             session, DQ_EVENT, {"student_ids": [student_id], "attribute_keys": [DQ_KEY]}
         )
@@ -724,9 +727,7 @@ def refused_student_ids(
     """Students whose parents refused (or withdrew) APAAR consent: never pushed to an APAAR
     action (FR-APC-006). ``student_ids`` must come from the caller's own scoped reads."""
     return frozenset(
-        sid
-        for sid, s in repo.statuses(session, student_ids).items()
-        if s in ("refused", "withdrawn")
+        sid for sid, s in repo.statuses(session, student_ids).items() if s in _NO_APAAR_ACTION
     )
 
 
