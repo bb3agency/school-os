@@ -277,8 +277,7 @@ def record_consent(
     ``decided_on`` missing, ``signed_form_required``, ``evidence_document_id`` / ``guardian_id``
     ``not_found``, ``date_in_future``, ``aadhaar_full_number_rejected``). Audit
     ``apaar.consent.recorded`` (ids, statuses and codes only). A change into or out of ``refused``
-    or ``withdrawn``
-    re-checks the student's APAAR readiness findings (data-quality event)."""
+    or ``withdrawn`` re-checks the student's APAAR readiness findings (data-quality event)."""
     _reach_student(session, ctx, student_id, (RECORD,))
     students.lock_student_for_change(session, ctx, student_id)
     previous = repo.current(session, [student_id]).get(student_id)
