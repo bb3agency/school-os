@@ -63,21 +63,29 @@ export interface BffFetchOptions {
   fetchImpl?: (request: Request) => Promise<Response>;
 }
 
-async function readProblem(
-  response: Response,
-): Promise<Partial<Problem> & { step_up_url?: string }> {
+type BffProblem = Partial<Problem> & { step_up_url?: string; login_url?: string };
+
+async function readProblem(response: Response): Promise<BffProblem> {
   try {
-    return (await response.clone().json()) as Partial<Problem> & { step_up_url?: string };
+    return (await response.clone().json()) as BffProblem;
   } catch {
     return {};
   }
 }
 
+/**
+ * The BFF's own step-up routes only: staff, operator and SchoolOS support
+ * (`/bff/auth/support/step-up`, ADR-0023), whose session the school console also serves.
+ */
 function safeStepUpUrl(value: unknown): string | null {
-  return typeof value === "string" && /^\/bff\/auth\/(platform\/)?step-up(\?|$)/.test(value)
+  return typeof value === "string" &&
+    /^\/bff\/auth\/(platform\/|support\/)?step-up(\?|$)/.test(value)
     ? value
     : null;
 }
+
+/** Where the BFF sends a SchoolOS support session that has ended (ADR-0023). */
+const SUPPORT_SIGNED_OUT = "/signed-out?kind=support";
 
 export function createBffFetch(options: BffFetchOptions): FetchLike {
   const navigate = options.navigate ?? defaultNavigate;
@@ -136,7 +144,10 @@ export function createBffFetch(options: BffFetchOptions): FetchLike {
       forgetSessionInfo(options.kind);
       // A background poll never takes the user away: the idle-timeout dialog handles that.
       if (passive) return response;
-      const target = loginUrl(options.kind, currentPath());
+      // The school console also serves a SchoolOS support session (client kind "staff"). It
+      // starts again only from the admin panel, so it never goes to the staff sign-in.
+      const support = (await readProblem(response)).login_url === SUPPORT_SIGNED_OUT;
+      const target = support ? SUPPORT_SIGNED_OUT : loginUrl(options.kind, currentPath());
       navigate(target);
       throw new AuthRedirectError(target);
     }

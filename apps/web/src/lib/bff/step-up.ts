@@ -48,10 +48,13 @@ export class StepUpCancelledError extends Error {
 }
 
 /**
- * Staff step-up route that returns to the completion page (opened in its own window). The
- * platform admin panel registers no handler and keeps the full-page step-up.
+ * School-console step-up route that returns to the completion page (opened in its own
+ * window): the staff route, or the support route for a SchoolOS support session (ADR-0023),
+ * which must re-authenticate the operator, never start a staff sign-in. The platform admin
+ * panel registers no handler and keeps the full-page step-up.
  */
-export function stepUpWindowUrl(): string {
+export function stepUpWindowUrl(kind: "staff" | "support" = "staff"): string {
   // No locale in any URL (ADR-0036 note): the window's language comes from the cookie.
-  return `/bff/auth/step-up?next=${encodeURIComponent("/step-up-complete")}`;
+  const route = kind === "support" ? "/bff/auth/support/step-up" : "/bff/auth/step-up";
+  return `${route}?next=${encodeURIComponent("/step-up-complete")}`;
 }

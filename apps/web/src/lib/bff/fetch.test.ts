@@ -287,5 +287,48 @@ describe("step-up and retry (ADR-0018, SEC-005)", () => {
 
   it("the step-up window returns to the completion page, never elsewhere", () => {
     expect(stepUpWindowUrl()).toBe("/bff/auth/step-up?next=%2Fstep-up-complete");
+    expect(stepUpWindowUrl("support")).toBe(
+      "/bff/auth/support/step-up?next=%2Fstep-up-complete",
+    );
+  });
+
+  it("a SchoolOS support session keeps the BFF's support step-up URL (ADR-0023)", async () => {
+    const { navigate, bffFetch } = setup(() =>
+      Response.json(
+        {
+          code: "step_up_required",
+          step_up_url: "/bff/auth/support/step-up?next=%2Fstudents",
+        },
+        { status: 428 },
+      ),
+    );
+    await expect(
+      bffFetch(new Request("http://localhost:3000/bff/api/v1/students")),
+    ).rejects.toBeInstanceOf(AuthRedirectError);
+    expect(navigate).toHaveBeenCalledWith("/bff/auth/support/step-up?next=%2Fstudents");
+  });
+
+  it("an ended support session goes to the support signed-out page, not staff sign-in", async () => {
+    const { navigate, bffFetch } = setup(() =>
+      Response.json(
+        { code: "unauthenticated", login_url: "/signed-out?kind=support" },
+        { status: 401 },
+      ),
+    );
+    await expect(
+      bffFetch(new Request("http://localhost:3000/bff/api/v1/students")),
+    ).rejects.toBeInstanceOf(AuthRedirectError);
+    expect(navigate).toHaveBeenCalledWith("/signed-out?kind=support");
+  });
+
+  it("any other login_url from a 401 is ignored (staff sign-in, back to this page)", async () => {
+    const { navigate, bffFetch } = setup(() =>
+      Response.json(
+        { code: "unauthenticated", login_url: "https://evil.example/" },
+        { status: 401 },
+      ),
+    );
+    await expect(bffFetch(new Request("http://localhost:3000/bff/api/v1/users"))).rejects.toThrow();
+    expect(navigate).toHaveBeenCalledWith("/bff/auth/login?next=%2Fsettings%2Fusers%3Fpage%3D2");
   });
 });
