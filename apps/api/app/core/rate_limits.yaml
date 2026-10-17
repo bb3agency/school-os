@@ -97,6 +97,13 @@ policies:
     {quota: 10, window_s: 600, per: school, fail: open, report: true, weighted: false}
   support_tickets:
     {quota: 10, window_s: 3600, per: user, fail: open, report: true, weighted: false}
+  # Readiness reads assess every student of the school (or section) per call (audit finding
+  # SEC-046): a per-person budget, charged before the permission check like search, and a
+  # per-school budget charged after authorization so refused members cannot spend it.
+  readiness_reads:
+    {quota: 30, window_s: 60, per: user, fail: open, report: true, weighted: false}
+  readiness_school:
+    {quota: 300, window_s: 60, per: school, fail: open, report: true, weighted: false}
   # On-demand audit-chain verification (audit 2026-10-06 R-19): one queued run per school (or
   # per operator for the control-plane chain) every 10 minutes; the daily job verifies anyway.
   # audit_verify is charged by the handler after the permission check (ratelimit.charge), so
@@ -189,6 +196,9 @@ routes:
   # queue-heavy school jobs
   POST /api/v1/dq/runs: [heavy_jobs]
   POST /api/v1/dq/readiness/{profile_key}/runs: [heavy_jobs]
+  # readiness reads that assess every student per call (SEC-046)
+  GET /api/v1/dq/readiness/{profile_key}: [readiness_reads, readiness_school]
+  GET /api/v1/dq/readiness/{profile_key}/students: [readiness_reads, readiness_school]
   POST /api/v1/academic-years/{year_id}/promotions:preview: [heavy_jobs]
   POST /api/v1/platform/invoice-runs: [platform_emergency]
   # audit-chain verification (R-19)

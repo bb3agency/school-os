@@ -136,3 +136,34 @@ def test_ASVS_2_2_1_backoff_is_per_person_not_a_lockout_of_others(
         api.call(victim, "POST", "/api/v1/me/login-event", mfa=False)
     assert api.call(victim, "POST", "/api/v1/me/login-event").status_code == 429
     assert api.call(other, "POST", "/api/v1/me/login-event").status_code == 200
+
+
+def test_SEC_046_readiness_reads_have_per_person_and_per_school_budgets(
+    world: Any, api: Any, clock: Clock
+) -> None:
+    """The readiness summary and section list assess every student per call (SEC-046): one
+    per-person budget shared by both routes, plus a per-school one charged after authorization."""
+    config = rl.load_config()
+    for route in (
+        "GET /api/v1/dq/readiness/{profile_key}",
+        "GET /api/v1/dq/readiness/{profile_key}/students",
+    ):
+        names = config.routes[route]
+        assert {config.policies[n].per for n in names} == {"user", "school"}, route
+    quota = config.policies["readiness_reads"].quota
+    who = world.person("owner")
+    summary = "/api/v1/dq/readiness/apaar"
+    section = f"{summary}/students?section_id={world.a.ids['section_9a']}"
+    codes = [api.call(who, "GET", summary).status_code for _ in range(quota - 1)]
+    assert 429 not in codes
+    assert api.call(who, "GET", section).status_code != 429
+    refused = api.call(who, "GET", section)
+    assert refused.status_code == 429
+    assert '"readiness_reads";q=' in refused.headers["RateLimit-Policy"]
+    # Another person in the school keeps their own budget.
+    assert api.call(world.person("principal"), "GET", summary).status_code != 429
+    # A member without dq.readiness.read is refused (403) and spends no school budget.
+    teacher = world.person("teacher")
+    assert api.call(teacher, "GET", summary).status_code == 403
+    clock.advance(3)
+    assert api.call(who, "GET", summary).status_code != 429
