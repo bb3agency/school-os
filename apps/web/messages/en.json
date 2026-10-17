@@ -230,7 +230,6 @@
         "colYear": "Year",
         "colStarts": "Starts on",
         "colEnds": "Ends on",
-        "colCurrent": "Current year",
         "emptyTitle": "No academic years yet",
         "emptyBody": "Add the current academic year, for example 2026-27, to get started."
       },
@@ -4925,9 +4924,7 @@
     "form": {
       "question": "Your question",
       "hint": "Write in English, Telugu or a mix, up to 1000 characters. Do not type Aadhaar numbers.",
-      "shortcut": "Press Ctrl+Enter to ask.",
       "submit": "Ask",
-      "asking": "Answering…",
       "stop": "Stop"
     },
     "status": {
@@ -4940,7 +4937,6 @@
     },
     "answer": {
       "heading": "Answer",
-      "yourQuestion": "Your question",
       "sources": "Sources",
       "sourceLink": "Source {index}: {title}",
       "untitled": "Untitled source",
@@ -4959,11 +4955,8 @@
       "previewLabel": "Draft answer, not checked yet",
       "replacedNote": "The draft was checked against the sources and changed to what they support.",
       "countNote": "Student count (numbers only)",
-      "assistant": "SchoolOS answer",
-      "draftPill": "Draft",
       "sourcesCount": "{count, plural, one {# source} other {# sources}}",
       "verifiedBadge": "From a verified answer",
-      "followUp": "Ask a follow-up",
       "tableLabel": "Table in the answer",
       "withheld": "Source you can no longer open",
       "withheldNote": "You no longer have access to this source, so its text is hidden.",
@@ -5218,7 +5211,6 @@
     "chat": {
       "newChat": "New chat",
       "recent": "Recent",
-      "recentLabel": "Recent chats",
       "allChats": "All chats",
       "untitled": "New chat",
       "pinnedMark": "Pinned",
@@ -5368,7 +5360,6 @@
       "deleted": "Memory deleted.",
       "forgotten": "Memory cleared.",
       "edited": "Memory changed.",
-      "loadFailed": "Memory could not be loaded.",
       "userOff": "Memory is off for you, so Ask neither uses nor adds memories. Switch it on to add, change or save items; you can still delete them.",
       "fullHint": "Memory is full (30 items). Delete something you no longer need to add more."
     }
