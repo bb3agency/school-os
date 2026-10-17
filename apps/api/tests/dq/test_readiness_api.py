@@ -264,6 +264,43 @@ def test_FR_DQ_044_apaar_failure_list(world: Any, api: Any) -> None:
     assert item["against"] == "admission_register"
 
 
+def test_L_03_apaar_readiness_never_pushes_a_refused_student(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """FR-APC-006: a student whose parents refused (or withdrew) APAAR consent is not on the
+    APAAR failure list and gets no DQ-031 finding of the ``apaar`` profile; the SSC check,
+    which is not an APAAR action, still applies to them."""
+    import datetime as dt
+
+    from app.apaar import service as apaar_service
+    from app.apaar.schemas import ConsentIn
+
+    name = fresh_name()
+    sid, _ = ssc_student(world.a, name=name, udise_name=name + " Reddy")
+    refused = ConsentIn(status="refused", relationship="father", decided_on=dt.date(2026, 7, 1))
+    DS.call(world.a, apaar_service.record_consent, sid, refused)
+    admin = world.person("office_admin")
+    listed = api.call(
+        admin,
+        "GET",
+        "/api/v1/dq/readiness/apaar/students",
+        params={"section_id": str(world.a.ids["section_9a"])},
+    )
+    assert listed.status_code == 200, listed.text
+    mine = next(s for s in listed.json() if s["student"]["id"] == str(sid))
+    assert (mine["status"], mine["owners"]) == ("ready", [])
+    assert run(api, admin, sid, profile="apaar").status_code == 202
+    assert not [
+        f
+        for f in DS.findings(admin_engine, sid)
+        if f["rule_id"] == "DQ-031" and f["profile_key"] == "apaar" and f["status"] == "open"
+    ]
+    ssc = api.call(
+        admin, "GET", f"{BASE}/students", params={"section_id": str(world.a.ids["section_9a"])}
+    )
+    assert next(s for s in ssc.json() if s["student"]["id"] == str(sid))["status"] == "needs_school"
+
+
 def test_US_505_parent_slip_is_printable_and_audited(
     world: Any, api: Any, admin_engine: Engine
 ) -> None:

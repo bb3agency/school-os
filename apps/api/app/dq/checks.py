@@ -788,9 +788,13 @@ def readiness_kind(attribute_key: str) -> rd.ValueKind:
 
 
 def readiness_applies(facts: StudentFacts, profile: Profile) -> bool:
-    """The profile's classes (current-year enrolment) and its "verified" exemption."""
+    """The profile's classes (current-year enrolment) and its "verified" exemption. A profile
+    that needs APAAR never applies to a student whose parents refused or withdrew APAAR
+    consent (FR-APC-006, audit L-03): the APAAR failure list is an APAAR action."""
     spec = profile.readiness
     if spec is None:
+        return False
+    if profile.needs_apaar and facts.apaar_refused:
         return False
     if spec.skip_when_verified and facts.has_verified(spec.skip_when_verified):
         return False
