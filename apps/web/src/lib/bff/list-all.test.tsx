@@ -1,5 +1,6 @@
 import { screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useSchoolMembers } from "@/features/documents/data";
 import { useSectionOptions } from "@/features/findings/data";
 import { installBffStub, uninstallBffStub, type BffStub } from "@/test/bff-stub";
 import { renderWithIntl } from "@/test/render";
@@ -79,5 +80,44 @@ describe("section pickers list every section of a large school (FR-TEN-010)", ()
     expect(list).toHaveTextContent("Class 9 · A");
     expect(list).toHaveTextContent("Class 10 · A");
     expect(stub.callsTo("GET /bff/api/v1/sections")).toHaveLength(2);
+  });
+});
+
+function MemberNames() {
+  const members = useSchoolMembers(true);
+  if (!members.data) return <p>Loading</p>;
+  return (
+    <ul aria-label="Members">
+      {members.data.map((member) => (
+        <li key={member.id}>{member.display_name}</li>
+      ))}
+    </ul>
+  );
+}
+
+describe("document access pickers list every staff member (WEB-05)", () => {
+  beforeEach(() => {
+    installBffStub("staff").routes["GET /bff/api/v1/users"] = (_request, url) =>
+      url.searchParams.get("cursor") === "users-2"
+        ? Response.json({
+            data: [
+              { id: "0192f3a4-0000-7000-8000-0000000000d2", display_name: "Second Page Teacher" },
+            ],
+            next_cursor: null,
+          })
+        : Response.json({
+            data: [
+              { id: "0192f3a4-0000-7000-8000-0000000000d1", display_name: "First Page Clerk" },
+            ],
+            next_cursor: "users-2",
+          });
+  });
+  afterEach(() => uninstallBffStub());
+
+  it("includes people from the second page of /users", async () => {
+    renderWithIntl(<MemberNames />);
+    const list = await screen.findByRole("list", { name: "Members" });
+    expect(list).toHaveTextContent("First Page Clerk");
+    expect(list).toHaveTextContent("Second Page Teacher");
   });
 });

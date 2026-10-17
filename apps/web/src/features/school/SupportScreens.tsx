@@ -18,6 +18,7 @@ import { Value } from "@/components/ui/Value";
 import { known, priorityTone, ticketTone } from "@/features/status";
 import { TicketThread } from "@/features/support/TicketThread";
 import { Link } from "@/i18n/navigation";
+import { Pager, usePagedList } from "@/features/students/paging";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { useStaffCan } from "@/lib/bff/staff-me";
 import { formatDateTime } from "@/lib/format";
@@ -58,11 +59,12 @@ export function SupportScreen() {
   // The API returns only what the caller may read; this changes the wording only.
   const allTickets = can(SUPPORT_MANAGE);
   const listTitle = allTickets ? t("listTitle") : t("listTitleOwn");
-  const tickets = useApiQuery(
-    [...KEY, "list"],
-    async () =>
-      (await unwrap(api.GET("/api/v1/support/tickets", { params: { query: { limit: 100 } } })))
-        .data,
+  const { rows: tickets, pager } = usePagedList([...KEY, "list"], (cursor) =>
+    unwrap(
+      api.GET("/api/v1/support/tickets", {
+        params: { query: { limit: 100, ...(cursor ? { cursor } : {}) } },
+      }),
+    ),
   );
   const form = useApiForm({
     schema: ticketSchema,
@@ -130,6 +132,9 @@ export function SupportScreen() {
             emptyTitle={t("emptyTitle")}
             emptyBody={t("emptyBody")}
           />
+          <div className="mt-4">
+            <Pager label={t("pagesLabel")} {...pager} />
+          </div>
         </Card>
         <Card title={t("newTitle")} description={t("newBody")} tone="default">
           <form noValidate onSubmit={form.onSubmit} className="space-y-4">

@@ -3,7 +3,14 @@
 import { useQuery, type Query } from "@tanstack/react-query";
 import { runPollDelay } from "@/features/findings/RunChecks";
 import { AuthRedirectError } from "@/lib/bff/fetch";
-import { ApiError, NotAvailableError, toLoadable, unwrap, useBffClient } from "@/lib/bff/query";
+import {
+  ApiError,
+  listAll,
+  NotAvailableError,
+  toLoadable,
+  unwrap,
+  useBffClient,
+} from "@/lib/bff/query";
 import { StepUpCancelledError } from "@/lib/bff/step-up";
 import type { Loadable } from "@/lib/loadable";
 import type { DocumentListFilters } from "./filters";
@@ -126,13 +133,16 @@ export function useDocument(documentId: string, enabled: boolean): Loadable<Docu
 }
 
 const PAGE = { limit: 200 } as const;
+/** One page of a picker list from `cursor`; listAll reads every page (WEB-05). */
+const page = (cursor: string | undefined) => (cursor ? { ...PAGE, cursor } : PAGE);
 
 /** GET /roles (needs user.manage): custom roles and their names. */
 export function useSchoolRoles(enabled: boolean) {
   const api = useBffClient("staff");
   return useQuery({
     queryKey: DOCUMENT_KEYS.roles,
-    queryFn: async () => (await unwrap(api.GET("/api/v1/roles", { params: { query: PAGE } }))).data,
+    queryFn: () =>
+      listAll((cursor) => unwrap(api.GET("/api/v1/roles", { params: { query: page(cursor) } }))),
     enabled,
     staleTime: 10 * 60_000,
     retry: false,
@@ -144,7 +154,8 @@ export function useSchoolMembers(enabled: boolean) {
   const api = useBffClient("staff");
   return useQuery({
     queryKey: DOCUMENT_KEYS.members,
-    queryFn: async () => (await unwrap(api.GET("/api/v1/users", { params: { query: PAGE } }))).data,
+    queryFn: () =>
+      listAll((cursor) => unwrap(api.GET("/api/v1/users", { params: { query: page(cursor) } }))),
     enabled,
     staleTime: 5 * 60_000,
     retry: false,

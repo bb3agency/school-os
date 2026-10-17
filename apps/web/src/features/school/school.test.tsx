@@ -164,6 +164,8 @@ describe("Plan and billing (FR-PLT-030)", () => {
       ]);
     renderWithIntl(<BillingScreen />);
     expect(await screen.findByText("Standard")).toBeInTheDocument();
+    // The API lists the last 24 invoices (no paging): the card says so (WEB-05).
+    expect(screen.getByText(sm.billing.invoicesNote)).toBeInTheDocument();
     expect(screen.getByText(sm.billing.pastDueTitle)).toBeInTheDocument();
     expect(screen.getByText("1,210 of 1,500", { selector: "span" })).toBeInTheDocument();
     expect(screen.getByText("3.25 GB (no limit)")).toBeInTheDocument();
@@ -344,6 +346,35 @@ describe("announcements banner (FR-PLT-026)", () => {
 });
 
 describe("support (FR-PLT-027)", () => {
+  it("pages through more than 100 of the school's tickets (WEB-05)", async () => {
+    const ticket = (id: string, subject: string) => ({
+      id,
+      number: subject,
+      subject,
+      category: "import",
+      priority: "p3",
+      status: "open",
+      created_at: "2026-10-01T05:00:00Z",
+      updated_at: "2026-10-01T05:00:00Z",
+    });
+    stub.routes["GET /bff/api/v1/support/tickets"] = (_request, url) =>
+      url.searchParams.get("cursor") === "tickets-2"
+        ? page([ticket("0192f3a4-0000-7000-8000-00000000f2a2", "SUP-000002")])
+        : Response.json({
+            data: [ticket("0192f3a4-0000-7000-8000-00000000f2a1", "SUP-000001")],
+            next_cursor: "tickets-2",
+          });
+    const user = userEvent.setup();
+    renderWithIntl(<SupportScreen />);
+    expect((await screen.findAllByText(/SUP-000001/)).length).toBeGreaterThan(0);
+    const pager = screen.getByRole("navigation", { name: sm.support.pagesLabel });
+    await user.click(within(pager).getByRole("button", { name: /Next/ }));
+    expect((await screen.findAllByText(/SUP-000002/)).length).toBeGreaterThan(0);
+    expect(
+      stub.callsTo("GET /bff/api/v1/support/tickets").at(-1)?.url.searchParams.get("cursor"),
+    ).toBe("tickets-2");
+  });
+
   it("opens a ticket with an Idempotency-Key, with the student-data warning visible", async () => {
     stub.routes["GET /bff/api/v1/support/tickets"] = () => page([]);
     stub.routes["POST /bff/api/v1/support/tickets"] = () =>

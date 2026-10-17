@@ -737,10 +737,14 @@ export function SubscriptionsScreen({ status = "" }: { status?: string }) {
       : null;
   };
   const query = { limit: 200, ...(status ? { status } : {}) };
-  const subscriptions = useApiQuery(
+  const { rows: subscriptions, pager } = usePagedList(
     [...PK.subscriptions, "list", query],
-    async () =>
-      (await unwrap(api.GET("/api/v1/platform/subscriptions", { params: { query } }))).data,
+    (cursor) =>
+      unwrap(
+        api.GET("/api/v1/platform/subscriptions", {
+          params: { query: { ...query, ...(cursor ? { cursor } : {}) } },
+        }),
+      ),
   );
   const columns: Column<Subscription>[] = [
     {
@@ -865,6 +869,7 @@ export function SubscriptionsScreen({ status = "" }: { status?: string }) {
         emptyTitle={t("emptyTitle")}
         emptyBody={t("emptyBody")}
       />
+      <Pager label={t("pagesLabel")} {...pager} />
     </div>
   );
 }

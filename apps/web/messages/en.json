@@ -523,7 +523,8 @@
         "notCountedYet": "No answers counted yet this month. Each day is added the next morning.",
         "countsFrom": "Answers count against this bundle from {date}.",
         "overageNote": "Answers above the included number are billed on the next month's invoice. To change the bundle, contact SchoolOS support."
-      }
+      },
+      "invoicesNote": "Your last 24 invoices, newest first. For an older invoice, contact SchoolOS support."
     },
     "audit": {
       "title": "Audit log",
@@ -634,7 +635,8 @@
       "closedNote": "This ticket is closed. Open a new ticket if you still need help.",
       "backToList": "Back to all tickets",
       "priorityLine": "Priority: {priority}",
-      "home": "Home"
+      "home": "Home",
+      "pagesLabel": "Pages of tickets"
     }
   },
   "platform": {
@@ -1141,7 +1143,8 @@
       "suspendUnknownConsequence": "A school on the shared platform is suspended too, so staff can't sign in until you reactivate the subscription. For a dedicated school only the subscription changes.",
       "examWindowOverride": "Today is inside a protected board-exam window and I approve this suspension as platform owner",
       "reactivateBody": "Overdue invoices must be paid first. A school suspended for non-payment can sign in again straight away.",
-      "overrideReason": "Reason for the negotiated price"
+      "overrideReason": "Reason for the negotiated price",
+      "pagesLabel": "Pages of subscriptions"
     },
     "invoices": {
       "title": "Invoices",
