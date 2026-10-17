@@ -11,6 +11,7 @@ series.
 
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 from collections import defaultdict
 from collections.abc import Sequence
@@ -24,7 +25,7 @@ from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.core.ids import new_id
 from app.documents import service as documents
 from app.fees import _common as c
-from app.fees import ledger, receipts, templates
+from app.fees import ledger, receipts, refund_hooks, templates
 from app.fees import repository as repo
 from app.fees.models import Adjustment, Concession, Receipt, ReceiptCancellation, Refund
 from app.fees.money import ZERO, group_indian, in_words, percent_of, spread, total
@@ -784,8 +785,10 @@ def request_refund(
     session: Session, ctx: UserContext, receipt_id: uuid.UUID, data: RefundCreate
 ) -> RefundOut:
     """Ask for a refund against an issued receipt (``fee.refund.request``): at most what it took
-    less refunds already asked for or paid (409 ``refund_exceeds_paid``). Online receipts are
-    refunded through the payment provider (a later wave): 409 ``payments_not_connected``."""
+    less refunds already asked for or paid (409 ``refund_exceeds_paid``). An online (Razorpay)
+    receipt is refunded only to the original method through the school's connected account
+    (422 ``original_method_only``; 409 ``payments_not_connected``); ``original_method`` is only
+    for online receipts (422 ``original_method_online_only``). FR-FEE-013, FR-PAY-011."""
     c.require_on(session, ctx)
     c.require_school_wide(ctx, c.REFUND_REQUEST)
     reason = c.clean_reason("reason", data.reason)
@@ -793,11 +796,16 @@ def request_refund(
     if receipt.status != "issued":
         raise receipts.ReceiptCancelled()
     if receipt.mode == "razorpay":
-        raise Conflict(
-            "Online payments are refunded through the school's payment account, which is not "
-            "connected yet.",
-            code="payments_not_connected",
-        )
+        if data.mode != "original_method":
+            raise ValidationFailed([c.error("mode", "original_method_only")])
+        if not refund_hooks.can_refund_online(session):
+            raise Conflict(
+                "Online payments are not connected for this school, so the payment cannot be "
+                "refunded online. Connect the school's Razorpay account first.",
+                code="payments_not_connected",
+            )
+    elif data.mode == "original_method":
+        raise ValidationFailed([c.error("mode", "original_method_online_only")])
     details: dict[str, str] = {}
     if data.mode == "cheque":
         if not data.mode_details.cheque_number:
@@ -871,10 +879,12 @@ def approve_refund(
     *,
     expected_version: int | None,
 ) -> RefundOut:
-    """Approve a cash, cheque or bank-transfer refund (``fee.refund.approve``, step-up, not the
-    requester): in one transaction the voucher takes the next number of its own series
+    """Approve a refund (``fee.refund.approve``, step-up, not the requester). Cash, cheque and
+    bank transfer: in one transaction the voucher takes the next number of its own series
     (``RFD/2026-27/0001``), its content is frozen and the ``refund`` ledger entries are posted,
-    dated today (409 ``day_closed``)."""
+    dated today (409 ``day_closed``). Online (``original_method``): the decision is recorded and
+    the refund is sent to the provider by the worker; the voucher and ledger entries follow the
+    provider's confirmation (FR-PAY-011)."""
     c.require_on(session, ctx)
     c.require_school_wide(ctx, c.REFUND_APPROVE)
     c.require_recent_mfa(ctx)
@@ -890,9 +900,93 @@ def approve_refund(
             "The refund is more than this receipt took and was not refunded yet.",
             code="refund_exceeds_paid",
         )
+    if row.mode == "original_method":
+        return _approve_online_refund(session, ctx, row, receipt, note)
     account = _account_for(session, receipt.account_id)
     today = c.today(session)
     c.ensure_day_open(session, today)
+    row = write_voucher(
+        session,
+        row,
+        receipt,
+        today,
+        decision=_decision_values(ctx, session, "processed", note),
+        posted_by=ctx.membership_id,
+    )
+    c.record(
+        session,
+        action="fee.refund.approved",
+        resource_type="fee_refund",
+        resource_id=row.id,
+        summary={
+            "voucher_number": row.voucher_number,
+            "receipt_number": receipt.receipt_number,
+            "amount": c.money_text(row.amount),
+            "mode": row.mode,
+            "requested_by": row.requested_by,
+        },
+    )
+    _notify_decided(
+        session,
+        kind="refund",
+        request_id=row.id,
+        account_id=account.id,
+        requester=row.requested_by,
+        decision="approved",
+    )
+    return _refund_out(session, row, receipt)
+
+
+def _approve_online_refund(
+    session: Session, ctx: UserContext, row: Refund, receipt: Receipt, note: str | None
+) -> RefundOut:
+    if not refund_hooks.can_refund_online(session):
+        raise Conflict(
+            "Online payments are not connected for this school, so the payment cannot be "
+            "refunded online. Connect the school's Razorpay account first.",
+            code="payments_not_connected",
+        )
+    with c.db_errors():
+        row = repo.update_refund(session, row.id, _decision_values(ctx, session, "approved", note))
+    refund_hooks.queue_online_refund(session, row.id)
+    c.record(
+        session,
+        action="fee.refund.approved",
+        resource_type="fee_refund",
+        resource_id=row.id,
+        summary={
+            "receipt_number": receipt.receipt_number,
+            "amount": c.money_text(row.amount),
+            "mode": row.mode,
+            "requested_by": row.requested_by,
+        },
+    )
+    _notify_decided(
+        session,
+        kind="refund",
+        request_id=row.id,
+        account_id=receipt.account_id,
+        requester=row.requested_by,
+        decision="approved",
+    )
+    return _refund_out(session, row, receipt)
+
+
+def write_voucher(
+    session: Session,
+    row: Refund,
+    receipt: Receipt,
+    today: dt.date,
+    *,
+    decision: dict[str, Any] | None,
+    posted_by: uuid.UUID | None,
+) -> Refund:
+    """The voucher of a refund in the caller's transaction (FR-FEE-013): the next number of its
+    own series, frozen content and the ``refund`` ledger entries, dated ``today``. The caller
+    locked the receipt and checked the day. ``decision`` carries the approval fields when the
+    voucher is written at approval (cash, cheque, bank transfer); online refunds were decided
+    before and are written when the provider confirms them."""
+    account = _account_for(session, receipt.account_id)
     parts = _refund_parts(session, receipt, row.amount)
     financial_year = c.fy(today)
     numbering = c.settings().numbering.refund
@@ -915,7 +1009,7 @@ def approve_refund(
             session,
             row.id,
             {
-                **_decision_values(ctx, session, "processed", note),
+                **(decision or {"status": "processed"}),
                 "financial_year": financial_year,
                 "voucher_no": number,
                 "voucher_number": voucher_number,
@@ -939,33 +1033,12 @@ def approve_refund(
                     "entry_date": today,
                     "receipt_id": receipt.id,
                     "refund_id": row.id,
-                    "posted_by": ctx.membership_id,
+                    "posted_by": posted_by,
                 }
                 for inst_no, head_id, part in parts
             ],
         )
-    c.record(
-        session,
-        action="fee.refund.approved",
-        resource_type="fee_refund",
-        resource_id=row.id,
-        summary={
-            "voucher_number": voucher_number,
-            "receipt_number": receipt.receipt_number,
-            "amount": c.money_text(row.amount),
-            "mode": row.mode,
-            "requested_by": row.requested_by,
-        },
-    )
-    _notify_decided(
-        session,
-        kind="refund",
-        request_id=row.id,
-        account_id=account.id,
-        requester=row.requested_by,
-        decision="approved",
-    )
-    return _refund_out(session, row, receipt)
+    return row
 
 
 def reject_refund(

@@ -50,6 +50,7 @@ def _load(name: str, path: Path) -> ModuleType:
 
 
 F = _load("sos_test_fees_support", _HERE.with_name("support.py"))
+P = _load("sos_test_fees_online_support", _HERE.with_name("online_support.py"))
 W = F.W
 
 Request = tuple[str, dict[str, Any] | None, dict[str, str]]
@@ -60,7 +61,7 @@ _days = itertools.count(1)
 
 
 def is_fee_path(path: str) -> bool:
-    return path.startswith("/api/v1/fees/") or path.endswith("/fee-accounts")
+    return path.startswith(("/api/v1/fees/", "/api/v1/payments/")) or path.endswith("/fee-accounts")
 
 
 @contextlib.contextmanager
@@ -327,6 +328,147 @@ def _day_close(w: Any, r: str, a: Engine) -> Request:
     return "/api/v1/fees/day-closes", {"date": str(day)}, {}
 
 
+# --- R2-2D online payments (school A connected with synthetic manual keys) ----------------------
+
+
+def _connection_live(w: Any) -> bool:
+    return bool(
+        F.scalar(
+            _ADMIN_ENGINE[0],
+            "SELECT count(*) FROM fin.payment_connections WHERE tenant_id = :t "
+            "AND status = 'active'",
+            t=w.a.tenant_id,
+        )
+    )
+
+
+_ADMIN_ENGINE: list[Engine] = []
+
+
+def _connected(w: Any, a: Engine) -> None:
+    """School A has an active Razorpay connection (fake provider, synthetic keys)."""
+    F.install()
+    _ADMIN_ENGINE[:] = [a]
+    if not _connection_live(w):
+        P.connect(w.a)  # the caller has fees on for school A
+
+
+def _disconnected(w: Any, a: Engine) -> None:
+    del a
+    F.install()
+    P.disconnect_if_connected(w.a)
+
+
+def _open_intent(w: Any, a: Engine) -> uuid.UUID:
+    _connected(w, a)
+    value: uuid.UUID = P.link(w.a, _account(w), [2]).id
+    return value
+
+
+def _open_item(w: Any) -> uuid.UUID:
+    from app.core.db import tenant_session
+    from app.fees import online
+
+    with tenant_session(w.a.tenant_id) as s:
+        online.open_exception(
+            s,
+            kind="paid_not_receipted",
+            reason="no_receipt",
+            dedupe=f"matrix{next(_seq)}{uuid.uuid4().hex[:8]}",
+        )
+        value: object = s.execute(
+            __import__("sqlalchemy").text(
+                "SELECT id FROM fin.reconciliation_items WHERE status = 'open' "
+                "ORDER BY created_at DESC LIMIT 1"
+            )
+        ).scalar_one()
+    return uuid.UUID(str(value))
+
+
+def _create_link(w: Any, r: str, a: Engine) -> Request:
+    _connected(w, a)
+    return f"/api/v1/fees/accounts/{_account(w)}/payment-intents", {"instalments": [2]}, {}
+
+
+def _online_specs() -> dict[tuple[str, str], Builder]:
+    def connected(path: str, body: dict[str, Any] | None = None) -> Builder:
+        def build(w: Any, r: str, a: Engine) -> Request:
+            _connected(w, a)
+            return path, body, {}
+
+        return build
+
+    def manual(w: Any, r: str, a: Engine) -> Request:
+        _disconnected(w, a)
+        return (
+            "/api/v1/payments/connection/manual",
+            {"key_id": P.key_id(), "key_secret": "synthetic-matrix-secret"},
+            {},
+        )
+
+    return {
+        ("GET", "/api/v1/payments/connection"): connected("/api/v1/payments/connection"),
+        ("POST", "/api/v1/payments/connection/manual"): manual,
+        ("POST", "/api/v1/payments/connection/oauth/start"): connected(
+            "/api/v1/payments/connection/oauth/start"
+        ),
+        ("POST", "/api/v1/payments/connection/oauth/callback"): connected(
+            "/api/v1/payments/connection/oauth/callback",
+            {"code": "synthetic-code", "state": "s" * 43},
+        ),
+        ("POST", "/api/v1/payments/connection/test"): connected("/api/v1/payments/connection/test"),
+        ("POST", "/api/v1/payments/connection/rotate-webhook-secret"): connected(
+            "/api/v1/payments/connection/rotate-webhook-secret"
+        ),
+        ("DELETE", "/api/v1/payments/connection"): connected("/api/v1/payments/connection"),
+        ("POST", "/api/v1/fees/accounts/{account_id}/payment-intents"): _create_link,
+        ("GET", "/api/v1/fees/accounts/{account_id}/payment-intents"): lambda w, r, a: (
+            f"/api/v1/fees/accounts/{_account(w)}/payment-intents",
+            None,
+            {},
+        ),
+        ("GET", "/api/v1/fees/payment-intents/{intent_id}"): lambda w, r, a: (
+            "/api/v1/fees/payment-intents/"
+            + str(_shared(w, "fees_matrix_intent", lambda: _open_intent(w, a))),
+            None,
+            {},
+        ),
+        ("POST", "/api/v1/fees/payment-intents/{intent_id}/cancel"): lambda w, r, a: (
+            f"/api/v1/fees/payment-intents/{_open_intent(w, a)}/cancel",
+            None,
+            {},
+        ),
+        ("GET", "/api/v1/fees/reconciliation/online"): lambda w, r, a: (
+            "/api/v1/fees/reconciliation/online",
+            None,
+            {},
+        ),
+        ("GET", "/api/v1/fees/reconciliation/online/summary"): lambda w, r, a: (
+            "/api/v1/fees/reconciliation/online/summary",
+            None,
+            {},
+        ),
+        (
+            "POST",
+            "/api/v1/fees/reconciliation/online/items/{recon_item_id}/explain",
+        ): lambda w, r, a: (
+            f"/api/v1/fees/reconciliation/online/items/{_open_item(w)}/explain",
+            {"note": "Synthetic matrix explanation note"},
+            {},
+        ),
+    }
+
+
+# Routes whose guard passes for its holders but whose service refuses in tests (no partner
+# application configured: 409 oauth_not_available).
+ONLINE_REFUSED = frozenset(
+    {
+        ("POST", "/api/v1/payments/connection/oauth/start"),
+        ("POST", "/api/v1/payments/connection/oauth/callback"),
+    }
+)
+
+
 def matrix_specs() -> dict[tuple[str, str], Builder]:
     """One builder per fee route (school A)."""
     acc = _account
@@ -496,6 +638,7 @@ def matrix_specs() -> dict[tuple[str, str], Builder]:
         ("POST", "/api/v1/fees/day-closes"): _day_close,
         ("GET", "/api/v1/fees/dues"): g(lambda w, a: "/api/v1/fees/dues"),
         ("GET", "/api/v1/fees/dues.csv"): g(lambda w, a: "/api/v1/fees/dues.csv"),
+        **_online_specs(),
     }
 
 
@@ -509,6 +652,9 @@ MATRIX_CREATES = frozenset(
         "/api/v1/fees/accounts/{account_id}/concessions",
         "/api/v1/fees/accounts/{account_id}/adjustments",
         "/api/v1/fees/receipts/{receipt_id}/refunds",
+        # R2-2D
+        "/api/v1/payments/connection/manual",
+        "/api/v1/fees/accounts/{account_id}/payment-intents",
     }
 )
 
@@ -574,6 +720,24 @@ def b_objects(admin: Engine, w: Any) -> dict[str, uuid.UUID]:
                 RefundCreate(amount=Decimal("1.00"), mode="cash", reason=REASON),
             ).id,
         }
+        # R2-2D: a payment link and a reconciliation item of school B.
+        P.connect(w.b)
+        out["intent_id"] = P.link(w.b, account_id, [2], role="accountant").id
+        from app.core.db import tenant_session
+        from app.fees import online
+
+        with tenant_session(w.b.tenant_id) as s:
+            online.open_exception(s, kind="paid_not_receipted", reason="no_receipt", dedupe="bolab")
+            out["recon_item_id"] = uuid.UUID(
+                str(
+                    s.execute(
+                        __import__("sqlalchemy").text(
+                            "SELECT id FROM fin.reconciliation_items WHERE dedupe_key = "
+                            "'paid_not_receipted:bolab'"
+                        )
+                    ).scalar_one()
+                )
+            )
     _B[w.b.tenant_id] = out
     _ = key
     return out
@@ -611,6 +775,11 @@ BOLA_BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
         "amount": "1.00",
         "reason_code": "other",
         "reason": REASON,
+    },
+    ("POST", "/api/v1/fees/accounts/{account_id}/payment-intents"): {"instalments": [1]},
+    ("POST", "/api/v1/fees/payment-intents/{intent_id}/cancel"): None,
+    ("POST", "/api/v1/fees/reconciliation/online/items/{recon_item_id}/explain"): {
+        "note": "Synthetic BOLA explanation note"
     },
     **{
         ("POST", f"/api/v1/fees/{plural}/{{{param}}}/{action}"): (

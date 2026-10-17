@@ -1,0 +1,14 @@
+{
+  "entity": "event",
+  "account_id": "acc_SYNTHETIC0001",
+  "event": "account.app.authorization_revoked",
+  "contains": [],
+  "payload": {
+    "account_id": "acc_SYNTHETIC0001",
+    "app": {
+      "id": "SYNTHETICAPP0001",
+      "title": "SchoolOS"
+    }
+  },
+  "created_at": 1790000100
+}

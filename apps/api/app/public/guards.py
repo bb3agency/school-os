@@ -240,6 +240,22 @@ def _seen_before(provider: WebhookProvider, event_id: str) -> bool:
     return not fresh
 
 
+def forget_event(provider: WebhookProvider, event_id: str) -> None:
+    """Release an event id claimed by the replay check when the route could not store the
+    event (it answers 5xx, so the provider retries and the retry must not look like a replay).
+    Best effort: an unreachable store leaves the claim to expire."""
+    digest = hashlib.sha256(f"{provider}|{event_id}".encode()).hexdigest()
+    try:
+        kv_store().delete(f"{_REPLAY_PREFIX}{digest}")
+    except KVUnavailable:
+        log.warning(
+            "security.webhook.replay_release_failed",
+            resource_type="webhook",
+            action=provider,
+            error_code="kv_unavailable",
+        )
+
+
 class RequireWebhookSignature:
     """Dependency of a provider webhook route (see the module docstring)."""
 
@@ -360,6 +376,7 @@ __all__ = [
     "RequirePublicHandle",
     "RequireWebhookSignature",
     "WebhookCaller",
+    "forget_event",
     "require_meta_verify_token",
     "require_public_handle",
     "require_webhook_signature",

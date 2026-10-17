@@ -1494,6 +1494,8 @@ source_modules =
 forbidden_modules =
     app.fees.repository
     app.fees.models
+    app.fees.online_repository
+    app.fees.online_models
 allow_indirect_imports = True
 
 # Money, configuration and print templates stay pure (no database, web or feature modules), so
@@ -1504,6 +1506,7 @@ type = forbidden
 source_modules =
     app.fees.money
     app.fees.config
+    app.fees.payments_config
     app.fees.templates
 forbidden_modules =
     sqlalchemy
@@ -1517,3 +1520,31 @@ forbidden_modules =
     app.ops
     app.students
     app.documents
+
+# --- R2-2D online payments (ADR-0042 decision 3; FR-PAY-001): only app.fees.providers talks to
+# a payment provider (egress allowlist api.razorpay.com, auth.razorpay.com); the rest of the
+# fees module never imports an HTTP client.
+[importlinter:contract:fees-provider-egress]
+name = fees: only providers/ make HTTP calls to a payment provider
+type = forbidden
+source_modules =
+    app.fees.api
+    app.fees.api_online
+    app.fees.service
+    app.fees.online
+    app.fees.online_repository
+    app.fees.online_models
+    app.fees.online_schemas
+    app.fees.links
+    app.fees.refund_hooks
+    app.fees.webhook
+    app.fees.tasks
+    app.fees.tasks_online
+    app.fees.receipts
+    app.fees.approvals
+    app.fees.repository
+    app.fees.models
+forbidden_modules =
+    httpx
+    requests
+allow_indirect_imports = True

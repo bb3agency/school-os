@@ -286,6 +286,8 @@ The sub-processor register (§1) lists them in a separate block **"Providers the
 
 ### 15.3 Notice, DPIA and records of processing (additions)
 
+**Online payments as built (R2-2D, 2026-10-18).** Razorpay is the **school's own** payment provider (the school is its merchant and has its own agreement with it); SchoolOS acts on the school's instructions in the school's account and never receives the money. Razorpay receives from SchoolOS only the amount, the intent id and a description with the school's short name and an 8-character code (no student or parent name, phone, email or class). What Razorpay sends back (payer contact, email, VPA, card, bank) is dropped before the webhook event is stored; the inbox keeps ids, statuses and amounts, encrypted with the school's key, for 90 days after processing (PRV-024 keeps receipts and vouchers 8 years). Provider payments keep no payer identifier. Notes explaining reconciliation items are stored with the item and never logged or audited.
+
 - **School's notice to parents (PRV-001):** add fee collection (purpose, the school's payment provider, retention), WhatsApp messages (categories, how to join and stop, that the school's own number and Meta are used), parent links (lifetime, do not forward), certificate verification.
 - **DPIA (§10) inputs:** WhatsApp as a channel (Meta's processing, metadata, forwarding), parent link exposure, payment data flows (none through SchoolOS), opt-in evidence, the public verification page.
 - **Records of processing (§11):** new rows for fees and receipts (legal basis: the school's legitimate use for its services and accounting; retention 8 years), parent messaging (consent recorded per category), parent pages, certificate verification.

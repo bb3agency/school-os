@@ -818,6 +818,9 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "concession_id": lambda w: _b_fee(w, "concession_id"),
     "adjustment_id": lambda w: _b_fee(w, "adjustment_id"),
     "refund_id": lambda w: _b_fee(w, "refund_id"),
+    # R2-2D online payments: a payment link and a reconciliation item of school B.
+    "intent_id": lambda w: _b_fee(w, "intent_id"),
+    "recon_item_id": lambda w: _b_fee(w, "recon_item_id"),
 }
 
 

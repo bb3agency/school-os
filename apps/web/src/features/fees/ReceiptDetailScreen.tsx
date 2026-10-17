@@ -60,7 +60,7 @@ const refundSchema = z.object({
     .string()
     .trim()
     .refine((v) => (toPaise(v) ?? 0) > 0, { error: "invalidAmount" }),
-  mode: z.enum(["cash", "cheque", "bank_transfer"]),
+  mode: z.enum(["original_method", "cash", "cheque", "bank_transfer"]),
   reason,
 });
 
@@ -287,14 +287,11 @@ export function ReceiptDetailScreen({ receiptId }: { receiptId: string }) {
                       )}
                     </ActionDialog>
                   ) : null}
-                  {r.status === "issued" &&
-                  refundable > 0 &&
-                  can(REFUND_REQUEST) &&
-                  r.mode !== "razorpay" ? (
+                  {r.status === "issued" && refundable > 0 && can(REFUND_REQUEST) ? (
                     <ActionDialog
                       triggerLabel={t("requestRefund")}
                       title={t("refundTitle")}
-                      description={t("refundBody")}
+                      description={r.mode === "razorpay" ? t("refundOnlineBody") : t("refundBody")}
                       confirmLabel={t("requestRefund")}
                       consequence={t("refundConsequence")}
                       schema={refundSchema}
@@ -322,7 +319,10 @@ export function ReceiptDetailScreen({ receiptId }: { receiptId: string }) {
                             name="mode"
                             label={t("refundMode")}
                             error={errors.mode}
-                            options={(["cash", "cheque", "bank_transfer"] as const).map((v) => ({
+                            options={(r.mode === "razorpay"
+                              ? (["original_method"] as const)
+                              : (["cash", "cheque", "bank_transfer"] as const)
+                            ).map((v) => ({
                               value: v,
                               label: tf(`modes.${v}`),
                             }))}
