@@ -166,6 +166,8 @@ EXPECTED_TABLES = {
     "document_acl",
     "certificates",
     "certificate_counters",
+    # R2-1A (0056_certificate_verifications, ADR-0045): printed verification codes.
+    "certificate_verifications",
     # R1 (0051_apaar_consent_pen, ADR-0039): the APAAR consent register and form language.
     "apaar_consents",
     "apaar_consent_settings",
