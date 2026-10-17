@@ -221,10 +221,32 @@ def _check_transition(previous: str | None, status: ConsentStatus) -> None:
         )
 
 
+def _date_problems(
+    session: Session, decided_on: dt.date | None, current_on: dt.date | None
+) -> list[dict[str, str]]:
+    """The date on the form: not in the future, not too early, not before the current
+    decision (audit 2026-10-17 L-08)."""
+    if decided_on is None:
+        return []
+    if decided_on > _today(session):
+        return [_error("decided_on", "date_in_future")]
+    if decided_on < settings().earliest_decision:
+        return [_error("decided_on", "date_too_early")]
+    if current_on is not None and decided_on < current_on:
+        return [_error("decided_on", "before_current_decision")]
+    return []
+
+
 def _check_decision(
-    session: Session, ctx: UserContext, student_id: uuid.UUID, data: ConsentIn
+    session: Session,
+    ctx: UserContext,
+    student_id: uuid.UUID,
+    data: ConsentIn,
+    current_on: dt.date | None = None,
 ) -> tuple[str | None, uuid.UUID | None]:
-    """Field rules of a decision (422 per field). Returns (relationship, guardian_id)."""
+    """Field rules of a decision (422 per field). Returns (relationship, guardian_id).
+    ``current_on``: the date of the current decision; a new one may not predate it (the
+    latest entry is the current state; audit 2026-10-17 L-08)."""
     problems: list[dict[str, str]] = []
     relationship: str | None = data.relationship
     guardian_id = data.guardian_id
@@ -242,11 +264,7 @@ def _check_decision(
             problems.append(_error("relationship", "missing"))
         if data.decided_on is None:
             problems.append(_error("decided_on", "missing"))
-    if data.decided_on is not None:
-        if data.decided_on > _today(session):
-            problems.append(_error("decided_on", "date_in_future"))
-        elif data.decided_on < settings().earliest_decision:
-            problems.append(_error("decided_on", "date_too_early"))
+    problems.extend(_date_problems(session, data.decided_on, current_on))
     if data.status == "given" and data.evidence_document_id is None:
         # PRV-021: consent is recorded only with the signed form.
         problems.append(_error("evidence_document_id", "signed_form_required"))
@@ -275,7 +293,8 @@ def record_consent(
     Errors: 404 outside scope; 409 ``consent_not_given`` (withdrawn without a given consent),
     ``consent_already_decided`` (pending after a decision); 422 per field (``relationship`` /
     ``decided_on`` missing, ``signed_form_required``, ``evidence_document_id`` / ``guardian_id``
-    ``not_found``, ``date_in_future``, ``aadhaar_full_number_rejected``). Audit
+    ``not_found``, ``date_in_future``, ``before_current_decision`` (dated before the current
+    decision), ``aadhaar_full_number_rejected``). Audit
     ``apaar.consent.recorded`` (ids, statuses and codes only). A change into or out of ``refused``
     or ``withdrawn`` re-checks the student's APAAR readiness findings (data-quality event)."""
     _reach_student(session, ctx, student_id, (RECORD,))
@@ -289,7 +308,9 @@ def record_consent(
     previous_status = previous.status if previous is not None else None
     _check_transition(previous_status, data.status)
     note = _clean_note(data.note)
-    relationship, guardian_id = _check_decision(session, ctx, student_id, data)
+    relationship, guardian_id = _check_decision(
+        session, ctx, student_id, data, previous.decided_on if previous is not None else None
+    )
     with _db_errors():
         row = repo.insert(
             session,

@@ -212,6 +212,27 @@ def test_FR_APC_006_refusal_queues_an_apaar_readiness_recheck(
     assert {"student_ids": [str(sid)], "attribute_keys": ["apaar_consent"]} in events
 
 
+def test_L_08_a_decision_may_not_predate_the_current_one(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """The latest entry is the current state (FR-APC-002), so a decision dated before the
+    current one would put an older form on top: a withdrawal dated before the consent it
+    withdraws, or an old refusal found later. Same-day decisions are fine."""
+    admin = world.person("office_admin")
+    sid = A.student(world.a)
+    doc = A.signed_form(admin_engine, world.a, admin)
+    assert A.record(api, admin, sid, A.given(doc, decided_on="2026-08-01")).status_code == 201
+    early = {"status": "withdrawn", "relationship": "mother", "decided_on": "2026-07-01"}
+    res = A.record(api, admin, sid, early)
+    assert res.status_code == 422, res.text
+    assert res.json()["errors"][0]["field"] == "decided_on"
+    assert res.json()["errors"][0]["code"] == "before_current_decision"
+    assert A.record(api, admin, sid, A.refused(decided_on="2026-07-20")).status_code == 422
+    same_day = {"status": "withdrawn", "relationship": "mother", "decided_on": "2026-08-01"}
+    assert A.record(api, admin, sid, same_day).status_code == 201
+    assert len(A.consent_rows(admin_engine, sid)) == 2
+
+
 def test_L_01_withdrawal_and_new_consent_queue_an_apaar_readiness_recheck(
     world: Any, api: Any, admin_engine: Engine
 ) -> None:
