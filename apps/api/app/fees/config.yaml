@@ -1,0 +1,64 @@
+# Fee ledger and receipts rules (R2-1B; ADR-0042; docs/03 §3.20; docs/05 §15.1). Versioned
+# configuration shipped inside the package (invariant 13). Read by app/fees/config.py.
+version: 1
+
+# Per-school feature flag (platform.feature_flags, operators). Fees are on for a school only
+# when this flag is on AND the school setting `fees_enabled` is true (owner or principal,
+# PATCH /tenant; FR-FEE-001). Unknown flag = off: every /fees route answers 404 module_hidden.
+flag: fees.enabled
+
+# Numbering (ADR-0042 decision 4, P2; owner decision D17): one gap-free series per school and
+# financial year (April-March) for every mode; refund vouchers have their own series.
+# Placeholders: {series} {fy} {no}. The result must match receipts_number_shape (≤ 40 chars).
+numbering:
+  receipt: {series: RCT, format: "{series}/{fy}/{no:06d}"}
+  refund: {series: RFD, format: "{series}/{fy}/{no:04d}"}
+  # The financial year starts on this month (India: April).
+  financial_year_start_month: 4
+
+# Printed receipts (FR-FEE-011): A5 by default (D17), A4 per school (fin.fee_settings).
+receipt:
+  default_paper_size: A5
+  default_gst_note: "Education services: exempt from GST"
+  template_version: v1
+  # Roles that may open the stored receipt PDF as a document (fee permissions only, FR-FEE-024).
+  document_acl_roles: [owner, principal, office_admin, office_staff, accountant, auditor_readonly]
+  download_url_ttl_s: 300
+
+limits:
+  # Largest single amount anywhere in fees (₹1 crore); amounts have exactly two decimals.
+  max_amount: "10000000.00"
+  max_heads: 40
+  max_heads_per_plan: 30
+  max_instalments: 24
+  max_plan_students: 2000         # one class applied in one transaction
+  max_concession_targets: 300
+  reason_min_length: 10
+  reason_max_length: 1000
+  counter_matches: 8              # students shown while typing at the counter (docs/17 §5.8)
+  list_max: 200
+  dues_max_rows: 5000             # CSV rows of one dues download
+
+# Mode details typed at the counter (FR-FEE-010, FR-FEE-014). UTRs and bank references are typed
+# fields shown unmasked in that field only (a 12-digit reference can pass the Verhoeff check);
+# every free-text field keeps the Aadhaar refusal (PRV-015).
+modes:
+  utr_pattern: "^[0-9]{12}$"
+  bank_reference_pattern: "^[A-Za-z0-9]{12,22}$"
+  cheque_number_pattern: "^[0-9]{6}$"
+  bank_name_max_length: 80
+
+# Late fees (FR-FEE-009; ADR-0042 P5, D18): never compounding; each posting keyed once.
+late_fees:
+  # Most per-day postings one nightly run catches up for one instalment (missed nights).
+  max_catch_up_days: 400
+
+# Day close (FR-FEE-019): a day can be closed up to this many days back (not in the future).
+day_close:
+  max_days_back: 31
+
+# Purge and retention (docs/05 §13; owner decision D21): fee records are kept 8 years after the
+# financial year ends; no automatic deletion before that exists yet (the first deletions are due
+# in 2035), so no purge job is scheduled in R2. Offboarding deletes them after the export.
+retention:
+  financial_years_kept: 8
