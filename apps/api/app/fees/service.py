@@ -14,7 +14,9 @@ FR-FEE-001..014, FR-FEE-018..030). Other modules call only this module.
   print anything; :func:`account_summary` is information for holders of ``finance.read``.
 
 Internal modules: ``setup`` (settings, heads, plans), ``ledger`` (accounts and dues),
-``receipts``, ``approvals`` (maker-checker requests), ``late_fees``, ``reports``.
+``receipts``, ``approvals`` (maker-checker requests), ``late_fees``, ``reports``; R2-2E:
+``upi`` (UPI settings, QR, UTR check, report) and ``statements`` (bank statements, proposals,
+UPI confirmations, exceptions).
 """
 
 from __future__ import annotations
@@ -29,9 +31,10 @@ from app.core import purge as purging
 from app.core.errors import Conflict
 from app.core.records import RecordTable
 from app.fees import _common as c
-from app.fees import approvals, ledger, receipts, reports, setup
+from app.fees import approvals, ledger, receipts, reports, setup, statements, upi
 from app.fees import late_fees as late
 from app.fees import repository as repo
+from app.fees import upi_repository as upi_repo
 from app.fees._common import (
     COLLECT,
     CONCESSION_APPROVE,
@@ -39,6 +42,7 @@ from app.fees._common import (
     MANAGE,
     READ,
     RECEIPT_CANCEL,
+    RECONCILE,
     REFUND_APPROVE,
     REFUND_REQUEST,
     REPORT,
@@ -113,6 +117,24 @@ dues_list = reports.dues_list
 dues_csv = reports.dues_csv
 
 post_late_fees = late.post_for_school
+
+# R2-2E UPI and bank statements (ADR-0042 decision 9; FR-FEE-014..017)
+get_upi_settings = upi.get_settings
+put_upi_settings = upi.put_settings
+upi_qr_svg = upi.qr_image
+check_utr = upi.check_utr
+upi_report = upi.report
+upi_exception_counts = upi.exception_counts
+statement_presets = statements.presets
+import_statement = statements.import_statement
+list_statements = statements.list_statements
+get_statement = statements.get_statement
+confirm_statement = statements.confirm
+match_line = statements.match
+ignore_line = statements.ignore
+rematch = statements.rematch
+upi_exceptions = statements.exceptions
+erase_statement_narrations = statements.erase_old_narrations
 
 
 # --- data contract for other modules (R2-2F Ask, R2-3G sending, R2-3H parent pages) -------------
@@ -214,6 +236,12 @@ def create_payment_intent(
     raise PaymentsNotConnected()
 
 
+def upi_payee(session: Session) -> tuple[str, str, str] | None:
+    """The school's ``(payee name, UPI ID, upi:// URI)`` for the parent dues page (R2-3H) or
+    ``None`` when not set. No permission check: the caller decides. The QR encodes the URI."""
+    return upi.payee(session)
+
+
 def receipt_issued_event() -> str:
     """Outbox event written in the issuing transaction (payload: ``receipt_id``,
     ``account_id``, ``user_id``); the PDF render consumes it today, the receipt message later."""
@@ -226,13 +254,18 @@ def receipt_issued_event() -> str:
 def export_records(session: Session) -> list[RecordTable]:
     """Worker only: every fees table of the current school for its full data export
     (FR-FEE-027; the caller checked ``tenant.export_all`` and audits the export)."""
-    return repo.export_tables(session)
+    return repo.export_tables(session) + upi_repo.export_tables(session)
 
 
 # Children before parents (migration 0058_fees_core). Registered with app.tenancy at import;
 # purged before students, documents, the academic structure and the members they reference.
 _PURGE = purging.PurgeTables(
     deleted=(
+        # R2-2E (0060_fees_upi): confirmations and statement lines reference receipts
+        "fin.upi_confirmations",
+        "fin.bank_statement_lines",
+        "fin.bank_statement_imports",
+        "fin.upi_settings",
         "fin.day_closes",
         "fin.ledger_entries",
         "fin.refunds",
@@ -276,6 +309,7 @@ __all__ = [
     "MANAGE",
     "READ",
     "RECEIPT_CANCEL",
+    "RECONCILE",
     "REFUND_APPROVE",
     "REFUND_REQUEST",
     "RENDER_EVENT",
@@ -292,4 +326,5 @@ __all__ = [
     "export_records",
     "purge_tenant_data",
     "tenant_data_counts",
+    "upi_payee",
 ]

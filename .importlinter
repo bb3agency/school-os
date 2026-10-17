@@ -1494,6 +1494,9 @@ source_modules =
 forbidden_modules =
     app.fees.repository
     app.fees.models
+    # R2-2E UPI and bank statements
+    app.fees.upi_repository
+    app.fees.upi_models
 allow_indirect_imports = True
 
 # Money, configuration and print templates stay pure (no database, web or feature modules), so
@@ -1505,6 +1508,10 @@ source_modules =
     app.fees.money
     app.fees.config
     app.fees.templates
+    # R2-2E: statement presets, the statement reader and the UPI QR test without a database
+    app.fees.upi_config
+    app.fees.statements_parse
+    app.fees.upi_qr
 forbidden_modules =
     sqlalchemy
     fastapi

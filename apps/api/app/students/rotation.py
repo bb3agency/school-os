@@ -111,6 +111,9 @@ CIPHERTEXT_COLUMNS: Final[tuple[tuple[str, str], ...]] = (
     # registers their re-encryption, and refreshes opt-in phone indexes in the same pass).
     ("msg.messages", "vars_ciphertext"),
     ("msg.provider_events", "payload_ciphertext"),
+    # R2-2E (0060_fees_upi): bank statement narrations (app.fees registers their re-encryption;
+    # erased after 90 days).
+    ("fin.bank_statement_lines", "narration_ciphertext"),
 )
 
 # Ciphertext-looking columns that are NOT under a tenant DEK, with the reason.

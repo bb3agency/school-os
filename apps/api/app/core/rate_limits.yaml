@@ -218,6 +218,11 @@ routes:
   GET /api/v1/fees/reports/daily.csv: [exports]
   GET /api/v1/fees/dues.csv: [exports]
   POST /api/v1/fees/plans/{plan_id}/apply: [heavy_jobs]
+  # R2-2E UPI and bank statements: statement import like other sheet uploads; matching again
+  # and the counter's UTR check are searches; the QR is a small render
+  POST /api/v1/fees/bank-statements: [imports]
+  POST /api/v1/fees/bank-statements/rematch: [heavy_jobs]
+  POST /api/v1/fees/upi/utr-check: [search]
   # support tickets
   POST /api/v1/support/tickets: [support_tickets]
   POST /api/v1/platform/support/tickets: [support_tickets]

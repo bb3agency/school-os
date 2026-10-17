@@ -44,6 +44,7 @@ RECEIPT_CANCEL: Final = "fee.receipt.cancel"
 REFUND_REQUEST: Final = "fee.refund.request"
 REFUND_APPROVE: Final = "fee.refund.approve"
 REPORT: Final = "fee.report"
+RECONCILE: Final = "fee.reconcile"  # R2-2E: bank statements and UPI confirmations
 ALL_PERMISSIONS: Final = (
     READ,
     COLLECT,
@@ -54,6 +55,7 @@ ALL_PERMISSIONS: Final = (
     REFUND_REQUEST,
     REFUND_APPROVE,
     REPORT,
+    RECONCILE,
 )
 AADHAAR_CODE: Final = "aadhaar_full_number_rejected"
 AADHAAR_DETAIL: Final = "Don't enter Aadhaar numbers. Enter only the last 4 digits."
@@ -255,6 +257,7 @@ __all__ = [
     "MANAGE",
     "READ",
     "RECEIPT_CANCEL",
+    "RECONCILE",
     "REFUND_APPROVE",
     "REFUND_REQUEST",
     "REPORT",

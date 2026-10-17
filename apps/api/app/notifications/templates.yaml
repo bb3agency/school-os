@@ -386,6 +386,15 @@ templates:
     te:
       title: "మీ ఆమోదం కోసం {kind, select, concession {ఫీజు రాయితీ} adjustment {ఫీజు సర్దుబాటు} cancellation {రసీదు రద్దు} refund {ఫీజు వాపసు} other {ఫీజు అభ్యర్థన}} వేచి ఉంది"
       body: "ఒక {kind, select, concession {ఫీజు రాయితీ} adjustment {ఫీజు సర్దుబాటు} cancellation {రసీదు రద్దు} refund {ఫీజు వాపసు} other {ఫీజు అభ్యర్థన}} రెండవ వ్యక్తి ఆమోదం కోసం వేచి ఉంది. ఫీజులు > ఆమోదాలు తెరిచి చూసి ఆమోదించండి లేదా తిరస్కరించండి."
+  # R2-2E (FR-FEE-017, FR-FEE-026): each morning to fee.reconcile holders, counts only.
+  fee.upi_exceptions:
+    params: [unconfirmed, credits]
+    en:
+      title: "UPI payments to check against the bank"
+      body: "{unconfirmed, plural, =0 {No UPI receipt is waiting} one {# UPI receipt is not yet seen in a bank statement} other {# UPI receipts are not yet seen in a bank statement}} and {credits, plural, =0 {no bank credit needs matching} one {# bank credit needs matching} other {# bank credits need matching}}. Open Fees > Reconcile, import the latest bank statement and confirm the matches."
+    te:
+      title: "బ్యాంకుతో సరిచూడాల్సిన UPI చెల్లింపులు"
+      body: "{unconfirmed, plural, =0 {ఏ UPI రసీదూ వేచి లేదు} one {# UPI రసీదు ఇంకా బ్యాంకు స్టేట్‌మెంట్‌లో కనిపించలేదు} other {# UPI రసీదులు ఇంకా బ్యాంకు స్టేట్‌మెంట్‌లో కనిపించలేదు}}, {credits, plural, =0 {సరిపోల్చాల్సిన బ్యాంకు జమ ఏదీ లేదు} one {# బ్యాంకు జమను సరిపోల్చాలి} other {# బ్యాంకు జమలను సరిపోల్చాలి}}. ఫీజులు > సరిపోల్చడం తెరిచి, తాజా బ్యాంకు స్టేట్‌మెంట్ దిగుమతి చేసి సరిపోలికలను నిర్ధారించండి."
   fee.request_decided:
     params: [request_id, kind, account_id, decision]
     resource_type: fee_request

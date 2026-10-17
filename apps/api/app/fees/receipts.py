@@ -34,6 +34,7 @@ from app.documents import service as documents
 from app.fees import _common as c
 from app.fees import ledger, setup, templates
 from app.fees import repository as repo
+from app.fees import upi_repository as upi_repo
 from app.fees.models import Receipt, ReceiptCancellation, Refund
 from app.fees.money import group_indian, in_words, spread, total
 from app.fees.schemas import (
@@ -454,6 +455,11 @@ def receipt_out(session: Session, row: Receipt) -> ReceiptOut:
         refunded=refunded_amount(refunds),
         refunds=[refund_out(r, row.receipt_number, names) for r in refunds],
         version=row.version,
+        bank_confirmed_at=(
+            upi_repo.confirmation_times(session, [row.id]).get(row.id)
+            if row.mode == "upi_qr"
+            else None
+        ),
     )
 
 

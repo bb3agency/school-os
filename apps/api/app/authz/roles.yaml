@@ -135,6 +135,8 @@ roles:
       fee.refund.request: school
       fee.refund.approve: school_step_up
       fee.report: school_step_up
+      # R2-2E UPI and bank statements (ADR-0042 decision 9)
+      fee.reconcile: school
 
   office_admin:
     name_en: Office admin
@@ -242,6 +244,8 @@ roles:
       fee.refund.request: school
       fee.refund.approve: school_step_up
       fee.report: school_step_up
+      # R2-2E UPI and bank statements (ADR-0042 decision 9)
+      fee.reconcile: school
 
   exam_coordinator:
     name_en: Exam coordinator

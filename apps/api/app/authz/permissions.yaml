@@ -326,6 +326,12 @@ permissions:
     description: Download the day book and dues lists (bulk personal financial data; recent MFA sign-in)
     sensitivity: sensitive
     step_up: true
+  # --- R2-2E UPI and bank statements (ADR-0042 decision 9; FR-FEE-016/017). Migration
+  # 0060_fees_upi upserts it. School-wide only (FR-FEE-024).
+  fee.reconcile:
+    description: Import bank statements, confirm UPI receipts seen in the bank and work through reconciliation exceptions
+    sensitivity: sensitive
+    step_up: false
   # --- control plane (docs/07 §6.5, contract §5); never grantable to tenant roles ------------
   platform.tenants.read:
     description: See schools, their plan, status, deployment and usage (no student data)
