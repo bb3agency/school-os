@@ -105,11 +105,14 @@ class Dues:
 
     @property
     def overdue(self) -> Decimal:
-        return sum((o.due for _, o in self.lines if o.overdue), ZERO)
+        """Overdue amounts SchoolOS collects (taxable heads are invoiced in Tally, FR-FEE-023)."""
+        return sum((o.due for _, o in self.lines if o.overdue and o.collectable), ZERO)
 
     @property
     def oldest_due_on(self) -> dt.date | None:
-        dates = [o.due_on for _, o in self.lines if o.overdue and o.due_on is not None]
+        dates = [
+            o.due_on for _, o in self.lines if o.overdue and o.collectable and o.due_on is not None
+        ]
         return min(dates) if dates else None
 
     def totals(self) -> AccountTotals:

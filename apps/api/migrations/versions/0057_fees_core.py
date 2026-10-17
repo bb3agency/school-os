@@ -422,7 +422,7 @@ CREATE TABLE fin.concessions (
   CONSTRAINT concessions_maker_checker CHECK (decided_by IS NULL OR decided_by <> requested_by),
   CONSTRAINT concessions_decision CHECK (
     (status IN ('approved','rejected')) = (decided_by IS NOT NULL)
-    AND (decided_at IS NULL) = (status = 'pending')
+    AND (decided_at IS NULL) = (status IN ('pending','withdrawn'))
     AND (status <> 'rejected' OR decision_note IS NOT NULL)
     AND (decision_note IS NULL OR char_length(decision_note) BETWEEN 10 AND 1000)),
   CONSTRAINT concessions_total CHECK ((status = 'approved') = (total_amount IS NOT NULL)
@@ -478,7 +478,7 @@ CREATE TABLE fin.adjustments (
   CONSTRAINT adjustments_maker_checker CHECK (decided_by IS NULL OR decided_by <> requested_by),
   CONSTRAINT adjustments_decision CHECK (
     (status IN ('approved','rejected')) = (decided_by IS NOT NULL)
-    AND (decided_at IS NULL) = (status = 'pending')
+    AND (decided_at IS NULL) = (status IN ('pending','withdrawn'))
     AND (status <> 'rejected' OR decision_note IS NOT NULL)
     AND (decision_note IS NULL OR char_length(decision_note) BETWEEN 10 AND 1000)),
   CONSTRAINT adjustments_version_positive CHECK (version >= 1)
@@ -698,7 +698,7 @@ CREATE TABLE fin.receipt_cancellations (
     CHECK (decided_by IS NULL OR decided_by <> requested_by),
   CONSTRAINT receipt_cancellations_decision CHECK (
     (status IN ('approved','rejected')) = (decided_by IS NOT NULL)
-    AND (decided_at IS NULL) = (status = 'pending')
+    AND (decided_at IS NULL) = (status IN ('pending','withdrawn'))
     AND (status <> 'rejected' OR decision_note IS NOT NULL)
     AND (decision_note IS NULL OR char_length(decision_note) BETWEEN 10 AND 1000)
     AND (status = 'approved') = (cancelled_on IS NOT NULL)),
