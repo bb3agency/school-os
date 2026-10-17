@@ -54,8 +54,11 @@ def test_FR_CERT_010_task_renders_once(school: Any, admin_engine: Engine) -> Non
     try:
         payload = _payload(cert.id, school.tenant_id)
         assert tasks.render.apply(kwargs=payload).get() == "ready"
-        # Delivered twice (at-least-once): nothing happens the second time.
-        assert tasks.render.apply(kwargs=payload).get() == "ready"
+        # Delivered twice (at-least-once): the same event is skipped (L-14), and a new event
+        # for a rendered certificate changes nothing either.
+        assert tasks.render.apply(kwargs=payload).get() is None
+        again = {**payload, "event_id": str(uuid.uuid4())}
+        assert tasks.render.apply(kwargs=again).get() == "ready"
     finally:
         pdf.set_renderer(None)
     assert len(renderer.pages) == 1

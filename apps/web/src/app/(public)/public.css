@@ -92,3 +92,129 @@ a:focus-visible {
   outline: 3px solid var(--public-accent);
   outline-offset: 2px;
 }
+
+/* --- R2-1A certificate verification (/v; ADR-0045; docs/17 §5.8) --------------------------- */
+
+.public-card h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.125rem;
+}
+
+.public-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.public-form label {
+  font-weight: 600;
+}
+
+.public-input {
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--public-muted);
+  border-radius: 0.5rem;
+  font: inherit;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 1.125rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.public-input[aria-invalid="true"] {
+  border-color: #a4262c;
+}
+
+.public-input:focus-visible,
+.public-button:focus-visible {
+  outline: 3px solid var(--public-accent);
+  outline-offset: 2px;
+}
+
+.public-button {
+  min-height: 44px;
+  padding: 0.5rem 1.25rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: var(--public-accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.public-error {
+  color: #a4262c;
+  font-weight: 600;
+}
+
+/* Colour is never the only signal: each banner says its status in words. */
+.public-banner {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid;
+  border-radius: 0.75rem;
+  font-weight: 600;
+}
+
+.public-banner-green {
+  background: #e6f4ea;
+  border-color: #1e7e34;
+  color: #14532d;
+}
+
+.public-banner-amber {
+  background: #fff4e0;
+  border-color: #a15c00;
+  color: #6b3d00;
+}
+
+.public-banner-red {
+  background: #fdecea;
+  border-color: #a4262c;
+  color: #7a1c20;
+}
+
+.public-facts,
+.public-lines {
+  margin: 0.75rem 0 0;
+}
+
+.public-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1rem;
+}
+
+.public-facts dt,
+.public-lines dt {
+  color: var(--public-muted);
+}
+
+.public-facts dd,
+.public-lines dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.public-lines div {
+  display: grid;
+  gap: 0.125rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--public-line);
+}
+
+@media (min-width: 40rem) {
+  .public-lines div {
+    grid-template-columns: 16rem 1fr;
+    gap: 1rem;
+  }
+}
+
+.public-code {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  letter-spacing: 0.06em;
+}

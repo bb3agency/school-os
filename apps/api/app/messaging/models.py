@@ -1,4 +1,4 @@
-"""Messaging tables in schema ``msg`` (migration 0058_messaging_core; docs/05 §15.3; ADR-0043).
+"""Messaging tables in schema ``msg`` (migration 0057_messaging_core; docs/05 §15.3; ADR-0043).
 
 Models describe tables for typed queries only; DDL (RLS, grants, triggers, composite FKs into
 ``sis.guardians``, ``sis.students``, ``kb.documents``, ``core.public_handles`` and

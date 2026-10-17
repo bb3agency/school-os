@@ -1,4 +1,4 @@
-"""Database access for messaging (0058_messaging_core; docs/05 §15.3; ADR-0043).
+"""Database access for messaging (0057_messaging_core; docs/05 §15.3; ADR-0043).
 
 Callers inside ``app.messaging`` only. Every function runs in a ``core.db.tenant_session``: RLS
 limits each statement to that school. ``msg.optins`` is append-only for the app role (INSERT and

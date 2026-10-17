@@ -47,6 +47,7 @@ from app.core.logging import get_context
 from app.tenancy import offboarding
 from app.tenancy import repository as repo
 from app.tenancy.schemas import (
+    RESTRICTED_TC_FIELDS,
     AcademicYearCreate,
     AcademicYearOut,
     AcademicYearUpdate,
@@ -1080,6 +1081,13 @@ def update_tenant_settings(
     if "parent_language" in fields:
         # ADR-0044, FR-LANG-001: the language parents receive is audited with its value.
         summary["parent_language"] = merged.parent_language
+    # R2-1A (ADR-0045; FR-CERT-015, FR-CERT-018): the TC format and the restricted-fields switch
+    # are audited with their values, the switch also with the field keys it prints.
+    if "certificate_format" in fields:
+        summary["certificate_format"] = merged.certificate_format.model_dump(mode="json")
+    if "print_restricted_tc_fields" in fields:
+        summary["print_restricted_tc_fields"] = merged.print_restricted_tc_fields
+        summary["restricted_tc_fields"] = list(RESTRICTED_TC_FIELDS)
     _audit(
         session,
         action="tenant.settings_updated",

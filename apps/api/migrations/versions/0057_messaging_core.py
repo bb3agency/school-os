@@ -42,14 +42,11 @@ The permission catalog gets ``messaging.configure`` (step-up), ``messaging.optin
 ``message.read`` (rows written out here, like 0051). Role grants of existing schools need the
 post-migration system-role sync (ADR-0022).
 
-``down_revision`` is ``0055_public_handles`` while waves R2-1A (0056) and R2-1B (0057) are built
-in parallel; the merge re-chains it (docs/14 R2 "Migration numbers").
-
 Expand-only (invariant 12). Downgrade drops the tables (lossy: messaging accounts, opt-in
 records, message history) and removes the new catalog keys no role holds.
 
-Revision ID: 0058_messaging_core
-Revises: 0055_public_handles
+Revision ID: 0057_messaging_core
+Revises: 0056_certificate_verifications
 Create Date: 2026-10-17
 """
 
@@ -58,8 +55,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0058_messaging_core"
-down_revision = "0055_public_handles"
+revision = "0057_messaging_core"
+down_revision = "0056_certificate_verifications"
 branch_labels = None
 depends_on = None
 

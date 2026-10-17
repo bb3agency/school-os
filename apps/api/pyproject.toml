@@ -62,9 +62,11 @@ dependencies = [
   # no runtime Python dependencies; no known vulnerabilities (PyPI + OSV, 2026-09-27); 5.13.0 is
   # the current release (2026-08-13, roughly monthly releases). trivy/pip-audit cover the wheel.
   "pypdfium2==5.13.0",
-  # QR codes on printed WhatsApp join slips (R2-1C, FR-MSG-009; app/messaging/slips.py), rendered
-  # as inline SVG. Licence BSD-3-Clause; pure Python, no runtime dependencies; no known
-  # vulnerabilities (PyPI + OSV, 2026-10-17). Wave R2-1A (certificate QR codes) can reuse it.
+  # QR codes printed on certificates (ADR-0045 decision 4, FR-CERT-020; CLAUDE.md §11 licence
+  # check): pure Python, no runtime dependencies, renders an inline SVG path (no image files,
+  # no network). Licence BSD-3-Clause; maintained (1.6.6 released 2025-03); no known
+  # vulnerabilities (PyPI/OSV, 2026-10-17). Imported only by app/certificates/qr.py.
+  # Also used by app/messaging/slips.py for the WhatsApp join-slip QR codes (R2-1C, FR-MSG-009).
   "segno==1.6.6",
 ]
 

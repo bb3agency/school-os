@@ -74,6 +74,8 @@ from app.knowledge import (
     sources,
 )
 from app.knowledge import repository as repo
+from app.knowledge import resolve as resolving
+from app.knowledge import usage as ai_usage
 from app.knowledge.answer import (
     Answer,
     AskContext,
@@ -160,7 +162,10 @@ from app.knowledge.schemas import (
     MemorySettingsOut,
     MessageCitationOut,
     MessageOut,
+    ResolveOut,
+    SearchOnlyReason,
     SearchResultOut,
+    UsageOut,
     VerifiedAnswerIn,
     VerifiedAnswerOut,
     VerifiedAnswerReviewIn,
@@ -190,6 +195,22 @@ QUERIES_TABLE: Final = "kb.queries"
 MAX_QUESTION_CHARS: Final = 1000
 INTERNAL_ERROR: Final = "internal_error"
 INTERNAL_ERROR_KEY: Final = "kb.errors.internal"
+_SEARCH_ONLY_REASONS: Final[dict[str, SearchOnlyReason]] = {
+    "ai_budget_exhausted": "ai_budget_exhausted",
+    "ai_disabled": "ai_disabled",
+    "ai_rate_limited": "ai_rate_limited",
+}
+"""Stored error codes that name their own reason; every other provider failure reads
+``ai_unavailable`` (docs/09 Knowledge error codes), and none at all ``answer_unchecked``."""
+
+
+def search_only_reason(mode: str, error: str | None) -> SearchOnlyReason | None:
+    """Why a stored answer is search-only (FR-KB-041); None for a full answer."""
+    if mode != "search_only":
+        return None
+    if error is None:
+        return "answer_unchecked"
+    return _SEARCH_ONLY_REASONS.get(error, "ai_unavailable")
 
 
 def _error(field: str, code: str) -> dict[str, str]:
@@ -883,6 +904,7 @@ class SchoolKnowledgeService:
             superseded=row.superseded_by is not None,
             cached=row.cached_from is not None,
             summarized=row.summarized,
+            search_only_reason=search_only_reason(row.mode, row.error),
         )
 
     def get_conversation(
@@ -1197,6 +1219,23 @@ class SchoolKnowledgeService:
             request_id=ctx.request_id,
         )
         return self.memory_settings(session, ctx)
+
+    # --- usage and source links (R2.4; FR-KB-040, FR-KB-042) --------------------------------
+
+    def usage(
+        self, session: Session, ctx: UserContext, *, now: dt.datetime | None = None
+    ) -> UsageOut:
+        """This IST month's state for everyone with ``kb.ask``; the billable answer count and
+        the bundle's included answers only for ``tenant.billing.read`` holders."""
+        if not ctx.has(ASK):
+            raise Forbidden()
+        return ai_usage.school_usage(
+            session, ctx, runtime=self.runtime, now=now or dt.datetime.now(dt.UTC)
+        )
+
+    def resolve_source(self, session: Session, ctx: UserContext, source: str) -> ResolveOut:
+        """Where a ``sos://`` source opens, if the caller can see it now (404 otherwise)."""
+        return resolving.resolve(ctx, source, self._visibility(session, ctx))
 
     # --- search-only ------------------------------------------------------------------------
 

@@ -1,8 +1,8 @@
-"""0058_messaging_core: model/database agreement, grants, triggers and a populated round trip
+"""0057_messaging_core: model/database agreement, grants, triggers and a populated round trip
 (CLAUDE.md §6.1, §6.7, §6.12; docs/05 §15.3; ADR-0043; FR-MSG-008, FR-MSG-016, FR-MSG-023).
 
 A fresh database is migrated to head, seeded with a synthetic school (``seed-synthetic``) and
-given messaging rows (account, settings, an opt-in, a message, an inbox event); head -> 0055 ->
+given messaging rows (account, settings, an opt-in, a message, an inbox event); head -> 0056 ->
 head must succeed with that data present: the msg tables and catalog keys go, the student records
 are untouched, and the upgrade brings the empty tables back.
 """
@@ -34,7 +34,7 @@ from app.messaging import models
 
 pytestmark = pytest.mark.db
 DB = "schoolos_messaging_migration"
-REVISION = "0058_messaging_core"
+REVISION = "0057_messaging_core"
 SETTINGS = Settings(
     env=Environment.CI,
     key_wrapper=KeyWrapperKind.LOCAL_DEV,
@@ -211,7 +211,7 @@ def test_FR_MSG_016_status_trigger_and_account_secret_checks(populated: _Walk) -
 def test_CLAUDE_6_12_messaging_migration_reversible_with_data(populated: _Walk) -> None:
     admin = populated.admin
     before = ScriptDirectory.from_config(populated.cfg).get_revision(REVISION).down_revision
-    assert before == "0055_public_handles"
+    assert before == "0056_certificate_verifications"
     _seed(admin)
     students = _scalar(admin, "SELECT count(*) FROM sis.students")
     guardians = _scalar(admin, "SELECT count(*) FROM sis.guardians")

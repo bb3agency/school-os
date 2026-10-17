@@ -265,6 +265,42 @@ def test_FR_TEN_011_undo_restores_everything_within_24_hours(
     assert _call(api, school, "commit", pair, json=P.body(pair)).status_code == 201
 
 
+def test_L_02_undo_refused_when_a_graduates_pen_is_on_a_live_record(
+    school: Any, api: Any, admin_engine: Engine
+) -> None:
+    """A graduate frees its PEN (FR-STU-018). If a live record took that PEN since the commit,
+    undoing the graduation would leave two live records with one PEN: refused."""
+    pair = P.year_pair(school)
+    graduate = P.enrolled(school, pair.section("from", "X"), name="Synthetica Graduate")
+    pen = "7" + uuid.uuid4().int.__str__()[:10]
+    admin = school.people["office_admin"]
+    recorded = api.call(
+        admin,
+        "POST",
+        f"/api/v1/students/{graduate}/values",
+        json={"attribute_key": "udise_pen", "source": "udise_plus", "value": pen},
+    )
+    assert recorded.status_code == 201, recorded.text
+    assert _call(api, school, "commit", pair, json=P.body(pair)).status_code == 201
+    assert _status(admin_engine, graduate) == "graduated"
+    again = api.call(
+        admin,
+        "POST",
+        "/api/v1/students",
+        json={
+            "values": [
+                {"attribute_key": "full_name", "source": "admission_register", "value": "Again"},
+                {"attribute_key": "udise_pen", "source": "tc_incoming", "value": pen},
+            ]
+        },
+    )
+    assert again.status_code == 201, again.text
+    res = _call(api, school, "undo", pair)
+    assert res.status_code == 409, res.text
+    assert res.json()["code"] == "promotion_has_dependents"
+    assert _status(admin_engine, graduate) == "graduated"
+
+
 def test_FR_TEN_011_undo_refused_when_an_enrolment_changed(
     school: Any, api: Any, admin_engine: Engine
 ) -> None:

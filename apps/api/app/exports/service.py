@@ -501,7 +501,11 @@ def request_precheck(session: Session, ctx: UserContext, data: PrecheckCreate) -
         )
     _require_step_up(ctx)
     reach = (DQ_READ, SENSITIVE) if data.include_sensitive else (DQ_READ,)
-    ids = _students_for(session, ctx, data.scope, permissions=reach)
+    ids = dq.board_students(
+        session, profile.key, _students_for(session, ctx, data.scope, permissions=reach)
+    )
+    if not ids:  # every student follows another board here (FR-TEN-021, L-10)
+        raise _invalid("scope", "no_students")
     sensitive: list[str] = []
     if data.include_sensitive:
         classes = _exportable_columns(session, load_config())
@@ -916,7 +920,7 @@ def download_url(
     if row.status != "ready":
         raise Conflict("The export is not ready yet. Try again shortly.", code="export_not_ready")
     now = repo.now(session)
-    if row.expires_at is not None and row.expires_at <= now:
+    if _expired(session, row, now):
         raise Conflict(
             "This export's files were deleted (exports are kept for a few days). Make a new one.",
             code="export_expired",
@@ -1468,7 +1472,6 @@ def run_export(
 
 
 def _complete(tenant_id: uuid.UUID, snap: _Snapshot, built: _Built) -> str:
-    cfg = load_config()
     with _worker_session(tenant_id, snap.requested_by) as session:
         row = repo.get_export(session, snap.id, lock=True)
         if row is None or row.status not in LIVE:
@@ -1490,7 +1493,7 @@ def _complete(tenant_id: uuid.UUID, snap: _Snapshot, built: _Built) -> str:
             )
         repo.insert_files(session, rows)
         now = repo.now(session)
-        keep = retention.days(session, RETENTION_CATEGORY, default=cfg.retention_days)
+        keep = _retention_days(session)
         repo.update_export(
             session,
             snap.id,
@@ -1542,6 +1545,22 @@ def _complete(tenant_id: uuid.UUID, snap: _Snapshot, built: _Built) -> str:
 # --- retention ------------------------------------------------------------------------------------
 
 
+def _retention_days(session: Session) -> int:
+    """How long this school keeps export files now (FR-ADM-002; bounds in
+    ``app/admin/retention.yaml``, at least one day)."""
+    days = retention.days(session, RETENTION_CATEGORY, default=load_config().retention_days)
+    return max(days, 1)
+
+
+def _expired(session: Session, row: Export, now: dt.datetime) -> bool:
+    """Past the expiry set when the files were made, or past the school's current retention
+    when it was shortened since (audit 2026-10-17 L-13)."""
+    if row.expires_at is not None and row.expires_at <= now:
+        return True
+    keep = dt.timedelta(days=_retention_days(session))
+    return row.finished_at is not None and row.finished_at + keep <= now
+
+
 def purge_expired(tenant_id: uuid.UUID, *, now: dt.datetime | None = None) -> int:
     """Daily: delete the files of this school's exports 7 days after they were ready (and the
     leftovers of failed ones); the rows stay as the record (docs/05 §13). Audited per export
@@ -1549,7 +1568,13 @@ def purge_expired(tenant_id: uuid.UUID, *, now: dt.datetime | None = None) -> in
     purged = 0
     with _worker_session(tenant_id) as session:
         at = now or repo.now(session)
-        for row in repo.due_for_purge(session, now=at, failed_before=at - FAILED_ORPHAN_AGE):
+        keep = _retention_days(session)
+        for row in repo.due_for_purge(
+            session,
+            now=at,
+            failed_before=at - FAILED_ORPHAN_AGE,
+            ready_before=at - dt.timedelta(days=keep),
+        ):
             deleted = documents.delete_export_files(session, row.id)
             repo.update_export(
                 session,

@@ -361,6 +361,10 @@ budget:
   bundle:
     cost_per_answer_usd: "0.06"
     overage_headroom_fraction: 0.5
+    # kb.queries statuses counted as billable answers (ADR-0038 decision 4) by GET
+    # /knowledge/usage (FR-KB-040). Keep equal to app/platform/billing.yaml
+    # ai_answers.billable_statuses, which the control plane bills from (a test pins them).
+    billable_statuses: [answered]
   reservation:
     input_tokens: 16000              # 12k tool results + system prompt, tools, question, history
     ttl_s: 600                        # abandoned reservations lapse; > timeout x 3 attempts + backoff

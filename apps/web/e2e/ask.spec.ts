@@ -171,8 +171,35 @@ test.describe("Ask the school: chat, keyboard and axe (stand-in IdP)", () => {
     ).toBeVisible();
     await expect(answer.getByText("Dasara holidays run")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Save as verified answer" })).toHaveCount(0);
+    // FR-KB-041: the page banner now says answers are limited, why, and what to do.
+    const banner = page.getByTestId("ask-usage-banner");
+    await expect(banner.getByText("Ask shows matching passages only")).toBeVisible();
+    await expect(banner.getByText(/Full answers return when the month resets/)).toBeVisible();
     await expectNoAxeViolations(page, "ask search-only");
     await expectNoHorizontalOverflow(page, "ask search-only");
+    // After a reload the stored answer still says why it is search-only (search_only_reason).
+    await page.reload();
+    const stored = page.getByRole("article", { name: "Answer" });
+    await expect(stored.getByText(/AI budget for this month is used up/)).toBeVisible();
+  });
+
+  test("usage meter and near-limit notice for billing readers, dismissed by keyboard", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await signIn(page, "/ask", "clerk");
+    const meter = page.getByTestId("ask-usage-meter");
+    await expect(meter.getByText("812 of 1,000 answers this month")).toBeVisible();
+    await expect(meter.getByText("Near your monthly answers")).toBeVisible();
+    await expect(page.getByRole("meter", { name: "AI answers used this month" })).toBeVisible();
+    const banner = page.getByTestId("ask-usage-banner");
+    await expect(banner.getByText("Near your monthly AI answers")).toBeVisible();
+    await expectNoAxeViolations(page, "ask usage");
+    const dismiss = page.getByRole("button", { name: "Dismiss: Near your monthly AI answers" });
+    await dismiss.focus();
+    await page.keyboard.press("Enter");
+    await expect(banner).toHaveCount(0);
+    await expect(meter).toBeVisible();
   });
 
   test("All chats: find, pin, rename and delete by keyboard", async ({ page }) => {

@@ -107,7 +107,7 @@ CIPHERTEXT_COLUMNS: Final[tuple[tuple[str, str], ...]] = (
     ("kb.user_memories", "text_ciphertext"),
     ("sis.behaviour_notes", "body_ciphertext"),
     ("sis.flag_actions", "note_ciphertext"),
-    # R2-1C (0058_messaging_core): message variables and the provider inbox (app.messaging
+    # R2-1C (0057_messaging_core): message variables and the provider inbox (app.messaging
     # registers their re-encryption, and refreshes opt-in phone indexes in the same pass).
     ("msg.messages", "vars_ciphertext"),
     ("msg.provider_events", "payload_ciphertext"),

@@ -574,6 +574,18 @@ def earlier_questions(
     return [(r.id, bytes(r.question_ciphertext)) for r in rows]
 
 
+def count_answers(
+    session: Session, *, start: dt.datetime, end: dt.datetime, statuses: Sequence[str]
+) -> int:
+    """The current school's questions in ``[start, end)`` whose status is one of ``statuses``
+    (the billable answers of ``GET /knowledge/usage``; the same rule as the control plane's
+    daily ``platform.usage.ai_counts_on``). A count only: no question, answer or person."""
+    stmt = select(func.count()).where(
+        Query.created_at >= start, Query.created_at < end, Query.status.in_(list(statuses))
+    )
+    return int(session.execute(stmt).scalar_one())
+
+
 def get_query_of_user(
     session: Session, query_id: uuid.UUID, user_id: uuid.UUID, *, for_update: bool = False
 ) -> Query | None:

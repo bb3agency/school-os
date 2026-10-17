@@ -84,6 +84,7 @@ Budgets are versioned in `apps/api/app/core/rate_limits.yaml` (invariant 13); th
 | `public_lookup_fail` | 20 / 600 s, cost 2 per failed lookup | client IP | closed | public handle guards: room checked before every lookup (refuses even a valid key once used up), charged after a miss (R2-0) |
 | `public_token` | 30 / 60 s | handle | open | public handle guards, per live handle (R2-0) |
 | `public_pay` | 5 / 86400 s | handle | closed | `POST /public/links/current/pay` (R2-3H) |
+| `cert_verify_ip` | 20 / 600 s | client IP | closed | `GET /public/certificates/{code}`, every lookup, charged before the guard resolves the code (ADR-0045 decision 7; R2-1A) |
 | `webhook_route` | 600 / 60 s | handle | closed | webhook guard, per route handle after the signature check; `/api/v1/webhooks/*` also get `machine_ip` (R2-0) |
 | `platform_audit_verify` | `rate_limits.yaml` (1 / 600 s) | operator | open | `POST /platform/audit/verify` (R-19) |
 
@@ -174,7 +175,7 @@ The active school is sent by the BFF as `X-Active-Tenant`. A user with several m
 | POST | `/students/{id}/values` | `student.update_nonidentity` | Non-identity attributes, or adding a source observation; identity changes → change requests |
 | POST | `/students/{id}/sensitive-reveal` | `student.read_sensitive` | Returns one C3 field; audited |
 | GET/POST | `/students/{id}/guardians` | read_basic / update_nonidentity | |
-| PATCH | `/students/{id}` | `student.update_nonidentity` | Record status (`active`, `left`, `graduated`, `provisional`); `If-Match` required |
+| PATCH | `/students/{id}` | `student.update_nonidentity` | Record status (`active`, `left`, `graduated`, `provisional`); `If-Match` required. Making a left or graduated record active or provisional again answers `422 national_id_in_use` (field `status`) while another live record holds its PEN or APAAR ID (FR-STU-018) |
 | POST | `/students/{id}/values/{value_id}/verify` | `student.update_nonidentity` | `{"status": "verified"\|"rejected"}` for the current value of a non-identity attribute; identity values → change requests (`403 identity_change_required`); superseded value → `409 value_superseded` |
 | PATCH | `/students/{id}/guardians/{guardian_id}` | `student.update_nonidentity` | Name, phone, address (C3, encrypted), relationship, primary flag; `If-Match` with the guardian's ETag |
 | DELETE | `/students/{id}/guardians/{guardian_id}` | `student.update_nonidentity` | Unlink (`204`); `If-Match` with the guardian's ETag (`412` when stale). A guardian no other student is linked to is deleted with their phone and address. Audit `guardian.unlinked` (+ `guardian.deleted`) |
@@ -204,7 +205,7 @@ Promotions notes (M1, FR-TEN-011, US-202 AC2; owner decisions 2026-09-27; as bui
 | Method | Path | Permission | Notes |
 |---|---|---|---|
 | GET | `/students/{id}/apaar-consent` | `apaar.consent.read` or `apaar.consent.record` | `{student_id, status, current, history[], version}`; `status` `pending` until a decision is recorded; `ETag` = number of decisions |
-| POST | `/students/{id}/apaar-consent` | `apaar.consent.record` | Body `{status, relationship?, guardian_id?, decided_on?, form_language?, evidence_document_id?, note?}`. `201` with the new state; `Idempotency-Key`; optional `If-Match` (`412` when stale). `409 consent_not_given` (withdrawn without a given consent), `409 consent_already_decided` (pending after a decision); `422` `signed_form_required`, `missing` (relationship / decided_on), `not_found` (evidence or guardian), `date_in_future`, `date_too_early`, `aadhaar_full_number_rejected` (note). Audit `apaar.consent.recorded` |
+| POST | `/students/{id}/apaar-consent` | `apaar.consent.record` | Body `{status, relationship?, guardian_id?, decided_on?, form_language?, evidence_document_id?, note?}`. `201` with the new state; `Idempotency-Key`; optional `If-Match` (`412` when stale). `409 consent_not_given` (withdrawn without a given consent), `409 consent_already_decided` (pending after a decision); `422` `signed_form_required`, `missing` (relationship / decided_on), `not_found` (evidence or guardian), `date_in_future`, `date_too_early`, `before_current_decision` (dated before the current decision), `aadhaar_full_number_rejected` (note). Audit `apaar.consent.recorded` |
 | GET | `/students/{id}/apaar-consent/form?language=` | read or record | `text/html` A4 page with the consent and refusal options (school's language unless `language` = `en` \| `te`); `Cache-Control: no-store`, CSP style hashes only; audit `apaar.consent_form.printed`; rate limit `render` |
 | GET | `/sections/{section_id}/apaar-consent-forms?status=&language=` | read or record | One A4 page per current-year student of the section (in scope), optionally only one state; `409 no_forms`, `409 too_many_forms` (> 150); audited; rate limit `render` |
 | GET | `/apaar/consents?section_id=&class_id=&status=&limit=&cursor=` | `apaar.consent.read` | `Page[{student_id, display_name, admission_no, class_section, section_id, status, decided_on, has_form, recorded_at, version, has_apaar_id}]`, by class and name; `status=pending` is the follow-up list |
@@ -281,7 +282,7 @@ Certificate notes (M3, as built; data model 05 §5.7). The stories and requireme
   - `?check=true` on a register route only checks that it can be printed now (step-up, year, type, row cap) and answers `204` without the page; it is not audited. The registers screen checks first and then links to the print view, so one view is audited once.
 - **Download** gives `{url, expires_at, filename}` (`attachment`, ≤ 5 min), or `409 pdf_not_ready` / `document_not_ready`. Audited as `certificate.downloaded`.
 - **Scope**: certificates are reached through their student. Holders of a scoped role see only their sections' students. Another school's id, or a student out of scope, gives `404`.
-- **No public verification route** (QR or serial lookup). It would need an ADR (PO question).
+- **Public verification** by code only (no serial lookup): ADR-0045, built in R2-1A; see "Certificates: format and verification" and "Public" in the R2 endpoints below.
 
 ### Imports and extraction
 | Method | Path | Permission |
@@ -373,7 +374,7 @@ Document errors: 413 `file_too_large`; 415 `unsupported_file_type` / `polyglot_s
 | POST | `/knowledge/verified-answers/{id}/review` (`If-Match`; optional `answer_text`, `citations`, `review_due`) | `kb.verified_answer.manage`. Confirms an answer (typically `needs_review`) again: citations (new, else stored) are re-checked against the current versions (422 as on create); becomes `active`, verified by the caller now; `ETag` of the new version. 404 when you cannot read a cited document; 409 `verified_answer_retired`; 409 `reviewer_must_differ` when you drafted the answer (created it, or last changed its text or citations) and another active member holds `kb.verified_answer.manage` (owner decision 2026-10-09); 412 stale `If-Match`. A reviewer who changes `answer_text` or `citations` becomes the drafter. Audited `kb.verified_answer.reviewed` (previous status, changed field names, `self_reviewed`: true when the drafter reviewed it because no one else could) (**built**; FR-KB-030) |
 | POST | `/knowledge/verified-answers/{id}/retire` (`If-Match`) | `kb.verified_answer.manage`. `retired`: never used by Ask again, kept for the record; 409 `verified_answer_retired` when it already is; 404/412 as for review. Audited `kb.verified_answer.retired` (**built**; FR-KB-030) |
 | GET | `/knowledge/conversations` (`limit` ≤ 200, default 50; `cursor`) | `kb.ask`, your own only. `Page[ConversationOut]`: `id`, `title` (decrypted for you), `pinned`, `created_at`, `updated_at` (last message, rename or pin), `message_count` (current messages), `version`; pinned first, then newest activity (**built**; ADR-0034) |
-| GET | `/knowledge/conversations/{id}` | `kb.ask`, your own only (anyone else's, another school's or a deleted one: 404). `ETag`. The conversation plus `messages[]`, oldest first: `query_id`, `question`, `answer` (null while `streaming`, for a cancelled question without text, or when withheld), `answer_withheld`, `status` (`streaming`/`answered`/`not_found`/`refused`/`search_only`/`cancelled`/`error`), `mode`, `language`, `citations[]` (`index`, `source`, `title`, `snippet`, `withheld`), `feedback`, `followups[]`, `created_at`, `superseded`, `cached`, `summarized`. Every cited source is re-checked under your current access; one you can no longer see is `withheld` (no title or snippet) and then that answer and its follow-ups are withheld too (**built**) |
+| GET | `/knowledge/conversations/{id}` | `kb.ask`, your own only (anyone else's, another school's or a deleted one: 404). `ETag`. The conversation plus `messages[]`, oldest first: `query_id`, `question`, `answer` (null while `streaming`, for a cancelled question without text, or when withheld), `answer_withheld`, `status` (`streaming`/`answered`/`not_found`/`refused`/`search_only`/`cancelled`/`error`), `mode`, `language`, `citations[]` (`index`, `source`, `title`, `snippet`, `withheld`), `feedback`, `followups[]`, `created_at`, `superseded`, `cached`, `summarized`, `search_only_reason` (null unless `mode` is `search_only`: `ai_budget_exhausted`, `ai_disabled`, `ai_rate_limited`, `ai_unavailable` (every provider failure), or `answer_unchecked` when the answer failed the output checks; R2.4, FR-KB-041). Every cited source is re-checked under your current access; one you can no longer see is `withheld` (no title or snippet) and then that answer and its follow-ups are withheld too (**built**) |
 | PATCH | `/knowledge/conversations/{id}` (`If-Match`; `title` 1-120 characters and/or `pinned`) | `kb.ask`, your own only. 422 `title_length`, `title_personal_number` (an Aadhaar-like number), `title_control_characters`; 400 `if_match_required`; 412 stale; 404. `ETag`. Audited `kb.conversation.updated` (`changed`, `pinned`, `title_chars`; never the title) (**built**) |
 | DELETE | `/knowledge/conversations/{id}` | `kb.ask`, your own only. 204; hidden at once everywhere (list, context, chat search) and its title and summary erased; its questions stay in the encrypted query log until the 180-day purge (docs/08 §7). 404 for anyone else's or one already deleted. Audited `kb.conversation.deleted` (`messages` count) (**built**) |
 | GET | `/knowledge/memories` | `kb.ask`, your own only. `Page[MemoryOut]` (one page, `next_cursor` null): `id`, `text`, `source` (`explicit`/`suggested`), `status` (`active`/`pending`), `created_at`, `updated_at`, `expires_at` (pending only), `version`; newest first (**built**; ADR-0034) |
@@ -384,7 +385,8 @@ Document errors: 413 `file_too_large`; 415 `unsupported_file_type` / `polyglot_s
 | POST | `/knowledge/memories/{id}/confirm` | `kb.ask`, your own only. A pending suggestion becomes `active` (used from now on); 404 for one expired (24 hours) or anyone else's; 409 `memory_off`. Audited `kb.memory.confirmed` (**built**) |
 | GET | `/knowledge/memory-settings` | `kb.ask`. `{enabled, school_enabled}`: your own switch (on unless you turned it off) and the school's (`ai_memory_enabled` in tenant settings, default on) (**built**) |
 | PUT | `/knowledge/memory-settings` (`enabled`) | `kb.ask`. Your own switch; off: nothing saved, suggested or used, items stay listed. Audited `kb.memory.settings_changed` (**built**) |
-| GET | `/knowledge/resolve?source=sos://…` | permission of the underlying resource (not built) |
+| GET | `/knowledge/resolve?source=sos://…` | `kb.ask` or `document.read` (`require_any`), then the source's own permission and scope. `{kind, id, href}`: `href` app-relative, null for a student count; 404 when you cannot open the source now (malformed, another school's, outside ACL/scope, masked, a retired verified answer, someone else's chat; document pages need `kb.ask` or `document.read`, every other kind `kb.ask`); 422 when `source` is not `sos://…` or longer than 300 characters. Logs nothing (**built** R2.4; FR-KB-042) |
+| GET | `/knowledge/usage` | `kb.ask`. `{month, state, search_only_reason, answers_used, included_answers}`: the IST month (`YYYY-MM`); `state` `ok` / `near_limit` (from 80% of the monthly AI budget or of the bundle's included answers) / `search_only` with `search_only_reason` `ai_budget_exhausted` / `ai_disabled` / `ai_unavailable` (what a question asked now would meet; read-only); `answers_used` (billable answers this month so far, live, ADR-0038 decision 4) and `included_answers` (null without a bundle) only for `tenant.billing.read` holders, null for everyone else. Never tokens or money (**built** R2.4; FR-KB-040) |
 
 #### Knowledge error codes (`kb.errors.*`)
 
@@ -486,7 +488,7 @@ All **built** (modules `app/academics` and `app/insights`, docs/05 §5.8, purpos
 | POST | `/edge/tally/enrol` (`code`, `device` facts) | 201: `device_id`, `key_id`, `secret` (once) (FR-TALLY-001) |
 | GET | `/edge/tally/config` | Selected company and groups, sync interval, `min_agent_version`, rotate-after days (FR-TALLY-004) |
 | PUT | `/edge/tally/catalog` | Company, Tally product/version, groups (names, parents); ≤ 500 groups (FR-TALLY-004) |
-| POST | `/edge/tally/syncs` | One snapshot (`batch_id`, company, `as_of`, parties under selected groups, ≤ 5,000); a repeated `batch_id` gets the first result; 409 `no_groups_selected`, `agent_outdated`; 422 `group_not_selected`, `company_not_selected`, `duplicate_party`, `too_many`, `total_too_large` (FR-TALLY-005) |
+| POST | `/edge/tally/syncs` | One snapshot (`batch_id`, company, `as_of`, parties under selected groups, ≤ 5,000); a repeated `batch_id` gets the first result; 409 `no_groups_selected`, `agent_outdated`, `snapshot_outdated` (its `as_of` is older than the balances already applied for the company; nothing changes, audited `tally.sync.outdated`; audit 2026-10-17 L-12); 422 `group_not_selected`, `company_not_selected`, `duplicate_party`, `too_many`, `total_too_large` (FR-TALLY-005) |
 | POST | `/edge/tally/key-rotation` | New `key_id` and `secret` once; the old key works until the new one is used or 7 days (FR-TALLY-002) |
 
 ### Exports, audit, admin, jobs
@@ -570,11 +572,13 @@ Conventions as above: `Idempotency-Key` on creating POSTs, `If-Match` on changes
 
 | Method | Path | Guard |
 |---|---|---|
-| GET | `/certificates/formats` (format keys, versions, `verified`, fields with `restricted`) | `certificate.read`, `.issue` or `.approve` (`require_any`) |
-| PATCH | `/tenant` with `settings.certificate_format.transfer` = `generic-v1` \| `ap-tc-2027` | `tenant.settings.manage`ᴿ (existing route) |
-| GET | `/certificates/{certificate_id}/verification` (code, created reason, check count, last checked, withdrawn) | as `GET /certificates/{id}` |
-| POST | `/certificates/{certificate_id}/verification` (`{"reason"}`; add a code to a certificate issued before R2) → 201 | `certificate.approve`ᴿ (`Idempotency-Key`); 409 `verification_exists` |
-| POST | `/certificates/{certificate_id}/verification/withdraw` (`{"reason"}`) | `certificate.approve`ᴿ (`If-Match`) |
+| GET | `/certificates/formats` (format keys, versions, `verified`, `builtin`, `sources`, lines with `fill` and `restricted`, inputs) (**built R2-1A**) | `certificate.read`, `.issue` or `.approve` (`require_any`) |
+| PATCH | `/tenant` with `settings.certificate_format.transfer` = `generic-v1` \| `ap-tc-2027` and `settings.print_restricted_tc_fields` (bool, default false); both audited with their values, the switch with `restricted_tc_fields` (**built R2-1A**) | `tenant.settings.manage`ᴿ (existing route) |
+| GET | `/certificates/{certificate_id}/verification` → `{status: active\|withdrawn\|none, code (four groups), url, created_reason, created_at, check_count, last_checked_at, withdrawn_at, withdraw_reason, version, can_add, can_withdraw}`, `ETag` (**built R2-1A**) | as `GET /certificates/{id}` |
+| POST | `/certificates/{certificate_id}/verification` (`{"reason"}` 10..500; add a code to a certificate issued before R2) → 201 (**built R2-1A**) | `certificate.approve`ᴿ (`Idempotency-Key`); 409 `verification_exists` (it has or had a code), `certificate_not_issued` |
+| POST | `/certificates/{certificate_id}/verification/withdraw` (`{"reason"}` 10..500) (**built R2-1A**) | `certificate.approve`ᴿ (`If-Match` = the verification's ETag); 409 `verification_not_active` |
+
+As built (R2-1A): `GET /certificates/types` gives the transfer certificate in the school's format (`format_key`, `format_version`, `format_verified`; inputs carry `label_en`/`label_te`, kind `number` with `max_value`); the preview's `fields` list a format TC's lines in print order with `fill` (`record`, `input`, `derived`, `identifier`, `restricted`) and `masked`; `CertificateOut` carries `format_key`/`format_version`; a pending TC whose format version changed is refused with 409 `certificate_format_changed`. Every issued certificate and duplicate gets a code; the print view and PDF (template `v2`) print it with its QR while `SOS_VERIFY_BASE_URL` is set.
 
 #### Fees (R2.2; FR-FEE-*)
 
@@ -644,14 +648,14 @@ Conventions as above: `Idempotency-Key` on creating POSTs, `If-Match` on changes
 
 | Method | Path | Guard |
 |---|---|---|
-| GET | `/knowledge/usage` → `{month, state, answers_used?, included_answers?}` (numbers only for `tenant.billing.read` holders) | `kb.ask` |
-| GET | `/knowledge/resolve?source=sos://…` (already listed as "not built") → `{kind, id, href}` | permission of the underlying resource; 404 otherwise |
+| GET | `/knowledge/usage` → `{month, state, search_only_reason, answers_used, included_answers}` (numbers only for `tenant.billing.read` holders) | `kb.ask` (**built**, see Knowledge) |
+| GET | `/knowledge/resolve?source=sos://…` → `{kind, id, href}` | `kb.ask` or `document.read`, then the source's own rules; 404 otherwise (**built**, see Knowledge) |
 
 #### Public (R2; FR-PUB-*, FR-CERT-021) — through the BFF with the service token, **no user token**
 
 | Method | Path | Guard |
 |---|---|---|
-| GET | `/public/certificates/{code}` (code normalised: case, spaces and dashes ignored) | `require_public_handle("cert_verify")`; limits `public_ip`, `public_lookup_fail` |
+| GET | `/public/certificates/{code}` → `{status: valid\|cancelled, certificate_type, title_en, school_name, school_place, serial, issued_on, duplicate: {copy_no, original_serial, issued_on}\|null, cancelled_on, content\|null}` (**built R2-1A**; the BFF normalises the code (case, spaces, dashes, `O`→`0`, `I`/`L`→`1`) and sends 16 characters; anything else is the uniform 404; `Cache-Control: private, no-store`, `X-Robots-Tag: noindex, nofollow`; each check counted and audited `certificate.verified_publicly`) | `require_public_handle("cert_verify")` (key from the path); limits `public_ip`, `cert_verify_ip` (before the resolve), `public_lookup_fail`, `public_token` |
 | POST | `/public/links/exchange` (`{"token"}`; the BFF's `/p/{token}` handler calls it and sets the `__Host-sos_parent` cookie) → `{kind, expires_at}` (**built R2-0**; no `handle_ref`: the cookie carries the token itself and the BFF sends it back in `X-SOS-Public-Token`, so every request re-resolves it; not a view) | `require_public_handle(parent_*)`; limits `public_ip`, `public_lookup_fail` |
 | GET | `/public/links/current` (the page content for the cookie's handle: notice, receipt or dues per ADR-0046 decision 2, in the parent language). **Built R2-0 as the frame** `{kind, expires_at, language, school_name}` (counts the view; first view audited); R2-3H adds the content | `require_public_handle(parent_*)` (token from `X-SOS-Public-Token`, re-resolved every time); `public_token` |
 | GET | `/public/links/current/document-url` (notice PDF or receipt PDF, presigned ≤ 5 min) | as above |

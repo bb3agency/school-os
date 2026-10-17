@@ -191,7 +191,7 @@ EXPECTED_TABLES = {
     # Ask memory (0038_ask_conversations, ADR-0034): each person's own items and switch.
     "ask_memories",
     "ask_memory_settings",
-    # R2-1C WhatsApp (0058_messaging_core, ADR-0043): no secrets, blind indexes or variables.
+    # R2-1C WhatsApp (0057_messaging_core, ADR-0043): no secrets, blind indexes or variables.
     "messaging_accounts",
     "messaging_templates",
     "messaging_settings",

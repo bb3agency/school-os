@@ -60,7 +60,7 @@ from app.dq import readiness as rd
 from app.dq.explanations import load_explanations
 from app.dq.masking import mask_value
 from app.dq.matching import MatchClass, MatchPolicy, VariantDictionary, classify, match_key
-from app.dq.profiles import FORMAT_ISSUES, EngineConfig, NameFormat, Profile
+from app.dq.profiles import FORMAT_ISSUES, EngineConfig, NameFormat, Profile, profile_board
 from app.dq.rules import (
     CheckKind,
     Finding,
@@ -159,6 +159,17 @@ class StudentFacts:
             fact is not None and fact.verified and self.canonical_value(attribute_key) is not None
         )
 
+    def in_other_board(self, profile: Profile, class_boards: Mapping[str, str]) -> bool:
+        """FR-TEN-021 (audit 2026-10-17 L-10): the student's current class follows another
+        board than the board ``profile`` belongs to (``settings.class_boards``), so that
+        board's checks leave them alone. Portal profiles (no board), schools without a class
+        map and students without a current class are never excluded."""
+        board = profile_board(profile) if class_boards else None
+        if board is None:
+            return False
+        codes = {e.class_code for e in self.enrolments if e.current and e.class_code}
+        return bool(codes) and all(class_boards.get(code, board) != board for code in codes)
+
 
 @dataclass(frozen=True, slots=True)
 class CheckContext:
@@ -172,6 +183,8 @@ class CheckContext:
     population: Mapping[uuid.UUID, StudentFacts] = field(default_factory=dict)
     profiles: tuple[Profile, ...] = ()
     identity_keys: frozenset[str] = frozenset()
+    # FR-TEN-021: class code -> board (``settings.class_boards``; empty: one board for all).
+    class_boards: Mapping[str, str] = field(default_factory=dict)
 
     def classify(self, a: str, b: str) -> Any:
         return classify(a, b, variants=self.variants, thresholds=self.policy.thresholds)
@@ -787,10 +800,19 @@ def readiness_kind(attribute_key: str) -> rd.ValueKind:
     return "name" if kind == "name" else "date" if kind == "date" else "enum"
 
 
-def readiness_applies(facts: StudentFacts, profile: Profile) -> bool:
-    """The profile's classes (current-year enrolment) and its "verified" exemption."""
+def readiness_applies(
+    facts: StudentFacts, profile: Profile, class_boards: Mapping[str, str] | None = None
+) -> bool:
+    """The profile's classes (current-year enrolment) and its "verified" exemption; classes
+    the school mapped to another board are left out (FR-TEN-021, L-10). A profile
+    that needs APAAR never applies to a student whose parents refused or withdrew APAAR
+    consent (FR-APC-006, audit L-03): the APAAR failure list is an APAAR action."""
     spec = profile.readiness
     if spec is None:
+        return False
+    if profile.needs_apaar and facts.apaar_refused:
+        return False
+    if class_boards and facts.in_other_board(profile, class_boards):
         return False
     if spec.skip_when_verified and facts.has_verified(spec.skip_when_verified):
         return False
@@ -923,10 +945,21 @@ def build_checks(rules: RuleRegistry) -> tuple[RuleCheck[CheckContext], ...]:
 
 
 def evaluate(context: CheckContext, checks: Iterable[RuleCheck[CheckContext]]) -> list[Finding]:
-    """Every finding of ``checks`` for the students of ``context`` (deduplicated by fingerprint)."""
+    """Every finding of ``checks`` for the students of ``context`` (deduplicated by fingerprint).
+    A board profile's findings about a student whose class follows another board here are
+    dropped (FR-TEN-021, audit 2026-10-17 L-10)."""
+    by_key = {p.key: p for p in context.profiles}
     out: dict[str, Finding] = {}
     for check in checks:
         for finding in check.evaluate(context):
+            profile = by_key.get(str(finding.details.get("profile_key") or ""))
+            facts = context.students.get(finding.student_id) if profile is not None else None
+            if (
+                profile is not None
+                and facts is not None
+                and facts.in_other_board(profile, context.class_boards)
+            ):
+                continue
             out.setdefault(fingerprint_of(finding), finding)
     return list(out.values())
 

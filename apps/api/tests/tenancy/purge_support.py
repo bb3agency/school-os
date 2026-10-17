@@ -19,6 +19,8 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection, Engine, text
 
+from app.certificates.codes import new_code
+
 TENANT_SCHEMAS = ("core", "sis", "kb", "audit", "ops", "fin", "msg")
 
 
@@ -592,7 +594,7 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             ti=uuid.uuid4(),
             g=ids["guardian"],
         )
-        # --- WhatsApp messaging (R2-1C, 0058_messaging_core, ADR-0043) ------------------------
+        # --- WhatsApp messaging (R2-1C, 0057_messaging_core, ADR-0043) ------------------------
         msg_account, msg_event = uuid.uuid4(), uuid.uuid4()
         _run(
             c,
@@ -658,6 +660,30 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             t=t,
             a=msg_account,
             k="in:wamid." + uuid.uuid4().hex,
+        )
+        # --- certificate verification code and its handle (R2-1A, 0056; ADR-0045) -------------
+        verify_code = new_code()
+        handle_id = uuid.uuid4()
+        _run(
+            c,
+            "INSERT INTO core.public_handles (id, tenant_id, kind, key_hash, target_type, "
+            "target_id) VALUES (:i, :t, 'cert_verify', sha256(convert_to(:k, 'UTF8')), "
+            "'certificate', :ti)",
+            i=handle_id,
+            t=t,
+            k=verify_code,
+            ti=ids["cert"],
+        )
+        _run(
+            c,
+            "INSERT INTO sis.certificate_verifications (id, tenant_id, certificate_id, code, "
+            "handle_id, created_reason, created_by) VALUES (:i, :t, :c, :k, :h, 'issued', :m)",
+            i=uuid.uuid4(),
+            t=t,
+            c=ids["cert"],
+            k=verify_code,
+            h=handle_id,
+            m=ids["m1"],
         )
         # --- register-photo extraction -------------------------------------------------------
         _run(

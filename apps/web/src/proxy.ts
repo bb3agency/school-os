@@ -5,9 +5,11 @@ import { englishRouting, LOCALE_COOKIE, routing } from "@/i18n/routing";
 import {
   buildPublicCsp,
   isPublicPath,
+  isVerifyPath,
   PUBLIC_EXPIRED_PATH,
   publicSecurityHeaders,
   routeSurface,
+  VERIFY_UNKNOWN_PATH,
 } from "@/lib/public-surface";
 import {
   applySecurityHeaders,
@@ -87,9 +89,16 @@ function localise(request: NextRequest): NextResponse {
  * no staff sign-in path header. A path under /p the group does not serve gets the same expired
  * page as a dead link.
  */
-function publicPage(request: NextRequest, served: boolean): NextResponse {
+function publicPage(
+  request: NextRequest,
+  served: boolean,
+  surface: "public" | "verify" = "public",
+): NextResponse {
   const nonce = generateNonce();
-  const https = isHttpsDeployment(process.env.PUBLIC_BASE_URL);
+  // R2-1A: the verification pages live on VERIFY_BASE_URL (ADR-0045 decision 9).
+  const https = isHttpsDeployment(
+    surface === "verify" ? process.env.VERIFY_BASE_URL : process.env.PUBLIC_BASE_URL,
+  );
   const csp = buildPublicCsp({ nonce, isDev: process.env.NODE_ENV === "development", https });
   request.headers.set("x-nonce", nonce);
   request.headers.set("Content-Security-Policy", csp);
@@ -97,7 +106,10 @@ function publicPage(request: NextRequest, served: boolean): NextResponse {
   const init = { request: { headers: request.headers } };
   const response = served
     ? NextResponse.next(init)
-    : NextResponse.rewrite(new URL(PUBLIC_EXPIRED_PATH, request.url), init);
+    : NextResponse.rewrite(
+        new URL(surface === "verify" ? VERIFY_UNKNOWN_PATH : PUBLIC_EXPIRED_PATH, request.url),
+        init,
+      );
   for (const [name, value] of Object.entries(publicSecurityHeaders(csp, https))) {
     response.headers.set(name, value);
   }
@@ -134,9 +146,11 @@ export function proxy(request: NextRequest): NextResponse {
   const host = request.headers.get("host") ?? request.nextUrl.host;
   const surface = routeSurface(host, request.nextUrl.pathname);
   if (surface.kind === "public") return publicPage(request, surface.served);
+  if (surface.kind === "verify") return publicPage(request, surface.served, "verify");
   if (surface.kind === "not_found") {
     // On the public host a staff path; on the staff host a parent path.
-    return wrongHost(!isPublicPath(request.nextUrl.pathname));
+    const path = request.nextUrl.pathname;
+    return wrongHost(!isPublicPath(path) && !isVerifyPath(path));
   }
   const nonce = generateNonce();
   const https = isHttpsDeployment(process.env.APP_BASE_URL);

@@ -598,6 +598,32 @@ def test_FR_TALLY_005_a_snapshot_is_applied_once_and_marks_missing_ledgers(
     assert "Synthetic" not in str(events)
 
 
+def test_L_12_a_snapshot_older_than_the_applied_one_is_refused(
+    api: Any, admin_engine: Engine
+) -> None:
+    """An older snapshot (a retry queue, a second device) never overwrites newer balances:
+    409 ``snapshot_outdated``, nothing applied, the refusal audited. Same day is fine."""
+    school, agent = _ready(api, admin_engine)
+    newer = [T.party("Synthetic Party Newer", "500.00", guid="guid-newer")]
+    assert T.snapshot(api, agent, newer, as_of=dt.date(2026, 9, 29)).status_code == 200
+    _new_window()
+    older = [T.party("Synthetic Party Newer", "900.00", guid="guid-newer")]
+    res = T.snapshot(api, agent, older, as_of=dt.date(2026, 9, 27))
+    assert res.status_code == 409, res.text
+    assert res.json()["code"] == "snapshot_outdated"
+    balance = _scalar(
+        admin_engine,
+        "SELECT closing_balance FROM ops.tally_parties WHERE tenant_id = :t",
+        t=school.tenant_id,
+    )
+    assert str(balance) == "500.00"
+    actions = [e["action"] for e in T.audit_actions(admin_engine, school.tenant_id, "tally.sync")]
+    assert actions == ["tally.sync.received", "tally.sync.outdated"]
+    _new_window()
+    same_day = [T.party("Synthetic Party Newer", "450.00", guid="guid-newer")]
+    assert T.snapshot(api, agent, same_day, as_of=dt.date(2026, 9, 29)).status_code == 200
+
+
 def test_FR_TALLY_005_duplicate_ledgers_in_one_snapshot_are_refused(
     api: Any, admin_engine: Engine
 ) -> None:
