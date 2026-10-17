@@ -537,4 +537,5 @@ Tests (planned, `apps/api/tests/security/`): route enumeration with the new guar
 | SEC-042 | A PEN or APAAR ID clash in an import names the other record only when the importer may read it, as on `POST /students` (audit 2026-10-17) | R1 |
 | SEC-043 | A slip print that shows restricted (C3) values audits whose they were (student ids only), for a section as for one student (audit 2026-10-17) | R1 |
 | SEC-045 | Print views mask C3 values unless `include_sensitive` is asked for, with `student.read_sensitive` and step-up, like exports (parent verification slips; audit 2026-10-17) | R1 |
+| SEC-047 | Print templates never show the typed APAAR ID through the Aadhaar mask (guard test; the exports carry it unmasked as `TypedDigits12`, ADR-0037; audit 2026-10-17) | R1 |
 | SEC-044 | A readiness run is limited by the `dq.readiness.manage` grant's own scope, besides `student.read_basic` and `dq.findings.read` (audit 2026-10-17) | R1 |

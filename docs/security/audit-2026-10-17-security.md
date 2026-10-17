@@ -9,8 +9,11 @@ the earlier fixes still hold, and the supply chain. The earlier audit records we
 their findings are not repeated. Paths are relative to `apps/api/` unless they start with `apps/`,
 `docs/` or `infra/`. Synthetic data only.
 
-**Status:** four findings fixed (each with a test that failed first, or tool evidence), four
-reported for an owner decision or for the R2-0 engineer, the rest checked and found sound.
+**Status:** four findings fixed in the first pass (each with a test that failed first, or tool
+evidence). The owner then asked for every finding to be fixed (2026-10-17): SEC-045 and SEC-047
+are fixed too, SEC-046 is handed to the R2-0 engineer (rate limits), and SEC-048 cannot be fixed
+without breaking lint (no patched `braces` exists; see below). The rest was checked and found
+sound.
 
 ## Method
 
@@ -36,14 +39,14 @@ reported for an owner decision or for the R2-0 engineer, the rest checked and fo
 | SEC-043 | Low-Medium | Audit (invariant 7, PRV) | `GET /dq/readiness/{profile}/slips?section_id=` shows the Aadhaar-as-printed (C3) values of up to 300 students to a `student.read_sensitive` holder, but its audit event `dq.readiness.slips_printed` held only the section and a count (`sensitive_shown`). The school could not answer whose restricted values a person saw. The single-student view and the PDF export already name their students | The event lists `sensitive_student_ids` (ids only) whenever restricted values were shown; nothing changes when none were | ce5ae953 | `tests/dq/test_readiness_api.py::test_SEC_043_section_slips_audit_whose_restricted_values_were_shown` |
 | SEC-044 | Low (custom roles) | AuthZ (SEC-015) | `POST /dq/readiness/{profile}/runs` resolved its students through `student.read_basic` (and `dq.findings.read` when held) only. A member holding `dq.readiness.manage` for one section through a custom role and `student.read_basic` school-wide through another (e.g. accountant) ran checks over the whole school and stored DQ-031 findings for students outside the grant's scope; the run's counts described them | `dq.request_run(..., also=(dq.readiness.manage,))`: the route's own permission joins the structure check (sections and classes outside it are a 422, no existence oracle), the student resolution and the queued-run freeze | 93199770 | `tests/dq/test_readiness_api.py::test_SEC_044_a_scoped_readiness_manager_runs_checks_only_in_their_scope` |
 
-## Reported (owner decision, or owned by another engineer)
+## Second pass: owner decision of 2026-10-17 ("fix all findings")
 
-| ID | Severity | Area | Finding | Recommendation |
-|---|---|---|---|---|
-| SEC-045 | Low (owner decision) | Step-up, masking (docs/07 §11, ADR-0021) | The HTML slips of a whole section show C3 (Aadhaar-as-printed name, date of birth, gender) unmasked by default to a `student.read_sensitive` holder, without step-up, while the PDF of the same slips masks them unless `include_sensitive` is asked for and needs MFA within 5 minutes. docs/07 §11 says C3 values are masked in the UI by default and included in exports only on request with step-up. The browser can print the HTML page to PDF, so the PDF rule is easy to step around. The audit now names the students (SEC-043) | Mask C3 on the section print unless `include_sensitive=true`, and then require step-up (the single-student detail can stay as it is, audited). Needs a web change (a "show restricted details" choice on the print button) |
-| SEC-046 | Low (R2-0 owner) | Rate limits (API4) | `GET /dq/readiness/{profile}` (summary) and `/students` assess every current-year student of the profile's classes on each call, with no per-route budget (only the general per-person and per-school layers). One person can keep the database busy for the whole school | Add a `render`-like per-person budget for these two routes in `app/core/rate_limits.yaml` (owned by the R2-0 engineer this week; not edited here) |
-| SEC-047 | Info (owner decision) | Privacy / invariant 4 vs PRV-020 | The slip and consent-form templates pass every value through the Aadhaar mask (`mask_aadhaar`), so an APAAR ID (12 digits) that happens to pass the Verhoeff check (about one in ten) would be printed masked if a profile ever shows it. Today neither page prints the APAAR ID, so nothing is wrong yet. PRV-020 says only the typed `apaar_id` field is shown unmasked | Keep it this way (fail closed); if a slip ever needs the APAAR ID, print the typed field outside the mask, as the student record does |
-| SEC-048 | Low (dev only) | Supply chain | `npm audit` (with dev dependencies) still reports `braces` through `eslint-config-next` → `@next/eslint-plugin-next` → `fast-glob` → `micromatch`; the fix needs a major upgrade (`npm audit fix --force`). Lint tooling only, never in the image | Take it with the next `eslint-config-next` major; nothing runs it on untrusted input |
+| ID | Severity | Area | Finding | Resolution | Commit | Test |
+|---|---|---|---|---|---|---|
+| SEC-045 | Low | Step-up, masking (docs/07 §11, ADR-0021) | The HTML slips of a whole section (and of one student) showed C3 (Aadhaar-as-printed name, date of birth, gender) unmasked by default to a `student.read_sensitive` holder, without step-up, while the PDF of the same slips masks them unless `include_sensitive` is asked for with MFA within 5 minutes; the browser can print the HTML to PDF | **Fixed.** `GET /dq/readiness/{profile}/slips` masks C3 unless `include_sensitive=true`, which needs `student.read_sensitive` reaching every student on the page (403 `sensitive_not_allowed`) and step-up (428), and is audited with `sensitive_student_ids` (SEC-043). `check=true` runs the same checks and answers 204 without a page or audit event. Web: the slip links stay masked; holders of `student.read_sensitive` get "Show Aadhaar details on slips", which checks first (the BFF client handles the 428 with the confirm-it's-you prompt), then links the unmasked view in a new tab (en, te). The student detail screen itself (one student, audited `dq.readiness.student_viewed`) is unchanged | 0be50cf4 (API, OpenAPI, client), 8966728a (web, docs) | `tests/dq/test_readiness_api.py::test_SEC_045_*`, `::test_SEC_043_*` (now asks for the values); `apps/web/src/features/readiness/readiness.test.tsx` ("slips with Aadhaar details (SEC-045)") |
+| SEC-046 | Low | Rate limits (API4) | `GET /dq/readiness/{profile}` and `/students` assess every current-year student of the profile's classes on each call with no per-route budget | **Handed to the R2-0 engineer**, who owns `app/core/rate_limits.yaml` this week: add a per-person budget (like `render`) to these two routes | - | - |
+| SEC-047 | Info | Privacy / invariant 4 vs PRV-020 | The slip and consent-form templates mask every Verhoeff-valid 12-digit number, so a typed APAAR ID printed there would come out masked for about one in ten students. Neither prints it today | **Guarded** (the mask stays fail-closed): a test fails if a readiness profile compares `apaar_id` (slip rows) or the consent form prints it, pointing to the `TypedDigits12` path the spreadsheet exports use (`tests/exports/test_apaar_export.py`) | 6b0a0899 | `tests/dq/test_print_apaar_guard.py` |
+| SEC-048 | Low (dev only) | Supply chain | `npm audit` (dev dependencies) reports GHSA-vfj7-8cjw-p6xm in `braces` ≤ 3.0.3 through `eslint-config-next` → `@next/eslint-plugin-next` → `fast-glob` 3.3.1 → `micromatch` 4.0.8 | **Left reported.** No fixed `braces` exists (3.0.3 is the latest release and is in the affected range), so an npm `overrides` cannot help; every `@next/eslint-plugin-next` up to 16.4.2 and the 16.5 canary pins `fast-glob` 3.3.1, and npm's only offered "fix" is a downgrade to `eslint-config-next` 14.2.35, which does not support ESLint 10 or Next 16. The package runs only in lint, on the repository's own glob patterns, never in an image or on untrusted input. Revisit when `@next/eslint-plugin-next` drops `fast-glob` or `braces` ships a fix | - | `npm audit --omit=dev`: 0 |
 
 ## Checked and sound (no finding)
 
@@ -90,4 +93,6 @@ reported for an owner decision or for the R2-0 engineer, the rest checked and fo
   tests/extraction/test_migration.py tests/imports tests/dq` (counts in the hand-back).
 - Web: `npm run typecheck`, `npm run lint`, `npm run test` (1705 passed, 3 skipped),
   `npm run build` after the Next.js update.
-- No API schema change: OpenAPI and the TypeScript client are unchanged. No migration.
+- First pass: no API schema change. Second pass (SEC-045): the slips route gained
+  `include_sensitive` and `check`; `openapi.json` and the TypeScript client were regenerated.
+  No migration in either pass.
