@@ -47,3 +47,7 @@ WhatsApp templates should be short and utility-only (ADR-0043). A parent still n
 ## Related requirements
 
 FR-PUB-005..012 (docs/03 §3.22), FR-MSG-010, FR-PAY-005, SEC-036, SEC-037, SEC-039, PRV-026, PRV-028; US-2401..US-2405 (docs/02 C24). Docs: 05 §15.5, 07 §3 TB12, §11.2, 08 §15, 09 §4 "Public", 10 §11.2, 17 §5.8.
+
+## Follow-up (2026-10-17, wave R2-0 built)
+
+The exchange answers `{kind, expires_at}`; the `__Host-sos_parent` cookie carries the token itself (HttpOnly, Secure, SameSite=Lax, Max-Age = remaining lifetime), and the BFF sends it to the API in `X-SOS-Public-Token` on every page request, so each request re-resolves the handle and a revocation applies at once (no separate handle reference to store). A dead link answers 303 to `/p/expired`, which is the same 404 page for every failure (the first hop is a 303 for live and dead links alike, so preview fetchers learn nothing). `/p/view` counts views; the exchange does not. Guardian unlink and phone change revoke the guardian's open links (opt-out, notice withdrawal and WhatsApp disconnect follow in R2-1C/R2-3G through `public.service.revoke_for_guardian` / `revoke_for_target`).

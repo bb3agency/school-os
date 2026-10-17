@@ -456,6 +456,9 @@ class DownStore:
     def acquire(self, blocks: Sequence[str], buckets: Sequence[rl.BucketSpec]) -> rl.RawDecision:
         raise rl.StoreUnavailable("down")
 
+    def peek(self, bucket: rl.BucketSpec) -> rl.BucketResult:
+        raise rl.StoreUnavailable("down")
+
     def fail(self, count_key: str, block_key: str, backoff: rl.Backoff) -> tuple[int, int]:
         raise rl.StoreUnavailable("down")
 
@@ -567,3 +570,86 @@ def test_P2_07_threads_share_one_in_memory_budget() -> None:
     for t in threads:
         t.join()
     assert sum(admitted) == 40
+
+
+# --- R2-0 public surface (ADR-0046 decision 7, ADR-0047 decision 4; FR-PUB-011) ----------------
+
+
+def test_FR_PUB_011_peek_reports_room_without_charging(store: rl.RateLimitStore) -> None:
+    """A failures-only budget: peek before the lookup, charge only the failure (cost 2)."""
+    bucket = spec("sos:rl:t:peek", 20, 600, cost=2)
+    for _ in range(10):
+        assert store.peek(bucket).retry_ms == 0
+        assert store.peek(bucket).retry_ms == 0  # peeking twice charges nothing
+        assert store.acquire([], [bucket]).allowed
+    refused = store.peek(bucket)
+    assert refused.retry_ms > 0
+    assert refused.remaining == 0
+    assert not store.acquire([], [bucket]).allowed
+
+
+def test_FR_PUB_011_public_policies_are_configured_as_documented() -> None:
+    config = rl.load_config()
+    expected = {
+        "public_ip": (60, 60, "ip", "closed"),
+        "public_lookup_fail": (20, 600, "ip", "closed"),
+        "public_token": (30, 60, "handle", "open"),
+        "public_pay": (5, 86400, "handle", "closed"),
+        "webhook_route": (600, 60, "handle", "closed"),
+    }
+    for name, (quota, window, per, fail) in expected.items():
+        p = config.policies[name]
+        assert (p.quota, p.window_s, p.per, p.fail) == (quota, window, per, fail), name
+    assert config.ip_policy_for("/api/v1/public/links/current") == "public_ip"
+    assert config.ip_policy_for("/api/v1/webhooks/razorpay/abc") == "machine_ip"
+    assert config.ip_policy_for("/api/v1/students") == "ip"
+    # Per-IP and per-handle budgets are charged by the public guards, never by route template.
+    assert not [
+        r
+        for r, names in config.routes.items()
+        for n in names
+        if config.policies[n].per in ("ip", "handle")
+    ]
+
+
+def test_FR_PUB_011_route_table_refuses_per_handle_policies() -> None:
+    raw = rl.load_config().model_dump(mode="json")
+    raw["routes"] = {"GET /api/v1/public/links/current": ["public_token"]}
+    with pytest.raises(ValidationError, match="per-handle route policy"):
+        rl.RateLimitConfig.model_validate(raw)
+    raw = rl.load_config().model_dump(mode="json")
+    raw["policies"].pop("public_ip")
+    with pytest.raises(ValidationError, match="public_ip"):
+        rl.RateLimitConfig.model_validate(raw)
+
+
+def test_FR_PUB_011_limiter_peek_fails_closed_or_open_by_policy() -> None:
+    limiter = limiter_with(DownStore())
+    closed = rl.Bucket(limiter.config.policy("public_lookup_fail"), "ip-hash", 2)
+    opened = rl.Bucket(limiter.config.policy("public_token"), "handle-1", 1)
+    assert limiter.peek(opened).allowed
+    assert limiter.peek(opened).degraded
+    # Fail closed: the per-process fallback keeps the same budget while Valkey is down.
+    assert limiter.peek(closed).allowed
+    for _ in range(10):
+        limiter.fallback.acquire([], [limiter._spec(closed)])
+    refused = limiter.peek(closed)
+    assert not refused.allowed
+    assert refused.denied is not None
+    assert refused.denied.name == "public_lookup_fail"
+
+
+def test_FR_PUB_011_public_paths_get_the_closed_public_ip_layer(
+    memory_limiter: rl.RateLimiter,
+) -> None:
+    app = demo_app(memory_limiter)
+
+    @app.get("/api/v1/public/ping")
+    def ping() -> dict[str, str]:
+        return {"ok": "yes"}
+
+    client = TestClient(app)
+    quota = memory_limiter.config.policies["public_ip"].quota
+    codes = [client.get("/api/v1/public/ping").status_code for _ in range(quota + 1)]
+    assert codes[:-1] == [200] * quota
+    assert codes[-1] == 429

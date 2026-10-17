@@ -58,16 +58,26 @@ apps/api/app/
   changes/       change requests (maker-checker) for identity fields
   documents/     upload, storage, versions, ACLs, virus scan hook
   knowledge/     ingestion, chunking, embeddings, retrieval, tools, prompts, gateway, evals
-  exports/       board/portal pre-check sheets (CISCE, UDISE+), generic CSV/XLSX
+  exports/       board/portal pre-check sheets (UDISE+, BSEAP SSC, CBSE, CISCE), generic CSV/XLSX, print-job PDFs
+  certificates/  TC, bonafide, study and conduct certificates, serial numbers, register print views
+  circulars/     circulars → tasks with reminders, parent notice drafts
+  academics/     daily attendance, attendance register, exams and marks
+  insights/      early-warning indicators, flags, interventions (purpose-limited, invariant 14)
+  apaar/         APAAR consent register (append-only), consent forms (ADR-0039)
+  tally/         read-only Tally connector and fee dues (edge agent in apps/edge-agent)
+  breakglass/    support access to a school with approval, visible to the school
+  public/        public handles and core.resolve_public_handle (ADR-0047), parent links (ADR-0046),
+                 guards for unauthenticated routes (require_public_handle, require_webhook_signature,
+                 require_meta_verify_token; pinned in public/public_routes.yaml)
   notifications/ in-app notifications, bilingual templates
   admin/         tenant admin, retention settings, data export
-  ops/           tenant-side job runs, outbox, idempotency keys, break-glass grants
+  ops/           tenant-side job runs, outbox, idempotency keys
   platform/      control plane: operators, school provisioning, plans, subscriptions, invoices,
                  payments (billing), usage, fleet + heartbeat, feature flags, announcements,
                  support tickets, platform audit (DB role sos_platform; routes /api/v1/platform/*)
   devtools/      synthetic data generator (make seed-synthetic; local/ci only)
-apps/api/migrations/  Alembic revisions 0001_baseline … 0054_r1_finish (linear chain; `alembic heads` shows the current head)
-apps/api/tests/  tests per module (tests/<module>/) + cross-module suites (tests/security/, tests/migrations/)
+apps/api/migrations/  Alembic revisions 0001_baseline … 0055_public_handles (linear chain; `alembic heads` shows the current head)
+apps/api/tests/  tests per module (tests/<module>/) + cross-module suites (tests/security/, tests/migrations/, tests/api/, tests/deploy/)
 apps/api/openapi.json  committed OpenAPI document (make openapi; freshness test)
 apps/worker/     Celery entrypoint (sos_worker.celery_app; imports app.* tasks and beat schedules)
 apps/web/        Next.js app (app router, BFF route handlers, i18n; operator UI under /[locale]/platform/*)
@@ -108,7 +118,7 @@ Also: `make down`, `make logs`, `make db-shell`, `make format`. The dev OIDC stu
 ## 6. Non-negotiable invariants (tests enforce these; never weaken them)
 
 1. **Tenant isolation.** Every tenant-owned table has `tenant_id uuid NOT NULL`, RLS `ENABLE` + `FORCE`, and the standard policy; references between tenant tables are composite `(tenant_id, x_id)` foreign keys. No database role has `BYPASSRLS`. Every request and job sets the transaction-local tenant context inside its transaction via `core.db.tenant_session()` (`set_config('app.tenant_id', :t, true)`, the same as `SET LOCAL`, with bound parameters). Cross-tenant access exists only through the pinned allowlist of `SECURITY DEFINER` functions owned by `sos_definer` (NOBYPASSRLS), which reach only tables carrying the `definer_access` policy (ADR-0013). The **only** schema without RLS is `platform` (control plane, no student data): it is written only by `sos_platform`, `sos_app` may only read `platform.feature_flags`, and `sos_platform` has **no** privileges on any tenant table. Never disable RLS to make a test pass.
-2. **Authorization on every route.** Each route declares `Depends(require("<permission>", scope=...))` (or, for a read that any one of several permissions may use, `Depends(require_any("<permission>", "<alternative>", ...))`, whose service still checks scope per object); control-plane routes declare `Depends(require_platform("platform.<...>"))` and the fleet heartbeat declares `Depends(require_fleet_signature())`. A test enumerates all routes and fails if any lacks one of these (public health checks are the only allowlisted exceptions).
+2. **Authorization on every route.** Each route declares `Depends(require("<permission>", scope=...))` (or, for a read that any one of several permissions may use, `Depends(require_any("<permission>", "<alternative>", ...))`, whose service still checks scope per object); control-plane routes declare `Depends(require_platform("platform.<...>"))` and the fleet heartbeat declares `Depends(require_fleet_signature())`. Routes without a signed-in user (parent links, certificate verification, provider webhooks; ADR-0046/0047) declare `require_public_handle(...)`, `require_webhook_signature(provider)` or `require_meta_verify_token()` and must be listed in `app/public/public_routes.yaml`. A test enumerates all routes and fails if any lacks one of these (public health checks are the only allowlisted exceptions).
 3. **Object-level access through scoped repositories.** Never fetch a student/document by ID without the caller's scope (e.g., a class teacher only sees their sections). BOLA tests exist per resource.
 4. **No Aadhaar numbers, ever.** Store only `aadhaar_last4` and the as-printed demographic fields. `core.redaction` MUST mask any 12-digit sequence that passes the Verhoeff check in OCR output, extracted text, logs, prompts and exports.
 5. **No PII in logs, traces, metrics, error reports or analytics.** Use structured logging with `redact()`. IDs yes, names/DOB/phones no.

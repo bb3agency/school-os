@@ -32,7 +32,7 @@ from sqlalchemy.orm import Session
 
 from app.apaar import service as apaar
 from app.authz.context import UserContext
-from app.core.errors import NotFound, ValidationFailed
+from app.core.errors import Forbidden, NotFound, ValidationFailed
 from app.core.languages import telugu_enabled, telugu_text
 from app.core.logging import get_logger
 from app.core.pdf import PrintDocument
@@ -43,7 +43,13 @@ from app.dq import service as dq
 from app.dq import slip as slip_page
 from app.dq.masking import mask_value
 from app.dq.matching import MatchClass, classify, load_match_policy, load_variant_dictionary
-from app.dq.profiles import Profile, ReadinessSpec, load_engine_config, load_profiles
+from app.dq.profiles import (
+    Profile,
+    ReadinessSpec,
+    load_engine_config,
+    load_profiles,
+    profile_board,
+)
 from app.dq.rules import load_rules
 from app.dq.schemas import (
     Bilingual,
@@ -183,9 +189,10 @@ def _assess(
     rule = load_rules()[RULE_ID]
     rows = repo.profile_findings(session, list(facts), profile.key, RULE_ID)
     by_fp = {r["fingerprint"]: r for r in rows}
+    class_boards = _class_boards(session)
     out: dict[uuid.UUID, _Student] = {}
     for sid, fact in facts.items():
-        applies = checks.readiness_applies(fact, profile)
+        applies = checks.readiness_applies(fact, profile, class_boards)
         if applies or force:
             unfiltered = profile.model_copy(
                 update={
@@ -247,23 +254,47 @@ def _section(session: Session, ctx: UserContext, section_id: uuid.UUID) -> Any:
     return section
 
 
+def _class_boards(session: Session) -> dict[str, str]:
+    return tenancy.school_boards(session)[1]
+
+
+def _other_board_classes(session: Session, profile: Profile) -> frozenset[str]:
+    """Class codes this school mapped to another board than the profile's (FR-TEN-021,
+    audit 2026-10-17 L-10); none for a portal profile or a school without a class map."""
+    board = profile_board(profile)
+    if board is None:
+        return frozenset()
+    return frozenset(c for c, b in _class_boards(session).items() if b != board)
+
+
 def _profile_sections(session: Session, profile: Profile) -> dict[uuid.UUID, Any]:
-    """Current-year sections of the profile's classes (every class when it names none)."""
+    """Current-year sections of the profile's classes (every class when it names none),
+    without the classes that follow another board here."""
     spec = _spec(profile)
     years = [y for y in tenancy.list_academic_years(session) if y.is_current]
     if not years:
         return {}
     classes = {c.id: c for c in tenancy.list_classes(session)}
+    others = _other_board_classes(session, profile)
+
+    def wanted(class_id: uuid.UUID) -> bool:
+        klass = classes.get(class_id)
+        if klass is None:
+            return not spec.classes
+        return (not spec.classes or klass.code in spec.classes) and klass.code not in others
+
     return {
         s.id: s
         for s in tenancy.list_sections(session, academic_year_id=years[0].id)
-        if not spec.classes or (s.class_id in classes and classes[s.class_id].code in spec.classes)
+        if wanted(s.class_id)
     }
 
 
 def _in_reach(
     session: Session, ctx: UserContext, section_ids: Collection[uuid.UUID] | None
 ) -> list[uuid.UUID]:
+    """Current-year students reached by BOTH ``student.read_basic`` (always applied by
+    ``students.list_students_in_scope``) and ``dq.readiness.read`` (FR-DQ-046, SEC-015)."""
     return students.list_students_in_scope(
         session, ctx, section_ids=section_ids, permissions=(READ,)
     )
@@ -357,7 +388,7 @@ def section_students(
     """The students of one section with their readiness, worst first (no values)."""
     profile = readiness_profile(profile_key)
     _section(session, ctx, section_id)
-    ids = _in_reach(session, ctx, [section_id])
+    ids = dq.board_students(session, profile.key, _in_reach(session, ctx, [section_id]))
     assessed = _assess(session, profile, ids)
     names = students.summaries(session, ctx, ids)
     rcfg = rd.load_readiness_config()
@@ -583,7 +614,12 @@ def request_run(
     spec = _spec(profile)
     empty = not (scope.section_ids or scope.class_ids or scope.student_ids or scope.batch_id)
     if empty and spec.classes:
-        class_ids = [c.id for c in tenancy.list_classes(session) if c.code in spec.classes]
+        others = _other_board_classes(session, profile)
+        class_ids = [
+            c.id
+            for c in tenancy.list_classes(session)
+            if c.code in spec.classes and c.code not in others
+        ]
         if not class_ids:
             raise ValidationFailed(
                 [
@@ -596,7 +632,9 @@ def request_run(
                 detail="This school has none of the classes this check is for.",
             )
         scope = RunScopeIn(class_ids=class_ids)
-    return dq.request_run(session, ctx, RunCreate(scope=scope, profile_key=profile.key))
+    return dq.request_run(
+        session, ctx, RunCreate(scope=scope, profile_key=profile.key), also=(MANAGE,)
+    )
 
 
 # --- parent verification slips ----------------------------------------------------------------
@@ -720,6 +758,8 @@ def _slip_targets(
     elif section_id is not None:
         _section(session, ctx, section_id)
         ids, target = _in_reach(session, ctx, [section_id])[:MAX_SLIPS], section_id
+    # FR-TEN-021 (L-10): no slip for a student whose class follows another board here.
+    ids = dq.board_students(session, profile.key, ids)
     # Slips always show what each record holds, even where the check does not apply.
     assessed = _assess(session, profile, ids, force=True)
     refs = dict(students.summaries(session, ctx, ids))
@@ -791,10 +831,26 @@ def slips(
     student_id: uuid.UUID | None = None,
     section_id: uuid.UUID | None = None,
     include_ready: bool = True,
-) -> str:
+    include_sensitive: bool = False,
+    check: bool = False,
+) -> str | None:
     """Printable parent verification slips (A4 HTML), for one student or one section
-    (US-505 AC2). Audit ``dq.readiness.slips_printed`` (counts and ids only)."""
+    (US-505 AC2). Audit ``dq.readiness.slips_printed`` (counts and ids only). ``check``: run
+    every check (permission, reach, step-up) and return ``None`` without a page or an audit
+    event, so the screen can confirm the sign-in before it opens the print view.
+
+    Aadhaar-as-printed (C3) values are masked unless ``include_sensitive`` (SEC-045, docs/07
+    §11, the same rule as the PDF print): that needs ``student.read_sensitive`` reaching every
+    student on the page (403 ``sensitive_not_allowed``) and a sign-in with MFA within 5 minutes
+    (428 ``step_up_required``). The audit event then names those students (SEC-043)."""
     profile = readiness_profile(profile_key)
+    if include_sensitive:
+        if not ctx.has(SENSITIVE):
+            raise Forbidden(
+                "Restricted details can be shown only to staff allowed to see them.",
+                code="sensitive_not_allowed",
+            )
+        dq._require_step_up(ctx)
     ordered, target, assessed, refs = _slip_targets(
         session,
         ctx,
@@ -803,13 +859,23 @@ def slips(
         section_id=section_id,
         include_ready=include_ready,
     )
+    reveal_ids: frozenset[uuid.UUID] = frozenset()
+    if include_sensitive:
+        reveal_ids = _sensitive_reach(session, ctx)
+        if not set(ordered) <= reveal_ids:
+            raise Forbidden(
+                "Some of these students' restricted details are outside what you may see.",
+                code="sensitive_not_allowed",
+            )
+    if check:
+        return None
     page, revealed, _ = _slip_page(
         session,
         profile,
         ordered,
         assessed,
         refs,
-        reveal_ids=_sensitive_reach(session, ctx),
+        reveal_ids=reveal_ids,
         for_pdf=False,
     )
     summary: dict[str, Any] = {
@@ -817,6 +883,10 @@ def slips(
         "students": len(ordered),
         "sensitive_shown": revealed,
     }
+    if revealed:
+        # SEC-043: whose restricted (C3) values the page showed, ids only, so the school can
+        # answer "who saw this child's Aadhaar-as-printed details" for a section print too.
+        summary["sensitive_student_ids"] = [str(s) for s in ordered if s in reveal_ids]
     if section_id is not None:
         summary["section_id"] = str(section_id)
     dq._audit(

@@ -3,6 +3,13 @@ import { NextResponse, type NextRequest } from "next/server";
 import { legacyLocalePath, teluguEnabled, uiLocale } from "@/i18n/languages";
 import { englishRouting, LOCALE_COOKIE, routing } from "@/i18n/routing";
 import {
+  buildPublicCsp,
+  isPublicPath,
+  PUBLIC_EXPIRED_PATH,
+  publicSecurityHeaders,
+  routeSurface,
+} from "@/lib/public-surface";
+import {
   applySecurityHeaders,
   buildContentSecurityPolicy,
   generateNonce,
@@ -74,10 +81,62 @@ function localise(request: NextRequest): NextResponse {
 }
 
 /**
+ * The parent pages (`(public)` route group, `/p/*`) on `PUBLIC_BASE_URL` (ADR-0046, SEC-036):
+ * their own strict CSP and headers (no referrer, no caching, no indexing), no locale routing,
+ * no staff sign-in path header. A path under /p the group does not serve gets the same expired
+ * page as a dead link.
+ */
+function publicPage(request: NextRequest, served: boolean): NextResponse {
+  const nonce = generateNonce();
+  const https = isHttpsDeployment(process.env.PUBLIC_BASE_URL);
+  const csp = buildPublicCsp({ nonce, isDev: process.env.NODE_ENV === "development", https });
+  request.headers.set("x-nonce", nonce);
+  request.headers.set("Content-Security-Policy", csp);
+  request.headers.delete(PATH_HEADER);
+  const init = { request: { headers: request.headers } };
+  const response = served
+    ? NextResponse.next(init)
+    : NextResponse.rewrite(new URL(PUBLIC_EXPIRED_PATH, request.url), init);
+  for (const [name, value] of Object.entries(publicSecurityHeaders(csp, https))) {
+    response.headers.set(name, value);
+  }
+  return response;
+}
+
+/** A plain 404 for a surface that does not exist on this host (staff page on the public host,
+ * parent page on the staff host). Says nothing about the other surface. */
+function wrongHost(publicHost: boolean): NextResponse {
+  const response = new NextResponse("Not found", {
+    status: 404,
+    headers: { "Content-Type": "text/plain; charset=utf-8" },
+  });
+  const csp = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
+  const https = isHttpsDeployment(
+    publicHost ? process.env.PUBLIC_BASE_URL : process.env.APP_BASE_URL,
+  );
+  if (publicHost) {
+    for (const [name, value] of Object.entries(publicSecurityHeaders(csp, https))) {
+      response.headers.set(name, value);
+    }
+  } else {
+    applySecurityHeaders(response.headers, { csp, hsts: https });
+  }
+  return response;
+}
+
+/**
  * Next.js 16 proxy (formerly middleware): per-request CSP nonce + security headers
- * (SEC-010) and locale negotiation without URL prefixes (NFR-I18N-001).
+ * (SEC-010) and locale negotiation without URL prefixes (NFR-I18N-001); the parent pages on
+ * their own origin (ADR-0046).
  */
 export function proxy(request: NextRequest): NextResponse {
+  const host = request.headers.get("host") ?? request.nextUrl.host;
+  const surface = routeSurface(host, request.nextUrl.pathname);
+  if (surface.kind === "public") return publicPage(request, surface.served);
+  if (surface.kind === "not_found") {
+    // On the public host a staff path; on the staff host a parent path.
+    return wrongHost(!isPublicPath(request.nextUrl.pathname));
+  }
   const nonce = generateNonce();
   const https = isHttpsDeployment(process.env.APP_BASE_URL);
   const csp = buildContentSecurityPolicy({

@@ -66,7 +66,7 @@ describe("NFR-I18N-001 message catalogues", () => {
     const values = [...catalogs.te.values()];
     const translated = values.filter((value) => TELUGU.test(value)).length;
     // Brand names, codes and examples (SchoolOS, GSTIN, {percent}%) may stay in Latin script.
-    expect(translated / values.length).toBeGreaterThan(0.9);
+    expect(translated / values.length).toBeGreaterThan(0.92);
   });
 
   it("uses sentence case in English headings (no Title Case Words)", () => {

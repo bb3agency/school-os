@@ -84,7 +84,7 @@ export default async function SchoolLayout({ children }: { children: ReactNode }
           {support ? <SupportAccessBanner /> : null}
           <SuspendedBanner initialStatus={schoolStatus} />
           <AnnouncementBanner />
-          <StepUpHost />
+          <StepUpHost sessionKind={support ? "support" : "staff"} />
         </>
       }
     >

@@ -820,9 +820,39 @@ def _snapshot_due(data: SyncIn) -> Decimal:
     return sum((p.closing_balance for p in data.parties if p.closing_balance > 0), ZERO)
 
 
+class SnapshotOutdated(Conflict):
+    status, code = 409, "snapshot_outdated"
+    title = "Tally already sent newer balances"
+
+
 def accept_sync(caller: AgentCaller, data: SyncIn) -> SyncOut:
     """Apply one complete snapshot (FR-TALLY-005). A batch already accepted is answered from its
-    stored result and applies nothing. Parties missing from the snapshot are marked not present."""
+    stored result and applies nothing. Parties missing from the snapshot are marked not present.
+    A snapshot older (``as_of``) than the balances already applied for its company is refused
+    with 409 ``snapshot_outdated`` and nothing changes; the refusal is audited
+    (``tally.sync.outdated``; audit 2026-10-17 L-12)."""
+    try:
+        return _accept_sync(caller, data)
+    except SnapshotOutdated:
+        with tenant_session(caller.tenant_id) as session:
+            audit.record(
+                session,
+                action="tally.sync.outdated",
+                resource_type="tally_device",
+                resource_id=caller.device_id,
+                summary={"batch_id": data.batch_id, "parties": len(data.parties)},
+                actor_type="system",
+            )
+        log.warning(
+            "tally.sync.outdated",
+            tenant_id=caller.tenant_id,
+            resource_type="tally_device",
+            resource_id=caller.device_id,
+        )
+        raise
+
+
+def _accept_sync(caller: AgentCaller, data: SyncIn) -> SyncOut:
     now = _now()
     with tenant_session(caller.tenant_id) as session:
         device = _touch(session, _active_device(session, caller), caller, now)
@@ -840,7 +870,11 @@ def accept_sync(caller: AgentCaller, data: SyncIn) -> SyncOut:
         if _outdated(device.agent_version):
             raise Conflict("Update the Tally agent before it can sync.", code="agent_outdated")
         company = _check_snapshot(data, repo.selected_groups(session))
-        stored = repo.parties_of_company(session, company)
+        stored = repo.parties_of_company(session, company)  # locked: one snapshot at a time
+        if any(p.as_of > data.as_of for p in stored):
+            raise SnapshotOutdated(
+                "Tally already sent newer balances for this company. Nothing was changed."
+            )
         by_guid = {p.guid: p for p in stored if p.guid}
         by_name = {p.ledger_name: p for p in stored if not p.guid}
         creates: list[dict[str, Any]] = []

@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { Alert } from "@/components/ui/Alert";
+import { Pager, usePagedList } from "@/features/students/paging";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { DashboardView } from "./DashboardView";
 import { PK, useCan } from "./data";
@@ -41,15 +42,22 @@ export function SchoolsScreen({ filters = {} }: { filters?: SchoolFilters }) {
     ...(filters.trialEnding ? { trial_ending: true } : {}),
     ...(filters.pastDue ? { past_due: true } : {}),
   };
-  const schools = useApiQuery(
-    [...PK.tenants, "list", query],
-    async () => (await unwrap(api.GET("/api/v1/platform/tenants", { params: { query } }))).data,
+  const t = useTranslations("platform.schools");
+  const { rows: schools, pager } = usePagedList([...PK.tenants, "list", query], (cursor) =>
+    unwrap(
+      api.GET("/api/v1/platform/tenants", {
+        params: { query: { ...query, ...(cursor ? { cursor } : {}) } },
+      }),
+    ),
   );
   return (
-    <SchoolsView
-      schools={schools}
-      filters={filters}
-      canProvision={can("platform.tenants.provision")}
-    />
+    <div className="space-y-4">
+      <SchoolsView
+        schools={schools}
+        filters={filters}
+        canProvision={can("platform.tenants.provision")}
+      />
+      <Pager label={t("pagesLabel")} {...pager} />
+    </div>
   );
 }

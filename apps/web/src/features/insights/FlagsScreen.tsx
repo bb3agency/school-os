@@ -13,6 +13,7 @@ import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SelectField } from "@/components/ui/Select";
 import { StatCard } from "@/components/ui/StatCard";
 import { Table, TableScroll, TBody, Td, Th, THead, Tr } from "@/components/ui/Table";
+import { Pager, useCursorStack } from "@/features/students/paging";
 import { Link } from "@/i18n/navigation";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
@@ -205,13 +206,19 @@ export function FlagsScreen() {
   const can = useStaffCan();
   const meLoaded = useStaffMe() !== undefined;
   const allowed = can(PERM.insightsRead);
-  const [filters, setFilters] = useState<FlagFilters>({
+  const [filters, setFilterState] = useState<FlagFilters>({
     view: "mine",
     status: "active",
     indicator: "any",
     due: "any",
   });
-  const list = useFlags(filters, allowed);
+  // Cursor paging (docs/09 §2): a page holds 100 flags; new filters start at the first page.
+  const pages = useCursorStack();
+  const setFilters = (next: FlagFilters) => {
+    pages.reset();
+    setFilterState(next);
+  };
+  const list = useFlags(filters, allowed, pages.cursor);
   const summary = useSummary(allowed);
   const settings = useSettings(allowed);
 
@@ -283,58 +290,70 @@ export function FlagsScreen() {
               />
             </div>
             <LoadGate data={meLoaded ? list : { status: "loading" }}>
-              {(page) =>
-                page.data.length === 0 ? (
-                  <EmptyState icon="shieldCheck" title={t("emptyTitle")} body={t("emptyBody")} />
-                ) : (
-                  <TableScroll label={t("listTitle")}>
-                    <Table>
-                      <THead>
-                        <Tr>
-                          <Th>{t("columns.student")}</Th>
-                          <Th>{t("columns.why")}</Th>
-                          <Th>{t("columns.due")}</Th>
-                          <Th>{t("columns.owner")}</Th>
-                          <Th>{t("columns.status")}</Th>
-                        </Tr>
-                      </THead>
-                      <TBody>
-                        {page.data.map((flag) => (
-                          <Tr key={flag.id}>
-                            <Td>
-                              <Link
-                                href={`/flags/${flag.id}`}
-                                className="font-semibold break-words text-primary underline underline-offset-4"
-                              >
-                                {flag.student.full_name ?? t("unnamed")}
-                              </Link>
-                              <p className="text-sm text-ink-muted">
-                                {flag.student.section_label ?? ""}
-                              </p>
-                            </Td>
-                            <Td>
-                              <p className="text-sm text-ink">{t(`indicator.${flag.indicator}`)}</p>
-                              <p className="text-sm break-words text-ink-muted">
-                                <FlagReason flag={flag} />
-                              </p>
-                            </Td>
-                            <Td>
-                              <span className="flex flex-wrap items-center gap-1">
-                                <span className="font-mono">{formatDate(flag.due_on)}</span>
-                                <OverduePill overdue={flag.overdue} />
-                              </span>
-                            </Td>
-                            <Td>{flag.owner?.display_name ?? t("unassigned")}</Td>
-                            <Td>
-                              <FlagStatusPill status={flag.status} />
-                            </Td>
+              {(page) => (
+                <div className="space-y-4">
+                  {page.data.length === 0 ? (
+                    <EmptyState icon="shieldCheck" title={t("emptyTitle")} body={t("emptyBody")} />
+                  ) : (
+                    <TableScroll label={t("listTitle")}>
+                      <Table>
+                        <THead>
+                          <Tr>
+                            <Th>{t("columns.student")}</Th>
+                            <Th>{t("columns.why")}</Th>
+                            <Th>{t("columns.due")}</Th>
+                            <Th>{t("columns.owner")}</Th>
+                            <Th>{t("columns.status")}</Th>
                           </Tr>
-                        ))}
-                      </TBody>
-                    </Table>
-                  </TableScroll>
-                )
-              }
+                        </THead>
+                        <TBody>
+                          {page.data.map((flag) => (
+                            <Tr key={flag.id}>
+                              <Td>
+                                <Link
+                                  href={`/flags/${flag.id}`}
+                                  className="font-semibold break-words text-primary underline underline-offset-4"
+                                >
+                                  {flag.student.full_name ?? t("unnamed")}
+                                </Link>
+                                <p className="text-sm text-ink-muted">
+                                  {flag.student.section_label ?? ""}
+                                </p>
+                              </Td>
+                              <Td>
+                                <p className="text-sm text-ink">
+                                  {t(`indicator.${flag.indicator}`)}
+                                </p>
+                                <p className="text-sm break-words text-ink-muted">
+                                  <FlagReason flag={flag} />
+                                </p>
+                              </Td>
+                              <Td>
+                                <span className="flex flex-wrap items-center gap-1">
+                                  <span className="font-mono">{formatDate(flag.due_on)}</span>
+                                  <OverduePill overdue={flag.overdue} />
+                                </span>
+                              </Td>
+                              <Td>{flag.owner?.display_name ?? t("unassigned")}</Td>
+                              <Td>
+                                <FlagStatusPill status={flag.status} />
+                              </Td>
+                            </Tr>
+                          ))}
+                        </TBody>
+                      </Table>
+                    </TableScroll>
+                  )}
+                  <Pager
+                    label={t("pagesLabel")}
+                    page={pages.page}
+                    onPrevious={pages.hasPrevious ? pages.previous : undefined}
+                    onNext={
+                      page.next_cursor ? () => pages.next(page.next_cursor as string) : undefined
+                    }
+                  />
+                </div>
+              )}
             </LoadGate>
           </Card>
           <LoadGate data={settings}>

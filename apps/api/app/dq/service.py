@@ -64,7 +64,7 @@ from app.dq import repository as repo
 from app.dq.explanations import Language, load_explanations
 from app.dq.masking import FULL_MASK
 from app.dq.models import ACTIVE_STATUSES
-from app.dq.profiles import load_engine_config, load_profiles, superseded_keys
+from app.dq.profiles import load_engine_config, load_profiles, profile_board, superseded_keys
 from app.dq.rules import Severity, load_rules
 from app.dq.schemas import (
     Bilingual,
@@ -414,14 +414,16 @@ def _not_found(field: str) -> ValidationFailed:
     )
 
 
-def _check_structure(session: Session, ctx: UserContext, scope: engine.Scope) -> None:
+def _check_structure(
+    session: Session, ctx: UserContext, scope: engine.Scope, *, also: Sequence[str] = ()
+) -> None:
     """Unknown (or other schools') sections and classes are a 422, like any bad reference.
 
     So are existing ones outside the caller's scope (audit 2026-10-04 AA-18): the answer must
     not show whether an id exists. A section is in reach when both ``dq.findings.read`` and
     ``student.read_basic`` reach it (school-wide, the section, or its class); a class when both
     reach the class or one of its sections (SEC-015)."""
-    grants = [ctx.scope_for(READ), ctx.scope_for(STUDENT_READ)]
+    grants = [ctx.scope_for(READ), ctx.scope_for(STUDENT_READ), *(ctx.scope_for(p) for p in also)]
     scoped = [g for g in grants if not g.school_wide]
     own_classes: dict[uuid.UUID, uuid.UUID] = {}
     if scoped:
@@ -553,17 +555,21 @@ def _run_now(
     return _run_out(_complete(session, run, stats, profiles, system=False))
 
 
-def request_run(session: Session, ctx: UserContext, data: RunCreate) -> RunOut:
+def request_run(
+    session: Session, ctx: UserContext, data: RunCreate, *, also: Sequence[str] = ()
+) -> RunOut:
     """``POST /dq/runs``: run now when the scope has at most ``sync_max_students`` students,
-    else queue it for the worker (status ``queued``; the requester is notified when done)."""
+    else queue it for the worker (status ``queued``; the requester is notified when done).
+    ``also``: the route's own permission when it is not ``dq.findings.read`` (a readiness run:
+    ``dq.readiness.manage``); its scope limits the run too (SEC-044)."""
     _check_profile(data.profile_key)
     scope = _scope_of(data)
-    _check_structure(session, ctx, scope)
-    ids = engine.resolve_students(session, ctx, scope)
+    _check_structure(session, ctx, scope, also=also)
+    ids = engine.resolve_students(session, ctx, scope, also=also)
     if len(ids) <= load_engine_config().sync_max_students:
         return _run_now(session, ctx, scope, ids, data.profile_key)
     # The worker runs with a whole-school context: freeze a scoped caller's reach now.
-    school_wide = _reach(session, ctx) is None
+    school_wide = _reach(session, ctx) is None and all(ctx.scope_for(p).school_wide for p in also)
     effective = scope if school_wide else engine.Scope(student_ids=tuple(ids))
     run = repo.insert_run(
         session,
@@ -1104,6 +1110,33 @@ def rules_catalog() -> list[RuleOut]:
             )
         )
     return out
+
+
+def board_students(
+    session: Session, profile_key: str, student_ids: Sequence[uuid.UUID]
+) -> list[uuid.UUID]:
+    """``student_ids`` without those whose current class the school mapped to another board
+    than the profile's (FR-TEN-021, audit 2026-10-17 L-10), in the given order. Portal
+    profiles, schools without a class map and students without a current class keep
+    everyone. ``student_ids`` must come from the caller's own scoped reads."""
+    profile = load_profiles().get(profile_key)
+    board = profile_board(profile) if profile is not None else None
+    if board is None:
+        return list(student_ids)
+    _, class_boards = tenancy.school_boards(session)
+    others = {code for code, b in class_boards.items() if b != board}
+    if not others:
+        return list(student_ids)
+    placements = students.current_placements(session, student_ids)
+    class_of = {s.id: s.class_id for s in tenancy.list_sections(session)}
+    codes = {c.id: c.code for c in tenancy.list_classes(session)}
+
+    def code(sid: uuid.UUID) -> str | None:
+        section = placements.get(sid)
+        klass = class_of.get(section) if section is not None else None
+        return codes.get(klass) if klass is not None else None
+
+    return [sid for sid in student_ids if code(sid) not in others]
 
 
 def profiles_catalog() -> list[ProfileOut]:

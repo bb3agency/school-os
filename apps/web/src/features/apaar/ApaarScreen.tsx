@@ -340,9 +340,11 @@ function FormLanguageCard() {
     retry: false,
   });
   const manage = can(SETTINGS_MANAGE);
-  const current = settings.data?.form_language ?? "en";
+  // ADR-0044 decision 7: null = the form follows the school's parent language.
+  const own = settings.data?.form_language ?? null;
+  const current = settings.data?.effective_language ?? "en";
 
-  async function save(language: FormLanguage) {
+  async function save(language: FormLanguage | null) {
     if (!settings.data) return;
     setPending(true);
     setError(undefined);
@@ -368,10 +370,22 @@ function FormLanguageCard() {
       <div className="space-y-3">
         <p className="text-sm">
           {t("current")} <strong>{t(`languages.${current}`)}</strong>
+          {own === null ? <> {t("followingSchool")}</> : null}
         </p>
         {manage && settings.data ? (
           <div className="flex flex-wrap gap-2">
-            {FORM_LANGUAGES.filter((language) => language !== current).map((language) => (
+            {own !== null ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={pending}
+                onClick={() => void save(null)}
+              >
+                <Icon name="check" className="size-4" />
+                {pending ? tc("working") : t("followSchool")}
+              </Button>
+            ) : null}
+            {FORM_LANGUAGES.filter((language) => language !== own).map((language) => (
               <Button
                 key={language}
                 variant="secondary"

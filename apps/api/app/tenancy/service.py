@@ -36,7 +36,13 @@ from app.core.crypto import (
 from app.core.db import platform_session, tenant_session
 from app.core.errors import Conflict, NotFound, PreconditionFailed, ValidationFailed
 from app.core.ids import new_id
-from app.core.languages import enabled_languages, telugu_enabled
+from app.core.languages import (
+    Language,
+    enabled_languages,
+    telugu_enabled,
+    unreviewed_parent_texts,
+)
+from app.core.languages import parent_language as resolve_parent_language
 from app.core.logging import get_context
 from app.tenancy import offboarding
 from app.tenancy import repository as repo
@@ -965,6 +971,7 @@ def _tenant_out(tenant: Any) -> TenantOut:
         deployment_mode=tenant.deployment_mode,
         settings=settings,
         modules_hidden=sorted(operating_modes()[settings.operating_mode]),
+        parent_language_unreviewed=unreviewed_parent_texts(settings.parent_language),
         version=tenant.version,
     )
 
@@ -976,6 +983,25 @@ def module_enabled(session: Session, module: str) -> bool:
     if tenant is None:
         raise NotFound("School not found")
     return module not in operating_modes()[_stored_settings(tenant).operating_mode]
+
+
+def parent_language(session: Session) -> Language:
+    """The school's parent language (``en`` until set; ADR-0044, FR-LANG-001), read in the
+    school's own ``tenant_session``. Independent of ``SOS_TELUGU_ENABLED``. Per-guardian choices
+    come from ``students.service.guardian_language`` and win over this; combine the two with
+    ``app.core.languages.parent_language``."""
+    tenant = repo.get_own_tenant(session)
+    if tenant is None:
+        raise NotFound("School not found")
+    return resolve_parent_language(dict(tenant.settings or {}))
+
+
+def school_display_name(session: Session) -> str:
+    """The school's name for a parent page heading (any caller in the school's session)."""
+    tenant = repo.get_own_tenant(session)
+    if tenant is None:
+        raise NotFound("School not found")
+    return str(tenant.name)
 
 
 def school_boards(session: Session) -> tuple[list[str], dict[str, str]]:
@@ -1051,6 +1077,9 @@ def update_tenant_settings(
         summary["boards"] = list(new_boards)
     if "operating_mode" in fields:
         summary["operating_mode"] = merged.operating_mode
+    if "parent_language" in fields:
+        # ADR-0044, FR-LANG-001: the language parents receive is audited with its value.
+        summary["parent_language"] = merged.parent_language
     _audit(
         session,
         action="tenant.settings_updated",

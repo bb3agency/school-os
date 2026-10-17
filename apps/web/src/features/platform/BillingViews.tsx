@@ -11,7 +11,7 @@ import {
 } from "@schoolos/api-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
-import { z } from "zod";
+import * as z from "@/lib/zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
@@ -22,6 +22,7 @@ import { SelectField } from "@/components/ui/Select";
 import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { planTone, subscriptionTone } from "@/features/status";
+import { Pager, usePagedList } from "@/features/students/paging";
 import { ApiError, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import type { FieldErrors } from "@/lib/forms";
 import { formatCount, formatDate, formatInr } from "@/lib/format";
@@ -736,10 +737,14 @@ export function SubscriptionsScreen({ status = "" }: { status?: string }) {
       : null;
   };
   const query = { limit: 200, ...(status ? { status } : {}) };
-  const subscriptions = useApiQuery(
+  const { rows: subscriptions, pager } = usePagedList(
     [...PK.subscriptions, "list", query],
-    async () =>
-      (await unwrap(api.GET("/api/v1/platform/subscriptions", { params: { query } }))).data,
+    (cursor) =>
+      unwrap(
+        api.GET("/api/v1/platform/subscriptions", {
+          params: { query: { ...query, ...(cursor ? { cursor } : {}) } },
+        }),
+      ),
   );
   const columns: Column<Subscription>[] = [
     {
@@ -864,6 +869,7 @@ export function SubscriptionsScreen({ status = "" }: { status?: string }) {
         emptyTitle={t("emptyTitle")}
         emptyBody={t("emptyBody")}
       />
+      <Pager label={t("pagesLabel")} {...pager} />
     </div>
   );
 }
@@ -895,9 +901,12 @@ export function InvoicesScreen({ filters = {} }: { filters?: InvoiceFilters }) {
       : {}),
     ...(filters.tenantId ? { tenant_id: filters.tenantId } : {}),
   };
-  const invoices = useApiQuery(
-    [...PK.invoices, "list", query],
-    async () => (await unwrap(api.GET("/api/v1/platform/invoices", { params: { query } }))).data,
+  const { rows: invoices, pager } = usePagedList([...PK.invoices, "list", query], (cursor) =>
+    unwrap(
+      api.GET("/api/v1/platform/invoices", {
+        params: { query: { ...query, ...(cursor ? { cursor } : {}) } },
+      }),
+    ),
   );
 
   return (
@@ -989,6 +998,7 @@ export function InvoicesScreen({ filters = {} }: { filters?: InvoiceFilters }) {
         />
       </FilterCard>
       <InvoiceTable invoices={invoices} caption={t("title")} schoolName={nameOf} />
+      <Pager label={t("pagesLabel")} {...pager} />
     </div>
   );
 }

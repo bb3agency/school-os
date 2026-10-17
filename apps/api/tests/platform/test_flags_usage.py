@@ -146,3 +146,75 @@ def test_FR_PLT_020_usage_rollup_counts_only(
             == 2
         )
     assert usage.collect_daily(day) >= 1
+
+
+def test_L_09_students_documents_and_storage_are_counted(
+    api: Api, owner: Operator, make_plan: Callable[..., uuid.UUID], admin_engine: Engine
+) -> None:
+    """Shared tier (FR-PLT-020): active students, active documents and stored bytes are counted
+    in the school's own session (counts only), so per-student billing and the ``students``
+    limit work; left students and quarantined versions do not count."""
+    plan = make_plan(limits={"students": 2})
+    tid = uuid.UUID(
+        api.call("POST", "/tenants", owner, json=provision_payload(plan)).json()["tenant_id"]
+    )
+    api.call("POST", f"/tenants/{tid}/activate", owner)
+    with admin_engine.begin() as c:
+        user_id: Any = c.execute(
+            text("SELECT user_id FROM core.memberships WHERE tenant_id = :t LIMIT 1"), {"t": tid}
+        ).scalar_one()
+        for status in ("active", "active", "left", "provisional"):
+            c.execute(
+                text("INSERT INTO sis.students (id, tenant_id, status) VALUES (:i, :t, :s)"),
+                {"i": uuid.uuid4(), "t": tid, "s": status},
+            )
+        for doc_status, sizes in (("active", (1000, 500)), ("archived", (300,))):
+            doc_id = uuid.uuid4()
+            versions = [uuid.uuid4() for _ in sizes]
+            c.execute(
+                text(
+                    "INSERT INTO kb.documents (id, tenant_id, purpose, doc_type, title, "
+                    "sensitivity, status, current_version_id, created_by) VALUES "
+                    "(:d, :t, 'circular', 'circular', 'Synthetic', 'C1', :st, :v, :u)"
+                ),
+                {"d": doc_id, "t": tid, "st": doc_status, "v": versions[-1], "u": user_id},
+            )
+            for n, (vid, size) in enumerate(zip(versions, sizes, strict=True), start=1):
+                c.execute(
+                    text(
+                        "INSERT INTO kb.document_versions (id, tenant_id, document_id, "
+                        "version_no, object_key, sha256, mime_type, size_bytes, status, "
+                        "created_by) VALUES (:v, :t, :d, :n, :k, :h, 'application/pdf', :s, "
+                        ":st, :u)"
+                    ),
+                    {
+                        "v": vid,
+                        "t": tid,
+                        "d": doc_id,
+                        "n": n,
+                        "k": f"t/{tid}/docs/{doc_id}/v{n}/original.pdf",
+                        "h": bytes(32),
+                        "s": size,
+                        "st": "quarantined" if size == 500 else "ready",
+                        "u": user_id,
+                    },
+                )
+    day = dt.datetime.now(dt.UTC).astimezone(dt.timezone(dt.timedelta(hours=5, minutes=30))).date()
+    values = usage.collect_tenant(tid, day)
+    _numbers_only(values)
+    assert (values["students_active"], values["documents"], values["storage_bytes"]) == (
+        2,
+        1,
+        1300,
+    )
+    with platform_session() as s:
+        crossed: list[int] = list(
+            s.execute(
+                text(
+                    "SELECT threshold FROM platform.usage_threshold_events "
+                    "WHERE tenant_id = :t AND metric = 'students' ORDER BY threshold"
+                ),
+                {"t": tid},
+            ).scalars()
+        )
+    assert crossed == [80, 100]

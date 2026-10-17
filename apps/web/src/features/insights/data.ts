@@ -2,7 +2,7 @@
 
 import type { components } from "@schoolos/api-client";
 import { useQuery } from "@tanstack/react-query";
-import { z } from "zod";
+import * as z from "@/lib/zod";
 import { AuthRedirectError } from "@/lib/bff/fetch";
 import { ApiError, NotAvailableError, toLoadable, unwrap, useBffClient } from "@/lib/bff/query";
 import type { Loadable } from "@/lib/loadable";
@@ -165,10 +165,14 @@ function retry(count: number, error: unknown): boolean {
 }
 
 /** GET /insights/flags (soonest due first). */
-export function useFlags(filters: FlagFilters, enabled: boolean): Loadable<Paged<Flag>> {
+export function useFlags(
+  filters: FlagFilters,
+  enabled: boolean,
+  cursor?: string,
+): Loadable<Paged<Flag>> {
   const api = useBffClient("staff");
   const query = useQuery({
-    queryKey: KEYS.flagList(filters),
+    queryKey: [...KEYS.flagList(filters), cursor ?? null],
     queryFn: () =>
       unwrap(
         api.GET("/api/v1/insights/flags", {
@@ -176,6 +180,7 @@ export function useFlags(filters: FlagFilters, enabled: boolean): Loadable<Paged
             query: {
               view: filters.view,
               limit: 100,
+              ...(cursor ? { cursor } : {}),
               ...(filters.status !== "active" ? { status: filters.status } : {}),
               ...(filters.indicator !== "any" ? { indicator: filters.indicator } : {}),
               ...(filters.due !== "any" ? { due: filters.due } : {}),

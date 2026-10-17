@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "@/lib/zod";
 import { containsAadhaarNumber } from "@/lib/aadhaar";
 import { ApiError } from "@/lib/bff/query";
 import { optionalText, text } from "@/lib/validation";

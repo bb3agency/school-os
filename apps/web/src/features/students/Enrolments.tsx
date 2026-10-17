@@ -3,7 +3,7 @@
 import type { components } from "@schoolos/api-client";
 import { useLocale, useTranslations } from "next-intl";
 import { useId } from "react";
-import { z } from "zod";
+import * as z from "@/lib/zod";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { SelectField } from "@/components/ui/Select";

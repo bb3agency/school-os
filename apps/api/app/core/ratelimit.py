@@ -76,6 +76,7 @@ __all__ = [
     "client_ip",
     "client_ip_of",
     "enforce",
+    "ensure_room",
     "get_rate_limiter",
     "header_values",
     "ip_hash",
@@ -93,7 +94,7 @@ CLIENT_IP_STATE: Final = "sos_client_ip"
 """``request.state`` key: the client IP resolved by the middleware."""
 _UNAVAILABLE_LOG_EVERY_S: Final = 10.0
 
-Per = Literal["ip", "user", "school", "operator"]
+Per = Literal["ip", "user", "school", "operator", "handle"]
 FailMode = Literal["open", "closed"]
 FailureScope = Literal["ip", "subject_ip"]
 
@@ -146,6 +147,9 @@ class RateLimitConfig(BaseModel):
     cost: Cost
     exempt_paths: tuple[str, ...]
     machine_path_prefixes: tuple[str, ...]
+    # R2 public surface (ADR-0046, ADR-0047): parent and verification routes the BFF calls with
+    # the service token and no user; per-IP layer ``public_ip`` instead of ``ip``.
+    public_path_prefixes: tuple[str, ...] = ()
     policies: dict[str, Policy]
     routes: dict[str, tuple[str, ...]]
     auth_failures: AuthFailures
@@ -154,6 +158,8 @@ class RateLimitConfig(BaseModel):
         for name in ("ip", "machine_ip", "user", "school", "operator"):
             if name not in self.policies:
                 raise ValueError(f"rate_limits.yaml needs policy {name!r}")
+        if self.public_path_prefixes and "public_ip" not in self.policies:
+            raise ValueError("rate_limits.yaml needs policy 'public_ip' for public_path_prefixes")
         for route, names in self.routes.items():
             method, _, path = route.partition(" ")
             if method not in {"GET", "POST", "PUT", "PATCH", "DELETE"} or not path.startswith("/"):
@@ -161,8 +167,11 @@ class RateLimitConfig(BaseModel):
             for name in names:
                 if name not in self.policies:
                     raise ValueError(f"rate_limits.yaml route {route!r}: unknown policy {name!r}")
-                if self.policies[name].per == "ip":
-                    raise ValueError(f"rate_limits.yaml route {route!r}: per-ip route policy")
+                if self.policies[name].per in ("ip", "handle"):
+                    raise ValueError(
+                        f"rate_limits.yaml route {route!r}: per-{self.policies[name].per} "
+                        "route policy (charged by the public guards, not by route)"
+                    )
 
     def policy(self, name: str) -> Policy:
         return self.policies[name].model_copy(update={"name": name})
@@ -174,6 +183,17 @@ class RateLimitConfig(BaseModel):
 
     def is_machine_path(self, path: str) -> bool:
         return any(path.startswith(prefix) for prefix in self.machine_path_prefixes)
+
+    def is_public_path(self, path: str) -> bool:
+        return any(path.startswith(prefix) for prefix in self.public_path_prefixes)
+
+    def ip_policy_for(self, path: str) -> str:
+        """The layer-1 policy of a path: ``machine_ip``, ``public_ip`` or ``ip``."""
+        if self.is_machine_path(path):
+            return "machine_ip"
+        if self.is_public_path(path):
+            return "public_ip"
+        return "ip"
 
 
 @lru_cache(maxsize=1)
@@ -213,6 +233,11 @@ class RawDecision:
 
 class RateLimitStore(Protocol):
     def acquire(self, blocks: Sequence[str], buckets: Sequence[BucketSpec]) -> RawDecision: ...
+
+    def peek(self, bucket: BucketSpec) -> BucketResult:
+        """Whether ``bucket.cost`` more units would fit now, charging nothing
+        (``retry_ms == 0``: they would)."""
+        ...
 
     def fail(self, count_key: str, block_key: str, backoff: Backoff) -> tuple[int, int]:
         """Count one failure; returns ``(failures, delay_ms)`` (0 = no delay yet)."""
@@ -290,6 +315,11 @@ class InMemoryRateLimitStore:
                 for spec, new_tat in zip(buckets, tats, strict=True):
                     self._put(spec.key, new_tat, new_tat, now)
             return RawDecision(allowed, block_ms, tuple(results))
+
+    def peek(self, bucket: BucketSpec) -> BucketResult:
+        with self._lock:
+            now = self.clock()
+            return _gcra(self._get(bucket.key, now) or 0.0, now, bucket)[1]
 
     def fail(self, count_key: str, block_key: str, backoff: Backoff) -> tuple[int, int]:
         with self._lock:
@@ -369,6 +399,29 @@ end
 return out
 """
 
+# KEYS[1]: one GCRA bucket. ARGV: period_ms, quota, cost. Reads only: {remaining, retry_ms,
+# reset_ms} for charging ``cost`` now (retry_ms 0 = it would fit).
+_PEEK_LUA: Final = """
+local t = redis.call('TIME')
+local now = tonumber(t[1]) * 1000 + math.floor(tonumber(t[2]) / 1000)
+local period = tonumber(ARGV[1])
+local quota = tonumber(ARGV[2])
+local cost = tonumber(ARGV[3])
+local interval = period / quota
+local tat = tonumber(redis.call('GET', KEYS[1]) or '0') or 0
+if tat < now then tat = now end
+local new_tat = tat + interval * cost
+local allow_at = new_tat - period
+if allow_at > now then
+  local remaining = math.floor((period - (tat - now)) / interval + 0.000001)
+  if remaining < 0 then remaining = 0 end
+  return {remaining, math.ceil(allow_at - now), math.ceil(tat - now)}
+end
+local remaining = math.floor((period - (new_tat - now)) / interval + 0.000001)
+if remaining < 0 then remaining = 0 end
+return {remaining, 0, math.ceil(new_tat - now)}
+"""
+
 # KEYS[1] failure count, KEYS[2] block. ARGV: free, base_ms, max_ms, reset_ms.
 _FAIL_LUA: Final = """
 local t = redis.call('TIME')
@@ -393,6 +446,7 @@ class ValkeyRateLimitStore:
         self._client = client
         self._acquire = client.register_script(_ACQUIRE_LUA)
         self._fail = client.register_script(_FAIL_LUA)
+        self._peek = client.register_script(_PEEK_LUA)
 
     def acquire(self, blocks: Sequence[str], buckets: Sequence[BucketSpec]) -> RawDecision:
         args: list[int] = [len(blocks)]
@@ -407,6 +461,14 @@ class ValkeyRateLimitStore:
             BucketResult(values[i], values[i + 1], values[i + 2]) for i in range(2, len(values), 3)
         )
         return RawDecision(values[0] == 1, values[1], results)
+
+    def peek(self, bucket: BucketSpec) -> BucketResult:
+        try:
+            raw = self._peek(keys=[bucket.key], args=[bucket.period_ms, bucket.quota, bucket.cost])
+        except redis.RedisError as exc:
+            raise StoreUnavailable("valkey rate limit peek failed") from exc
+        remaining, retry, reset = (int(v) for v in raw)
+        return BucketResult(remaining, retry, reset)
 
     def fail(self, count_key: str, block_key: str, backoff: Backoff) -> tuple[int, int]:
         args = [
@@ -578,6 +640,34 @@ class RateLimiter:
             blocked=blocked,
             degraded=degraded,
         )
+
+    def peek(self, bucket: Bucket) -> Decision:
+        """Whether ``bucket`` could be charged now, without charging it (a budget spent only
+        by failures, e.g. ``public_lookup_fail``, must still refuse the next attempt once it is
+        used up). Valkey unreachable: ``fail: open`` allows, ``fail: closed`` asks the
+        per-process fallback. Never raises."""
+        if not self.enabled:
+            return Decision(True, 0, ())
+        spec = self._spec(bucket)
+        degraded = False
+        try:
+            result = self.store.peek(spec)
+        except StoreUnavailable:
+            _note_unavailable()
+            if bucket.policy.fail == "open":
+                return Decision(True, 0, (), degraded=True)
+            result, degraded = self.fallback.peek(spec), True
+        state = PolicyState(
+            bucket.policy,
+            result.remaining,
+            _ceil_s(result.reset_ms),
+            bucket.policy.report or result.retry_ms > 0,
+        )
+        if result.retry_ms > 0:
+            return Decision(
+                False, _ceil_s(result.retry_ms), (state,), denied=bucket.policy, degraded=degraded
+            )
+        return Decision(True, 0, (state,), degraded=degraded)
 
     def record_failure(self, scope: FailureScope, partition: str) -> int:
         """Count one failed authentication; returns the delay (s) now imposed (0 = none)."""
@@ -790,7 +880,7 @@ def _charge(request: Request, limiter: RateLimiter, buckets: Sequence[Bucket]) -
     return decision
 
 
-def charge(request: Request, policy_name: str, partition: str) -> Decision:
+def charge(request: Request, policy_name: str, partition: str, *, cost: int = 1) -> Decision:
     """Charge one budget from inside a handler, AFTER authorization.
 
     A budget shared by a whole school (``per: school``) charged before the permission check
@@ -802,7 +892,23 @@ def charge(request: Request, policy_name: str, partition: str) -> Decision:
     limiter = get_rate_limiter()
     if not limiter.enabled:
         return Decision(True, 0, ())
-    return _charge(request, limiter, [Bucket(limiter.config.policy(policy_name), partition, 1)])
+    policy = limiter.config.policy(policy_name)
+    return _charge(request, limiter, [Bucket(policy, partition, cost)])
+
+
+def ensure_room(request: Request, policy_name: str, partition: str, *, cost: int = 1) -> None:
+    """Refuse (429) when ``cost`` more units of ``policy_name`` would not fit now, charging
+    nothing. For budgets spent only by failures (``public_lookup_fail``, ADR-0046 decision 7):
+    the guard checks room before the lookup and charges the failure after it, so a used-up
+    budget refuses every further attempt, including ones that would have succeeded."""
+    limiter = get_rate_limiter()
+    if not limiter.enabled:
+        return
+    decision = limiter.peek(Bucket(limiter.config.policy(policy_name), partition, cost))
+    if not decision.allowed:
+        remember(request.scope, decision)
+        _log_limited(request, decision, limiter.ip_hash(client_ip_of(request)))
+        raise RateLimitExceeded(decision.retry_after_s)
 
 
 def charge_school_routes(request: Request, tenant_id: uuid.UUID | None) -> Decision:

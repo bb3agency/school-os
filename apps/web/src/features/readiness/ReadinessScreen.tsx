@@ -3,7 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect } from "react";
-import { z } from "zod";
+import * as z from "@/lib/zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { Pill } from "@/components/ui/Badge";
@@ -33,6 +33,7 @@ import {
   useSectionReadiness,
 } from "./data";
 import { OwnerBadge, ReadinessBadge, ReadyBar } from "./parts";
+import { SensitiveSlipLink } from "./SensitiveSlipLink";
 import { slipHref, type ReadinessSection, type ReadinessStudent } from "./types";
 
 const runSchema = z.object({});
@@ -398,6 +399,7 @@ export function ReadinessScreen({
                   },
                 }}
               />
+              <SensitiveSlipLink profileKey={profileKey} target={{ sectionId }} />
             </span>
           }
         >

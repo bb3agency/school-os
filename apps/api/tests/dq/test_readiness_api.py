@@ -3,12 +3,15 @@ SEC-015, invariants 4-6). Synthetic data only."""
 
 from __future__ import annotations
 
+import json
 import sys
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
 
 import pytest
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
 
 from app.core.languages import contains_telugu
 from app.students.schemas import ValueIn
@@ -264,6 +267,43 @@ def test_FR_DQ_044_apaar_failure_list(world: Any, api: Any) -> None:
     assert item["against"] == "admission_register"
 
 
+def test_L_03_apaar_readiness_never_pushes_a_refused_student(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """FR-APC-006: a student whose parents refused (or withdrew) APAAR consent is not on the
+    APAAR failure list and gets no DQ-031 finding of the ``apaar`` profile; the SSC check,
+    which is not an APAAR action, still applies to them."""
+    import datetime as dt
+
+    from app.apaar import service as apaar_service
+    from app.apaar.schemas import ConsentIn
+
+    name = fresh_name()
+    sid, _ = ssc_student(world.a, name=name, udise_name=name + " Reddy")
+    refused = ConsentIn(status="refused", relationship="father", decided_on=dt.date(2026, 7, 1))
+    DS.call(world.a, apaar_service.record_consent, sid, refused)
+    admin = world.person("office_admin")
+    listed = api.call(
+        admin,
+        "GET",
+        "/api/v1/dq/readiness/apaar/students",
+        params={"section_id": str(world.a.ids["section_9a"])},
+    )
+    assert listed.status_code == 200, listed.text
+    mine = next(s for s in listed.json() if s["student"]["id"] == str(sid))
+    assert (mine["status"], mine["owners"]) == ("ready", [])
+    assert run(api, admin, sid, profile="apaar").status_code == 202
+    assert not [
+        f
+        for f in DS.findings(admin_engine, sid)
+        if f["rule_id"] == "DQ-031" and f["profile_key"] == "apaar" and f["status"] == "open"
+    ]
+    ssc = api.call(
+        admin, "GET", f"{BASE}/students", params={"section_id": str(world.a.ids["section_9a"])}
+    )
+    assert next(s for s in ssc.json() if s["student"]["id"] == str(sid))["status"] == "needs_school"
+
+
 def test_US_505_parent_slip_is_printable_and_audited(
     world: Any, api: Any, admin_engine: Engine
 ) -> None:
@@ -350,3 +390,219 @@ def test_US_504_findings_list_explains_readiness_findings(world: Any, api: Any) 
         "Ask the MEO or MIS coordinator to correct UDISE+."
     )
     assert finding["routes"][0]["code"] == "ROUTE-UDISE"
+
+
+def test_SEC_044_a_scoped_readiness_manager_runs_checks_only_in_their_scope(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """SEC-015, SEC-044: a readiness run is limited by the dq.readiness.manage grant's own
+    scope. A member whose custom role holds it for 9A only (and who reads every student through
+    another role) stores no findings for a 9C student, and a 9C section scope is refused like
+    any section outside reach (422, no existence oracle)."""
+    tid = world.a.tenant_id
+    key = f"readiness_9a_{uuid.uuid4().hex[:8]}"
+    role_id = uuid.uuid4()
+    with admin_engine.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO core.roles (id, tenant_id, key, name_en, name_te) "
+                "VALUES (:r, :t, :k, 'Synthetic readiness 9A', 'కృత్రిమ పాత్ర')"
+            ),
+            {"r": role_id, "t": tid, "k": key},
+        )
+        for perm in ("dq.readiness.read", "dq.readiness.manage"):
+            c.execute(
+                text(
+                    "INSERT INTO core.role_permissions (tenant_id, role_id, permission_key) "
+                    "VALUES (:t, :r, :p)"
+                ),
+                {"t": tid, "r": role_id, "p": perm},
+            )
+    # accountant: student.read_basic for the whole school, no data-quality permission.
+    member = W.add_member(
+        admin_engine, tid, [key, "accountant"], scopes=[("section", world.a.ids["section_9a"])]
+    )
+    name = fresh_name()
+    sid_9c, _ = ssc_student(world.a, name=name, udise_dob="2012-03-15", section_key="section_9c")
+    res = run(api, member, sid_9c)
+    assert res.status_code == 202, res.text
+    assert res.json()["stats"]["students"] == 0
+    assert DS.findings(admin_engine, sid_9c, "DQ-031") == []
+    refused = api.call(
+        member,
+        "POST",
+        f"{BASE}/runs",
+        json={"scope": {"section_ids": [str(world.a.ids["section_9c"])]}},
+        headers={"Idempotency-Key": str(uuid.uuid4())},
+    )
+    assert refused.status_code == 422, refused.text
+    sid_9a, _ = ssc_student(world.a, udise_dob="2012-03-15")
+    own = run(api, member, sid_9a)
+    assert own.status_code == 202, own.text
+    assert own.json()["stats"]["students"] == 1
+
+
+def test_SEC_043_section_slips_audit_whose_restricted_values_were_shown(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """Invariant 7, SEC-043: a section print of slips that shows Aadhaar-as-printed values
+    (asked for, by a holder of ``student.read_sensitive``) names the students in its audit
+    event, ids only; a print without restricted values names nobody."""
+    sid, _ = ssc_student(world.a)
+    section = str(world.a.ids["section_9a"])
+    office = world.person("office_admin")  # holds student.read_sensitive
+    res = api.call(
+        office,
+        "GET",
+        f"{BASE}/slips",
+        params={"section_id": section, "include_sensitive": "true"},
+    )
+    assert res.status_code == 200, res.text
+    event = W.audit_events(admin_engine, world.a.tenant_id, "dq.readiness.slips_printed")[-1]
+    assert event["summary"]["section_id"] == section
+    assert event["summary"]["sensitive_shown"] >= 1
+    assert str(sid) in event["summary"]["sensitive_student_ids"]
+    assert len(event["summary"]["sensitive_student_ids"]) == event["summary"]["sensitive_shown"]
+    staff = world.person("office_staff")  # no student.read_sensitive
+    plain = api.call(staff, "GET", f"{BASE}/slips", params={"section_id": section})
+    assert plain.status_code == 200
+    latest = W.audit_events(admin_engine, world.a.tenant_id, "dq.readiness.slips_printed")[-1]
+    assert latest["summary"]["sensitive_shown"] == 0
+    assert "sensitive_student_ids" not in latest["summary"]
+
+
+def test_SEC_045_slips_mask_restricted_values_unless_asked_for_with_step_up(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """SEC-045 (docs/07 §11, ADR-0021): the HTML slips mask Aadhaar-as-printed values by
+    default, also for a holder of ``student.read_sensitive``. ``include_sensitive=true`` shows
+    them, and needs that permission (403) and a recent sign-in with MFA (428), like the PDF."""
+    name = fresh_name()
+    aadhaar_name = name.replace(" Sai Kumar", " Saikumarr")
+    sid, _ = ssc_student(world.a, name=name, aadhaar_name=aadhaar_name)
+    section = str(world.a.ids["section_9a"])
+    office = world.person("office_admin")  # holds student.read_sensitive
+    for params in ({"student_id": str(sid)}, {"section_id": section}):
+        masked = api.call(office, "GET", f"{BASE}/slips", params=params)
+        assert masked.status_code == 200, masked.text
+        assert "Saikumarr" not in masked.text
+        event = W.audit_events(admin_engine, world.a.tenant_id, "dq.readiness.slips_printed")[-1]
+        assert event["summary"]["sensitive_shown"] == 0
+        shown = api.call(
+            office, "GET", f"{BASE}/slips", params={**params, "include_sensitive": "true"}
+        )
+        assert shown.status_code == 200, shown.text
+        assert "Saikumarr" in shown.text
+        stale = api.call(
+            office,
+            "GET",
+            f"{BASE}/slips",
+            params={**params, "include_sensitive": "true"},
+            auth_age_s=600,
+        )
+        assert stale.status_code == 428, stale.text
+        no_mfa = api.call(
+            office,
+            "GET",
+            f"{BASE}/slips",
+            params={**params, "include_sensitive": "true"},
+            mfa=False,
+        )
+        assert no_mfa.status_code in (403, 428)  # office_admin needs MFA for everything
+    # check=true: every check, no page and no audit event (the screen confirms the sign-in).
+    before = len(W.audit_events(admin_engine, world.a.tenant_id, "dq.readiness.slips_printed"))
+    checked = api.call(
+        office,
+        "GET",
+        f"{BASE}/slips",
+        params={"student_id": str(sid), "include_sensitive": "true", "check": "true"},
+    )
+    assert checked.status_code == 204, checked.text
+    assert checked.content == b""
+    stale_check = api.call(
+        office,
+        "GET",
+        f"{BASE}/slips",
+        params={"student_id": str(sid), "include_sensitive": "true", "check": "true"},
+        auth_age_s=600,
+    )
+    assert stale_check.status_code == 428
+    after = W.audit_events(admin_engine, world.a.tenant_id, "dq.readiness.slips_printed")
+    assert len(after) == before
+    staff = world.person("office_staff")  # no student.read_sensitive
+    refused = api.call(
+        staff, "GET", f"{BASE}/slips", params={"student_id": str(sid), "include_sensitive": "true"}
+    )
+    assert refused.status_code == 403
+    assert refused.json()["code"] == "sensitive_not_allowed"
+
+
+@contextmanager
+def _boards(
+    admin: Engine, tenant_id: uuid.UUID, boards: list[str], class_boards: dict[str, str]
+) -> Iterator[None]:
+    """The school's boards and class map for one block (the world is shared)."""
+    with admin.begin() as c:
+        row = c.execute(
+            text("SELECT boards, settings FROM core.tenants WHERE id = :t"), {"t": tenant_id}
+        ).one()
+        c.execute(
+            text(
+                "UPDATE core.tenants SET boards = :b, "
+                "settings = settings || jsonb_build_object('class_boards', CAST(:cb AS jsonb)) "
+                "WHERE id = :t"
+            ),
+            {"b": boards, "cb": json.dumps(class_boards), "t": tenant_id},
+        )
+    try:
+        yield
+    finally:
+        with admin.begin() as c:
+            c.execute(
+                text("UPDATE core.tenants SET boards = :b, settings = :s WHERE id = :t"),
+                {"b": list(row.boards), "s": json.dumps(row.settings), "t": tenant_id},
+            )
+
+
+def test_L_10_board_readiness_skips_classes_mapped_to_another_board(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """FR-TEN-021: a school with Class IX on CBSE does not check its Class IX students for the
+    State Board SSC nominal roll: not in the summary, not in the default run scope, and a run
+    on them stores no SSC finding. The portal (apaar) check still covers them."""
+    name = fresh_name()
+    sid, _ = ssc_student(world.a, name=name, udise_name=name + " Reddy")
+    office = world.person("office_admin")
+    with _boards(admin_engine, world.a.tenant_id, ["CBSE", "BSEAP"], {"IX": "CBSE"}):
+        body = api.call(office, "GET", BASE).json()
+        nine = {str(world.a.ids["section_9a"]), str(world.a.ids["section_9c"])}
+        assert not nine & {s["section_id"] for s in body["sections"]}
+        default = api.call(
+            world.person("exam_coordinator"),
+            "POST",
+            f"{BASE}/runs",
+            json={},
+            headers={"Idempotency-Key": str(uuid.uuid4())},
+        )
+        assert default.status_code == 202, default.text
+        assert default.json()["scope"]["class_ids"] == [str(world.a.ids["class_x"])]
+        assert run(api, office, sid).status_code == 202
+        ssc = [
+            f
+            for f in DS.findings(admin_engine, sid)
+            if f["profile_key"] == SSC and f["status"] == "open"
+        ]
+        assert ssc == []
+        listed = api.call(
+            office,
+            "GET",
+            "/api/v1/dq/readiness/apaar/students",
+            params={"section_id": str(world.a.ids["section_9a"])},
+        ).json()
+        mine = next(s for s in listed if s["student"]["id"] == str(sid))
+        assert mine["status"] == "needs_school"
+        ssc_list = api.call(
+            office, "GET", f"{BASE}/students", params={"section_id": str(world.a.ids["section_9a"])}
+        )
+        assert ssc_list.status_code == 200, ssc_list.text
+        assert str(sid) not in {s["student"]["id"] for s in ssc_list.json()}

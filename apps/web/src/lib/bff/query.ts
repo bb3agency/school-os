@@ -67,6 +67,30 @@ export function asList<T>(body: readonly T[] | null | undefined): T[] {
   return Array.isArray(body) ? [...body] : [];
 }
 
+/** Most pages `listAll` follows (200 rows each at the API's cap: 5,000 rows). */
+export const LIST_ALL_MAX_PAGES = 25;
+
+/**
+ * Every page of a cursor-paged list, for small catalogues a picker must show in full (the
+ * school's years, classes and sections; FR-TEN-010). One page stops at the API's cap of 200
+ * rows, and sections of every year are listed, so a large school passes it within a few
+ * years; the rows after it were silently missing from every section picker.
+ */
+export async function listAll<T>(
+  load: (cursor: string | undefined) => Promise<{ data?: T[] | null; next_cursor?: string | null }>,
+  maxPages: number = LIST_ALL_MAX_PAGES,
+): Promise<T[]> {
+  const rows: T[] = [];
+  let cursor: string | undefined;
+  for (let page = 0; page < maxPages; page += 1) {
+    const body = await load(cursor);
+    rows.push(...asList(body.data));
+    if (!body.next_cursor) break;
+    cursor = body.next_cursor;
+  }
+  return rows;
+}
+
 let navigateOverride: Navigate | undefined;
 /** Tests only: capture sign-in/step-up navigation instead of leaving the page. */
 export function setNavigateForTesting(navigate: Navigate | undefined): void {

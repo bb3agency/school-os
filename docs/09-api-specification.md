@@ -78,6 +78,13 @@ Budgets are versioned in `apps/api/app/core/rate_limits.yaml` (invariant 13); th
 | `platform_emergency` | 60 / 600 s | operator | open | `POST /platform/invoice-runs` |
 | `kb_ask` | `models.yaml` (10 / 60 s) | person | open | `POST /knowledge/ask`, and one unit per AI notice draft (`POST /notices` except `blank`, `POST /notices/{notice_id}/draft`) and per circular reading asked for (`POST /circulars/{document_id}/read`; audit 2026-10-06 R-20) (429 `ai_rate_limited` with `Retry-After` and the RateLimit headers) |
 | `audit_verify` | `rate_limits.yaml` (1 / 600 s) | school | open | `POST /audit/verify`, charged after the permission check (R-19) |
+| `readiness_reads` | 30 / 60 s | person | open | `GET /dq/readiness/{profile_key}`, `GET /dq/readiness/{profile_key}/students` (each call assesses every student; SEC-046) |
+| `readiness_school` | 300 / 60 s | school | open | the same two routes, charged after authorization (SEC-046) |
+| `public_ip` | 60 / 60 s | client IP | closed | every `/api/v1/public/*` request (layer 1, instead of `ip`; R2-0) |
+| `public_lookup_fail` | 20 / 600 s, cost 2 per failed lookup | client IP | closed | public handle guards: room checked before every lookup (refuses even a valid key once used up), charged after a miss (R2-0) |
+| `public_token` | 30 / 60 s | handle | open | public handle guards, per live handle (R2-0) |
+| `public_pay` | 5 / 86400 s | handle | closed | `POST /public/links/current/pay` (R2-3H) |
+| `webhook_route` | 600 / 60 s | handle | closed | webhook guard, per route handle after the signature check; `/api/v1/webhooks/*` also get `machine_ip` (R2-0) |
 | `platform_audit_verify` | `rate_limits.yaml` (1 / 600 s) | operator | open | `POST /platform/audit/verify` (R-19) |
 
 The shared ALB's WAF adds coarse per-IP rules in front (docs/10 §5); dedicated hosts have no WAF and rely on these limits.
@@ -167,7 +174,7 @@ The active school is sent by the BFF as `X-Active-Tenant`. A user with several m
 | POST | `/students/{id}/values` | `student.update_nonidentity` | Non-identity attributes, or adding a source observation; identity changes → change requests |
 | POST | `/students/{id}/sensitive-reveal` | `student.read_sensitive` | Returns one C3 field; audited |
 | GET/POST | `/students/{id}/guardians` | read_basic / update_nonidentity | |
-| PATCH | `/students/{id}` | `student.update_nonidentity` | Record status (`active`, `left`, `graduated`, `provisional`); `If-Match` required |
+| PATCH | `/students/{id}` | `student.update_nonidentity` | Record status (`active`, `left`, `graduated`, `provisional`); `If-Match` required. Making a left or graduated record active or provisional again answers `422 national_id_in_use` (field `status`) while another live record holds its PEN or APAAR ID (FR-STU-018) |
 | POST | `/students/{id}/values/{value_id}/verify` | `student.update_nonidentity` | `{"status": "verified"\|"rejected"}` for the current value of a non-identity attribute; identity values → change requests (`403 identity_change_required`); superseded value → `409 value_superseded` |
 | PATCH | `/students/{id}/guardians/{guardian_id}` | `student.update_nonidentity` | Name, phone, address (C3, encrypted), relationship, primary flag; `If-Match` with the guardian's ETag |
 | DELETE | `/students/{id}/guardians/{guardian_id}` | `student.update_nonidentity` | Unlink (`204`); `If-Match` with the guardian's ETag (`412` when stale). A guardian no other student is linked to is deleted with their phone and address. Audit `guardian.unlinked` (+ `guardian.deleted`) |
@@ -197,7 +204,7 @@ Promotions notes (M1, FR-TEN-011, US-202 AC2; owner decisions 2026-09-27; as bui
 | Method | Path | Permission | Notes |
 |---|---|---|---|
 | GET | `/students/{id}/apaar-consent` | `apaar.consent.read` or `apaar.consent.record` | `{student_id, status, current, history[], version}`; `status` `pending` until a decision is recorded; `ETag` = number of decisions |
-| POST | `/students/{id}/apaar-consent` | `apaar.consent.record` | Body `{status, relationship?, guardian_id?, decided_on?, form_language?, evidence_document_id?, note?}`. `201` with the new state; `Idempotency-Key`; optional `If-Match` (`412` when stale). `409 consent_not_given` (withdrawn without a given consent), `409 consent_already_decided` (pending after a decision); `422` `signed_form_required`, `missing` (relationship / decided_on), `not_found` (evidence or guardian), `date_in_future`, `date_too_early`, `aadhaar_full_number_rejected` (note). Audit `apaar.consent.recorded` |
+| POST | `/students/{id}/apaar-consent` | `apaar.consent.record` | Body `{status, relationship?, guardian_id?, decided_on?, form_language?, evidence_document_id?, note?}`. `201` with the new state; `Idempotency-Key`; optional `If-Match` (`412` when stale). `409 consent_not_given` (withdrawn without a given consent), `409 consent_already_decided` (pending after a decision); `422` `signed_form_required`, `missing` (relationship / decided_on), `not_found` (evidence or guardian), `date_in_future`, `date_too_early`, `before_current_decision` (dated before the current decision), `aadhaar_full_number_rejected` (note). Audit `apaar.consent.recorded` |
 | GET | `/students/{id}/apaar-consent/form?language=` | read or record | `text/html` A4 page with the consent and refusal options (school's language unless `language` = `en` \| `te`); `Cache-Control: no-store`, CSP style hashes only; audit `apaar.consent_form.printed`; rate limit `render` |
 | GET | `/sections/{section_id}/apaar-consent-forms?status=&language=` | read or record | One A4 page per current-year student of the section (in scope), optionally only one state; `409 no_forms`, `409 too_many_forms` (> 150); audited; rate limit `render` |
 | GET | `/apaar/consents?section_id=&class_id=&status=&limit=&cursor=` | `apaar.consent.read` | `Page[{student_id, display_name, admission_no, class_section, section_id, status, decided_on, has_form, recorded_at, version, has_apaar_id}]`, by class and name; `status=pending` is the follow-up list |
@@ -326,7 +333,7 @@ Imports notes (M1, as built; US-401, FR-IMP-001..007):
 | GET | `/dq/readiness/{profile_key}/students` (`section_id` required, `status`) → the section's students, worst first: status, fix owners, fields, open items; no values (**built**) | `dq.readiness.read` |
 | GET | `/dq/readiness/{profile_key}/students/{student_id}` → per field: each record's value, the right value's source, items (reason, owner, kinds, explanation, owner label, `segments` and `changes` when you may see both values, finding id and status, `waived`) (**built**) | `dq.readiness.read` (C3 values: `student.read_sensitive` in scope, audited `dq.readiness.student_viewed`) |
 | POST | `/dq/readiness/{profile_key}/runs` (`scope` as `/dq/runs`; empty = the profile's classes) → 202 `RunOut` (**built**) | `dq.readiness.manage` |
-| GET | `/dq/readiness/{profile_key}/slips` (`student_id` \| `section_id`, `include_ready`) → `text/html` A4 parent verification slips (own CSP) (**built**) | `dq.readiness.read` (audited `dq.readiness.slips_printed`) |
+| GET | `/dq/readiness/{profile_key}/slips` (`student_id` \| `section_id`, `include_ready`, `include_sensitive`, `check`) → `text/html` A4 parent verification slips (own CSP); Aadhaar-as-printed values masked unless `include_sensitive=true` (403 `sensitive_not_allowed` without `student.read_sensitive` for every student, 428 `step_up_required`; SEC-045); `check=true` → 204 after the same checks, no page, not audited (**built**) | `dq.readiness.read` (audited `dq.readiness.slips_printed`, with `sensitive_student_ids` when restricted values were shown) |
 
 Data quality notes (M1, as built):
 - **Runs:** scopes with at most `sync_max_students` (300, `app/dq/config/engine.yaml`) students are checked inside the request and answer `202` with `status: completed`; bigger scopes answer `202` with `status: queued` and run on the worker (queue `dq`); the requester gets the `dq.run.completed` notification. `Location: /api/v1/dq/runs/{id}`; `Idempotency-Key` accepted. Unknown `profile_key`, or a section/class that does not exist, belongs to another school or is outside the caller's scope → `422` `not_found` on the same field (one answer, so the reply does not show whether an id exists; AA-18). Writes also trigger incremental runs through the outbox (`student.values.changed`, `import.committed|reverted`, `extraction.confirmed`, `change_request.approved`).
@@ -479,7 +486,7 @@ All **built** (modules `app/academics` and `app/insights`, docs/05 §5.8, purpos
 | POST | `/edge/tally/enrol` (`code`, `device` facts) | 201: `device_id`, `key_id`, `secret` (once) (FR-TALLY-001) |
 | GET | `/edge/tally/config` | Selected company and groups, sync interval, `min_agent_version`, rotate-after days (FR-TALLY-004) |
 | PUT | `/edge/tally/catalog` | Company, Tally product/version, groups (names, parents); ≤ 500 groups (FR-TALLY-004) |
-| POST | `/edge/tally/syncs` | One snapshot (`batch_id`, company, `as_of`, parties under selected groups, ≤ 5,000); a repeated `batch_id` gets the first result; 409 `no_groups_selected`, `agent_outdated`; 422 `group_not_selected`, `company_not_selected`, `duplicate_party`, `too_many`, `total_too_large` (FR-TALLY-005) |
+| POST | `/edge/tally/syncs` | One snapshot (`batch_id`, company, `as_of`, parties under selected groups, ≤ 5,000); a repeated `batch_id` gets the first result; 409 `no_groups_selected`, `agent_outdated`, `snapshot_outdated` (its `as_of` is older than the balances already applied for the company; nothing changes, audited `tally.sync.outdated`; audit 2026-10-17 L-12); 422 `group_not_selected`, `company_not_selected`, `duplicate_party`, `too_many`, `total_too_large` (FR-TALLY-005) |
 | POST | `/edge/tally/key-rotation` | New `key_id` and `secret` once; the old key works until the new one is used or 7 days (FR-TALLY-002) |
 
 ### Exports, audit, admin, jobs
@@ -628,8 +635,8 @@ Conventions as above: `Idempotency-Key` on creating POSTs, `If-Match` on changes
 
 | Method | Path | Guard |
 |---|---|---|
-| PATCH | `/tenant` with `settings.parent_language` (`en`/`te`); response adds `parent_language_unreviewed` (keys of unreviewed Telugu entries the school would use) | `tenant.settings.manage`ᴿ (existing route) |
-| PATCH | `/guardians/{guardian_id}` with `preferred_language` (`en`/`te`/null) | `student.update_nonidentity` (student in scope) |
+| PATCH | `/tenant` with `settings.parent_language` (`en`/`te`); response adds `parent_language_unreviewed` (keys of unreviewed Telugu entries the school would use, from `app/core/parent_texts.yaml`) (**built R2-0**; `GET/PUT /apaar/settings` now take `form_language: null` = follow the school and answer `effective_language`) | `tenant.settings.manage`ᴿ (existing route) |
+| PATCH | `/students/{student_id}/guardians/{guardian_id}` (the existing guardian route; **built R2-0**) with `preferred_language` (`en`/`te`/null), audited with the code; scoped editors only when every linked student is in reach | `student.update_nonidentity` (student in scope) |
 
 #### Ask finish-up (R2.4; FR-KB-040..045)
 
@@ -643,8 +650,8 @@ Conventions as above: `Idempotency-Key` on creating POSTs, `If-Match` on changes
 | Method | Path | Guard |
 |---|---|---|
 | GET | `/public/certificates/{code}` (code normalised: case, spaces and dashes ignored) | `require_public_handle("cert_verify")`; limits `public_ip`, `public_lookup_fail` |
-| POST | `/public/links/exchange` (`{"token"}`; the BFF's `/p/{token}` handler calls it and sets the `__Host-sos_parent` cookie) → `{kind, expires_at, handle_ref}` | `require_public_handle(parent_*)`; limits `public_ip`, `public_lookup_fail` |
-| GET | `/public/links/current` (the page content for the cookie's handle: notice, receipt or dues per ADR-0046 decision 2, in the parent language) | `require_public_handle(parent_*)` (handle ref from the cookie, re-resolved every time); `public_token` |
+| POST | `/public/links/exchange` (`{"token"}`; the BFF's `/p/{token}` handler calls it and sets the `__Host-sos_parent` cookie) → `{kind, expires_at}` (**built R2-0**; no `handle_ref`: the cookie carries the token itself and the BFF sends it back in `X-SOS-Public-Token`, so every request re-resolves it; not a view) | `require_public_handle(parent_*)`; limits `public_ip`, `public_lookup_fail` |
+| GET | `/public/links/current` (the page content for the cookie's handle: notice, receipt or dues per ADR-0046 decision 2, in the parent language). **Built R2-0 as the frame** `{kind, expires_at, language, school_name}` (counts the view; first view audited); R2-3H adds the content | `require_public_handle(parent_*)` (token from `X-SOS-Public-Token`, re-resolved every time); `public_token` |
 | GET | `/public/links/current/document-url` (notice PDF or receipt PDF, presigned ≤ 5 min) | as above |
 | POST | `/public/links/current/pay` (`{"instalments"}`, CSRF token bound to the cookie) → `{redirect_url}` | `require_public_handle("parent_dues")`; `public_pay` (5 per handle per day) |
 | POST | `/public/links/current/optin` (opt-in page: categories, language) | `require_public_handle("parent_optin")` |

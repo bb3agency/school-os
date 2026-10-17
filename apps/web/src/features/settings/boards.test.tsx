@@ -42,6 +42,7 @@ const TENANT: TenantProfile = {
     class_boards: {},
     operating_mode: "full",
     current_erp_name: "",
+    parent_language: "en",
   },
   modules_hidden: [],
   version: 7,

@@ -46,9 +46,15 @@ async function signedInAs(): Promise<Pending["who"]> {
  * reloads. When the window is blocked, "Continue in this tab" does the full-page step-up.
  */
 export function StepUpHost({
+  sessionKind = "staff",
   navigate = defaultNavigate,
   open: openStepUpWindow = openWindow,
 }: {
+  /**
+   * Who is signed in to the school console: staff, or SchoolOS support on a break-glass
+   * grant (ADR-0023), which confirms through the support step-up route.
+   */
+  sessionKind?: "staff" | "support";
   /** Tests inject navigation and the window opener. */
   navigate?: Navigate;
   open?: Opener;
@@ -132,7 +138,7 @@ export function StepUpHost({
   }, [confirmed]);
 
   function signIn() {
-    const opened = openStepUpWindow(stepUpWindowUrl());
+    const opened = openStepUpWindow(stepUpWindowUrl(sessionKind));
     if (opened) {
       setBlocked(false);
       setWaiting(true);

@@ -446,8 +446,8 @@ Every LLM role runs on Google Gemini through Vertex AI in `asia-south1` (ADR-003
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `SOS_PUBLIC_BASE_URL` | none (public pages off) | Origin of parent link pages (`https://my.schoolos.in` on the shared tier, D29; the school's `https://<public_host>` on a dedicated host). Staging/prod refuse a non-https value, a value equal to the staff app origin, or one with a path |
-| `SOS_VERIFY_BASE_URL` | none (verification off) | Origin of the certificate verification page and of the QR links printed on certificates: a separate `verify.` host on the shared tier (for example `https://verify.schoolos.in`; owner decision D29); the school's `https://<public_host>` on a dedicated host. Same checks as `SOS_PUBLIC_BASE_URL` and must differ from it on the shared tier |
+| `SOS_PUBLIC_BASE_URL` (**read since R2-0**) | none (public pages off) | Origin of parent link pages (`https://my.schoolos.in` on the shared tier, D29; the school's `https://<public_host>` on a dedicated host). Staging/prod refuse a non-https value, a value equal to the staff app origin, or one with a path |
+| `SOS_VERIFY_BASE_URL` (**read since R2-0**: start-up checks only; R2-1A uses it) | none (verification off) | Origin of the certificate verification page and of the QR links printed on certificates: a separate `verify.` host on the shared tier (for example `https://verify.schoolos.in`; owner decision D29); the school's `https://<public_host>` on a dedicated host. Same checks as `SOS_PUBLIC_BASE_URL` and must differ from it on the shared tier |
 | `SOS_PUBLIC_LINK_LIFETIMES` | unset: `app/public/config.yaml` (notice 30 d, receipt 90 d, dues 7 d, opt-in 7 d) | Override for tests only; refused in staging/prod |
 | `SOS_FEES_ENABLED` | `false` | Master switch for the fees module (each school also needs the flag `fees.enabled` and its setting) |
 | `SOS_PAYMENTS_PROVIDER_MODE` | unset: `fake` in local/ci, `live` in staging/prod | `fake` = deterministic offline provider (refused in staging/prod); `live` = Razorpay |
@@ -460,13 +460,13 @@ Every LLM role runs on Google Gemini through Vertex AI in `asia-south1` (ADR-003
 | `SOS_MESSAGING_PROVIDER_MODE` | unset: `fake` in local/ci, `live` in staging/prod | `fake` (refused in staging/prod) or `live` (Meta Cloud API) |
 | `SOS_META_APP_ID` | none | SchoolOS's Meta app id (Tech Provider) |
 | `SOS_META_APP_SECRET` | none | Meta app secret: verifies `X-Hub-Signature-256` and exchanges Embedded Signup codes (Secrets Manager; never on dedicated hosts) |
-| `SOS_META_WEBHOOK_VERIFY_TOKEN` | none | Random string for the webhook `GET` challenge (Secrets Manager) |
+| `SOS_META_WEBHOOK_VERIFY_TOKEN` (**read since R2-0** by `require_meta_verify_token`) | none (`GET /webhooks/meta` answers 403) | Random string for the webhook `GET` challenge (Secrets Manager); staging/prod refuse `dev-only` values and anything under 32 characters |
 | `SOS_META_EMBEDDED_SIGNUP_CONFIG_ID` | none | Embedded Signup v4 configuration id (public; also given to the web app) |
 | `SOS_META_GRAPH_API_VERSION` | from `app/messaging/config.yaml` | Pinned Graph API version; override only for a tested upgrade |
 | `SOS_MESSAGING_MANUAL_TOKEN_ALLOWED` | `false` | Allows the manual-token connection; set `true` for pilots until SchoolOS is a Meta Tech Provider (ADR-0043 decision 5, D13) |
 | `SOS_WEBHOOK_MAX_BODY_BYTES_RAZORPAY`, `SOS_WEBHOOK_MAX_BODY_BYTES_META` | 262144, 3145728 | Body limits before signature checks |
 
-**Web (BFF) additions:** `PUBLIC_BASE_URL` (the public origin; the `(public)` route group answers only on it and the staff routes never do), `META_APP_ID` and `META_EMBEDDED_SIGNUP_CONFIG_ID` (public values for the settings page), CSP additions scoped to `/settings/whatsapp`: `script-src https://connect.facebook.net`, `frame-src https://www.facebook.com https://web.facebook.com`, `connect-src https://graph.facebook.com`.
+**Web (BFF) additions:** `PUBLIC_BASE_URL` (**read since R2-0** by the proxy and the `(public)` group: an https origin, or loopback http locally; unset or invalid = `/p` answers 404; the public origin; the `(public)` route group answers only on it and the staff routes never do), `META_APP_ID` and `META_EMBEDDED_SIGNUP_CONFIG_ID` (public values for the settings page), CSP additions scoped to `/settings/whatsapp`: `script-src https://connect.facebook.net`, `frame-src https://www.facebook.com https://web.facebook.com`, `connect-src https://graph.facebook.com`.
 
 **Infrastructure (Terraform, when applied; owner decision D2: no cloud yet):**
 - ALB listener rule: `/api/v1/webhooks/*` → API target group (like `/api/v1/fleet/*`); WAF rate rules for `/api/v1/webhooks/*` (per IP), `/p/*` and `/v/*` (per IP, stricter); WAF must not block large Meta payloads (body inspection limit set for that path).

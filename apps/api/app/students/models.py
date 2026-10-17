@@ -184,6 +184,8 @@ class Guardian(Base):
     phone_blind_index: Mapped[bytes | None] = mapped_column(LargeBinary)
     address_ciphertext: Mapped[bytes | None] = mapped_column(LargeBinary)
     key_version: Mapped[int | None] = mapped_column(Integer)
+    # ADR-0044 (0055): the language this guardian receives; NULL = the school's parent language.
+    preferred_language: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
     version: Mapped[int] = mapped_column(Integer, server_default=text("1"))

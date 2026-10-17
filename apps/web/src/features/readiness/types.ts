@@ -50,14 +50,23 @@ export function readyShare(counts: { students: number; ready: number }): number 
   return counts.students > 0 ? counts.ready / counts.students : 0;
 }
 
-/** The parent verification slips through the BFF (an API page with its own strict CSP). */
+/** One student's or one section's slips. */
+export type SlipTarget = { studentId: string } | { sectionId: string };
+
+/**
+ * The parent verification slips through the BFF (an API page with its own strict CSP).
+ * Aadhaar-as-printed values are masked unless `includeSensitive` (SEC-045: the API then needs
+ * student.read_sensitive and a recent MFA sign-in).
+ */
 export function slipHref(
   profileKey: string,
-  target: { studentId: string } | { sectionId: string },
+  target: SlipTarget,
+  options: { includeSensitive?: boolean } = {},
 ): string {
   const query =
     "studentId" in target
       ? `student_id=${encodeURIComponent(target.studentId)}`
       : `section_id=${encodeURIComponent(target.sectionId)}`;
-  return `/bff/api/v1/dq/readiness/${encodeURIComponent(profileKey)}/slips?${query}`;
+  const sensitive = options.includeSensitive ? "&include_sensitive=true" : "";
+  return `/bff/api/v1/dq/readiness/${encodeURIComponent(profileKey)}/slips?${query}${sensitive}`;
 }

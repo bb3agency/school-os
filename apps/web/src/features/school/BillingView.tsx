@@ -283,7 +283,7 @@ export function BillingView({ billing, invoices }: BillingViewProps) {
         </Card>
       </div>
       {plan && plan.available ? <AiAnswersCard bundle={plan.ai_bundle ?? null} /> : null}
-      <Card title={t("invoicesTitle")}>
+      <Card title={t("invoicesTitle")} description={t("invoicesNote")}>
         <DataTable
           caption={t("invoicesTitle")}
           captionHidden

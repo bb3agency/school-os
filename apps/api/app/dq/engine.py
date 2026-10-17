@@ -139,10 +139,14 @@ class Scope:
         )
 
 
-def resolve_students(session: Session, ctx: UserContext, scope: Scope) -> list[uuid.UUID]:
+def resolve_students(
+    session: Session, ctx: UserContext, scope: Scope, *, also: Collection[str] = ()
+) -> list[uuid.UUID]:
     """Student ids of ``scope`` limited to what ``ctx`` may read (``student.read_basic``) and,
-    when it holds ``dq.findings.read``, to that grant's scope too (SEC-015)."""
-    reach = (DQ_READ,) if ctx.has(DQ_READ) else ()
+    when it holds ``dq.findings.read``, to that grant's scope too (SEC-015). ``also``: further
+    permissions whose scope must reach the student as well (``dq.readiness.manage`` for a
+    readiness run, SEC-044)."""
+    reach = (*((DQ_READ,) if ctx.has(DQ_READ) else ()), *also)
     if scope.section_ids is not None:
         return students.list_students_in_scope(
             session, ctx, section_ids=scope.section_ids, permissions=reach
@@ -219,6 +223,7 @@ def load_context(
         population=_population(session, facts, cfg.apaar_attribute),
         profiles=tuple(profiles),
         identity_keys=identity_keys,
+        class_boards=tenancy.school_boards(session)[1],
     )
 
 

@@ -16,6 +16,7 @@ import { Link } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
 import { useStudentReadiness } from "./data";
 import { DiffView, OwnerBadge, ReadinessBadge } from "./parts";
+import { SensitiveSlipLink } from "./SensitiveSlipLink";
 import {
   slipHref,
   type ReadinessDetail,
@@ -194,6 +195,7 @@ function Detail({ data, profileKey }: { data: ReadinessDetail; profileKey: strin
                 },
               }}
             />
+            <SensitiveSlipLink profileKey={profileKey} target={{ studentId: data.student.id }} />
           </span>
         }
       />

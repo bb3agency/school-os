@@ -390,6 +390,8 @@ ACTION_SEGMENTS = {
 # Creating POSTs that do not take Idempotency-Key, with the reason.
 IDEMPOTENCY_EXEMPT = {
     ("POST", "/api/v1/fleet/heartbeat"): "machine route; nonce and timestamp make it replay-safe",
+    ("POST", "/api/v1/public/links/exchange"): "a read: checks a parent link token, stores "
+    "nothing (ADR-0046; no member, so no per-person replay store)",
     ("POST", "/api/v1/edge/tally/enrol"): "machine route; the one-time code is consumed",
     ("POST", "/api/v1/edge/tally/syncs"): "machine route; sync ids are unique per device",
     ("POST", "/api/v1/sections/{section_id}/attendance"): "an upsert keyed by student and day",

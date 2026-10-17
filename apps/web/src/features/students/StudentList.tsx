@@ -3,7 +3,7 @@
 import type { AcademicYear, SchoolClass, Section } from "@schoolos/api-client";
 import { useLocale, useTranslations } from "next-intl";
 import { useState, type FormEvent } from "react";
-import { z } from "zod";
+import * as z from "@/lib/zod";
 import { Avatar } from "@/components/ui/Avatar";
 import { Pill } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
@@ -30,7 +30,7 @@ import { Value } from "@/components/ui/Value";
 import { classLabel as classDisplay } from "@/lib/school-class";
 import { Link } from "@/i18n/navigation";
 import { formValues } from "@/lib/forms";
-import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
+import { listAll, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { type Loadable } from "@/lib/loadable";
 import { UUID_PATTERN } from "@/lib/validation";
 import { containsFullAadhaar } from "./aadhaar";
@@ -139,18 +139,18 @@ interface StructureData {
 /** Classes and sections for filters and forms (GET /academic-years, /classes, /sections). */
 export function useSchoolStructure(): StructureData {
   const api = useBffClient("staff");
-  const query = { limit: 200 } as const;
-  const years = useApiQuery(
-    ["staff", "academic-years"],
-    async () => (await unwrap(api.GET("/api/v1/academic-years", { params: { query } }))).data,
+  // Every page (listAll): sections of all years pass one page of 200 in a large school.
+  const query = (cursor: string | undefined) => ({ limit: 200, ...(cursor ? { cursor } : {}) });
+  const years = useApiQuery(["staff", "academic-years"], () =>
+    listAll((cursor) =>
+      unwrap(api.GET("/api/v1/academic-years", { params: { query: query(cursor) } })),
+    ),
   );
-  const classes = useApiQuery(
-    ["staff", "classes"],
-    async () => (await unwrap(api.GET("/api/v1/classes", { params: { query } }))).data,
+  const classes = useApiQuery(["staff", "classes"], () =>
+    listAll((cursor) => unwrap(api.GET("/api/v1/classes", { params: { query: query(cursor) } }))),
   );
-  const sections = useApiQuery(
-    ["staff", "sections"],
-    async () => (await unwrap(api.GET("/api/v1/sections", { params: { query } }))).data,
+  const sections = useApiQuery(["staff", "sections"], () =>
+    listAll((cursor) => unwrap(api.GET("/api/v1/sections", { params: { query: query(cursor) } }))),
   );
   return { years, classes, sections };
 }

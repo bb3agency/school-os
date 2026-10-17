@@ -97,16 +97,25 @@ def files_of(
 
 
 def due_for_purge(
-    session: Session, *, now: dt.datetime, failed_before: dt.datetime, limit: int = 500
+    session: Session,
+    *,
+    now: dt.datetime,
+    failed_before: dt.datetime,
+    ready_before: dt.datetime | None = None,
+    limit: int = 500,
 ) -> list[Export]:
-    """Ready exports past ``expires_at`` and failed ones created before ``failed_before`` whose
-    files were not deleted yet (docs/05 §13)."""
+    """Ready exports past ``expires_at`` (or finished before ``ready_before``: the school's
+    current, possibly shorter, retention; audit 2026-10-17 L-13) and failed ones created before
+    ``failed_before`` whose files were not deleted yet (docs/05 §13)."""
+    expired = Export.expires_at <= now
+    if ready_before is not None:
+        expired = or_(expired, Export.finished_at <= ready_before)
     stmt = (
         select(Export)
         .where(
             Export.files_deleted_at.is_(None),
             or_(
-                and_(Export.status == "ready", Export.expires_at <= now),
+                and_(Export.status == "ready", expired),
                 and_(Export.status == "failed", Export.created_at <= failed_before),
             ),
         )

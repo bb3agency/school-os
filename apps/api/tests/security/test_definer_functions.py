@@ -29,6 +29,8 @@ EXPECTED: dict[str, set[str]] = {
     # Expand-phase wrapper for API images older than 0027 (dropped by the contract migration).
     "core.create_user_for_invite(text,text,citext,text)": {"sos_app"},
     "core.user_membership_count(uuid)": {"sos_app"},
+    # ADR-0047 (R2-0): the public handle resolver.
+    "core.resolve_public_handle(text,bytea)": {"sos_app"},
     "core.list_tenant_ids(text[])": {"sos_app", "sos_platform"},
     "core.provision_tenant(uuid,text,text,text[],text,text)": {"sos_platform"},
     "core.set_tenant_status(uuid,text)": {"sos_platform"},
@@ -50,6 +52,7 @@ DEFINER_TABLES_NEEDED = {
     "core.tenant_keys",
     "core.sections",
     "core.academic_years",
+    "core.public_handles",
 }
 
 

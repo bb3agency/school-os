@@ -34,9 +34,10 @@ from sqlalchemy.orm import Session
 PURGE_ROLE: Final = "sos_purger"
 # A constant statement (no interpolation, SEC-001): keep the role name in step with PURGE_ROLE.
 _SET_PURGE_ROLE: Final = text("SET LOCAL ROLE sos_purger")
-_CONSTRAINT_NAME: Final = re.compile(r"(core|sis|kb|ops)\.([a-z][a-z0-9_]{0,62})")
-TENANT_SCHEMAS: Final = ("core", "sis", "kb", "audit", "ops")
-TABLE_NAME: Final = re.compile(r"^(core|sis|kb|audit|ops)\.[a-z][a-z0-9_]{0,62}$")
+_CONSTRAINT_NAME: Final = re.compile(r"(core|sis|kb|ops|fin|msg)\.([a-z][a-z0-9_]{0,62})")
+# fin and msg: the R2 tenant schemas (owner decision D14 of 2026-10-14).
+TENANT_SCHEMAS: Final = ("core", "sis", "kb", "audit", "ops", "fin", "msg")
+TABLE_NAME: Final = re.compile(r"^(core|sis|kb|audit|ops|fin|msg)\.[a-z][a-z0-9_]{0,62}$")
 
 Flag = Literal["app.purge_tenant", "app.purge_audit"]
 

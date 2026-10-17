@@ -83,6 +83,7 @@ IST: Final = ZoneInfo("Asia/Kolkata")
 AADHAAR_CODE: Final = "aadhaar_full_number_rejected"
 AADHAAR_DETAIL: Final = "Don't enter Aadhaar numbers. Enter only the last 4 digits."
 _FORM_KEYS: Final = ("full_name", "admission_no", "dob", "udise_pen")
+_NO_APAAR_ACTION: Final = frozenset({"refused", "withdrawn"})  # see refused_student_ids
 
 log = get_logger(__name__)
 
@@ -220,10 +221,32 @@ def _check_transition(previous: str | None, status: ConsentStatus) -> None:
         )
 
 
+def _date_problems(
+    session: Session, decided_on: dt.date | None, current_on: dt.date | None
+) -> list[dict[str, str]]:
+    """The date on the form: not in the future, not too early, not before the current
+    decision (audit 2026-10-17 L-08)."""
+    if decided_on is None:
+        return []
+    if decided_on > _today(session):
+        return [_error("decided_on", "date_in_future")]
+    if decided_on < settings().earliest_decision:
+        return [_error("decided_on", "date_too_early")]
+    if current_on is not None and decided_on < current_on:
+        return [_error("decided_on", "before_current_decision")]
+    return []
+
+
 def _check_decision(
-    session: Session, ctx: UserContext, student_id: uuid.UUID, data: ConsentIn
+    session: Session,
+    ctx: UserContext,
+    student_id: uuid.UUID,
+    data: ConsentIn,
+    current_on: dt.date | None = None,
 ) -> tuple[str | None, uuid.UUID | None]:
-    """Field rules of a decision (422 per field). Returns (relationship, guardian_id)."""
+    """Field rules of a decision (422 per field). Returns (relationship, guardian_id).
+    ``current_on``: the date of the current decision; a new one may not predate it (the
+    latest entry is the current state; audit 2026-10-17 L-08)."""
     problems: list[dict[str, str]] = []
     relationship: str | None = data.relationship
     guardian_id = data.guardian_id
@@ -241,11 +264,7 @@ def _check_decision(
             problems.append(_error("relationship", "missing"))
         if data.decided_on is None:
             problems.append(_error("decided_on", "missing"))
-    if data.decided_on is not None:
-        if data.decided_on > _today(session):
-            problems.append(_error("decided_on", "date_in_future"))
-        elif data.decided_on < settings().earliest_decision:
-            problems.append(_error("decided_on", "date_too_early"))
+    problems.extend(_date_problems(session, data.decided_on, current_on))
     if data.status == "given" and data.evidence_document_id is None:
         # PRV-021: consent is recorded only with the signed form.
         problems.append(_error("evidence_document_id", "signed_form_required"))
@@ -274,9 +293,10 @@ def record_consent(
     Errors: 404 outside scope; 409 ``consent_not_given`` (withdrawn without a given consent),
     ``consent_already_decided`` (pending after a decision); 422 per field (``relationship`` /
     ``decided_on`` missing, ``signed_form_required``, ``evidence_document_id`` / ``guardian_id``
-    ``not_found``, ``date_in_future``, ``aadhaar_full_number_rejected``). Audit
-    ``apaar.consent.recorded`` (ids, statuses and codes only). A change to or from ``refused``
-    re-checks the student's APAAR readiness findings (data-quality event)."""
+    ``not_found``, ``date_in_future``, ``before_current_decision`` (dated before the current
+    decision), ``aadhaar_full_number_rejected``). Audit
+    ``apaar.consent.recorded`` (ids, statuses and codes only). A change into or out of ``refused``
+    or ``withdrawn`` re-checks the student's APAAR readiness findings (data-quality event)."""
     _reach_student(session, ctx, student_id, (RECORD,))
     students.lock_student_for_change(session, ctx, student_id)
     previous = repo.current(session, [student_id]).get(student_id)
@@ -288,7 +308,9 @@ def record_consent(
     previous_status = previous.status if previous is not None else None
     _check_transition(previous_status, data.status)
     note = _clean_note(data.note)
-    relationship, guardian_id = _check_decision(session, ctx, student_id, data)
+    relationship, guardian_id = _check_decision(
+        session, ctx, student_id, data, previous.decided_on if previous is not None else None
+    )
     with _db_errors():
         row = repo.insert(
             session,
@@ -323,8 +345,9 @@ def record_consent(
             "has_note": note is not None,
         },
     )
-    if "refused" in (data.status, previous_status):
-        # DQ-009 / DQ-022 skip students whose parents refused (FR-APC-006): re-check now.
+    if (data.status in _NO_APAAR_ACTION) != (previous_status in _NO_APAAR_ACTION):
+        # DQ-009 / DQ-022 skip students whose parents refused or withdrew (FR-APC-006): a
+        # decision that changes whether the student is skipped re-checks them now.
         ops.enqueue_event(
             session, DQ_EVENT, {"student_ids": [student_id], "attribute_keys": [DQ_KEY]}
         )
@@ -460,17 +483,22 @@ def summary(
 
 
 def parent_language(session: Session) -> FormLanguage:
-    """The language the school prints parent forms in (``en`` until set; owner decision D9).
-    Parent verification slips (``app.dq``) follow it too."""
+    """The language the school prints parent forms in (owner decision D9; ADR-0044 decision 7):
+    the consent form's own setting when the school chose one, else the school's parent language
+    (``tenancy.parent_language``), else English. Parent verification slips (``app.dq``) follow
+    it too. Independent of ``SOS_TELUGU_ENABLED``."""
     return _form_language(session, None)
 
 
 def _form_language(session: Session, language: FormLanguage | None) -> FormLanguage:
+    """Per-print override, then the form setting, then the school's parent language."""
     if language is not None:
         return language
     row = repo.get_settings(session)
-    chosen: FormLanguage = "te" if row is not None and row.form_language == "te" else "en"
-    return chosen
+    if row is not None and row.form_language in ("en", "te"):
+        chosen: FormLanguage = "te" if row.form_language == "te" else "en"
+        return chosen
+    return tenancy.parent_language(session)
 
 
 def _form_students(
@@ -670,25 +698,37 @@ def _section_in_reach(session: Session, ctx: UserContext, section_id: uuid.UUID)
 # --- settings ---------------------------------------------------------------------------------
 
 
+def _settings_out(session: Session, form_language: str | None, version: int) -> ApaarSettingsOut:
+    own: FormLanguage | None = None
+    if form_language in ("en", "te"):
+        own = "te" if form_language == "te" else "en"
+    return ApaarSettingsOut(
+        form_language=own,
+        effective_language=own or tenancy.parent_language(session),
+        version=version,
+    )
+
+
 def get_settings(session: Session) -> ApaarSettingsOut:
-    """The school's parent-form language (``en`` until set; version 0 before the first save)."""
+    """The consent form's language setting (null = the school's parent language; version 0
+    before the first save) and the language forms print in now."""
     row = repo.get_settings(session)
     if row is None:
-        return ApaarSettingsOut(form_language="en", version=0)
-    return ApaarSettingsOut(form_language=row.form_language, version=row.version)
+        return _settings_out(session, None, 0)
+    return _settings_out(session, row.form_language, row.version)
 
 
 def update_settings(
     session: Session, ctx: UserContext, data: ApaarSettingsIn, *, expected_version: int
 ) -> ApaarSettingsOut:
-    """Set the language of the printed parent form (owner decision D9; permission
-    ``tenant.settings.manage``, step-up; ``If-Match``: 0 for the first save). Audit
-    ``apaar.settings.updated``."""
+    """Set the language of the printed parent form, or ``null`` to follow the school's parent
+    language (owner decision D9; ADR-0044 decision 7; permission ``tenant.settings.manage``,
+    step-up; ``If-Match``: 0 for the first save). Audit ``apaar.settings.updated``."""
     row = repo.get_settings(session, lock=True)
     current = row.version if row is not None else 0
     if expected_version != current:
         raise PreconditionFailed("The setting was changed by someone else. Reload it.")
-    before = row.form_language if row is not None else "en"
+    before = row.form_language if row is not None else None
     if row is None:
         row = repo.insert_settings(
             session, id=new_id(), form_language=data.form_language, updated_by=ctx.user_id
@@ -698,7 +738,7 @@ def update_settings(
             session, row.id, form_language=data.form_language, updated_by=ctx.user_id
         )
     else:
-        return ApaarSettingsOut(form_language=row.form_language, version=row.version)
+        return _settings_out(session, row.form_language, row.version)
     _audit(
         session,
         action="apaar.settings.updated",
@@ -706,7 +746,7 @@ def update_settings(
         resource_id=row.id,
         summary={"form_language": data.form_language, "previous_form_language": before},
     )
-    return ApaarSettingsOut(form_language=row.form_language, version=row.version)
+    return _settings_out(session, row.form_language, row.version)
 
 
 # --- for other modules ------------------------------------------------------------------------
@@ -724,9 +764,7 @@ def refused_student_ids(
     """Students whose parents refused (or withdrew) APAAR consent: never pushed to an APAAR
     action (FR-APC-006). ``student_ids`` must come from the caller's own scoped reads."""
     return frozenset(
-        sid
-        for sid, s in repo.statuses(session, student_ids).items()
-        if s in ("refused", "withdrawn")
+        sid for sid, s in repo.statuses(session, student_ids).items() if s in _NO_APAAR_ACTION
     )
 
 

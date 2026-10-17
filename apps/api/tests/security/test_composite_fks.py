@@ -17,7 +17,7 @@ from app.core.db import tenant_session
 
 pytestmark = pytest.mark.db
 
-TENANT_SCHEMAS = ["core", "sis", "kb", "audit", "ops"]
+TENANT_SCHEMAS = ["core", "sis", "kb", "audit", "ops", "fin", "msg"]
 
 
 def test_ADR_0013_every_tenant_to_tenant_fk_is_composite(admin_engine: Engine) -> None:

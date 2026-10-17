@@ -129,6 +129,10 @@ class ValidationContext:
     # FR-IMP-010 / FR-STU-018: PEN and APAAR ID values of the file already held by an active
     # student of the school: attribute key -> value -> student id.
     national_ids: Mapping[str, Mapping[str, str]] = field(default_factory=dict)
+    # SEC-042: the holders the importer may read (``student.read_basic`` scope). A clash with a
+    # holder outside it is still a row error, but does not name that record (as
+    # ``students.create_student`` does). Fails closed when not given.
+    visible_holders: frozenset[str] = frozenset()
 
     @property
     def creates(self) -> bool:
@@ -433,14 +437,16 @@ class _RowValidator:
 
     def _national_ids(self, result: RowResult) -> None:
         """FR-IMP-010: a PEN or APAAR ID already on another active record of the school is a row
-        error naming that record (``student_id``): open it, or import the child into UDISE+ by
-        PEN, instead of creating a second record (FR-STU-018)."""
+        error naming that record (``student_id``) when the importer may read it (SEC-042): open
+        it, or import the child into UDISE+ by PEN, instead of creating a second record
+        (FR-STU-018)."""
         for key in NATIONAL_ID_KEYS:
             value = result.values.get(key)
             holder = self.ctx.national_ids.get(key, {}).get(value) if value else None
             if holder is not None and holder != result.student_id:
                 problem = issue(key, NATIONAL_ID_CODE, f"errors.{key}_in_use")
-                problem["student_id"] = holder
+                if holder in self.ctx.visible_holders:
+                    problem["student_id"] = holder
                 result.errors.append(problem)
 
     def _create_row(self, result: RowResult) -> None:

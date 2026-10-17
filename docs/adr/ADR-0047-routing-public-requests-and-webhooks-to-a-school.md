@@ -43,3 +43,7 @@ Each must find **one** school, then do all further work inside that school's `te
 ## Related requirements
 
 FR-PUB-001..012, SEC-036, SEC-039; docs/05 §3.3, §3.4, §15.5; 07 §6.6, §7, §11.2; 09 §4 "Public", "Webhooks"; ADR-0042, ADR-0043, ADR-0045, ADR-0046.
+
+## Follow-up (2026-10-17, wave R2-0 built)
+
+Built as decided in migration `0055_public_handles` and `app/public/` (the number moved from 0054 because `0054_r1_finish` landed first). Refinements: the app role may delete only handles expired more than 30 days (restrictive policy `purge_expired_only`), so the purge needs no other role; an update trigger keeps revocations final; parent tokens are resolved for all four parent kinds in one statement (`unnest` + `LATERAL` over the same function, still two return columns); the guards carry pseudo-permissions `public.handle`, `public.webhook`, `public.meta_verify` and are pinned to `public_routes.yaml` by the route-enumeration test; a failures-only budget is checked before the lookup (`ratelimit.ensure_room`) so a used-up budget also refuses valid keys. Verifiers for Razorpay and Meta register with `app.public.webhooks.register_webhook_verifier` in waves R2-2D and R2-1C.

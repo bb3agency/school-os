@@ -3,7 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useMemo, useState } from "react";
-import { z } from "zod";
+import * as z from "@/lib/zod";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Badge, Pill } from "@/components/ui/Badge";
 import { Icon } from "@/components/ui/Icon";

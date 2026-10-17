@@ -1,19 +1,27 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { installBffStub, uninstallBffStub, type BffStub } from "@/test/bff-stub";
+import { installBffStub, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
 import { intlErrors, renderWithIntl } from "@/test/render";
 import { me, SECTION, STUDENT, structureRoutes } from "@/test/school-fixtures";
 import { ReadinessScreen } from "./ReadinessScreen";
 import { ReadinessStudentScreen } from "./ReadinessStudentScreen";
 import { readyShare, slipHref, type ReadinessDetail, type ReadinessSummary } from "./types";
 
+const router = vi.hoisted(() => ({ replace: vi.fn() }));
+
 vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
     usePathname: () => "/findings/readiness",
-    useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
+    useRouter: () => ({
+      push: vi.fn(),
+      replace: router.replace,
+      refresh: vi.fn(),
+      prefetch: vi.fn(),
+    }),
     useSearchParams: () => new URLSearchParams(),
     useParams: () => ({ locale: "en" }),
   };
@@ -168,6 +176,7 @@ function common(permissions: string[]) {
 
 beforeEach(() => {
   stub = installBffStub("staff");
+  router.replace.mockReset();
 });
 afterEach(() => {
   uninstallBffStub();
@@ -181,6 +190,10 @@ describe("readiness helpers (FR-DQ-045)", () => {
     );
     expect(slipHref(SSC, { sectionId: SECTION })).toBe(
       `/bff/api/v1/dq/readiness/${SSC}/slips?section_id=${SECTION}`,
+    );
+    // SEC-045: Aadhaar-as-printed values only when asked for (the API needs step-up then).
+    expect(slipHref(SSC, { sectionId: SECTION }, { includeSensitive: true })).toBe(
+      `/bff/api/v1/dq/readiness/${SSC}/slips?section_id=${SECTION}&include_sensitive=true`,
     );
     expect(readyShare({ students: 160, ready: 142 })).toBeCloseTo(0.8875);
     expect(readyShare({ students: 0, ready: 0 })).toBe(0);
@@ -243,6 +256,69 @@ describe("board readiness screen (US-504, US-506)", () => {
   });
 });
 
+describe("board readiness actions and states (FR-DQ-044, FR-DQ-048)", () => {
+  it("a school without the default check opens its first readiness check instead", async () => {
+    common(READ);
+    renderWithIntl(<ReadinessScreen profileKey="apaar" sectionId={null} chosen={false} />);
+    await waitFor(() =>
+      expect(router.replace).toHaveBeenCalledWith(`/findings/readiness?profile=${SSC}`),
+    );
+  });
+
+  it("a check chosen in the address is kept even when it is not listed", async () => {
+    common(READ);
+    renderWithIntl(<ReadinessScreen profileKey="apaar" sectionId={null} />);
+    expect(await screen.findByRole("navigation", { name: "Board or portal" })).toBeVisible();
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it("Check now starts a check of the section shown with an Idempotency-Key", async () => {
+    common([...READ, "dq.readiness.manage"]);
+    stub.routes[`GET /bff/api/v1/dq/readiness/${SSC}/students`] = () => Response.json([]);
+    stub.routes[`POST /bff/api/v1/dq/readiness/${SSC}/runs`] = () =>
+      Response.json(
+        {
+          id: "0192f3a4-0000-7000-8000-00000000ab02",
+          trigger: "manual",
+          event_type: null,
+          status: "completed",
+          profile_key: SSC,
+          scope: { section_ids: [SECTION] },
+          stats: { students: 40, blockers: 2, warnings: 5, new: 3, reopened: 1, cleared: 0 },
+          created_at: "2026-10-10T05:00:00Z",
+          started_at: "2026-10-10T05:00:00Z",
+          finished_at: "2026-10-10T05:00:02Z",
+          error_code: null,
+        },
+        { status: 202 },
+      );
+    renderWithIntl(<ReadinessScreen profileKey={SSC} sectionId={SECTION} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Check now" }));
+    const dialog = screen.getByRole("dialog", { name: "Check readiness now" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Start the check" }));
+    expect(
+      await within(dialog).findByText("40 students checked: 2 blockers and 5 warnings."),
+    ).toBeInTheDocument();
+    const call = stub.callsTo(`POST /bff/api/v1/dq/readiness/${SSC}/runs`)[0];
+    expect(call?.headers.get("idempotency-key")).toMatch(/^[0-9a-f-]{36}$/);
+    expect(JSON.parse(call?.body ?? "{}")).toEqual({ scope: { section_ids: [SECTION] } });
+    // The finished check reloads the summary.
+    await waitFor(() =>
+      expect(stub.callsTo(`GET /bff/api/v1/dq/readiness/${SSC}`).length).toBeGreaterThan(1),
+    );
+  });
+
+  it("an unavailable summary says what to do, never shows raw API text", async () => {
+    common(READ);
+    stub.routes[`GET /bff/api/v1/dq/readiness/${SSC}`] = () =>
+      problem(503, "service_unavailable", { detail: "upstream pool exhausted" });
+    renderWithIntl(<ReadinessScreen profileKey={SSC} sectionId={null} />);
+    expect(await screen.findByRole("alert")).toBeVisible();
+    expect(screen.queryByText(/upstream pool exhausted/)).toBeNull();
+    expect(screen.queryByRole("table", { name: "Sections" })).toBeNull();
+  });
+});
+
 describe("student readiness (US-505)", () => {
   it("highlights the exact characters and says who fixes it", async () => {
     common(READ);
@@ -290,5 +366,62 @@ describe("student readiness (US-505)", () => {
     renderWithIntl(<ReadinessStudentScreen profileKey={SSC} studentId={STUDENT} />, "te");
     expect(await screen.findByText("సరైన విలువ")).toBeVisible();
     expect(screen.getByText("తల్లిదండ్రులు: ఆధార్")).toBeVisible();
+  });
+});
+
+describe("slips with Aadhaar details (SEC-045)", () => {
+  const SLIPS = `GET /bff/api/v1/dq/readiness/${SSC}/slips`;
+
+  it("is not offered without student.read_sensitive", async () => {
+    common(READ);
+    stub.routes[`GET /bff/api/v1/dq/readiness/${SSC}/students/${STUDENT}`] = () =>
+      Response.json(detail());
+    renderWithIntl(<ReadinessStudentScreen profileKey={SSC} studentId={STUDENT} />);
+    expect(await screen.findByRole("link", { name: "Print parent slip" })).toHaveAttribute(
+      "href",
+      slipHref(SSC, { studentId: STUDENT }),
+    );
+    expect(screen.queryByRole("button", { name: "Show Aadhaar details on slips" })).toBeNull();
+  });
+
+  it("checks first (step-up through the BFF client), then links the unmasked print view", async () => {
+    common([...READ, "student.read_sensitive"]);
+    stub.routes[`GET /bff/api/v1/dq/readiness/${SSC}/students/${STUDENT}`] = () =>
+      Response.json(detail());
+    stub.routes[SLIPS] = () => new Response(null, { status: 204 });
+    renderWithIntl(<ReadinessStudentScreen profileKey={SSC} studentId={STUDENT} />);
+    expect(screen.queryByRole("link", { name: /Open slips with Aadhaar details/ })).toBeNull();
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Show Aadhaar details on slips" }),
+    );
+    const open = await screen.findByRole("link", { name: /Open slips with Aadhaar details/ });
+    expect(open).toHaveAttribute(
+      "href",
+      slipHref(SSC, { studentId: STUDENT }, { includeSensitive: true }),
+    );
+    expect(open).toHaveAttribute("target", "_blank");
+    expect(open).toHaveAttribute("rel", "noopener noreferrer");
+    const [call] = stub.callsTo(SLIPS);
+    expect(call?.url.searchParams.get("check")).toBe("true");
+    expect(call?.url.searchParams.get("include_sensitive")).toBe("true");
+    expect(call?.url.searchParams.get("student_id")).toBe(STUDENT);
+    // The normal print link stays masked.
+    expect(screen.getByRole("link", { name: "Print parent slip" })).toHaveAttribute(
+      "href",
+      slipHref(SSC, { studentId: STUDENT }),
+    );
+  });
+
+  it("explains a refusal and opens nothing", async () => {
+    common([...READ, "student.read_sensitive"]);
+    stub.routes[`GET /bff/api/v1/dq/readiness/${SSC}/students/${STUDENT}`] = () =>
+      Response.json(detail());
+    stub.routes[SLIPS] = () => problem(403, "sensitive_not_allowed");
+    renderWithIntl(<ReadinessStudentScreen profileKey={SSC} studentId={STUDENT} />);
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Show Aadhaar details on slips" }),
+    );
+    expect(await screen.findByRole("alert")).toBeVisible();
+    expect(screen.queryByRole("link", { name: /Open slips with Aadhaar details/ })).toBeNull();
   });
 });

@@ -65,13 +65,14 @@ from app.core.errors import (
     ValidationFailed,
 )
 from app.core.ids import new_id
-from app.core.languages import telugu_text
+from app.core.languages import Language, telugu_text
 from app.core.logging import get_context, get_logger
 from app.core.records import RecordTable
 from app.core.textnorm import comparison_key
 from app.documents import service as documents
 from app.identity import service as identity
 from app.ops import service as ops
+from app.public import service as public
 from app.students import crypto
 from app.students import repository as repo
 from app.students.canonical import Resolution, resolve
@@ -789,6 +790,29 @@ def _guard_national_ids(
         raise ValidationFailed(problems, detail=NATIONAL_ID_DETAIL)
 
 
+def _held_national_ids(
+    session: Session, student_ids: Collection[uuid.UUID]
+) -> dict[uuid.UUID, set[tuple[str, str]]]:
+    """Student -> its current, not rejected (PEN / APAAR ID key, value) pairs."""
+    out: dict[uuid.UUID, set[tuple[str, str]]] = {}
+    for row in repo.current_values(session, student_ids, NATIONAL_ID_KEYS):
+        if row.verification_status != "rejected" and (plain := _plain(session, row)):
+            out.setdefault(row.student_id, set()).add((row.attribute_key, plain))
+    return out
+
+
+def _national_ids_taken(session: Session, student_ids: Collection[uuid.UUID]) -> bool:
+    """Whether another live record now holds a PEN or APAAR ID of ``student_ids`` (records
+    about to become live again; FR-STU-018). The numbers are locked for the transaction."""
+    mine = set(student_ids)
+    for _sid, pairs in sorted(_held_national_ids(session, mine).items(), key=lambda i: str(i[0])):
+        for key, value in sorted(pairs):
+            repo.lock_national_id(session, key, value)
+            if any(s not in mine for _, s in repo.national_id_holders(session, key, [value])):
+                return True
+    return False
+
+
 def national_id_holders(
     session: Session, attribute_key: str, values: Collection[str]
 ) -> dict[str, list[uuid.UUID]]:
@@ -1248,13 +1272,25 @@ def update_student_status(
 ) -> StudentOut:
     """Change the record status (active, left, graduated, provisional); ``If-Match`` required.
 
-    Audit: ``student.status_changed`` with {from, to}.
+    Making a left or graduated record active or provisional again is refused with 422
+    ``national_id_in_use`` (field ``status``) while another live record holds its PEN or APAAR
+    ID (FR-STU-018). Audit: ``student.status_changed`` with {from, to}.
     """
     structure = _structure(session)
     student = _visible_student(
         session, ctx, student_id, permission=UPDATE, structure=structure, lock=True
     )
     previous = student.status
+    if status in repo.LIVE_STATUSES and previous not in repo.LIVE_STATUSES:
+        # FR-STU-018 (audit L-02): a left or graduated record freed its PEN and APAAR ID;
+        # making it live again must not give the school two live records with one number.
+        held = _held_national_ids(session, [student_id]).get(student_id, set())
+        _guard_national_ids(
+            session,
+            ctx,
+            [("status", key, value) for key, value in sorted(held)],
+            student_id=student_id,
+        )
     with _db_errors():
         updated = repo.update_student(
             session, student_id, values={"status": status}, expected_version=expected_version
@@ -2203,8 +2239,26 @@ def _guardian_out(
         phone=MASK if (reveal and has_phone) else None,
         address=MASK if (reveal and has_address) else None,
         masked=reveal and (has_phone or has_address),
+        preferred_language=_language(guardian.preferred_language),
         version=guardian.version,
     )
+
+
+def _language(value: str | None) -> Language | None:
+    if value == "en":
+        return "en"
+    if value == "te":
+        return "te"
+    return None
+
+
+def guardian_language(session: Session, guardian_id: uuid.UUID) -> Language | None:
+    """A guardian's own parent language (``en``/``te``) or ``None`` for the school's (ADR-0044,
+    FR-LANG-003). For parent-facing output (messages, parent pages) of a guardian the caller
+    already holds, e.g. a public handle's guardian; combine with the school setting through
+    ``app.core.languages.parent_language``. Read in the school's ``tenant_session``."""
+    guardian = repo.get_guardian(session, guardian_id)
+    return _language(guardian.preferred_language) if guardian is not None else None
 
 
 def list_guardians(session: Session, ctx: UserContext, student_id: uuid.UUID) -> list[GuardianOut]:
@@ -2379,8 +2433,10 @@ def update_guardian(
     *,
     expected_version: int,
 ) -> GuardianOut:
-    """Change a guardian's name, phone or address (``If-Match``: guardian version) and/or the
-    relationship/primary flag for this student. Audit: ``guardian.updated`` (field names)."""
+    """Change a guardian's name, phone, address or parent language (``If-Match``: guardian
+    version) and/or the relationship/primary flag for this student. Audit: ``guardian.updated``
+    (field names; the new parent language code). A phone change revokes the guardian's open
+    parent links (FR-PUB-007)."""
     fields = data.model_fields_set
     reject_full_aadhaar(
         {k: getattr(data, k) for k in fields if k in ("full_name", "phone", "address")}
@@ -2392,7 +2448,7 @@ def update_guardian(
     link = repo.get_link(session, student_id, guardian_id)
     if link is None:
         raise NotFound("Guardian not found")
-    if fields & {"full_name", "phone", "address"} and not all(
+    if fields & {"full_name", "phone", "address", "preferred_language"} and not all(
         _in_scope(session, ctx, other, perm, structure)
         for other in repo.guardian_student_ids(session, guardian_id)
         for perm in (READ, UPDATE)
@@ -2410,6 +2466,8 @@ def update_guardian(
     values: dict[str, Any] = {}
     if data.full_name is not None:
         values.update(full_name=data.full_name, full_name_norm=comparison_key(data.full_name))
+    if "preferred_language" in fields:
+        values["preferred_language"] = data.preferred_language
     values.update(
         _guardian_secret_columns(
             session,
@@ -2437,13 +2495,19 @@ def update_guardian(
         if link_values:
             repo.update_link(session, student_id, guardian_id, link_values)
     link = repo.ensure_found(repo.get_link(session, student_id, guardian_id), "Guardian")
+    summary: dict[str, Any] = {"student_id": student_id, "fields": sorted(fields)}
+    if "preferred_language" in fields:
+        summary["preferred_language"] = data.preferred_language
     _audit(
         session,
         action="guardian.updated",
         resource_type="guardian",
         resource_id=guardian_id,
-        summary={"student_id": student_id, "fields": sorted(fields)},
+        summary=summary,
     )
+    if "phone" in fields:
+        # A link sent to the old number must stop working (FR-PUB-007, ADR-0046 decision 5).
+        public.revoke_for_guardian(session, guardian_id, reason="phone_changed")
     _touch(session, student, _definitions(session))
     reveal = _can_reveal(session, ctx, student_id, structure)
     return _guardian_out(guardian, link.relationship, link.is_primary, reveal=reveal)
@@ -2475,6 +2539,8 @@ def remove_guardian(
     if guardian.version != expected_version:
         raise PreconditionFailed("The guardian was changed by someone else. Reload and try again.")
     repo.unlink_guardian(session, student_id, guardian_id)
+    # FR-PUB-007: an unlinked or deleted guardian's parent links stop working at once.
+    public.revoke_for_guardian(session, guardian_id, reason="guardian_unlinked")
     _audit(
         session,
         action="guardian.unlinked",
@@ -2935,7 +3001,8 @@ def undo_promotion(session: Session, ctx: UserContext, year_id: uuid.UUID) -> Pr
     Refused with 409 ``no_promotion`` when there is none, 409 ``promotion_undo_expired`` after
     24 hours, and 409 ``promotion_has_dependents`` when anything was recorded on top of it: an
     enrolment it closed or opened changed since (version or status), or a graduate's record
-    status changed, and 409 ``structure_archived`` when an enrolment it would reopen is in
+    status changed or another live record took its PEN or APAAR ID (FR-STU-018), and 409
+    ``structure_archived`` when an enrolment it would reopen is in
     archived structure. Otherwise, in the caller's transaction: the enrolments it opened are
     removed, the ones it closed are active again, graduates get their previous status back.
 
@@ -2968,6 +3035,14 @@ def undo_promotion(session: Session, ctx: UserContext, year_id: uuid.UUID) -> Pr
             raise _promotion_has_dependents()
     if repo.students_active_in_year(session, [i.student_id for i in items], year.id):
         raise _promotion_has_dependents()  # re-enrolled in the old year since the commit
+    reviving = [
+        i.student_id
+        for i in items
+        if i.outcome == "graduated" and i.previous_student_status in repo.LIVE_STATUSES
+    ]
+    if reviving and _national_ids_taken(session, reviving):
+        # A graduate freed its PEN / APAAR ID and a live record holds it now (audit L-02).
+        raise _promotion_has_dependents()
     # The reopened enrolments must not land in archived structure (409 structure_archived);
     # their sections stay locked against a concurrent archive (FR-TEN-010).
     tenancy.lock_enrolment_targets(session, repo.enrollment_section_ids(session, old_ids))

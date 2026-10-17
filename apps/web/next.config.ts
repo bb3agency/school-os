@@ -34,6 +34,10 @@ const nextConfig: NextConfig = {
     "/fonts/telugu/**": [
       "../../node_modules/@fontsource/noto-sans-telugu/files/noto-sans-telugu-telugu-{400,600,700}-normal.woff2",
     ],
+    // ADR-0044: Telugu parent pages load the same files from /p/fonts/telugu (any staff switch).
+    "/p/fonts/telugu/**": [
+      "../../node_modules/@fontsource/noto-sans-telugu/files/noto-sans-telugu-telugu-{400,600,700}-normal.woff2",
+    ],
   },
   outputFileTracingExcludes: {
     "*": ["../../node_modules/sharp/**", "../../node_modules/@img/**"],

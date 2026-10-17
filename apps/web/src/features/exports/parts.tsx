@@ -2,7 +2,7 @@
 
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useState } from "react";
-import { z } from "zod";
+import * as z from "@/lib/zod";
 import { Alert } from "@/components/ui/Alert";
 import { Pill, type PillVariant } from "@/components/ui/Badge";
 import { useSectionOptions, type SectionOption } from "@/features/findings/data";
