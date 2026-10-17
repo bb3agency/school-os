@@ -167,7 +167,7 @@ The active school is sent by the BFF as `X-Active-Tenant`. A user with several m
 | POST | `/students/{id}/values` | `student.update_nonidentity` | Non-identity attributes, or adding a source observation; identity changes → change requests |
 | POST | `/students/{id}/sensitive-reveal` | `student.read_sensitive` | Returns one C3 field; audited |
 | GET/POST | `/students/{id}/guardians` | read_basic / update_nonidentity | |
-| PATCH | `/students/{id}` | `student.update_nonidentity` | Record status (`active`, `left`, `graduated`, `provisional`); `If-Match` required |
+| PATCH | `/students/{id}` | `student.update_nonidentity` | Record status (`active`, `left`, `graduated`, `provisional`); `If-Match` required. Making a left or graduated record active or provisional again answers `422 national_id_in_use` (field `status`) while another live record holds its PEN or APAAR ID (FR-STU-018) |
 | POST | `/students/{id}/values/{value_id}/verify` | `student.update_nonidentity` | `{"status": "verified"\|"rejected"}` for the current value of a non-identity attribute; identity values → change requests (`403 identity_change_required`); superseded value → `409 value_superseded` |
 | PATCH | `/students/{id}/guardians/{guardian_id}` | `student.update_nonidentity` | Name, phone, address (C3, encrypted), relationship, primary flag; `If-Match` with the guardian's ETag |
 | DELETE | `/students/{id}/guardians/{guardian_id}` | `student.update_nonidentity` | Unlink (`204`); `If-Match` with the guardian's ETag (`412` when stale). A guardian no other student is linked to is deleted with their phone and address. Audit `guardian.unlinked` (+ `guardian.deleted`) |
