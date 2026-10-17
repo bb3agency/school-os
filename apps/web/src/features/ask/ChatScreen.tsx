@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SchoolChoices } from "@schoolos/api-client";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -30,6 +30,8 @@ import { AskTabs } from "./parts";
 import { useStickToBottom } from "./scroll";
 import { currentStep, stepLabel } from "./Status";
 import { ChatTurn, type TurnHandlers, type TurnModel } from "./Turn";
+import { AskUsageBanner, AskUsageMeter } from "./UsageNotices";
+import { USAGE_KEY, useAskUsage } from "./usage";
 
 const questionSchema = textSchema(MAX_QUESTION);
 
@@ -176,6 +178,17 @@ export function ChatScreen({ conversationId }: { conversationId: string | null }
 
   const detail = useConversation(allowed ? id : null);
   const memory = useMemorySettings(allowed);
+  // This month's answers and limits (FR-KB-040/041): numbers only for billing readers.
+  const usage = useAskUsage(allowed);
+  const queryClient = useQueryClient();
+  const busyBefore = useRef(chat.busy);
+  useEffect(() => {
+    // An answer just finished: the count (and maybe the state) changed.
+    if (busyBefore.current && !chat.busy) {
+      void queryClient.invalidateQueries({ queryKey: USAGE_KEY });
+    }
+    busyBefore.current = chat.busy;
+  }, [chat.busy, queryClient]);
   const schools = useQuery({
     queryKey: ["staff", "me", "schools"],
     queryFn: () => unwrap(api.GET("/api/v1/me/schools")) as Promise<SchoolChoices>,
@@ -403,6 +416,9 @@ export function ChatScreen({ conversationId }: { conversationId: string | null }
         </h1>
         <ConversationMenu conversation={detail.data ?? null} />
         <AskTabs active="ask" />
+        <div className="basis-full empty:hidden">
+          <AskUsageMeter usage={usage.data} />
+        </div>
       </header>
 
       {/* Announcements: steps (sparingly) and the finished answer, never each word. */}
@@ -513,6 +529,7 @@ export function ChatScreen({ conversationId }: { conversationId: string | null }
               </button>
             </div>
           ) : null}
+          <AskUsageBanner usage={usage.data} />
           {composerNode}
         </div>
 

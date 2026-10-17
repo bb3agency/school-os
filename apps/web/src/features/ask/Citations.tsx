@@ -17,7 +17,8 @@ import { Icon } from "@/components/ui/Icon";
 import { DownloadButton } from "@/features/documents/parts";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
-import { parseSource, sourceHref, type AskCitation } from "./answer";
+import { needsResolve, parseSource, sourceHref, type AskCitation } from "./answer";
+import { ResolveSourceLink } from "./ResolveSource";
 import { openLabel } from "./parts";
 
 // The popover's code loads with the first chip a reader points at (keeps the route lean).
@@ -181,6 +182,7 @@ export function SourceCard({ citation, id }: { citation: AskCitation; id: string
   const ref = citation.withheld ? null : parseSource(citation.source);
   const href = ref ? sourceHref(ref) : null;
   const name = citation.withheld ? t("withheld") : citation.title.trim() || t("untitled");
+  const resolvable = !citation.withheld && needsResolve(citation.source);
   return (
     <li
       id={id}
@@ -205,6 +207,8 @@ export function SourceCard({ citation, id }: { citation: AskCitation; id: string
             >
               {name}
             </Link>
+          ) : resolvable ? (
+            <ResolveSourceLink source={citation.source} name={name} />
           ) : (
             <span className="font-semibold break-anywhere text-ink">{name}</span>
           )}
@@ -222,7 +226,7 @@ export function SourceCard({ citation, id }: { citation: AskCitation; id: string
         </p>
         {citation.withheld ? (
           <p className="text-xs text-ink-muted">{t("withheldNote")}</p>
-        ) : ref === null ? (
+        ) : ref === null && !resolvable ? (
           <p className="text-xs text-ink-muted">{t("noLink")}</p>
         ) : null}
         {!citation.withheld && citation.snippet ? (
