@@ -1,7 +1,7 @@
 import { act, cleanup, waitFor } from "@testing-library/react";
 import type * as Navigation from "next/navigation";
 import { isValidElement, type ReactElement } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { PlatformShell } from "@/components/shell/PlatformShell";
 import { SchoolShell } from "@/components/shell/SchoolShell";
 import { renderWithIntl, testQueryClient } from "@/test/render";
@@ -66,10 +66,20 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
+/**
+ * Every page module, imported once before the scan. Transforming a page and its feature graph
+ * is the slow part, and under a full parallel run one page could pay for a whole feature in its
+ * own 60 s budget (once 133 s for ask/search); one shared budget for all imports is stable.
+ */
+const loaded = new Map<string, PageModule>();
+beforeAll(async () => {
+  for (const [path, load] of Object.entries(modules)) loaded.set(path, await load());
+}, 600_000);
+
 async function element(path: string): Promise<ReactElement | null> {
-  const load = modules[path];
-  if (!load) return null;
-  const Page = (await load()).default;
+  const pageModule = loaded.get(path) ?? (await modules[path]?.());
+  if (!pageModule) return null;
+  const Page = pageModule.default;
   try {
     const result = await Page({ params: params(), searchParams: Promise.resolve({}) });
     return isValidElement(result) ? result : null;
