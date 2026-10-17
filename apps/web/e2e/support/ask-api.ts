@@ -28,6 +28,8 @@ let conversations: Conversation[] = [];
 let memories: Json[] = [];
 let memoryEnabled = true;
 let asked = 0;
+/** A question about the budget used the month's answers up (search-only from then on). */
+let budgetUsed = false;
 
 const now = () => new Date().toISOString();
 
@@ -47,6 +49,7 @@ export function resetAsk(): void {
   ];
   memoryEnabled = true;
   asked = 0;
+  budgetUsed = false;
 }
 resetAsk();
 
@@ -87,6 +90,7 @@ export function askEvents(
       : undefined;
   if (typeof body.conversation_id === "string" && !existing) return null;
   asked += 1;
+  if (searchOnly) budgetUsed = true;
   const id = queryId(asked);
   const question = typeof body.question === "string" ? body.question : "";
   const conversationId = existing?.id ?? (asked === 1 ? CONVERSATION_ID : queryId(900 + asked));
@@ -193,6 +197,7 @@ export function askEvents(
       superseded: false,
       cached: false,
       summarized: false,
+      search_only_reason: searchOnly ? "ai_budget_exhausted" : null,
     });
     conversation.updated_at = now();
   };
@@ -236,6 +241,22 @@ export function askAnswer(method: string, path: string, body: Json): [number, un
       conversations = conversations.filter((c) => c !== conversation);
       return [204, ""];
     }
+  }
+  // R2.4 (FR-KB-040): the stand-in principal holds tenant.billing.read, so numbers are sent.
+  if (path === "/api/v1/knowledge/usage" && method === "GET") {
+    const answered = conversations
+      .flatMap((c) => c.messages)
+      .filter((m) => m.status === "answered").length;
+    return [
+      200,
+      {
+        month: "2026-10",
+        state: budgetUsed ? "search_only" : "near_limit",
+        search_only_reason: budgetUsed ? "ai_budget_exhausted" : null,
+        answers_used: 812 + answered,
+        included_answers: 1000,
+      },
+    ];
   }
   if (path === "/api/v1/knowledge/memory-settings") {
     if (method === "PUT" && typeof body.enabled === "boolean") memoryEnabled = body.enabled;
