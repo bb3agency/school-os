@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "schoolos-dev-host",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "python", "scripts/dev.py"],
+      "port": 3000
+    }
+  ]
+}
