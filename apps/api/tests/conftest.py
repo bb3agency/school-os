@@ -34,6 +34,12 @@ from app.core.config import get_settings
 # (FR-PLT-016). Tests of the guard itself pass the dev placeholders explicitly.
 os.environ.setdefault("SOS_BILLING_SUPPLIER_LEGAL_NAME", "Synthetic Test Supplier Private Limited")
 os.environ.setdefault("SOS_BILLING_SUPPLIER_GSTIN", "37ABCDE1234F1Z5")
+# R2-1C WhatsApp messaging (ADR-0043): on in tests (shared tier, fake provider in ci/local), with
+# the pilot manual-token mode and a synthetic Meta app secret for webhook signatures. Tests of
+# the switch itself (404 module_unavailable) override these explicitly.
+os.environ.setdefault("SOS_MESSAGING_ENABLED", "true")
+os.environ.setdefault("SOS_MESSAGING_MANUAL_TOKEN_ALLOWED", "true")
+os.environ.setdefault("SOS_META_APP_SECRET", "synthetic-meta-app-secret-for-tests-only")
 # Importing app.core.ratelimit above already built and cached Settings (its module-level
 # get_logger() calls get_settings()), so without this the supplier identity set here was only
 # seen after some other test happened to clear the cache (tests/devtools/test_seed_synthetic.py):
