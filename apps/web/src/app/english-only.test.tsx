@@ -1,10 +1,10 @@
-import { act, cleanup } from "@testing-library/react";
+import { act, cleanup, waitFor } from "@testing-library/react";
 import type * as Navigation from "next/navigation";
 import { isValidElement, type ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PlatformShell } from "@/components/shell/PlatformShell";
 import { SchoolShell } from "@/components/shell/SchoolShell";
-import { renderWithIntl } from "@/test/render";
+import { renderWithIntl, testQueryClient } from "@/test/render";
 
 /**
  * ADR-0036 (English first, Telugu hidden): with SOS_TELUGU_ENABLED off (the default) no page
@@ -137,8 +137,11 @@ describe("English only while Telugu is switched off (ADR-0036)", () => {
           {page}
         </SchoolShell>
       );
-      const { container } = renderWithIntl(shell);
-      // Let queries settle into their error or empty states.
+      const queryClient = testQueryClient();
+      const { container } = renderWithIntl(shell, "en", queryClient);
+      // Let every query settle into its error or empty state before scanning (one timer tick
+      // was not always enough on a loaded machine, so some pages were scanned while loading).
+      await waitFor(() => expect(queryClient.isFetching()).toBe(0), { timeout: 20_000 });
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
