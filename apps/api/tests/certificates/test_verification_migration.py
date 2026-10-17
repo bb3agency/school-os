@@ -145,7 +145,7 @@ def populated(test_database: Any, make_alembic_config: Callable[[str], Config]) 
 def _seed(admin: Engine) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID]:
     """A pending AP-format TC, a code and its handle (test setup only)."""
     with admin.begin() as c:
-        tenant_id = c.execute(
+        tenant_id: uuid.UUID = c.execute(
             text("SELECT id FROM core.tenants WHERE status = 'active' ORDER BY created_at LIMIT 1")
         ).scalar_one()
         student_id = uuid.uuid4()
@@ -156,7 +156,7 @@ def _seed(admin: Engine) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID]:
             ),
             {"i": student_id, "t": tenant_id},
         )
-        membership_id = c.execute(
+        membership_id: uuid.UUID = c.execute(
             text("SELECT id FROM core.memberships WHERE tenant_id = :t LIMIT 1"),
             {"t": tenant_id},
         ).scalar_one()

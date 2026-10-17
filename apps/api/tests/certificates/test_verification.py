@@ -366,7 +366,7 @@ def test_FR_CERT_023_withdrawn_code_answers_not_found_and_stays_withdrawn(
     assert again.status_code == 409
     assert again.json()["code"] == "verification_not_active"
     with admin_engine.connect() as c:
-        revoked = c.execute(
+        revoked: str = c.execute(
             text(
                 "SELECT h.revoked_reason FROM core.public_handles h "
                 "JOIN sis.certificate_verifications v ON v.handle_id = h.id "

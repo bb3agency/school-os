@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 from sqlalchemy import Engine, text
 
+from app.apaar import service as apaar_service
 from app.certificates import formats as tc_formats
 from app.certificates import service as certificates
 from app.core.db import tenant_session
@@ -224,7 +225,7 @@ def test_FR_CERT_017_apaar_id_only_verified_and_with_consent_given(  # noqa: PLR
     sid = _student(school)
     apaar_id = _verify(admin_engine, sid, "apaar_id")
     statuses = {sid: consent} if consent else {}
-    monkeypatch.setattr(certificates.apaar, "consent_statuses", lambda s, ids: statuses)
+    monkeypatch.setattr(apaar_service, "consent_statuses", lambda s, ids: statuses)
     lines = _lines(_ap_tc(school, sid))
     assert lines["apaar_id"] == (apaar_id if printed else "—")
 
@@ -233,7 +234,7 @@ def test_FR_CERT_017_an_unverified_apaar_id_is_never_printed_even_with_consent(
     school: Any, ap: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     sid = _student(school)
-    monkeypatch.setattr(certificates.apaar, "consent_statuses", lambda s, ids: {sid: "given"})
+    monkeypatch.setattr(apaar_service, "consent_statuses", lambda s, ids: {sid: "given"})
     assert _lines(_ap_tc(school, sid))["apaar_id"] == "—"
 
 
@@ -310,7 +311,7 @@ def test_FR_CERT_018_settings_change_is_audited_with_the_field_keys(
         assert out.settings.certificate_format.transfer == "ap-tc-2027"
         assert out.settings.print_restricted_tc_fields is True
         with admin_engine.connect() as c:
-            summary = c.execute(
+            summary: dict[str, Any] = c.execute(
                 text(
                     "SELECT summary FROM audit.events WHERE tenant_id = :t "
                     "AND action = 'tenant.settings_updated' ORDER BY seq DESC LIMIT 1"
