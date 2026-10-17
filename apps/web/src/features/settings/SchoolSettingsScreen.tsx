@@ -19,7 +19,7 @@ import { BoardsCard } from "./BoardsCard";
 import { known, schoolTone } from "@/features/status";
 import { ApiError, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { refreshSessionInfo } from "@/lib/bff/session-client";
-import { STAFF_ME_KEY, useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
+import { STAFF_ME_KEY, useStaffCan, useStaffMe, useStaffMeQuery } from "@/lib/bff/staff-me";
 import { formatInr } from "@/lib/format";
 import { formList, useApiForm } from "@/lib/forms";
 import { useTeluguEnabled } from "@/i18n/LanguagesProvider";
@@ -50,13 +50,16 @@ export function SchoolSettingsScreen() {
   const api = useBffClient("staff");
   const can = useStaffCan();
   const meLoaded = useStaffMe() !== undefined;
+  // Wait for /me before choosing between the editors and the read-only view, so a manager
+  // never sees the read-only page flash first (WEB-16). A failed /me shows the read-only view.
+  const mePending = useStaffMeQuery().isPending;
   const manage = can(SETTINGS_MANAGE);
   const tenant = useApiQuery(TENANT_KEY, () => unwrap(api.GET("/api/v1/tenant")));
   // The boards card remounts with each new version of the school; this keeps its "saved".
   const [boardsSaved, setBoardsSaved] = useState<number | null>(null);
 
   let body: ReactNode;
-  if (tenant.status === "loading") body = <LoadingState label={tc("loading")} />;
+  if (tenant.status === "loading" || mePending) body = <LoadingState label={tc("loading")} />;
   else if (tenant.status === "unavailable") {
     body = (
       <Alert tone="info" title={tc("notAvailableYetTitle")}>
