@@ -20,6 +20,7 @@ from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from importlib import resources
 from typing import Any, Final, Literal
+from zoneinfo import ZoneInfo
 
 import yaml
 
@@ -33,6 +34,7 @@ Classification = Literal["C1", "C2", "C3"]
 AADHAAR_CODE: Final = "aadhaar_full_number_rejected"
 AADHAAR_MESSAGE_KEY: Final = "errors.aadhaar_last4_only"
 MIN_DATE: Final = dt.date(1900, 1, 1)
+IST: Final = ZoneInfo("Asia/Kolkata")
 _CONTROL_RE: Final = re.compile(r"[\x00-\x1f\x7f]")
 _WS_RE: Final = re.compile(r"\s+")
 _MAX_TEXT: Final = 1000
@@ -242,6 +244,15 @@ def clean_text(raw: str) -> str:
     return _WS_RE.sub(" ", unicodedata.normalize("NFC", raw)).strip()
 
 
+def _utc_now() -> dt.datetime:
+    return dt.datetime.now(dt.UTC)
+
+
+def _today_ist() -> dt.date:
+    """The school's date (IST), as imports and the rest of the module use (audit L-04)."""
+    return _utc_now().astimezone(IST).date()
+
+
 def validate_value(
     definition: AttributeDef,
     source: str,
@@ -267,7 +278,7 @@ def validate_value(
     if definition.compact:
         value = _COMPACT_RE.sub("", value)
     if definition.data_type == "date":
-        return _date_value(value, rules, field_name, today or dt.datetime.now(dt.UTC).date())
+        return _date_value(value, rules, field_name, today or _today_ist())
     max_length = int(rules.get("max_length", _MAX_TEXT))
     if len(value) > max_length:
         raise ValidationFailed([error(field_name, "too_long")])
