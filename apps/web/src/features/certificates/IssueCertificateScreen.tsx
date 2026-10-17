@@ -20,7 +20,7 @@ import { SourceChip } from "@/features/findings/parts";
 import { Link, useRouter } from "@/i18n/navigation";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { useApiForm } from "@/lib/forms";
-import { localLabel, useCertificateTypes } from "./parts";
+import { localLabel, useCertificateTypes, useInputLabel } from "./parts";
 import {
   CERT_KEYS,
   CERTIFICATE_TYPES,
@@ -29,6 +29,7 @@ import {
   type CertificatePreview,
   type CertificateType,
   type CertificateTypeInfo,
+  type PrintedField,
 } from "./types";
 
 /** The type's inputs as a zod schema (quick feedback only; the API checks every value). */
@@ -38,6 +39,9 @@ export function buildInputSchema(info: CertificateTypeInfo) {
     let field = z.string().trim();
     if (input.kind === "date") {
       field = field.regex(/^(\d{4}-\d{2}-\d{2})?$/, { error: "invalidDate" });
+    }
+    if (input.kind === "number") {
+      field = field.regex(/^\d{0,6}$/, { error: "invalidNumber" });
     }
     if (input.max_length) field = field.max(input.max_length, { error: "tooLong" });
     if (input.kind === "choice") {
@@ -202,12 +206,15 @@ function Preview({
                   <Td className="font-semibold">{localLabel(field, locale)}</Td>
                   <Td>
                     <span className="break-anywhere">
-                      <Value>{field.value}</Value>
+                      <PreviewValue field={field} />
                     </span>
                   </Td>
                   <Td>
                     <span className="flex flex-wrap items-center gap-1">
                       {field.source ? <SourceChip source={field.source} /> : null}
+                      {field.fill && field.fill !== "record" ? (
+                        <Pill variant="tag">{t(`fill.${field.fill as "input"}`)}</Pill>
+                      ) : null}
                       {field.verified ? (
                         <Pill variant="positive">{t("verified")}</Pill>
                       ) : field.provisional ? (
@@ -225,10 +232,24 @@ function Preview({
   );
 }
 
+/** A preview value by where it comes from (R2 formats, FR-CERT-015..018). */
+function PreviewValue({ field }: { field: PrintedField }) {
+  const t = useTranslations("certificates.issue");
+  if (field.fill === "input") return <span className="text-ink-muted">{t("typedBelow")}</span>;
+  if (field.masked) return <span className="text-ink-muted">{t("hidden")}</span>;
+  if (field.fill === "identifier" && !field.value) {
+    return <span className="text-ink-muted">{t("notPrinted")}</span>;
+  }
+  if (field.fill === "restricted" && !field.value) {
+    return <span className="text-ink-muted">{t("blankByHand")}</span>;
+  }
+  return <Value>{field.value}</Value>;
+}
+
 function InputField({ input, error }: { input: CertificateInput; error: string | undefined }) {
   const t = useTranslations("certificates");
   const locale = useLocale();
-  const label = t(`inputs.${input.key}` as "inputs.remarks");
+  const label = useInputLabel()(input);
   const hint = input.required ? undefined : t("issue.optional");
   if (input.kind === "choice") {
     return (
@@ -247,6 +268,19 @@ function InputField({ input, error }: { input: CertificateInput; error: string |
   }
   if (input.kind === "date") {
     return <TextField name={input.key} type="date" label={label} hint={hint} error={error} />;
+  }
+  if (input.kind === "number") {
+    return (
+      <TextField
+        name={input.key}
+        label={label}
+        hint={hint}
+        error={error}
+        inputMode="numeric"
+        maxLength={6}
+        autoComplete="off"
+      />
+    );
   }
   return (
     <TextField
@@ -270,6 +304,7 @@ function IssueForm({
   preview: CertificatePreview | null;
 }) {
   const t = useTranslations("certificates.issue");
+  const tf = useTranslations("certificates.format");
   const router = useRouter();
   const api = useBffClient("staff");
   const form = useApiForm({
@@ -294,6 +329,14 @@ function IssueForm({
         description={info.requires_approval ? t("inputsBodyApproval") : t("inputsBody")}
       >
         <div className="space-y-4">
+          {info.format_key && info.format_key !== "generic-v1" ? (
+            <Alert
+              tone={info.format_verified === false ? "warning" : "info"}
+              title={t("formatTitle", { format: tf(`names.${info.format_key as "ap-tc-2027"}`) })}
+            >
+              {info.format_verified === false ? t("formatUnverified") : null}
+            </Alert>
+          ) : null}
           {info.inputs.length === 0 ? (
             <p className="text-sm text-ink-muted">{t("noInputs")}</p>
           ) : null}

@@ -78,9 +78,51 @@ export function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATH.test(pathname);
 }
 
+// --- R2-1A: certificate verification on VERIFY_BASE_URL (ADR-0045 decision 9; D29) -----------
+
+/** The verification pages: `/v` (the code box), `/v/check` (its form), `/v/<code>`. */
+export const VERIFY_PREFIX = "/v";
+const VERIFY_PATH = /^\/v(?:\/|$)/;
+const VERIFY_SERVED = [/^\/v$/, /^\/v\/check$/, /^\/v\/[A-Za-z0-9-]{1,64}$/];
+/** Where an unknown /v path is sent: the uniform "not found" answer of a code page. */
+export const VERIFY_UNKNOWN_PATH = "/v/unknown";
+
+export interface VerifyOrigin {
+  /** The verification host (host[:port]), lower case. */
+  verifyHost: string;
+  /** Local only: the verification pages on the staff app's own loopback http origin. */
+  sharedWithApp: boolean;
+  secure: boolean;
+}
+
+/**
+ * `VERIFY_BASE_URL` checked like `PUBLIC_BASE_URL`: an https origin, or plain http on a
+ * loopback host. It may equal `PUBLIC_BASE_URL` (a dedicated school's own host); it may equal
+ * the staff origin only on a local http run. Anything else switches verification off.
+ */
+export function verifyOrigin(env: Env = process.env): VerifyOrigin | null {
+  const url = parseOrigin(env.VERIFY_BASE_URL);
+  if (!url) return null;
+  const loopback = LOOPBACK_HOSTS.has(url.hostname.toLowerCase());
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) return null;
+  const app = parseOrigin(env.APP_BASE_URL);
+  const verifyHost = url.host.toLowerCase();
+  const sharedWithApp = app !== null && app.host.toLowerCase() === verifyHost;
+  if (sharedWithApp && !(url.protocol === "http:" && loopback)) return null;
+  return { verifyHost, sharedWithApp, secure: url.protocol === "https:" };
+}
+
+export function isVerifyPath(pathname: string): boolean {
+  return VERIFY_PATH.test(pathname);
+}
+
+// --- end R2-1A ----------------------------------------------------------------------------------
+
 export type SurfaceRoute =
   | { kind: "staff" }
   | { kind: "public"; served: boolean }
+  /** R2-1A: the certificate verification pages on VERIFY_BASE_URL. */
+  | { kind: "verify"; served: boolean }
   /** Nothing here: a public page on the staff host, or a staff page on the public host. */
   | { kind: "not_found" };
 
@@ -91,8 +133,20 @@ export function routeSurface(
   env: Env = process.env,
 ): SurfaceRoute {
   const origins = publicOrigins(env);
+  const verify = verifyOrigin(env);
+  const lowerHost = (host ?? "").toLowerCase();
+  const onVerifyHost = verify !== null && lowerHost === verify.verifyHost;
+  if (isVerifyPath(pathname)) {
+    return onVerifyHost
+      ? { kind: "verify", served: VERIFY_SERVED.some((p) => p.test(pathname)) }
+      : { kind: "not_found" };
+  }
+  // A verification host of its own serves nothing else (D29).
+  if (onVerifyHost && !verify.sharedWithApp && lowerHost !== origins?.publicHost) {
+    return { kind: "not_found" };
+  }
   const publicPath = isPublicPath(pathname);
-  const onPublicHost = origins !== null && (host ?? "").toLowerCase() === origins.publicHost;
+  const onPublicHost = origins !== null && lowerHost === origins.publicHost;
   if (onPublicHost && origins.shared) {
     return publicPath
       ? { kind: "public", served: SERVED.some((p) => p.test(pathname)) }
