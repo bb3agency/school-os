@@ -58,16 +58,23 @@ apps/api/app/
   changes/       change requests (maker-checker) for identity fields
   documents/     upload, storage, versions, ACLs, virus scan hook
   knowledge/     ingestion, chunking, embeddings, retrieval, tools, prompts, gateway, evals
-  exports/       board/portal pre-check sheets (CISCE, UDISE+), generic CSV/XLSX
+  exports/       board/portal pre-check sheets (UDISE+, BSEAP SSC, CBSE, CISCE), generic CSV/XLSX, print-job PDFs
+  certificates/  TC, bonafide, study and conduct certificates, serial numbers, register print views
+  circulars/     circulars → tasks with reminders, parent notice drafts
+  academics/     daily attendance, attendance register, exams and marks
+  insights/      early-warning indicators, flags, interventions (purpose-limited, invariant 14)
+  apaar/         APAAR consent register (append-only), consent forms (ADR-0039)
+  tally/         read-only Tally connector and fee dues (edge agent in apps/edge-agent)
+  breakglass/    support access to a school with approval, visible to the school
   notifications/ in-app notifications, bilingual templates
   admin/         tenant admin, retention settings, data export
-  ops/           tenant-side job runs, outbox, idempotency keys, break-glass grants
+  ops/           tenant-side job runs, outbox, idempotency keys
   platform/      control plane: operators, school provisioning, plans, subscriptions, invoices,
                  payments (billing), usage, fleet + heartbeat, feature flags, announcements,
                  support tickets, platform audit (DB role sos_platform; routes /api/v1/platform/*)
   devtools/      synthetic data generator (make seed-synthetic; local/ci only)
 apps/api/migrations/  Alembic revisions 0001_baseline … 0054_r1_finish (linear chain; `alembic heads` shows the current head)
-apps/api/tests/  tests per module (tests/<module>/) + cross-module suites (tests/security/, tests/migrations/)
+apps/api/tests/  tests per module (tests/<module>/) + cross-module suites (tests/security/, tests/migrations/, tests/api/, tests/deploy/)
 apps/api/openapi.json  committed OpenAPI document (make openapi; freshness test)
 apps/worker/     Celery entrypoint (sos_worker.celery_app; imports app.* tasks and beat schedules)
 apps/web/        Next.js app (app router, BFF route handlers, i18n; operator UI under /[locale]/platform/*)
