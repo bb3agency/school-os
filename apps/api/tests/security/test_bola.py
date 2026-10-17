@@ -226,6 +226,13 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     },
     ("DELETE", "/api/v1/tally/parties/{party_id}/links/{student_id}"): None,
     ("POST", "/api/v1/notices/{notice_id}/draft"): {},
+    # R2-1C WhatsApp opt-ins (ADR-0043): another school's guardian is 404 like a random id.
+    ("POST", "/api/v1/guardians/{guardian_id}/optins"): {
+        "category": "notices",
+        "status": "opted_in",
+        "method": "in_person",
+        "decided_on": "2026-10-01",
+    },
     # APAAR consent register (ADR-0039): another school's student is 404 like a random id.
     ("POST", "/api/v1/students/{student_id}/apaar-consent"): {
         "status": "refused",
@@ -308,6 +315,9 @@ ACTOR: dict[tuple[str, str], str] = dict.fromkeys(
         ("GET", "/api/v1/students/{student_id}/timeline"),
         # ADR-0039: recording APAAR consent is not an owner permission (docs/07 §6.2).
         ("POST", "/api/v1/students/{student_id}/apaar-consent"),
+        # ADR-0043: recording WhatsApp opt-ins is not an owner permission (docs/07 §6.2).
+        ("POST", "/api/v1/guardians/{guardian_id}/optins"),
+        ("GET", "/api/v1/sections/{section_id}/join-slips"),
     ),
     "principal",
 )
@@ -789,6 +799,7 @@ QUERY: dict[tuple[str, str], dict[str, str]] = {
     ("GET", "/api/v1/students/{student_id}/certificates/preview"): {"certificate_type": "bonafide"},
     ("GET", "/api/v1/sections/{section_id}/attendance/month"): {"month": "2026-09"},
     ("GET", "/api/v1/imports/{import_id}/preset-mapping"): {"preset": "register-excel"},
+    ("GET", "/api/v1/sections/{section_id}/join-slips"): {"categories": "notices"},
 }
 
 

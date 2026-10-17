@@ -20,11 +20,11 @@ from typing import Any
 
 import httpx
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 from sqlalchemy import Engine, text
 
-from app.core.config import get_settings
 from app.core.db import tenant_session
-from app.messaging import service
+from app.messaging import runtime, service
 from app.messaging.providers.fake import STATE
 from app.messaging.schemas import ManualConnectIn
 from app.messaging.webhook import signature
@@ -80,7 +80,7 @@ def connect(school: Any) -> tuple[uuid.UUID, str]:
             db,
             owner_ctx(school),
             ManualConnectIn(
-                token="synthetic-system-user-token-" + digits(12),  # type: ignore[arg-type]
+                token=SecretStr("synthetic-system-user-token-" + digits(12)),
                 waba_id=waba,
                 phone_number_id=number,
             ),
@@ -139,7 +139,9 @@ def envelope(waba: str, field: str, value: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def inbound(waba: str, wa_id: str, *, text_body: str | None = None, button: str | None = None) -> dict[str, Any]:
+def inbound(
+    waba: str, wa_id: str, *, text_body: str | None = None, button: str | None = None
+) -> dict[str, Any]:
     message: dict[str, Any] = {
         "from": wa_id,
         "id": "wamid.IN" + digits(16),
@@ -158,7 +160,9 @@ def inbound(waba: str, wa_id: str, *, text_body: str | None = None, button: str 
     return envelope(waba, "messages", value)
 
 
-def status(waba: str, wamid: str, state: str, *, ts: int | None = None, code: int | None = None) -> dict[str, Any]:
+def status(
+    waba: str, wamid: str, state: str, *, ts: int | None = None, code: int | None = None
+) -> dict[str, Any]:
     item: dict[str, Any] = {
         "id": wamid,
         "status": state,
@@ -172,7 +176,7 @@ def status(waba: str, wamid: str, state: str, *, ts: int | None = None, code: in
 
 
 def secret() -> bytes:
-    value = get_settings().meta_app_secret
+    value = runtime.settings().meta_app_secret
     assert value is not None
     return value.get_secret_value().encode()
 

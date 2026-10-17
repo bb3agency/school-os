@@ -54,7 +54,7 @@ from app.audit import service as audit
 from app.authz.context import UserContext
 from app.authz.http import decode_cursor, encode_cursor
 from app.core import purge as purging
-from app.core.config import DeploymentMode, Settings, get_settings
+from app.core.config import DeploymentMode, Settings
 from app.core.crypto import CryptoError, unwrap_bound, wrap_bound
 from app.core.db import context_free_session, tenant_session
 from app.core.errors import (
@@ -83,23 +83,24 @@ from app.messaging.providers import (
     TemplateMessage,
     get_provider,
 )
+from app.messaging.runtime import settings as messaging_settings
 from app.messaging.schemas import (
-    AccountOut,
     CategoryCounts,
     CategoryStateOut,
     EmbeddedSignupIn,
     GuardianOptinsOut,
     JoinSlipsIn,
     ManualConnectIn,
-    MessageOut,
-    MessagePage,
-    MessageSearchIn,
+    MessagingAccountOut,
+    MessagingMessageOut,
+    MessagingMessagePage,
+    MessagingSearchIn,
+    MessagingSettingsIn,
+    MessagingSettingsOut,
+    MessagingTemplateOut,
     OptinEntryOut,
     OptinIn,
     SectionOptinSummaryOut,
-    SettingsIn,
-    SettingsOut,
-    TemplateOut,
 )
 from app.messaging.webhook import ParsedEvent
 from app.notifications import service as notifications
@@ -118,8 +119,6 @@ PROVISION_EVENT: Final = "messaging.provision_templates"
 PROVISION_TASK: Final = "messaging.provision_templates"
 INBOX_EVENT: Final = "messaging.inbox"
 INBOX_TASK: Final = "messaging.process_inbox"
-DELIVER_EVENT: Final = "messaging.deliver"
-DELIVER_TASK: Final = "messaging.deliver"
 EVENTS_TABLE: Final = "msg.provider_events"
 MESSAGES_TABLE: Final = "msg.messages"
 _STAFF_METHODS: Final = frozenset({"signed_form", "in_person", "staff_recorded_stop"})
@@ -153,7 +152,6 @@ _PERMANENT_REASONS: Final = {
 
 ops.register_outbox_route(PROVISION_EVENT, PROVISION_TASK)
 ops.register_outbox_route(INBOX_EVENT, INBOX_TASK)
-ops.register_outbox_route(DELIVER_EVENT, DELIVER_TASK)
 
 log = get_logger(__name__)
 
@@ -194,7 +192,7 @@ class ProviderFailed(DomainError):
 
 def available(settings: Settings | None = None) -> bool:
     """FR-MSG-024: shared tier with ``SOS_MESSAGING_ENABLED`` only (owner decision D24)."""
-    s = settings or get_settings()
+    s = settings or messaging_settings()
     return s.messaging_enabled and s.deployment_mode is DeploymentMode.SHARED
 
 
@@ -307,13 +305,13 @@ def _currency_state(account: Account) -> str:
     return "confirmed_inr" if account.currency == "INR" else "not_inr"
 
 
-def _template_out(row: MessageTemplate) -> TemplateOut:
+def _template_out(row: MessageTemplate) -> MessagingTemplateOut:
     try:
         reviewed = cat.template(row.template_key).text(row.language).reviewed  # type: ignore[arg-type]
     except KeyError:
         reviewed = False
     state = rules.TemplateState(row.status, row.provider_category, row.paused_by_sos)
-    return TemplateOut(
+    return MessagingTemplateOut(
         template_key=row.template_key,
         template_version=row.template_version,
         language=row.language,
@@ -328,14 +326,15 @@ def _template_out(row: MessageTemplate) -> TemplateOut:
     )
 
 
-def _account_out(session: Session, account: Account | None) -> AccountOut:
-    s = get_settings()
+def _account_out(session: Session, account: Account | None) -> MessagingAccountOut:
+    s = messaging_settings()
     cfg = load_config()
     signup = (
         {
             "app_id": s.meta_app_id,
             "config_id": s.meta_embedded_signup_config_id,
             "version": cfg.graph.embedded_signup_version,
+            "graph_version": s.meta_graph_api_version or cfg.graph.api_version,
         }
         if s.meta_app_id and s.meta_embedded_signup_config_id
         else None
@@ -348,8 +347,8 @@ def _account_out(session: Session, account: Account | None) -> AccountOut:
         "unreviewed_texts": cat.unreviewed(school_language) if school_language == "te" else [],
     }
     if account is None:
-        return AccountOut(connected=False, **base)
-    return AccountOut(
+        return MessagingAccountOut(connected=False, **base)
+    return MessagingAccountOut(
         connected=True,
         id=account.id,
         mode=account.mode,
@@ -374,7 +373,7 @@ def _account_out(session: Session, account: Account | None) -> AccountOut:
     )
 
 
-def get_account(session: Session, ctx: UserContext) -> AccountOut:
+def get_account(session: Session, ctx: UserContext) -> MessagingAccountOut:
     """The school's WhatsApp connection, its number, quality, limit, billing currency state and
     template statuses (FR-MSG-004; ``messaging.configure`` or ``message.read``)."""
     del ctx
@@ -382,7 +381,7 @@ def get_account(session: Session, ctx: UserContext) -> AccountOut:
     return _account_out(session, repo.live_account(session))
 
 
-def list_templates(session: Session, ctx: UserContext) -> list[TemplateOut]:
+def list_templates(session: Session, ctx: UserContext) -> list[MessagingTemplateOut]:
     del ctx
     ensure_available()
     account = repo.live_account(session)
@@ -427,7 +426,7 @@ def _connect(
     business_id: str | None,
     obtain_token: Callable[[MessagingProvider], str],
     register: bool,
-) -> AccountOut:
+) -> MessagingAccountOut:
     ensure_available()
     if repo.live_account(session, lock=True) is not None:
         raise AlreadyConnected("WhatsApp is already connected. Disconnect it first.")
@@ -498,7 +497,7 @@ def _connect(
 
 def connect_embedded_signup(
     session: Session, ctx: UserContext, data: EmbeddedSignupIn
-) -> AccountOut:
+) -> MessagingAccountOut:
     """Connect with Meta's Embedded Signup v4 (FR-MSG-002; ``messaging.configure``, step-up).
     Errors: 409 ``messaging_already_connected``; 502 ``messaging_auth_failed`` /
     ``messaging_provider_error``. Audit ``messaging.connected``."""
@@ -514,12 +513,14 @@ def connect_embedded_signup(
     )
 
 
-def connect_manual(session: Session, ctx: UserContext, data: ManualConnectIn) -> AccountOut:
+def connect_manual(
+    session: Session, ctx: UserContext, data: ManualConnectIn
+) -> MessagingAccountOut:
     """Connect with a system-user token for pilots (FR-MSG-003; D13), checked by a read call
     before saving. 403 ``manual_token_not_allowed`` unless
     ``SOS_MESSAGING_MANUAL_TOKEN_ALLOWED``."""
     ensure_available()
-    if not get_settings().messaging_manual_token_allowed:
+    if not messaging_settings().messaging_manual_token_allowed:
         raise ManualTokenNotAllowed(
             "Connecting with a pasted token is switched off. Use Connect WhatsApp instead."
         )
@@ -578,7 +579,7 @@ def disconnect(session: Session, ctx: UserContext, *, expected_version: int | No
     )
 
 
-def resume(session: Session, ctx: UserContext) -> AccountOut:
+def resume(session: Session, ctx: UserContext) -> MessagingAccountOut:
     """Resume sending after a pause (FR-MSG-021; ``messaging.configure``, step-up). The account
     is read from Meta first; 409 ``messaging_still_restricted`` while the quality is still
     flagged or red."""
@@ -683,7 +684,7 @@ def provision_templates(tenant_id: uuid.UUID, account_id: uuid.UUID) -> dict[str
     Already created ones are left alone; a failure is kept on the row (``error_code``) and the
     next sync or provisioning retries. Audit ``messaging.template.created`` (counts)."""
     counts: Counter[str] = Counter()
-    base_url = get_settings().public_base_url
+    base_url = messaging_settings().public_base_url
     with tenant_session(tenant_id) as session:
         account = repo.get_account(session, account_id, lock=True)
         if account is None or account.status == "disconnected":
@@ -818,7 +819,7 @@ def sync_templates(tenant_id: uuid.UUID) -> dict[str, int]:
     return dict(counts)
 
 
-def request_template_sync(session: Session, ctx: UserContext) -> AccountOut:
+def request_template_sync(session: Session, ctx: UserContext) -> MessagingAccountOut:
     """Sync now (``messaging.configure``, step-up): templates not created yet are created, the
     rest are read back. Runs in the worker; the page reloads the statuses."""
     del ctx
@@ -857,10 +858,10 @@ def _ensure_settings(session: Session) -> MessagingSettings:
     return row
 
 
-def _settings_out(session: Session, row: MessagingSettings) -> SettingsOut:
+def _settings_out(session: Session, row: MessagingSettings) -> MessagingSettingsOut:
     cfg = load_config()
     account = repo.live_account(session)
-    return SettingsOut(
+    return MessagingSettingsOut(
         notices_enabled=row.notices_enabled,
         absence_alerts_enabled=row.absence_alerts_enabled,
         fee_reminders_enabled=row.fee_reminders_enabled,
@@ -877,12 +878,12 @@ def _settings_out(session: Session, row: MessagingSettings) -> SettingsOut:
     )
 
 
-def get_messaging_settings(session: Session, ctx: UserContext) -> SettingsOut:
+def get_messaging_settings(session: Session, ctx: UserContext) -> MessagingSettingsOut:
     del ctx
     ensure_available()
     row = repo.get_settings(session)
     if row is None:
-        return SettingsOut(
+        return MessagingSettingsOut(
             notices_enabled=False,
             absence_alerts_enabled=False,
             fee_reminders_enabled=False,
@@ -916,8 +917,8 @@ def _office_phone(value: str | None) -> str | None:
 
 
 def update_messaging_settings(
-    session: Session, ctx: UserContext, data: SettingsIn, *, expected_version: int
-) -> SettingsOut:
+    session: Session, ctx: UserContext, data: MessagingSettingsIn, *, expected_version: int
+) -> MessagingSettingsOut:
     """Change switches and times (``messaging.configure``, step-up; ``If-Match``, ``W/"0"``
     before the first save). Audit ``messaging.settings.changed`` (field names only)."""
     ensure_available()
@@ -1241,9 +1242,7 @@ def join_slips(session: Session, ctx: UserContext, data: JoinSlipsIn) -> str:
     only its hash is stored. 409 ``messaging_not_connected``, ``no_slips``, ``too_many_slips``.
     Audit ``messaging.join_slips.printed`` (count)."""
     ensure_available()
-    account = repo.live_account(session)
-    if account is None or not account.display_phone:
-        raise NotConnected("Connect WhatsApp before printing join slips.")
+    # Scope first: a section or student out of reach is 404 whether or not WhatsApp is connected.
     if data.section_id is not None:
         student_ids = _reach_section(session, ctx, data.section_id, RECORD)
     else:
@@ -1251,6 +1250,9 @@ def join_slips(session: Session, ctx: UserContext, data: JoinSlipsIn) -> str:
         for student_id in dict.fromkeys(data.student_ids or []):
             students.ensure_in_scope(session, ctx, student_id, RECORD)
             student_ids.append(student_id)
+    account = repo.live_account(session)
+    if account is None or not account.display_phone:
+        raise NotConnected("Connect WhatsApp before printing join slips.")
     names = students.summaries(session, ctx, student_ids)
     guardians = [g for g in students.guardians_of_students(session, student_ids) if g.has_phone]
     cfg = load_config().optin
@@ -1587,8 +1589,8 @@ def _error_reason(code: str | None) -> str | None:
     return code
 
 
-def _message_out(row: Message) -> MessageOut:
-    return MessageOut(
+def _message_out(row: Message) -> MessagingMessageOut:
+    return MessagingMessageOut(
         id=row.id,
         purpose=row.purpose,
         kind=row.kind,
@@ -1614,7 +1616,9 @@ def _message_out(row: Message) -> MessageOut:
     )
 
 
-def search_messages(session: Session, ctx: UserContext, data: MessageSearchIn) -> MessagePage:
+def search_messages(
+    session: Session, ctx: UserContext, data: MessagingSearchIn
+) -> MessagingMessagePage:
     """Message history (US-2208; ``message.read``). School-wide readers may list everything;
     scoped readers (class teachers) must name a student or guardian in their sections (422
     ``filter_required``). A student or guardian outside reach is 404. Phones appear only as the
@@ -1664,7 +1668,7 @@ def search_messages(session: Session, ctx: UserContext, data: MessageSearchIn) -
         if more and rows
         else None
     )
-    return MessagePage(items=[_message_out(r) for r in rows], next_cursor=next_cursor)
+    return MessagingMessagePage(items=[_message_out(r) for r in rows], next_cursor=next_cursor)
 
 
 # --- webhook intake (API process) -------------------------------------------------------------

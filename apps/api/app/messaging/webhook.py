@@ -25,10 +25,10 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any, Final
 
-from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.messaging.catalogue import catalogue
 from app.messaging.config import classify
+from app.messaging.runtime import settings as messaging_settings
 from app.public.config import WebhookProvider
 from app.public.service import ResolvedHandle
 from app.public.webhooks import (
@@ -74,7 +74,7 @@ class MetaWebhookVerifier:
     provider: WebhookProvider = "meta"
 
     def verify(self, request: WebhookRequest) -> VerifiedWebhook:
-        secret = get_settings().meta_app_secret
+        secret = messaging_settings().meta_app_secret
         if secret is None:
             raise WebhookRejected("app_secret_unset")
         given = request.headers.get(SIGNATURE_HEADER) or ""

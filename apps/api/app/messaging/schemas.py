@@ -90,7 +90,7 @@ class ManualConnectIn(_In):
         return self
 
 
-class TemplateOut(_Out):
+class MessagingTemplateOut(_Out):
     template_key: str
     template_version: int
     language: Language
@@ -104,7 +104,7 @@ class TemplateOut(_Out):
     last_synced_at: dt.datetime | None
 
 
-class AccountOut(_Out):
+class MessagingAccountOut(_Out):
     """The school's WhatsApp connection (FR-MSG-004). ``connected`` false: nothing below is set."""
 
     connected: bool
@@ -131,13 +131,13 @@ class AccountOut(_Out):
     connected_at: dt.datetime | None = None
     paused_at: dt.datetime | None = None
     last_synced_at: dt.datetime | None = None
-    templates: list[TemplateOut] = Field(default_factory=list)
+    templates: list[MessagingTemplateOut] = Field(default_factory=list)
     unreviewed_texts: list[str] = Field(default_factory=list)
     version: int = 0
 
 
-class TemplatesOut(_Out):
-    items: list[TemplateOut]
+class MessagingTemplatesOut(_Out):
+    items: list[MessagingTemplateOut]
 
 
 # --- settings ---------------------------------------------------------------------------------
@@ -146,7 +146,7 @@ class TemplatesOut(_Out):
 OfficePhone = Annotated[str, BeforeValidator(_nfc), StringConstraints(min_length=10, max_length=20)]
 
 
-class SettingsIn(_In):
+class MessagingSettingsIn(_In):
     """Switches and times (ADR-0043 decisions 10-11, owner decision D25). The switches are read
     by the sending wave (R2-3G); absence alerts stay off until the school turns them on."""
 
@@ -163,7 +163,7 @@ class SettingsIn(_In):
     )
 
 
-class SettingsOut(_Out):
+class MessagingSettingsOut(_Out):
     notices_enabled: bool
     absence_alerts_enabled: bool
     fee_reminders_enabled: bool
@@ -264,7 +264,7 @@ class SectionOptinSummaryOut(_Out):
 # --- messages ---------------------------------------------------------------------------------
 
 
-class MessageSearchIn(_In):
+class MessagingSearchIn(_In):
     """Delivery log filters (POST: no personal data in URLs). Scoped callers (class teachers)
     must name a student or guardian in their sections."""
 
@@ -278,7 +278,7 @@ class MessageSearchIn(_In):
     cursor: str | None = Field(default=None, max_length=512)
 
 
-class MessageOut(_Out):
+class MessagingMessageOut(_Out):
     id: uuid.UUID
     purpose: MessagePurpose
     kind: Literal["template", "text"]
@@ -303,13 +303,12 @@ class MessageOut(_Out):
     failed_at: dt.datetime | None
 
 
-class MessagePage(_Out):
-    items: list[MessageOut]
+class MessagingMessagePage(_Out):
+    items: list[MessagingMessageOut]
     next_cursor: str | None
 
 
 __all__ = [
-    "AccountOut",
     "CategoryCounts",
     "CategoryStateOut",
     "CurrencyState",
@@ -317,14 +316,15 @@ __all__ = [
     "GuardianOptinsOut",
     "JoinSlipsIn",
     "ManualConnectIn",
-    "MessageOut",
-    "MessagePage",
-    "MessageSearchIn",
+    "MessagingAccountOut",
+    "MessagingMessageOut",
+    "MessagingMessagePage",
+    "MessagingSearchIn",
+    "MessagingSettingsIn",
+    "MessagingSettingsOut",
+    "MessagingTemplateOut",
+    "MessagingTemplatesOut",
     "OptinEntryOut",
     "OptinIn",
     "SectionOptinSummaryOut",
-    "SettingsIn",
-    "SettingsOut",
-    "TemplateOut",
-    "TemplatesOut",
 ]

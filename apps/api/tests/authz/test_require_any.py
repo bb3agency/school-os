@@ -274,6 +274,16 @@ def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
             ("apaar.consent.record", "tenant.settings.manage"),
             False,
         ),
+        # R2-1C WhatsApp (ADR-0043): configurers and readers share the account state and the
+        # settings; readers and recorders share a guardian's opt-ins (scope in the service).
+        ("GET", "/api/v1/messaging/account"): ("messaging.configure", ("message.read",), False),
+        ("GET", "/api/v1/messaging/templates"): ("messaging.configure", ("message.read",), False),
+        ("GET", "/api/v1/messaging/settings"): ("message.read", ("messaging.configure",), False),
+        ("GET", "/api/v1/guardians/{guardian_id}/optins"): (
+            "message.read",
+            ("messaging.optin.record",),
+            False,
+        ),
     }
     assert {
         (m, p): (g.sos_permission, g.sos_any_of, g.sos_step_up) for m, p, g in guards

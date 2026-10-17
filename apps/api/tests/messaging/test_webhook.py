@@ -42,7 +42,9 @@ def test_SEC_034_meta_signature_valid_invalid_missing(
     assert M.post(api.client, payload, header="sha1=abcdef").status_code == 401
     tampered = json.dumps(payload).encode()
     good_sig = signature(M.secret(), tampered)
-    assert M.post(api.client, tampered.replace(b"Hello", b"Hullo"), header=good_sig).status_code == 401
+    assert (
+        M.post(api.client, tampered.replace(b"Hello", b"Hullo"), header=good_sig).status_code == 401
+    )
     assert _events(admin_engine, world.a.tenant_id) == before
     res = M.post(api.client, payload)
     assert res.status_code == 200
@@ -90,7 +92,9 @@ def test_SEC_034_through_the_fake_verifier(world: Any, api: Any, admin_engine: E
         body = json.dumps(M.inbound(waba, "91" + M.synthetic_mobile(), text_body="x")).encode()
         bad = api.client.post(M.WEBHOOK, content=body, headers={FAKE_SIGNATURE_HEADER: "00"})
         assert bad.status_code == 401
-        ok = api.client.post(M.WEBHOOK, content=body, headers={FAKE_SIGNATURE_HEADER: fake.sign(body)})
+        ok = api.client.post(
+            M.WEBHOOK, content=body, headers={FAKE_SIGNATURE_HEADER: fake.sign(body)}
+        )
         assert ok.status_code == 200
         assert _events(admin_engine, world.a.tenant_id) == before + 1
     finally:
@@ -107,13 +111,16 @@ def test_SEC_034_body_limit_is_metas_three_megabytes(world: Any, api: Any) -> No
     assert M.post(api.client, payload).status_code == 413
 
 
-def test_FR_MSG_020_subscription_challenge(world: Any, api: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_FR_MSG_020_subscription_challenge(
+    world: Any, api: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     token = "synthetic-verify-token-0123456789abcdef"
     configured = Settings(env=Environment.CI, meta_webhook_verify_token=SecretStr(token))
     monkeypatch.setattr(guards, "get_settings", lambda: configured)
     query = {"hub.mode": "subscribe", "hub.verify_token": token, "hub.challenge": "8812345"}
     ok = api.client.get(M.WEBHOOK, params=query)
-    assert ok.status_code == 200 and ok.text == "8812345"
+    assert ok.status_code == 200
+    assert ok.text == "8812345"
     assert api.client.get(M.WEBHOOK, params={**query, "hub.verify_token": "x"}).status_code == 403
     del world
 
@@ -127,7 +134,8 @@ def test_FR_MSG_018_inbound_text_never_leaves_the_parser() -> None:
     assert "unwell" not in json.dumps(event.payload)
     status = M.status("1", "wamid.X", "delivered", code=None)
     (st,) = parse_entries(json.dumps(status).encode())["1"]
-    assert st.event_key.startswith("status:wamid.X:delivered:") and "recipient_id" not in st.payload
+    assert st.event_key.startswith("status:wamid.X:delivered:")
+    assert "recipient_id" not in st.payload
 
 
 def test_FR_MSG_020_store_events_rereads_the_handle(world: Any, admin_engine: Engine) -> None:

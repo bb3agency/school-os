@@ -164,8 +164,8 @@ def _seed(admin: Engine) -> uuid.UUID:
         c.execute(text("INSERT INTO msg.settings (id, tenant_id) VALUES (:settings, :t)"), p)
         c.execute(
             text(
-                "INSERT INTO msg.optins (id, tenant_id, guardian_id, category, seq, status, method, "
-                "wording_version, decided_on) VALUES (:optin, :t, :guardian, 'notices', 1, "
+                "INSERT INTO msg.optins (id, tenant_id, guardian_id, category, seq, status, "
+                "method, wording_version, decided_on) VALUES (:optin, :t, :guardian, 'notices', 1, "
                 "'opted_out', 'whatsapp_stop', 'optin-2026-10', current_date)"
             ),
             p,
@@ -180,8 +180,8 @@ def _seed(admin: Engine) -> uuid.UUID:
         )
         c.execute(
             text(
-                "INSERT INTO msg.provider_events (id, tenant_id, account_id, event_key, event_type) "
-                "VALUES (:event, :t, :account, 'in:wamid.X', 'inbound_message')"
+                "INSERT INTO msg.provider_events (id, tenant_id, account_id, event_key, "
+                "event_type) VALUES (:event, :t, :account, 'in:wamid.X', 'inbound_message')"
             ),
             p,
         )
@@ -193,8 +193,11 @@ def test_FR_MSG_016_status_trigger_and_account_secret_checks(populated: _Walk) -
     message = _seed(admin)
     with pytest.raises(DBAPIError, match="only move forward"), admin.begin() as c:
         c.execute(text("UPDATE msg.messages SET status = 'queued' WHERE id = :i"), {"i": message})
+    with admin.begin() as c:
+        c.execute(
+            text("UPDATE msg.messages SET status = 'delivered' WHERE id = :i"), {"i": message}
+        )
     with pytest.raises(DBAPIError, match="cannot fail"), admin.begin() as c:
-        c.execute(text("UPDATE msg.messages SET status = 'delivered' WHERE id = :i"), {"i": message})
         c.execute(text("UPDATE msg.messages SET status = 'failed' WHERE id = :i"), {"i": message})
     with pytest.raises(DBAPIError, match="accounts_secrets"), admin.begin() as c:
         c.execute(
@@ -221,6 +224,4 @@ def test_CLAUDE_6_12_messaging_migration_reversible_with_data(populated: _Walk) 
     assert _scalar(admin, "SELECT to_regnamespace('msg') IS NOT NULL") is True
     command.upgrade(populated.cfg, "head")
     assert _scalar(admin, "SELECT count(*) FROM msg.optins") == 0
-    assert (
-        _scalar(admin, "SELECT count(*) FROM core.permissions WHERE key = 'message.read'") == 1
-    )
+    assert _scalar(admin, "SELECT count(*) FROM core.permissions WHERE key = 'message.read'") == 1

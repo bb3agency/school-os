@@ -5,13 +5,14 @@ from __future__ import annotations
 
 import datetime as dt
 import re
+from importlib import resources
 
 import pytest
 import yaml
 from pydantic import ValidationError
 
 from app.core import languages
-from app.core.config import Environment, MessagingProviderMode, Settings
+from app.core.config import DeploymentMode, Environment, MessagingProviderMode, Settings
 from app.messaging import catalogue as cat
 from app.messaging import eligibility as rules
 from app.messaging import slips
@@ -37,7 +38,7 @@ def test_FR_MSG_005_catalogue_is_utility_only() -> None:
 
 def test_FR_MSG_005_a_marketing_template_is_refused_at_load() -> None:
     raw = yaml.safe_load(
-        cat.resources.files("app.messaging").joinpath("templates.yaml").read_text("utf-8")
+        resources.files("app.messaging").joinpath("templates.yaml").read_text("utf-8")
     )
     raw["templates"]["school_notice"]["category"] = "marketing"
     with pytest.raises(ValidationError, match="utility"):
@@ -50,7 +51,8 @@ def test_FR_MSG_005_bodies_use_every_variable_and_never_start_or_end_with_one() 
             body = item.text(language).body
             numbers = sorted(int(n) for n in re.findall(r"\{\{(\d+)\}\}", body))
             assert numbers == list(range(1, len(item.variables) + 1)), (key, language)
-            assert not body.startswith("{{") and not body.rstrip(".").endswith("}}")
+            assert not body.startswith("{{")
+            assert not body.rstrip(".").endswith("}}")
 
 
 def test_PRV_026_variables_carry_only_what_the_purpose_needs() -> None:
@@ -82,7 +84,8 @@ def test_FR_MSG_006_url_button_needs_the_public_origin() -> None:
         cat.build_components("school_notice", "en", None)
     components = cat.build_components("school_notice", "en", "https://my.schoolos.example")
     url = components[1]["buttons"][0]
-    assert url["type"] == "URL" and url["url"] == "https://my.schoolos.example/p/{{1}}"
+    assert url["type"] == "URL"
+    assert url["url"] == "https://my.schoolos.example/p/{{1}}"
 
 
 def test_FR_LANG_005_unreviewed_telugu_texts_are_listed_for_the_school() -> None:
@@ -208,7 +211,9 @@ def test_FR_MSG_001_fake_provider_refused_in_production() -> None:
 
 def test_FR_MSG_024_messaging_refused_on_a_dedicated_host() -> None:
     with pytest.raises(ValueError, match="dedicated"):
-        Settings(env=Environment.CI, deployment_mode="dedicated", messaging_enabled=True)  # type: ignore[arg-type]
+        Settings(
+            env=Environment.CI, deployment_mode=DeploymentMode.DEDICATED, messaging_enabled=True
+        )
 
 
 def test_FR_MSG_009_join_slip_page() -> None:
@@ -229,5 +234,7 @@ def test_FR_MSG_009_join_slip_page() -> None:
     assert "Synthetic &lt;Model&gt; School" in page
     assert "JOIN ABCD2345" in page
     assert "https://wa.me/919000001234?text=JOIN%20ABCD2345" in page
-    assert "<svg" in page and "<script" not in page
-    assert 'lang="te"' in page and languages.contains_telugu(page)
+    assert "<svg" in page
+    assert "<script" not in page
+    assert 'lang="te"' in page
+    assert languages.contains_telugu(page)

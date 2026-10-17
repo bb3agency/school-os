@@ -23,6 +23,7 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
+from pydantic import SecretStr
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.engine import make_url
 
@@ -34,12 +35,6 @@ from app.core.config import get_settings
 # (FR-PLT-016). Tests of the guard itself pass the dev placeholders explicitly.
 os.environ.setdefault("SOS_BILLING_SUPPLIER_LEGAL_NAME", "Synthetic Test Supplier Private Limited")
 os.environ.setdefault("SOS_BILLING_SUPPLIER_GSTIN", "37ABCDE1234F1Z5")
-# R2-1C WhatsApp messaging (ADR-0043): on in tests (shared tier, fake provider in ci/local), with
-# the pilot manual-token mode and a synthetic Meta app secret for webhook signatures. Tests of
-# the switch itself (404 module_unavailable) override these explicitly.
-os.environ.setdefault("SOS_MESSAGING_ENABLED", "true")
-os.environ.setdefault("SOS_MESSAGING_MANUAL_TOKEN_ALLOWED", "true")
-os.environ.setdefault("SOS_META_APP_SECRET", "synthetic-meta-app-secret-for-tests-only")
 # Importing app.core.ratelimit above already built and cached Settings (its module-level
 # get_logger() calls get_settings()), so without this the supplier identity set here was only
 # seen after some other test happened to clear the cache (tests/devtools/test_seed_synthetic.py):
@@ -199,6 +194,26 @@ def readonly_engine(test_database: TestDatabase) -> Iterator[Engine]:
 @pytest.fixture(scope="session")
 def make_alembic_config() -> type[Config] | object:
     return alembic_config
+
+
+MESSAGING_TEST_SETTINGS = {
+    "messaging_enabled": True,
+    "messaging_manual_token_allowed": True,
+    "meta_app_secret": SecretStr("synthetic-meta-app-secret-for-tests-only"),
+}
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _messaging_on() -> Iterator[None]:
+    """R2-1C WhatsApp messaging (ADR-0043) on for the suite: shared tier, fake provider, the
+    pilot manual-token mode and a synthetic Meta app secret. Patched for messaging only
+    (``app.messaging.runtime``), so settings tests keep building their own environments; tests of
+    the switch itself patch it off."""
+    from app.messaging import runtime
+
+    runtime.patch_for_tests(MESSAGING_TEST_SETTINGS)
+    yield
+    runtime.patch_for_tests(None)
 
 
 @pytest.fixture(autouse=True)

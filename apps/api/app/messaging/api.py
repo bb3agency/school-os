@@ -19,26 +19,27 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Query, Response
 from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from app.authz.context import UserContext
 from app.authz.dependencies import TenantDB, require, require_any
 from app.authz.http import IdempotencyDep, IfMatch, OptionalIfMatch, etag
 from app.messaging import service
+from app.messaging.config import OptinCategory
 from app.messaging.schemas import (
-    AccountOut,
     EmbeddedSignupIn,
     GuardianOptinsOut,
     JoinSlipsIn,
     ManualConnectIn,
-    MessagePage,
-    MessageSearchIn,
+    MessagingAccountOut,
+    MessagingMessagePage,
+    MessagingSearchIn,
+    MessagingSettingsIn,
+    MessagingSettingsOut,
+    MessagingTemplatesOut,
     OptinIn,
     SectionOptinSummaryOut,
-    SettingsIn,
-    SettingsOut,
-    TemplatesOut,
 )
 from app.messaging.slips import STYLE_CSP
 from app.messaging.webhook import parse_entries
@@ -66,12 +67,12 @@ _UNAVAILABLE: dict[int | str, dict[str, Any]] = {
 }
 
 
-def _account_headers(item: AccountOut) -> dict[str, str]:
+def _account_headers(item: MessagingAccountOut) -> dict[str, str]:
     return {"Location": "/api/v1/messaging/account", "ETag": etag(item.version)}
 
 
-@router.get("/messaging/account", response_model=AccountOut, responses=_UNAVAILABLE)
-def get_account(ctx: AccountReader, db: TenantDB, response: Response) -> AccountOut:
+@router.get("/messaging/account", response_model=MessagingAccountOut, responses=_UNAVAILABLE)
+def get_account(ctx: AccountReader, db: TenantDB, response: Response) -> MessagingAccountOut:
     """The school's WhatsApp connection: number, display name, status and pause reason, quality
     rating, messaging limit (and the default daily cap, Meta's limit minus 10%), billing currency
     state (INR required from 1 Jan 2027) and each template's status (FR-MSG-004; permission
@@ -83,7 +84,7 @@ def get_account(ctx: AccountReader, db: TenantDB, response: Response) -> Account
 
 @router.post(
     "/messaging/account/embedded-signup",
-    response_model=AccountOut,
+    response_model=MessagingAccountOut,
     status_code=201,
     responses=_UNAVAILABLE,
 )
@@ -106,7 +107,7 @@ def connect_embedded_signup(
 
 @router.post(
     "/messaging/account/manual",
-    response_model=AccountOut,
+    response_model=MessagingAccountOut,
     status_code=201,
     responses=_UNAVAILABLE,
 )
@@ -122,8 +123,10 @@ def connect_manual(
     )
 
 
-@router.post("/messaging/account/resume", response_model=AccountOut, responses=_UNAVAILABLE)
-def resume(ctx: Configurer, db: TenantDB) -> AccountOut:
+@router.post(
+    "/messaging/account/resume", response_model=MessagingAccountOut, responses=_UNAVAILABLE
+)
+def resume(ctx: Configurer, db: TenantDB) -> MessagingAccountOut:
     """Resume sending after a pause (FR-MSG-021; ``messaging.configure``, MFA within 5 minutes).
     Errors: 409 ``messaging_not_paused``, ``messaging_still_restricted``,
     ``messaging_not_connected``."""
@@ -139,24 +142,27 @@ def disconnect(ctx: Configurer, db: TenantDB, version: OptionalIfMatch) -> Respo
     return Response(status_code=204)
 
 
-@router.get("/messaging/templates", response_model=TemplatesOut, responses=_UNAVAILABLE)
-def list_templates(ctx: AccountReader, db: TenantDB) -> TemplatesOut:
+@router.get("/messaging/templates", response_model=MessagingTemplatesOut, responses=_UNAVAILABLE)
+def list_templates(ctx: AccountReader, db: TenantDB) -> MessagingTemplatesOut:
     """Each catalogue template per language with Meta's status and category, whether Telugu
     text is reviewed and whether it can be used now (FR-MSG-005..007)."""
-    return TemplatesOut(items=service.list_templates(db, ctx))
+    return MessagingTemplatesOut(items=service.list_templates(db, ctx))
 
 
 @router.post(
-    "/messaging/templates/sync", response_model=AccountOut, status_code=202, responses=_UNAVAILABLE
+    "/messaging/templates/sync",
+    response_model=MessagingAccountOut,
+    status_code=202,
+    responses=_UNAVAILABLE,
 )
-def sync_templates(ctx: Configurer, db: TenantDB) -> AccountOut:
+def sync_templates(ctx: Configurer, db: TenantDB) -> MessagingAccountOut:
     """Submit templates not created yet and read every status back (in the background;
     ``messaging.configure``, MFA within 5 minutes)."""
     return service.request_template_sync(db, ctx)
 
 
-@router.get("/messaging/settings", response_model=SettingsOut, responses=_UNAVAILABLE)
-def get_settings(ctx: SettingsReader, db: TenantDB, response: Response) -> SettingsOut:
+@router.get("/messaging/settings", response_model=MessagingSettingsOut, responses=_UNAVAILABLE)
+def get_settings(ctx: SettingsReader, db: TenantDB, response: Response) -> MessagingSettingsOut:
     """Messaging switches per purpose, absence-alert time, quiet hours, daily cap and the office
     phone for automatic replies, with the estimated Meta rate used for cost previews
     (``message.read`` or ``messaging.configure``)."""
@@ -165,10 +171,10 @@ def get_settings(ctx: SettingsReader, db: TenantDB, response: Response) -> Setti
     return out
 
 
-@router.put("/messaging/settings", response_model=SettingsOut, responses=_UNAVAILABLE)
+@router.put("/messaging/settings", response_model=MessagingSettingsOut, responses=_UNAVAILABLE)
 def put_settings(
-    ctx: Configurer, db: TenantDB, body: SettingsIn, version: IfMatch, response: Response
-) -> SettingsOut:
+    ctx: Configurer, db: TenantDB, body: MessagingSettingsIn, version: IfMatch, response: Response
+) -> MessagingSettingsOut:
     """Change the messaging settings (``messaging.configure``, MFA within 5 minutes;
     ``If-Match``, ``W/"0"`` before the first save). Audited (field names)."""
     out = service.update_messaging_settings(db, ctx, body, expected_version=version)
@@ -249,6 +255,30 @@ def join_slips(ctx: Recorder, db: TenantDB, body: JoinSlipsIn) -> HTMLResponse:
 
 
 @router.get(
+    "/sections/{section_id}/join-slips",
+    response_class=HTMLResponse,
+    responses={
+        200: {"content": {"text/html": {}}, "description": "Print-ready A4 slips (two a page)"},
+        **_UNAVAILABLE,
+    },
+)
+def section_join_slips(
+    ctx: Recorder,
+    db: TenantDB,
+    section_id: uuid.UUID,
+    categories: Annotated[
+        list[OptinCategory],
+        Query(min_length=1, max_length=3, description="Categories the slips opt into."),
+    ],
+) -> HTMLResponse:
+    """The same slips for a whole section (the web's print link; ids and codes only in the URL,
+    no personal data). ``messaging.optin.record``, scope; errors as
+    ``POST /messaging/join-slips``."""
+    data = JoinSlipsIn(section_id=section_id, categories=list(dict.fromkeys(categories)))
+    return join_slips(ctx, db, data)
+
+
+@router.get(
     "/sections/{section_id}/optins/summary",
     response_model=SectionOptinSummaryOut,
     responses=_UNAVAILABLE,
@@ -259,8 +289,8 @@ def section_summary(ctx: Reader, db: TenantDB, section_id: uuid.UUID) -> Section
     return service.section_summary(db, ctx, section_id)
 
 
-@router.post("/messages/search", response_model=MessagePage, responses=_UNAVAILABLE)
-def search_messages(ctx: Reader, db: TenantDB, body: MessageSearchIn) -> MessagePage:
+@router.post("/messages/search", response_model=MessagingMessagePage, responses=_UNAVAILABLE)
+def search_messages(ctx: Reader, db: TenantDB, body: MessagingSearchIn) -> MessagingMessagePage:
     """Message history and delivery log, newest first: purpose, template, language, status
     (queued, sent, delivered, read, failed with a plain reason, skipped with why) and the
     phone's last four digits only (US-2208, FR-MSG-017; ``message.read``). Class teachers name a

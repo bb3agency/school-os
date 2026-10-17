@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import threading
 
-from app.core.config import MessagingProviderMode, Settings, get_settings
+from app.core.config import MessagingProviderMode, Settings
 from app.messaging.providers.base import (
     AccountInfo,
     MessagingProvider,
@@ -21,6 +21,7 @@ from app.messaging.providers.base import (
 )
 from app.messaging.providers.fake import FakeMessagingProvider
 from app.messaging.providers.meta_cloud import MetaCloudProvider
+from app.messaging.runtime import settings as messaging_settings
 
 _lock = threading.Lock()
 _override: MessagingProvider | None = None
@@ -31,7 +32,7 @@ def get_provider(settings: Settings | None = None) -> MessagingProvider:
     with _lock:
         if _override is not None:
             return _override
-    s = settings or get_settings()
+    s = settings or messaging_settings()
     if s.effective_messaging_provider_mode is MessagingProviderMode.FAKE:
         if s.is_production_like:
             raise RuntimeError(f"the fake messaging provider is refused in {s.env}")

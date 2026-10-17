@@ -6,7 +6,8 @@ Outbox consumers (``app.ops``, relayed every 5 s):
   within 60 s of Meta's delivery, FR-MSG-010);
 - ``messaging.provision_templates``: create the catalogue's templates in the school's WABA and
   read their statuses back;
-- ``messaging.deliver``: send one queued message (the sending wave R2-3G queues them).
+The sending wave (R2-3G) adds its own consumer that calls ``service.deliver`` for queued
+messages.
 
 Beat: ``messaging.sweep_inbox`` every minute (events whose wake-up was lost),
 ``messaging.sync_accounts`` hourly (quality, limit, currency, template statuses; pauses on a red
@@ -89,21 +90,6 @@ def provision_templates(
     return {**out, **{f"sync_{k}": v for k, v in synced.items()}}
 
 
-@shared_task(
-    name=service.DELIVER_TASK,
-    base=TenantTask,
-    bind=True,
-    queue="maintenance",
-    acks_late=True,
-    ignore_result=True,
-)
-def deliver(self: Task[Any, Any], tenant_id: str, event_id: str, payload: dict[str, Any]) -> str:
-    del self, event_id
-    if not service.available():
-        return "unavailable"
-    return service.deliver(uuid.UUID(tenant_id), uuid.UUID(str(payload["message_id"])))
-
-
 @shared_task(name="messaging.sweep_inbox", acks_late=True, ignore_result=True)
 def sweep_inbox() -> dict[str, int]:
     return _each_school("inbox", service.process_inbox)
@@ -141,7 +127,6 @@ def beat_schedule() -> dict[str, dict[str, Any]]:
 
 __all__ = [
     "beat_schedule",
-    "deliver",
     "process_inbox",
     "provision_templates",
     "purge_expired",

@@ -128,6 +128,9 @@ PURGE_TASK: Final = "admin.purge_tenant_exports"
 ops.register_outbox_route(EXPORT_EVENT, EXPORT_TASK)
 
 READY_TEMPLATE: Final = "admin.tenant_export.ready"
+# Audit summaries take at most 50 keys (audit.schemas); the completed-export event lists the
+# non-empty tables, largest first.
+AUDIT_TABLE_KEYS: Final = 50
 FAILED_TEMPLATE: Final = "admin.tenant_export.failed"
 RESOURCE: Final = "tenant_export"
 IST: Final = ZoneInfo("Asia/Kolkata")
@@ -799,7 +802,14 @@ def _complete(
             snap.id,
             {
                 "include_sensitive": snap.include_sensitive,
-                "tables": built.counts.tables,
+                # Audit summaries take at most 50 keys; the archive has more tables since R2:
+                # the non-empty ones, largest first (the full list is in the manifest).
+                "tables": dict(
+                    sorted(
+                        ((k, v) for k, v in built.counts.tables.items() if v),
+                        key=lambda item: (-item[1], item[0]),
+                    )[:AUDIT_TABLE_KEYS]
+                ),
                 "documents": built.counts.documents,
                 "document_kib": -(-built.counts.document_bytes // 1024),
                 "audit_events": built.counts.audit_events,
