@@ -51,6 +51,32 @@
   font-display: swap;
 }
 
+/* SOS Figures (docs/17 §3.1): PP Mori has no ₹ and no tabular figures, so amounts mixed two
+   fonts and columns of numbers wobbled. This family maps only digits, separators, minus, % and
+   ₹ to the self-hosted Inter variable files (OFL-1.1, @fontsource-variable/inter, the same
+   files the layout already loads, so no extra download); `font-figures` / `.num` put it in
+   front of the sans and switch on tabular figures. unicode-range keeps every other glyph in
+   PP Mori. */
+@font-face {
+  font-family: "SOS Figures";
+  src: url("../../../../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2")
+    format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0025, U+002B-002E, U+0030-0039, U+2212;
+}
+
+@font-face {
+  font-family: "SOS Figures";
+  src: url("../../../../node_modules/@fontsource-variable/inter/files/inter-latin-ext-wght-normal.woff2")
+    format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+20B9;
+}
+
 /*
  * SchoolOS design tokens (Tailwind v4, CSS-first). docs/17-ui-design-system.md describes them.
  * Only the semantic colours below exist, so every screen draws from the same palette.
@@ -61,93 +87,111 @@
  */
 @theme {
   --color-*: initial;
-  --color-white: #ffffff;
-  --color-black: #000000;
+  --color-white: oklch(1 0 0);
+  --color-black: oklch(0 0 0);
   --color-transparent: transparent;
   --color-current: currentColor;
 
-  /* Canvas: soft sky-blue → pale aqua gradient behind the white cards (decorative). */
-  --color-canvas: #eef5fc; /* solid fallback and flat areas */
-  --color-canvas-from: #dbe9fa; /* ink-muted 6.1:1, ink-subtle 4.8:1, primary 5.4:1 */
-  --color-canvas-via: #ecf5fc; /* ink-subtle 5.3:1 */
-  --color-canvas-to: #dcf2f0; /* ink-muted 6.5:1, ink-subtle 5.1:1, primary 5.7:1 */
-  /* Near-neutral canvas behind dense record screens (docs/17 §3.2): calm, so status colour
-     inside the tables is the only colour that means something. */
-  --color-canvas-neutral: #f4f6f9; /* ink 16.4:1, ink-muted 7.0:1, ink-subtle 5.4:1, primary 6.2:1 */
+  /*
+   * "Quiet ledger" (docs/17 v1.0, owner decision 2026-10-18): warm neutral greys (hue 85, low
+   * chroma), white surfaces with hairline borders, ONE accent (ink blue, hue 258) and fixed
+   * status colours. OKLCH is Baseline widely available; tokens.test.ts converts each value to
+   * sRGB and re-checks every pair in docs/17 §7. Ratios below are against white unless named.
+   */
+
+  /* Canvas: one flat, warm near-white everywhere (dashboards included; no gradient). The old
+     gradient stops and the neutral canvas are kept as aliases so existing classes still work. */
+  --color-canvas: oklch(0.985 0.002 85); /* #fbfaf9 */
+  --color-canvas-from: oklch(0.985 0.002 85);
+  --color-canvas-via: oklch(0.985 0.002 85);
+  --color-canvas-to: oklch(0.985 0.002 85);
+  --color-canvas-neutral: oklch(0.985 0.002 85);
 
   /* Surfaces */
-  --color-surface: #ffffff;
-  --color-surface-muted: #f3f5f8; /* filled inputs, table header; ink 16.2:1, ink-muted 6.9:1 */
-  --color-surface-sunken: #eef1f5; /* segmented-control track; ink-muted 6.7:1 */
-  --color-surface-hover: #f7f9fb; /* row hover */
+  --color-surface: oklch(1 0 0);
+  --color-surface-muted: oklch(
+    0.97 0.003 85
+  ); /* #f6f5f3 table header, filled inputs; ink-subtle 5.5:1 */
+  --color-surface-sunken: oklch(0.955 0.005 85); /* #f2f0ec segmented track; ink-muted 6.5:1 */
+  --color-surface-hover: oklch(0.955 0.004 85); /* row hover */
 
   /* Borders */
-  --color-border: #e6ebf1; /* hairline, decorative dividers and card edges only */
-  --color-border-soft: #d3dae3; /* secondary buttons (text label identifies them, 1.4.11) */
-  --color-border-control: #7b8494; /* input / switch boundaries: 3.8:1 on white, 3.5:1 on surface-muted */
-  --color-border-strong: #6b7280; /* legacy control boundary, 4.8:1 on white, 4.4:1 on surface-muted */
+  --color-border: oklch(0.92 0.004 85); /* #e6e4e2 hairline: card edges and dividers (decorative) */
+  --color-border-soft: oklch(
+    0.86 0.008 85
+  ); /* #d3d1cb secondary buttons (the label identifies them) */
+  --color-border-control: oklch(
+    0.62 0.006 85
+  ); /* #888682 inputs, switch: 3.6:1 on white, 3.3:1 on muted */
+  --color-border-strong: oklch(0.58 0.008 85); /* legacy control boundary, 4.2:1 */
 
   /* Ink scale */
-  --color-ink: #111827; /* 17.7:1 on white, 14.4:1 on canvas-from */
-  --color-ink-muted: #4b5563; /* 7.6:1 on white, 6.1:1 on canvas-from */
-  --color-ink-subtle: #5b6576; /* secondary lines ("1,157 last month"): 5.9:1 on white, 4.8:1 on canvas-from */
+  --color-ink: oklch(0.22 0.006 85); /* #1c1a17 17.3:1 */
+  --color-ink-muted: oklch(0.45 0.008 85); /* #575550 7.4:1 secondary text */
+  --color-ink-subtle: oklch(0.53 0.008 85); /* #6e6b67 5.3:1, 4.8:1 on muted: notes, placeholders */
 
-  /* Action (near-black primary button) */
-  --color-action: #111827; /* white text 17.7:1 */
-  --color-action-hover: #1f2937; /* white text 14.7:1 */
-  --color-on-action: #ffffff;
+  /* Action: the near-black primary button (one per view). */
+  --color-action: oklch(0.22 0.006 85); /* white text 17.3:1 */
+  --color-action-hover: oklch(0.32 0.008 85);
+  --color-on-action: oklch(1 0 0);
 
-  /* Brand blue: links, focus, brand buttons. `primary` keeps its old name and meaning (links). */
-  --color-primary: #1d4ed8; /* 6.7:1 on white, 5.4:1 on canvas-from, 6.1:1 on info-soft */
-  --color-primary-hover: #1e3a8a;
-  --color-primary-soft: #e8efff; /* primary text on it 5.8:1 */
-  --color-on-primary: #ffffff;
-  --color-brand: #2563eb; /* white text 5.2:1 */
-  --color-brand-strong: #1e40af; /* white text 8.7:1 */
+  /* The one accent, ink blue: links, focus, the current nav item, selection, info. `primary`
+     and `brand` keep their old names and point at it. */
+  --color-accent: oklch(0.5 0.13 258); /* #2f62ac 6.1:1, 5.8:1 on canvas, 5.2:1 on accent-soft */
+  --color-accent-strong: oklch(0.4 0.11 258); /* #1d4682 hover/pressed, 9.3:1 */
+  --color-accent-soft: oklch(0.95 0.025 258); /* #e4efff tint: selected rows, active nav */
+  --color-on-accent: oklch(1 0 0);
+  --color-primary: oklch(0.5 0.13 258);
+  --color-primary-hover: oklch(0.4 0.11 258);
+  --color-primary-soft: oklch(0.95 0.025 258);
+  --color-on-primary: oklch(1 0 0);
+  --color-brand: oklch(0.5 0.13 258);
+  --color-brand-strong: oklch(0.4 0.11 258);
 
-  /* Status */
-  --color-danger: #b42318; /* 6.6:1 on white, 6.0:1 on danger-soft, white on it 6.6:1 */
-  --color-danger-hover: #912018;
-  --color-danger-soft: #fef3f2;
-  --color-warning-ink: #7a2e0e; /* 9.0:1 on warning-soft */
-  --color-warning-soft: #fffaeb;
-  --color-warning-border: #b54708;
-  --color-success-ink: #05603a; /* 7.3:1 on success-soft */
-  --color-success-soft: #ecfdf3;
-  --color-success: #15803d; /* switch "on" track, check circles: 5.0:1 on white */
-  --color-positive-ink: #166534; /* 6.8:1 on positive-soft */
-  --color-positive-soft: #f0fdf4;
-  --color-positive-border: #86efac; /* decorative */
-  --color-info-ink: #1e40af; /* 7.9:1 on info-soft */
-  --color-info-soft: #eff4ff;
-  --color-info-border: #bfd3fb; /* decorative */
-  --color-violet-ink: #5b21b6; /* 8.0:1 on violet-soft, 9.0:1 on white */
-  --color-violet-soft: #f3efff;
-  --color-teal-ink: #115e59; /* 6.9:1 on teal-soft */
-  --color-teal-soft: #e6f7f5;
-  --color-teal: #0f766e; /* 5.5:1 on white */
+  /* Status: fixed, independent of the accent; info uses the accent. */
+  --color-danger: oklch(0.53 0.19 27); /* #c22826 5.8:1 */
+  --color-danger-hover: oklch(0.44 0.16 27);
+  --color-danger-soft: oklch(0.96 0.025 27);
+  --color-warning-ink: oklch(0.5 0.1 65); /* #8a5619 */
+  --color-warning-soft: oklch(0.95 0.05 70);
+  --color-warning-border: oklch(0.62 0.13 65); /* decorative */
+  --color-success-ink: oklch(0.4 0.1 150); /* #115629 7.7:1 on success-soft */
+  --color-success-soft: oklch(0.95 0.04 150);
+  --color-success: oklch(0.52 0.12 150); /* switch on, check circles: 5.2:1 */
+  --color-positive-ink: oklch(0.4 0.1 150);
+  --color-positive-soft: oklch(0.95 0.04 150);
+  --color-positive-border: oklch(0.85 0.07 150); /* decorative */
+  --color-info-ink: oklch(0.4 0.11 258); /* 8.0:1 on info-soft */
+  --color-info-soft: oklch(0.95 0.025 258);
+  --color-info-border: oklch(0.86 0.05 258); /* decorative */
+  --color-violet-ink: oklch(0.45 0.14 295); /* 6.8:1 on violet-soft ("Review" pill) */
+  --color-violet-soft: oklch(0.95 0.03 295);
+  --color-teal-ink: oklch(0.45 0.08 185); /* 6.3:1 on teal-soft ("Done" pill) */
+  --color-teal-soft: oklch(0.95 0.03 185);
+  --color-teal: oklch(0.5 0.09 185);
 
-  /* AI panel: white text; lightest stop brand #2563eb (5.2:1). */
-  --color-ai-from: #1e3a8a; /* white 10.4:1 */
-  --color-ai-to: #2563eb;
+  /* AI panel (Ask): accent strong to accent; white text 6.1:1 at the lightest stop. */
+  --color-ai-from: oklch(0.4 0.11 258);
+  --color-ai-to: oklch(0.5 0.13 258);
 
-  /* Chart series (graphics: 3:1 against white cards, WCAG 1.4.11) */
-  --color-chart-1: #2563eb; /* 5.2:1 */
-  --color-chart-2: #d97706; /* amber, 3.2:1 */
-  --color-chart-3: #0d9488; /* teal, 3.7:1 */
-  --color-chart-4: #7c3aed; /* violet, 5.7:1 */
-  --color-chart-track: #e6ebf1; /* ring/bar track, decorative (the value carries the meaning) */
+  /* Chart series (graphics: 3:1 against white, WCAG 1.4.11) */
+  --color-chart-1: oklch(0.5 0.13 258); /* accent, 6.1:1 */
+  --color-chart-2: oklch(0.62 0.14 65); /* amber, 3.8:1 */
+  --color-chart-3: oklch(0.55 0.09 185); /* teal, 4.7:1 */
+  --color-chart-4: oklch(0.5 0.15 295); /* violet, 6.4:1 */
+  --color-chart-track: oklch(0.92 0.004 85); /* decorative (the value carries the meaning) */
 
-  --color-focus: #1d4ed8; /* 6.7:1 on white, 5.4:1 on canvas */
+  --color-focus: oklch(0.5 0.13 258); /* 3px ring: 6.1:1 on white, 5.8:1 on canvas */
 
-  /* Platform admin chrome: deliberately different from the school app. */
-  --color-platform: #3b0764; /* white text 15:1 */
-  --color-platform-hover: #581c87; /* white text 10.9:1 */
-  --color-platform-ink: #ffffff;
-  --color-platform-muted: #e9d5ff; /* 11.0:1 on platform */
-  --color-platform-accent: #fcd34d; /* badge + focus ring on dark chrome, 10.4:1 on platform */
-  --color-platform-accent-ink: #3b0764;
-  --color-platform-soft: #f5f0ff; /* platform ink on it 13.4:1 */
+  /* Operator console chrome (owner decision 2026-10-18): dark warm neutral with an amber
+     marker, deliberately unlike the school console. */
+  --color-platform: oklch(0.22 0.01 85); /* #1d1a15 white text 17.3:1 */
+  --color-platform-hover: oklch(0.3 0.012 85); /* white text 13.7:1 */
+  --color-platform-ink: oklch(1 0 0);
+  --color-platform-muted: oklch(0.86 0.01 85); /* 11.4:1 on platform, 9.0:1 on hover */
+  --color-platform-accent: oklch(0.86 0.15 88); /* amber marker + focus ring, 11.2:1 on platform */
+  --color-platform-accent-ink: oklch(0.22 0.01 85);
+  --color-platform-soft: oklch(0.97 0.03 90);
 
   /* Radii: the calm app scale (docs/17 §3). Cards, dialogs and panels in the signed-in app
      are 10-14px, controls a step smaller. The public marketing pages restore their larger
@@ -162,9 +206,12 @@
   --radius-3xl: 1rem; /* 16px: defined so rounded-3xl exists; the marketing bands use it */
   --radius-full: 9999px;
 
-  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 12px 32px -12px rgb(30 64 175 / 0.12);
-  --shadow-raised: 0 1px 2px rgb(16 24 40 / 0.06), 0 2px 6px -1px rgb(16 24 40 / 0.08);
-  --shadow-popover: 0 4px 8px -2px rgb(16 24 40 / 0.08), 0 20px 40px -12px rgb(30 64 175 / 0.22);
+  /* Flat, hairline structure: cards carry no shadow (the token stays so `shadow-card` still
+     compiles), a selected segment gets a 1px lift, and only overlays (popover, menu, palette,
+     dialog, drawer, toast) cast a real shadow. */
+  --shadow-card: 0 0 #0000;
+  --shadow-raised: 0 1px 2px oklch(0.22 0.006 85 / 0.08);
+  --shadow-popover: 0 1px 2px oklch(0 0 0 / 0.06), 0 8px 24px oklch(0 0 0 / 0.1);
 
   /* Latin UI font. While Telugu is switched on (ADR-0036), /fonts/telugu/noto-sans-telugu.css
      redefines the sans and mono stacks with the Telugu font as the fallback for Telugu
@@ -174,6 +221,11 @@
   --font-display: "Instrument Serif", Georgia, "Times New Roman", serif;
   --font-serif: var(--font-display);
   --font-mono: "JetBrains Mono", ui-monospace, Consolas, "Liberation Mono", monospace;
+  /* Figures (docs/17 §3.1): digits, ₹ and separators from self-hosted Inter (SOS Figures,
+     tabular), everything else from the sans. Numeric cells, amounts and KPIs (`font-figures`
+     or the `.num` class). */
+  --font-figures:
+    "SOS Figures", "PP Mori", "Inter Variable", system-ui, "Segoe UI", Arial, sans-serif;
 
   /* Type scale (docs/17 §3.1): size / line height pairs for a dense work tool. PP Mori ships
      200/400/600 only (font-medium renders as 400): emphasis is font-semibold. It has no
@@ -226,6 +278,36 @@
     :root[data-sidebar="collapsed"] [data-sidebar-mode="inline"] *
   ) {
     @slot;
+  }
+}
+
+/*
+ * Density (docs/17 §3.4): comfortable by default; compact while an ancestor carries
+ * data-density="compact" (<html>, set before the first paint from the viewer's choice, or a
+ * single table that pins it). An inner data-density="comfortable" wins over an outer compact
+ * one. Coarse pointers (touch) always stay comfortable: the 44px targets matter more there.
+ */
+@custom-variant compact {
+  @media (pointer: fine) {
+    &:where([data-density="compact"] *):not(:where([data-density="comfortable"] *)) {
+      @slot;
+    }
+  }
+}
+
+/* Row height and cell padding as variables, for components that size rows themselves
+   (DataTableV2, menus, the palette). */
+:root {
+  --row-height: 2.75rem; /* 44px */
+  --cell-px: 1rem;
+  --cell-py: 0.75rem;
+}
+
+@media (pointer: fine) {
+  :root[data-density="compact"] {
+    --row-height: 2rem; /* 32px */
+    --cell-px: 0.75rem;
+    --cell-py: 0.375rem;
   }
 }
 
@@ -336,14 +418,8 @@
   }
 
   body {
+    /* One flat canvas everywhere (Quiet ledger; no gradient). */
     background-color: var(--color-canvas);
-    /* Decorative only; text contrast is checked against both end colours. */
-    background-image: linear-gradient(
-      160deg,
-      var(--color-canvas-from) 0%,
-      var(--color-canvas-via) 45%,
-      var(--color-canvas-to) 100%
-    );
     color: var(--color-ink);
     font-family: var(--font-sans);
     font-feature-settings: "cv11", "ss01";
@@ -390,7 +466,7 @@
   }
 
   dialog::backdrop {
-    background-color: rgb(15 23 42 / 0.55);
+    background-color: oklch(0.22 0.006 85 / 0.45);
   }
 
   meter {
@@ -399,24 +475,76 @@
   }
 }
 
+/* Figures: amounts, counts, KPIs and numeric cells (docs/17 §3.1). */
+@utility num {
+  font-family: var(--font-figures);
+  font-variant-numeric: tabular-nums;
+}
+
 @layer components {
+  /* Command palette (docs/17 §5.9): a native modal <dialog> near the top of the screen. */
+  dialog.palette {
+    margin: 10vh auto auto;
+    margin: 10dvh auto auto;
+    padding: 0;
+    width: min(36rem, calc(100vw - 2rem));
+    max-height: min(32rem, 80vh);
+    max-height: min(32rem, 80dvh);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+    box-shadow: var(--shadow-popover);
+    overflow: hidden;
+  }
+
+  /* Menus and popovers: a panel under their trigger (absolute inside a relative wrapper). */
+  .overlay-panel {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+    box-shadow: var(--shadow-popover);
+  }
+
+  /* Toasts (docs/17 §5.5): one polite status region, bottom end; classes only (CSP). */
+  .toast-region {
+    position: fixed;
+    z-index: 60;
+    inset-block-end: max(1rem, env(safe-area-inset-bottom));
+    inset-inline-end: max(1rem, env(safe-area-inset-right));
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: min(24rem, calc(100vw - 2rem));
+    pointer-events: none;
+  }
+
+  .toast-region > * {
+    pointer-events: auto;
+  }
+
+  /* Phone bottom bar (teachers, principals): above the home indicator. */
+  .bottom-bar {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
   /* Mono uppercase label ("SENTIMENT DYNAMICS"). Telugu has no case and letter-spacing
      breaks its shaping, so it gets the sans font and normal spacing. */
+  /* Quiet ledger (docs/17 v1.0): group labels are sentence case, 12px, semibold, in the sans;
+     no mono capitals. JetBrains Mono stays for IDs (admission number, PEN, receipt number). */
   .eyebrow {
-    font-family: var(--font-mono);
-    font-size: 0.6875rem;
-    font-weight: 500;
-    letter-spacing: 0.08em;
-    line-height: 1.4;
-    text-transform: uppercase;
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: normal;
+    line-height: 1.125rem;
+    text-transform: none;
   }
 
   .eyebrow:lang(te) {
-    font-family: var(--font-sans);
     font-size: 0.8125rem;
-    letter-spacing: normal;
     line-height: 1.75;
-    text-transform: none;
   }
 
   /* Serif display (KPI numbers, hero headline accents): Latin only. Big serif figures
@@ -436,7 +564,7 @@
   /* Native <select> chevron (data: image is allowed by img-src; no inline styles). */
   .select-chevron {
     appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%234b5563'%3E%3Cpath d='M5.3 7.3a1 1 0 0 1 1.4 0L10 10.58l3.3-3.3a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 0-1.42Z'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%2358554f'%3E%3Cpath d='M5.3 7.3a1 1 0 0 1 1.4 0L10 10.58l3.3-3.3a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 0-1.42Z'/%3E%3C/svg%3E");
     background-position: right 0.625rem center;
     background-repeat: no-repeat;
     background-size: 1.125rem;
@@ -550,7 +678,6 @@
   /* Pale green quote block (copilot suggestions). */
   .quote-gradient {
     background-color: var(--color-positive-soft);
-    background-image: linear-gradient(135deg, #ecfdf5, #f0fdf4 60%, #f7fee7);
   }
 }
 
@@ -835,6 +962,53 @@
 
   .content-in {
     animation: fade-in var(--duration-enter) var(--ease-out);
+  }
+
+  /* Command palette: fade + scale 0.98 → 1 (150ms). Menus, popovers: from their trigger
+     (120ms). Bulk bar and toasts: rise 8px. All transform/opacity; none under reduced motion. */
+  dialog.palette[open] {
+    animation: palette-in var(--duration-quick) var(--ease-out);
+  }
+
+  .menu-in {
+    animation: menu-in var(--motion-quick) var(--ease-out);
+  }
+
+  .bar-in {
+    animation: bar-in var(--duration-quick) var(--ease-out);
+  }
+}
+
+@keyframes palette-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 

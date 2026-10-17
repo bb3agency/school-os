@@ -31,7 +31,7 @@ export function StatCard({
   return (
     <div className={cardClasses({ padding: "sm" })}>
       <dt className="text-sm text-ink-muted">{label}</dt>
-      <dd className="mt-1 font-display text-4xl leading-tight text-ink tabular-nums">
+      <dd className="num mt-1 text-[1.75rem] leading-8 font-semibold text-ink">
         <TickValue value={value}>{value ?? <Unavailable label={unavailableLabel} />}</TickValue>
       </dd>
       {hint ? <dd className="mt-1 text-xs text-ink-subtle">{hint}</dd> : null}
@@ -64,7 +64,7 @@ export interface KpiCardProps {
 }
 
 /**
- * KPI tile: label, big serif number, dark delta pill, comparison line and an optional
+ * KPI tile: label, a 28px figure (SOS Figures, tabular), dark delta pill, comparison line and an optional
  * sparkline. A `role="group"` named by the label, so the number is read with its label.
  */
 export function KpiCard({
@@ -91,7 +91,7 @@ export function KpiCard({
         {aside}
       </div>
       <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
-        <p className="font-display text-5xl leading-none text-ink tabular-nums">
+        <p className="num text-[1.75rem] leading-8 font-semibold text-ink">
           <TickValue value={value}>{value ?? <Unavailable label={unavailableLabel} />}</TickValue>
         </p>
         {delta && value !== null ? (
