@@ -595,7 +595,7 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             g=ids["guardian"],
         )
         # --- certificate verification code and its handle (R2-1A, 0056; ADR-0045) -------------
-        code = new_code()
+        verify_code = new_code()
         handle_id = uuid.uuid4()
         _run(
             c,
@@ -604,7 +604,7 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             "'certificate', :ti)",
             i=handle_id,
             t=t,
-            k=code,
+            k=verify_code,
             ti=ids["cert"],
         )
         _run(
@@ -614,7 +614,7 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             i=uuid.uuid4(),
             t=t,
             c=ids["cert"],
-            k=code,
+            k=verify_code,
             h=handle_id,
             m=ids["m1"],
         )

@@ -46349,6 +46349,7 @@
             "name": "code",
             "required": true,
             "schema": {
+              "maxLength": 64,
               "title": "Code",
               "type": "string"
             }
