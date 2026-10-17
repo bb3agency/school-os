@@ -2529,6 +2529,114 @@ def remove_guardian(
     _touch(session, student, _definitions(session))
 
 
+# --- R2-1C messaging: guardian lookups for WhatsApp (ADR-0043 decision 8; FR-MSG-019) ----------
+# The phone stays C3 in sis.guardians: messaging gets only its blind index (for matching and for
+# binding an opt-in to the number it was given for) and, inside the sending worker, the number.
+
+
+@dataclass(frozen=True, slots=True)
+class GuardianPhoneIndex:
+    """A guardian's phone as messaging may keep it: the blind index under ``key_version`` and the
+    last four digits (shown masked to staff, FR-MSG-017). Never the number."""
+
+    digest: bytes
+    key_version: int
+    last4: str
+
+
+@dataclass(frozen=True, slots=True)
+class GuardianBrief:
+    """A guardian linked to a student, without C3 values (messaging lists and slips)."""
+
+    guardian_id: uuid.UUID
+    student_id: uuid.UUID
+    full_name: str
+    relationship: str
+    is_primary: bool
+    has_phone: bool
+    preferred_language: Language | None
+
+
+def _guardian_phone(session: Session, guardian: Guardian) -> str | None:
+    if guardian.phone_ciphertext is None:
+        return None
+    return crypto.decrypt_value(
+        session,
+        guardian.phone_ciphertext,
+        table=GUARDIANS_TABLE,
+        column="phone_ciphertext",
+        row_id=guardian.id,
+    )
+
+
+def guardian_student_ids(session: Session, guardian_id: uuid.UUID) -> list[uuid.UUID]:
+    """Students the guardian is linked to (system read; callers check scope per student with
+    :func:`ensure_in_scope`)."""
+    return repo.guardian_student_ids(session, guardian_id)
+
+
+def guardians_of_students(
+    session: Session, student_ids: Collection[uuid.UUID]
+) -> list[GuardianBrief]:
+    """Guardians of the given students (``student_ids`` MUST come from a scoped list such as
+    :func:`list_students_in_scope`); C2 fields only."""
+    return [
+        GuardianBrief(
+            guardian_id=g.id,
+            student_id=link.student_id,
+            full_name=g.full_name,
+            relationship=link.relationship,
+            is_primary=link.is_primary,
+            has_phone=g.phone_ciphertext is not None,
+            preferred_language=_language(g.preferred_language),
+        )
+        for g, link in repo.guardian_links_of(session, list(student_ids))
+    ]
+
+
+def guardian_phone_index(
+    session: Session, guardian_id: uuid.UUID, *, key_version: int | None = None
+) -> GuardianPhoneIndex | None:
+    """The guardian's current phone as a blind index under ``key_version`` (default: the school's
+    active key) and its last four digits; ``None`` without a phone. Decrypts in memory only."""
+    guardian = repo.get_guardian(session, guardian_id)
+    phone = _guardian_phone(session, guardian) if guardian is not None else None
+    if phone is None:
+        return None
+    digest, version = crypto.blind_index(
+        session, phone, purpose=PHONE_INDEX_PURPOSE, key_version=key_version
+    )
+    return GuardianPhoneIndex(digest=digest, key_version=version, last4=phone[-4:])
+
+
+def phone_index(session: Session, phone: str) -> GuardianPhoneIndex:
+    """The blind index of a 10-digit mobile number under the school's active key (inbound
+    WhatsApp senders, matched without storing the number; FR-MSG-019)."""
+    clean = normalize_phone(phone)
+    digest, version = crypto.blind_index(session, clean, purpose=PHONE_INDEX_PURPOSE)
+    return GuardianPhoneIndex(digest=digest, key_version=version, last4=clean[-4:])
+
+
+def guardian_ids_by_phone(session: Session, phone: str) -> list[uuid.UUID]:
+    """Guardians whose phone is ``phone`` (10-digit mobile), by blind index under every key
+    version in use (rotation may be under way)."""
+    clean = normalize_phone(phone)
+    digests = {
+        version: crypto.blind_index(
+            session, clean, purpose=PHONE_INDEX_PURPOSE, key_version=version
+        )[0]
+        for version in repo.guardian_phone_key_versions(session)
+    }
+    return repo.guardian_ids_by_phone_index(session, digests)
+
+
+def guardian_phone_for_sending(session: Session, guardian_id: uuid.UUID) -> str | None:
+    """The guardian's 10-digit mobile number, for the messaging worker to call the provider
+    (FR-MSG-019). Never log, store or return it anywhere else."""
+    guardian = repo.get_guardian(session, guardian_id)
+    return _guardian_phone(session, guardian) if guardian is not None else None
+
+
 # --- promotions (FR-TEN-011, US-202 AC2; owner decisions 2026-09-27) ----------------------------
 
 PROMOTE: Final = "tenant.structure.manage"

@@ -7,6 +7,9 @@ version: 1
 purge_order:
   # R2-0 (ADR-0047): public handles first (they reference guardians and the school's keys'
   # tenant); R2 fees and messaging insert themselves after it, before students (docs/05 §15.6).
+  # R2-1C (ADR-0043): messaging rows reference public handles, guardians and students, so they
+  # go first.
+  - messaging
   - public
   - tally
   - circulars

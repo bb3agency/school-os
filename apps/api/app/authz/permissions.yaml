@@ -276,6 +276,22 @@ permissions:
     sensitivity: sensitive
     step_up: false
 
+  # --- R2-1C WhatsApp messaging (ADR-0043, US-2201..US-2210, FR-MSG-*) ----------------------
+  # Migration 0058_messaging_core upserts these into core.permissions. message.send arrives with
+  # wave R2-3G (sending).
+  messaging.configure:
+    description: Connect or disconnect the school's WhatsApp number, sync templates, change messaging switches and times, and resume sending after a pause
+    sensitivity: critical
+    step_up: true
+  messaging.optin.record:
+    description: "Record a guardian's WhatsApp opt-in or opt-out with its evidence, and print join slips (class teachers: their sections)"
+    sensitivity: sensitive
+    step_up: false
+  message.read:
+    description: "See WhatsApp delivery reports, message history and opt-in states (class teachers: their sections)"
+    sensitivity: sensitive
+    step_up: false
+
   # --- control plane (docs/07 §6.5, contract §5); never grantable to tenant roles ------------
   platform.tenants.read:
     description: See schools, their plan, status, deployment and usage (no student data)

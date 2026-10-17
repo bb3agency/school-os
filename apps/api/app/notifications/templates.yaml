@@ -347,6 +347,25 @@ templates:
     te:
       title: ఫాలో-అప్ గడువు దాటింది
       body: ఒక విద్యార్థి ఫ్లాగ్ గడువు దాటింది, ఇంకా ఎవరూ చర్యను నమోదు చేయలేదు. దాన్ని తెరిచి చేసినది నమోదు చేయండి, లేదా కారణంతో మూసివేయండి.
+  # --- R2-1C WhatsApp messaging (ADR-0043; FR-MSG-007, FR-MSG-021): to messaging.configure ---
+  messaging.paused:
+    params: [account_id, reason]
+    resource_type: messaging_account
+    en:
+      title: WhatsApp sending is paused
+      body: "SchoolOS stopped sending WhatsApp messages for the school because Meta reported a problem ({reason}). Open the WhatsApp settings to see what to do, then resume when it is safe."
+    te:
+      title: WhatsApp పంపడం ఆపివేయబడింది
+      body: "Meta ఒక సమస్యను నివేదించినందున ({reason}) SchoolOS పాఠశాల WhatsApp సందేశాలను పంపడం ఆపింది. ఏమి చేయాలో చూడటానికి WhatsApp సెట్టింగ్‌లను తెరవండి, సురక్షితమైనప్పుడు మళ్ళీ ప్రారంభించండి."
+  messaging.template_paused:
+    params: [account_id, template_key]
+    resource_type: messaging_account
+    en:
+      title: A WhatsApp message type is paused
+      body: "Meta moved the {template_key} message out of the utility category, so SchoolOS will not use it. Messages of that type stop until a new version is approved."
+    te:
+      title: ఒక WhatsApp సందేశ రకం ఆపివేయబడింది
+      body: "Meta {template_key} సందేశాన్ని యుటిలిటీ వర్గం నుండి మార్చింది, కాబట్టి SchoolOS దాన్ని ఉపయోగించదు. కొత్త వెర్షన్ ఆమోదించబడే వరకు ఆ రకం సందేశాలు ఆగిపోతాయి."
   # --- Tally connector (M6; FR-TALLY-009; ADR-0032 Proposed, behind tally.connector.enabled) ---
   tally.agent_silent:
     params: [device_id, hours]

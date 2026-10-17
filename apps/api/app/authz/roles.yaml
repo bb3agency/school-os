@@ -57,6 +57,9 @@ roles:
       certificate.approve: school_step_up
       register.read: school_step_up
       apaar.consent.read: school
+      # R2-1C messaging (ADR-0043)
+      messaging.configure: school_step_up
+      message.read: school
 
   principal:
     name_en: Principal
@@ -117,6 +120,10 @@ roles:
       register.read: school_step_up
       apaar.consent.read: school
       apaar.consent.record: school
+      # R2-1C messaging (ADR-0043)
+      messaging.configure: school_step_up
+      messaging.optin.record: school
+      message.read: school
 
   office_admin:
     name_en: Office admin
@@ -161,6 +168,9 @@ roles:
       attendance.read: school
       apaar.consent.read: school
       apaar.consent.record: school
+      # R2-1C messaging (ADR-0043)
+      messaging.optin.record: school
+      message.read: school
 
   office_staff:
     name_en: Office staff
@@ -187,6 +197,9 @@ roles:
       certificate.issue: school
       apaar.consent.read: school
       apaar.consent.record: school
+      # R2-1C messaging (ADR-0043)
+      messaging.optin.record: school
+      message.read: school
 
   accountant:
     name_en: Accountant
@@ -202,6 +215,8 @@ roles:
       finance.read: school
       tally.configure: school
       support.ticket.create: school
+      # R2-1C messaging (ADR-0043)
+      message.read: school
 
   exam_coordinator:
     name_en: Exam coordinator
@@ -251,6 +266,9 @@ roles:
       marks.read: scoped
       support.ticket.create: school
       apaar.consent.read: scoped
+      # R2-1C messaging (ADR-0043)
+      messaging.optin.record: scoped
+      message.read: scoped
 
   teacher:
     name_en: Teacher
@@ -278,6 +296,8 @@ roles:
       certificate.read: school
       register.read: school_step_up
       apaar.consent.read: school
+      # R2-1C messaging (ADR-0043)
+      message.read: school
 
 # Break-glass support access (docs/07 §6.4, US-103, FR-OPS-004). NOT a system role: it is not
 # cloned at provisioning, not listed for assignment and never assignable by staff. It is created

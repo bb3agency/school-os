@@ -229,6 +229,9 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | task.manage (M4: create, assign, change, cancel tasks) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
 | notice.draft (M4: draft and edit parent notices, download approved ones) | ✓ | ✓ | ✓ | ✓ | — | — | — | — | — |
 | notice.approve (M4: approve parent notices) | ✓ | ✓ | — | — | — | — | — | — | — |
+| messaging.configure (R2-1C: connect or disconnect WhatsApp, sync templates, switches and times, resume after a pause; ADR-0043) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
+| messaging.optin.record (R2-1C: record opt-in/opt-out with evidence, print join slips) | — | ✓ | ✓ | ✓ | — | — | S | — | — |
+| message.read (R2-1C: delivery log, message history, opt-in states) | ✓ | ✓ | ✓ | ✓ | ✓ | — | S | — | ✓ |
 
 `auditor_readonly` memberships are time-bound (default 14 days) and read-only.
 
@@ -317,10 +320,9 @@ Platform roles belong to SchoolOS staff (operators), not to schools (ADR-0013). 
 | fee.reconcile (bank statement import, UPI confirmations, reconciliation items) | — | ✓ | — | — | ✓ | — | — | — | — |
 | fee.report (download the day book and dues lists: bulk personal financial data) | ✓ᴿ | ✓ᴿ | — | — | ✓ᴿ | — | — | — | ✓ᴿ |
 | payments.configure (connect, rotate, disconnect the school's Razorpay account) | ✓ᴿ | — | — | — | — | — | — | — | — |
-| messaging.configure (connect WhatsApp, switches, times, resume after a pause) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
-| messaging.optin.record (record opt-in/opt-out with evidence, print join slips) | — | ✓ | ✓ | ✓ | — | — | S | — | — |
-| message.send (send an approved notice, resend, revoke a parent link) | — | ✓ | ✓ | — | — | — | — | — | — |
-| message.read (delivery reports and message history) | ✓ | ✓ | ✓ | ✓ | ✓ | — | S | — | ✓ |
+| message.send (send an approved notice, resend, revoke a parent link; wave R2-3G) | — | ✓ | ✓ | — | — | — | — | — | — |
+
+`messaging.configure`, `messaging.optin.record` and `message.read` moved to the §6.2 matrix when wave R2-1C built them (2026-10-17, migration `0058_messaging_core`).
 
 Unchanged keys used by R2: `certificate.approve`ᴿ (add or withdraw a verification code), `tenant.settings.manage`ᴿ (parent language, TC format), `student.update_nonidentity` (guardian language), `tenant.billing.read` (AI answer usage numbers).
 

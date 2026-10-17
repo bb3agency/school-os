@@ -62,6 +62,14 @@ class KnowledgeProviderMode(StrEnum):
     LIVE = "live"
 
 
+class MessagingProviderMode(StrEnum):
+    """WhatsApp provider (ADR-0043 decision 1): ``fake`` = deterministic offline provider for
+    local and CI (refused in staging/prod); ``live`` = the Meta Cloud API."""
+
+    FAKE = "fake"
+    LIVE = "live"
+
+
 class LlmCredentialsSource(StrEnum):
     """How the gateway authenticates to Vertex AI (ADR-0033; invariant 10: a service identity,
     never a person's account). ``workload-identity``: an AWS -> Google workload identity
@@ -372,6 +380,22 @@ class Settings(BaseSettings):
     verify_base_url: str | None = None
     meta_webhook_verify_token: SecretStr | None = None
 
+    # --- R2-1C WhatsApp messaging (ADR-0043; docs/10 §11; FR-MSG-001..003, FR-MSG-024) ----------
+    # Master switch (shared tier only in R2, owner decision D24: refused on a dedicated host).
+    # Provider mode: unset = "fake" in local/ci, "live" in staging/prod; "fake" is refused in
+    # staging/prod. The Meta app secret verifies X-Hub-Signature-256 and exchanges Embedded
+    # Signup codes (Secrets Manager); the app id and the Embedded Signup configuration id are
+    # public values the settings page also gets. The Graph API version is pinned in
+    # app/messaging/config.yaml; the override is for a tested upgrade only. The manual-token
+    # connection is for pilots until SchoolOS is a Meta Tech Provider (ADR-0043 decision 5, D13).
+    messaging_enabled: bool = False
+    messaging_provider_mode: MessagingProviderMode | None = None
+    meta_app_id: str | None = Field(default=None, pattern=r"^[0-9]{1,32}$")
+    meta_app_secret: SecretStr | None = None
+    meta_embedded_signup_config_id: str | None = Field(default=None, pattern=r"^[0-9]{1,32}$")
+    meta_graph_api_version: str | None = Field(default=None, pattern=r"^v[0-9]{1,3}\.[0-9]$")
+    messaging_manual_token_allowed: bool = False
+
     # Control plane / fleet (docs/16 §10, §12; ADR-0015). Supplier identity for GST invoices.
     billing_supplier_legal_name: str = DEV_SUPPLIER_NAME
     billing_supplier_gstin: str = DEV_SUPPLIER_GSTIN
@@ -565,6 +589,32 @@ class Settings(BaseSettings):
                     f"characters in {self.env}"
                 )
 
+    @property
+    def effective_messaging_provider_mode(self) -> MessagingProviderMode:
+        """``SOS_MESSAGING_PROVIDER_MODE``, else ``fake`` locally and in CI, ``live`` elsewhere."""
+        if self.messaging_provider_mode is not None:
+            return self.messaging_provider_mode
+        return MessagingProviderMode.LIVE if self.is_production_like else MessagingProviderMode.FAKE
+
+    def _guard_messaging(self) -> None:
+        """WhatsApp messaging (ADR-0043; FR-MSG-001, FR-MSG-024): never on a dedicated host in
+        R2 (owner decision D24); staging/prod never use the fake provider, and live messaging
+        needs the Meta app id and secret (no ``dev-only`` values)."""
+        if not self.messaging_enabled:
+            return
+        if self.deployment_mode is not DeploymentMode.SHARED:
+            raise ValueError("SOS_MESSAGING_ENABLED is not offered on a dedicated host (D24)")
+        if self.is_production_like:
+            if self.effective_messaging_provider_mode is MessagingProviderMode.FAKE:
+                raise ValueError(f"SOS_MESSAGING_PROVIDER_MODE=fake is not allowed in {self.env}")
+            secret = self.meta_app_secret
+            if self.meta_app_id is None or secret is None:
+                raise ValueError(
+                    f"SOS_META_APP_ID and SOS_META_APP_SECRET are required in {self.env}"
+                )
+            if "dev-only" in secret.get_secret_value() or len(secret.get_secret_value()) < 16:
+                raise ValueError(f"SOS_META_APP_SECRET must be the real app secret in {self.env}")
+
     def _guard_postgres_tls(self) -> None:
         """Shared tier, staging/prod: the database is RDS across the VPC, so TLS must check the
         server's certificate and host name (audit 2026-10-05; Terraform writes
@@ -587,6 +637,7 @@ class Settings(BaseSettings):
         self._guard_email()
         self._guard_llm_credentials()
         self._guard_public_origins()
+        self._guard_messaging()
         if self.is_production_like:
             # Anti-automation is a production control (OWASP API4:2023, ASVS 2.2.1).
             if not self.rate_limit_enabled:
