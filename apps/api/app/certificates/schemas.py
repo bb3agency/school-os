@@ -94,9 +94,13 @@ class ChoiceOut(_Out):
 
 class InputOut(_Out):
     key: str
-    kind: Literal["date", "choice", "text"]
+    label_en: str = ""
+    label_te: str = ""
+    kind: Literal["date", "choice", "text", "number"]
     required: bool
     max_length: int | None
+    # kind ``number``: the largest value accepted (0..max_value).
+    max_value: int | None = None
     choices: list[ChoiceOut]
 
 
@@ -108,6 +112,10 @@ class CertificateTypeOut(_Out):
     ends_enrolment: bool
     printed: list[str]
     inputs: list[InputOut]
+    # Transfer certificates: the school's TC format (FR-CERT-015); ``null`` for other types.
+    format_key: str | None = None
+    format_version: int | None = None
+    format_verified: bool | None = None
 
 
 # --- preview -------------------------------------------------------------------------------------
@@ -123,6 +131,12 @@ class PrintedField(_Out):
     source: str | None
     verified: bool
     provisional: bool
+    # R2 formats (FR-CERT-015..018): ``record`` (a student value), ``input`` (typed when the TC
+    # is prepared), ``derived`` (worked out from the record), ``identifier`` (PEN / APAAR ID under
+    # their printing rule), ``restricted`` (religion, caste: blank unless the school prints them).
+    fill: Literal["record", "input", "derived", "identifier", "restricted"] = "record"
+    # A restricted value the school prints but the caller may not see (no student.read_sensitive).
+    masked: bool = False
 
 
 class Blocker(_Out):
@@ -158,6 +172,9 @@ class CertificatePreview(_Out):
     blockers: list[Blocker]
     warnings: list[PreviewWarning]
     can_issue: bool
+    # Transfer certificates: the format the TC would be prepared in (FR-CERT-015).
+    format_key: str | None = None
+    format_version: int | None = None
 
 
 # --- certificates --------------------------------------------------------------------------------
@@ -201,6 +218,10 @@ class CertificateOut(_Out):
     status: Status
     requires_approval: bool
     inputs: dict[str, str]
+    # Transfer certificates: the format it was prepared in (``generic-v1`` for TCs from before
+    # R2); ``null`` for other types (FR-CERT-015).
+    format_key: str | None = None
+    format_version: int | None = None
     original_certificate_id: uuid.UUID | None
     duplicate_no: int | None
     duplicate_reason: str | None
@@ -239,10 +260,102 @@ class DownloadUrlOut(_Out):
     filename: str
 
 
+# --- R2-1A: formats and verification (ADR-0045; FR-CERT-015..024) ----------------------------
+
+FormatFill = Literal["attribute", "input", "derived", "identifier", "restricted", "blank"]
+
+
+class FormatSourceOut(_Out):
+    title: str
+    url: str | None
+
+
+class FormatLineOut(_Out):
+    key: str
+    label_en: str
+    label_te: str
+    fill: FormatFill
+    restricted: bool
+
+
+class CertificateFormatOut(_Out):
+    """A TC format a school may choose (``GET /certificates/formats``). ``verified`` is false
+    until a school confirmed the layout (owner decision D3)."""
+
+    key: str
+    version: int
+    certificate_type: Literal["transfer"]
+    label_en: str
+    label_te: str
+    builtin: bool
+    verified: bool
+    sources: list[FormatSourceOut]
+    notes: str
+    lines: list[FormatLineOut]
+    inputs: list[InputOut]
+
+
+VerificationStatus = Literal["active", "withdrawn", "none"]
+
+
+class VerificationOut(_Out):
+    """The verification code of a certificate (``GET /certificates/{id}/verification``). ``code``
+    is printed on the paper (four groups); ``url`` is the QR's link, ``null`` while verification
+    is off (``SOS_VERIFY_BASE_URL`` unset). ``check_count`` counts successful public lookups of
+    this code (FR-CERT-024); nothing else about who checked is kept. ``version`` is the ETag for
+    a withdrawal."""
+
+    certificate_id: uuid.UUID
+    status: VerificationStatus
+    code: str | None
+    url: str | None
+    created_reason: Literal["issued", "duplicate", "added_later"] | None
+    created_at: dt.datetime | None
+    check_count: int
+    last_checked_at: dt.datetime | None
+    withdrawn_at: dt.datetime | None
+    withdraw_reason: str | None
+    version: int
+    can_add: bool
+    can_withdraw: bool
+
+
+class VerificationReasonIn(_In):
+    """Why a code is added to a certificate issued before R2, or withdrawn (10..500 characters,
+    no Aadhaar numbers)."""
+
+    reason: Note
+
+
+class PublicDuplicate(_Out):
+    copy_no: int
+    original_serial: str
+    issued_on: dt.date
+
+
+class PublicCertificateOut(_Out):
+    """What the public verification page shows for a live code (FR-CERT-021; ADR-0045 decision
+    5): the school's printed name and place, the type, serial and issue date, and for a valid
+    certificate exactly its frozen printed content. A cancelled certificate (or a copy of a
+    cancelled original) shows no content. Nothing comes from the live student record."""
+
+    status: Literal["valid", "cancelled"]
+    certificate_type: CertificateType
+    title_en: str
+    school_name: str
+    school_place: str
+    serial: str
+    issued_on: dt.date
+    duplicate: PublicDuplicate | None
+    cancelled_on: dt.date | None
+    content: CertificateContent | None
+
+
 __all__ = [
     "ApproveIn",
     "Blocker",
     "CertificateContent",
+    "CertificateFormatOut",
     "CertificateOut",
     "CertificatePreview",
     "CertificateRequest",
@@ -252,11 +365,19 @@ __all__ = [
     "ContentLine",
     "DownloadUrlOut",
     "DuplicateRequest",
+    "FormatFill",
+    "FormatLineOut",
+    "FormatSourceOut",
     "InputOut",
     "PdfStatus",
     "PreviewWarning",
     "PrintedField",
+    "PublicCertificateOut",
+    "PublicDuplicate",
     "ReasonIn",
     "RegisterKind",
     "Status",
+    "VerificationOut",
+    "VerificationReasonIn",
+    "VerificationStatus",
 ]

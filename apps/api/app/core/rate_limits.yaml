@@ -140,6 +140,12 @@ policies:
   # check; machine_ip covers the address before it.
   webhook_route:
     {quota: 600, window_s: 60, per: handle, fail: closed, report: false, weighted: false}
+  # --- R2-1A certificates (ADR-0045 decision 7; US-2003 AC4). Every certificate lookup from one
+  # address, charged by app/certificates/api.py before the guard resolves anything (a used-up
+  # budget refuses valid and invalid codes alike); failed lookups also spend public_lookup_fail.
+  cert_verify_ip:
+    {quota: 20, window_s: 600, per: ip, fail: closed, report: true, weighted: false}
+  # --- end R2-1A
 
 # Route template (method + path, as in openapi.json) -> stricter per-route policies. A test fails
 # when a key is not a route, when an expensive-looking route (export, import, upload, search,

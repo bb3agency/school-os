@@ -14,8 +14,9 @@ import uuid
 from collections.abc import Callable
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import HTMLResponse
+from starlette.concurrency import run_in_threadpool
 
 from app.authz.context import UserContext
 from app.authz.dependencies import TenantDB, require, require_any
@@ -23,6 +24,7 @@ from app.authz.http import Cursor, IdempotencyDep, IfMatch, Limit, Page, etag
 from app.certificates import service
 from app.certificates.schemas import (
     ApproveIn,
+    CertificateFormatOut,
     CertificateOut,
     CertificatePreview,
     CertificateRequest,
@@ -30,10 +32,15 @@ from app.certificates.schemas import (
     CertificateTypeOut,
     DownloadUrlOut,
     DuplicateRequest,
+    PublicCertificateOut,
     ReasonIn,
     Status,
+    VerificationOut,
+    VerificationReasonIn,
 )
 from app.certificates.templates import STYLE_CSP
+from app.core import ratelimit
+from app.public.guards import PublicCaller, PublicNotFound, require_public_handle
 
 router = APIRouter(prefix="/api/v1", tags=["certificates"])
 
@@ -93,10 +100,19 @@ def _register(
 
 
 @router.get("/certificates/types", response_model=list[CertificateTypeOut])
-def list_certificate_types(ctx: Reader) -> list[CertificateTypeOut]:
-    """Certificate types with the values each one asks for (read, issue or approve
-    permission)."""
-    return service.types_catalog()
+def list_certificate_types(ctx: Reader, db: TenantDB) -> list[CertificateTypeOut]:
+    """Certificate types with the values each one asks for; the transfer certificate in the
+    school's chosen format (read, issue or approve permission; FR-CERT-015)."""
+    return service.types_catalog(db)
+
+
+@router.get("/certificates/formats", response_model=list[CertificateFormatOut])
+def list_certificate_formats(ctx: Reader) -> list[CertificateFormatOut]:
+    """The transfer certificate formats a school may choose (``PATCH /tenant`` with
+    ``settings.certificate_format.transfer``): lines in print order, inputs, sources and whether
+    a school confirmed the layout (``verified``; owner decision D3). Read, issue or approve
+    permission (FR-CERT-015)."""
+    return service.formats_catalog()
 
 
 @router.get("/students/{student_id}/certificates/preview", response_model=CertificatePreview)
@@ -360,3 +376,114 @@ def admission_withdrawal_register(
         ),
         "admission-withdrawal-register.html",
     )
+
+
+# --- verification codes (R2; ADR-0045; FR-CERT-019..024) -------------------------------------
+
+
+def _verification_etag(response: Response, item: VerificationOut) -> VerificationOut:
+    response.headers["ETag"] = etag(item.version)
+    return item
+
+
+@router.get("/certificates/{certificate_id}/verification", response_model=VerificationOut)
+def get_certificate_verification(
+    ctx: Reader, db: TenantDB, certificate_id: uuid.UUID, response: Response
+) -> VerificationOut:
+    """The certificate's verification code (as printed, in four groups), the QR link, how
+    often it was checked online and when last (US-2004 AC1; read, issue or approve permission).
+    ``ETag`` is the version a withdrawal sends in ``If-Match``."""
+    return _verification_etag(response, service.get_verification(db, ctx, certificate_id))
+
+
+@router.post(
+    "/certificates/{certificate_id}/verification",
+    response_model=VerificationOut,
+    status_code=201,
+)
+def add_certificate_verification(
+    ctx: Approver,
+    db: TenantDB,
+    certificate_id: uuid.UUID,
+    body: VerificationReasonIn,
+    idem: IdempotencyDep,
+) -> Response:
+    """Add a verification code to a certificate issued before R2 (FR-CERT-023a; permission
+    ``certificate.approve``, MFA within 5 minutes; reason 10..500). The original paper has no
+    code: the next duplicate carries one. Accepts ``Idempotency-Key``. Errors:
+    ``certificate_not_issued``, ``verification_exists`` (409)."""
+    return idem.run(
+        db,
+        body,
+        lambda: service.add_verification(db, ctx, certificate_id, body),
+        headers=lambda item: {"ETag": etag(item.version)},
+    )
+
+
+@router.post("/certificates/{certificate_id}/verification/withdraw", response_model=VerificationOut)
+def withdraw_certificate_verification(
+    *,
+    ctx: Approver,
+    db: TenantDB,
+    certificate_id: uuid.UUID,
+    expected: IfMatch,
+    body: VerificationReasonIn,
+    response: Response,
+) -> VerificationOut:
+    """Withdraw the certificate's verification code (FR-CERT-023b; permission
+    ``certificate.approve``, MFA within 5 minutes, ``If-Match`` from ``GET .../verification``;
+    reason 10..500): the public page answers "not found" for it from then on. Error
+    ``verification_not_active`` (409)."""
+    out = service.withdraw_verification(db, ctx, certificate_id, body, expected_version=expected)
+    return _verification_etag(response, out)
+
+
+# --- public verification (R2; pinned in app/public/public_routes.yaml) -----------------------
+
+public_router = APIRouter(prefix="/api/v1", tags=["public"])
+
+VERIFY_BUDGET = "cert_verify_ip"
+
+
+def _verify_budget(request: Request) -> None:
+    """Every lookup from one address counts before anything is resolved (ADR-0045 decision 7:
+    20 per 10 minutes; failures also spend ``public_lookup_fail`` in the guard). Charged first,
+    so a used-up budget answers 429 for valid and invalid codes alike (no oracle)."""
+    ratelimit.charge(request, VERIFY_BUDGET, ratelimit.ip_hash(ratelimit.client_ip_of(request)))
+
+
+ByCode = Annotated[
+    PublicCaller, Depends(require_public_handle("cert_verify", key="path", param="code"))
+]
+
+_PUBLIC_RESPONSES: dict[int | str, dict[str, Any]] = {
+    404: {"description": "Unknown, mistyped or withdrawn code (always the same body)."},
+    429: {"description": "Too many lookups from this address."},
+}
+
+
+@public_router.get(
+    "/public/certificates/{code}",
+    response_model=PublicCertificateOut,
+    responses=_PUBLIC_RESPONSES,
+    dependencies=[Depends(_verify_budget)],
+)
+async def verify_certificate(
+    request: Request, code: str, caller: ByCode, response: Response
+) -> PublicCertificateOut:
+    """Check a certificate by its verification code (FR-CERT-021, FR-CERT-022; ADR-0045),
+    called by the web app's verification page with its service token and no user token. The
+    caller sends the normalised code (16 characters, upper case, no dashes). A valid code
+    answers the school's printed name and place, the type, serial, date of issue and exactly the
+    printed content (a cancelled certificate: no content); anything else is the uniform 404.
+    Each check is counted and audited. There is no lookup by serial, name or date of birth."""
+    del code  # read by the guard
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    ip_hash = ratelimit.ip_hash(ratelimit.client_ip_of(request))
+    out = await run_in_threadpool(
+        service.verify_publicly, caller.tenant_id, caller.handle_id, ip_hash=ip_hash
+    )
+    if out is None:
+        raise PublicNotFound()
+    return out
