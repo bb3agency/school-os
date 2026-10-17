@@ -55,6 +55,10 @@ Facts checked on 2026-10-14 (sources at the end):
 | Two-way chat inbox for the office | Large scope, staff workload and moderation; out of R2 |
 | Store message text | Needed only to show "what was sent"; the template version and encrypted variables are enough and expire |
 
+## Follow-up (2026-10-17, wave R2-1C built)
+
+Built as decided in `app/messaging/` and migration `0058_messaging_core` (docs/03 §3.22 "As built"). Refinements: (1) the Meta verifier's event id is the hash of the raw body (Meta has no delivery id), events inside are deduplicated by their own keys; (2) inbound text never reaches the inbox, not even encrypted: the parser keeps only the keyword class and a join code; (3) an opt-in is bound to the guardian's number at the time through its blind index, so a phone change needs a new opt-in without coupling the students module to messaging; (4) staff cannot record an in-person opt-in after a parent's STOP (only a signed form or the parent's join); (5) the confirmation of a STOP and the daily automatic reply are free-form texts inside the window, the join confirmation is the `optin_confirm` template (it must be approved); (6) template provisioning needs `SOS_PUBLIC_BASE_URL` for the URL-button templates; (7) disconnecting revokes every open parent link referenced by a message, not by target type; (8) on a dedicated host the settings guard refuses `SOS_MESSAGING_ENABLED` (decision 12). Open: a STOP sent while the school is suspended is not routed (the resolver refuses `meta_waba` handles of suspended schools), Meta keeps retrying for 7 days; transient-failure retries and quiet hours belong to wave R2-3G.
+
 ## Related requirements
 
 FR-MSG-001..024 (docs/03 §3.21), FR-PUB-001..012, SEC-034, SEC-035, SEC-039, PRV-025..028; US-2201..US-2210 (docs/02 C22). Docs: 01 §7.3, 02 §9, 05 §15.3, 07 §3 TB11, §4 T28-T35, 08 §15, 09 §4 "Messaging", "Webhooks", 10 §11.2, 14 R2, 17 §5.8.

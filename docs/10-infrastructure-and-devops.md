@@ -456,15 +456,15 @@ Every LLM role runs on Google Gemini through Vertex AI in `asia-south1` (ADR-003
 | `SOS_RAZORPAY_OAUTH_REDIRECT_URI` | none | Whitelisted callback on the staff app (`https://<app_domain>/bff/payments/oauth/callback`) |
 | `SOS_RAZORPAY_OAUTH_MODE` | `live` | `test` for Razorpay test mode in staging (OAuth token `mode`) |
 | `SOS_RAZORPAY_MANUAL_KEYS_ALLOWED` | `false` | Allows the "manual keys" connection mode; set `true` for pilots until SchoolOS is an approved Razorpay Technology Partner (ADR-0042 P1, D13) |
-| `SOS_MESSAGING_ENABLED` | `false` | Master switch for WhatsApp messaging (shared tier only in R2; refused with `SOS_DEPLOYMENT_MODE=dedicated`) |
-| `SOS_MESSAGING_PROVIDER_MODE` | unset: `fake` in local/ci, `live` in staging/prod | `fake` (refused in staging/prod) or `live` (Meta Cloud API) |
-| `SOS_META_APP_ID` | none | SchoolOS's Meta app id (Tech Provider) |
-| `SOS_META_APP_SECRET` | none | Meta app secret: verifies `X-Hub-Signature-256` and exchanges Embedded Signup codes (Secrets Manager; never on dedicated hosts) |
+| `SOS_MESSAGING_ENABLED` (**read since R2-1C**) | `false` | Master switch for WhatsApp messaging (shared tier only in R2; refused with `SOS_DEPLOYMENT_MODE=dedicated`); off, every `/messaging`, `/guardians/{id}/optins`, `/messages` and `/webhooks/meta` route answers `404 module_unavailable` and the worker jobs do nothing (FR-MSG-024) |
+| `SOS_MESSAGING_PROVIDER_MODE` (**read since R2-1C**) | unset: `fake` in local/ci, `live` in staging/prod | `fake` (refused in staging/prod) or `live` (Meta Cloud API) |
+| `SOS_META_APP_ID` (**read since R2-1C**) | none | SchoolOS's Meta app id (Tech Provider); digits only; required in staging/prod when messaging is on; returned to the settings page for Embedded Signup |
+| `SOS_META_APP_SECRET` (**read since R2-1C**) | none (every webhook delivery answers 401) | Meta app secret: verifies `X-Hub-Signature-256` and exchanges Embedded Signup codes (Secrets Manager; never on dedicated hosts); staging/prod refuse `dev-only` values and anything under 16 characters when messaging is on |
 | `SOS_META_WEBHOOK_VERIFY_TOKEN` (**read since R2-0** by `require_meta_verify_token`) | none (`GET /webhooks/meta` answers 403) | Random string for the webhook `GET` challenge (Secrets Manager); staging/prod refuse `dev-only` values and anything under 32 characters |
-| `SOS_META_EMBEDDED_SIGNUP_CONFIG_ID` | none | Embedded Signup v4 configuration id (public; also given to the web app) |
-| `SOS_META_GRAPH_API_VERSION` | from `app/messaging/config.yaml` | Pinned Graph API version; override only for a tested upgrade |
-| `SOS_MESSAGING_MANUAL_TOKEN_ALLOWED` | `false` | Allows the manual-token connection; set `true` for pilots until SchoolOS is a Meta Tech Provider (ADR-0043 decision 5, D13) |
-| `SOS_WEBHOOK_MAX_BODY_BYTES_RAZORPAY`, `SOS_WEBHOOK_MAX_BODY_BYTES_META` | 262144, 3145728 | Body limits before signature checks |
+| `SOS_META_EMBEDDED_SIGNUP_CONFIG_ID` (**read since R2-1C**) | none (the page offers only the manual token, when allowed) | Embedded Signup v4 configuration id (public; returned by `GET /messaging/account` for the settings page) |
+| `SOS_META_GRAPH_API_VERSION` (**read since R2-1C**) | from `app/messaging/config.yaml` (`v23.0`) | Pinned Graph API version (`vNN.N`); override only for a tested upgrade |
+| `SOS_MESSAGING_MANUAL_TOKEN_ALLOWED` (**read since R2-1C**) | `false` | Allows the manual-token connection (`POST /messaging/account/manual`, else 403 `manual_token_not_allowed`); set `true` for pilots until SchoolOS is a Meta Tech Provider (ADR-0043 decision 5, D13) |
+| (`app/public/config.yaml`, not settings) | 262144 (Razorpay), 3145728 (Meta) | Webhook body limits before signature checks; since R2-1C the API middleware lets `/api/v1/webhooks/meta` through up to Meta's limit (other routes keep 1 MiB) |
 
 **Web (BFF) additions:** `PUBLIC_BASE_URL` (**read since R2-0** by the proxy and the `(public)` group: an https origin, or loopback http locally; unset or invalid = `/p` answers 404; the public origin; the `(public)` route group answers only on it and the staff routes never do), `META_APP_ID` and `META_EMBEDDED_SIGNUP_CONFIG_ID` (public values for the settings page), CSP additions scoped to `/settings/whatsapp`: `script-src https://connect.facebook.net`, `frame-src https://www.facebook.com https://web.facebook.com`, `connect-src https://graph.facebook.com`.
 

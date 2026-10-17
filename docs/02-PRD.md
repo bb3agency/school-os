@@ -664,6 +664,8 @@ Stories of the 2026-27 plan, release R2 (docs/18 §3 R2; owner decisions D4-D9 o
 **US-2210** · As a parent who writes to the school's number, I want a polite answer telling me how to reach the office, since nobody reads messages there. [FR-MSG-018]
 - AC1: Any message that is not a keyword gets at most one automatic reply a day with the office phone number; the message text is not stored.
 
+*Built in wave R2-1C (2026-10-17): US-2201, US-2202, US-2203, US-2209, US-2210 and the message history of US-2208; US-2204..US-2207 (sending) and the broadcast report are wave R2-3G (docs/14). A staff opt-in after a parent's STOP needs a signed form (US-2203 AC2); a new number needs a new opt-in.*
+
 #### C23 · Parent language per school (R2.3; ADR-0044)
 
 **US-2301** · As a principal, I want to choose English or Telugu for everything parents receive, while our staff screens stay English. [FR-LANG-001, FR-LANG-002, FR-LANG-005, FR-LANG-006]
