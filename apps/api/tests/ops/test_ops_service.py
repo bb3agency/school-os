@@ -67,6 +67,35 @@ def test_FR_OPS_004_dispatch_routes_by_event_type(
     assert service.dispatch_outbox(lambda *_: None).claimed == 0
 
 
+def test_L_05_an_event_the_broker_refused_is_dispatched_again(
+    admin_engine: Engine, engines: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The broker is down while the dispatcher relays a batch: no event is lost; the batch is
+    claimed again on the next run (at-least-once, like ``acks_late`` redelivery)."""
+    _drain()
+    tid = _tenant(admin_engine)
+    monkeypatch.setitem(service.OUTBOX_ROUTES, "test.routed", "tests.consumer")
+    with tenant_session(tid) as s:
+        first = service.enqueue_event(s, "test.routed", {"resource_id": str(uuid.uuid4())})
+        second = service.enqueue_event(s, "test.routed", {"resource_id": str(uuid.uuid4())})
+
+    def broker_down(task: str, kwargs: dict[str, Any]) -> None:
+        raise ConnectionError("broker unavailable")
+
+    with pytest.raises(ConnectionError):
+        service.dispatch_outbox(broker_down, batch=50)
+    with admin_engine.connect() as c:
+        pending = c.execute(
+            text("SELECT id FROM ops.outbox WHERE dispatched_at IS NULL AND id = ANY(:i)"),
+            {"i": [first, second]},
+        ).scalars()
+        assert set(pending) == {first, second}
+    sent: list[str] = []
+    result = service.dispatch_outbox(lambda task, kwargs: sent.append(kwargs["event_id"]))
+    assert result.sent == 2
+    assert set(sent) == {str(first), str(second)}
+
+
 def test_FR_OPS_004_job_runs_resume_and_die(admin_engine: Engine, engines: None) -> None:
     tid = _tenant(admin_engine)
     with tenant_session(tid) as s:

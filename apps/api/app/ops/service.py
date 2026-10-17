@@ -59,29 +59,43 @@ SendTask = Callable[[str, dict[str, Any]], None]
 
 
 def dispatch_outbox(send: SendTask, *, batch: int = 100) -> DispatchResult:
+    """Claim a batch of events and relay each to its consumer **inside the claiming
+    transaction**: when the broker refuses one (``send`` raises), the claim rolls back and the
+    whole batch is relayed again on the next run, so no event is lost (audit 2026-10-17 L-05).
+    Delivery is at least once, as with ``acks_late`` redelivery; consumers are idempotent."""
+    sent = unrouted = 0
     with context_free_session() as s:
         rows = repo.claim_outbox(s, batch)
-    sent = unrouted = 0
-    for row in rows:
-        task = OUTBOX_ROUTES.get(row["event_type"])
-        if task is None:
-            unrouted += 1
-            log.error(
-                "ops.outbox.unrouted",
-                tenant_id=str(row["tenant_id"]),
-                resource_id=str(row["id"]),
-                action=row["event_type"],
-            )
-            continue
-        send(
-            task,
-            {
-                "tenant_id": str(row["tenant_id"]),
-                "event_id": str(row["id"]),
-                "payload": dict(row["payload"]),
-            },
-        )
-        sent += 1
+        for row in rows:
+            task = OUTBOX_ROUTES.get(row["event_type"])
+            if task is None:
+                unrouted += 1
+                log.error(
+                    "ops.outbox.unrouted",
+                    tenant_id=str(row["tenant_id"]),
+                    resource_id=str(row["id"]),
+                    action=row["event_type"],
+                )
+                continue
+            try:
+                send(
+                    task,
+                    {
+                        "tenant_id": str(row["tenant_id"]),
+                        "event_id": str(row["id"]),
+                        "payload": dict(row["payload"]),
+                    },
+                )
+            except Exception as exc:
+                log.error(
+                    "ops.outbox.send_failed",
+                    resource_id=str(row["id"]),
+                    action=row["event_type"],
+                    error_type=type(exc).__name__,
+                    count=len(rows),
+                )
+                raise
+            sent += 1
     return DispatchResult(len(rows), sent, unrouted)
 
 
