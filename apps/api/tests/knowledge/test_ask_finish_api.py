@@ -336,7 +336,7 @@ def test_FR_KB_042_resolve_conversation_sources_only_for_their_owner(
     owner = a.people["owner"]
     cid = K.conversation_row(a, owner)
     with admin_engine.connect() as c:
-        qid = c.execute(
+        qid: uuid.UUID = c.execute(
             text("SELECT id FROM kb.queries WHERE conversation_id = :c"), {"c": cid}
         ).scalar_one()
     source = f"sos://conversation/{cid}#q{qid}"
