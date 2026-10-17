@@ -38,10 +38,6 @@ composite FKs, the restrictive ``offboarding_purge`` policy and ``SELECT, DELETE
 - ``msg.provider_events``: the webhook inbox, ``UNIQUE (tenant_id, provider, event_key)``,
   payload encrypted with the school's key (``sos_readonly`` gets nothing).
 
-``core.resolve_public_handle`` (ADR-0047, amended): ``meta_waba`` handles also resolve while the
-school is ``suspended``, so a parent's STOP is still honoured (the service stores and applies
-only opt-outs then, and sends nothing). The downgrade restores the 0055 body.
-
 The permission catalog gets ``messaging.configure`` (step-up), ``messaging.optin.record`` and
 ``message.read`` (rows written out here, like 0051). Role grants of existing schools need the
 post-migration system-role sync (ADR-0022).
@@ -528,48 +524,7 @@ UPSERT = sa.text(
 )
 
 
-RESOLVER_SIGNATURE = "core.resolve_public_handle(text,bytea)"
-
-
-def _resolver(suspended_kinds: str) -> str:
-    return rf"""
-CREATE OR REPLACE FUNCTION core.resolve_public_handle(p_kind text, p_key_hash bytea)
-  RETURNS TABLE (tenant_id uuid, handle_id uuid)
-  LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
-  SELECT h.tenant_id, h.id
-  FROM core.public_handles AS h
-  JOIN core.tenants AS t ON t.id = h.tenant_id
-  WHERE h.kind = p_kind
-    AND h.key_hash = p_key_hash
-    AND h.revoked_at IS NULL
-    AND (h.expires_at IS NULL OR h.expires_at > pg_catalog.now())
-    AND (t.status = 'active'
-         OR (t.status = 'suspended' AND h.kind IN ({suspended_kinds})))
-$$;
-"""  # noqa: S608 - DDL; only constant kind lists are interpolated
-
-
-# ADR-0047 amendment (R2-1C, 2026-10-18): a parent's STOP must be honoured while the school is
-# suspended (consent withdrawal, PRV-025), so Meta's webhook also reaches suspended schools; the
-# messaging service then stores and applies opt-outs only and sends nothing.
-RESOLVER_WITH_META = _resolver("'parent_receipt', 'cert_verify', 'meta_waba'")
-RESOLVER_0055 = _resolver("'parent_receipt', 'cert_verify'")
-
-
-def _replace_resolver(sql: str) -> None:
-    # The function is owned by sos_definer; CREATE on core exists only inside this transaction
-    # (as in 0055). Grants and ownership survive CREATE OR REPLACE.
-    op.execute("GRANT CREATE ON SCHEMA core TO sos_definer")
-    op.execute("SET ROLE sos_definer")
-    op.execute(sql)
-    op.execute(f"REVOKE ALL ON FUNCTION {RESOLVER_SIGNATURE} FROM PUBLIC")
-    op.execute(f"GRANT EXECUTE ON FUNCTION {RESOLVER_SIGNATURE} TO sos_app")
-    op.execute("SET ROLE sos_owner")
-    op.execute("REVOKE CREATE ON SCHEMA core FROM sos_definer")
-
-
 def upgrade() -> None:
-    _replace_resolver(RESOLVER_WITH_META)
     op.execute(TABLES_SQL)
     for table in TENANT_TABLES:
         op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
@@ -593,7 +548,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    _replace_resolver(RESOLVER_0055)
     bind = op.get_bind()
     for row in NEW_PERMISSIONS:
         savepoint = bind.begin_nested()

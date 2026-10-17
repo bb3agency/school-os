@@ -123,9 +123,6 @@ RUN_WHILE_SUSPENDED: Final[frozenset[str]] = frozenset(
         "knowledge.remove_document",
         # Bookkeeping for an AI call already made and billed (audit W3-10); no provider call.
         "knowledge.settle_spend",
-        # R2-1C (FR-MSG-010, PRV-025): a parent's STOP is honoured while the school is suspended
-        # (consent withdrawal); in that state the inbox applies opt-outs only and sends nothing.
-        "messaging.process_inbox",
     }
 )
 

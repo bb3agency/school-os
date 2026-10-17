@@ -34,11 +34,11 @@ from app.ops.service import TenantTask
 log = get_logger(__name__)
 
 
-def _each_school(action: str, run: Any, statuses: tuple[str, ...] = ("active",)) -> dict[str, int]:
+def _each_school(action: str, run: Any) -> dict[str, int]:
     if not service.available():
         return {"skipped": 1}
     totals = {"schools": 0, "failed": 0}
-    for tenant_id in service.live_tenant_ids(statuses):
+    for tenant_id in service.live_tenant_ids():
         try:
             run(tenant_id)
             totals["schools"] += 1
@@ -92,8 +92,7 @@ def provision_templates(
 
 @shared_task(name="messaging.sweep_inbox", acks_late=True, ignore_result=True)
 def sweep_inbox() -> dict[str, int]:
-    # Suspended schools too: a parent's STOP is applied (opt-outs only, ADR-0047 amendment).
-    return _each_school("inbox", service.process_inbox, ("active", "suspended"))
+    return _each_school("inbox", service.process_inbox)
 
 
 def _sync(tenant_id: uuid.UUID) -> None:

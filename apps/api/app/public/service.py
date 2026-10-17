@@ -216,9 +216,8 @@ def issue_handle(
 
 def resolve(kind: HandleKind, key: str) -> ResolvedHandle | None:
     """The school and handle of a live key of ``kind``, or ``None`` for anything else (unknown,
-    malformed, expired, revoked, or a school that is not active; receipts, certificate codes and
-    WhatsApp account routes (opt-outs only, R2-1C) also resolve while the school is suspended).
-    One indexed lookup through
+    malformed, expired, revoked, or a school that is not active; receipts and certificate codes
+    also resolve while the school is suspended). One indexed lookup through
     ``core.resolve_public_handle`` in a context-free session; a database failure is a 503,
     never a guess (ADR-0047 decision 5). The key itself is never logged."""
     return resolve_any((kind,), key)

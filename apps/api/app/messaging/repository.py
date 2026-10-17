@@ -446,17 +446,14 @@ def set_event_payload(session: Session, event_id: uuid.UUID, payload: bytes) -> 
     )
 
 
-def pending_events(
-    session: Session, limit: int, *, event_types: Collection[str] | None = None
-) -> list[ProviderEvent]:
+def pending_events(session: Session, limit: int) -> list[ProviderEvent]:
     """Events waiting to be applied, oldest first, locked (``SKIP LOCKED``: two workers never
-    apply the same event); only ``event_types`` when given."""
-    stmt = select(ProviderEvent).where(ProviderEvent.status == "received")
-    if event_types is not None:
-        stmt = stmt.where(ProviderEvent.event_type.in_(list(event_types)))
+    apply the same event)."""
     return list(
         session.scalars(
-            stmt.order_by(ProviderEvent.event_at.asc().nulls_first(), ProviderEvent.received_at)
+            select(ProviderEvent)
+            .where(ProviderEvent.status == "received")
+            .order_by(ProviderEvent.event_at.asc().nulls_first(), ProviderEvent.received_at)
             .limit(limit)
             .with_for_update(skip_locked=True)
         )
