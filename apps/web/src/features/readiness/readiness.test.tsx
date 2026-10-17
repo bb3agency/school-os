@@ -1,19 +1,27 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { installBffStub, uninstallBffStub, type BffStub } from "@/test/bff-stub";
+import { installBffStub, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
 import { intlErrors, renderWithIntl } from "@/test/render";
 import { me, SECTION, STUDENT, structureRoutes } from "@/test/school-fixtures";
 import { ReadinessScreen } from "./ReadinessScreen";
 import { ReadinessStudentScreen } from "./ReadinessStudentScreen";
 import { readyShare, slipHref, type ReadinessDetail, type ReadinessSummary } from "./types";
 
+const router = vi.hoisted(() => ({ replace: vi.fn() }));
+
 vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
     usePathname: () => "/findings/readiness",
-    useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
+    useRouter: () => ({
+      push: vi.fn(),
+      replace: router.replace,
+      refresh: vi.fn(),
+      prefetch: vi.fn(),
+    }),
     useSearchParams: () => new URLSearchParams(),
     useParams: () => ({ locale: "en" }),
   };
@@ -168,6 +176,7 @@ function common(permissions: string[]) {
 
 beforeEach(() => {
   stub = installBffStub("staff");
+  router.replace.mockReset();
 });
 afterEach(() => {
   uninstallBffStub();
@@ -240,6 +249,69 @@ describe("board readiness screen (US-504, US-506)", () => {
       "href",
       slipHref(SSC, { sectionId: SECTION }),
     );
+  });
+});
+
+describe("board readiness actions and states (FR-DQ-044, FR-DQ-048)", () => {
+  it("a school without the default check opens its first readiness check instead", async () => {
+    common(READ);
+    renderWithIntl(<ReadinessScreen profileKey="apaar" sectionId={null} chosen={false} />);
+    await waitFor(() =>
+      expect(router.replace).toHaveBeenCalledWith(`/findings/readiness?profile=${SSC}`),
+    );
+  });
+
+  it("a check chosen in the address is kept even when it is not listed", async () => {
+    common(READ);
+    renderWithIntl(<ReadinessScreen profileKey="apaar" sectionId={null} />);
+    expect(await screen.findByRole("navigation", { name: "Board or portal" })).toBeVisible();
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it("Check now starts a check of the section shown with an Idempotency-Key", async () => {
+    common([...READ, "dq.readiness.manage"]);
+    stub.routes[`GET /bff/api/v1/dq/readiness/${SSC}/students`] = () => Response.json([]);
+    stub.routes[`POST /bff/api/v1/dq/readiness/${SSC}/runs`] = () =>
+      Response.json(
+        {
+          id: "0192f3a4-0000-7000-8000-00000000ab02",
+          trigger: "manual",
+          event_type: null,
+          status: "completed",
+          profile_key: SSC,
+          scope: { section_ids: [SECTION] },
+          stats: { students: 40, blockers: 2, warnings: 5, new: 3, reopened: 1, cleared: 0 },
+          created_at: "2026-10-10T05:00:00Z",
+          started_at: "2026-10-10T05:00:00Z",
+          finished_at: "2026-10-10T05:00:02Z",
+          error_code: null,
+        },
+        { status: 202 },
+      );
+    renderWithIntl(<ReadinessScreen profileKey={SSC} sectionId={SECTION} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Check now" }));
+    const dialog = screen.getByRole("dialog", { name: "Check readiness now" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Start the check" }));
+    expect(
+      await within(dialog).findByText("40 students checked: 2 blockers and 5 warnings."),
+    ).toBeInTheDocument();
+    const call = stub.callsTo(`POST /bff/api/v1/dq/readiness/${SSC}/runs`)[0];
+    expect(call?.headers.get("idempotency-key")).toMatch(/^[0-9a-f-]{36}$/);
+    expect(JSON.parse(call?.body ?? "{}")).toEqual({ scope: { section_ids: [SECTION] } });
+    // The finished check reloads the summary.
+    await waitFor(() =>
+      expect(stub.callsTo(`GET /bff/api/v1/dq/readiness/${SSC}`).length).toBeGreaterThan(1),
+    );
+  });
+
+  it("an unavailable summary says what to do, never shows raw API text", async () => {
+    common(READ);
+    stub.routes[`GET /bff/api/v1/dq/readiness/${SSC}`] = () =>
+      problem(503, "service_unavailable", { detail: "upstream pool exhausted" });
+    renderWithIntl(<ReadinessScreen profileKey={SSC} sectionId={null} />);
+    expect(await screen.findByRole("alert")).toBeVisible();
+    expect(screen.queryByText(/upstream pool exhausted/)).toBeNull();
+    expect(screen.queryByRole("table", { name: "Sections" })).toBeNull();
   });
 });
 
