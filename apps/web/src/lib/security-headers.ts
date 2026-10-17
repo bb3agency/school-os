@@ -18,7 +18,18 @@ export interface CspOptions {
   filesOrigin?: string | undefined;
   /** Add `upgrade-insecure-requests` (skip it only for plain-http local runs). */
   upgradeInsecureRequests: boolean;
+  /**
+   * Meta's Embedded Signup on `/settings/whatsapp` only (R2-1C; ADR-0043; docs/10 §11.2): its SDK
+   * from connect.facebook.net, its frames and Graph API calls. Nowhere else.
+   */
+  embeddedSignup?: boolean;
 }
+
+/** The one staff route that may load Meta's SDK (with or without a locale prefix). */
+export const EMBEDDED_SIGNUP_PATH = /^(\/(en|te))?\/settings\/whatsapp\/?$/;
+const META_SCRIPT = "https://connect.facebook.net";
+const META_FRAMES = "https://www.facebook.com https://web.facebook.com";
+const META_CONNECT = "https://graph.facebook.com https://www.facebook.com";
 
 const NONCE_BYTES = 16;
 
@@ -58,10 +69,11 @@ export function normaliseFilesOrigin(
 
 export function buildContentSecurityPolicy(options: CspOptions): string {
   const { nonce, isDev } = options;
+  const meta = options.embeddedSignup === true;
   const filesOrigin = normaliseFilesOrigin(options.filesOrigin, { allowLoopbackHttp: isDev });
   const directives: string[] = [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${meta ? ` ${META_SCRIPT}` : ""}${isDev ? " 'unsafe-eval'" : ""}`,
     // Production: stylesheets only from our origin (no inline styles, no style attributes).
     `style-src 'self'${isDev ? " 'unsafe-inline'" : ""}`,
     `img-src 'self' data: blob:${filesOrigin ? ` ${filesOrigin}` : ""}`,
@@ -69,10 +81,11 @@ export function buildContentSecurityPolicy(options: CspOptions): string {
     // posts uploads straight to the presigned storage URL (docs/07 §10: presigned POST; the
     // BFF never carries file bodies). Lead decision 2026-09-27, recorded in docs/07 §11.
     // `next dev` uses a websocket for hot reload.
-    `connect-src 'self'${filesOrigin ? ` ${filesOrigin}` : ""}${isDev ? " ws: wss:" : ""}`,
+    `connect-src 'self'${filesOrigin ? ` ${filesOrigin}` : ""}${meta ? ` ${META_CONNECT}` : ""}${isDev ? " ws: wss:" : ""}`,
     "font-src 'self'",
     "object-src 'none'",
     "base-uri 'none'",
+    ...(meta ? [`frame-src ${META_FRAMES}`] : []),
     "frame-ancestors 'none'",
     "form-action 'self'",
   ];
@@ -84,6 +97,11 @@ export interface SecurityHeaderOptions {
   csp: string;
   /** Send HSTS only when the app is served over https. */
   hsts: boolean;
+  /**
+   * `same-origin-allow-popups` on the Embedded Signup page: Meta's sign-up window must be able
+   * to post its result back to the page that opened it (R2-1C). `same-origin` everywhere else.
+   */
+  allowPopups?: boolean;
 }
 
 export function securityHeaders(options: SecurityHeaderOptions): Record<string, string> {
@@ -92,7 +110,7 @@ export function securityHeaders(options: SecurityHeaderOptions): Record<string, 
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Permissions-Policy": "camera=(self), microphone=(), geolocation=(), payment=()",
-    "Cross-Origin-Opener-Policy": "same-origin",
+    "Cross-Origin-Opener-Policy": options.allowPopups ? "same-origin-allow-popups" : "same-origin",
     "Cross-Origin-Resource-Policy": "same-origin",
   };
   if (options.hsts) {

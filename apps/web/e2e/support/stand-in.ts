@@ -313,6 +313,7 @@ const TENANT = {
     ai_memory_enabled: true,
     operating_mode: "full",
     current_erp_name: "",
+    fees_enabled: false,
     parent_language: "en",
   },
   version: 7,

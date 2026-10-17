@@ -282,6 +282,8 @@ NON_UUID_PATH_PARAMS = {
     ("GET", "/api/v1/dq/readiness/{profile_key}/students/{student_id}", "profile_key"),
     ("POST", "/api/v1/dq/readiness/{profile_key}/runs", "profile_key"),
     ("GET", "/api/v1/dq/readiness/{profile_key}/slips", "profile_key"),
+    # R2-1A: a certificate verification code (ADR-0045), bounded; the guard shape-checks it.
+    ("GET", "/api/v1/public/certificates/{code}", "code"),
 }
 
 
@@ -323,6 +325,12 @@ RESPONSE_FIELD_ALLOWLIST = {
     "app.certificates.schemas.ContentLine.key": "printed field code",
     "app.certificates.schemas.Blocker.attribute_key": "attribute catalog key",
     "app.certificates.schemas.PreviewWarning.attribute_key": "attribute catalog key",
+    # R2-1A (ADR-0045): TC format codes and printed line codes.
+    "app.certificates.schemas.CertificateFormatOut.key": "TC format code",
+    "app.certificates.schemas.FormatLineOut.key": "printed line code",
+    "app.certificates.schemas.CertificateTypeOut.format_key": "TC format code",
+    "app.certificates.schemas.CertificatePreview.format_key": "TC format code",
+    "app.certificates.schemas.CertificateOut.format_key": "TC format code",
     "app.dq.schemas.FindingOut.attribute_key": "attribute catalog key",
     "app.dq.schemas.FindingValue.attribute_key": "attribute catalog key",
     "app.dq.schemas.FindingOut.profile_key": "DQ profile code",
@@ -337,6 +345,9 @@ RESPONSE_FIELD_ALLOWLIST = {
     "app.imports.schemas.PresetOut.key": "import template library code (ADR-0041)",
     "app.insights.schemas.RuleSettingOut.key": "rule code",
     "app.notifications.schemas.NotificationOut.template_key": "i18n template key",
+    # R2-1C (ADR-0043): catalogue template codes of WhatsApp messages, not secrets.
+    "app.messaging.schemas.MessagingTemplateOut.template_key": "message catalogue code",
+    "app.messaging.schemas.MessagingMessageOut.template_key": "message catalogue code",
     "app.identity.schemas.PermissionOut.key": "permission key",
     "app.identity.schemas.RoleOut.key": "role key",
     "app.platform.schemas.FlagOut.key": "feature flag key",
@@ -404,6 +415,15 @@ IDEMPOTENCY_EXEMPT = {
     ("POST", "/api/v1/platform/audit/verify"): "re-runs a read-only verification",
     ("POST", "/api/v1/audit/verify"): "queues a read-only verification; a queued one is not "
     "queued twice (R-19)",
+    # R2-1C WhatsApp (ADR-0043).
+    ("POST", "/api/v1/webhooks/meta"): "machine route; signed, replayed bodies and event keys "
+    "are deduplicated",
+    ("POST", "/api/v1/messaging/account/resume"): "a state transition (409 when not paused)",
+    ("POST", "/api/v1/messaging/templates/sync"): "re-reads Meta; creating is idempotent per "
+    "template name",
+    ("POST", "/api/v1/messaging/join-slips"): "a print view; each print makes new single-use "
+    "codes by design",
+    ("POST", "/api/v1/messages/search"): "a read (POST keeps ids out of URLs)",
     ("POST", "/api/v1/platform/tenants/{tenant_id}/offboarding"): "a state transition (409 on "
     "repeat)",
     ("POST", "/api/v1/platform/tenants/{tenant_id}/owner-invite:resend"): "re-sends the same "
@@ -432,6 +452,12 @@ IDEMPOTENCY_EXEMPT = {
     # FR-STU-018 (ADR-0039): a lookup like POST /students/search, numbers kept out of the URL.
     ("POST", "/api/v1/students/national-id-check"): "read-only lookup (the PEN or APAAR ID "
     "travels in the body, SEC-008); nothing is created",
+    # R2-1B fees (ADR-0042).
+    ("POST", "/api/v1/fees/plans/{plan_id}/apply"): "idempotent by design: accounts and charges "
+    "are unique per student and line, a repeat posts nothing",
+    ("POST", "/api/v1/fees/plans/{plan_id}/adjustments"): "idempotent by design: one proposal per "
+    "account, instalment, head and plan version",
+    ("POST", "/api/v1/fees/day-closes"): "a state transition (409 day_closed on repeat)",
 }
 
 

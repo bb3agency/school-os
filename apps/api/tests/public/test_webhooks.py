@@ -174,12 +174,17 @@ def test_SEC_040_registry_refuses_fakes_in_production_and_duplicates() -> None:
     prod = Settings.model_construct(env=Environment.PROD)
     with pytest.raises(RegistryError, match="refused"):
         webhooks.register_webhook_verifier(FakeWebhookVerifier("meta", SECRET), settings=prod)
+    # The API factory registers the real Meta verifier (R2-1C); set it aside for this check.
+    real_meta = webhooks.webhook_verifier("meta")
+    webhooks.unregister_webhook_verifier("meta")
     webhooks.register_webhook_verifier(FakeWebhookVerifier("meta", SECRET))
     try:
         with pytest.raises(RegistryError, match="already registered"):
             webhooks.register_webhook_verifier(FakeWebhookVerifier("meta", SECRET))
     finally:
         webhooks.unregister_webhook_verifier("meta")
+        if real_meta is not None:
+            webhooks.register_webhook_verifier(real_meta)
     with pytest.raises(RegistryError, match="unknown webhook provider"):
         webhooks.register_webhook_verifier(FakeWebhookVerifier("paypal", SECRET))  # type: ignore[arg-type]
     with pytest.raises(ValueError, match="unknown webhook provider"):

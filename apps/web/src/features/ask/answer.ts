@@ -62,15 +62,41 @@ export interface AskStepRecord {
   count: number | null;
 }
 
-/** `kb.errors.*` message keys the API sends in the `error` event (docs/09 Knowledge error codes). */
+/**
+ * `kb.errors.*` message keys the API sends in the `error` event (docs/09 Knowledge error codes),
+ * plus `unchecked`: a search-only answer without an error (the model answered, but its text
+ * could not be checked against the passages, docs/06 §9), FR-KB-041.
+ */
 export const KB_MESSAGES = [
   "budget",
   "disabled",
   "rate_limited",
   "unavailable",
   "internal",
+  "unchecked",
 ] as const;
 export type KbMessage = (typeof KB_MESSAGES)[number];
+
+/** Why a stored answer is search-only (MessageOut.search_only_reason; FR-KB-041). */
+export type SearchOnlyReason = NonNullable<ConversationMessage["search_only_reason"]>;
+
+const REASON_NOTICE: Record<SearchOnlyReason, KbMessage> = {
+  ai_budget_exhausted: "budget",
+  ai_disabled: "disabled",
+  ai_rate_limited: "rate_limited",
+  ai_unavailable: "unavailable",
+  answer_unchecked: "unchecked",
+};
+
+/** The `kbErrors.*` message for an API reason code; null without one. */
+export function noticeOfReason(reason: SearchOnlyReason | null | undefined): KbMessage | null {
+  return reason ? REASON_NOTICE[reason] : null;
+}
+
+/** The explanation of a search-only answer: its notice, else "could not be checked". */
+export function searchOnlyNotice(state: Pick<AskState, "notice">): KbMessage {
+  return state.notice ?? "unchecked";
+}
 
 export interface AskState {
   phase: AskPhase;
@@ -384,6 +410,19 @@ export function sourceHref(ref: SourceRef): string | null {
 }
 
 /**
+ * A `sos://` source this build cannot parse (a newer kind): `GET /knowledge/resolve` opens it
+ * (FR-KB-042). Anything else is not a source and gets no link at all.
+ */
+export function needsResolve(source: string): boolean {
+  return /^sos:\/\/[a-z]{1,32}\/[^\s]{1,280}$/.test(source) && parseSource(source) === null;
+}
+
+/** An app-relative path (`/…`, never `//host` or a scheme): the only targets we navigate to. */
+export function isSafeAppPath(href: string): boolean {
+  return /^\/(?![/\\])[^\s]*$/.test(href);
+}
+
+/**
  * Text to prefill a verified-answer citation from an Ask citation: the snippet is at most 300
  * characters of the cited text and ends in "…" when shortened; the API checks the quote against
  * the page text, so the ellipsis is dropped.
@@ -442,7 +481,7 @@ export function stateFromMessage(
       snippet: c.snippet ?? "",
       ...(c.withheld ? { withheld: true } : {}),
     })),
-    notice: extras?.notice ?? null,
+    notice: extras?.notice ?? noticeOfReason(message.search_only_reason),
     latencyMs: extras?.latencyMs ?? null,
     steps: extras?.steps ?? [],
     followups: withheld ? [] : message.followups,

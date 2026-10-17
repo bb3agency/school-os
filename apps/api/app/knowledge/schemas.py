@@ -200,6 +200,14 @@ class MessageCitationOut(_Out):
     )
 
 
+SearchOnlyReason = Literal[
+    "ai_budget_exhausted", "ai_disabled", "ai_rate_limited", "ai_unavailable", "answer_unchecked"
+]
+"""Why an answer is search-only (FR-KB-041): the stream's ``error`` type, with the provider
+failures folded into ``ai_unavailable``; ``answer_unchecked`` when the model answered but its
+text could not be checked against the passages (docs/06 §9), so only the passages are shown."""
+
+
 class MessageOut(_Out):
     query_id: uuid.UUID
     question: str
@@ -226,6 +234,10 @@ class MessageOut(_Out):
     summarized: bool = Field(
         default=False,
         description="Earlier messages of the conversation reached the model as a summary only.",
+    )
+    search_only_reason: SearchOnlyReason | None = Field(
+        default=None,
+        description="Why the answer is search-only (null unless mode is search_only).",
     )
 
 
@@ -305,3 +317,54 @@ __all__ = [
     "VerifiedCitationOut",
     "VerifiedStatus",
 ]
+
+
+# --- Ask finish-up (R2.4; FR-KB-040..042) -----------------------------------------------------
+
+UsageState = Literal["ok", "near_limit", "search_only"]
+
+
+class UsageOut(_Out):
+    """This month's AI answers for the school (``GET /knowledge/usage``, FR-KB-040).
+
+    ``state`` is for everyone with ``kb.ask``; the numbers only for ``tenant.billing.read``
+    holders (null for everyone else). Never tokens or money."""
+
+    month: str = Field(
+        pattern=r"^[0-9]{4}-[0-9]{2}$", description="The calendar month in IST (YYYY-MM)."
+    )
+    state: UsageState = Field(
+        description="ok; near_limit from 80% of the monthly AI budget or of the included "
+        "answers; search_only when Ask answers with matching passages only."
+    )
+    search_only_reason: Literal["ai_budget_exhausted", "ai_disabled", "ai_unavailable"] | None = (
+        Field(default=None, description="Why answers are search-only (null unless search_only).")
+    )
+    answers_used: int | None = Field(
+        default=None,
+        ge=0,
+        description="Billable answers this month so far (ADR-0038 decision 4). Null unless "
+        "you hold tenant.billing.read.",
+    )
+    included_answers: int | None = Field(
+        default=None,
+        ge=1,
+        description="Answers a month in the school's AI answer bundle. Null without a bundle, "
+        "or unless you hold tenant.billing.read.",
+    )
+
+
+ResolveKind = Literal[
+    "doc", "student", "finding", "change", "verified", "count", "fee", "conversation"
+]
+
+
+class ResolveOut(_Out):
+    """Where a ``sos://`` source opens (``GET /knowledge/resolve``, FR-KB-042)."""
+
+    kind: ResolveKind
+    id: uuid.UUID = Field(description="The source's object id (document, student, ...).")
+    href: str | None = Field(
+        description="App-relative path of the screen that opens it (no locale prefix); null "
+        "when the source has no screen (a student count)."
+    )

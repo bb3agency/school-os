@@ -13,3 +13,15 @@ sources:
   dq.readiness_slip: {reviewed: false}
   # R2-0 public page shell (apps/web messages te.json "public" namespace).
   public.shell: {reviewed: false}
+  # --- R2-1C messaging (ADR-0043): the Telugu WhatsApp templates, free-form replies and the
+  # printed join slip (app/messaging/templates.yaml; tests/messaging pins these keys to its te
+  # `reviewed` flags).
+  messaging.template.optin_confirm: {reviewed: false}
+  messaging.template.school_notice: {reviewed: false}
+  messaging.template.absence_alert: {reviewed: false}
+  messaging.template.fee_reminder: {reviewed: false}
+  messaging.template.fee_receipt: {reviewed: false}
+  messaging.text.optin_stopped: {reviewed: false}
+  messaging.text.auto_reply: {reviewed: false}
+  messaging.text.auto_reply_no_phone: {reviewed: false}
+  messaging.slip: {reviewed: false}

@@ -23,10 +23,12 @@ from app.core.logging import bind_task_context, clear_context, reset_context, se
 from app.core.telemetry import setup_telemetry
 from app.documents.tasks import beat_schedule as documents_beat_schedule
 from app.exports.tasks import beat_schedule as exports_beat_schedule
+from app.fees.tasks import beat_schedule as fees_beat_schedule
 from app.imports.tasks import beat_schedule as imports_beat_schedule
 from app.insights.tasks import beat_schedule as insights_beat_schedule
 from app.knowledge.service import check_provider_agreements
 from app.knowledge.tasks import beat_schedule as knowledge_beat_schedule
+from app.messaging.tasks import beat_schedule as messaging_beat_schedule
 from app.notifications.tasks import beat_schedule as notifications_beat_schedule
 from app.ops.tasks import beat_schedule as ops_beat_schedule
 from app.platform.tasks import beat_schedule as platform_beat_schedule
@@ -49,9 +51,11 @@ import app.documents.service  # isort: skip
 import app.dq.service  # isort: skip
 import app.exports.service  # isort: skip
 import app.extraction.service  # isort: skip
+import app.fees.service  # isort: skip
 import app.imports.service  # isort: skip
 import app.insights.service  # isort: skip
 import app.knowledge.service  # isort: skip
+import app.messaging.service  # isort: skip
 import app.notifications.service  # isort: skip
 import app.ops.service  # isort: skip
 import app.public.service  # isort: skip
@@ -82,6 +86,10 @@ TASK_MODULES: list[str] = [
     "app.insights.tasks",
     "app.tally.tasks",
     "app.public.tasks",
+    # R2-1C WhatsApp messaging (ADR-0043): inbox, template provisioning, sync, retention.
+    "app.messaging.tasks",
+    # R2-1B fees: receipt PDFs (queue pdf) and nightly late fees.
+    "app.fees.tasks",
 ]
 
 
@@ -141,6 +149,9 @@ def create_celery() -> Celery:
             "offboarding.certify": {"queue": "pdf"},
             # FR-CERT-010: certificate PDFs render on the Chromium workers.
             "certificates.render": {"queue": "pdf"},
+            # FR-FEE-011: receipt PDFs on the Chromium workers; FR-FEE-009 late fees nightly.
+            "fees.render_receipt": {"queue": "pdf"},
+            "fees.post_late_fees": {"queue": "maintenance"},
             "exports.purge_expired": {"queue": "maintenance"},
             # FR-ADM-001: the school's full data export on "exports"; the hourly purge of
             # archives past their 24 hours on "maintenance".
@@ -177,6 +188,9 @@ def create_celery() -> Celery:
             "insights.purge_expired": {"queue": "maintenance"},
             # M6 (FR-TALLY-009): silent Tally agents and sync-record retention.
             "tally.check_silent_agents": {"queue": "maintenance"},
+            # R2-1C (FR-MSG-010, FR-MSG-020): webhook inbox, template provisioning, sends and
+            # sync are short provider and database calls.
+            "messaging.*": {"queue": "maintenance"},
         },
         beat_schedule={
             # FR-AUD-004: 02:00 IST signed archive, then chain verification (SEC-007).
@@ -215,6 +229,11 @@ def create_celery() -> Celery:
             **tally_beat_schedule(),
             # FR-PUB-006: expired parent link handles deleted 30 days after expiry (daily).
             **public_beat_schedule(),
+            # FR-MSG-006, FR-MSG-020, FR-MSG-021, FR-MSG-023: webhook inbox sweep (1 min),
+            # account and template sync (hourly), retention (daily). Off while messaging is off.
+            **messaging_beat_schedule(),
+            # FR-FEE-009 (R2-1B): late fees posted once each, nightly at 00:30 IST.
+            **fees_beat_schedule(),
             # FR-PLT-*: control-plane jobs on shared; heartbeat client on dedicated (ADR-0017).
             **platform_beat_schedule(settings),
         },

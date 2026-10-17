@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Pill } from "@/components/ui/Badge";
@@ -40,6 +40,22 @@ export function useCertificateTypes() {
 /** A label in the reader's language (the API sends both). */
 export function localLabel(item: { label_en: string; label_te: string }, locale: string): string {
   return locale === "te" && item.label_te ? item.label_te : item.label_en;
+}
+
+/**
+ * An input's label: the catalogue's own words for the inputs the web knows (`inputs.*`), else
+ * the label the API sends (format inputs such as the AP TC's; R2-1A, FR-CERT-016).
+ */
+export function useInputLabel() {
+  const t = useTranslations("certificates");
+  const locale = useLocale();
+  return (input: { key: string; label_en?: string; label_te?: string }): string => {
+    const key = `inputs.${input.key}` as "inputs.remarks";
+    if (t.has(key)) return t(key);
+    return input.label_en
+      ? localLabel({ label_en: input.label_en, label_te: input.label_te ?? "" }, locale)
+      : input.key;
+  };
 }
 
 /** "Choice value → label" for the inputs a certificate was requested with. */

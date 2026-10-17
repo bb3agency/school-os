@@ -505,7 +505,8 @@ export function DocumentDetailScreen({ documentId }: { documentId: string }) {
   const canManage = can(DOCUMENT_PERM.manage);
   const archived = doc.status === "archived";
   // Import files and generated certificate PDFs never get a new version (FR-CERT-010).
-  const uploadPurpose = doc.purpose === "certificate" ? null : doc.purpose;
+  const uploadPurpose =
+    doc.purpose === "certificate" || doc.purpose === "fee_receipt" ? null : doc.purpose;
   const canUpload =
     can(DOCUMENT_PERM.upload) &&
     uploadPurpose !== null &&

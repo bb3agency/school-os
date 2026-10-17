@@ -35,7 +35,7 @@ from __future__ import annotations
 import json
 import re
 import time
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from fastapi import FastAPI
@@ -237,12 +237,18 @@ class BodySizeLimitMiddleware:
         *,
         max_body_bytes: int = DEFAULT_MAX_BODY_BYTES,
         max_multipart_bytes: int = DEFAULT_MAX_MULTIPART_BYTES,
+        path_limits: Mapping[str, int] | None = None,
     ) -> None:
         self.app = app
         self.max_body_bytes = max_body_bytes
         self.max_multipart_bytes = max_multipart_bytes
+        # Exact paths with their own limit (provider webhooks whose guard checks the provider's
+        # size, e.g. Meta's 3 MB deliveries; R2-1C).
+        self.path_limits = dict(path_limits or {})
 
-    def _limit_for(self, headers: Headers) -> int:
+    def _limit_for(self, headers: Headers, path: str = "") -> int:
+        if path in self.path_limits:
+            return self.path_limits[path]
         content_type = headers.get("content-type", "").lower()
         if content_type.startswith("multipart/form-data"):
             return self.max_multipart_bytes
@@ -263,7 +269,7 @@ class BodySizeLimitMiddleware:
             await self.app(scope, receive, send)
             return
         headers = Headers(scope=scope)
-        limit = self._limit_for(headers)
+        limit = self._limit_for(headers, str(scope.get("path", "")))
         declared = headers.get("content-length")
         if declared is not None and declared.isdigit() and int(declared) > limit:
             await self._reject(scope, receive, send, limit)
@@ -472,6 +478,7 @@ def install_middleware(
     max_body_bytes: int = DEFAULT_MAX_BODY_BYTES,
     max_multipart_bytes: int = DEFAULT_MAX_MULTIPART_BYTES,
     quiet_paths: Iterable[str] = ("/healthz", "/readyz"),
+    path_body_limits: Mapping[str, int] | None = None,
 ) -> None:
     """Add the middleware in the right order (outermost last): headers > context > rate limit >
     body limit > text-direction check."""
@@ -485,6 +492,7 @@ def install_middleware(
         BodySizeLimitMiddleware,
         max_body_bytes=max_body_bytes,
         max_multipart_bytes=max_multipart_bytes,
+        path_limits=path_body_limits,
     )
     app.add_middleware(RateLimitMiddleware, settings=settings)
     app.add_middleware(RequestContextMiddleware, quiet_paths=quiet_paths)

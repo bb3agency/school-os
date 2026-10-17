@@ -203,7 +203,7 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | export.read_all (see every export's details, not its files; ADR-0021) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
 | export.download_any (download other staff's exports; ADR-0021) | ✓ᴿ | — | — | — | — | — | — | — | — |
 | audit.read | ✓ | ✓ | ✓ | — | — | — | — | — | ✓ |
-| finance.read (M6) | ✓ | ✓ | — | — | ✓ | — | — | — | ✓ |
+| finance.read (M6; from R2-1B also fee accounts, dues, the daily collection report and plans) | ✓ | ✓ | — | — | ✓ | — | — | — | ✓ |
 | insights.read (M5: see behaviour notes, flags, indicators and the student timeline; educational roles only, 08 PRV-004, so not the owner; also needs student.read_sensitive in the same scope; proposed, PO to confirm) | — | ✓ | — | — | — | — | S | — | — |
 | insights.note (M5: write behaviour notes) | — | ✓ | — | — | — | — | S | — | — |
 | insights.act (M5: record actions on flags, raise and close flags) | — | ✓ | — | — | — | — | S | — | — |
@@ -229,6 +229,17 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | task.manage (M4: create, assign, change, cancel tasks) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
 | notice.draft (M4: draft and edit parent notices, download approved ones) | ✓ | ✓ | ✓ | ✓ | — | — | — | — | — |
 | notice.approve (M4: approve parent notices) | ✓ | ✓ | — | — | — | — | — | — | — |
+| messaging.configure (R2-1C: connect or disconnect WhatsApp, sync templates, switches and times, resume after a pause; ADR-0043) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
+| messaging.optin.record (R2-1C: record opt-in/opt-out with evidence, print join slips) | — | ✓ | ✓ | ✓ | — | — | S | — | — |
+| message.read (R2-1C: delivery log, message history, opt-in states) | ✓ | ✓ | ✓ | ✓ | ✓ | — | S | — | ✓ |
+| fee.collect (R2-1B: take payments at the counter, issue receipts, request receipt cancellations; fee permissions are school-wide only, FR-FEE-024) | — | ✓ | ✓ | ✓ | ✓ | — | — | — | — |
+| fee.manage (R2-1B: fee heads, plans, applying plans, adjustment requests, fee settings, day close) | — | ✓ | — | — | ✓ | — | — | — | — |
+| fee.concession.request (R2-1B) | — | ✓ | ✓ | — | ✓ | — | — | — | — |
+| fee.concession.approve (R2-1B: concessions and adjustments; maker-checker; principal or accountant, D17) | — | ✓ᴿ | — | — | ✓ᴿ | — | — | — | — |
+| fee.receipt.cancel (R2-1B: approve a receipt cancellation; maker-checker; principal or accountant, D17) | — | ✓ᴿ | — | — | ✓ᴿ | — | — | — | — |
+| fee.refund.request (R2-1B) | — | ✓ | — | — | ✓ | — | — | — | — |
+| fee.refund.approve (R2-1B: maker-checker; principal or accountant, D17) | — | ✓ᴿ | — | — | ✓ᴿ | — | — | — | — |
+| fee.report (R2-1B: download the day book and dues lists, bulk personal financial data) | ✓ᴿ | ✓ᴿ | — | — | ✓ᴿ | — | — | — | ✓ᴿ |
 
 `auditor_readonly` memberships are time-bound (default 14 days) and read-only.
 
@@ -317,10 +328,11 @@ Platform roles belong to SchoolOS staff (operators), not to schools (ADR-0013). 
 | fee.reconcile (bank statement import, UPI confirmations, reconciliation items) | — | ✓ | — | — | ✓ | — | — | — | — |
 | fee.report (download the day book and dues lists: bulk personal financial data) | ✓ᴿ | ✓ᴿ | — | — | ✓ᴿ | — | — | — | ✓ᴿ |
 | payments.configure (connect, rotate, disconnect the school's Razorpay account) | ✓ᴿ | — | — | — | — | — | — | — | — |
-| messaging.configure (connect WhatsApp, switches, times, resume after a pause) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
-| messaging.optin.record (record opt-in/opt-out with evidence, print join slips) | — | ✓ | ✓ | ✓ | — | — | S | — | — |
-| message.send (send an approved notice, resend, revoke a parent link) | — | ✓ | ✓ | — | — | — | — | — | — |
-| message.read (delivery reports and message history) | ✓ | ✓ | ✓ | ✓ | ✓ | — | S | — | ✓ |
+| message.send (send an approved notice, resend, revoke a parent link; wave R2-3G) | — | ✓ | ✓ | — | — | — | — | — | — |
+
+`messaging.configure`, `messaging.optin.record` and `message.read` moved to the §6.2 matrix when wave R2-1C built them (2026-10-17, migration `0057_messaging_core`).
+
+**R2-1B (2026-10-18):** the eight `fee.*` keys of the table above except `fee.reconcile` (R2-2E) are in the catalog, `roles.yaml` and the §6.2 matrix; every fee route requires them school-wide (a section-scoped custom role holding `fee.collect` gets 403). `finance.read` now also reads fee accounts, plans, dues and the daily report. `payments.configure` (R2-2D) and the messaging keys (R2-1C) stay planned here.
 
 Unchanged keys used by R2: `certificate.approve`ᴿ (add or withdraw a verification code), `tenant.settings.manage`ᴿ (parent language, TC format), `student.update_nonidentity` (guardian language), `tenant.billing.read` (AI answer usage numbers).
 
@@ -444,6 +456,10 @@ R2 adds the first internet-facing routes that take no staff session: parent link
 | Opt-in fraud (someone opts in another parent's number) | Join code is single-use and accepted only from the guardian's own number (blind-index match); `in_person` opt-ins name the recorder; STOP always wins |
 
 **As built in R2-0 (2026-10-17).** Guards carry the pseudo-permissions `public.handle`, `public.webhook`, `public.meta_verify` (not in the catalog, not grantable) and are pinned to `app/public/public_routes.yaml` by `tests/security/test_route_enumeration.py` (unlisted, misplaced and unguarded public routes fail; synthetic-app self-tests). `require_public_handle` refuses a user token and a missing service token (401), checks room in `public_lookup_fail` before any lookup (`ratelimit.ensure_room`: a used-up budget refuses even a valid key, so it cannot be used as an oracle), charges the failure (cost 2) after a miss and `public_token` per handle after a hit; every dead key gets the same 404 body (no `detail`). The webhook guard looks up the provider's registered verifier (404 while none), enforces the provider's body limit (413), answers 401 without detail for a bad signature and 404 for an unknown route, charges `webhook_route` per route handle and marks replayed event ids `duplicate` (Valkey `SET NX`, 72 h; Valkey down = 503). The parent cookie carries the token itself (`__Host-sos_parent`, HttpOnly, Secure, SameSite=Lax); the BFF sends it to the API in `X-SOS-Public-Token`, never in a URL. Unlinking a guardian or changing their phone revokes their open parent links. Tests in `apps/api/tests/public/` and `tests/security/`.
+
+**As built in R2-1A (2026-10-17; ADR-0045).** Certificate verification codes are 80 random bits (Crockford base32, `secrets.randbits`), never derived from the serial, student or school; only their SHA-256 is the `cert_verify` handle key; the printed code is kept in `sis.certificate_verifications` (not readable by `sos_readonly`) and never written to audit summaries or logs (`tests/certificates/test_verification.py::test_SEC_037_codes_never_reach_the_logs`). `GET /api/v1/public/certificates/{code}` is pinned in `public_routes.yaml` with `require_public_handle("cert_verify")`; every lookup first spends `cert_verify_ip` (20 / 600 s per IP, fail closed, before the resolve: a used-up budget answers 429 for any code), misses also spend `public_lookup_fail`; unknown, mistyped, withdrawn and malformed codes get the same 404 body; the route re-reads handle, code and certificate under RLS and returns only the frozen printed content (none for a cancelled certificate or a copy of a cancelled original). Withdrawing a code (`certificate.approve`ᴿ, `If-Match`) revokes its handle in the same transaction. The web serves `/v` only on `VERIFY_BASE_URL` (the proxy answers 404 for `/v` on the staff and parent hosts and for staff or parent paths on the verification host, except a dedicated host where the parent and verification origins are the school's own) with the public CSP and no-leak headers; the code box posts to `/v/check`, which only normalises and redirects (303) to `/v/{code}`. Printing religion and caste (`print_restricted_tc_fields`) is a per-school exception to FR-CERT-009 for the TC only, changed with `tenant.settings.manage`ᴿ and audited with the field keys; the values are never logged.
+
+**As built in R2-1C (2026-10-17).** `require_webhook_signature("meta")` uses `app.messaging.webhook.MetaWebhookVerifier`, registered by the API factory: `X-Hub-Signature-256` `sha256=` + HMAC-SHA256 of the raw body with `SOS_META_APP_SECRET` (read per call; unset = every delivery 401), constant-time compare, `object = whatsapp_business_account` required, each `entry[].id` resolved through the `meta_waba` handle (unknown ones dropped and counted). The API's body-size middleware allows `/api/v1/webhooks/meta` up to Meta's 3 MB (`app/public/config.yaml`), other routes keep 1 MiB. Events are re-checked under RLS against the school's live account and its handle before they are stored. Meta's SDK is loaded only on `/settings/whatsapp`, whose CSP adds `connect.facebook.net` (script), `www/web.facebook.com` (frames) and `graph.facebook.com` (connect) and whose `Cross-Origin-Opener-Policy` is `same-origin-allow-popups` (the sign-up window posts back to the opener); every other page is unchanged. Tests: `apps/api/tests/messaging/test_webhook.py` (valid, invalid, missing, tampered, other school's WABA, unknown WABA, replay, fake verifier, 3 MB limit, challenge), `test_api.py` (log capture: no phone, token, app secret or message text).
 
 Tests (planned, `apps/api/tests/security/`): route enumeration with the new guards and allowlist; uniform 404 shape and timing band for unknown/expired/revoked handles; rate-limit behaviour; signature tests (valid, invalid, wrong school's secret, rotated secret, replayed event id, oversized body); resolver catalog and isolation tests; no token in any log line (log capture test); public responses are field allowlists (snapshot tests).
 

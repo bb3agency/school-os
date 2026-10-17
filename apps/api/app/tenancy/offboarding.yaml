@@ -5,8 +5,18 @@ version: 1
 # tenant_data_counts / purge_tenant_data with app.tenancy.service at import time. The purge
 # refuses to start when any of them is not registered (fail closed).
 purge_order:
-  # R2-0 (ADR-0047): public handles first (they reference guardians and the school's keys'
-  # tenant); R2 fees and messaging insert themselves after it, before students (docs/05 §15.6).
+  # R2-1A (ADR-0045): certificates before public, because sis.certificate_verifications
+  # references core.public_handles (certificates reference only students, documents and the
+  # academic structure, all purged later).
+  - certificates
+  # R2-1C (ADR-0043): messaging rows reference public handles, guardians and students, so they
+  # go first.
+  - messaging
+  # R2-1B (ADR-0042): the fee ledger references students, documents, the structure and
+  # members, so it goes before all of them (and before public, like every R2 module).
+  - fees
+  # R2-0 (ADR-0047): public handles next (they reference guardians and the school's keys'
+  # tenant), before students (docs/05 §15.6).
   - public
   - tally
   - circulars
@@ -16,7 +26,6 @@ purge_order:
   - extraction
   - dq
   - changes
-  - certificates
   - apaar
   - students
   - imports

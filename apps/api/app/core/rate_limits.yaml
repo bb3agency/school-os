@@ -140,6 +140,12 @@ policies:
   # check; machine_ip covers the address before it.
   webhook_route:
     {quota: 600, window_s: 60, per: handle, fail: closed, report: false, weighted: false}
+  # --- R2-1A certificates (ADR-0045 decision 7; US-2003 AC4). Every certificate lookup from one
+  # address, charged by app/certificates/api.py before the guard resolves anything (a used-up
+  # budget refuses valid and invalid codes alike); failed lookups also spend public_lookup_fail.
+  cert_verify_ip:
+    {quota: 20, window_s: 600, per: ip, fail: closed, report: true, weighted: false}
+  # --- end R2-1A
 
 # Route template (method + path, as in openapi.json) -> stricter per-route policies. A test fails
 # when a key is not a route, when an expensive-looking route (export, import, upload, search,
@@ -203,9 +209,22 @@ routes:
   POST /api/v1/platform/invoice-runs: [platform_emergency]
   # audit-chain verification (R-19)
   POST /api/v1/platform/audit/verify: [platform_audit_verify]
+  # R2-1B fees (ADR-0042): counter search, print views, CSV downloads, applying a plan
+  POST /api/v1/fees/accounts/search: [search]
+  GET /api/v1/fees/receipts/{receipt_id}/print: [render]
+  POST /api/v1/fees/receipts/{receipt_id}/render: [render]
+  GET /api/v1/fees/reports/daily/print: [render]
+  GET /api/v1/fees/refunds/{refund_id}/print: [render]
+  GET /api/v1/fees/reports/daily.csv: [exports]
+  GET /api/v1/fees/dues.csv: [exports]
+  POST /api/v1/fees/plans/{plan_id}/apply: [heavy_jobs]
   # support tickets
   POST /api/v1/support/tickets: [support_tickets]
   POST /api/v1/platform/support/tickets: [support_tickets]
+  # --- R2-1C messaging (ADR-0043): delivery-log search and printed join slips ---------------
+  POST /api/v1/messages/search: [search]
+  POST /api/v1/messaging/join-slips: [render]
+  GET /api/v1/sections/{section_id}/join-slips: [render]
   # break-glass (generous)
   POST /api/v1/breakglass/support-session: [emergency]
   POST /api/v1/breakglass/grants/{grant_id}/revoke: [emergency]

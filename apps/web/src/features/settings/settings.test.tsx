@@ -34,6 +34,7 @@ const SETTINGS = {
   ai_monthly_budget_inr: 5000,
   operating_mode: "full" as const,
   current_erp_name: "",
+  fees_enabled: false,
   parent_language: "en" as const,
 };
 const TENANT = {

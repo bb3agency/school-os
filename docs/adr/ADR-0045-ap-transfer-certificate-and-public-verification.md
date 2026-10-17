@@ -45,3 +45,17 @@ Receiving schools, employers and boards cannot check a paper TC today except by 
 ## Related requirements
 
 FR-CERT-015..024 (docs/03 §3.18), FR-PUB-001..004, SEC-036, SEC-039, PRV-029; US-2001..US-2006 (docs/02 C20). Docs: 05 §15.4, 07 §11.2, 09 §4 "Public", 17 §5.8.
+
+## Follow-up (2026-10-17, wave R2-1A built)
+
+Built as decided in migration `0056_certificate_verifications` and `app/certificates/` (`formats/ap-tc-2027.yaml`, `formats.py`, `codes.py`, `qr.py`, template `v2`), with the public route `GET /api/v1/public/certificates/{code}` behind `require_public_handle("cert_verify")` and the web pages `/v`, `/v/check` and `/v/{code}` on `VERIFY_BASE_URL`. Refinements:
+
+- **Alphabet.** "32 characters without `0 O 1 I L U`" leaves 30 symbols (78.5 bits for 16 characters). The code uses Crockford's base32 (`0-9`, `A-Z` without `I L O U`): 32 symbols, exactly 80 bits. Look-alikes are handled when a code is typed (`O` reads as `0`, `I`/`L` as `1`; dashes, spaces and case ignored), so a misread paper still finds its certificate.
+- **Lookup budget.** Decision 7's "20 lookups per 10 minutes, failed lookups count double" is two budgets: `cert_verify_ip` (20 / 600 s per IP, every lookup, charged before the guard resolves anything, so a used-up budget answers 429 for valid and invalid codes alike) and R2-0's `public_lookup_fail` (failures, cost 2).
+- **Codes and the verification host.** Every certificate and duplicate gets a code at issue; the code, QR and "Check this certificate at <host>/v" are printed only while `SOS_VERIFY_BASE_URL` is set (a school without the host prints nothing it cannot honour).
+- **Adding a code later** is refused (`409 verification_exists`) once a certificate has, or had, a code: the paper of a withdrawn code is replaced by a duplicate, which gets its own code.
+- **PEN and APAAR lines** that may not be printed show "—" (never a blank invitation to write the number in by hand); the restricted lines (religion, caste) are labelled blanks unless the school turned on `print_restricted_tc_fields`.
+- **No fee line on any TC** (D16): the generic format's "Month up to which fees were paid" blank was removed with template `v2`; a format file whose line mentions fees or dues is refused at load.
+- **Format versions.** A pending TC prepared on a format version that changed before approval is refused (`409 certificate_format_changed`); the issued certificate stores `format_key`, `format_version` and its frozen content.
+- **Purge order.** `certificates` purges before `public` (the verification table references the handle).
+- **Open:** the fee note on the TC preview (FR-CERT-025) waits for `fees.service` (wave R2-1B); Playwright for `/v` waits for the hardening wave (R2-3I) with the public stand-in; the AP layout is unconfirmed until a pilot school compares it with its TC book (D3).

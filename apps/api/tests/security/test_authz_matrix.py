@@ -17,6 +17,7 @@ from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
 from typing import Any
+from urllib.parse import quote
 
 import pytest
 from fastapi.routing import APIRoute, iter_route_contexts
@@ -219,6 +220,21 @@ def _kb_conversation(action: str) -> Builder:
         return path, None, {}
 
     return build
+
+
+def _kb_usage(w: Any, r: str, a: Engine) -> Request:
+    _ADMIN_ENGINE[:] = [a]
+    _kb_ai_runtime(w)
+    return "/api/v1/knowledge/usage", None, {}
+
+
+def _kb_resolve(w: Any, r: str, a: Engine) -> Request:
+    """A page of the circular every role reads: kb.ask and document.read holders both open it
+    (require_any; FR-KB-042)."""
+    _ADMIN_ENGINE[:] = [a]
+    _kb_ai_runtime(w)
+    source = f"sos://doc/{KB.shared_document(a, w.a)}/v1#p1"
+    return f"/api/v1/knowledge/resolve?source={quote(source, safe='')}", None, {}
 
 
 def _kb_memory_create(w: Any, r: str, a: Engine) -> Request:
@@ -1090,6 +1106,31 @@ def _cert_path(suffix: str = "") -> Builder:
     return build
 
 
+# --- R2-1A: verification codes (ADR-0045; FR-CERT-023): add needs a certificate without one ---
+
+_VERIFY_REASON = {"reason": "Synthetic matrix verification reason"}
+
+
+def _cert_without_code(w: Any, r: str, a: Engine) -> Request:
+    """A fresh certificate issued as before R2 (no code), so the add succeeds."""
+    from unittest import mock
+
+    from app.certificates import service as certificates
+
+    with mock.patch.object(certificates, "_create_verification", return_value=None):
+        cert = _cert_issued(w, a, fresh=True)
+    return f"/api/v1/certificates/{cert.id}/verification", _VERIFY_REASON, {}
+
+
+def _cert_withdraw_code(w: Any, r: str, a: Engine) -> Request:
+    cert = _cert_issued(w, a, fresh=True)
+    return (
+        f"/api/v1/certificates/{cert.id}/verification/withdraw",
+        _VERIFY_REASON,
+        {"If-Match": 'W/"1"'},
+    )
+
+
 SPECS: dict[tuple[str, str], Builder] = {
     ("GET", "/api/v1/me"): lambda w, r, a: ("/api/v1/me", None, {}),
     ("GET", "/api/v1/me/schools"): lambda w, r, a: ("/api/v1/me/schools", None, {}),
@@ -1687,6 +1728,15 @@ SPECS: dict[tuple[str, str], Builder] = {
     ("POST", "/api/v1/certificates/{certificate_id}/reject"): _cert_decide("reject"),
     ("POST", "/api/v1/certificates/{certificate_id}/withdraw"): _cert_decide("withdraw"),
     ("POST", "/api/v1/certificates/{certificate_id}/cancel"): _cert_cancel,
+    # R2-1A (ADR-0045): formats, verification codes.
+    ("GET", "/api/v1/certificates/formats"): lambda w, r, a: (
+        "/api/v1/certificates/formats",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/certificates/{certificate_id}/verification"): _cert_path("/verification"),
+    ("POST", "/api/v1/certificates/{certificate_id}/verification"): _cert_without_code,
+    ("POST", "/api/v1/certificates/{certificate_id}/verification/withdraw"): (_cert_withdraw_code),
     ("GET", "/api/v1/registers/transfer-certificates"): lambda w, r, a: (
         "/api/v1/registers/transfer-certificates",
         None,
@@ -1747,6 +1797,9 @@ SPECS: dict[tuple[str, str], Builder] = {
         {"enabled": True},
         {},
     ),
+    # R2.4 (FR-KB-040, FR-KB-042).
+    ("GET", "/api/v1/knowledge/usage"): _kb_usage,
+    ("GET", "/api/v1/knowledge/resolve"): _kb_resolve,
     # Circulars, tasks and parent notices (M4; FR-CIR-*, FR-TASK-*, FR-NOTICE-*).
     ("GET", "/api/v1/circulars"): lambda w, r, a: ("/api/v1/circulars", None, {}),
     ("GET", "/api/v1/circulars/{document_id}"): lambda w, r, a: (
@@ -2057,6 +2110,192 @@ SPECS.update(
 )
 
 
+# --- R2-1C WhatsApp messaging (ADR-0043): fake provider, school A connected as needed -------------
+
+
+def _msg() -> ModuleType:
+    """tests/messaging/support.py (connect with the fake provider, synthetic guardians)."""
+    name = "sos_test_messaging_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "messaging" / "support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+def _msg_unconnect(w: Any, a: Engine) -> None:
+    """Retire school A's live account (setup only) so a connect call has a free slot."""
+    with a.begin() as c:
+        c.execute(
+            text(
+                "UPDATE msg.accounts SET status = 'disconnected', disconnected_at = now(), "
+                "token_ciphertext = NULL, pin_ciphertext = NULL "
+                "WHERE tenant_id = :t AND status <> 'disconnected'"
+            ),
+            {"t": w.a.tenant_id},
+        )
+
+
+def _msg_ids() -> tuple[str, str]:
+    m = _msg()
+    return "7" + m.digits(14), "8" + m.digits(14)
+
+
+def _msg_signup(w: Any, r: str, a: Engine) -> Request:
+    _msg_unconnect(w, a)
+    waba, number = _msg_ids()
+    body = {"code": "matrix-signup-code-" + r, "waba_id": waba, "phone_number_id": number}
+    return "/api/v1/messaging/account/embedded-signup", body, {}
+
+
+def _msg_manual(w: Any, r: str, a: Engine) -> Request:
+    _msg_unconnect(w, a)
+    waba, number = _msg_ids()
+    body = {"token": "matrix-pilot-token-0000-" + r, "waba_id": waba, "phone_number_id": number}
+    return "/api/v1/messaging/account/manual", body, {}
+
+
+def _msg_resume(w: Any, r: str, a: Engine) -> Request:
+    _msg().connect(w.a)
+    with a.begin() as c:
+        c.execute(
+            text(
+                "UPDATE msg.accounts SET status = 'paused', pause_reason = 'quality_flagged' "
+                "WHERE tenant_id = :t AND status <> 'disconnected'"
+            ),
+            {"t": w.a.tenant_id},
+        )
+    return "/api/v1/messaging/account/resume", None, {}
+
+
+def _msg_connected(path: str, body: dict[str, Any] | None = None) -> Builder:
+    def build(w: Any, r: str, a: Engine) -> Request:
+        _msg().connect(w.a)
+        return path, body, {}
+
+    return build
+
+
+def _msg_settings(w: Any, r: str, a: Engine) -> Request:
+    with a.connect() as c:
+        version = c.execute(
+            text("SELECT version FROM msg.settings WHERE tenant_id = :t"), {"t": w.a.tenant_id}
+        ).scalar_one_or_none()
+    body = {
+        "notices_enabled": False,
+        "absence_alerts_enabled": False,
+        "fee_reminders_enabled": False,
+        "fee_receipts_enabled": False,
+        "absence_alert_time": "11:00:00",
+        "quiet_start": "21:00:00",
+        "quiet_end": "07:00:00",
+        "daily_cap": None,
+        "office_phone": None,
+    }
+    return "/api/v1/messaging/settings", body, _if_match(int(version or 0))
+
+
+def _msg_guardian(w: Any) -> uuid.UUID:
+    value: uuid.UUID = SW.ensure_students(w)["g9a"]
+    return value
+
+
+def _msg_slips(w: Any, r: str, a: Engine) -> Request:
+    _msg().connect(w.a)
+    student = SW.ensure_students(w)["s9a"]
+    return (
+        "/api/v1/messaging/join-slips",
+        {"student_ids": [str(student)], "categories": ["notices"]},
+        {},
+    )
+
+
+def _msg_section_slips(w: Any, r: str, a: Engine) -> Request:
+    _msg().connect(w.a)
+    section = w.a.ids["section_9a"]
+    return f"/api/v1/sections/{section}/join-slips?categories=notices", None, {}
+
+
+SPECS.update(
+    {
+        ("GET", "/api/v1/messaging/account"): lambda w, r, a: (
+            "/api/v1/messaging/account",
+            None,
+            {},
+        ),
+        ("POST", "/api/v1/messaging/account/embedded-signup"): _msg_signup,
+        ("POST", "/api/v1/messaging/account/manual"): _msg_manual,
+        ("POST", "/api/v1/messaging/account/resume"): _msg_resume,
+        ("DELETE", "/api/v1/messaging/account"): _msg_connected("/api/v1/messaging/account"),
+        ("GET", "/api/v1/messaging/templates"): lambda w, r, a: (
+            "/api/v1/messaging/templates",
+            None,
+            {},
+        ),
+        ("POST", "/api/v1/messaging/templates/sync"): _msg_connected(
+            "/api/v1/messaging/templates/sync"
+        ),
+        ("GET", "/api/v1/messaging/settings"): lambda w, r, a: (
+            "/api/v1/messaging/settings",
+            None,
+            {},
+        ),
+        ("PUT", "/api/v1/messaging/settings"): _msg_settings,
+        ("GET", "/api/v1/guardians/{guardian_id}/optins"): lambda w, r, a: (
+            f"/api/v1/guardians/{_msg_guardian(w)}/optins",
+            None,
+            {},
+        ),
+        ("POST", "/api/v1/guardians/{guardian_id}/optins"): lambda w, r, a: (
+            f"/api/v1/guardians/{_msg_guardian(w)}/optins",
+            {
+                "category": "notices",
+                "status": "opted_in",
+                "method": "in_person",
+                "decided_on": "2026-10-01",
+            },
+            {},
+        ),
+        ("POST", "/api/v1/messaging/join-slips"): _msg_slips,
+        ("GET", "/api/v1/sections/{section_id}/join-slips"): _msg_section_slips,
+        ("GET", "/api/v1/sections/{section_id}/optins/summary"): lambda w, r, a: (
+            f"/api/v1/sections/{w.a.ids['section_9a']}/optins/summary",
+            None,
+            {},
+        ),
+        ("POST", "/api/v1/messages/search"): lambda w, r, a: (
+            "/api/v1/messages/search",
+            {"guardian_id": str(_msg_guardian(w))},
+            {},
+        ),
+    }
+)
+
+
+# --- R2-1B fees (ADR-0042): fees on for school A around each call -------------------------------
+
+
+def _fees() -> ModuleType:
+    """tests/fees/security_support.py (fee requests built through the real services)."""
+    name = "sos_test_fees_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "fees" / "security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+SPECS.update(_fees().matrix_specs())
+
+
 def _success(method: str, path: str) -> int:
     creates = {
         "/api/v1/users",
@@ -2076,6 +2315,7 @@ def _success(method: str, path: str) -> int:
         "/api/v1/knowledge/memories",
         "/api/v1/students/{student_id}/certificates",
         "/api/v1/certificates/{certificate_id}/duplicates",
+        "/api/v1/certificates/{certificate_id}/verification",
         "/api/v1/tasks",
         "/api/v1/circular-suggestions/{suggestion_id}/confirm",
         "/api/v1/exams",
@@ -2085,6 +2325,10 @@ def _success(method: str, path: str) -> int:
         "/api/v1/tally/enrolment-codes",
         "/api/v1/tally/parties/{party_id}/links",
         "/api/v1/students/{student_id}/apaar-consent",
+        # R2-1C WhatsApp (ADR-0043)
+        "/api/v1/messaging/account/embedded-signup",
+        "/api/v1/messaging/account/manual",
+        "/api/v1/guardians/{guardian_id}/optins",
     }
     accepted = {
         "/api/v1/documents",
@@ -2108,9 +2352,13 @@ def _success(method: str, path: str) -> int:
         "/api/v1/notices/{notice_id}/render",
         # R-19: a chain check is queued; the result is read with GET /audit/verify.
         "/api/v1/audit/verify",
+        # R2-1C: template provisioning and sync run in the worker.
+        "/api/v1/messaging/templates/sync",
     }
     if method == "POST" and path in accepted:
         return 202
+    if method == "POST" and path in _fees().MATRIX_CREATES:
+        return 201
     if (method, path) == ("POST", "/api/v1/users/{user_id}/invitation-email"):
         return 409  # guard passed; the service refuses (email off in tests)
     if method == "POST" and path.startswith("/api/v1/me/invitations/"):
@@ -2122,12 +2370,18 @@ def _success(method: str, path: str) -> int:
         "/api/v1/documents/{document_id}",
         "/api/v1/students/{student_id}/guardians/{guardian_id}",
         "/api/v1/tally/parties/{party_id}/links/{student_id}",
+        "/api/v1/messaging/account",
     ):
         return 204
     return 201 if method == "POST" and path in creates else 200
 
 
 def _call(api: Any, w: Any, admin: Engine, role: str, key: tuple[str, str], **kw: Any) -> Any:
+    if _fees().is_fee_path(key[1]):
+        # R2-1B: fees are on for school A only while the request is built and sent.
+        with _fees().on(admin, w.a.tenant_id, key[1]):
+            path, body, headers = SPECS[key](w, role, admin)
+            return api.call(w.person(role), key[0], path, json=body, headers=headers, **kw)
     path, body, headers = SPECS[key](w, role, admin)
     if key[1].startswith("/api/v1/tally/"):
         # The Tally connector is behind a per-school flag (default off, ADR-0032): on for the call.

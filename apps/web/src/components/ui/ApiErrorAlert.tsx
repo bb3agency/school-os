@@ -30,7 +30,9 @@ export type ErrorNamespace =
   | "tasks"
   | "notices"
   | "tally"
+  | "fees"
   | "apaar"
+  | "messaging"
   | "platform.announcements"
   | "platform.invoices.payments";
 

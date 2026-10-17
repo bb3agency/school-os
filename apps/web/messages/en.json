@@ -157,7 +157,8 @@
         "ask": "Ask",
         "admin": "School admin",
         "work": "Circulars and tasks",
-        "classroom": "Classroom"
+        "classroom": "Classroom",
+        "fees": "Fees"
       }
     },
     "home": {
@@ -1683,7 +1684,14 @@
       "apaar_id_in_use": "This APAAR ID is already on another student's record. Search by this APAAR ID to open it.",
       "pen_required_for_transfer_in": "A child from another school needs the PEN from the transfer certificate.",
       "signed_form_required": "Upload the signed form. Consent is recorded only with it.",
-      "before_current_decision": "This date is before the decision already recorded. Check the date on the form."
+      "evidence_required": "Upload the signed form and give its document ID.",
+      "no_mobile_number": "This guardian has no mobile number. Add one before recording an opt-in.",
+      "method_does_not_match_status": "Choose a decision that matches: agreed, or asked to stop.",
+      "date_in_future": "The date can't be in the future.",
+      "date_too_early": "This date is too long ago. Check the date on the form.",
+      "filter_required": "Choose a student or a guardian first.",
+      "before_current_decision": "This date is before the decision already recorded. Check the date on the form.",
+      "invalid_number": "Enter a whole number."
     },
     "api": {
       "generic": {
@@ -2015,7 +2023,8 @@
     "noAadhaar": "This looks like a full Aadhaar number. SchoolOS never stores one: remove it.",
     "emergencyReason": "Emergency access is only for a security incident or a legal obligation. Choose one of those, or untick Emergency.",
     "penInvalid": "Enter the 11-digit PEN, for example 21345678901.",
-    "penRequiredForTransfer": "A child from another school needs the PEN from the transfer certificate."
+    "penRequiredForTransfer": "A child from another school needs the PEN from the transfer certificate.",
+    "invalidHeadCode": "Use up to 20 letters, digits, - or _, starting with a letter or digit, for example TUI."
   },
   "support": {
     "piiWarningTitle": "Do not include student personal data",
@@ -4427,7 +4436,8 @@
       "evidence": "Evidence for corrections",
       "register_scan": "Register photos",
       "import_file": "Spreadsheet imports",
-      "certificate": "Issued certificates"
+      "certificate": "Issued certificates",
+      "fee_receipt": "Fee receipts"
     },
     "docStatus": {
       "active": "In use",
@@ -4990,7 +5000,11 @@
       "withheldTitle": "Answer hidden",
       "withheldBody": "This answer is hidden because you can no longer see one of its sources. Ask the question again to get an answer from what you can see now.",
       "incompleteTitle": "Answer not finished",
-      "incompleteBody": "This answer was still being written when the chat opened, perhaps in another window, or it was cut off. It shows here when it is ready; if it does not, ask again."
+      "incompleteBody": "This answer was still being written when the chat opened, perhaps in another window, or it was cut off. It shows here when it is ready; if it does not, ask again.",
+      "resolveOpen": "opens its screen",
+      "resolveGone": "Source you can no longer open",
+      "resolveNoScreen": "This source has no screen to open.",
+      "resolveFailed": "Could not open the source. Try again."
     },
     "notFound": {
       "title": "Not found in the school records you can access",
@@ -5007,7 +5021,8 @@
       "disabled": "AI answers are switched off for this school. The principal can switch them on in school settings.",
       "rate_limited": "Many questions are being asked right now. Wait a minute, then ask again for a full answer.",
       "unavailable": "AI answers are temporarily unavailable. Try again in a few minutes.",
-      "internal": "Something went wrong and SchoolOS could not finish this answer. Ask again."
+      "internal": "Something went wrong and SchoolOS could not finish this answer. Ask again.",
+      "unchecked": "SchoolOS could not check the AI answer against the school's records, so it shows the matching passages instead. Read them, or ask again in other words."
     },
     "errors": {
       "ai_rate_limited": {
@@ -5386,6 +5401,22 @@
       "edited": "Memory changed.",
       "userOff": "Memory is off for you, so Ask neither uses nor adds memories. Switch it on to add, change or save items; you can still delete them.",
       "fullHint": "Memory is full (30 items). Delete something you no longer need to add more."
+    },
+    "usage": {
+      "meterOf": "{used} of {included} answers this month",
+      "meterNoBundle": "{used} answers this month",
+      "meterLabel": "AI answers used this month",
+      "near": "Near your monthly answers",
+      "nearTitle": "Near your monthly AI answers",
+      "nearBody": "The school has used most of this month's included AI answers. Extra answers are billed at the bundle's rate. Plan and billing shows the details.",
+      "searchOnlyTitle": "Ask shows matching passages only",
+      "next": {
+        "ai_budget_exhausted": "Full answers return when the month resets. Ask the principal about a bigger answer bundle.",
+        "ai_disabled": "Ask the principal to switch AI answers on in school settings.",
+        "ai_unavailable": "Ask again in a few minutes."
+      },
+      "nextBudgetBilling": "Full answers return when the month resets. To get them sooner, ask SchoolOS support about a bigger answer bundle.",
+      "dismiss": "Dismiss: {title}"
     }
   },
   "marketing": {
@@ -6205,7 +6236,14 @@
       "conduct": "Conduct and character",
       "remarks": "Remarks",
       "purpose": "Purpose",
-      "purpose_note": "Purpose (details)"
+      "purpose_note": "Purpose (details)",
+      "identification_mark_1": "Personal mark of identification (1)",
+      "identification_mark_2": "Personal mark of identification (2)",
+      "languages_studied": "First language and languages studied",
+      "medium": "Medium of instruction",
+      "working_days": "Working days up to the date of leaving",
+      "days_attended": "Working days the pupil attended",
+      "application_date": "Date of application for the certificate"
     },
     "errors": {
       "certificate_blocked": {
@@ -6275,6 +6313,22 @@
       "requester_inactive": {
         "title": "The person who prepared it has left",
         "body": "They are no longer an active member of the school. Reject this request; someone active must prepare it again."
+      },
+      "verification_exists": {
+        "title": "This certificate already has a verification code",
+        "body": "A certificate gets one code. If the code was withdrawn, issue a duplicate: the duplicate gets a new code."
+      },
+      "verification_not_active": {
+        "title": "There is no code to withdraw",
+        "body": "The code was already withdrawn. Reload the page to see it."
+      },
+      "certificate_format_changed": {
+        "title": "The TC format changed",
+        "body": "This request was prepared in an older version of the format. Reject it and prepare the TC again."
+      },
+      "verification_code_unavailable": {
+        "title": "The code could not be made",
+        "body": "Try again in a moment."
       }
     },
     "detail": {
@@ -6385,6 +6439,18 @@
         "openStructure": "Open school structure",
         "openCertificates": "Open the student's certificates",
         "change_request_pending": "A correction to a detail it prints is waiting for approval. Decide the correction first."
+      },
+      "formatTitle": "Format: {format}",
+      "formatUnverified": "This layout was built from public sources and is not yet confirmed with a school. Compare it with your TC book before you hand it out.",
+      "typedBelow": "Typed below",
+      "notPrinted": "Not printed",
+      "blankByHand": "Blank, filled by hand",
+      "hidden": "Printed, hidden from you",
+      "fill": {
+        "input": "You type it",
+        "derived": "Worked out from the record",
+        "identifier": "Printed only when verified",
+        "restricted": "Restricted"
       }
     },
     "registers": {
@@ -6436,6 +6502,51 @@
       "logoNote": "A school logo cannot be added yet.",
       "save": "Save letterhead",
       "saved": "Letterhead saved. New certificates use it."
+    },
+    "verification": {
+      "title": "Online check",
+      "description": "The code and QR printed on the certificate. Anyone holding the paper can check it at the verification page.",
+      "code": "Verification code",
+      "link": "Verification page",
+      "off": "Online checking is not switched on for this school yet. The code is kept and printed once it is.",
+      "checks": "Checked online",
+      "checkCount": "{count, plural, =0 {Not checked yet} one {Checked # time} other {Checked # times}}",
+      "lastChecked": "Last checked",
+      "reasons": {
+        "issued": "Made when the certificate was issued",
+        "duplicate": "Made when this duplicate was issued",
+        "added_later": "Added later by the principal"
+      },
+      "withdrawnTitle": "This code was withdrawn",
+      "withdrawnBody": "The verification page now says it cannot find this certificate. Issue a duplicate to give the paper a new code.",
+      "noneTitle": "No verification code",
+      "noneBody": "This certificate was issued before online checking. Add a code to keep a record; the paper does not show it, so the next duplicate carries one.",
+      "add": "Add verification code",
+      "addTitle": "Add a verification code",
+      "addBody": "Say why the code is needed. You need a recent sign-in with your second step.",
+      "withdraw": "Withdraw code",
+      "withdrawTitle": "Withdraw this verification code",
+      "withdrawBody": "Use this when the code was misused, for example posted online by mistake. The page will no longer find the certificate with it. This cannot be undone.",
+      "reason": "Reason",
+      "reasonHint": "10 to 500 characters. Do not enter Aadhaar numbers."
+    },
+    "format": {
+      "title": "Transfer certificate format",
+      "description": "The layout new transfer certificates are prepared in. Certificates already issued keep the format they were issued in.",
+      "current": "Current format:",
+      "names": {
+        "generic-v1": "SchoolOS standard",
+        "ap-tc-2027": "Andhra Pradesh TC"
+      },
+      "unverified": "Built from public sources and not yet confirmed with a school. Compare it with your TC book first.",
+      "switchTo": "Use {format}",
+      "restrictedTitle": "Religion and caste on the TC",
+      "restrictedOff": "Left blank on the certificate, to fill by hand. This is the default.",
+      "restrictedOn": "Printed from the student record.",
+      "restrictedHint": "Printing them is an exception to the rule that restricted details are never printed. The change is recorded with the field names and needs a recent second-step sign-in.",
+      "printThem": "Print religion and caste",
+      "leaveBlank": "Leave them blank",
+      "saved": "Saved."
     }
   },
   "circulars": {
@@ -7635,6 +7746,859 @@
     "busy": {
       "title": "Please try again in a few minutes",
       "body": "Too many tries from this connection, or the page is busy. Wait a few minutes and open the link again."
+    },
+    "verify": {
+      "meta": "Check a certificate",
+      "title": "Check a certificate",
+      "intro": "Type the verification code printed on the certificate, or scan its QR code with your phone camera.",
+      "codeLabel": "Verification code",
+      "codeHint": "16 letters and numbers, for example 7K4M-Q2XP-9HD3-RT6W. Dashes and spaces do not matter.",
+      "check": "Check",
+      "invalid": "This is not a verification code. Check the 16 characters printed on the certificate.",
+      "noSearch": "Certificates can only be found by their code, not by name, date of birth or serial number.",
+      "notFoundTitle": "We could not find a certificate with this code",
+      "notFoundBody": "Check the code or contact the school that issued it.",
+      "again": "Check another code",
+      "busyBody": "Too many checks from this connection, or the page is busy. Wait a few minutes and try again.",
+      "valid": "Valid: issued by {school} on {date}",
+      "duplicate": "Duplicate copy {copy} of serial {serial}, issued on {date}",
+      "cancelled": "Cancelled on {date}",
+      "cancelledNoContent": "The school cancelled this certificate, so its details are not shown.",
+      "school": "School",
+      "serial": "Serial number",
+      "issuedOn": "Date of issue",
+      "code": "Code",
+      "printedTitle": "What the certificate says",
+      "printedOnly": "This page shows only what the certificate prints.",
+      "leftBlank": "Left blank on the certificate",
+      "anyoneWithCode": "Anyone with this code can see what the certificate shows.",
+      "footer": "Certificate check by SchoolOS for the school that issued it."
+    }
+  },
+  "messaging": {
+    "nav": {
+      "messages": "Messages",
+      "settings": "WhatsApp"
+    },
+    "settingsTitle": "WhatsApp messages",
+    "settingsDescription": "Send school messages to parents from the school's own WhatsApp number. The school pays Meta directly for them.",
+    "logTitle": "Messages",
+    "logDescription": "What was sent to parents on WhatsApp and whether it arrived.",
+    "noAccessTitle": "You can't see WhatsApp messages",
+    "noAccessBody": "Ask the principal if you need access to WhatsApp messages.",
+    "off": {
+      "title": "WhatsApp messages are not available here",
+      "body": "This SchoolOS does not send WhatsApp messages yet. Copy approved notices to parents as before."
+    },
+    "unreviewedTitle": "Parent message texts have not been reviewed yet",
+    "unreviewedBody": "The school writes to parents in their own language, but a fluent reader has not checked these message texts yet. Until then, check each message with the office before sending.",
+    "connect": {
+      "title": "Connect the school's WhatsApp number",
+      "description": "Use the school's own WhatsApp Business number. Parents see the school's name.",
+      "checklistTitle": "Before you connect",
+      "paysMeta": "The school pays Meta directly with its own payment method. SchoolOS does not charge for messages.",
+      "inr": "Set the account's billing currency to Indian rupees before 31 December 2026. Meta stops delivering messages from other currencies after that.",
+      "limit": "A new account can message 250 people a day until Meta verifies the business. Verify the business with Meta first.",
+      "optin": "Messages go only to parents who agreed (opt-in). Print join slips or record signed forms after connecting.",
+      "askOwner": "The owner or principal connects the number.",
+      "signup": "Connect WhatsApp",
+      "signupPending": "Waiting for Meta…",
+      "signupHint": "A Meta window opens. Sign in with the school's Meta business login, choose the business account and verify the number.",
+      "signupCancelled": "The Meta window was closed before it finished. Nothing was changed.",
+      "manual": "Connect with a token",
+      "manualHint": "For pilot schools: paste the token your SchoolOS contact helped you create in the school's Meta Business Manager.",
+      "manualTitle": "Connect with a token",
+      "manualDescription": "SchoolOS checks the token with Meta, stores it locked and never shows it again.",
+      "token": "Access token",
+      "tokenHint": "The system-user token from Meta Business Manager.",
+      "wabaId": "WhatsApp Business account ID",
+      "phoneNumberId": "Phone number ID",
+      "connect": "Connect",
+      "notConfigured": "Connecting is not set up on this SchoolOS yet. Contact SchoolOS support."
+    },
+    "account": {
+      "title": "Connected number",
+      "description": "Synced with Meta every hour.",
+      "none": "Not known yet",
+      "number": "Number",
+      "name": "Display name",
+      "status": "Sending",
+      "quality": "Quality rating",
+      "limit": "Messaging limit",
+      "limitValue": "{count} people a day (SchoolOS stops at {cap})",
+      "currency": "Billing currency",
+      "mode": "Connected with",
+      "connectedAt": "Connected on",
+      "syncedAt": "Last synced",
+      "statuses": {
+        "active": "Sending",
+        "paused": "Paused",
+        "connecting": "Connecting",
+        "disconnected": "Disconnected"
+      },
+      "qualities": {
+        "GREEN": "High",
+        "YELLOW": "Medium",
+        "RED": "Low",
+        "FLAGGED": "Flagged by Meta",
+        "UNKNOWN": "Not rated yet"
+      },
+      "currencies": {
+        "confirmed_inr": "Indian rupees",
+        "not_inr": "Not Indian rupees",
+        "unknown": "Not known yet"
+      },
+      "modes": {
+        "embedded_signup": "Meta sign-up",
+        "manual_token": "Token (pilot)"
+      },
+      "pausedTitle": "Sending is paused",
+      "pause": {
+        "quality_flagged": "Meta flagged the number's quality. Wait until Meta's quality rating improves, then resume.",
+        "quality_red": "Meta rates the number's quality low. Wait until it improves, then resume.",
+        "account_restricted": "Meta restricted the account. Check the account in Meta Business Manager, then resume.",
+        "number_disabled": "Meta disabled the number. Check it in Meta Business Manager, then resume.",
+        "account_deleted": "Meta reports the account was deleted. Disconnect and connect again.",
+        "other": "Sending was paused. Check the account in Meta Business Manager, then resume."
+      },
+      "inrTitle": "Billing currency is not Indian rupees",
+      "inrBody": "From {date} Meta delivers messages only from accounts billed in Indian rupees. Change the currency in Meta Business Manager.",
+      "resume": "Resume sending",
+      "resumeTitle": "Resume sending?",
+      "resumeBody": "SchoolOS checks the number with Meta first. Messages start going out again.",
+      "disconnect": "Disconnect",
+      "disconnectTitle": "Disconnect WhatsApp?",
+      "disconnectBody": "Sending stops at once, and links already sent to parents stop working. You can connect again later."
+    },
+    "templates": {
+      "title": "Message templates",
+      "description": "Meta approves each message and language before it can be sent.",
+      "sync": "Check with Meta",
+      "syncTitle": "Check templates with Meta?",
+      "syncBody": "SchoolOS submits any template not sent yet and reads every status back. This takes a minute.",
+      "pausedBySchoolOs": "Paused by SchoolOS",
+      "reviewed": "Checked",
+      "notReviewed": "Not checked by a fluent reader",
+      "columns": {
+        "purpose": "Message",
+        "language": "Language",
+        "status": "Meta status",
+        "review": "Text review"
+      },
+      "purposes": {
+        "optin_confirm": "Joining confirmation",
+        "school_notice": "School notice",
+        "absence_alert": "Absence alert",
+        "fee_reminder": "Fee reminder",
+        "fee_receipt": "Fee receipt"
+      },
+      "languages": {
+        "en": "English",
+        "te": "Telugu"
+      },
+      "statuses": {
+        "not_created": "Not submitted",
+        "pending": "Waiting for Meta",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "paused": "Paused by Meta",
+        "disabled": "Disabled by Meta"
+      }
+    },
+    "settings": {
+      "title": "When messages are sent",
+      "description": "Switches are read by the sending features as they arrive.",
+      "switches": "Messages the school sends",
+      "switch": {
+        "notices_enabled": "School notices",
+        "absence_alerts_enabled": "Absence alerts",
+        "fee_reminders_enabled": "Fee reminders",
+        "fee_receipts_enabled": "Fee receipts"
+      },
+      "switchHint": {
+        "notices_enabled": "Approved notices, when the office chooses to send one.",
+        "absence_alerts_enabled": "Once a day, for children marked absent.",
+        "fee_reminders_enabled": "Before and after due dates.",
+        "fee_receipts_enabled": "Right after a receipt is issued."
+      },
+      "allOff": "All off",
+      "absenceTime": "Absence alerts at",
+      "quietStart": "No messages from",
+      "quietEnd": "Until",
+      "quiet": "Quiet hours",
+      "quietValue": "{start} to {end}",
+      "dailyCap": "Most messages a day",
+      "dailyCapHint": "Leave empty for {cap} (Meta's limit minus 10%).",
+      "dailyCapHintUnknown": "Leave empty for Meta's limit minus 10%.",
+      "officePhone": "Office phone for replies",
+      "officePhoneHint": "Parents who write to the WhatsApp number are told to call this number.",
+      "save": "Save settings",
+      "saved": "Saved."
+    },
+    "optins": {
+      "title": "WhatsApp messages",
+      "description": "Which messages each guardian agreed to get, and in which language.",
+      "ruleTitle": "Only with the parent's agreement",
+      "ruleBody": "Record an opt-in only with a signed form or when the parent agreed in person. A parent who sent STOP can join again only with a new signed form or the join message.",
+      "loading": "Loading…",
+      "mobileEnding": "mobile ending {last4}",
+      "noMobile": "no mobile number",
+      "record": "Record a decision",
+      "recordTitle": "Record a WhatsApp decision",
+      "recordDescription": "Every decision is kept with who recorded it. Nothing is overwritten.",
+      "category": "Messages about",
+      "method": "Decision",
+      "choices": {
+        "in_person": "Agreed in person",
+        "signed_form": "Signed form (upload it first)",
+        "staff_recorded_stop": "Asked to stop"
+      },
+      "decidedOn": "Date of the decision",
+      "evidence": "Signed form document ID",
+      "evidenceHint": "Needed for a signed form: upload the form under Documents (purpose: evidence) and paste its ID.",
+      "save": "Save",
+      "categories": {
+        "notices": "Notices",
+        "attendance": "Attendance",
+        "fees": "Fees"
+      },
+      "states": {
+        "opted_in": "Agreed",
+        "opted_out": "Stopped",
+        "not_asked": "Not asked"
+      },
+      "methods": {
+        "whatsapp_join": "joined on WhatsApp",
+        "signed_form": "signed form",
+        "in_person": "in person",
+        "whatsapp_stop": "sent STOP",
+        "staff_recorded_stop": "asked the office to stop"
+      },
+      "stoppedByParent": "Stopped by the parent",
+      "numberChanged": "The number changed after this: ask again",
+      "language": "Message language",
+      "languageTitle": "Language of WhatsApp messages",
+      "languageDescription": "Messages and parent pages for this guardian use this language. Staff screens stay English.",
+      "languageLabel": "Language",
+      "languageNow": "Messages in: {language}",
+      "languages": {
+        "school": "The school's choice",
+        "en": "English",
+        "te": "Telugu"
+      }
+    },
+    "log": {
+      "purpose": "Message",
+      "status": "Status",
+      "all": "All",
+      "emptyTitle": "No messages yet",
+      "emptyBody": "Messages to parents appear here once the school sends them.",
+      "more": "Show more",
+      "fallback": "Sent in English: the message in the parent's language is not approved",
+      "phoneEnding": "ending {last4}",
+      "columns": {
+        "time": "Queued",
+        "purpose": "Message",
+        "language": "Language",
+        "phone": "Mobile",
+        "status": "Status"
+      },
+      "purposes": {
+        "optin_confirm": "Joining confirmation",
+        "school_notice": "School notice",
+        "absence_alert": "Absence alert",
+        "fee_reminder": "Fee reminder",
+        "fee_receipt": "Fee receipt",
+        "optin_stopped": "Stop confirmation"
+      },
+      "languages": {
+        "en": "English",
+        "te": "Telugu"
+      },
+      "statuses": {
+        "queued": "Waiting",
+        "sent": "Sent",
+        "delivered": "Delivered",
+        "read": "Read",
+        "failed": "Failed",
+        "skipped": "Not sent"
+      },
+      "reasons": {
+        "no_optin": "The guardian has not agreed to these messages",
+        "opted_out": "The guardian stopped these messages",
+        "optin_for_other_number": "The number changed after the guardian agreed",
+        "no_mobile_number": "No mobile number on record",
+        "messaging_paused": "Sending was paused",
+        "messaging_not_connected": "WhatsApp was not connected",
+        "messaging_currency_not_inr": "The account is not billed in Indian rupees",
+        "template_not_approved": "Meta has not approved this message yet",
+        "template_paused": "This message is paused",
+        "not_on_whatsapp": "Not on WhatsApp",
+        "window_closed": "The parent's reply window had closed",
+        "number_not_registered": "The school's number is not registered",
+        "template_parameters": "The message text did not fit",
+        "provider_error": "WhatsApp did not accept the message",
+        "other": "WhatsApp did not deliver it"
+      }
+    },
+    "slips": {
+      "open": "Print join slips",
+      "title": "WhatsApp join slips",
+      "description": "Slips for parents to join the school's WhatsApp messages, each in the parent's language.",
+      "section": "Section",
+      "chooseSection": "Choose a section",
+      "categories": "Parents join for",
+      "category": {
+        "notices": "Notices",
+        "attendance": "Attendance alerts",
+        "fees": "Fees"
+      },
+      "hint": "Each guardian with a mobile number gets a slip with a new code that works once, for 30 days.",
+      "print": "Open the slips to print",
+      "chooseFirst": "Choose a section and at least one kind of message."
+    },
+    "errors": {
+      "messaging_already_connected": {
+        "title": "Already connected",
+        "body": "WhatsApp is already connected. Disconnect it first."
+      },
+      "messaging_not_connected": {
+        "title": "WhatsApp is not connected",
+        "body": "Connect WhatsApp first."
+      },
+      "messaging_still_restricted": {
+        "title": "Still restricted by Meta",
+        "body": "Meta still rates the number low. Wait until it improves before resuming."
+      },
+      "messaging_not_paused": {
+        "title": "Sending is not paused",
+        "body": "Sending is not paused."
+      },
+      "messaging_auth_failed": {
+        "title": "Meta did not accept the connection",
+        "body": "Meta did not accept the connection. Check the token or start the sign-up again."
+      },
+      "messaging_provider_error": {
+        "title": "WhatsApp did not answer",
+        "body": "WhatsApp did not answer. Try again in a few minutes."
+      },
+      "manual_token_not_allowed": {
+        "title": "Token connection is off",
+        "body": "Connecting with a token is switched off. Use Connect WhatsApp."
+      },
+      "opted_out_by_parent": {
+        "title": "The parent stopped these messages",
+        "body": "The parent stopped these messages on WhatsApp. Record a new signed form, or ask the parent to send the join message."
+      },
+      "module_unavailable": {
+        "title": "Not available here",
+        "body": "WhatsApp messages are not available on this SchoolOS."
+      },
+      "no_slips": {
+        "title": "No slips to print",
+        "body": "No guardian in this section has a mobile number."
+      },
+      "too_many_slips": {
+        "title": "Too many slips at once",
+        "body": "Too many slips at once. Print one section at a time."
+      }
+    }
+  },
+  "fees": {
+    "off": {
+      "title": "Fees are not switched on",
+      "body": "This school does not keep its fee ledger in SchoolOS yet. The owner or principal turns fees on in school settings once SchoolOS has enabled them for the school."
+    },
+    "newTab": "opens in a new tab",
+    "noAccessTitle": "You cannot see fee records",
+    "noAccessBody": "Fee records are shown only to the principal, accountant and office staff who collect fees. Ask the principal if you need access.",
+    "online": "Online",
+    "previous": "Previous page",
+    "next": "Next page",
+    "nav": {
+      "collect": "Collect fees",
+      "receipts": "Receipts",
+      "approvals": "Fee approvals",
+      "daily": "Daily collection",
+      "dues": "Fee dues",
+      "setup": "Fee setup"
+    },
+    "modes": {
+      "cash": "Cash",
+      "cheque": "Cheque",
+      "bank_transfer": "Bank transfer",
+      "upi_qr": "UPI (school QR)",
+      "razorpay": "Online (Razorpay)"
+    },
+    "modeDetails": {
+      "cheque_number": "Cheque number",
+      "bank_name": "Bank",
+      "cheque_date": "Cheque date",
+      "reference": "Bank reference",
+      "payment_id": "Payment id"
+    },
+    "receiptStatus": {
+      "issued": "Issued",
+      "cancelled": "Cancelled"
+    },
+    "requestStatus": {
+      "pending": "Waiting for approval",
+      "approved": "Approved",
+      "processed": "Paid out",
+      "rejected": "Rejected",
+      "withdrawn": "Withdrawn",
+      "processing": "In progress",
+      "failed": "Failed"
+    },
+    "cancelReasons": {
+      "wrong_student": "Wrong student",
+      "wrong_amount": "Wrong amount",
+      "cheque_dishonoured": "Cheque bounced",
+      "duplicate_entry": "Entered twice",
+      "other": "Other reason"
+    },
+    "concessionTypes": {
+      "sibling": "Sibling",
+      "staff_ward": "Staff ward",
+      "merit": "Merit",
+      "hardship": "Hardship",
+      "rte": "RTE",
+      "other": "Other"
+    },
+    "adjustmentReasons": {
+      "late_fee_waiver": "Late fee waiver",
+      "plan_change": "Fee plan changed",
+      "concession_reversal": "Concession undone",
+      "correction": "Correction",
+      "other": "Other reason"
+    },
+    "approvalKinds": {
+      "concession": "Concession",
+      "adjustment": "Adjustment",
+      "cancellation": "Receipt cancellation",
+      "refund": "Refund"
+    },
+    "entryKinds": {
+      "charge": "Fee charged",
+      "concession": "Concession",
+      "late_fee": "Late fee",
+      "adjustment": "Adjustment",
+      "payment": "Payment",
+      "payment_reversal": "Payment cancelled",
+      "refund": "Refund"
+    },
+    "headKinds": {
+      "tuition": "Tuition",
+      "admission": "Admission",
+      "exam": "Exam",
+      "books": "Books",
+      "transport": "Transport",
+      "other": "Other"
+    },
+    "counter": {
+      "title": "Collect fees",
+      "description": "Find the student, check what is due, take the payment and print the receipt.",
+      "findTitle": "Find the student",
+      "searchLabel": "Student name or admission number",
+      "searchHint": "Type at least 2 letters, then use the arrow keys and Enter. Press / or F2 to come back here.",
+      "searching": "Searching…",
+      "noMatches": "No student with a fee account matches. Check the spelling or the admission number.",
+      "matchesLabel": "Matching students",
+      "noName": "Name not recorded",
+      "balance": "Balance",
+      "duesTitle": "What is due",
+      "columns": {
+        "instalment": "Instalment",
+        "head": "Fee head",
+        "dueOn": "Due date",
+        "charged": "Charged",
+        "concession": "Concession",
+        "lateFee": "Late fee",
+        "adjustment": "Adjustment",
+        "paid": "Paid",
+        "due": "Due"
+      },
+      "lateFee": "Late fee",
+      "taxable": "Taxable: invoice in Tally",
+      "overdue": "Overdue",
+      "nothingDue": "Nothing is due on this account now.",
+      "nothingDueTitle": "Nothing to collect",
+      "totalDue": "Total due now:",
+      "openAccount": "Open the fee account",
+      "amount": "Amount (₹)",
+      "amountHint": "Filled with the total due; type a smaller amount for a part payment. Advances are not taken.",
+      "mode": "Paid by",
+      "modeHint": "Press C for cash, Q for cheque, B for bank transfer, U for UPI.",
+      "chequeNumber": "Cheque number",
+      "bankName": "Bank name",
+      "chequeDate": "Cheque date",
+      "reference": "Bank reference",
+      "referenceHint": "12 to 22 letters or digits from the bank's message.",
+      "utr": "UPI reference (UTR)",
+      "utrHint": "The 12-digit number shown on the parent's phone after paying.",
+      "allocationTitle": "Where the money goes",
+      "upTo": "Up to {amount}",
+      "useOldestFirst": "Use oldest due first",
+      "changeAllocation": "Change allocation",
+      "save": "Save and print",
+      "todayNote": "The receipt is dated today, {date}.",
+      "dayClosedTitle": "Today's collection is closed",
+      "dayClosedBody": "No more receipts can be dated today. Ask the accountant; collection opens again tomorrow.",
+      "savedTitle": "Receipt saved",
+      "receiptNumber": "Receipt number",
+      "print": "Print",
+      "next": "Next student",
+      "openReceipt": "Open the receipt",
+      "errors": {
+        "amount": "Enter an amount in rupees greater than zero, like 2500 or 2500.50.",
+        "amountAboveDue": "The amount is more than what is due now. Lower it to the total due or less.",
+        "chequeNumber": "Enter the 6-digit cheque number.",
+        "required": "Fill in this field.",
+        "reference": "Enter the bank reference: 12 to 22 letters or digits.",
+        "utr": "Enter the 12-digit UPI reference (UTR).",
+        "allocation": "Enter each amount in rupees, or leave it empty.",
+        "allocationSum": "The amounts must add up to the receipt amount.",
+        "utrInUse": "This UTR is already on another receipt. Open that receipt."
+      }
+    },
+    "receipts": {
+      "title": "Receipts",
+      "description": "Every receipt issued, newest first. Cancelled receipts keep their number.",
+      "filterDate": "Receipt date",
+      "filterMode": "Paid by",
+      "filterStatus": "Status",
+      "any": "Any",
+      "listTitle": "Receipts",
+      "emptyTitle": "No receipts",
+      "emptyBody": "No receipt matches these filters.",
+      "columns": {
+        "number": "Receipt",
+        "date": "Date",
+        "student": "Student",
+        "mode": "Paid by",
+        "collector": "Collected by",
+        "status": "Status",
+        "amount": "Amount"
+      },
+      "cancelledOn": "Cancelled on {date}",
+      "cancellationPending": "Cancellation waiting for approval"
+    },
+    "receipt": {
+      "title": "Receipt {number}",
+      "loading": "Receipt",
+      "downloadPdf": "Download PDF",
+      "pdfFailed": "The PDF could not be made. Print from the print view instead.",
+      "pdfPreparing": "The PDF is being made. It is ready in a few seconds.",
+      "cancelledTitle": "Cancelled on {date}",
+      "cancelledBody": "This receipt was cancelled with a second person's approval. It keeps its number and prints marked CANCELLED.",
+      "detailsTitle": "Receipt details",
+      "student": "Student",
+      "date": "Date",
+      "mode": "Paid by",
+      "utr": "UTR {utr}",
+      "collectedBy": "Collected by",
+      "linesTitle": "Fee lines",
+      "instalment": "Instalment",
+      "head": "Fee head",
+      "amount": "Amount",
+      "total": "Total",
+      "hash": "Content fingerprint (SHA-256): {hash}",
+      "actionsTitle": "Print and requests",
+      "print": "Open print view",
+      "requestCancel": "Request cancellation",
+      "cancelTitle": "Request cancellation",
+      "cancelBody": "A wrong receipt is never edited. A second person (principal or accountant) approves the cancellation.",
+      "cancelConsequence": "Nothing changes until the cancellation is approved.",
+      "reasonCode": "Reason",
+      "reason": "Explain what happened",
+      "reasonHint": "10 to 1000 characters. Do not type Aadhaar numbers.",
+      "requestRefund": "Request refund",
+      "refundTitle": "Request a refund",
+      "refundBody": "The money goes back to the payer with a refund voucher once a second person approves.",
+      "refundConsequence": "The voucher is written only after approval.",
+      "refundAmount": "Refund amount (₹)",
+      "refundMode": "Refund by",
+      "cancellationTitle": "Cancellation",
+      "requestedBy": "Requested by {name} on {when}",
+      "toApprovals": "Go to fee approvals",
+      "refundsTitle": "Refunds",
+      "printVoucher": "Print voucher"
+    },
+    "account": {
+      "title": "Fee account",
+      "collect": "Collect fees",
+      "charged": "Charged",
+      "paid": "Paid",
+      "balance": "Balance",
+      "overdue": "Overdue",
+      "pending": "{count, plural, one {# request is} other {# requests are}} waiting for approval",
+      "tabsLabel": "Fee account sections",
+      "tabDues": "Dues",
+      "tabStatement": "Statement",
+      "tabRequests": "Concessions and adjustments",
+      "statementTitle": "Statement",
+      "columns": {
+        "date": "Date",
+        "kind": "Entry",
+        "line": "Line",
+        "receipt": "Receipt",
+        "amount": "Amount",
+        "balance": "Running balance"
+      },
+      "instalmentShort": "Inst. {no}",
+      "lateFee": "late fee",
+      "requestConcession": "Request concession",
+      "concessionTitle": "Request a concession",
+      "concessionBody": "A percentage of the charge, or an amount, on one fee line. A second person approves it.",
+      "needsApproval": "Dues change only after a second person approves.",
+      "concessionType": "Type",
+      "basis": "Given as",
+      "basisAmount": "An amount in rupees",
+      "basisPercent": "A percentage of the charge",
+      "value": "Amount or percentage",
+      "line": "Fee line",
+      "reason": "Reason",
+      "reasonHint": "10 to 1000 characters. Do not type Aadhaar numbers.",
+      "requestAdjustment": "Request adjustment",
+      "adjustmentTitle": "Request an adjustment",
+      "adjustmentBody": "Adds to or reduces what is due on one line, for example a late fee waiver. A second person approves it.",
+      "adjustmentAmount": "Amount (₹)",
+      "adjustmentAmountHint": "Positive adds to the dues; negative reduces them (a waiver is negative).",
+      "reasonCode": "Why",
+      "concessionsTitle": "Concessions",
+      "adjustmentsTitle": "Adjustments",
+      "none": "None yet."
+    },
+    "approvals": {
+      "title": "Fee approvals",
+      "description": "Concessions, adjustments, receipt cancellations and refunds waiting for a second person. You never decide your own request.",
+      "listTitle": "Waiting for a decision",
+      "emptyTitle": "Nothing is waiting",
+      "emptyBody": "When someone asks for a concession, adjustment, cancellation or refund, it appears here.",
+      "student": "Student",
+      "requestedBy": "Asked by {name} on {when}",
+      "approve": "Approve",
+      "approveTitle": "Approve this request",
+      "approveBody": "Check the reason first. You need to confirm it's you with a recent sign-in.",
+      "consequence": {
+        "concession": "The concession is posted to the student's account at once.",
+        "adjustment": "The adjustment is posted to the student's account at once.",
+        "cancellation": "The receipt is cancelled today and the payment is reversed in the ledger.",
+        "refund": "A refund voucher is written today and the refund is posted."
+      },
+      "note": "Note (optional)",
+      "reject": "Reject",
+      "rejectTitle": "Reject this request",
+      "rejectConsequence": "Nothing changes; the person who asked sees your reason.",
+      "rejectReason": "Why it is rejected",
+      "mine": "You made this request, so someone else decides it.",
+      "withdraw": "Withdraw",
+      "withdrawTitle": "Withdraw your request",
+      "withdrawConsequence": "The request is closed and nothing changes."
+    },
+    "daily": {
+      "title": "Daily collection",
+      "description": "Receipts of a day by mode and collector, cancellations and refunds, and the cash and cheques to hand over.",
+      "date": "Date",
+      "closedTitle": "This day is closed",
+      "closedBody": "Closed by {name} with {count, plural, one {# receipt} other {# receipts}}. Nothing more can be dated this day.",
+      "receipts": "Receipts",
+      "net": "Net collection",
+      "cash": "Cash to hand over",
+      "cheques": "Cheques to hand over",
+      "print": "Print (A4)",
+      "csv": "Download day book (CSV)",
+      "close": "Close day",
+      "closeTitle": "Close {date}?",
+      "closeBody": "Count the cash and cheques against these totals first.",
+      "closeConsequence": "{count, plural, one {# receipt} other {# receipts}}, net {net}. After closing, no receipt, cancellation or refund can be dated this day.",
+      "byMode": "By mode",
+      "byCollector": "By collector",
+      "none": "No receipts.",
+      "count": "{count, plural, one {# receipt} other {# receipts}}",
+      "online": "Online",
+      "receiptsTitle": "Receipts of the day",
+      "emptyTitle": "No receipts",
+      "emptyBody": "No receipt was issued on this day.",
+      "columns": {
+        "number": "Receipt",
+        "student": "Student",
+        "mode": "Paid by",
+        "status": "Status",
+        "amount": "Amount"
+      },
+      "reversalsTitle": "Cancellations and refunds of the day",
+      "cancelled": "Receipt {number} cancelled",
+      "refunded": "Voucher {voucher} for receipt {number}"
+    },
+    "dues": {
+      "title": "Fee dues",
+      "description": "Students with overdue fees, oldest due first.",
+      "class": "Class",
+      "allClasses": "All classes",
+      "csv": "Download dues (CSV)",
+      "students": "Students with overdue fees",
+      "total": "Total overdue",
+      "listTitle": "Overdue fees",
+      "emptyTitle": "No overdue fees",
+      "emptyBody": "No student in this list has an overdue fee.",
+      "noName": "Name not recorded",
+      "columns": {
+        "student": "Student",
+        "class": "Class",
+        "oldest": "Oldest due date",
+        "lastPayment": "Last payment",
+        "overdue": "Overdue"
+      }
+    },
+    "setup": {
+      "title": "Fee setup",
+      "description": "Fee heads and the fee plan of each class for the year, with instalments and late fees.",
+      "headsTitle": "Fee heads",
+      "headsBody": "The kinds of fee the school charges. Taxable heads are planned here but invoiced in Tally.",
+      "addHead": "Add fee head",
+      "addHeadTitle": "Add a fee head",
+      "headCode": "Code",
+      "headCodeHint": "Short and unique, for example TUI or EXAM.",
+      "headName": "Name",
+      "headKind": "Kind",
+      "headTaxable": "Taxable (GST)",
+      "headTaxableHint": "A taxable head is never collected with a SchoolOS receipt.",
+      "noHeads": "No fee heads yet. Add the heads first, then make a plan.",
+      "inactive": "not in use",
+      "taxable": "taxable",
+      "plansTitle": "Fee plans",
+      "newPlan": "New fee plan",
+      "noPlans": "No fee plans yet.",
+      "version": "version {no}",
+      "status": {
+        "draft": "Draft",
+        "active": "Active",
+        "superseded": "Replaced"
+      },
+      "planSummary": "{total} a year in {count, plural, one {# instalment} other {# instalments}}; {accounts, plural, one {# student} other {# students}} on this plan.",
+      "activate": "Activate",
+      "activateTitle": "Activate this plan",
+      "activateConsequence": "Once active, the plan cannot be edited; changes are made as a new version.",
+      "activateNewVersion": "The current version is replaced. Propose the differences as adjustments afterwards.",
+      "applyPreview": "Apply to class…",
+      "newVersion": "New version",
+      "newVersionTitle": "Make a new version",
+      "newVersionBody": "A draft copy you can change. Charges already posted are never rewritten.",
+      "proposeDifferences": "Propose differences",
+      "proposeTitle": "Propose the differences as adjustments",
+      "proposeBody": "For each student on the earlier version, what changed is asked as an adjustment.",
+      "proposeConsequence": "A second person approves each adjustment before dues change.",
+      "proposeReason": "Reason for the change",
+      "previewTitle": "Preview of applying the plan",
+      "appliedTitle": "Plan applied",
+      "applySummary": "{students, plural, one {# student} other {# students}} in the class: {created} new accounts, {present} already present, {charges} charges, {skipped} skipped.",
+      "applyNow": "Apply now",
+      "editorTitle": "New fee plan",
+      "editorBody": "Enter each head's amount per instalment; the annual amount is the row total.",
+      "year": "Academic year",
+      "class": "Class",
+      "planName": "Plan name",
+      "category": "Category (optional)",
+      "categoryHint": "For example new_admission; leave empty for everyone.",
+      "gridLabel": "Fee heads by instalment",
+      "head": "Fee head",
+      "instalmentLabel": "Name of instalment {no}",
+      "instalmentDue": "Due date of instalment {no}",
+      "cellLabel": "{head}, instalment {no}",
+      "annual": "Year total",
+      "instalmentTotal": "Instalment total",
+      "addInstalment": "Add instalment",
+      "removeInstalment": "Remove last instalment",
+      "term": "Term {no}",
+      "lateRule": "Late fee",
+      "lateNone": "No late fee",
+      "lateFlat": "Flat amount per overdue instalment",
+      "latePerDay": "Amount per day, up to a cap",
+      "lateAmount": "Late fee amount (₹)",
+      "lateGrace": "Grace days",
+      "lateCap": "Cap per instalment (₹)",
+      "saveDraft": "Save draft",
+      "editorIncomplete": "The plan is not complete",
+      "editorIncompleteBody": "Give the plan a name, at least one amount, and a name and due date for every instalment. Amounts are rupees with at most two decimals."
+    },
+    "errors": {
+      "module_hidden": {
+        "title": "Fees are not switched on",
+        "body": "The owner or principal turns fees on in school settings."
+      },
+      "amount_exceeds_due": {
+        "title": "More than what is due",
+        "body": "Advances are not taken. Lower the amount to the total due or less."
+      },
+      "head_not_collectable": {
+        "title": "Taxable fee head",
+        "body": "A taxable fee is invoiced in Tally, not collected with a SchoolOS receipt."
+      },
+      "utr_in_use": {
+        "title": "UTR already used",
+        "body": "This UPI reference is already on another receipt. Open that receipt instead."
+      },
+      "day_closed": {
+        "title": "The day is closed",
+        "body": "Nothing more can be dated today. Collection opens again tomorrow."
+      },
+      "self_approval_forbidden": {
+        "title": "Someone else must decide",
+        "body": "You made this request, so another principal or accountant must decide it."
+      },
+      "request_not_pending": {
+        "title": "Already decided",
+        "body": "This request was already decided or withdrawn. Reload the page."
+      },
+      "receipt_cancelled": {
+        "title": "Receipt cancelled",
+        "body": "This receipt was cancelled. Open its print view to print it marked CANCELLED."
+      },
+      "refund_exceeds_paid": {
+        "title": "Refund too large",
+        "body": "The refund is more than this receipt took and was not refunded yet."
+      },
+      "receipt_has_refunds": {
+        "title": "Receipt has a refund",
+        "body": "A receipt with a refund cannot be cancelled."
+      },
+      "plan_in_use": {
+        "title": "Plan in use",
+        "body": "An active plan cannot be edited. Make a new version instead."
+      },
+      "plan_exists": {
+        "title": "Plan already exists",
+        "body": "A plan for this class, year and category already exists. Open it or make a new version."
+      },
+      "nothing_to_concede": {
+        "title": "Nothing to concede",
+        "body": "These lines have nothing left to concede."
+      },
+      "pdf_not_ready": {
+        "title": "PDF not ready",
+        "body": "The PDF is still being made. Try again in a moment."
+      },
+      "payments_not_connected": {
+        "title": "Online payments not connected",
+        "body": "Collect the fee at the counter for now."
+      },
+      "head_code_taken": {
+        "title": "Code already used",
+        "body": "Another fee head has this code. Choose a different code."
+      },
+      "account_closed": {
+        "title": "Account closed",
+        "body": "This fee account is closed."
+      },
+      "not_requester": {
+        "title": "Not your request",
+        "body": "Only the person who made the request can withdraw it."
+      },
+      "cancellation_exists": {
+        "title": "Cancellation already asked",
+        "body": "A cancellation of this receipt is already waiting or approved."
+      }
     }
   }
 }

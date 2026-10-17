@@ -43,11 +43,13 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
+from app.apaar import service as apaar
 from app.audit import service as audit
 from app.authz.context import UserContext
 from app.authz.http import Page, decode_cursor, encode_cursor
+from app.certificates import codes, qr, templates
+from app.certificates import formats as tc_formats
 from app.certificates import repository as repo
-from app.certificates import templates
 from app.certificates.config import (
     CertificatesConfig,
     InputSpec,
@@ -55,11 +57,12 @@ from app.certificates.config import (
     format_serial,
     load_config,
 )
-from app.certificates.models import Certificate
+from app.certificates.models import Certificate, CertificateVerification
 from app.certificates.schemas import (
     ApproveIn,
     Blocker,
     CertificateContent,
+    CertificateFormatOut,
     CertificateOut,
     CertificatePreview,
     CertificateRequest,
@@ -68,13 +71,20 @@ from app.certificates.schemas import (
     ContentLine,
     DownloadUrlOut,
     DuplicateRequest,
+    FormatLineOut,
+    FormatSourceOut,
     InputOut,
     PreviewWarning,
     PrintedField,
+    PublicCertificateOut,
+    PublicDuplicate,
     ReasonIn,
+    VerificationOut,
+    VerificationReasonIn,
 )
 from app.changes import service as changes
 from app.core import purge as purging
+from app.core.config import get_settings
 from app.core.db import tenant_session
 from app.core.errors import (
     Conflict,
@@ -96,6 +106,7 @@ from app.identity import service as identity
 from app.identity.principal import STEP_UP_MAX_AGE
 from app.notifications import service as notifications
 from app.ops import service as ops
+from app.public import service as public
 from app.students import service as students
 from app.students.schemas import EnrollmentOut
 from app.tenancy import service as tenancy
@@ -106,6 +117,9 @@ ISSUE: Final = "certificate.issue"
 APPROVE: Final = "certificate.approve"
 REGISTER: Final = "register.read"
 STUDENT_READ: Final = "student.read_basic"
+STUDENT_SENSITIVE: Final = "student.read_sensitive"
+VERIFY_KIND: Final = "cert_verify"
+VERIFY_TARGET: Final = "certificate"
 RENDER_EVENT: Final = "certificate.render_requested"
 RENDER_TASK: Final = "certificates.render"
 DOCUMENT_PURPOSE: Final = "certificate"
@@ -214,6 +228,33 @@ class NotRequester(Forbidden):
 
     def __init__(self) -> None:
         super().__init__("Only the person who prepared this certificate can withdraw it.")
+
+
+class FormatChanged(Conflict):
+    code = "certificate_format_changed"
+
+    def __init__(self) -> None:
+        super().__init__(
+            "The transfer certificate format changed after this request was prepared. Reject it "
+            "and prepare the certificate again."
+        )
+
+
+class VerificationExists(Conflict):
+    code = "verification_exists"
+
+    def __init__(self) -> None:
+        super().__init__(
+            "This certificate already has a verification code (or had one that was withdrawn). "
+            "Issue a duplicate to give the paper a new code."
+        )
+
+
+class VerificationNotActive(Conflict):
+    code = "verification_not_active"
+
+    def __init__(self) -> None:
+        super().__init__("This certificate has no verification code to withdraw. Reload it.")
 
 
 class NoCurrentYear(Conflict):
@@ -421,6 +462,64 @@ def _format_value(key: str, value: str | None) -> str | None:
 
 
 @dataclass(frozen=True, slots=True)
+class _Layout:
+    """What a certificate of one type prints and asks for: the type's own lists, or for a TC
+    the school's format (``generic-v1`` = ``config.yaml``; a file format = ``fmt``)."""
+
+    certificate_type: str
+    format_key: str | None
+    format_version: int | None
+    fmt: tc_formats.TcFormat | None
+    inputs: Mapping[str, InputSpec]
+    printed: tuple[str, ...]
+    required: tuple[str, ...]
+
+
+def _layout(certificate_type: str, format_key: str | None) -> _Layout:
+    """The layout of ``certificate_type`` in format ``format_key`` (only TCs have formats)."""
+    spec = settings().spec(certificate_type)
+    if certificate_type != "transfer":
+        return _Layout(certificate_type, None, None, None, spec.inputs, spec.printed, spec.required)
+    fmt = (
+        None if format_key in (None, tc_formats.GENERIC_KEY) else tc_formats.get_format(format_key)
+    )
+    if fmt is None:
+        if format_key not in (None, tc_formats.GENERIC_KEY):
+            raise FormatChanged()  # a format file that no longer exists
+        return _Layout(
+            certificate_type,
+            tc_formats.GENERIC_KEY,
+            tc_formats.GENERIC_VERSION,
+            None,
+            spec.inputs,
+            spec.printed,
+            spec.required,
+        )
+    return _Layout(
+        certificate_type, fmt.key, fmt.version, fmt, fmt.inputs, fmt.attributes, fmt.required
+    )
+
+
+def _school_layout(session: Session, certificate_type: str) -> _Layout:
+    """The layout a new certificate of ``certificate_type`` gets in this school (FR-CERT-015)."""
+    if certificate_type != "transfer":
+        return _layout(certificate_type, None)
+    return _layout(
+        certificate_type, tenancy.get_tenant(session).settings.certificate_format.transfer
+    )
+
+
+def _row_layout(row: Certificate) -> _Layout:
+    """The layout a request was prepared in; 409 when that format version is gone."""
+    if row.certificate_type != "transfer":
+        return _layout(row.certificate_type, None)
+    layout = _layout(row.certificate_type, row.format_key or tc_formats.GENERIC_KEY)
+    if row.format_version is not None and layout.format_version != row.format_version:
+        raise FormatChanged()
+    return layout
+
+
+@dataclass(frozen=True, slots=True)
 class _Record:
     """What a certificate needs from the student record, read once."""
 
@@ -434,6 +533,12 @@ class _Record:
     structure: _Structure
     blockers: list[Blocker]
     warnings: list[PreviewWarning]
+    layout: _Layout
+    # Format TCs only (FR-CERT-017, FR-CERT-018): printable identifiers (``None`` = not
+    # printed) with their verification, and the restricted values (read only when printed).
+    identifiers: dict[str, PrintedField]
+    restricted: dict[str, str | None]
+    print_restricted: bool
 
     @property
     def current_enrolment(self) -> EnrollmentOut | None:
@@ -459,16 +564,66 @@ class _Record:
         return self.enrolments[-1] if self.enrolments else None
 
 
+def _identifiers(
+    session: Session, student_id: uuid.UUID, catalog: Mapping[str, Any]
+) -> dict[str, PrintedField]:
+    """The UDISE+ PEN and APAAR ID as a format TC may print them (FR-CERT-017, ADR-0039): the
+    PEN only from a verified value; the APAAR ID only verified AND with the parent's current
+    consent ``given`` (never refused, withdrawn or pending). Anything else is ``None``."""
+    keys = [k for k in sorted(tc_formats.IDENTIFIERS) if k in catalog]
+    values = students.canonical_values(session, [student_id], keys).get(student_id, {})
+    consent = apaar.consent_statuses(session, [student_id]).get(student_id)
+    out: dict[str, PrintedField] = {}
+    for key in keys:
+        v = values.get(key)
+        ok = v is not None and v.value is not None and v.verified
+        if key == "apaar_id" and consent != "given":
+            ok = False
+        out[key] = PrintedField(
+            key=key,
+            label_en=catalog[key].label_en,
+            label_te=telugu_text(catalog[key].label_te) or "",
+            value=v.value if ok and v is not None else None,
+            source=v.source if ok and v is not None else None,
+            verified=ok,
+            provisional=False,
+            fill="identifier",
+        )
+    return out
+
+
+def _restricted(
+    session: Session, layout: _Layout, student_id: uuid.UUID
+) -> tuple[bool, dict[str, str | None]]:
+    """Whether the school prints the restricted TC fields and, only then, their values
+    (FR-CERT-018; owner decision D15). The values are C3: never logged or audited."""
+    if layout.fmt is None or not layout.fmt.restricted:
+        return False, {}
+    on = tenancy.get_tenant(session).settings.print_restricted_tc_fields
+    if not on:
+        return False, {}
+    values = students.canonical_values(
+        session, [student_id], layout.fmt.restricted, include_sensitive=True
+    ).get(student_id, {})
+    return True, {k: (v.value if (v := values.get(k)) else None) for k in layout.fmt.restricted}
+
+
 def _record(
-    session: Session, ctx: UserContext, student_id: uuid.UUID, certificate_type: str
+    session: Session,
+    ctx: UserContext,
+    student_id: uuid.UUID,
+    certificate_type: str,
+    layout: _Layout | None = None,
 ) -> _Record:
-    """Read the printed values, enrolments and blockers of one student the caller reaches."""
+    """Read the printed values, enrolments and blockers of one student the caller reaches, for
+    ``layout`` (default: what a new certificate of the type gets in this school)."""
     cfg = settings()
     spec = cfg.spec(certificate_type)
+    layout = layout or _school_layout(session, certificate_type)
     profile = students.get_profile(session, ctx, student_id)  # 404 outside READ scope
     catalog = {a.key: a for a in students.attribute_catalog(session)}
     # FR-CERT-009: never a restricted (C3) attribute, whatever the configuration says.
-    keys = [k for k in spec.printed if k in catalog and catalog[k].classification != "C3"]
+    keys = [k for k in layout.printed if k in catalog and catalog[k].classification != "C3"]
     canonical = students.canonical_values(session, [student_id], keys).get(student_id, {})
     fields: list[PrintedField] = []
     raw: dict[str, str | None] = {}
@@ -488,11 +643,11 @@ def _record(
                 provisional=bool(value and value.provisional),
             )
         )
-        if raw[key] is None and key in spec.required:
+        if raw[key] is None and key in layout.required:
             blockers.append(Blocker(code="missing_value", attribute_key=key))
         elif value is not None and value.provisional:
             warnings.append(PreviewWarning(code="provisional_value", attribute_key=key))
-    for missing in (k for k in spec.required if k not in catalog):
+    for missing in (k for k in layout.required if k not in catalog):
         blockers.append(Blocker(code="missing_value", attribute_key=missing))
     blockers.extend(
         Blocker(
@@ -501,7 +656,7 @@ def _record(
             finding_id=b.finding_id,
             rule_id=b.rule_id,
         )
-        for b in dq.open_blockers(session, student_id, spec.printed)
+        for b in dq.open_blockers(session, student_id, layout.printed)
     )
     # A correction waiting for approval would change a printed value (audit 2026-10-05).
     blockers.extend(
@@ -510,6 +665,7 @@ def _record(
     )
     structure = _Structure.load(session)
     enrolments = students.enrolment_histories(session, [student_id]).get(student_id, [])
+    print_restricted, restricted = _restricted(session, layout, student_id)
     record = _Record(
         spec=spec,
         certificate_type=certificate_type,
@@ -521,6 +677,10 @@ def _record(
         structure=structure,
         blockers=blockers,
         warnings=warnings,
+        layout=layout,
+        identifiers=_identifiers(session, student_id, catalog) if layout.fmt is not None else {},
+        restricted=restricted,
+        print_restricted=print_restricted,
     )
     if structure.current is None:
         blockers.append(Blocker(code="no_current_year"))
@@ -538,53 +698,128 @@ def _refuse_blocked(record: _Record) -> None:
     """409 when anything stops issuing: the most specific reason first."""
     if not record.blockers:
         return
-    codes = {b.code for b in record.blockers}
-    if "no_current_year" in codes:
+    found = {b.code for b in record.blockers}
+    if "no_current_year" in found:
         raise NoCurrentYear()
-    if codes == {"change_request_pending"}:
+    if found == {"change_request_pending"}:
         raise ChangeRequestPending()
     raise CertificateBlocked()
 
 
-def _preview_out(record: _Record) -> CertificatePreview:
+def _format_preview(record: _Record, ctx: UserContext) -> list[PrintedField]:
+    """A format TC's lines in print order, each with its value now or as a TC input to type
+    (US-2001 AC1). A restricted value the school prints is shown only to holders of
+    ``student.read_sensitive`` (``masked`` otherwise)."""
+    fmt = record.layout.fmt
+    if fmt is None:  # pragma: no cover - callers check
+        return record.fields
+    by_key = {f.key: f for f in record.fields}
+    out: list[PrintedField] = []
+    for line in fmt.lines:
+        base: dict[str, Any] = {
+            "key": line.key,
+            "label_en": line.label_en,
+            "label_te": telugu_text(line.label_te) or "",
+            "value": None,
+            "source": None,
+            "verified": False,
+            "provisional": False,
+        }
+        if line.fill == "attribute" and line.attribute in by_key:
+            field = by_key[line.attribute]
+            out.append(field.model_copy(update={"key": line.key, "label_en": line.label_en}))
+            continue
+        if line.fill == "input":
+            out.append(PrintedField(**base, fill="input"))
+        elif line.fill == "derived" and line.derived is not None:
+            out.append(
+                PrintedField(**{**base, "value": _derived(record, line.derived)}, fill="derived")
+            )
+        elif line.fill == "identifier" and line.identifier in record.identifiers:
+            ident = record.identifiers[line.identifier]
+            out.append(ident.model_copy(update={"key": line.key, "label_en": line.label_en}))
+        elif line.fill == "restricted" and line.attribute is not None:
+            value = record.restricted.get(line.attribute)
+            shown = record.print_restricted and ctx.has(STUDENT_SENSITIVE)
+            out.append(
+                PrintedField(
+                    **{**base, "value": value if shown else None},
+                    fill="restricted",
+                    masked=record.print_restricted and value is not None and not shown,
+                )
+            )
+    return out
+
+
+def _preview_out(record: _Record, ctx: UserContext) -> CertificatePreview:
     current = record.current_enrolment or record.last_enrolment
     label = record.structure.class_labels(current.section_id)[0] if current else None
     year = record.structure.current
+    layout = record.layout
     return CertificatePreview(
         student_id=record.student_id,
         certificate_type=record.certificate_type,
         requires_approval=record.spec.requires_approval,
-        fields=record.fields,
+        fields=_format_preview(record, ctx) if layout.fmt is not None else record.fields,
         class_label=label,
         academic_year_label=year.label if year is not None else None,
         blockers=record.blockers,
         warnings=record.warnings,
         can_issue=not record.blockers,
+        format_key=layout.format_key,
+        format_version=layout.format_version,
     )
 
 
-def types_catalog() -> list[CertificateTypeOut]:
-    """Certificate types with their inputs and labels (``config.yaml``)."""
-    cfg = settings()
-    out: list[CertificateTypeOut] = []
-    for key, spec in cfg.types.items():
-        inputs = [
+def _choice_label(layout: _Layout, value: str) -> tuple[str, str]:
+    label = (
+        layout.fmt.choice_label(value)
+        if layout.fmt is not None
+        else settings().choice_labels.get(value)
+    )
+    return (label.en, label.te) if label is not None else (value, value)
+
+
+def _inputs_out(layout: _Layout) -> list[InputOut]:
+    labels: dict[str, tuple[str, str]] = {}
+    if layout.fmt is not None:
+        labels = {
+            ln.input: (ln.label_en, ln.label_te) for ln in layout.fmt.lines if ln.input is not None
+        }
+    else:
+        labels = {k: (v.en, v.te) for k, v in settings().detail_labels.items()}
+    out: list[InputOut] = []
+    for name, inp in layout.inputs.items():
+        en, te = labels.get(name, (name, name))
+        out.append(
             InputOut(
                 key=name,
+                label_en=en,
+                label_te=telugu_text(te) or "",
                 kind=inp.kind,
                 required=inp.required,
                 max_length=inp.max_length,
+                max_value=inp.max_value,
                 choices=[
                     ChoiceOut(
                         value=c,
-                        label_en=cfg.choice_labels[c].en,
-                        label_te=telugu_text(cfg.choice_labels[c].te) or "",
+                        label_en=_choice_label(layout, c)[0],
+                        label_te=telugu_text(_choice_label(layout, c)[1]) or "",
                     )
                     for c in inp.choices
                 ],
             )
-            for name, inp in spec.inputs.items()
-        ]
+        )
+    return out
+
+
+def types_catalog(session: Session) -> list[CertificateTypeOut]:
+    """Certificate types with their inputs and labels (``config.yaml``); the transfer
+    certificate in the school's chosen format (FR-CERT-015)."""
+    cfg = settings()
+    out: list[CertificateTypeOut] = []
+    for key, spec in cfg.types.items():
+        layout = _school_layout(session, key)
         out.append(
             CertificateTypeOut(
                 key=key,
@@ -592,8 +827,92 @@ def types_catalog() -> list[CertificateTypeOut]:
                 label_te=telugu_text(spec.label_te) or "",  # empty while hidden (ADR-0036)
                 requires_approval=spec.requires_approval,
                 ends_enrolment=spec.ends_enrolment,
-                printed=list(spec.printed),
-                inputs=inputs,
+                printed=list(layout.printed),
+                inputs=_inputs_out(layout),
+                format_key=layout.format_key,
+                format_version=layout.format_version,
+                format_verified=(
+                    None
+                    if layout.format_key is None
+                    else (layout.fmt.verified if layout.fmt is not None else True)
+                ),
+            )
+        )
+    return out
+
+
+def formats_catalog() -> list[CertificateFormatOut]:
+    """Every TC format a school may choose, with its lines, inputs, sources and whether a school
+    confirmed it (``GET /certificates/formats``; FR-CERT-015, owner decision D3)."""
+    cfg = settings()
+    spec = cfg.spec("transfer")
+    generic = _layout("transfer", tc_formats.GENERIC_KEY)
+    out = [
+        CertificateFormatOut(
+            key=tc_formats.GENERIC_KEY,
+            version=tc_formats.GENERIC_VERSION,
+            certificate_type="transfer",
+            label_en="Generic transfer certificate",
+            label_te=telugu_text("సాధారణ బదిలీ ధృవీకరణ పత్రం") or "",
+            builtin=True,
+            verified=True,
+            sources=[],
+            notes="The SchoolOS layout: the record's values, the details typed when the "
+            "certificate is prepared, then blank lines to fill by hand.",
+            lines=[
+                *(
+                    FormatLineOut(
+                        key=k, label_en=k, label_te="", fill="attribute", restricted=False
+                    )
+                    for k in spec.printed
+                ),
+                *(
+                    FormatLineOut(
+                        key=k,
+                        label_en=cfg.detail_labels[k].en,
+                        label_te=telugu_text(cfg.detail_labels[k].te) or "",
+                        fill="input",
+                        restricted=False,
+                    )
+                    for k in spec.inputs
+                ),
+                *(
+                    FormatLineOut(
+                        key=k,
+                        label_en=cfg.blank_labels[k].en,
+                        label_te=telugu_text(cfg.blank_labels[k].te) or "",
+                        fill="blank",
+                        restricted=False,
+                    )
+                    for k in spec.official_format_todo
+                ),
+            ],
+            inputs=_inputs_out(generic),
+        )
+    ]
+    for fmt in tc_formats.formats().values():
+        out.append(
+            CertificateFormatOut(
+                key=fmt.key,
+                version=fmt.version,
+                certificate_type=fmt.certificate_type,
+                label_en=fmt.label_en,
+                label_te=telugu_text(fmt.label_te) or "",
+                builtin=False,
+                verified=fmt.verified,
+                sources=[FormatSourceOut(title=s.title, url=s.url) for s in fmt.sources],
+                notes=fmt.notes,
+                lines=[
+                    FormatLineOut(
+                        key=ln.key,
+                        label_en=ln.label_en,
+                        label_te=telugu_text(ln.label_te) or "",
+                        fill=ln.fill,
+                        restricted=ln.fill == "restricted",
+                    )
+                    for ln in fmt.lines
+                ],
+                inputs=_inputs_out(_layout("transfer", fmt.key)),
             )
         )
     return out
@@ -606,10 +925,28 @@ def preview(
     permission ``certificate.issue``; 404 outside scope). Nothing is written or audited."""
     if not _in_reach(_reach(session, ctx, [ISSUE]), student_id):
         raise NotFound("Student not found")
-    return _preview_out(_record(session, ctx, student_id, certificate_type))
+    return _preview_out(_record(session, ctx, student_id, certificate_type), ctx)
 
 
 # --- inputs --------------------------------------------------------------------------------------
+
+
+def _clean_date(value: str, today: dt.date) -> tuple[str | None, str | None]:
+    try:
+        day = dt.date.fromisoformat(value)
+    except ValueError:
+        return None, "invalid_date"
+    return (None, "date_in_future") if day > today else (day.isoformat(), None)
+
+
+def _clean_number(inp: InputSpec, value: str) -> tuple[str | None, str | None]:
+    """A whole number 0..max_value (format TC inputs such as working days)."""
+    if not value.isascii() or not value.isdigit() or len(value) > 6:
+        return None, "invalid_number"
+    number = int(value)
+    if inp.max_value is not None and number > inp.max_value:
+        return None, "too_large"
+    return str(number), None
 
 
 def _clean_input(inp: InputSpec, value: str, today: dt.date) -> tuple[str | None, str | None]:
@@ -619,24 +956,23 @@ def _clean_input(inp: InputSpec, value: str, today: dt.date) -> tuple[str | None
     if inp.kind == "choice":
         return (value, None) if value in inp.choices else (None, "invalid_choice")
     if inp.kind == "date":
-        try:
-            day = dt.date.fromisoformat(value)
-        except ValueError:
-            return None, "invalid_date"
-        return (None, "date_in_future") if day > today else (day.isoformat(), None)
+        return _clean_date(value, today)
+    if inp.kind == "number":
+        return _clean_number(inp, value)
     if inp.max_length is not None and len(value) > inp.max_length:
         return None, "too_long"
     return value, None
 
 
 def _clean_inputs(
-    session: Session, spec: TypeSpec, raw: Mapping[str, str], record: _Record
+    session: Session, inputs: Mapping[str, InputSpec], raw: Mapping[str, str], record: _Record
 ) -> dict[str, str]:
-    """The type's inputs, checked against ``config.yaml`` (field-level 422 codes)."""
-    errors = [_error(f"inputs.{key}", "unknown_input") for key in raw if key not in spec.inputs]
+    """The type's (or the TC format's) inputs, checked against their spec (field-level 422
+    codes; FR-CERT-016: lengths, dates, choices, Aadhaar refusal)."""
+    errors = [_error(f"inputs.{key}", "unknown_input") for key in raw if key not in inputs]
     clean: dict[str, str] = {}
     today = _today(session)
-    for key, inp in spec.inputs.items():
+    for key, inp in inputs.items():
         value = (raw.get(key) or "").strip()
         if not value:
             if inp.required:
@@ -756,6 +1092,66 @@ def _details(
     return lines
 
 
+def _derived(record: _Record, name: str) -> str | None:
+    """A value worked out from the record for a format line (dob_in_words, admission_class,
+    class_at_leaving)."""
+    if name == "dob_in_words":
+        dob = record.raw.get("dob")
+        return templates.date_in_words(dt.date.fromisoformat(dob)) if dob else None
+    enrolment = (
+        (record.enrolments[0] if record.enrolments else None)
+        if name == "admission_class"
+        else record.last_enrolment
+    )
+    if enrolment is None:
+        return None
+    en, te = _class_and_year(record, enrolment)
+    return _both(en, te)
+
+
+def _input_text(layout: _Layout, key: str, value: str | None) -> str | None:
+    """A typed input as printed: a choice's label, a date as DD/MM/YYYY, text as typed."""
+    if value is None or value == "":
+        return None
+    spec = layout.inputs.get(key)
+    if spec is not None and spec.kind == "choice":
+        return _both(*_choice_label(layout, value))
+    if spec is not None and spec.kind == "date":
+        return templates.format_date(dt.date.fromisoformat(value))
+    return value
+
+
+NOT_PRINTED: Final = "—"
+
+
+def _format_lines(record: _Record, inputs: Mapping[str, str]) -> list[ContentLine]:
+    """The printed lines of a format TC in order (FR-CERT-015..018). Optional inputs left empty
+    and restricted lines the school does not print stay ``None`` (a labelled blank to fill by
+    hand); an identifier that may not be printed is "—" (never a blank to fill in)."""
+    fmt = record.layout.fmt
+    if fmt is None:  # pragma: no cover - callers check
+        return []
+    by_key = {f.key: f for f in record.fields}
+    out: list[ContentLine] = []
+    for line in fmt.lines:
+        value: str | None = None
+        if line.fill == "attribute" and line.attribute in by_key:
+            value = by_key[line.attribute].value
+        elif line.fill == "input" and line.input is not None:
+            value = _input_text(record.layout, line.input, inputs.get(line.input))
+        elif line.fill == "derived" and line.derived is not None:
+            value = _derived(record, line.derived)
+        elif line.fill == "identifier" and line.identifier is not None:
+            ident = record.identifiers.get(line.identifier)
+            value = ident.value if ident is not None and ident.value else NOT_PRINTED
+        elif line.fill == "restricted" and line.attribute is not None and record.print_restricted:
+            value = record.restricted.get(line.attribute)
+        out.append(
+            ContentLine(key=line.key, label_en=line.label_en, label_te=line.label_te, value=value)
+        )
+    return out
+
+
 def _build_content(
     session: Session,
     record: _Record,
@@ -767,27 +1163,38 @@ def _build_content(
 ) -> CertificateContent:
     cfg = settings()
     spec = record.spec
+    fmt = record.layout.fmt
     current = record.current_enrolment or record.last_enrolment
     class_en, class_te = (
         record.structure.class_labels(current.section_id) if current else (None, None)
     )
-    fields = [
-        ContentLine(key=f.key, label_en=f.label_en, label_te=f.label_te, value=f.value)
-        for f in record.fields
-    ]
-    blanks = [
-        ContentLine(
-            key=key,
-            label_en=cfg.blank_labels[key].en,
-            label_te=cfg.blank_labels[key].te,
-            value=None,
-        )
-        for key in spec.official_format_todo
-    ]
+    details: list[ContentLine]
+    blanks: list[ContentLine]
+    if fmt is not None:
+        # A format TC prints every line in the format's order (FR-CERT-015/016).
+        fields = _format_lines(record, inputs)
+        details, blanks = [], []
+        title_en, title_te = fmt.title_en, fmt.title_te
+    else:
+        fields = [
+            ContentLine(key=f.key, label_en=f.label_en, label_te=f.label_te, value=f.value)
+            for f in record.fields
+        ]
+        details = _details(record, inputs, cfg)
+        blanks = [
+            ContentLine(
+                key=key,
+                label_en=cfg.blank_labels[key].en,
+                label_te=cfg.blank_labels[key].te,
+                value=None,
+            )
+            for key in spec.official_format_todo
+        ]
+        title_en, title_te = spec.label_en, spec.label_te
     content = CertificateContent(
         certificate_type=record.certificate_type,
-        title_en=spec.label_en,
-        title_te=spec.label_te,
+        title_en=title_en,
+        title_te=title_te,
         serial=serial,
         academic_year_label=year.label,
         issued_on=issued_on,
@@ -796,7 +1203,7 @@ def _build_content(
         class_label_en=class_en,
         class_label_te=class_te,
         fields=fields,
-        details=_details(record, inputs, cfg),
+        details=details,
         blanks=blanks,
         **_letterhead(session),
     )
@@ -847,7 +1254,7 @@ def _draft_sha256(session: Session, ctx: UserContext, row: Certificate) -> str |
     if row.original_certificate_id is not None:
         original = repo.get_certificate(session, row.original_certificate_id)
         return _draft_digest(session, row, record=None, original=original)
-    record = _record(session, ctx, row.student_id, row.certificate_type)
+    record = _record(session, ctx, row.student_id, row.certificate_type, _row_layout(row))
     return _draft_digest(session, row, record=record, original=None)
 
 
@@ -894,6 +1301,12 @@ def _out(
         status=row.status,
         requires_approval=spec.requires_approval,
         inputs={str(k): str(v) for k, v in (row.inputs or {}).items()},
+        format_key=(row.format_key or tc_formats.GENERIC_KEY)
+        if row.certificate_type == "transfer"
+        else None,
+        format_version=(row.format_version or tc_formats.GENERIC_VERSION)
+        if row.certificate_type == "transfer"
+        else None,
         original_certificate_id=row.original_certificate_id,
         duplicate_no=row.duplicate_no,
         duplicate_reason=row.duplicate_reason,
@@ -926,6 +1339,284 @@ def _out(
 
 def _one(session: Session, ctx: UserContext, row: Certificate) -> CertificateOut:
     return _out(ctx, row, _names(session, [row]))
+
+
+# --- verification codes (R2; ADR-0045, ADR-0047; FR-CERT-019..024) ----------------------------
+
+_CODE_ATTEMPTS: Final = 3
+
+
+def verify_base_url() -> str | None:
+    """The verification host's origin (``SOS_VERIFY_BASE_URL``, D29), ``None`` while off."""
+    value = get_settings().verify_base_url
+    return value.rstrip("/") if value else None
+
+
+def verify_url(code: str) -> str | None:
+    """The link printed as a QR: ``{SOS_VERIFY_BASE_URL}/v/{code}`` (FR-CERT-020)."""
+    base = verify_base_url()
+    return f"{base}/v/{code}" if base else None
+
+
+def _create_verification(
+    session: Session,
+    ctx: UserContext,
+    certificate_id: uuid.UUID,
+    *,
+    reason: str,
+    note: str | None = None,
+) -> CertificateVerification:
+    """A fresh code and its ``cert_verify`` public handle, in the caller's transaction
+    (FR-CERT-019). The code is random (80 bits) and never derived from the certificate; the
+    handle stores only its SHA-256. Neither the code nor the hash goes into audit or logs."""
+    for _ in range(_CODE_ATTEMPTS):
+        code = codes.new_code()
+        try:
+            handle = public.issue_handle(
+                session,
+                kind=VERIFY_KIND,
+                target_type=VERIFY_TARGET,
+                target_id=certificate_id,
+                key=code,
+                created_by=ctx.user_id,
+            )
+        except public.HandleKeyInUse:  # pragma: no cover - 80-bit collision
+            continue
+        with _db_errors():
+            row = repo.insert_verification(
+                session,
+                id=new_id(),
+                tenant_id=repo.current_tenant_id(session),
+                certificate_id=certificate_id,
+                code=code,
+                handle_id=handle.handle_id,
+                created_reason=reason,
+                created_note=note,
+                created_by=ctx.membership_id,
+            )
+        _audit(
+            session,
+            action="certificate.verification_added",
+            resource_id=certificate_id,
+            summary={"verification_id": row.id, "created_reason": reason},
+        )
+        return row
+    raise Conflict(
+        "Try again in a moment.", code="verification_code_unavailable"
+    )  # pragma: no cover
+
+
+def _verification_mark(session: Session, row: Certificate) -> templates.VerificationMark | None:
+    """The verification block of a certificate's page: its live code, when verification is on
+    (FR-CERT-020). Drafts never carry one."""
+    if row.status not in ("issued", "cancelled"):
+        return None
+    live = repo.live_verifications(session, [row.id]).get(row.id)
+    url = verify_url(live.code) if live is not None else None
+    if live is None or url is None:
+        return None
+    host = url.split("://", 1)[1].rsplit("/v/", 1)[0]
+    return templates.VerificationMark(
+        code=codes.grouped(live.code),
+        host=host,
+        qr_svg=qr.qr_svg(url, label=f"QR code to check this certificate at {host}/v"),
+    )
+
+
+def _verification_out(
+    ctx: UserContext, row: Certificate, rows: Sequence[CertificateVerification]
+) -> VerificationOut:
+    current = next((v for v in rows if v.withdrawn_at is None), rows[0] if rows else None)
+    issued = row.status == "issued"
+    can_approve = ctx.has(APPROVE)
+    if current is None:
+        return VerificationOut(
+            certificate_id=row.id,
+            status="none",
+            code=None,
+            url=None,
+            created_reason=None,
+            created_at=None,
+            check_count=0,
+            last_checked_at=None,
+            withdrawn_at=None,
+            withdraw_reason=None,
+            version=0,
+            can_add=issued and can_approve,
+            can_withdraw=False,
+        )
+    live = current.withdrawn_at is None
+    reason: Any = current.created_reason
+    return VerificationOut(
+        certificate_id=row.id,
+        status="active" if live else "withdrawn",
+        code=codes.grouped(current.code),
+        url=verify_url(current.code),
+        created_reason=reason,
+        created_at=current.created_at,
+        check_count=current.check_count,
+        last_checked_at=current.last_checked_at,
+        withdrawn_at=current.withdrawn_at,
+        withdraw_reason=current.withdraw_reason,
+        version=current.version,
+        can_add=False,
+        can_withdraw=live and can_approve,
+    )
+
+
+def _clean_verification_reason(value: str | None) -> str:
+    text = (value or "").strip()
+    if not text:
+        raise ValidationFailed([_error("reason", "missing")])
+    if contains_full_aadhaar(text):
+        raise ValidationFailed(
+            [_error("reason", AADHAAR_CODE, "errors.aadhaar_last4_only")], detail=AADHAAR_DETAIL
+        )
+    if len(text) < settings().reason_min_length:
+        raise ValidationFailed([_error("reason", "too_short")])
+    if len(text) > settings().verification_reason_max_length:
+        raise ValidationFailed([_error("reason", "too_long")])
+    return text
+
+
+def get_verification(
+    session: Session, ctx: UserContext, certificate_id: uuid.UUID
+) -> VerificationOut:
+    """The certificate's verification code with its check count (US-2004 AC1; read, issue or
+    approve permission; 404 outside scope). ``status`` ``none`` for certificates without one."""
+    row = _load(session, ctx, certificate_id, permissions=_READERS)
+    return _verification_out(ctx, row, repo.verifications_of(session, row.id))
+
+
+def add_verification(
+    session: Session, ctx: UserContext, certificate_id: uuid.UUID, data: VerificationReasonIn
+) -> VerificationOut:
+    """Add a code to a certificate issued before R2 (FR-CERT-023a; ``certificate.approve``,
+    step-up, reason 10..500). The original paper cannot show it: the next duplicate carries a
+    code of its own. Errors: 404; 428; 409 ``certificate_not_issued`` /
+    ``verification_exists`` (it has, or had, a code). Audit
+    ``certificate.verification_added``."""
+    row = _load(session, ctx, certificate_id, permissions=[APPROVE], lock=True)
+    _require_recent_mfa(ctx)
+    reason = _clean_verification_reason(data.reason)
+    if row.status != "issued" or _void(session, row):
+        raise CertificateNotIssued()
+    if repo.verifications_of(session, row.id, lock=True):
+        raise VerificationExists()
+    _create_verification(session, ctx, row.id, reason="added_later", note=reason)
+    return _verification_out(ctx, row, repo.verifications_of(session, row.id))
+
+
+def withdraw_verification(
+    session: Session,
+    ctx: UserContext,
+    certificate_id: uuid.UUID,
+    data: VerificationReasonIn,
+    *,
+    expected_version: int,
+) -> VerificationOut:
+    """Withdraw a certificate's live code (FR-CERT-023b, US-2004 AC2; ``certificate.approve``,
+    step-up, ``If-Match`` = the verification's version, reason 10..500): its public handle is
+    revoked in the same transaction, so the page answers "not found" for it from now on.
+    Errors: 404; 428; 412; 409 ``verification_not_active``. Audit
+    ``certificate.verification_withdrawn``."""
+    row = _load(session, ctx, certificate_id, permissions=[APPROVE], lock=True)
+    _require_recent_mfa(ctx)
+    reason = _clean_verification_reason(data.reason)
+    rows = repo.verifications_of(session, row.id, lock=True)
+    live = next((v for v in rows if v.withdrawn_at is None), None)
+    if live is None:
+        raise VerificationNotActive()
+    if live.version != expected_version:
+        raise PreconditionFailed("This verification code was changed by someone else. Reload it.")
+    with _db_errors():
+        repo.withdraw_verification(session, live.id, by=ctx.membership_id, reason=reason)
+    public.revoke(session, live.handle_id, reason="withdrawn")
+    _audit(
+        session,
+        action="certificate.verification_withdrawn",
+        resource_id=row.id,
+        summary={"verification_id": live.id, "check_count": live.check_count},
+    )
+    log.info("certificate.verification_withdrawn", resource_type="certificate", resource_id=row.id)
+    return _verification_out(ctx, row, repo.verifications_of(session, row.id))
+
+
+def verify_publicly(
+    tenant_id: uuid.UUID, handle_id: uuid.UUID, *, ip_hash: str
+) -> PublicCertificateOut | None:
+    """The public verification of one live code (FR-CERT-021, FR-CERT-024; ADR-0045 decision
+    5), after the guard resolved it to (school, handle). Runs in that school's
+    ``tenant_session`` and re-reads the handle, the code and the certificate under RLS: ``None``
+    (the uniform 404) unless all three are live. Shows only the frozen printed content, never the
+    live record; a cancelled certificate (or a copy of a cancelled original) shows no content.
+    Counts the check and audits ``certificate.verified_publicly`` (certificate id, status shown,
+    ``ip_hash``) in the same transaction."""
+    with tenant_session(tenant_id) as session:
+        handle = public.load_handle(session, handle_id, (VERIFY_KIND,))
+        if handle is None or handle.target_type != VERIFY_TARGET:
+            return None
+        verification = repo.verification_by_handle(session, handle_id)
+        if (
+            verification is None
+            or verification.withdrawn_at is not None
+            or verification.certificate_id != handle.target_id
+        ):
+            return None
+        row = repo.get_certificate(session, verification.certificate_id)
+        content = _content_of(row) if row is not None else None
+        if row is None or content is None or row.status not in ("issued", "cancelled"):
+            return None
+        original = (
+            repo.get_certificate(session, row.original_certificate_id)
+            if row.original_certificate_id is not None
+            else None
+        )
+        cancelled_at = row.cancelled_at if row.status == "cancelled" else None
+        if cancelled_at is None and original is not None and original.status == "cancelled":
+            cancelled_at = original.cancelled_at
+        void = row.status == "cancelled" or cancelled_at is not None
+        shown = templates.shown(content)
+        issued_at = row.issued_at or dt.datetime.now(dt.UTC)
+        out = PublicCertificateOut(
+            status="cancelled" if void else "valid",
+            certificate_type=content.certificate_type,
+            title_en=shown.title_en,
+            school_name=shown.school_name_en,
+            school_place=shown.school_place,
+            serial=content.serial,
+            issued_on=content.issued_on,
+            duplicate=(
+                PublicDuplicate(
+                    copy_no=row.duplicate_no or 0,
+                    original_serial=content.serial,
+                    issued_on=issued_at.astimezone(IST).date(),
+                )
+                if row.original_certificate_id is not None
+                else None
+            ),
+            cancelled_on=cancelled_at.astimezone(IST).date() if cancelled_at else None,
+            content=None if void else shown,
+        )
+        repo.count_check(session, verification.id)
+        _audit(
+            session,
+            action="certificate.verified_publicly",
+            resource_id=row.id,
+            summary={
+                "status_shown": out.status,
+                "duplicate_no": row.duplicate_no,
+                "ip_hash": ip_hash,
+            },
+            system=True,
+        )
+    log.info(
+        "certificate.verified_publicly",
+        resource_type="certificate",
+        resource_id=row.id,
+        outcome=out.status,
+    )
+    return out
 
 
 # --- request, issue ------------------------------------------------------------------------------
@@ -1009,6 +1700,11 @@ def _issue(
             "enrollments_ended": withdrawn,
         },
     )
+    # FR-CERT-019: every certificate and every duplicate gets its own code, in this transaction
+    # (before the PDF is queued, so the PDF prints it).
+    _create_verification(
+        session, ctx, issued.id, reason="duplicate" if original is not None else "issued"
+    )
     ops.enqueue_event(
         session, RENDER_EVENT, {"certificate_id": str(issued.id), "user_id": str(ctx.user_id)}
     )
@@ -1029,7 +1725,7 @@ def request_certificate(
         raise NotFound("Student not found")
     record = _record(session, ctx, student_id, data.certificate_type)
     spec = record.spec
-    inputs = _clean_inputs(session, spec, data.inputs, record)
+    inputs = _clean_inputs(session, record.layout.inputs, data.inputs, record)
     _refuse_blocked(record)
     with _db_errors():
         row = repo.insert_certificate(
@@ -1040,6 +1736,8 @@ def request_certificate(
             certificate_type=data.certificate_type,
             status="pending",
             inputs=inputs,
+            format_key=record.layout.format_key,
+            format_version=record.layout.format_version,
             requested_by=ctx.membership_id,
             requested_at=_now(session),
         )
@@ -1052,6 +1750,7 @@ def request_certificate(
             "certificate_type": data.certificate_type,
             "needs_approval": spec.requires_approval,
             "input_keys": sorted(inputs),
+            "format_key": record.layout.format_key,
         },
     )
     if spec.requires_approval:
@@ -1090,6 +1789,8 @@ def request_duplicate(
             inputs={},
             original_certificate_id=original.id,
             duplicate_reason=reason,
+            format_key=original.format_key,
+            format_version=original.format_version,
             requested_by=ctx.membership_id,
             requested_at=_now(session),
         )
@@ -1154,10 +1855,10 @@ def approve(
         if original is None or original.status != "issued":
             raise CertificateNotIssued()
     else:
-        record = _record(session, ctx, row.student_id, row.certificate_type)
+        record = _record(session, ctx, row.student_id, row.certificate_type, _row_layout(row))
         _refuse_blocked(record)
         # The student may have left or been re-enrolled since the request: check again.
-        _clean_inputs(session, record.spec, dict(row.inputs or {}), record)
+        _clean_inputs(session, record.layout.inputs, dict(row.inputs or {}), record)
     # A-11: approve what the approver read. The fingerprint is taken from the same read of the
     # record that _issue freezes below, so a later edit cannot slip in between.
     expected = _draft_digest(session, row, record=record, original=original)
@@ -1378,7 +2079,7 @@ def _page(session: Session, ctx: UserContext, row: Certificate, *, for_pdf: bool
         original = repo.get_certificate(session, row.original_certificate_id)
         content = _content_of(original) if original is not None else None
     if content is None:
-        record = _record(session, ctx, row.student_id, row.certificate_type)
+        record = _record(session, ctx, row.student_id, row.certificate_type, _row_layout(row))
         year = record.structure.current
         if year is None:
             raise NoCurrentYear()
@@ -1395,6 +2096,7 @@ def _page(session: Session, ctx: UserContext, row: Certificate, *, for_pdf: bool
         reference=_reference(row),
         mark=mark,
         duplicate=_duplicate_mark(row),
+        verification=_verification_mark(session, row),
         for_pdf=for_pdf,
     )
 
@@ -1493,6 +2195,7 @@ def render_pdf(
             reference=_reference(row),
             mark="cancelled" if row.status == "cancelled" else None,
             duplicate=_duplicate_mark(row),
+            verification=_verification_mark(session, row),
             for_pdf=True,
         )
         title = f"{content.title_en} {content.serial}"
@@ -1663,7 +2366,8 @@ def register_page(
         father = next((f.value for f in content.fields if f.key == "father_name"), "") or ""
         issued_by = people.get(row.issued_by, "—") if row.issued_by else "—"
         if kind == "transfer":
-            details = {d.key: d.value or "" for d in content.details}
+            # Format TCs print these among their lines (R2), generic ones among the details.
+            details = {d.key: d.value or "" for d in (*content.fields, *content.details)}
             inputs = (original.inputs if original is not None else row.inputs) or {}
             approved = people.get(row.decided_by, "—") if row.decided_by else "—"
             lines.append(
@@ -1896,7 +2600,9 @@ def export_records(session: Session) -> list[RecordTable]:
 
 # Certificates and serial counters (FR-PLT-005, ADR-0029). Registered with app.tenancy at
 # import; purged before students, documents and the academic structure they reference.
-_PURGE = purging.PurgeTables(deleted=("sis.certificates", "sis.certificate_counters"))
+_PURGE = purging.PurgeTables(
+    deleted=("sis.certificate_verifications", "sis.certificates", "sis.certificate_counters")
+)
 
 
 def tenant_data_counts(session: Session) -> dict[str, int]:
@@ -1925,16 +2631,22 @@ __all__ = [
     "CertificateBlocked",
     "CertificateNotIssued",
     "CertificateNotPending",
+    "FormatChanged",
     "NoCurrentYear",
     "NotRequester",
     "SelfApprovalForbidden",
+    "VerificationExists",
+    "VerificationNotActive",
+    "add_verification",
     "admission_register_page",
     "approve",
     "cancel",
     "check_register",
     "download_url",
     "export_records",
+    "formats_catalog",
     "get_certificate",
+    "get_verification",
     "list_certificates",
     "mark_pdf_failed",
     "preview",
@@ -1949,5 +2661,9 @@ __all__ = [
     "settings",
     "tenant_data_counts",
     "types_catalog",
+    "verify_base_url",
+    "verify_publicly",
+    "verify_url",
     "withdraw",
+    "withdraw_verification",
 ]

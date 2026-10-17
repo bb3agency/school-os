@@ -25,6 +25,7 @@ import {
 import { Tabs } from "@/components/ui/Tabs";
 import { Value } from "@/components/ui/Value";
 import { StudentInsights } from "@/features/insights/StudentInsights";
+import { GuardianOptinsCard } from "@/features/messaging/GuardianOptins";
 import { Link } from "@/i18n/navigation";
 import { asList, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { useDateInput } from "@/lib/date-format";
@@ -774,7 +775,15 @@ export function StudentDetailView({
           {
             id: "guardians",
             label: t("tabGuardians"),
-            panel: <GuardiansCard student={data} guardians={guardians} permissions={permissions} />,
+            panel: (
+              <div className="space-y-6">
+                <GuardiansCard student={data} guardians={guardians} permissions={permissions} />
+                {/* R2-1C (US-2202, ADR-0043): WhatsApp opt-ins and message language. */}
+                {guardians.status === "ready" && guardians.data.length > 0 ? (
+                  <GuardianOptinsCard studentId={data.id} guardians={guardians.data} />
+                ) : null}
+              </div>
+            ),
           },
           {
             id: "enrolments",

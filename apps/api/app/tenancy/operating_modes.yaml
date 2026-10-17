@@ -8,11 +8,13 @@
 #              newly set up through the API. Data already recorded is kept; switching back to
 #              `full` shows the modules again.
 #
-# Module keys: `tally` (read-only Tally connector, app/tally). Fee screens (R2) join the
-# alongside list when they exist.
+# Module keys: `tally` (read-only Tally connector, app/tally); `fees` (R2-1B fee ledger and
+# receipts, app/fees). `fees` is also hidden in `full` mode until the school turns it on with
+# the setting `fees_enabled` (FR-FEE-001); in `alongside` mode that setting is how the owner
+# turns fees on despite the ERP (ADR-0042 decision 12).
 version: 1
 modes:
   full:
     hidden_modules: []
   alongside:
-    hidden_modules: [tally]
+    hidden_modules: [tally, fees]

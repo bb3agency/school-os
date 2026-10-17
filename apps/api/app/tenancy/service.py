@@ -15,7 +15,7 @@ from collections.abc import Callable, Collection, Iterator, Sequence
 from contextlib import contextmanager
 from functools import lru_cache
 from importlib import resources
-from typing import Any
+from typing import Any, Final
 
 import yaml
 from pydantic import ValidationError
@@ -47,6 +47,7 @@ from app.core.logging import get_context
 from app.tenancy import offboarding
 from app.tenancy import repository as repo
 from app.tenancy.schemas import (
+    RESTRICTED_TC_FIELDS,
     AcademicYearCreate,
     AcademicYearOut,
     AcademicYearUpdate,
@@ -958,6 +959,21 @@ def operating_modes() -> dict[str, frozenset[str]]:
     return modes
 
 
+# Modules a school switch turns on (FR-FEE-001): hidden in every mode while the switch is off,
+# shown in every mode (also ``alongside``, ADR-0042 decision 12) while it is on.
+_SWITCHED_MODULES: Final = {"fees": "fees_enabled"}
+
+
+def _hidden_modules(settings: TenantSettings) -> frozenset[str]:
+    hidden = set(operating_modes()[settings.operating_mode])
+    for module, switch in _SWITCHED_MODULES.items():
+        if getattr(settings, switch):
+            hidden.discard(module)
+        else:
+            hidden.add(module)
+    return frozenset(hidden)
+
+
 def _tenant_out(tenant: Any) -> TenantOut:
     settings = _shown_settings(_stored_settings(tenant))
     return TenantOut(
@@ -970,7 +986,7 @@ def _tenant_out(tenant: Any) -> TenantOut:
         plan_tier=tenant.plan_tier,
         deployment_mode=tenant.deployment_mode,
         settings=settings,
-        modules_hidden=sorted(operating_modes()[settings.operating_mode]),
+        modules_hidden=sorted(_hidden_modules(settings)),
         parent_language_unreviewed=unreviewed_parent_texts(settings.parent_language),
         version=tenant.version,
     )
@@ -982,7 +998,7 @@ def module_enabled(session: Session, module: str) -> bool:
     tenant = repo.get_own_tenant(session)
     if tenant is None:
         raise NotFound("School not found")
-    return module not in operating_modes()[_stored_settings(tenant).operating_mode]
+    return module not in _hidden_modules(_stored_settings(tenant))
 
 
 def parent_language(session: Session) -> Language:
@@ -1075,11 +1091,18 @@ def update_tenant_settings(
     if boards_changed:
         fields.add("boards")
         summary["boards"] = list(new_boards)
-    if "operating_mode" in fields:
-        summary["operating_mode"] = merged.operating_mode
-    if "parent_language" in fields:
-        # ADR-0044, FR-LANG-001: the language parents receive is audited with its value.
-        summary["parent_language"] = merged.parent_language
+    # Settings audited with their new value: the operating mode (FR-TEN-022), the language
+    # parents receive (ADR-0044, FR-LANG-001) and the school's fee switch (R2-1B, FR-FEE-001).
+    for key in ("operating_mode", "parent_language", "fees_enabled"):
+        if key in fields:
+            summary[key] = getattr(merged, key)
+    # R2-1A (ADR-0045; FR-CERT-015, FR-CERT-018): the TC format and the restricted-fields switch
+    # are audited with their values, the switch also with the field keys it prints.
+    if "certificate_format" in fields:
+        summary["certificate_format"] = merged.certificate_format.model_dump(mode="json")
+    if "print_restricted_tc_fields" in fields:
+        summary["print_restricted_tc_fields"] = merged.print_restricted_tc_fields
+        summary["restricted_tc_fields"] = list(RESTRICTED_TC_FIELDS)
     _audit(
         session,
         action="tenant.settings_updated",

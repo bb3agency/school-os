@@ -166,6 +166,8 @@ EXPECTED_TABLES = {
     "document_acl",
     "certificates",
     "certificate_counters",
+    # R2-1A (0056_certificate_verifications, ADR-0045): printed verification codes.
+    "certificate_verifications",
     # R1 (0051_apaar_consent_pen, ADR-0039): the APAAR consent register and form language.
     "apaar_consents",
     "apaar_consent_settings",
@@ -191,7 +193,29 @@ EXPECTED_TABLES = {
     # Ask memory (0038_ask_conversations, ADR-0034): each person's own items and switch.
     "ask_memories",
     "ask_memory_settings",
+    # R2-1C WhatsApp (0057_messaging_core, ADR-0043): no secrets, blind indexes or variables.
+    "messaging_accounts",
+    "messaging_templates",
+    "messaging_settings",
+    "messaging_optins",
+    "messaging_messages",
     "retention_settings",
+    # R2-1B fees (0058_fees_core, FR-FEE-027): every fin table, empty ones too.
+    "fees_fee_settings",
+    "fees_fee_heads",
+    "fees_fee_plans",
+    "fees_fee_plan_lines",
+    "fees_fee_plan_instalments",
+    "fees_student_fee_accounts",
+    "fees_ledger_entries",
+    "fees_concessions",
+    "fees_adjustments",
+    "fees_receipt_counters",
+    "fees_receipts",
+    "fees_receipt_allocations",
+    "fees_receipt_cancellations",
+    "fees_refunds",
+    "fees_day_closes",
     # DL-07: restricted document files left out of an export without restricted details.
     "documents_withheld",
 }

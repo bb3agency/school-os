@@ -347,6 +347,25 @@ templates:
     te:
       title: ఫాలో-అప్ గడువు దాటింది
       body: ఒక విద్యార్థి ఫ్లాగ్ గడువు దాటింది, ఇంకా ఎవరూ చర్యను నమోదు చేయలేదు. దాన్ని తెరిచి చేసినది నమోదు చేయండి, లేదా కారణంతో మూసివేయండి.
+  # --- R2-1C WhatsApp messaging (ADR-0043; FR-MSG-007, FR-MSG-021): to messaging.configure ---
+  messaging.paused:
+    params: [account_id, reason]
+    resource_type: messaging_account
+    en:
+      title: WhatsApp sending is paused
+      body: "SchoolOS stopped sending WhatsApp messages for the school because Meta reported a problem ({reason}). Open the WhatsApp settings to see what to do, then resume when it is safe."
+    te:
+      title: WhatsApp పంపడం ఆపివేయబడింది
+      body: "Meta ఒక సమస్యను నివేదించినందున ({reason}) SchoolOS పాఠశాల WhatsApp సందేశాలను పంపడం ఆపింది. ఏమి చేయాలో చూడటానికి WhatsApp సెట్టింగ్‌లను తెరవండి, సురక్షితమైనప్పుడు మళ్ళీ ప్రారంభించండి."
+  messaging.template_paused:
+    params: [account_id, template_key]
+    resource_type: messaging_account
+    en:
+      title: A WhatsApp message type is paused
+      body: "Meta moved the {template_key} message out of the utility category, so SchoolOS will not use it. Messages of that type stop until a new version is approved."
+    te:
+      title: ఒక WhatsApp సందేశ రకం ఆపివేయబడింది
+      body: "Meta {template_key} సందేశాన్ని యుటిలిటీ వర్గం నుండి మార్చింది, కాబట్టి SchoolOS దాన్ని ఉపయోగించదు. కొత్త వెర్షన్ ఆమోదించబడే వరకు ఆ రకం సందేశాలు ఆగిపోతాయి."
   # --- Tally connector (M6; FR-TALLY-009; ADR-0032 Proposed, behind tally.connector.enabled) ---
   tally.agent_silent:
     params: [device_id, hours]
@@ -357,3 +376,22 @@ templates:
     te:
       title: Tally ఏజెంట్ సింక్ ఆగిపోయింది
       body: "కార్యాలయ PCలోని Tally ఏజెంట్ {hours} గంటలకు పైగా SchoolOSను సంప్రదించలేదు, కాబట్టి ఫీజు బకాయిలు పాతవి కావచ్చు. PC ఆన్‌లో ఉందా, TallyPrime తెరిచి ఉందా, ఇంటర్నెట్ పనిచేస్తోందా చూడండి."
+  # --- R2-1B fees (ADR-0042; FR-FEE-026): maker-checker requests and decisions (ids only) ---
+  fee.approval_requested:
+    params: [request_id, kind, account_id]
+    resource_type: fee_request
+    en:
+      title: "{kind, select, concession {Fee concession} adjustment {Fee adjustment} cancellation {Receipt cancellation} refund {Fee refund} other {Fee request}} waiting for your approval"
+      body: "A {kind, select, concession {fee concession} adjustment {fee adjustment} cancellation {receipt cancellation} refund {fee refund} other {fee request}} is waiting for a second person's approval. Open Fees > Approvals to check it, then approve or reject it."
+    te:
+      title: "మీ ఆమోదం కోసం {kind, select, concession {ఫీజు రాయితీ} adjustment {ఫీజు సర్దుబాటు} cancellation {రసీదు రద్దు} refund {ఫీజు వాపసు} other {ఫీజు అభ్యర్థన}} వేచి ఉంది"
+      body: "ఒక {kind, select, concession {ఫీజు రాయితీ} adjustment {ఫీజు సర్దుబాటు} cancellation {రసీదు రద్దు} refund {ఫీజు వాపసు} other {ఫీజు అభ్యర్థన}} రెండవ వ్యక్తి ఆమోదం కోసం వేచి ఉంది. ఫీజులు > ఆమోదాలు తెరిచి చూసి ఆమోదించండి లేదా తిరస్కరించండి."
+  fee.request_decided:
+    params: [request_id, kind, account_id, decision]
+    resource_type: fee_request
+    en:
+      title: "Your fee request was {decision, select, approved {approved} other {rejected}}"
+      body: "Your {kind, select, concession {fee concession} adjustment {fee adjustment} cancellation {receipt cancellation} refund {fee refund} other {fee request}} request was {decision, select, approved {approved and the student's fee account is updated} other {rejected; open it to read the reason}}."
+    te:
+      title: "మీ ఫీజు అభ్యర్థన {decision, select, approved {ఆమోదించబడింది} other {తిరస్కరించబడింది}}"
+      body: "మీ {kind, select, concession {ఫీజు రాయితీ} adjustment {ఫీజు సర్దుబాటు} cancellation {రసీదు రద్దు} refund {ఫీజు వాపసు} other {ఫీజు}} అభ్యర్థన {decision, select, approved {ఆమోదించబడింది, విద్యార్థి ఫీజు ఖాతా నవీకరించబడింది} other {తిరస్కరించబడింది; కారణం చూడటానికి తెరవండి}}."

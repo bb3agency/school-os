@@ -219,6 +219,20 @@ def _any_of_guards() -> list[tuple[str, str, Any]]:
 
 CERT_READERS = ("certificate.read", ("certificate.issue", "certificate.approve"), False)
 APAAR_READERS = ("apaar.consent.read", ("apaar.consent.record",), False)
+FEE_ALL = (
+    "finance.read",
+    "fee.collect",
+    "fee.manage",
+    "fee.concession.request",
+    "fee.concession.approve",
+    "fee.receipt.cancel",
+    "fee.refund.request",
+    "fee.refund.approve",
+    "fee.report",
+)
+FEE_SETUP_READERS = ("finance.read", ("fee.manage",), False)
+FEE_VIEWERS = ("fee.collect", ("finance.read",), False)
+FEE_CANCEL_MAKERS = ("fee.collect", ("fee.manage",), False)
 
 
 def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
@@ -250,12 +264,18 @@ def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
         ("GET", "/api/v1/certificates"): CERT_READERS,
         ("GET", "/api/v1/certificates/{certificate_id}"): CERT_READERS,
         ("GET", "/api/v1/certificates/{certificate_id}/print"): CERT_READERS,
+        # R2-1A (ADR-0045): TC formats and a certificate's verification code.
+        ("GET", "/api/v1/certificates/formats"): CERT_READERS,
+        ("GET", "/api/v1/certificates/{certificate_id}/verification"): CERT_READERS,
         # Task assignees (FR-TASK-002, FR-CIR-004): whoever creates tasks or confirms suggested
         # deadlines picks an owner; the service requires a school-wide grant of either.
         ("GET", "/api/v1/task-assignees"): ("task.manage", ("circular.review",), False),
         # Exams (FR-MRK-001): the current year's exam list (C1: names and dates) for whoever
         # reads or records marks or manages exams; marks themselves stay section-scoped.
         ("GET", "/api/v1/exams"): ("marks.read", ("marks.record", "exam.manage"), False),
+        # Ask source links (FR-KB-042): askers, or document readers for a document page (search
+        # results); the service then applies the source's own permission and scope (404).
+        ("GET", "/api/v1/knowledge/resolve"): ("kb.ask", ("document.read",), False),
         # Tally connector status (ADR-0032, FR-TALLY-007): finance readers, the owner (agents) and
         # the accountant (mapping) share it; money totals only for school-wide finance.read.
         ("GET", "/api/v1/tally/status"): (
@@ -274,6 +294,46 @@ def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
             ("apaar.consent.record", "tenant.settings.manage"),
             False,
         ),
+        # R2-1C WhatsApp (ADR-0043): configurers and readers share the account state and the
+        # settings; readers and recorders share a guardian's opt-ins (scope in the service).
+        ("GET", "/api/v1/messaging/account"): ("messaging.configure", ("message.read",), False),
+        ("GET", "/api/v1/messaging/templates"): ("messaging.configure", ("message.read",), False),
+        ("GET", "/api/v1/messaging/settings"): ("message.read", ("messaging.configure",), False),
+        ("GET", "/api/v1/guardians/{guardian_id}/optins"): (
+            "message.read",
+            ("messaging.optin.record",),
+            False,
+        ),
+        # R2-1B fees (ADR-0042): reads shared by collectors, readers and approvers; every fee
+        # permission is school-wide, re-checked by the service (FR-FEE-024).
+        ("GET", "/api/v1/fees/status"): ("finance.read", FEE_ALL[1:], False),
+        ("GET", "/api/v1/fees/settings"): FEE_SETUP_READERS,
+        ("GET", "/api/v1/fees/plans"): FEE_SETUP_READERS,
+        ("GET", "/api/v1/fees/plans/{plan_id}"): FEE_SETUP_READERS,
+        ("GET", "/api/v1/fees/plans/{plan_id}/differences"): FEE_SETUP_READERS,
+        ("GET", "/api/v1/fees/heads"): ("finance.read", ("fee.collect", "fee.manage"), False),
+        ("POST", "/api/v1/fees/accounts/search"): FEE_VIEWERS,
+        ("GET", "/api/v1/fees/accounts/{account_id}"): FEE_VIEWERS,
+        ("GET", "/api/v1/fees/accounts/{account_id}/statement"): FEE_VIEWERS,
+        ("GET", "/api/v1/students/{student_id}/fee-accounts"): FEE_VIEWERS,
+        ("GET", "/api/v1/fees/receipts"): FEE_VIEWERS,
+        ("GET", "/api/v1/fees/receipts/{receipt_id}"): FEE_VIEWERS,
+        ("GET", "/api/v1/fees/receipts/{receipt_id}/print"): FEE_VIEWERS,
+        ("GET", "/api/v1/fees/receipts/{receipt_id}/download-url"): FEE_VIEWERS,
+        ("GET", "/api/v1/fees/refunds/{refund_id}/print"): FEE_VIEWERS,
+        ("POST", "/api/v1/fees/receipts/{receipt_id}/cancellation"): FEE_CANCEL_MAKERS,
+        ("POST", "/api/v1/fees/cancellations/{cancellation_id}/withdraw"): FEE_CANCEL_MAKERS,
+        ("GET", "/api/v1/fees/accounts/{account_id}/concessions"): (
+            "finance.read",
+            ("fee.concession.request", "fee.concession.approve"),
+            False,
+        ),
+        ("GET", "/api/v1/fees/accounts/{account_id}/adjustments"): (
+            "finance.read",
+            ("fee.manage", "fee.concession.approve"),
+            False,
+        ),
+        ("GET", "/api/v1/fees/approvals"): ("finance.read", FEE_ALL[1:-1], False),
     }
     assert {
         (m, p): (g.sos_permission, g.sos_any_of, g.sos_step_up) for m, p, g in guards

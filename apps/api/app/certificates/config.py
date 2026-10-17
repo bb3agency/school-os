@@ -40,10 +40,12 @@ class _Frozen(BaseModel):
 
 
 class InputSpec(_Frozen):
-    kind: Literal["date", "choice", "text"]
+    kind: Literal["date", "choice", "text", "number"]
     required: bool
     choices: tuple[str, ...] = ()
     max_length: int | None = Field(default=None, ge=1, le=1000)
+    # kind ``number`` (R2, AP TC working days): a whole number 0..max_value.
+    max_value: int | None = Field(default=None, ge=1, le=100_000)
 
     @model_validator(mode="after")
     def _shape(self) -> InputSpec:
@@ -51,6 +53,8 @@ class InputSpec(_Frozen):
             raise ValueError("choices are given exactly for kind 'choice'")
         if (self.kind == "text") != (self.max_length is not None):
             raise ValueError("max_length is given exactly for kind 'text'")
+        if (self.kind == "number") != (self.max_value is not None):
+            raise ValueError("max_value is given exactly for kind 'number'")
         return self
 
 
@@ -103,6 +107,7 @@ class CertificatesConfig(_Frozen):
     serial: SerialSpec
     reason_min_length: int = Field(ge=1)
     reason_max_length: int = Field(le=1000)
+    verification_reason_max_length: int = Field(ge=10, le=500)
     document_acl_roles: tuple[str, ...] = Field(min_length=1)
     download_url_ttl_s: int = Field(ge=1, le=300)
     register_max_rows: int = Field(ge=1, le=100_000)

@@ -168,6 +168,13 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
         "reason": "Synthetic BOLA duplicate reason"
     },
     ("POST", "/api/v1/certificates/{certificate_id}/render"): None,
+    # R2-1A (ADR-0045): adding or withdrawing another school's verification code is 404.
+    ("POST", "/api/v1/certificates/{certificate_id}/verification"): {
+        "reason": "Synthetic BOLA verification reason"
+    },
+    ("POST", "/api/v1/certificates/{certificate_id}/verification/withdraw"): {
+        "reason": "Synthetic BOLA verification reason"
+    },
     # M4: circulars (document ids), suggestions, tasks and notices of school B are 404.
     ("POST", "/api/v1/circulars/{document_id}/read"): {},
     ("POST", "/api/v1/circulars/{document_id}/review"): {},
@@ -226,6 +233,13 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     },
     ("DELETE", "/api/v1/tally/parties/{party_id}/links/{student_id}"): None,
     ("POST", "/api/v1/notices/{notice_id}/draft"): {},
+    # R2-1C WhatsApp opt-ins (ADR-0043): another school's guardian is 404 like a random id.
+    ("POST", "/api/v1/guardians/{guardian_id}/optins"): {
+        "category": "notices",
+        "status": "opted_in",
+        "method": "in_person",
+        "decided_on": "2026-10-01",
+    },
     # APAAR consent register (ADR-0039): another school's student is 404 like a random id.
     ("POST", "/api/v1/students/{student_id}/apaar-consent"): {
         "status": "refused",
@@ -308,6 +322,9 @@ ACTOR: dict[tuple[str, str], str] = dict.fromkeys(
         ("GET", "/api/v1/students/{student_id}/timeline"),
         # ADR-0039: recording APAAR consent is not an owner permission (docs/07 §6.2).
         ("POST", "/api/v1/students/{student_id}/apaar-consent"),
+        # ADR-0043: recording WhatsApp opt-ins is not an owner permission (docs/07 §6.2).
+        ("POST", "/api/v1/guardians/{guardian_id}/optins"),
+        ("GET", "/api/v1/sections/{section_id}/join-slips"),
     ),
     "principal",
 )
@@ -706,6 +723,33 @@ def _tally_flag(path: str, w: Any) -> contextlib.AbstractContextManager[None]:
     return contextlib.nullcontext()
 
 
+def _fees() -> ModuleType:
+    """tests/fees/security_support.py (fee objects of school B, fees switched on per call)."""
+    name = "sos_test_fees_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "fees" / "security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+def _b_fee(w: Any, key: str) -> uuid.UUID:
+    value: uuid.UUID = _fees().b_objects(_ADMIN[0], w)[key]
+    return value
+
+
+def _module_on(path: str, w: Any) -> contextlib.AbstractContextManager[None]:
+    """Tally routes need school A's connector flag; fee routes school A's fees switched on."""
+    if _fees().is_fee_path(path):
+        on: contextlib.AbstractContextManager[None] = _fees().on(_ADMIN[0], w.a.tenant_id, path)
+        return on
+    return _tally_flag(path, w)
+
+
 def _b_invitation(w: Any) -> uuid.UUID:
     """An open invitation in school B (one per session)."""
     if "bola_invitation" not in w.b.ids:
@@ -765,6 +809,15 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     # Tally connector (M6): an agent and a ledger of school B.
     "device_id": lambda w: _b_tally(w, "bola_tally_device"),
     "party_id": lambda w: _b_tally(w, "bola_tally_party"),
+    # R2-1B fees (ADR-0042): school B's fee objects are 404 like a random id.
+    "head_id": lambda w: _b_fee(w, "head_id"),
+    "plan_id": lambda w: _b_fee(w, "plan_id"),
+    "account_id": lambda w: _b_fee(w, "account_id"),
+    "receipt_id": lambda w: _b_fee(w, "receipt_id"),
+    "cancellation_id": lambda w: _b_fee(w, "cancellation_id"),
+    "concession_id": lambda w: _b_fee(w, "concession_id"),
+    "adjustment_id": lambda w: _b_fee(w, "adjustment_id"),
+    "refund_id": lambda w: _b_fee(w, "refund_id"),
 }
 
 
@@ -773,6 +826,10 @@ def _id_routes() -> list[tuple[str, str]]:
     for rc in iter_route_contexts(create_app().routes):
         # Control-plane routes are operator-only and not tenant scoped (tests/platform).
         if str(rc.path).startswith(("/api/v1/platform/", "/api/v1/fleet/")):
+            continue
+        # Public routes take no member and no school id (ADR-0047): a key resolves to one school
+        # or to the uniform 404 (tests/public/, tests/certificates/test_verification.py).
+        if str(rc.path).startswith(("/api/v1/public/", "/api/v1/webhooks/")):
             continue
         params = set(re.findall(r"{(\w+)}", str(rc.path)))
         # A readiness profile key (ADR-0040) names configuration, not an object of the school.
@@ -784,11 +841,14 @@ def _id_routes() -> list[tuple[str, str]]:
 ID_ROUTES = _id_routes()
 
 
+BODIES.update(_fees().BOLA_BODIES)
+
 # Required query parameters of ID routes, so the request reaches the object lookup.
 QUERY: dict[tuple[str, str], dict[str, str]] = {
     ("GET", "/api/v1/students/{student_id}/certificates/preview"): {"certificate_type": "bonafide"},
     ("GET", "/api/v1/sections/{section_id}/attendance/month"): {"month": "2026-09"},
     ("GET", "/api/v1/imports/{import_id}/preset-mapping"): {"preset": "register-excel"},
+    ("GET", "/api/v1/sections/{section_id}/join-slips"): {"categories": "notices"},
 }
 
 
@@ -825,9 +885,9 @@ def test_SEC_001_other_school_ids_are_404(
     before = W.audit_events(admin_engine, world.b.tenant_id)
     bodies = []
     for target in (b_id, uuid.uuid4()):
-        with _tally_flag(template, world):
+        with _module_on(template, world):
             res = api.call(
-                world.person(ACTOR.get(key, "owner")),
+                world.person(ACTOR.get(key, "principal" if "/fees/" in template else "owner")),
                 method,
                 _fill(template, target),
                 json=BODIES.get(key),

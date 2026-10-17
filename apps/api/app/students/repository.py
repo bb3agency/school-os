@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -1053,6 +1053,53 @@ def guardian_student_ids(session: Session, guardian_id: uuid.UUID) -> list[uuid.
             select(StudentGuardian.student_id).where(StudentGuardian.guardian_id == guardian_id)
         )
     )
+
+
+# --- R2-1C messaging lookups (ADR-0043; FR-MSG-019) -------------------------------------------
+
+
+def guardian_phone_key_versions(session: Session) -> list[int]:
+    """Key versions under which guardian phone blind indexes are currently stored."""
+    return [
+        int(v)
+        for v in session.scalars(
+            select(Guardian.key_version)
+            .where(Guardian.phone_blind_index.is_not(None), Guardian.key_version.is_not(None))
+            .distinct()
+        )
+        if v is not None
+    ]
+
+
+def guardian_ids_by_phone_index(session: Session, digests: Mapping[int, bytes]) -> list[uuid.UUID]:
+    """Guardians whose phone blind index equals the digest computed under their key version."""
+    if not digests:
+        return []
+    clauses = [
+        and_(Guardian.key_version == version, Guardian.phone_blind_index == digest)
+        for version, digest in digests.items()
+    ]
+    return list(session.scalars(select(Guardian.id).where(or_(*clauses)).order_by(Guardian.id)))
+
+
+def guardian_links_of(
+    session: Session, student_ids: Collection[uuid.UUID]
+) -> list[tuple[Guardian, StudentGuardian]]:
+    if not student_ids:
+        return []
+    rows = session.execute(
+        select(Guardian, StudentGuardian)
+        .join(
+            StudentGuardian,
+            and_(
+                StudentGuardian.tenant_id == Guardian.tenant_id,
+                StudentGuardian.guardian_id == Guardian.id,
+            ),
+        )
+        .where(StudentGuardian.student_id.in_(list(student_ids)))
+        .order_by(StudentGuardian.student_id, StudentGuardian.is_primary.desc(), Guardian.id)
+    ).all()
+    return [(g, link) for g, link in rows]
 
 
 def ensure_found[T](value: T | None, what: str) -> T:

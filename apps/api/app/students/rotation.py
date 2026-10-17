@@ -107,6 +107,10 @@ CIPHERTEXT_COLUMNS: Final[tuple[tuple[str, str], ...]] = (
     ("kb.user_memories", "text_ciphertext"),
     ("sis.behaviour_notes", "body_ciphertext"),
     ("sis.flag_actions", "note_ciphertext"),
+    # R2-1C (0057_messaging_core): message variables and the provider inbox (app.messaging
+    # registers their re-encryption, and refreshes opt-in phone indexes in the same pass).
+    ("msg.messages", "vars_ciphertext"),
+    ("msg.provider_events", "payload_ciphertext"),
 )
 
 # Ciphertext-looking columns that are NOT under a tenant DEK, with the reason.
@@ -117,6 +121,10 @@ NOT_TENANT_DEK: Final[Mapping[tuple[str, str], str]] = {
     # DEK; the agent rotates them itself every 90 days and offboarding deletes them.
     ("ops.tally_devices", "key_ciphertext"): "KMS key wrapper bound to the school (ADR-0032)",
     ("ops.tally_devices", "next_key_ciphertext"): "KMS key wrapper bound to the school (ADR-0032)",
+    # R2-1C (ADR-0043 decision 5): the school's Meta business token and registration PIN are
+    # wrapped with wrap_bound (KMS context bound to the account row), not a tenant DEK.
+    ("msg.accounts", "token_ciphertext"): "KMS key wrapper bound to the account row (ADR-0043)",
+    ("msg.accounts", "pin_ciphertext"): "KMS key wrapper bound to the account row (ADR-0043)",
 }
 
 

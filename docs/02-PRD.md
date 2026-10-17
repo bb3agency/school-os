@@ -554,6 +554,8 @@ Stories of the 2026-27 plan, release R2 (docs/18 §3 R2; owner decisions D4-D9 o
 **US-2006** · As an exam coordinator in a CBSE or CISCE school, I want the generic TC to stay available and later board formats to plug in without changing issued certificates. [FR-CERT-015]
 - AC1: Formats are versioned files; adding one needs no migration; the certificate stores the format key and version it was issued with.
 
+**C20 as built (wave R2-1A, 2026-10-17).** US-2001..US-2004 and US-2006 are built with their ACs as automated tests (docs/03 §3.19 "As built"; docs/14 R2-1A status). Refinements: a PEN or APAAR ID that may not be printed shows "—" on the TC; the code alphabet is Crockford base32 and a typed `O` reads as `0`, `I`/`L` as `1`; the code and QR are printed while the school's verification host is set; a code can be added later only to a certificate that never had one (a withdrawn code's paper is replaced by a duplicate). **US-2005 is not built yet**: it needs the fee ledger (wave R2-1B).
+
 #### C21 · Fee ledger, receipts and payments (R2.2; ADR-0042)
 
 **US-2101** · As an accountant with the principal, I want to set fee heads and a fee plan per class for the year with instalments, so that every student's dues are calculated the same way. [FR-FEE-002..FR-FEE-005, FR-FEE-023]
@@ -617,6 +619,8 @@ Stories of the 2026-27 plan, release R2 (docs/18 §3 R2; owner decisions D4-D9 o
 - AC1: At 06:00 IST SchoolOS compares yesterday's Razorpay payments, refunds and settlements with our receipts and lists: paid but no receipt, receipt but not captured, amount mismatch, refunded, settlement not seen after three working days.
 - AC2: Each line links to the receipt or the Razorpay payment id; I can mark a line explained with a note (audited). Nothing is changed automatically.
 
+*As built (R2-1B, 2026-10-18):* US-2101..US-2106 and US-2110 work for cash, cheque, bank transfer and UPI (UTR recorded at the counter); sending on WhatsApp (US-2102 AC3, US-2110 AC3), Razorpay (US-2107, US-2108, online refunds in US-2106 AC2), bank statements (US-2109) and the online reconciliation report (US-2111) follow in later R2 waves (docs/14). Applying a plan shows a preview and then applies at once (no waiting job). Fees appear once SchoolOS enables them for the school and the owner or principal switches them on in school settings.
+
 **US-2112** · As management, I want to ask "How much is due from Class 9?" in Ask the school and get the ledger figure with a source chip, when fees are on. [FR-KB-044]
 - AC1: Given fees are on and I hold `finance.read`, the fee tool reads the SchoolOS ledger (as of now) instead of Tally; the source chip opens the dues list.
 - AC2: Without `finance.read` the tool is not offered.
@@ -663,6 +667,8 @@ Stories of the 2026-27 plan, release R2 (docs/18 §3 R2; owner decisions D4-D9 o
 
 **US-2210** · As a parent who writes to the school's number, I want a polite answer telling me how to reach the office, since nobody reads messages there. [FR-MSG-018]
 - AC1: Any message that is not a keyword gets at most one automatic reply a day with the office phone number; the message text is not stored.
+
+*Built in wave R2-1C (2026-10-17): US-2201, US-2202, US-2203, US-2209, US-2210 and the message history of US-2208; US-2204..US-2207 (sending) and the broadcast report are wave R2-3G (docs/14). A staff opt-in after a parent's STOP needs a signed form (US-2203 AC2); a new number needs a new opt-in.*
 
 #### C23 · Parent language per school (R2.3; ADR-0044)
 

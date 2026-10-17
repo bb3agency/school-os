@@ -23,6 +23,7 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
+from pydantic import SecretStr
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.engine import make_url
 
@@ -193,6 +194,26 @@ def readonly_engine(test_database: TestDatabase) -> Iterator[Engine]:
 @pytest.fixture(scope="session")
 def make_alembic_config() -> type[Config] | object:
     return alembic_config
+
+
+MESSAGING_TEST_SETTINGS = {
+    "messaging_enabled": True,
+    "messaging_manual_token_allowed": True,
+    "meta_app_secret": SecretStr("synthetic-meta-app-secret-for-tests-only"),
+}
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _messaging_on() -> Iterator[None]:
+    """R2-1C WhatsApp messaging (ADR-0043) on for the suite: shared tier, fake provider, the
+    pilot manual-token mode and a synthetic Meta app secret. Patched for messaging only
+    (``app.messaging.runtime``), so settings tests keep building their own environments; tests of
+    the switch itself patch it off."""
+    from app.messaging import runtime
+
+    runtime.patch_for_tests(MESSAGING_TEST_SETTINGS)
+    yield
+    runtime.patch_for_tests(None)
 
 
 @pytest.fixture(autouse=True)
