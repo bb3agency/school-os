@@ -4991,7 +4991,11 @@
       "withheldTitle": "Answer hidden",
       "withheldBody": "This answer is hidden because you can no longer see one of its sources. Ask the question again to get an answer from what you can see now.",
       "incompleteTitle": "Answer not finished",
-      "incompleteBody": "This answer was still being written when the chat opened, perhaps in another window, or it was cut off. It shows here when it is ready; if it does not, ask again."
+      "incompleteBody": "This answer was still being written when the chat opened, perhaps in another window, or it was cut off. It shows here when it is ready; if it does not, ask again.",
+      "resolveOpen": "opens its screen",
+      "resolveGone": "Source you can no longer open",
+      "resolveNoScreen": "This source has no screen to open.",
+      "resolveFailed": "Could not open the source. Try again."
     },
     "notFound": {
       "title": "Not found in the school records you can access",
@@ -5008,7 +5012,8 @@
       "disabled": "AI answers are switched off for this school. The principal can switch them on in school settings.",
       "rate_limited": "Many questions are being asked right now. Wait a minute, then ask again for a full answer.",
       "unavailable": "AI answers are temporarily unavailable. Try again in a few minutes.",
-      "internal": "Something went wrong and SchoolOS could not finish this answer. Ask again."
+      "internal": "Something went wrong and SchoolOS could not finish this answer. Ask again.",
+      "unchecked": "SchoolOS could not check the AI answer against the school's records, so it shows the matching passages instead. Read them, or ask again in other words."
     },
     "errors": {
       "ai_rate_limited": {
@@ -5387,6 +5392,22 @@
       "edited": "Memory changed.",
       "userOff": "Memory is off for you, so Ask neither uses nor adds memories. Switch it on to add, change or save items; you can still delete them.",
       "fullHint": "Memory is full (30 items). Delete something you no longer need to add more."
+    },
+    "usage": {
+      "meterOf": "{used} of {included} answers this month",
+      "meterNoBundle": "{used} answers this month",
+      "meterLabel": "AI answers used this month",
+      "near": "Near your monthly answers",
+      "nearTitle": "Near your monthly AI answers",
+      "nearBody": "The school has used most of this month's included AI answers. Extra answers are billed at the bundle's rate. Plan and billing shows the details.",
+      "searchOnlyTitle": "Ask shows matching passages only",
+      "next": {
+        "ai_budget_exhausted": "Full answers return when the month resets. Ask the principal about a bigger answer bundle.",
+        "ai_disabled": "Ask the principal to switch AI answers on in school settings.",
+        "ai_unavailable": "Ask again in a few minutes."
+      },
+      "nextBudgetBilling": "Full answers return when the month resets. To get them sooner, ask SchoolOS support about a bigger answer bundle.",
+      "dismiss": "Dismiss: {title}"
     }
   },
   "marketing": {

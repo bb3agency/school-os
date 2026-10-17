@@ -7,7 +7,15 @@ import { TabNav } from "@/components/ui/TabNav";
 import { DownloadButton } from "@/features/documents/parts";
 import { Link } from "@/i18n/navigation";
 import { useStaffCan } from "@/lib/bff/staff-me";
-import { displayText, parseSource, sourceHref, splitMarkers, type SourceRef } from "./answer";
+import {
+  displayText,
+  needsResolve,
+  parseSource,
+  sourceHref,
+  splitMarkers,
+  type SourceRef,
+} from "./answer";
+import { ResolveSourceLink } from "./ResolveSource";
 import { ASK_PERM } from "./data";
 
 export type AskTab = "ask" | "search" | "verified";
@@ -130,6 +138,7 @@ export function SourceChip({
   const ref = parseSource(source);
   const href = ref ? sourceHref(ref) : null;
   const name = title?.trim() || t("untitled");
+  const resolvable = needsResolve(source);
   return (
     <li
       id={anchorId}
@@ -160,6 +169,8 @@ export function SourceChip({
               >
                 {name}
               </Link>
+            ) : resolvable ? (
+              <ResolveSourceLink source={source} name={name} />
             ) : (
               <span className="font-semibold text-ink">{name}</span>
             )}
@@ -169,7 +180,9 @@ export function SourceChip({
             {ref?.kind === "count" ? <Pill variant="tag">{t("countNote")}</Pill> : null}
             {ref?.kind === "fee" ? <Pill variant="tag">{tt("sourceNote")}</Pill> : null}
           </p>
-          {ref === null ? <p className="text-xs text-ink-muted">{t("noLink")}</p> : null}
+          {ref === null && !resolvable ? (
+            <p className="text-xs text-ink-muted">{t("noLink")}</p>
+          ) : null}
           {meta ? <p className="text-xs text-ink-muted">{meta}</p> : null}
         </div>
       </div>

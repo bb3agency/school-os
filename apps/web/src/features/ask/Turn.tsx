@@ -14,6 +14,7 @@ import {
   outcomeOf,
   parseSource,
   quoteFromSnippet,
+  searchOnlyNotice,
   type AskCitation,
   type AskState,
 } from "./answer";
@@ -342,7 +343,7 @@ function AssistantMessage({ turn, handlers }: { turn: TurnModel; handlers: TurnH
         ) : null}
         {outcome === "search_only" ? (
           <Alert tone="warning" title={t("searchOnly.title")}>
-            <p>{t(`kbErrors.${state.notice ?? "unavailable"}`)}</p>
+            <p>{t(`kbErrors.${searchOnlyNotice(state)}`)}</p>
             <p className="mt-1">{t("searchOnly.body")}</p>
           </Alert>
         ) : null}

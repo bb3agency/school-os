@@ -19,6 +19,10 @@
 - Conversations (``kb.ask``, the caller's own only; 404 otherwise): ``GET
   /knowledge/conversations``, ``GET|PATCH|DELETE /knowledge/conversations/{id}`` (PATCH with
   ``If-Match``).
+- Ask finish-up (R2.4): ``GET /knowledge/usage`` (``kb.ask``; this IST month's state, the
+  numbers only for ``tenant.billing.read`` holders; FR-KB-040) and ``GET /knowledge/resolve``
+  (``kb.ask`` or ``document.read``, then the permission and scope of the source itself; 404
+  when the caller cannot open it; FR-KB-042).
 - Memory (``kb.ask``, the caller's own only; ADR-0034): ``GET|POST|DELETE
   /knowledge/memories``, ``PATCH|DELETE /knowledge/memories/{id}`` (PATCH with ``If-Match``),
   ``POST /knowledge/memories/{id}/confirm``, ``GET|PUT /knowledge/memory-settings``.
@@ -38,12 +42,12 @@ from dataclasses import asdict
 from typing import Annotated, Any
 
 import anyio
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
 from app.authz.context import UserContext
-from app.authz.dependencies import TenantDB, require
+from app.authz.dependencies import TenantDB, require, require_any
 from app.authz.http import (
     Cursor,
     IdempotencyDep,
@@ -68,8 +72,10 @@ from app.knowledge.schemas import (
     MemoryPatchIn,
     MemorySettingsIn,
     MemorySettingsOut,
+    ResolveOut,
     SearchIn,
     SearchOut,
+    UsageOut,
     VerifiedAnswerIn,
     VerifiedAnswerOut,
     VerifiedAnswerReviewIn,
@@ -81,6 +87,9 @@ router = APIRouter(prefix="/api/v1", tags=["knowledge"])
 Asker = Annotated[UserContext, Depends(require(service.ASK))]
 Searcher = Annotated[UserContext, Depends(require(service.SEARCH))]
 Verifier = Annotated[UserContext, Depends(require(service.MANAGE_VERIFIED))]
+# A source link: Ask sources need kb.ask, document pages may also come from search results; the
+# service then checks the source's own permission and scope (404 otherwise).
+Resolver = Annotated[UserContext, Depends(require_any(service.ASK, service.SEARCH))]
 
 SSE_MEDIA_TYPE = "text/event-stream"
 _SSE_DOC: dict[int | str, dict[str, Any]] = {
@@ -435,3 +444,26 @@ def put_memory_settings(ctx: Asker, db: TenantDB, body: MemorySettingsIn) -> Mem
     """Turn memory on or off for you. Off: nothing is saved, suggested or used (your items stay
     listed so you can delete them)."""
     return service.get_service().set_memory_settings(db, ctx, body)
+
+
+@router.get("/knowledge/usage", response_model=UsageOut)
+def usage(ctx: Asker, db: TenantDB) -> UsageOut:
+    """This month's AI answers for the school (calendar month, IST; FR-KB-040). ``state`` is
+    ``ok``, ``near_limit`` (from 80% of the monthly AI budget or of the included answers) or
+    ``search_only`` (with ``search_only_reason``). ``answers_used`` (billable answers so far,
+    ADR-0038) and ``included_answers`` (the bundle's, null without one) only for
+    ``tenant.billing.read`` holders; null for everyone else. Never tokens or money."""
+    return service.get_service().usage(db, ctx)
+
+
+@router.get("/knowledge/resolve", response_model=ResolveOut)
+def resolve_source(
+    ctx: Resolver,
+    db: TenantDB,
+    source: Annotated[str, Query(min_length=8, max_length=300, pattern=r"^sos://")],
+) -> ResolveOut:
+    """Where a ``sos://`` source opens (FR-KB-042): ``kind``, ``id`` and an app-relative
+    ``href`` (null for a student count, which has no screen). 404 when you cannot open it now
+    (ACL, scope, masking, a retired answer, someone else's chat) or it is malformed or another
+    school's. Sources carry ids only, so the URL holds no personal data."""
+    return service.get_service().resolve_source(db, ctx, source)

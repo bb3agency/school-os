@@ -17,6 +17,7 @@ from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
 from typing import Any
+from urllib.parse import quote
 
 import pytest
 from fastapi.routing import APIRoute, iter_route_contexts
@@ -219,6 +220,21 @@ def _kb_conversation(action: str) -> Builder:
         return path, None, {}
 
     return build
+
+
+def _kb_usage(w: Any, r: str, a: Engine) -> Request:
+    _ADMIN_ENGINE[:] = [a]
+    _kb_ai_runtime(w)
+    return "/api/v1/knowledge/usage", None, {}
+
+
+def _kb_resolve(w: Any, r: str, a: Engine) -> Request:
+    """A page of the circular every role reads: kb.ask and document.read holders both open it
+    (require_any; FR-KB-042)."""
+    _ADMIN_ENGINE[:] = [a]
+    _kb_ai_runtime(w)
+    source = f"sos://doc/{KB.shared_document(a, w.a)}/v1#p1"
+    return f"/api/v1/knowledge/resolve?source={quote(source, safe='')}", None, {}
 
 
 def _kb_memory_create(w: Any, r: str, a: Engine) -> Request:
@@ -1781,6 +1797,9 @@ SPECS: dict[tuple[str, str], Builder] = {
         {"enabled": True},
         {},
     ),
+    # R2.4 (FR-KB-040, FR-KB-042).
+    ("GET", "/api/v1/knowledge/usage"): _kb_usage,
+    ("GET", "/api/v1/knowledge/resolve"): _kb_resolve,
     # Circulars, tasks and parent notices (M4; FR-CIR-*, FR-TASK-*, FR-NOTICE-*).
     ("GET", "/api/v1/circulars"): lambda w, r, a: ("/api/v1/circulars", None, {}),
     ("GET", "/api/v1/circulars/{document_id}"): lambda w, r, a: (

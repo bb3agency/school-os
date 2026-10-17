@@ -3170,6 +3170,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/knowledge/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Resolve Source
+         * @description Where a ``sos://`` source opens (FR-KB-042): ``kind``, ``id`` and an app-relative
+         *     ``href`` (null for a student count, which has no screen). 404 when you cannot open it now
+         *     (ACL, scope, masking, a retired answer, someone else's chat) or it is malformed or another
+         *     school's. Sources carry ids only, so the URL holds no personal data.
+         */
+        get: operations["resolve_source_api_v1_knowledge_resolve_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/knowledge/search": {
         parameters: {
             query?: never;
@@ -3185,6 +3208,30 @@ export interface paths {
          *     search-only view of Ask, without generated prose. The query goes in the body (SEC-008).
          */
         post: operations["search_api_v1_knowledge_search_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Usage
+         * @description This month's AI answers for the school (calendar month, IST; FR-KB-040). ``state`` is
+         *     ``ok``, ``near_limit`` (from 80% of the monthly AI budget or of the included answers) or
+         *     ``search_only`` (with ``search_only_reason``). ``answers_used`` (billable answers so far,
+         *     ADR-0038) and ``included_answers`` (the bundle's, null without one) only for
+         *     ``tenant.billing.read`` holders; null for everyone else. Never tokens or money.
+         */
+        get: operations["usage_api_v1_knowledge_usage_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -11242,6 +11289,11 @@ export interface components {
             /** Question */
             question: string;
             /**
+             * Search Only Reason
+             * @description Why the answer is search-only (null unless mode is search_only).
+             */
+            search_only_reason?: ("ai_budget_exhausted" | "ai_disabled" | "ai_rate_limited" | "ai_unavailable" | "answer_unchecked") | null;
+            /**
              * Status
              * @enum {string}
              */
@@ -13281,6 +13333,28 @@ export interface components {
             change_request_id?: string | null;
             /** Note */
             note?: string | null;
+        };
+        /**
+         * ResolveOut
+         * @description Where a ``sos://`` source opens (``GET /knowledge/resolve``, FR-KB-042).
+         */
+        ResolveOut: {
+            /**
+             * Href
+             * @description App-relative path of the screen that opens it (no locale prefix); null when the source has no screen (a student count).
+             */
+            href: string | null;
+            /**
+             * Id
+             * Format: uuid
+             * @description The source's object id (document, student, ...).
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "doc" | "student" | "finding" | "change" | "verified" | "count" | "fee" | "conversation";
         };
         /** RetentionCategoryOut */
         RetentionCategoryOut: {
@@ -15369,6 +15443,41 @@ export interface components {
              * Format: date
              */
             usage_date: string;
+        };
+        /**
+         * UsageOut
+         * @description This month's AI answers for the school (``GET /knowledge/usage``, FR-KB-040).
+         *
+         *     ``state`` is for everyone with ``kb.ask``; the numbers only for ``tenant.billing.read``
+         *     holders (null for everyone else). Never tokens or money.
+         */
+        UsageOut: {
+            /**
+             * Answers Used
+             * @description Billable answers this month so far (ADR-0038 decision 4). Null unless you hold tenant.billing.read.
+             */
+            answers_used?: number | null;
+            /**
+             * Included Answers
+             * @description Answers a month in the school's AI answer bundle. Null without a bundle, or unless you hold tenant.billing.read.
+             */
+            included_answers?: number | null;
+            /**
+             * Month
+             * @description The calendar month in IST (YYYY-MM).
+             */
+            month: string;
+            /**
+             * Search Only Reason
+             * @description Why answers are search-only (null unless search_only).
+             */
+            search_only_reason?: ("ai_budget_exhausted" | "ai_disabled" | "ai_unavailable") | null;
+            /**
+             * State
+             * @description ok; near_limit from 80% of the monthly AI budget or of the included answers; search_only when Ask answers with matching passages only.
+             * @enum {string}
+             */
+            state: "ok" | "near_limit" | "search_only";
         };
         /** UserOut */
         UserOut: {
@@ -22995,6 +23104,50 @@ export interface operations {
             };
         };
     };
+    resolve_source_api_v1_knowledge_resolve_get: {
+        parameters: {
+            query: {
+                source: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResolveOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     search_api_v1_knowledge_search_post: {
         parameters: {
             query?: never;
@@ -23024,6 +23177,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    usage_api_v1_knowledge_usage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageOut"];
                 };
             };
             /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
