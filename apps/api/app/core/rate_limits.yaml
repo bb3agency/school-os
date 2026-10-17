@@ -27,10 +27,20 @@ exempt_paths:
 machine_path_prefixes:
   - /api/v1/fleet/
   - /api/v1/edge/
+  # R2-0 (ADR-0047): provider webhooks (Razorpay, Meta) call the API directly; signature guard.
+  - /api/v1/webhooks/
+
+# R2-0 public surface (ADR-0046, ADR-0047; docs/09 §4 "Public"): parent link pages and
+# certificate verification, called by the BFF with the service token and no user token. The
+# per-IP layer is public_ip (stricter, fail closed) instead of ip; the public guards
+# (app/public/guards.py) add public_lookup_fail before any lookup and public_token per handle.
+public_path_prefixes:
+  - /api/v1/public/
 
 # per:   ip (client IP from the trusted proxy chain), user (the signed-in caller: issuer kind +
 #        subject; on /api/v1/platform/* that is the operator), school (the active school),
-#        operator (same partition as user, named for the control-plane layer).
+#        operator (same partition as user, named for the control-plane layer), handle (one
+#        public handle, R2: charged by the public and webhook guards only).
 # fail:  open = allow while Valkey is unreachable; closed = fall back to a per-process in-memory
 #        limiter with the same budget (sign-in and credential paths).
 # report: false = an aggregate the caller shares with others; its counters are shown in the
@@ -100,6 +110,29 @@ policies:
     {quota: 30, window_s: 600, per: user, fail: open, report: true, weighted: false}
   platform_emergency:
     {quota: 60, window_s: 600, per: operator, fail: open, report: true, weighted: false}
+
+  # --- R2-0 public surface and webhooks (ADR-0046 decision 7, ADR-0047 decision 4; FR-PUB-011;
+  # docs/09 §2.7 and §4). Charged by the public guards in app/public/guards.py, never listed
+  # under routes: (per: ip and per: handle are refused there). per: handle = one public handle
+  # (its id), so one forwarded link cannot be hammered.
+  # Layer 1 for /api/v1/public/* instead of ip: a parent's phone, not an office NAT.
+  public_ip:
+    {quota: 60, window_s: 60, per: ip, fail: closed, report: false, weighted: false}
+  # Failed lookups only (unknown, expired, revoked or malformed key), charged double (cost 2 =
+  # 10 failures per 10 minutes). The guard checks room BEFORE every lookup, so a used-up budget
+  # refuses the next attempt even when it would have found a live handle (no oracle).
+  public_lookup_fail:
+    {quota: 20, window_s: 600, per: ip, fail: closed, report: false, weighted: false}
+  # Views of one handle (a parent page re-resolves its handle on every request).
+  public_token:
+    {quota: 30, window_s: 60, per: handle, fail: open, report: true, weighted: false}
+  # New payment intents from one dues link (ADR-0046 decision 9; used from wave R2-3H).
+  public_pay:
+    {quota: 5, window_s: 86400, per: handle, fail: closed, report: true, weighted: false}
+  # Webhook deliveries per provider route handle (Razorpay route, Meta WABA) after the signature
+  # check; machine_ip covers the address before it.
+  webhook_route:
+    {quota: 600, window_s: 60, per: handle, fail: closed, report: false, weighted: false}
 
 # Route template (method + path, as in openapi.json) -> stricter per-route policies. A test fails
 # when a key is not a route, when an expensive-looking route (export, import, upload, search,

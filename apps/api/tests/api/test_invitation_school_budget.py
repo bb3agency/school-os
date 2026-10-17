@@ -47,6 +47,9 @@ class DownStore:
     def acquire(self, blocks: Sequence[str], buckets: Sequence[rl.BucketSpec]) -> rl.RawDecision:
         raise rl.StoreUnavailable("down")
 
+    def peek(self, bucket: rl.BucketSpec) -> rl.BucketResult:
+        raise rl.StoreUnavailable("down")
+
     def fail(self, count_key: str, block_key: str, backoff: rl.Backoff) -> tuple[int, int]:
         raise rl.StoreUnavailable("down")
 
