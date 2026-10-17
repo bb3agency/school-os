@@ -925,6 +925,24 @@ def test_FR_PLT_011_trial_activate_and_extend(
     assert api.call("POST", f"/subscriptions/{sub}/activate", billing_admin).status_code == 409
 
 
+def test_L_07_a_trial_ending_at_ist_midnight_ends_on_that_indian_date(
+    api: Api, owner: Operator, billing_admin: Operator, make_plan: Callable[..., uuid.UUID]
+) -> None:
+    """Billing days are IST days (docs/16 §10): a trial extended to midnight IST on a date
+    ends its period on that date, not on the UTC date before it."""
+    sub = _school(api, owner, make_plan(), start_as="trial")["subscription_id"]
+    day = (dt.datetime.now(dt.UTC) + dt.timedelta(days=60)).date()
+    ist_midnight = dt.datetime.combine(day, dt.time(), dt.timezone(dt.timedelta(hours=5.5)))
+    ext = api.call(
+        "POST",
+        f"/subscriptions/{sub}/extend-trial",
+        billing_admin,
+        json={"trial_ends_at": ist_midnight.isoformat()},
+    )
+    assert ext.status_code == 200, ext.text
+    assert ext.json()["current_period_end"] == day.isoformat()
+
+
 def test_FR_PLT_013_negotiated_price_returns_its_reason(
     api: Api,
     owner: Operator,

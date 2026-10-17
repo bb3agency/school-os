@@ -466,7 +466,7 @@ def extend_trial(actor: Actor, sub_id: uuid.UUID, trial_ends_at: dt.datetime) ->
             raise ValidationFailed(
                 [{"field": "trial_ends_at", "code": "not_later", "message_key": "errors.not_later"}]
             )
-        end_day = trial_ends_at.astimezone(dt.UTC).date()
+        end_day = today_ist(trial_ends_at)  # billing days are IST days (audit L-07)
         sub = repo.update_row(
             s,
             m.subscriptions,
