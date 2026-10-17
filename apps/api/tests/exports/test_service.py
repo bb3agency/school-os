@@ -21,6 +21,7 @@ from app.core.db import tenant_session
 from app.core.errors import Conflict, Forbidden, NotFound, StepUpRequired, ValidationFailed
 from app.core.languages import contains_telugu
 from app.core.redaction import contains_full_aadhaar
+from app.exports import repository as export_repo
 from app.exports import service as exports
 from app.students.schemas import ValueIn
 
@@ -936,9 +937,9 @@ def test_L_13_a_shorter_retention_applies_to_existing_exports(
         c.execute(text(upsert), {"t": school.tenant_id, "r": '{"exports": 2}'})
     try:
         person = school.people["principal"]
-        real_now = exports.repo.now
+        real_now = export_repo.now
         later = dt.timedelta(days=2, minutes=1)  # within the 7 days set when it was made
-        monkeypatch.setattr(exports.repo, "now", lambda session: real_now(session) + later)
+        monkeypatch.setattr(export_repo, "now", lambda session: real_now(session) + later)
         db_ctx = tenant_session(school.tenant_id, person.user_id)
         with db_ctx as db, pytest.raises(Conflict) as exc:
             exports.download_url(db, EX.ctx(school, person, "principal"), export_id)

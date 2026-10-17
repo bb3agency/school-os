@@ -20,7 +20,7 @@ from sqlalchemy import Engine, text
 from app.core.db import platform_session
 from app.core.errors import Conflict
 from app.platform import billing
-from app.platform.common import config, today_ist
+from app.platform.common import add_months, config, today_ist
 from app.platform.schemas import InvoiceLineIn, PaymentIn
 
 from .conftest import (
@@ -907,6 +907,31 @@ def test_FR_PLT_012_plan_change_applies_next_period_and_cancel_at_period_end(
     assert (cancel.json()["status"], cancel.json()["cancel_at_period_end"]) == ("active", True)
     billing.roll_periods(today=rolled.current_period_end)
     assert billing.get_subscription(sub).status == "cancelled"
+
+
+def test_L_11_roll_catch_up_drafts_every_skipped_period(
+    api: Api, owner: Operator, make_plan: Callable[..., uuid.UUID]
+) -> None:
+    """When the daily job did not run for months, each period it skips gets its draft
+    (billing in advance), once; a rerun adds nothing."""
+    sub = _school(api, owner, make_plan())["subscription_id"]
+    today = today_ist()
+    first = add_months(today, -2)
+    with platform_session() as s:
+        s.execute(
+            text(
+                "UPDATE platform.subscriptions SET current_period_start = :a, "
+                "current_period_end = :b WHERE id = :i"
+            ),
+            {"a": add_months(today, -3), "b": first, "i": sub},
+        )
+    billing.roll_periods(today=today)
+    rolled = billing.get_subscription(uuid.UUID(sub))
+    assert rolled.current_period_start == today
+    starts = [d["period_start"] for d in _drafts(sub)]
+    assert {first, add_months(today, -1), today} <= set(starts)
+    billing.roll_periods(today=today)
+    assert [d["period_start"] for d in _drafts(sub)] == starts
 
 
 def test_FR_PLT_011_trial_activate_and_extend(
