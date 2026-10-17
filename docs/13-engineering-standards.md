@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.4 · 2026-09-27 |
+| Version | 0.5 · 2026-10-17 |
 | Applies to | All code, infra, prompts and docs in this repository |
 | Related | CLAUDE.md, 07-Security, 12-Testing, 16-Platform admin panel |
-| Changes | 0.4: no personal data in URLs (§6, §8; SEC-008). 0.3: repository layout as built (config inside the API package, `infra/docker/`, terraform roots; `evals/` and root `config/` planned); CODEOWNERS paths (§13). 0.2: layout adds `platform/`, `deploy/dedicated/`, `infra/db/`, platform config; session-branch policy for AI-assisted work (§2); security review scope incl. `platform/` (§3); ownership and CODEOWNERS (§13). 0.1: baseline |
+| Changes | 0.5: layout and CODEOWNERS name the in-package config, prompts and `evals/` as built (no root `config/`). 0.4: no personal data in URLs (§6, §8; SEC-008). 0.3: repository layout as built (config inside the API package, `infra/docker/`, terraform roots; `evals/` and root `config/` planned); CODEOWNERS paths (§13). 0.2: layout adds `platform/`, `deploy/dedicated/`, `infra/db/`, platform config; session-branch policy for AI-assisted work (§2); security review scope incl. `platform/` (§3); ownership and CODEOWNERS (§13). 0.1: baseline |
 
 ---
 
@@ -15,7 +15,9 @@
 schoolos/
 ├── apps/
 │   ├── api/                 FastAPI app (package: app) + Alembic migrations
-│   │   ├── app/             modules (see CLAUDE.md §4)
+│   │   ├── app/             modules (see CLAUDE.md §4); versioned config ships next to the module that
+│   │   │                    reads it (no root config/): authz/{permissions,roles}.yaml, platform/{roles,billing}.yaml,
+│   │   │                    knowledge/config/models.yaml, knowledge/prompts/, dq/config/ (rules, profiles), …
 │   │   ├── migrations/
 │   │   ├── tests/           per-module tests + cross-module suites: security/, migrations/
 │   │   └── openapi.json     committed OpenAPI document (make openapi)
@@ -23,16 +25,13 @@ schoolos/
 │   └── web/                 Next.js (app router), BFF route handlers, i18n
 ├── packages/
 │   └── api-client/          TS client generated from OpenAPI
-├── evals/                   (M2) RAG datasets (synthetic) + harness + reports
+├── evals/                   RAG evaluation harness (package sos_evals): synthetic datasets, baselines, gates.toml
 ├── infra/
 │   ├── terraform/           bootstrap/ + modules/ (incl. shared_platform, dedicated_host) + envs/ (staging, prod, dedicated-template)
 │   ├── docker/              local-only: db init script, dev OIDC stub config, SeaweedFS config
 │   └── db/                  bootstrap.sql (roles, schemas, extensions; run as DB admin)
 ├── deploy/
 │   └── dedicated/           compose.yaml + Caddyfile for dedicated-tier hosts
-├── config/                  (M2) models.yaml, dq_rules.yaml, export_profiles/, prompts index. M0 config ships in the
-│                            API package: app/authz/{permissions,roles}.yaml, app/platform/{roles,billing}.yaml,
-│                            app/tenancy/academic_defaults.yaml
 ├── docs/                    documentation, ADRs, templates
 ├── .github/                 workflows, PR template, CODEOWNERS
 ├── CLAUDE.md  README.md  SECURITY.md  Makefile  .env.example  docker-compose.yml  .importlinter
@@ -146,7 +145,7 @@ Each area has an owner who reviews every change to it (`.github/CODEOWNERS`). At
 |---|---|---|
 | `apps/api/app/core/`, `authz/`, `audit/` | Platform security owner | Tenant isolation, authz, audit invariants |
 | `apps/api/app/platform/` | Control-plane owner | Privilege separation (ADR-0013), billing correctness, platform audit |
-| `apps/api/app/knowledge/gateway/`, prompts, `config/models.yaml` | Knowledge owner | ADR-0005, evals |
+| `apps/api/app/knowledge/gateway/`, `apps/api/app/knowledge/prompts/`, `apps/api/app/knowledge/config/` (incl. `models.yaml`) | Knowledge owner | ADR-0005, evals |
 | `apps/api/migrations/` | Data owner | Expand/contract, RLS, composite FKs, definer allowlists |
 | `infra/terraform/`, `infra/db/`, `deploy/dedicated/` | Infrastructure owner | Least privilege, encryption, hardening (SEC-030) |
 | `apps/api/app/authz/permissions.yaml`, `apps/api/app/platform/roles.yaml`, `apps/api/app/platform/billing.yaml`, `apps/api/tests/security/rls_allowlist.yaml` | Control-plane owner + security owner | Permission matrix (07 §6.5), definer allowlist (ADR-0013), money rules |
