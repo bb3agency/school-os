@@ -8,7 +8,7 @@ import uuid
 from typing import Any
 
 import pytest
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
 
 from app.core.languages import contains_telugu
 from app.students.schemas import ValueIn
@@ -350,6 +350,56 @@ def test_US_504_findings_list_explains_readiness_findings(world: Any, api: Any) 
         "Ask the MEO or MIS coordinator to correct UDISE+."
     )
     assert finding["routes"][0]["code"] == "ROUTE-UDISE"
+
+
+def test_SEC_044_a_scoped_readiness_manager_runs_checks_only_in_their_scope(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """SEC-015, SEC-044: a readiness run is limited by the dq.readiness.manage grant's own
+    scope. A member whose custom role holds it for 9A only (and who reads every student through
+    another role) stores no findings for a 9C student, and a 9C section scope is refused like
+    any section outside reach (422, no existence oracle)."""
+    tid = world.a.tenant_id
+    key = f"readiness_9a_{uuid.uuid4().hex[:8]}"
+    role_id = uuid.uuid4()
+    with admin_engine.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO core.roles (id, tenant_id, key, name_en, name_te) "
+                "VALUES (:r, :t, :k, 'Synthetic readiness 9A', 'కృత్రిమ పాత్ర')"
+            ),
+            {"r": role_id, "t": tid, "k": key},
+        )
+        for perm in ("dq.readiness.read", "dq.readiness.manage"):
+            c.execute(
+                text(
+                    "INSERT INTO core.role_permissions (tenant_id, role_id, permission_key) "
+                    "VALUES (:t, :r, :p)"
+                ),
+                {"t": tid, "r": role_id, "p": perm},
+            )
+    # accountant: student.read_basic for the whole school, no data-quality permission.
+    member = W.add_member(
+        admin_engine, tid, [key, "accountant"], scopes=[("section", world.a.ids["section_9a"])]
+    )
+    name = fresh_name()
+    sid_9c, _ = ssc_student(world.a, name=name, udise_dob="2012-03-15", section_key="section_9c")
+    res = run(api, member, sid_9c)
+    assert res.status_code == 202, res.text
+    assert res.json()["stats"]["students"] == 0
+    assert DS.findings(admin_engine, sid_9c, "DQ-031") == []
+    refused = api.call(
+        member,
+        "POST",
+        f"{BASE}/runs",
+        json={"scope": {"section_ids": [str(world.a.ids["section_9c"])]}},
+        headers={"Idempotency-Key": str(uuid.uuid4())},
+    )
+    assert refused.status_code == 422, refused.text
+    sid_9a, _ = ssc_student(world.a, udise_dob="2012-03-15")
+    own = run(api, member, sid_9a)
+    assert own.status_code == 202, own.text
+    assert own.json()["stats"]["students"] == 1
 
 
 def test_SEC_043_section_slips_audit_whose_restricted_values_were_shown(

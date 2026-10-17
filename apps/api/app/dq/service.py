@@ -414,14 +414,16 @@ def _not_found(field: str) -> ValidationFailed:
     )
 
 
-def _check_structure(session: Session, ctx: UserContext, scope: engine.Scope) -> None:
+def _check_structure(
+    session: Session, ctx: UserContext, scope: engine.Scope, *, also: Sequence[str] = ()
+) -> None:
     """Unknown (or other schools') sections and classes are a 422, like any bad reference.
 
     So are existing ones outside the caller's scope (audit 2026-10-04 AA-18): the answer must
     not show whether an id exists. A section is in reach when both ``dq.findings.read`` and
     ``student.read_basic`` reach it (school-wide, the section, or its class); a class when both
     reach the class or one of its sections (SEC-015)."""
-    grants = [ctx.scope_for(READ), ctx.scope_for(STUDENT_READ)]
+    grants = [ctx.scope_for(READ), ctx.scope_for(STUDENT_READ), *(ctx.scope_for(p) for p in also)]
     scoped = [g for g in grants if not g.school_wide]
     own_classes: dict[uuid.UUID, uuid.UUID] = {}
     if scoped:
@@ -553,17 +555,21 @@ def _run_now(
     return _run_out(_complete(session, run, stats, profiles, system=False))
 
 
-def request_run(session: Session, ctx: UserContext, data: RunCreate) -> RunOut:
+def request_run(
+    session: Session, ctx: UserContext, data: RunCreate, *, also: Sequence[str] = ()
+) -> RunOut:
     """``POST /dq/runs``: run now when the scope has at most ``sync_max_students`` students,
-    else queue it for the worker (status ``queued``; the requester is notified when done)."""
+    else queue it for the worker (status ``queued``; the requester is notified when done).
+    ``also``: the route's own permission when it is not ``dq.findings.read`` (a readiness run:
+    ``dq.readiness.manage``); its scope limits the run too (SEC-044)."""
     _check_profile(data.profile_key)
     scope = _scope_of(data)
-    _check_structure(session, ctx, scope)
-    ids = engine.resolve_students(session, ctx, scope)
+    _check_structure(session, ctx, scope, also=also)
+    ids = engine.resolve_students(session, ctx, scope, also=also)
     if len(ids) <= load_engine_config().sync_max_students:
         return _run_now(session, ctx, scope, ids, data.profile_key)
     # The worker runs with a whole-school context: freeze a scoped caller's reach now.
-    school_wide = _reach(session, ctx) is None
+    school_wide = _reach(session, ctx) is None and all(ctx.scope_for(p).school_wide for p in also)
     effective = scope if school_wide else engine.Scope(student_ids=tuple(ids))
     run = repo.insert_run(
         session,

@@ -596,7 +596,9 @@ def request_run(
                 detail="This school has none of the classes this check is for.",
             )
         scope = RunScopeIn(class_ids=class_ids)
-    return dq.request_run(session, ctx, RunCreate(scope=scope, profile_key=profile.key))
+    return dq.request_run(
+        session, ctx, RunCreate(scope=scope, profile_key=profile.key), also=(MANAGE,)
+    )
 
 
 # --- parent verification slips ----------------------------------------------------------------
