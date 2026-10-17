@@ -533,3 +533,7 @@ Tests (planned, `apps/api/tests/security/`): route enumeration with the new guar
 | SEC-038 | (R2, planned) Financial integrity: append-only ledger, frozen receipts, gap-free receipt and refund series, maker-checker with DB `CHECK` on concessions, adjustments, cancellations and refunds, step-up on approvals, daily collection report per collector | R2 wave 1 |
 | SEC-039 | (R2, planned) Public handle resolver `core.resolve_public_handle` pinned in the definer allowlist, two return columns, `definer_access` only on `core.public_handles` and `core.tenants` (ADR-0047) | R2 wave 0 |
 | SEC-040 | (R2, planned) Provider egress and code boundaries: only `app/fees/providers/*` and `app/messaging/providers/*` call payment and messaging hosts (import-linter, egress allowlist); fake providers refused in staging/prod; utility-only template catalogue test | R2 wave 1-2 |
+| SEC-041 | Web runtime dependencies without known high advisories (`npm audit --omit=dev` clean; Next.js 16.3.8; audit 2026-10-17) | R1 |
+| SEC-042 | A PEN or APAAR ID clash in an import names the other record only when the importer may read it, as on `POST /students` (audit 2026-10-17) | R1 |
+| SEC-043 | A slip print that shows restricted (C3) values audits whose they were (student ids only), for a section as for one student (audit 2026-10-17) | R1 |
+| SEC-044 | A readiness run is limited by the `dq.readiness.manage` grant's own scope, besides `student.read_basic` and `dq.findings.read` (audit 2026-10-17) | R1 |
