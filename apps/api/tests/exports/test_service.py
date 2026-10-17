@@ -878,6 +878,44 @@ def test_docs_05_13_files_purged_after_seven_days(
         assert exports.get_export(db, EX.ctx(school, person, "principal"), export_id).files == []
 
 
+def test_L_10_a_board_pre_check_leaves_out_classes_of_another_board(
+    school: Any, section: str, admin_engine: Engine
+) -> None:
+    """FR-TEN-021: the CISCE pre-check of a school whose Class IX follows the State Board has
+    no Class IX students (422 ``no_students`` for a Class IX section); a portal pre-check
+    still has them."""
+    EX.student(school, section_key="section_9a")
+    with admin_engine.begin() as c:
+        before = c.execute(
+            text("SELECT boards, settings FROM core.tenants WHERE id = :t"),
+            {"t": school.tenant_id},
+        ).one()
+        c.execute(
+            text(
+                "UPDATE core.tenants SET boards = ARRAY['CISCE','BSEAP'], settings = settings || "
+                '\'{"class_boards": {"IX": "BSEAP"}}\'::jsonb WHERE id = :t'
+            ),
+            {"t": school.tenant_id},
+        )
+    try:
+        person = school.people["principal"]
+        with pytest.raises(ValidationFailed) as exc:
+            EX.request_precheck(school, person, "principal", profile_key="cisce-registration-2027")
+        assert exc.value.errors[0]["code"] == "no_students"
+        portal = EX.request_precheck(school, person, "principal", profile_key="udise-plus")
+        assert portal.student_count >= 1
+    finally:
+        with admin_engine.begin() as c:
+            c.execute(
+                text("UPDATE core.tenants SET boards = :b, settings = :s WHERE id = :t"),
+                {
+                    "b": list(before.boards),
+                    "s": json.dumps(before.settings),
+                    "t": school.tenant_id,
+                },
+            )
+
+
 def test_L_13_a_shorter_retention_applies_to_existing_exports(
     school: Any, section: str, admin_engine: Engine, monkeypatch: pytest.MonkeyPatch
 ) -> None:

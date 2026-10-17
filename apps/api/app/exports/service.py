@@ -501,7 +501,11 @@ def request_precheck(session: Session, ctx: UserContext, data: PrecheckCreate) -
         )
     _require_step_up(ctx)
     reach = (DQ_READ, SENSITIVE) if data.include_sensitive else (DQ_READ,)
-    ids = _students_for(session, ctx, data.scope, permissions=reach)
+    ids = dq.board_students(
+        session, profile.key, _students_for(session, ctx, data.scope, permissions=reach)
+    )
+    if not ids:  # every student follows another board here (FR-TEN-021, L-10)
+        raise _invalid("scope", "no_students")
     sensitive: list[str] = []
     if data.include_sensitive:
         classes = _exportable_columns(session, load_config())

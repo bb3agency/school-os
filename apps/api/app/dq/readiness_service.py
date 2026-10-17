@@ -43,7 +43,13 @@ from app.dq import service as dq
 from app.dq import slip as slip_page
 from app.dq.masking import mask_value
 from app.dq.matching import MatchClass, classify, load_match_policy, load_variant_dictionary
-from app.dq.profiles import Profile, ReadinessSpec, load_engine_config, load_profiles
+from app.dq.profiles import (
+    Profile,
+    ReadinessSpec,
+    load_engine_config,
+    load_profiles,
+    profile_board,
+)
 from app.dq.rules import load_rules
 from app.dq.schemas import (
     Bilingual,
@@ -183,9 +189,10 @@ def _assess(
     rule = load_rules()[RULE_ID]
     rows = repo.profile_findings(session, list(facts), profile.key, RULE_ID)
     by_fp = {r["fingerprint"]: r for r in rows}
+    class_boards = _class_boards(session)
     out: dict[uuid.UUID, _Student] = {}
     for sid, fact in facts.items():
-        applies = checks.readiness_applies(fact, profile)
+        applies = checks.readiness_applies(fact, profile, class_boards)
         if applies or force:
             unfiltered = profile.model_copy(
                 update={
@@ -247,17 +254,39 @@ def _section(session: Session, ctx: UserContext, section_id: uuid.UUID) -> Any:
     return section
 
 
+def _class_boards(session: Session) -> dict[str, str]:
+    return tenancy.school_boards(session)[1]
+
+
+def _other_board_classes(session: Session, profile: Profile) -> frozenset[str]:
+    """Class codes this school mapped to another board than the profile's (FR-TEN-021,
+    audit 2026-10-17 L-10); none for a portal profile or a school without a class map."""
+    board = profile_board(profile)
+    if board is None:
+        return frozenset()
+    return frozenset(c for c, b in _class_boards(session).items() if b != board)
+
+
 def _profile_sections(session: Session, profile: Profile) -> dict[uuid.UUID, Any]:
-    """Current-year sections of the profile's classes (every class when it names none)."""
+    """Current-year sections of the profile's classes (every class when it names none),
+    without the classes that follow another board here."""
     spec = _spec(profile)
     years = [y for y in tenancy.list_academic_years(session) if y.is_current]
     if not years:
         return {}
     classes = {c.id: c for c in tenancy.list_classes(session)}
+    others = _other_board_classes(session, profile)
+
+    def wanted(class_id: uuid.UUID) -> bool:
+        klass = classes.get(class_id)
+        if klass is None:
+            return not spec.classes
+        return (not spec.classes or klass.code in spec.classes) and klass.code not in others
+
     return {
         s.id: s
         for s in tenancy.list_sections(session, academic_year_id=years[0].id)
-        if not spec.classes or (s.class_id in classes and classes[s.class_id].code in spec.classes)
+        if wanted(s.class_id)
     }
 
 
@@ -357,7 +386,7 @@ def section_students(
     """The students of one section with their readiness, worst first (no values)."""
     profile = readiness_profile(profile_key)
     _section(session, ctx, section_id)
-    ids = _in_reach(session, ctx, [section_id])
+    ids = dq.board_students(session, profile.key, _in_reach(session, ctx, [section_id]))
     assessed = _assess(session, profile, ids)
     names = students.summaries(session, ctx, ids)
     rcfg = rd.load_readiness_config()
@@ -583,7 +612,12 @@ def request_run(
     spec = _spec(profile)
     empty = not (scope.section_ids or scope.class_ids or scope.student_ids or scope.batch_id)
     if empty and spec.classes:
-        class_ids = [c.id for c in tenancy.list_classes(session) if c.code in spec.classes]
+        others = _other_board_classes(session, profile)
+        class_ids = [
+            c.id
+            for c in tenancy.list_classes(session)
+            if c.code in spec.classes and c.code not in others
+        ]
         if not class_ids:
             raise ValidationFailed(
                 [
@@ -720,6 +754,8 @@ def _slip_targets(
     elif section_id is not None:
         _section(session, ctx, section_id)
         ids, target = _in_reach(session, ctx, [section_id])[:MAX_SLIPS], section_id
+    # FR-TEN-021 (L-10): no slip for a student whose class follows another board here.
+    ids = dq.board_students(session, profile.key, ids)
     # Slips always show what each record holds, even where the check does not apply.
     assessed = _assess(session, profile, ids, force=True)
     refs = dict(students.summaries(session, ctx, ids))

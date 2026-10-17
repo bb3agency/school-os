@@ -3,12 +3,15 @@ SEC-015, invariants 4-6). Synthetic data only."""
 
 from __future__ import annotations
 
+import json
 import sys
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
 
 import pytest
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
 
 from app.core.languages import contains_telugu
 from app.students.schemas import ValueIn
@@ -387,3 +390,74 @@ def test_US_504_findings_list_explains_readiness_findings(world: Any, api: Any) 
         "Ask the MEO or MIS coordinator to correct UDISE+."
     )
     assert finding["routes"][0]["code"] == "ROUTE-UDISE"
+
+
+@contextmanager
+def _boards(
+    admin: Engine, tenant_id: uuid.UUID, boards: list[str], class_boards: dict[str, str]
+) -> Iterator[None]:
+    """The school's boards and class map for one block (the world is shared)."""
+    with admin.begin() as c:
+        row = c.execute(
+            text("SELECT boards, settings FROM core.tenants WHERE id = :t"), {"t": tenant_id}
+        ).one()
+        c.execute(
+            text(
+                "UPDATE core.tenants SET boards = :b, "
+                "settings = settings || jsonb_build_object('class_boards', CAST(:cb AS jsonb)) "
+                "WHERE id = :t"
+            ),
+            {"b": boards, "cb": json.dumps(class_boards), "t": tenant_id},
+        )
+    try:
+        yield
+    finally:
+        with admin.begin() as c:
+            c.execute(
+                text("UPDATE core.tenants SET boards = :b, settings = :s WHERE id = :t"),
+                {"b": list(row.boards), "s": json.dumps(row.settings), "t": tenant_id},
+            )
+
+
+def test_L_10_board_readiness_skips_classes_mapped_to_another_board(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """FR-TEN-021: a school with Class IX on CBSE does not check its Class IX students for the
+    State Board SSC nominal roll: not in the summary, not in the default run scope, and a run
+    on them stores no SSC finding. The portal (apaar) check still covers them."""
+    name = fresh_name()
+    sid, _ = ssc_student(world.a, name=name, udise_name=name + " Reddy")
+    office = world.person("office_admin")
+    with _boards(admin_engine, world.a.tenant_id, ["CBSE", "BSEAP"], {"IX": "CBSE"}):
+        body = api.call(office, "GET", BASE).json()
+        nine = {str(world.a.ids["section_9a"]), str(world.a.ids["section_9c"])}
+        assert not nine & {s["section_id"] for s in body["sections"]}
+        default = api.call(
+            world.person("exam_coordinator"),
+            "POST",
+            f"{BASE}/runs",
+            json={},
+            headers={"Idempotency-Key": str(uuid.uuid4())},
+        )
+        assert default.status_code == 202, default.text
+        assert default.json()["scope"]["class_ids"] == [str(world.a.ids["class_x"])]
+        assert run(api, office, sid).status_code == 202
+        ssc = [
+            f
+            for f in DS.findings(admin_engine, sid)
+            if f["profile_key"] == SSC and f["status"] == "open"
+        ]
+        assert ssc == []
+        listed = api.call(
+            office,
+            "GET",
+            "/api/v1/dq/readiness/apaar/students",
+            params={"section_id": str(world.a.ids["section_9a"])},
+        ).json()
+        mine = next(s for s in listed if s["student"]["id"] == str(sid))
+        assert mine["status"] == "needs_school"
+        ssc_list = api.call(
+            office, "GET", f"{BASE}/students", params={"section_id": str(world.a.ids["section_9a"])}
+        )
+        assert ssc_list.status_code == 200, ssc_list.text
+        assert str(sid) not in {s["student"]["id"] for s in ssc_list.json()}

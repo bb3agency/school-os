@@ -219,6 +219,7 @@ def load_context(
         population=_population(session, facts, cfg.apaar_attribute),
         profiles=tuple(profiles),
         identity_keys=identity_keys,
+        class_boards=tenancy.school_boards(session)[1],
     )
 
 
