@@ -15,8 +15,10 @@ import { translateOr } from "@/lib/i18n-dynamic";
  * - Server validation (422): each `errors[].field` (dotted body path) is mapped to a form
  *   field and its `message_key` translated under `errors.field.*`; unknown keys fall back to
  *   a generic "check this field" message. Anything not mapped shows in the form's alert.
- * - One Idempotency-Key per form "intent": a retry after a network error reuses it, a
- *   successful submit starts a new one (docs/09 §2).
+ * - One Idempotency-Key per form "intent": a retry of the same values after a network error
+ *   reuses it; a successful submit, or a retry with changed values, starts a new one (docs/09
+ *   §2: the API refuses a key reused with another body, 422 `idempotency_key_reused`).
+ * - A submit while the previous one is still running is ignored (double Enter or click).
  */
 
 export type FieldErrors = Record<string, string>;
@@ -45,6 +47,20 @@ export function zodErrorKeys(error: z.ZodError): Record<string, string> {
     if (!(field in out)) out[field] = issue.message;
   }
   return out;
+}
+
+/** A stable text form of the parsed values; files count by name, size and date. */
+function bodySignature(data: unknown): string {
+  try {
+    return JSON.stringify(data, (_key, value: unknown) =>
+      typeof File !== "undefined" && value instanceof File
+        ? { file: value.name, size: value.size, modified: value.lastModified }
+        : value,
+    );
+  } catch {
+    // Not serialisable: treat every attempt as new (a fresh key is always safe).
+    return newIdempotencyKey();
+  }
 }
 
 export interface ApiFormOptions<TSchema extends z.ZodType, TResult> {
@@ -81,12 +97,17 @@ export function useApiForm<TSchema extends z.ZodType, TResult>(
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<TResult | undefined>(undefined);
   const keyRef = useRef<string>("");
+  /** The values the current key was last sent with (a changed body needs a new key). */
+  const sentRef = useRef<string | null>(null);
+  /** Synchronous guard: React state is too late for a second Enter in the same frame. */
+  const busyRef = useRef(false);
 
   const translateClient = useCallback((key: string) => translateOr(tv, key, "invalid"), [tv]);
   const translateServer = useCallback((key: string) => translateOr(tf, key, "invalid"), [tf]);
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (busyRef.current) return;
     const form = event.currentTarget;
     const opts = options;
     if (!keyRef.current) keyRef.current = newIdempotencyKey();
@@ -106,10 +127,17 @@ export function useApiForm<TSchema extends z.ZodType, TResult>(
     setErrors({});
     setError(undefined);
     setPending(true);
+    busyRef.current = true;
+    const body = bodySignature(parsed.data);
+    if (sentRef.current !== null && sentRef.current !== body) {
+      keyRef.current = newIdempotencyKey();
+    }
+    sentRef.current = body;
     opts
       .submit(parsed.data, keyRef.current)
       .then(async (value) => {
         keyRef.current = newIdempotencyKey();
+        sentRef.current = null;
         setResult(value);
         await Promise.all(
           (opts.invalidate ?? []).map((queryKey) => queryClient.invalidateQueries({ queryKey })),
@@ -133,10 +161,14 @@ export function useApiForm<TSchema extends z.ZodType, TResult>(
         // A 4xx other than validation always means "don't retry with the same key".
         if (failure instanceof ApiError && failure.status < 500) {
           keyRef.current = newIdempotencyKey();
+          sentRef.current = null;
         }
         setError(unmapped || !(failure instanceof ApiError) ? failure : undefined);
       })
-      .finally(() => setPending(false));
+      .finally(() => {
+        busyRef.current = false;
+        setPending(false);
+      });
   };
 
   const reset = useCallback(() => {
@@ -144,6 +176,7 @@ export function useApiForm<TSchema extends z.ZodType, TResult>(
     setError(undefined);
     setResult(undefined);
     keyRef.current = newIdempotencyKey();
+    sentRef.current = null;
   }, []);
 
   return { onSubmit, errors, error, pending, result, reset };
