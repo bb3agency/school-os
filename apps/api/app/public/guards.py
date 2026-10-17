@@ -92,7 +92,7 @@ class PublicNotFound(NotFound):
     """The one answer for every key that does not open a page (ADR-0047 decision 5)."""
 
     def __init__(self) -> None:
-        super().__init__("Not found")
+        super().__init__()
 
 
 class PayloadTooLarge(DomainError):

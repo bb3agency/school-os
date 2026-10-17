@@ -75,3 +75,39 @@ def test_output_language_keeps_telugu_when_switched_on() -> None:
     assert languages.output_language("mixed", s) == "te"  # code-mixed questions (FR-KB-006)
     assert languages.output_language("en", s) == "en"
     assert languages.output_language("hi", s) == "en"
+
+
+# --- parent language (ADR-0044; FR-LANG-001..003) ------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("school", "guardian", "expected"),
+    [
+        (None, None, "en"),
+        ({}, None, "en"),
+        ({"parent_language": "te"}, None, "te"),
+        ({"parent_language": "te"}, "en", "en"),
+        ({"parent_language": "en"}, "te", "te"),
+        ("te", None, "te"),
+        ({"parent_language": "hi"}, None, "en"),
+        ({"parent_language": "te"}, "fr", "te"),
+    ],
+)
+def test_FR_LANG_003_parent_language_is_guardian_then_school_then_english(
+    school: object, guardian: str | None, expected: str
+) -> None:
+    assert languages.parent_language(school, guardian) == expected  # type: ignore[arg-type]
+
+
+def test_FR_LANG_001_parent_language_ignores_the_staff_switch() -> None:
+    """Telugu hidden for staff (the default) does not stop Telugu for parents."""
+    assert languages.telugu_enabled() is False
+    assert languages.parent_language({"parent_language": "te"}) == "te"
+    assert languages.output_language("te") == "en"
+
+
+def test_FR_LANG_005_unreviewed_texts_only_matter_for_telugu() -> None:
+    assert languages.unreviewed_parent_texts("en") == []
+    unreviewed = languages.unreviewed_parent_texts("te")
+    assert unreviewed == sorted(unreviewed)
+    assert {"apaar.consent_form", "dq.readiness_slip", "public.shell"} <= set(unreviewed)
