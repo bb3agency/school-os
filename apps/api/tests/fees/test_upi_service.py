@@ -164,7 +164,7 @@ def test_US_2109_AC2_statement_is_read_deleted_and_audited(
     doc = U.upload(admin_engine, school, data, kind="xlsx")
     ctx = F.ctx(school, school.people["accountant"], "accountant")
     out = fees.import_statement(ctx, StatementImportIn(document_id=doc))
-    assert (out.preset_key, out.file_kind, out.line_count, out.credit_count) == (
+    assert (out.preset, out.file_kind, out.line_count, out.credit_count) == (
         "sbi",
         "xlsx",
         3,

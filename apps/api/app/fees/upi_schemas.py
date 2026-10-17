@@ -92,7 +92,7 @@ class StatementImportIn(_In):
 
 
 class PresetOut(_Out):
-    key: str
+    preset: str
     version: int
     name: str
     verified: bool
@@ -100,7 +100,7 @@ class PresetOut(_Out):
 
 class StatementImportOut(_Out):
     id: uuid.UUID
-    preset_key: str
+    preset: str
     preset_version: int
     file_kind: str
     period_from: dt.date | None

@@ -216,6 +216,11 @@ EXPECTED_TABLES = {
     "fees_receipt_cancellations",
     "fees_refunds",
     "fees_day_closes",
+    # R2-2E UPI (0060_fees_upi): no narration ciphertext, no file hash.
+    "fees_upi_settings",
+    "fees_bank_statement_imports",
+    "fees_bank_statement_lines",
+    "fees_upi_confirmations",
     # DL-07: restricted document files left out of an export without restricted details.
     "documents_withheld",
 }

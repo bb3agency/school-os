@@ -240,6 +240,7 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | fee.refund.request (R2-1B) | — | ✓ | — | — | ✓ | — | — | — | — |
 | fee.refund.approve (R2-1B: maker-checker; principal or accountant, D17) | — | ✓ᴿ | — | — | ✓ᴿ | — | — | — | — |
 | fee.report (R2-1B: download the day book and dues lists, bulk personal financial data) | ✓ᴿ | ✓ᴿ | — | — | ✓ᴿ | — | — | — | ✓ᴿ |
+| fee.reconcile (R2-2E: import bank statements, confirm UPI receipts seen in the bank, work through UPI exceptions; school-wide only) | — | ✓ | — | — | ✓ | — | — | — | — |
 
 `auditor_readonly` memberships are time-bound (default 14 days) and read-only.
 
@@ -333,6 +334,8 @@ Platform roles belong to SchoolOS staff (operators), not to schools (ADR-0013). 
 `messaging.configure`, `messaging.optin.record` and `message.read` moved to the §6.2 matrix when wave R2-1C built them (2026-10-17, migration `0057_messaging_core`).
 
 **R2-1B (2026-10-18):** the eight `fee.*` keys of the table above except `fee.reconcile` (R2-2E) are in the catalog, `roles.yaml` and the §6.2 matrix; every fee route requires them school-wide (a section-scoped custom role holding `fee.collect` gets 403). `finance.read` now also reads fee accounts, plans, dues and the daily report. `payments.configure` (R2-2D) and the messaging keys (R2-1C) stay planned here.
+
+**R2-2E (2026-10-18):** `fee.reconcile` is in the catalog, `roles.yaml` and the §6.2 matrix (principal and accountant, school-wide, no step-up; migration `0060_fees_upi`). It guards statement import, proposals review, confirmations (bulk and one by one), dismissing a credit, "find matches again" and the UPI exceptions list; the UPI report also opens to `finance.read`. UPI settings are read by any of `fee.collect`, `fee.manage`, `finance.read`, `fee.reconcile` and changed with `fee.manage`; the counter's UTR check needs `fee.collect`. Release note: run the system-role sync after migrating.
 
 Unchanged keys used by R2: `certificate.approve`ᴿ (add or withdraw a verification code), `tenant.settings.manage`ᴿ (parent language, TC format), `student.update_nonidentity` (guardian language), `tenant.billing.read` (AI answer usage numbers).
 

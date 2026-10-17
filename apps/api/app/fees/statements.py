@@ -115,7 +115,7 @@ def presets(session: Session, ctx: UserContext) -> list[PresetOut]:
     c.require_on(session, ctx)
     c.require_school_wide(ctx, c.RECONCILE)
     return [
-        PresetOut(key=p.key, version=p.version, name=p.name, verified=p.verified)
+        PresetOut(preset=p.key, version=p.version, name=p.name, verified=p.verified)
         for p in _cfg().presets
     ]
 
@@ -370,7 +370,7 @@ def _import_out(session: Session, row: BankStatementImport) -> StatementImportOu
     names = identity.member_display_names(session, [row.imported_by])
     return StatementImportOut(
         id=row.id,
-        preset_key=row.preset_key,
+        preset=row.preset_key,
         preset_version=row.preset_version,
         file_kind=row.file_kind,
         period_from=row.period_from,
