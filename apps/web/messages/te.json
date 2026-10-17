@@ -58,6 +58,89 @@
     "currentSchool": "ప్రస్తుత పాఠశాల",
     "account": "మీ ఖాతా"
   },
+  "ui": {
+    "palette": {
+      "label": "వెతకండి లేదా వెళ్ళండి",
+      "placeholder": "పేజీ లేదా పని పేరు టైప్ చేయండి…",
+      "empty": "ఏదీ సరిపోలలేదు. మరో పదం ప్రయత్నించండి.",
+      "results": "{count, plural, =0 {ఫలితాలు లేవు} one {# ఫలితం} other {# ఫలితాలు}}",
+      "hintMove": "కదలడానికి",
+      "hintOpen": "తెరవడానికి",
+      "hintClose": "మూసివేయడానికి",
+      "trigger": "వెతకండి లేదా వెళ్ళండి…",
+      "groupPages": "వెళ్ళండి",
+      "groupActions": "పనులు",
+      "groupPreferences": "ప్రాధాన్యతలు",
+      "densityCompact": "కుదించిన వరుసలు వాడండి",
+      "densityComfortable": "విశాలమైన వరుసలు వాడండి",
+      "toggleSidebar": "మెనూను కుదించండి లేదా విస్తరించండి",
+      "addStudent": "విద్యార్థిని చేర్చండి",
+      "newChangeRequest": "కొత్త మార్పు అభ్యర్థన",
+      "uploadDocument": "పత్రాన్ని అప్‌లోడ్ చేయండి",
+      "collectFee": "ఫీజు వసూలు చేయండి",
+      "takeAttendance": "హాజరు నమోదు చేయండి",
+      "enterMarks": "మార్కులు నమోదు చేయండి",
+      "askSchool": "పాఠశాలను అడగండి",
+      "inviteUser": "సిబ్బందిని ఆహ్వానించండి",
+      "studentList": "విద్యార్థుల జాబితా డౌన్‌లోడ్ చేయండి",
+      "provisionSchool": "కొత్త పాఠశాలను ఏర్పాటు చేయండి"
+    },
+    "shell": {
+      "breadcrumb": "మీరు ఉన్న చోటు",
+      "search": "వెతకండి",
+      "preferences": "మీ ప్రాధాన్యతలు",
+      "density": "వరుసల సాంద్రత",
+      "comfortable": "విశాలంగా",
+      "compact": "కుదించి",
+      "shortcutPalette": "వెతకండి లేదా వెళ్ళండి (Ctrl+K)",
+      "quickLinks": "త్వరిత లింకులు",
+      "signedInAs": "{name}గా సైన్ ఇన్ అయ్యారు"
+    },
+    "toast": {
+      "region": "SchoolOS నుండి నోటిఫికేషన్లు",
+      "dismiss": "తీసివేయండి"
+    },
+    "pagination": {
+      "label": "పేజీలు",
+      "none": "వరుసలు లేవు",
+      "range": "{from}–{to}",
+      "rangeOf": "{total}లో {from}–{to}",
+      "rowsPerPage": "పేజీకి వరుసలు",
+      "previous": "మునుపటి",
+      "next": "తదుపరి"
+    },
+    "errorSummary": {
+      "title": "ఒక సమస్య ఉంది"
+    },
+    "steps": {
+      "done": "పూర్తయింది",
+      "current": "ప్రస్తుత దశ",
+      "upcoming": "ప్రారంభం కాలేదు"
+    },
+    "saveBar": {
+      "unsaved": "మార్పులు సేవ్ కాలేదు",
+      "noChanges": "మార్పులు లేవు"
+    },
+    "filters": {
+      "active": "అమలులో ఉన్న ఫిల్టర్లు",
+      "remove": "ఫిల్టర్ తీసివేయండి {label}: {value}",
+      "clearAll": "అన్నీ తీసివేయండి"
+    },
+    "table": {
+      "columns": "నిలువు వరుసలు",
+      "showColumns": "నిలువు వరుసలు చూపండి",
+      "density": "వరుసలు",
+      "comfortable": "విశాలంగా",
+      "compact": "కుదించి",
+      "noResults": "ఈ ఫిల్టర్లకు ఏ వరుసా సరిపోలలేదు",
+      "noResultsBody": "మరిన్ని చూడటానికి ఒక ఫిల్టర్ తీసివేయండి లేదా అన్నీ తీసివేయండి.",
+      "clearFilters": "ఫిల్టర్లు తీసివేయండి",
+      "selectAll": "ఈ పేజీలోని అన్ని వరుసలు ఎంచుకోండి",
+      "selected": "{count, plural, one {# ఎంచుకున్నారు} other {# ఎంచుకున్నారు}}",
+      "bulkActions": "ఎంచుకున్న వరుసలపై పనులు",
+      "clearSelection": "ఎంపిక తీసివేయండి"
+    }
+  },
   "language": {
     "label": "భాష",
     "en": "English",

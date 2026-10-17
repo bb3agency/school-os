@@ -174,6 +174,13 @@ const CONTRAST_PAIRS: ReadonlyArray<readonly [string, string, number, string]> =
   ["border-control", "canvas", 3, "checkbox boundary on the canvas"],
   ["platform-muted", "platform-hover", 4.5, "operator sidebar muted text on hover"],
   ["platform-ink", "platform", 4.5, "operator top bar breadcrumb"],
+  ["ink", "accent-soft", 4.5, "current sidebar item, palette option text"],
+  ["ink-muted", "accent-soft", 4.5, "filter chip label"],
+  ["accent-strong", "accent-soft", 4.5, "active palette option, filter chip value"],
+  ["warning-ink", "surface", 4.5, "'Changes not saved' on the save bar"],
+  ["ink-subtle", "surface-muted", 4.5, "palette group headings, footer hints"],
+  ["ink-muted", "surface-sunken", 4.5, "sidebar item on hover"],
+  ["platform-accent", "platform-hover", 3, "operator focus ring on the active row"],
 ];
 
 describe("design tokens meet WCAG 2.2 AA (NFR-A11Y-001)", () => {

@@ -60,7 +60,6 @@ export function PageHeader({
   badge,
   breadcrumb,
   eyebrow,
-  plain: _plain = false,
   className,
 }: {
   title: ReactNode;

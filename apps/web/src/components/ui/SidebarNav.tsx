@@ -69,15 +69,15 @@ export function activeHref(pathname: string, items: readonly NavItem[]): string 
 
 /**
  * Item colours per theme (docs/17 §7): school on white, platform on the dark violet chrome.
- * The current page gets a tinted row, bolder text and a 3px accent bar at its start edge,
+ * The current page gets a tinted row, semibold text and a 2px accent bar at its start edge,
  * so it never depends on colour alone.
  */
 const themes: Record<SidebarTheme, { link: string; active: string; bar: string; heading: string }> =
   {
     school: {
-      link: "text-ink-muted hover:bg-surface-muted hover:text-ink",
-      active: "bg-primary-soft font-semibold text-primary",
-      bar: "bg-primary",
+      link: "text-ink-muted hover:bg-surface-sunken hover:text-ink",
+      active: "bg-accent-soft font-semibold text-ink",
+      bar: "bg-accent",
       heading: "text-ink-subtle",
     },
     platform: {
@@ -101,7 +101,7 @@ function ItemList({
 }) {
   const styles = themes[theme];
   return (
-    <ul className="space-y-0.5" aria-labelledby={labelledBy}>
+    <ul className="space-y-px" aria-labelledby={labelledBy}>
       {items.map((item) => {
         const active = item.href === current;
         // Sub-entries without their own icon show a "corner" arrow, so the compact sidebar
@@ -115,7 +115,7 @@ function ItemList({
               data-tooltip={item.label}
               className={cn(
                 // 40px rows (touch targets well over 24px, WCAG 2.5.8); labels wrap, never clip.
-                "relative flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors pointer-coarse:min-h-11",
+                "relative flex min-h-8 items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors pointer-coarse:min-h-11",
                 "collapsed:justify-center collapsed:px-0",
                 active ? styles.active : styles.link,
               )}
@@ -124,13 +124,13 @@ function ItemList({
                 <span
                   aria-hidden="true"
                   className={cn(
-                    "absolute inset-y-2 start-0 w-[3px] rounded-full",
-                    "collapsed:inset-y-2.5",
+                    "absolute inset-y-1.5 start-0 w-0.5 rounded-full",
+                    "collapsed:inset-y-2",
                     styles.bar,
                   )}
                 />
               ) : null}
-              {icon ? <Icon name={icon} className={item.nested ? "size-4" : "size-5"} /> : null}
+              {icon ? <Icon name={icon} className={item.nested ? "size-4" : "size-4.5"} /> : null}
               <span className="min-w-0 flex-1 break-words collapsed:sr-only">{item.label}</span>
             </Link>
             {item.sub ? <div className="collapsed:hidden">{item.sub}</div> : null}
@@ -170,7 +170,7 @@ export function SidebarNav({
   return (
     <nav aria-label={label} id={id} data-print="hide" className={className}>
       {sections ? (
-        <div className="space-y-5 collapsed:space-y-2">
+        <div className="space-y-4 collapsed:space-y-2">
           {sections.map((section, index) => {
             const headingId = `${baseId}-${section.id}`;
             return (
@@ -186,7 +186,7 @@ export function SidebarNav({
               >
                 <p
                   id={headingId}
-                  className={cn("eyebrow mb-1.5 px-3 collapsed:sr-only", themes[theme].heading)}
+                  className={cn("eyebrow mb-1 px-2.5 collapsed:sr-only", themes[theme].heading)}
                 >
                   {section.label}
                 </p>
