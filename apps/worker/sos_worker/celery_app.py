@@ -30,6 +30,7 @@ from app.knowledge.tasks import beat_schedule as knowledge_beat_schedule
 from app.notifications.tasks import beat_schedule as notifications_beat_schedule
 from app.ops.tasks import beat_schedule as ops_beat_schedule
 from app.platform.tasks import beat_schedule as platform_beat_schedule
+from app.public.tasks import beat_schedule as public_beat_schedule
 from app.tally.tasks import beat_schedule as tally_beat_schedule
 
 # Importing identity.service registers the system-role cloning hook in
@@ -53,6 +54,7 @@ import app.insights.service  # isort: skip
 import app.knowledge.service  # isort: skip
 import app.notifications.service  # isort: skip
 import app.ops.service  # isort: skip
+import app.public.service  # isort: skip
 import app.students.service  # isort: skip
 import app.tally.service  # noqa: F401  isort: skip
 
@@ -79,6 +81,7 @@ TASK_MODULES: list[str] = [
     "app.circulars.tasks",
     "app.insights.tasks",
     "app.tally.tasks",
+    "app.public.tasks",
 ]
 
 
@@ -210,6 +213,8 @@ def create_celery() -> Celery:
             **insights_beat_schedule(),
             # FR-TALLY-009: silent Tally agents notified; old sync records deleted (30 min).
             **tally_beat_schedule(),
+            # FR-PUB-006: expired parent link handles deleted 30 days after expiry (daily).
+            **public_beat_schedule(),
             # FR-PLT-*: control-plane jobs on shared; heartbeat client on dedicated (ADR-0017).
             **platform_beat_schedule(settings),
         },

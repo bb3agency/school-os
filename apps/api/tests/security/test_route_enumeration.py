@@ -6,6 +6,12 @@ or ``require_principal()`` whose permission exists in the catalog (``permissions
 tenant routes; dedicated deployments mount no control-plane routes. Machine routes carry their
 own guard instead: the fleet heartbeat ``require_fleet_signature()`` and the Tally edge agent
 ``require_edge_agent_enrolment()`` / ``require_edge_agent_signature()`` (ADR-0032, Proposed).
+Routes without a member (R2, ADR-0047; FR-PUB-003) carry exactly one public guard,
+``require_public_handle(kind...)``, ``require_webhook_signature(provider)`` or
+``require_meta_verify_token()``, and only on the paths listed in ``app/public/public_routes.yaml``
+with the same guard, kinds and provider; every route under ``/api/v1/public/`` and
+``/api/v1/webhooks/`` must carry one. Synthetic apps prove the check fails for unlisted,
+wrongly guarded and unguarded public routes.
 """
 
 from __future__ import annotations
@@ -13,7 +19,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.routing import APIRoute, iter_route_contexts
 from sqlalchemy import Engine, text
 
@@ -22,6 +28,15 @@ from app.authz.dependencies import require
 from app.core.config import DeploymentMode, Settings
 from app.core.health import PUBLIC_PATHS
 from app.main import create_app
+from app.public import allowlist
+from app.public.guards import (
+    PSEUDO_HANDLE,
+    PSEUDO_META_VERIFY,
+    PSEUDO_WEBHOOK,
+    require_meta_verify_token,
+    require_public_handle,
+    require_webhook_signature,
+)
 
 # Routes that authenticate the caller but do not need a resolved school.
 TENANTLESS = {
@@ -63,6 +78,21 @@ def guards(route: APIRoute) -> list[Any]:
     return [d.call for d in route.dependant.dependencies if hasattr(d.call, "sos_permission")]
 
 
+def mounted(app: FastAPI) -> list[allowlist.MountedRoute]:
+    return [
+        allowlist.MountedRoute(method, path, tuple(guards(route)))
+        for method, path, route in api_routes(app)
+    ]
+
+
+def _machine_or_public(guard: Any) -> bool:
+    return (
+        getattr(guard, "sos_fleet_signature", False)
+        or hasattr(guard, "sos_edge_agent")
+        or allowlist.is_public_guard(guard)
+    )
+
+
 @pytest.fixture(scope="module")
 def app() -> FastAPI:
     return create_app()
@@ -85,6 +115,8 @@ def test_SEC_003_every_route_has_exactly_one_known_guard(app: FastAPI) -> None:
             problems.append(f"{method} {path}: fleet signature guard only on the heartbeat")
         if (method, path) == FLEET_HEARTBEAT:
             continue
+        if allowlist.is_public_guard(found[0]):
+            continue  # pinned to public_routes.yaml by test_FR_PUB_003_* below
         if getattr(found[0], "sos_edge_agent", None) != EDGE_AGENT.get((method, path)):
             problems.append(f"{method} {path}: edge-agent guards only on the edge-agent routes")
             continue
@@ -109,7 +141,7 @@ def test_SEC_005_step_up_flags_match_catalog(app: FastAPI) -> None:
     problems: list[str] = []
     for method, path, route in api_routes(app):
         for guard in guards(route):
-            if getattr(guard, "sos_fleet_signature", False) or hasattr(guard, "sos_edge_agent"):
+            if _machine_or_public(guard):
                 continue
             pdef = catalog[guard.sos_permission]
             if guard.sos_step_up and not pdef.step_up:
@@ -139,7 +171,7 @@ def test_SEC_003_route_permissions_exist_in_core_permissions(
         g.sos_permission
         for _, _, r in api_routes(app)
         for g in guards(r)
-        if not getattr(g, "sos_fleet_signature", False) and not hasattr(g, "sos_edge_agent")
+        if not _machine_or_public(g)
     }
     assert used
     assert used <= keys
@@ -177,3 +209,95 @@ def test_SEC_026_dedicated_mode_mounts_no_control_plane_routes() -> None:
     paths = [path for _, path, _ in api_routes(app)]
     assert not [p for p in paths if p.startswith(("/api/v1/platform/", "/api/v1/fleet/"))]
     assert "/api/v1/me" in paths, "school routes stay on in dedicated mode"
+
+
+# --- R2 public surface (ADR-0047 decision 4; FR-PUB-003) ---------------------------------------
+
+
+def test_FR_PUB_003_public_routes_match_the_allowlist(app: FastAPI) -> None:
+    assert allowlist.problems(mounted(app)) == []
+    listed = set(allowlist.public_routes().routes)
+    assert "POST /api/v1/public/links/exchange" in listed
+    public = {
+        f"{m} {p}"
+        for m, p, r in api_routes(app)
+        if any(allowlist.is_public_guard(g) for g in guards(r))
+    }
+    assert public == listed
+
+
+def test_FR_PUB_003_public_pseudo_permissions_are_not_grantable() -> None:
+    for pseudo in (PSEUDO_HANDLE, PSEUDO_WEBHOOK, PSEUDO_META_VERIFY):
+        assert pseudo not in permission_catalog()
+        with pytest.raises(CatalogError):
+            require(pseudo)
+
+
+def _synthetic(build: Any) -> FastAPI:
+    app = FastAPI()
+    build(app)
+    return app
+
+
+def test_FR_PUB_003_check_fails_for_unlisted_and_misplaced_public_guards() -> None:
+    """Self-test with synthetic apps: the allowlist check is not vacuous."""
+
+    def unlisted_webhook(app: FastAPI) -> None:
+        @app.post(
+            "/api/v1/webhooks/razorpay/{route}",
+            dependencies=[Depends(require_webhook_signature("razorpay"))],
+        )
+        def razorpay() -> None: ...
+
+    def handle_guard_on_a_tenant_path(app: FastAPI) -> None:
+        @app.get(
+            "/api/v1/students/lookup",
+            dependencies=[Depends(require_public_handle("parent_dues"))],
+        )
+        def lookup() -> None: ...
+
+    def unguarded_public_path(app: FastAPI) -> None:
+        @app.get("/api/v1/public/anything")
+        def anything() -> None: ...
+
+    def member_guard_on_a_public_path(app: FastAPI) -> None:
+        @app.get("/api/v1/public/links/current", dependencies=[Depends(require("audit.read"))])
+        def current() -> None: ...
+
+    def wrong_kinds(app: FastAPI) -> None:
+        @app.post(
+            "/api/v1/public/links/exchange",
+            dependencies=[Depends(require_public_handle("cert_verify"))],
+        )
+        def exchange() -> None: ...
+
+    def verify_token_unlisted(app: FastAPI) -> None:
+        @app.get("/api/v1/webhooks/meta", dependencies=[Depends(require_meta_verify_token())])
+        def challenge() -> None: ...
+
+    cases = {
+        unlisted_webhook: "missing from public_routes.yaml",
+        handle_guard_on_a_tenant_path: "missing from public_routes.yaml",
+        unguarded_public_path: "without a public guard",
+        member_guard_on_a_public_path: "without a public guard",
+        wrong_kinds: "handle kinds differ",
+        verify_token_unlisted: "missing from public_routes.yaml",
+    }
+    for build, expected in cases.items():
+        found = allowlist.problems(mounted(_synthetic(build)))
+        assert any(expected in p for p in found), (build.__name__, found)
+    # Every listed route that a synthetic app does not mount is reported as stale.
+    empty = allowlist.problems(mounted(_synthetic(lambda app: None)))
+    assert any("not mounted" in p for p in empty)
+
+
+def test_FR_PUB_003_listed_guard_kinds_match_the_yaml_shape() -> None:
+    raw = {
+        "version": 1,
+        "routes": {"GET /api/v1/students/x": {"guard": "public_handle", "kinds": ["parent_dues"]}},
+    }
+    with pytest.raises(ValueError, match="must be under /api/v1/public/"):
+        allowlist.PublicRoutes.model_validate(raw)
+    raw = {"version": 1, "routes": {"POST /api/v1/webhooks/x": {"guard": "webhook_signature"}}}
+    with pytest.raises(ValueError, match="provider is listed exactly"):
+        allowlist.PublicRoutes.model_validate(raw)

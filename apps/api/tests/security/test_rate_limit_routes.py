@@ -26,6 +26,7 @@ from app.core.health import PUBLIC_PATHS
 from app.main import create_app
 from app.platform.auth import RequirePlatform
 from app.platform.fleet import RequireFleetSignature
+from app.public.guards import RequireMetaVerifyToken, RequirePublicHandle, RequireWebhookSignature
 from app.tally.agent_auth import RequireEdgeAgentEnrolment, RequireEdgeAgentSignature
 
 LIMITED_GUARDS: tuple[type[Any], ...] = (
@@ -38,7 +39,14 @@ MACHINE_GUARDS: tuple[type[Any], ...] = (
     RequireFleetSignature,
     RequireEdgeAgentEnrolment,
     RequireEdgeAgentSignature,
+    # R2 (ADR-0047): provider webhooks under /api/v1/webhooks/ (machine_ip per address, then
+    # webhook_route per route handle in the guard).
+    RequireWebhookSignature,
+    RequireMetaVerifyToken,
 )
+# R2 (ADR-0046, ADR-0047): /api/v1/public/* get public_ip in the middleware; the guard adds
+# public_lookup_fail before any lookup and public_token per handle.
+PUBLIC_GUARDS: tuple[type[Any], ...] = (RequirePublicHandle,)
 # Routes that look expensive or abuse-prone and therefore need a stricter per-route budget.
 EXPENSIVE = re.compile(
     r"(/exports?(/|$)|/export$|tenant-export$|/imports(/|$)|import-templates$|/uploads$|/sheet$"
@@ -97,6 +105,13 @@ def test_P2_07_every_route_resolves_to_policies_or_is_exempt(app: FastAPI) -> No
         if config.is_machine_path(path):
             if not isinstance(guard, MACHINE_GUARDS):
                 problems.append(f"{method} {path}: machine path without a machine guard")
+            continue
+        if config.is_public_path(path):
+            if not isinstance(guard, PUBLIC_GUARDS):
+                problems.append(f"{method} {path}: public path without a public guard")
+            continue
+        if isinstance(guard, PUBLIC_GUARDS):
+            problems.append(f"{method} {path}: public guard outside the public paths")
             continue
         if not isinstance(guard, LIMITED_GUARDS):
             problems.append(f"{method} {path}: guard {guard!r} does not apply the rate limiter")
@@ -166,3 +181,16 @@ def test_school_budgets_sit_only_on_tenant_guarded_routes(app: FastAPI) -> None:
         if policy.per == "school" and not isinstance(guard_of(route), Requirement)
     ]
     assert problems == []
+
+
+def test_FR_PUB_011_public_guards_charge_their_budgets() -> None:
+    """The public handle guard checks room in public_lookup_fail before resolving, charges the
+    failure after a miss and charges public_token per handle; the webhook guard charges
+    webhook_route per route handle (ADR-0046 decision 7, ADR-0047 decision 4)."""
+    handle = inspect.getsource(RequirePublicHandle.__call__)
+    room = handle.index("ratelimit.ensure_room(")
+    resolve = handle.index("service.resolve_any")
+    assert room < resolve
+    assert handle.rindex('"public_lookup_fail", partition, cost=') > resolve
+    assert '"public_token"' in handle
+    assert '"webhook_route"' in inspect.getsource(RequireWebhookSignature.__call__)

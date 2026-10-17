@@ -4,12 +4,20 @@ English first: the product owner decided on 2026-09-30 to hide Telugu everywhere
 Telugu code, catalogs and templates stay in place behind one switch, ``SOS_TELUGU_ENABLED``
 (default false), so bringing Telugu back is a configuration change, not a rewrite. Every module
 asks this module, never the setting directly.
+
+Parent-facing output is the one exception (ADR-0044, owner decision D9): its language is the
+school's ``parent_language`` (or a guardian's own choice), read through :func:`parent_language`,
+whatever the staff switch says.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
+from functools import lru_cache
+from importlib import resources
 from typing import Literal
+
+import yaml
 
 from app.core.config import Settings, get_settings
 
@@ -50,6 +58,60 @@ def shown_texts(
     """Per-language texts (``{"en": ..., "te": ...}``, e.g. a bilingual watermark) joined for
     the languages shown, English first: only the English text while Telugu is hidden."""
     return separator.join(texts[lang] for lang in enabled_languages(settings) if texts.get(lang))
+
+
+PARENT_LANGUAGES: tuple[Language, ...] = (ENGLISH, TELUGU)
+
+
+def _as_language(value: object) -> Language | None:
+    if value == ENGLISH:
+        return ENGLISH
+    if value == TELUGU:
+        return TELUGU
+    return None
+
+
+def parent_language(
+    school: Mapping[str, object] | str | None, guardian: str | None = None
+) -> Language:
+    """The language of everything a parent receives (ADR-0044; FR-LANG-001..003): WhatsApp
+    templates, public parent pages, printed parent slips and forms.
+
+    Resolution order: the guardian's own choice (``sis.guardians.preferred_language``), then the
+    school's ``parent_language`` setting (``school`` is ``core.tenants.settings`` or the setting's
+    value), then English. Independent of ``SOS_TELUGU_ENABLED`` by design: with the switch off,
+    staff screens, staff PDFs, notifications and AI answers stay English (ADR-0036) while a school
+    may still write to parents in Telugu. Never use it for a staff surface."""
+    chosen = _as_language(guardian)
+    if chosen is not None:
+        return chosen
+    setting = school.get("parent_language") if isinstance(school, Mapping) else school
+    return _as_language(setting) or ENGLISH
+
+
+@lru_cache(maxsize=1)
+def _parent_text_sources() -> dict[str, bool]:
+    raw = yaml.safe_load(
+        resources.files("app.core").joinpath("parent_texts.yaml").read_text("utf-8")
+    )
+    sources = raw.get("sources") if isinstance(raw, dict) else None
+    if not isinstance(sources, dict) or not sources:
+        raise ValueError("parent_texts.yaml needs a non-empty 'sources' mapping")
+    out: dict[str, bool] = {}
+    for key, spec in sources.items():
+        reviewed = spec.get("reviewed") if isinstance(spec, dict) else None
+        if not isinstance(key, str) or not isinstance(reviewed, bool):
+            raise ValueError(f"parent_texts.yaml: {key!r} needs reviewed: true|false")
+        out[key] = reviewed
+    return out
+
+
+def unreviewed_parent_texts(language: Language) -> list[str]:
+    """Keys of the parent-facing Telugu texts not yet signed off by a fluent reviewer that a
+    school writing to parents in ``language`` would use (FR-LANG-005); empty for English."""
+    if language != TELUGU:
+        return []
+    return sorted(key for key, reviewed in _parent_text_sources().items() if not reviewed)
 
 
 def contains_telugu(text: str) -> bool:

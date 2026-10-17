@@ -128,12 +128,22 @@ class ConsentSummaryOut(_Out):
 
 
 class ApaarSettingsOut(_Out):
-    form_language: FormLanguage
+    form_language: FormLanguage | None = Field(
+        description="The consent form's own language, or null to follow the school's parent "
+        "language (ADR-0044 decision 7)."
+    )
+    effective_language: FormLanguage = Field(
+        description="The language forms print in now: ``form_language``, else the school's "
+        "parent language, else English."
+    )
     version: int
 
 
 class ApaarSettingsIn(_In):
-    form_language: FormLanguage
+    form_language: FormLanguage | None = Field(
+        description="``en`` or ``te`` for this form only, or null to follow the school's parent "
+        "language (ADR-0044)."
+    )
 
 
 __all__ = [

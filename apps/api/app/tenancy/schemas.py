@@ -367,6 +367,12 @@ class TenantSettings(BaseModel):
         default="",
         description="Name of the school's current ERP, shown on the refresh-from-ERP path.",
     )
+    parent_language: Language = Field(
+        default="en",
+        description="Language of everything parents receive: WhatsApp messages, parent link "
+        "pages, printed parent slips and forms (ADR-0044, FR-LANG-001). Independent of the "
+        "staff UI language; a guardian's own choice overrides it.",
+    )
 
     @field_validator("languages")
     @classmethod
@@ -394,6 +400,11 @@ class TenantSettingsPatch(_In):
     class_boards: dict[ClassCode, SupportedBoard] | None = Field(default=None, max_length=20)
     operating_mode: OperatingMode | None = None
     current_erp_name: ErpName | None = None
+    parent_language: Language | None = Field(
+        default=None,
+        description="``en`` or ``te``: the language parents receive (ADR-0044). Audited with "
+        "its new value.",
+    )
 
     @field_validator("languages")
     @classmethod
@@ -422,5 +433,10 @@ class TenantOut(_Out):
         default_factory=list,
         description="Modules the school's operating mode hides, e.g. ``tally`` while SchoolOS "
         "runs alongside another ERP (FR-TEN-022).",
+    )
+    parent_language_unreviewed: list[str] = Field(
+        default_factory=list,
+        description="Parent-facing Telugu texts the school would use that a fluent reviewer "
+        "has not signed off yet (FR-LANG-005); empty while the parent language is English.",
     )
     version: int

@@ -1,0 +1,34 @@
+# Public handles: keys that lead to one school without a signed-in member (ADR-0047, ADR-0046;
+# FR-PUB-005, FR-PUB-006; docs/05 §15.5). Versioned configuration shipped inside the package,
+# read by app/public/config.py. Numbers live here, never inline (invariant 13).
+version: 1
+
+# Parent link lifetimes in days (ADR-0046 decision 4, owner decision D22 of 2026-10-14).
+# Certificate codes and provider routes never expire (expires_at NULL).
+lifetimes_days:
+  parent_notice: 30
+  parent_receipt: 90
+  parent_dues: 7
+  parent_optin: 7
+
+# Expired parent handles are deleted this many days after expiry (FR-PUB-006). The database
+# refuses anything sooner than 30 (policy purge_expired_only, migration 0055).
+purge_after_days: 30
+# Rows deleted per school per transaction by the daily purge (a school with more is finished by
+# the next batch in the same run).
+purge_batch_size: 1000
+
+# Parent link tokens: 32 random bytes from the OS CSPRNG written base64url without padding
+# (43 characters), no structure (ADR-0046 decision 3, FR-PUB-005).
+parent_token_bytes: 32
+# Razorpay webhook route values: random, used in the webhook URL (ADR-0047 decision 3).
+route_token_length: 24
+
+# Webhook providers the signature guard knows (docs/09 §4 "Webhooks"; SEC-034). The verifiers
+# themselves are registered by the waves that connect the providers (R2-1C Meta, R2-2D Razorpay);
+# a provider without a registered verifier answers 404 (fail closed). Body limits apply before
+# any signature check. Replayed event ids are recognised for replay_window_hours.
+webhook_providers:
+  razorpay: {max_body_bytes: 262144}
+  meta: {max_body_bytes: 3145728}
+replay_window_hours: 72

@@ -33,6 +33,7 @@ from app.notifications.api import router as notifications_router
 from app.platform.api import fleet_router
 from app.platform.api import router as platform_router
 from app.platform.tenant_api import router as platform_tenant_router
+from app.public.api import router as public_router
 from app.students.api import router as students_router
 from app.tally.api import agent_router as tally_agent_router
 from app.tally.api import router as tally_router
@@ -86,6 +87,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # tally.connector.enabled (default off, 404). The agent routes are device-signed.
     app.include_router(tally_router)
     app.include_router(tally_agent_router)
+    # R2 public surface (ADR-0047): parent link pages through the BFF's service token only;
+    # every route is pinned in app/public/public_routes.yaml.
+    app.include_router(public_router)
     # Control plane + fleet heartbeat: shared deployment only (ADR-0017); 404 on dedicated hosts.
     if settings.deployment_mode is DeploymentMode.SHARED:
         app.include_router(platform_router)

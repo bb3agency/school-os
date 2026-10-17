@@ -65,13 +65,14 @@ from app.core.errors import (
     ValidationFailed,
 )
 from app.core.ids import new_id
-from app.core.languages import telugu_text
+from app.core.languages import Language, telugu_text
 from app.core.logging import get_context, get_logger
 from app.core.records import RecordTable
 from app.core.textnorm import comparison_key
 from app.documents import service as documents
 from app.identity import service as identity
 from app.ops import service as ops
+from app.public import service as public
 from app.students import crypto
 from app.students import repository as repo
 from app.students.canonical import Resolution, resolve
@@ -2203,8 +2204,26 @@ def _guardian_out(
         phone=MASK if (reveal and has_phone) else None,
         address=MASK if (reveal and has_address) else None,
         masked=reveal and (has_phone or has_address),
+        preferred_language=_language(guardian.preferred_language),
         version=guardian.version,
     )
+
+
+def _language(value: str | None) -> Language | None:
+    if value == "en":
+        return "en"
+    if value == "te":
+        return "te"
+    return None
+
+
+def guardian_language(session: Session, guardian_id: uuid.UUID) -> Language | None:
+    """A guardian's own parent language (``en``/``te``) or ``None`` for the school's (ADR-0044,
+    FR-LANG-003). For parent-facing output (messages, parent pages) of a guardian the caller
+    already holds, e.g. a public handle's guardian; combine with the school setting through
+    ``app.core.languages.parent_language``. Read in the school's ``tenant_session``."""
+    guardian = repo.get_guardian(session, guardian_id)
+    return _language(guardian.preferred_language) if guardian is not None else None
 
 
 def list_guardians(session: Session, ctx: UserContext, student_id: uuid.UUID) -> list[GuardianOut]:
@@ -2379,8 +2398,10 @@ def update_guardian(
     *,
     expected_version: int,
 ) -> GuardianOut:
-    """Change a guardian's name, phone or address (``If-Match``: guardian version) and/or the
-    relationship/primary flag for this student. Audit: ``guardian.updated`` (field names)."""
+    """Change a guardian's name, phone, address or parent language (``If-Match``: guardian
+    version) and/or the relationship/primary flag for this student. Audit: ``guardian.updated``
+    (field names; the new parent language code). A phone change revokes the guardian's open
+    parent links (FR-PUB-007)."""
     fields = data.model_fields_set
     reject_full_aadhaar(
         {k: getattr(data, k) for k in fields if k in ("full_name", "phone", "address")}
@@ -2392,7 +2413,7 @@ def update_guardian(
     link = repo.get_link(session, student_id, guardian_id)
     if link is None:
         raise NotFound("Guardian not found")
-    if fields & {"full_name", "phone", "address"} and not all(
+    if fields & {"full_name", "phone", "address", "preferred_language"} and not all(
         _in_scope(session, ctx, other, perm, structure)
         for other in repo.guardian_student_ids(session, guardian_id)
         for perm in (READ, UPDATE)
@@ -2410,6 +2431,8 @@ def update_guardian(
     values: dict[str, Any] = {}
     if data.full_name is not None:
         values.update(full_name=data.full_name, full_name_norm=comparison_key(data.full_name))
+    if "preferred_language" in fields:
+        values["preferred_language"] = data.preferred_language
     values.update(
         _guardian_secret_columns(
             session,
@@ -2437,13 +2460,19 @@ def update_guardian(
         if link_values:
             repo.update_link(session, student_id, guardian_id, link_values)
     link = repo.ensure_found(repo.get_link(session, student_id, guardian_id), "Guardian")
+    summary: dict[str, Any] = {"student_id": student_id, "fields": sorted(fields)}
+    if "preferred_language" in fields:
+        summary["preferred_language"] = data.preferred_language
     _audit(
         session,
         action="guardian.updated",
         resource_type="guardian",
         resource_id=guardian_id,
-        summary={"student_id": student_id, "fields": sorted(fields)},
+        summary=summary,
     )
+    if "phone" in fields:
+        # A link sent to the old number must stop working (FR-PUB-007, ADR-0046 decision 5).
+        public.revoke_for_guardian(session, guardian_id, reason="phone_changed")
     _touch(session, student, _definitions(session))
     reveal = _can_reveal(session, ctx, student_id, structure)
     return _guardian_out(guardian, link.relationship, link.is_primary, reveal=reveal)
@@ -2475,6 +2504,8 @@ def remove_guardian(
     if guardian.version != expected_version:
         raise PreconditionFailed("The guardian was changed by someone else. Reload and try again.")
     repo.unlink_guardian(session, student_id, guardian_id)
+    # FR-PUB-007: an unlinked or deleted guardian's parent links stop working at once.
+    public.revoke_for_guardian(session, guardian_id, reason="guardian_unlinked")
     _audit(
         session,
         action="guardian.unlinked",

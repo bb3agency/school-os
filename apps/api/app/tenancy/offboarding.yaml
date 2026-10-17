@@ -5,6 +5,9 @@ version: 1
 # tenant_data_counts / purge_tenant_data with app.tenancy.service at import time. The purge
 # refuses to start when any of them is not registered (fail closed).
 purge_order:
+  # R2-0 (ADR-0047): public handles first (they reference guardians and the school's keys'
+  # tenant); R2 fees and messaging insert themselves after it, before students (docs/05 §15.6).
+  - public
   - tally
   - circulars
   - insights

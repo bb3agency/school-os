@@ -56,7 +56,8 @@ class ApaarConsentSettings(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
     tenant_id: Mapped[uuid.UUID]
-    form_language: Mapped[str] = mapped_column(Text, server_default=text("'en'"))
+    # NULL (the default since 0055): follow the school's parent language (ADR-0044 decision 7).
+    form_language: Mapped[str | None] = mapped_column(Text)
     updated_by: Mapped[uuid.UUID | None]
     created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
