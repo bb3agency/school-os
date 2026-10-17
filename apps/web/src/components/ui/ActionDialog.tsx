@@ -3,7 +3,7 @@
 import type { QueryKey } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useCallback, useId, useRef, useState, type ReactNode } from "react";
-import type { z } from "zod";
+import type * as z from "@/lib/zod";
 import { cn } from "@/lib/cn";
 import { useDialogClose } from "@/lib/dialog-motion";
 import { useApiForm, type FieldErrors } from "@/lib/forms";

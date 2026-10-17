@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "@/lib/zod";
 
 /**
  * zod building blocks that mirror the API's Pydantic constraints (apps/api/app/platform/

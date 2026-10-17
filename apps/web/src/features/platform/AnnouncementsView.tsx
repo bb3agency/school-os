@@ -4,7 +4,7 @@ import type { Announcement } from "@schoolos/api-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
-import { z } from "zod";
+import * as z from "@/lib/zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { Badge, Pill, type BadgeTone } from "@/components/ui/Badge";

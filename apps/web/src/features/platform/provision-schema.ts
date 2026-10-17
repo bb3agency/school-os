@@ -1,5 +1,5 @@
 import type { ProvisionRequest } from "@schoolos/api-client";
-import { z } from "zod";
+import * as z from "@/lib/zod";
 import {
   BOARD_PATTERN,
   TENANT_CODE_PATTERN,

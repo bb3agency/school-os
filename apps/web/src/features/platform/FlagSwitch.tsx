@@ -3,7 +3,7 @@
 import type { FeatureFlag } from "@schoolos/api-client";
 import { useTranslations } from "next-intl";
 import { useId, useRef, useState } from "react";
-import { z } from "zod";
+import * as z from "@/lib/zod";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Pill } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";

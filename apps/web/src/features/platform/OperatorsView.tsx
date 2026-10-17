@@ -2,7 +2,7 @@
 
 import { PLATFORM_ROLES, type Operator, type PlatformRole } from "@schoolos/api-client";
 import { useTranslations } from "next-intl";
-import { z } from "zod";
+import * as z from "@/lib/zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge, Pill } from "@/components/ui/Badge";

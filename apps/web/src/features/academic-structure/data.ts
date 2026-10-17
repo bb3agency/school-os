@@ -8,7 +8,7 @@ import type {
   components,
 } from "@schoolos/api-client";
 import type { QueryClient } from "@tanstack/react-query";
-import { z } from "zod";
+import * as z from "@/lib/zod";
 import { ApiError, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import type { Loadable } from "@/lib/loadable";
 import { UUID_PATTERN, isoDate, requiredInt, text, uuid } from "@/lib/validation";

@@ -7,7 +7,7 @@ import {
   type SupportTicket,
 } from "@schoolos/api-client";
 import { useTranslations } from "next-intl";
-import { z } from "zod";
+import * as z from "@/lib/zod";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Badge } from "@/components/ui/Badge";

@@ -2,7 +2,7 @@
 
 import type { components } from "@schoolos/api-client";
 import { useQuery, type Query } from "@tanstack/react-query";
-import { z } from "zod";
+import * as z from "@/lib/zod";
 import { AuthRedirectError } from "@/lib/bff/fetch";
 import { ApiError, NotAvailableError, toLoadable, unwrap, useBffClient } from "@/lib/bff/query";
 import { typedDateToIso } from "@/lib/date-format";

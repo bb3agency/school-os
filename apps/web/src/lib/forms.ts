@@ -3,7 +3,7 @@
 import { useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useCallback, useRef, useState, type FormEvent } from "react";
-import type { z } from "zod";
+import type * as z from "@/lib/zod";
 import { apiFieldErrors } from "@/lib/api-errors";
 import { ApiError, newIdempotencyKey } from "@/lib/bff/query";
 import { translateOr } from "@/lib/i18n-dynamic";

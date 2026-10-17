@@ -3,7 +3,7 @@
 import { useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
-import { z } from "zod";
+import * as z from "@/lib/zod";
 import { Button } from "@/components/ui/Button";
 import { SelectField } from "@/components/ui/Select";
 import { ApiError, unwrap, useBffClient } from "@/lib/bff/query";

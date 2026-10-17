@@ -3,7 +3,7 @@
 import { TENANT_ROLES, type TenantRoleKey } from "@schoolos/api-client";
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useState } from "react";
-import { z } from "zod";
+import * as z from "@/lib/zod";
 import { Badge, Pill } from "@/components/ui/Badge";
 import { useSectionOptions, type SectionOption } from "@/features/findings/data";
 import { memberTone } from "@/features/status";
