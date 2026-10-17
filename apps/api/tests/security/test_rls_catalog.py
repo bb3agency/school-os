@@ -211,3 +211,35 @@ def test_ADR_0013_definer_access_allowlist_matches_the_catalog_exactly(
             ).scalars()
         )
     assert set(ALLOWLIST["definer_access_tables"]) == carrying
+
+
+def test_D14_r2_tenant_schemas_exist_with_the_tenant_grants(admin_engine: Engine) -> None:
+    """``fin`` and ``msg`` (R2, owner decision D14; docs/05 §15) come from bootstrap.sql: owned by
+    sos_owner, usable by the tenant roles, covered by this catalog test, closed to the control
+    plane; no application role may create objects in them."""
+    assert {"fin", "msg"} <= set(ALLOWLIST["tenant_schemas"])
+    with admin_engine.connect() as conn:
+        for schema in ("fin", "msg"):
+            owner = conn.execute(
+                text(
+                    "SELECT r.rolname FROM pg_namespace n JOIN pg_roles r ON r.oid = n.nspowner "
+                    "WHERE n.nspname = :s"
+                ),
+                {"s": schema},
+            ).scalar_one_or_none()
+            assert owner == "sos_owner", schema
+            for role in ("sos_app", "sos_readonly", "sos_definer", "sos_purger"):
+                usable: bool = conn.execute(
+                    text("SELECT has_schema_privilege(:r, :s, 'USAGE')"), {"r": role, "s": schema}
+                ).scalar_one()
+                assert usable, f"{role} needs USAGE on {schema}"
+            for role in ("sos_app", "sos_readonly", "sos_platform", "sos_definer", "sos_purger"):
+                creates: bool = conn.execute(
+                    text("SELECT has_schema_privilege(:r, :s, 'CREATE')"),
+                    {"r": role, "s": schema},
+                ).scalar_one()
+                assert not creates, f"{role} must not CREATE in {schema}"
+            platform: bool = conn.execute(
+                text("SELECT has_schema_privilege('sos_platform', :s, 'USAGE')"), {"s": schema}
+            ).scalar_one()
+            assert not platform, f"sos_platform must not use {schema}"

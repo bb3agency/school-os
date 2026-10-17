@@ -547,7 +547,7 @@ def test_SEC_012_census_lists_every_ciphertext_column(admin_engine: Engine) -> N
                 text(
                     "SELECT table_schema, table_name, column_name FROM information_schema.columns "
                     "WHERE data_type = 'bytea' AND column_name LIKE '%ciphertext%' "
-                    "AND table_schema IN ('core', 'sis', 'kb', 'ops', 'audit')"
+                    "AND table_schema IN ('core', 'sis', 'kb', 'ops', 'audit', 'fin', 'msg')"
                 )
             )
         }

@@ -19,7 +19,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection, Engine, text
 
-TENANT_SCHEMAS = ("core", "sis", "kb", "audit", "ops")
+TENANT_SCHEMAS = ("core", "sis", "kb", "audit", "ops", "fin", "msg")
 
 
 @dataclass(frozen=True, slots=True)

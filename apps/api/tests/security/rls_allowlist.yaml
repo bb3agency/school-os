@@ -2,7 +2,7 @@
 # Every change to this file needs a security review (CODEOWNERS).
 
 # Tenant-scoped schemas checked by the catalog test.
-tenant_schemas: [core, sis, kb, audit, ops]
+tenant_schemas: [core, sis, kb, audit, ops, fin, msg]  # fin, msg: R2 (D14)
 
 # Tables in tenant schemas WITHOUT a tenant_id column. They must still be listed here so that
 # adding a global table is always a deliberate, reviewed decision.
