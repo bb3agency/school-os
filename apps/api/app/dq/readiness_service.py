@@ -293,6 +293,8 @@ def _profile_sections(session: Session, profile: Profile) -> dict[uuid.UUID, Any
 def _in_reach(
     session: Session, ctx: UserContext, section_ids: Collection[uuid.UUID] | None
 ) -> list[uuid.UUID]:
+    """Current-year students reached by BOTH ``student.read_basic`` (always applied by
+    ``students.list_students_in_scope``) and ``dq.readiness.read`` (FR-DQ-046, SEC-015)."""
     return students.list_students_in_scope(
         session, ctx, section_ids=section_ids, permissions=(READ,)
     )
