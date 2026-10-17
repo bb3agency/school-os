@@ -85,7 +85,12 @@ def test_school_budgets_moved_after_authz_are_the_per_school_route_policies() ->
     school_route_policies = {name for names in config.routes.values() for name in names} & {
         name for name, p in config.policies.items() if p.per == "school"
     }
-    assert school_route_policies == {"data_export", "heavy_jobs", "school_invitations"}
+    assert school_route_policies == {
+        "data_export",
+        "heavy_jobs",
+        "readiness_school",
+        "school_invitations",
+    }
     assert "audit_verify" not in {n for names in config.routes.values() for n in names}
 
 
@@ -173,3 +178,38 @@ def test_heavy_jobs_is_shared_by_the_routes_of_one_school(
     assert api.call(other_people["office_admin"], "POST", DQ_RUNS, json={}).status_code == 202
     assert other.tenant_id != school.tenant_id
     assert isinstance(other.tenant_id, uuid.UUID)
+
+
+READINESS = "/api/v1/dq/readiness/apaar"
+
+
+def test_SEC_046_readiness_school_budget_is_charged_after_authz(
+    admin_engine: Engine, api: Any
+) -> None:
+    """SEC-046: the readiness reads' school-wide budget (``readiness_school``) is charged after
+    the permission check, like the other per-school route budgets: members without
+    ``dq.readiness.read`` get 403 every time and never spend it. The quotas are shrunk for the
+    test (the per-person layer is widened so it never trips first)."""
+    now = Clock()
+    base = rl.load_config()
+    policies = dict(base.policies)
+    policies["readiness_school"] = policies["readiness_school"].model_copy(update={"quota": 4})
+    policies["readiness_reads"] = policies["readiness_reads"].model_copy(update={"quota": 1000})
+    config = base.model_copy(update={"policies": policies})
+    rl.set_rate_limiter(
+        rl.RateLimiter(config, rl.InMemoryRateLimitStore(clock=now), hash_key=b"synthetic-key")
+    )
+    try:
+        _, people = _school(admin_engine, "accountant", "office_staff")
+        for _ in range(10):
+            assert api.call(people["accountant"], "GET", READINESS).status_code == 403
+        clerk = people["office_staff"]
+        for _ in range(4):
+            res = api.call(clerk, "GET", READINESS)
+            assert res.status_code == 200, res.text
+        refused = api.call(clerk, "GET", READINESS)
+        assert (refused.status_code, refused.json()["code"]) == (429, "rate_limited")
+        assert '"readiness_school";q=4;w=60' in refused.headers["RateLimit-Policy"]
+        assert api.call(people["accountant"], "GET", READINESS).status_code == 403
+    finally:
+        rl.set_rate_limiter(None)

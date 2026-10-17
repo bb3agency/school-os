@@ -77,6 +77,9 @@ def test_task_runs_the_export(school: Any, admin_engine: Engine) -> None:
     }
     assert tasks.generate.apply(kwargs=payload).get() == "ready"
     assert EX.export_row(admin_engine, export_id)["status"] == "ready"
-    # Delivered twice (at-least-once): nothing happens the second time.
-    assert tasks.generate.apply(kwargs=payload).get() == "ready"
+    # Delivered twice (at-least-once): the same event is skipped (L-14), and a new event for a
+    # ready export changes nothing either.
+    assert tasks.generate.apply(kwargs=payload).get() is None
+    again = {**payload, "event_id": str(uuid.uuid4())}
+    assert tasks.generate.apply(kwargs=again).get() == "ready"
     assert len(EX.files(admin_engine, export_id)) == 1

@@ -19,6 +19,12 @@ export type CertificateInput = Schemas["InputOut"];
 export type CertificatePreview = Schemas["CertificatePreview"];
 export type PrintedField = Schemas["PrintedField"];
 export type Blocker = Schemas["Blocker"];
+/** R2-1A (ADR-0045): verification codes and TC formats. */
+export type Verification = Schemas["VerificationOut"];
+export type CertificateFormat = Schemas["CertificateFormatOut"];
+
+/** Reason bounds for adding or withdrawing a verification code (FR-CERT-023; 0056 CHECKs). */
+export const VERIFICATION_REASON_MAX = 500;
 
 type Exhaustive<T extends string, L extends readonly T[]> = [T] extends [L[number]] ? L : never;
 
@@ -68,6 +74,8 @@ export const CERT_KEYS = {
   all: ["staff", "certificates"] as const,
   types: ["staff", "certificates", "types"] as const,
   one: (id: string) => ["staff", "certificates", "one", id] as const,
+  verification: (id: string) => ["staff", "certificates", "verification", id] as const,
+  formats: ["staff", "certificates", "formats"] as const,
   preview: (studentId: string, type: string) =>
     ["staff", "certificates", "preview", studentId, type] as const,
 } as const;

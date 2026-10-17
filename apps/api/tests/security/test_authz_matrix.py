@@ -17,6 +17,7 @@ from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
 from typing import Any
+from urllib.parse import quote
 
 import pytest
 from fastapi.routing import APIRoute, iter_route_contexts
@@ -219,6 +220,21 @@ def _kb_conversation(action: str) -> Builder:
         return path, None, {}
 
     return build
+
+
+def _kb_usage(w: Any, r: str, a: Engine) -> Request:
+    _ADMIN_ENGINE[:] = [a]
+    _kb_ai_runtime(w)
+    return "/api/v1/knowledge/usage", None, {}
+
+
+def _kb_resolve(w: Any, r: str, a: Engine) -> Request:
+    """A page of the circular every role reads: kb.ask and document.read holders both open it
+    (require_any; FR-KB-042)."""
+    _ADMIN_ENGINE[:] = [a]
+    _kb_ai_runtime(w)
+    source = f"sos://doc/{KB.shared_document(a, w.a)}/v1#p1"
+    return f"/api/v1/knowledge/resolve?source={quote(source, safe='')}", None, {}
 
 
 def _kb_memory_create(w: Any, r: str, a: Engine) -> Request:
@@ -1090,6 +1106,31 @@ def _cert_path(suffix: str = "") -> Builder:
     return build
 
 
+# --- R2-1A: verification codes (ADR-0045; FR-CERT-023): add needs a certificate without one ---
+
+_VERIFY_REASON = {"reason": "Synthetic matrix verification reason"}
+
+
+def _cert_without_code(w: Any, r: str, a: Engine) -> Request:
+    """A fresh certificate issued as before R2 (no code), so the add succeeds."""
+    from unittest import mock
+
+    from app.certificates import service as certificates
+
+    with mock.patch.object(certificates, "_create_verification", return_value=None):
+        cert = _cert_issued(w, a, fresh=True)
+    return f"/api/v1/certificates/{cert.id}/verification", _VERIFY_REASON, {}
+
+
+def _cert_withdraw_code(w: Any, r: str, a: Engine) -> Request:
+    cert = _cert_issued(w, a, fresh=True)
+    return (
+        f"/api/v1/certificates/{cert.id}/verification/withdraw",
+        _VERIFY_REASON,
+        {"If-Match": 'W/"1"'},
+    )
+
+
 SPECS: dict[tuple[str, str], Builder] = {
     ("GET", "/api/v1/me"): lambda w, r, a: ("/api/v1/me", None, {}),
     ("GET", "/api/v1/me/schools"): lambda w, r, a: ("/api/v1/me/schools", None, {}),
@@ -1687,6 +1728,15 @@ SPECS: dict[tuple[str, str], Builder] = {
     ("POST", "/api/v1/certificates/{certificate_id}/reject"): _cert_decide("reject"),
     ("POST", "/api/v1/certificates/{certificate_id}/withdraw"): _cert_decide("withdraw"),
     ("POST", "/api/v1/certificates/{certificate_id}/cancel"): _cert_cancel,
+    # R2-1A (ADR-0045): formats, verification codes.
+    ("GET", "/api/v1/certificates/formats"): lambda w, r, a: (
+        "/api/v1/certificates/formats",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/certificates/{certificate_id}/verification"): _cert_path("/verification"),
+    ("POST", "/api/v1/certificates/{certificate_id}/verification"): _cert_without_code,
+    ("POST", "/api/v1/certificates/{certificate_id}/verification/withdraw"): (_cert_withdraw_code),
     ("GET", "/api/v1/registers/transfer-certificates"): lambda w, r, a: (
         "/api/v1/registers/transfer-certificates",
         None,
@@ -1747,6 +1797,9 @@ SPECS: dict[tuple[str, str], Builder] = {
         {"enabled": True},
         {},
     ),
+    # R2.4 (FR-KB-040, FR-KB-042).
+    ("GET", "/api/v1/knowledge/usage"): _kb_usage,
+    ("GET", "/api/v1/knowledge/resolve"): _kb_resolve,
     # Circulars, tasks and parent notices (M4; FR-CIR-*, FR-TASK-*, FR-NOTICE-*).
     ("GET", "/api/v1/circulars"): lambda w, r, a: ("/api/v1/circulars", None, {}),
     ("GET", "/api/v1/circulars/{document_id}"): lambda w, r, a: (
@@ -2096,6 +2149,7 @@ def _success(method: str, path: str) -> int:
         "/api/v1/knowledge/memories",
         "/api/v1/students/{student_id}/certificates",
         "/api/v1/certificates/{certificate_id}/duplicates",
+        "/api/v1/certificates/{certificate_id}/verification",
         "/api/v1/tasks",
         "/api/v1/circular-suggestions/{suggestion_id}/confirm",
         "/api/v1/exams",

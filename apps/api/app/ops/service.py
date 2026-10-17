@@ -22,6 +22,7 @@ from celery import Task
 from sqlalchemy.orm import Session
 
 from app.audit.schemas import sanitize_summary
+from app.authz.kv import KVUnavailable, kv_store
 from app.core import purge as purging
 from app.core.db import context_free_session, tenant_session
 from app.core.errors import NotFound
@@ -59,29 +60,43 @@ SendTask = Callable[[str, dict[str, Any]], None]
 
 
 def dispatch_outbox(send: SendTask, *, batch: int = 100) -> DispatchResult:
+    """Claim a batch of events and relay each to its consumer **inside the claiming
+    transaction**: when the broker refuses one (``send`` raises), the claim rolls back and the
+    whole batch is relayed again on the next run, so no event is lost (audit 2026-10-17 L-05).
+    Delivery is at least once, as with ``acks_late`` redelivery; consumers are idempotent."""
+    sent = unrouted = 0
     with context_free_session() as s:
         rows = repo.claim_outbox(s, batch)
-    sent = unrouted = 0
-    for row in rows:
-        task = OUTBOX_ROUTES.get(row["event_type"])
-        if task is None:
-            unrouted += 1
-            log.error(
-                "ops.outbox.unrouted",
-                tenant_id=str(row["tenant_id"]),
-                resource_id=str(row["id"]),
-                action=row["event_type"],
-            )
-            continue
-        send(
-            task,
-            {
-                "tenant_id": str(row["tenant_id"]),
-                "event_id": str(row["id"]),
-                "payload": dict(row["payload"]),
-            },
-        )
-        sent += 1
+        for row in rows:
+            task = OUTBOX_ROUTES.get(row["event_type"])
+            if task is None:
+                unrouted += 1
+                log.error(
+                    "ops.outbox.unrouted",
+                    tenant_id=str(row["tenant_id"]),
+                    resource_id=str(row["id"]),
+                    action=row["event_type"],
+                )
+                continue
+            try:
+                send(
+                    task,
+                    {
+                        "tenant_id": str(row["tenant_id"]),
+                        "event_id": str(row["id"]),
+                        "payload": dict(row["payload"]),
+                    },
+                )
+            except Exception as exc:
+                log.error(
+                    "ops.outbox.send_failed",
+                    resource_id=str(row["id"]),
+                    action=row["event_type"],
+                    error_type=type(exc).__name__,
+                    count=len(rows),
+                )
+                raise
+            sent += 1
     return DispatchResult(len(rows), sent, unrouted)
 
 
@@ -110,6 +125,60 @@ RUN_WHILE_SUSPENDED: Final[frozenset[str]] = frozenset(
         "knowledge.settle_spend",
     }
 )
+
+# Outbox consumers with outside effects (an email, a stored PDF, OCR or LLM calls, a scan, a
+# full export). Delivery is at least once (the dispatcher relays inside its claim, L-05, and
+# tasks are ``acks_late``), so each of these runs once per ``event_id``: a delivery of an
+# event already done or running is skipped (audit 2026-10-17 L-14). A failed run frees the
+# event for its retry. Without Valkey the check fails open (the work runs, as before).
+DEDUPE_BY_EVENT: Final[frozenset[str]] = frozenset(
+    {
+        "notifications.send_email",
+        "certificates.render",
+        "exports.generate",
+        "exports.render",
+        "circulars.read_version",
+        "circulars.draft_notice",
+        "circulars.render_notice",
+        "extraction.process_batch",
+        "documents.scan",
+        "knowledge.ingest_version",
+        "knowledge.summarise_conversation",
+        "admin.tenant_export",
+    }
+)
+EVENT_LEASE_SECONDS: Final = 2 * 3600  # longer than the broker visibility timeout (1 h)
+EVENT_DONE_SECONDS: Final = 7 * 24 * 3600
+_RUNNING: Final = b"running"
+_DONE: Final = b"done"
+
+
+def _event_key(task_name: str, event_id: str) -> str:
+    return f"sos:outbox-done:{task_name}:{event_id}"
+
+
+def claim_event(task_name: str, event_id: str) -> bool:
+    """Start the one run of ``task_name`` for ``event_id``; False when it is done or running.
+    Fails open (True) when Valkey is unavailable."""
+    try:
+        return kv_store().set(
+            _event_key(task_name, event_id), _RUNNING, ttl_s=EVENT_LEASE_SECONDS, nx=True
+        )
+    except KVUnavailable:
+        log.warning("ops.task.dedupe_unavailable", action=task_name)
+        return True
+
+
+def _settle_event(task_name: str, event_id: str, *, done: bool) -> None:
+    key = _event_key(task_name, event_id)
+    try:
+        if done:
+            kv_store().set(key, _DONE, ttl_s=EVENT_DONE_SECONDS)
+        else:
+            kv_store().delete(key)
+    except KVUnavailable:
+        log.warning("ops.task.dedupe_unavailable", action=task_name)
+
 
 WorkDecision = Literal["run", "hold", "drop"]
 _HELD_STATUSES: Final = frozenset({"suspended", "offboarding"})
@@ -158,7 +227,22 @@ class TenantTask(Task):  # type: ignore[type-arg]
                     outcome="school_" + decision,
                 )
                 return None
+            if self.name in DEDUPE_BY_EVENT:
+                return self._run_once(args, kwargs)
         return super().__call__(*args, **kwargs)
+
+    def _run_once(self, args: tuple[Any, ...], kwargs: dict[str, Any]) -> Any:
+        event_id = str(kwargs["event_id"])
+        if not claim_event(self.name, event_id):
+            log.info("ops.task.duplicate", action=self.name, outcome="skipped")
+            return None
+        try:
+            result = super().__call__(*args, **kwargs)
+        except BaseException:
+            _settle_event(self.name, event_id, done=False)  # the retry may run it
+            raise
+        _settle_event(self.name, event_id, done=True)
+        return result
 
 
 # --- job runs ---------------------------------------------------------------------------------

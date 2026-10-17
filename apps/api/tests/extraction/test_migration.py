@@ -254,6 +254,7 @@ def test_PRV_016_downgrade_refuses_while_redacted_pages_exist_and_round_trips_ot
         "0053_readiness",
         "0054_r1_finish",
         "0055_public_handles",
+        "0056_certificate_verifications",
         "0057_fees_core",
     }
     with pytest.raises(DBAPIError, match="irreversible: redacted register pages exist"):

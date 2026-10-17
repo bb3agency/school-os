@@ -7,6 +7,7 @@ import csv
 import dataclasses
 import datetime as dt
 import io
+import json
 import sys
 import uuid
 from typing import Any
@@ -20,6 +21,7 @@ from app.core.db import tenant_session
 from app.core.errors import Conflict, Forbidden, NotFound, StepUpRequired, ValidationFailed
 from app.core.languages import contains_telugu
 from app.core.redaction import contains_full_aadhaar
+from app.exports import repository as export_repo
 from app.exports import service as exports
 from app.students.schemas import ValueIn
 
@@ -875,6 +877,82 @@ def test_docs_05_13_files_purged_after_seven_days(
     assert exc.value.code == "export_expired"
     with tenant_session(school.tenant_id, person.user_id) as db:
         assert exports.get_export(db, EX.ctx(school, person, "principal"), export_id).files == []
+
+
+def test_L_10_a_board_pre_check_leaves_out_classes_of_another_board(
+    school: Any, section: str, admin_engine: Engine
+) -> None:
+    """FR-TEN-021: the CISCE pre-check of a school whose Class IX follows the State Board has
+    no Class IX students (422 ``no_students`` for a Class IX section); a portal pre-check
+    still has them."""
+    EX.student(school, section_key="section_9a")
+    with admin_engine.begin() as c:
+        before = c.execute(
+            text("SELECT boards, settings FROM core.tenants WHERE id = :t"),
+            {"t": school.tenant_id},
+        ).one()
+        c.execute(
+            text(
+                "UPDATE core.tenants SET boards = ARRAY['CISCE','BSEAP'], settings = settings || "
+                '\'{"class_boards": {"IX": "BSEAP"}}\'::jsonb WHERE id = :t'
+            ),
+            {"t": school.tenant_id},
+        )
+    try:
+        person = school.people["principal"]
+        with pytest.raises(ValidationFailed) as exc:
+            EX.request_precheck(school, person, "principal", profile_key="cisce-registration-2027")
+        assert exc.value.errors[0]["code"] == "no_students"
+        portal = EX.request_precheck(school, person, "principal", profile_key="udise-plus")
+        assert portal.student_count >= 1
+    finally:
+        with admin_engine.begin() as c:
+            c.execute(
+                text("UPDATE core.tenants SET boards = :b, settings = :s WHERE id = :t"),
+                {
+                    "b": list(before.boards),
+                    "s": json.dumps(before.settings),
+                    "t": school.tenant_id,
+                },
+            )
+
+
+def test_L_13_a_shorter_retention_applies_to_existing_exports(
+    school: Any, section: str, admin_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """FR-ADM-002: when the school shortens how long export files are kept, files already made
+    go by the new setting too (download refused, then purged), not the expiry set when made."""
+    EX.student(school, section_key=section)
+    export_id = EX.ready_export(school, "principal", section_keys=(section,))
+    upsert = (
+        "INSERT INTO ops.retention_settings (id, tenant_id, rules) "
+        "VALUES (gen_random_uuid(), :t, CAST(:r AS jsonb)) "
+        "ON CONFLICT (tenant_id) DO UPDATE SET rules = EXCLUDED.rules"
+    )
+    with admin_engine.begin() as c:
+        before = c.execute(
+            text("SELECT rules FROM ops.retention_settings WHERE tenant_id = :t"),
+            {"t": school.tenant_id},
+        ).scalar_one_or_none()
+        c.execute(text(upsert), {"t": school.tenant_id, "r": '{"exports": 2}'})
+    try:
+        person = school.people["principal"]
+        real_now = export_repo.now
+        later = dt.timedelta(days=2, minutes=1)  # within the 7 days set when it was made
+        monkeypatch.setattr(export_repo, "now", lambda session: real_now(session) + later)
+        db_ctx = tenant_session(school.tenant_id, person.user_id)
+        with db_ctx as db, pytest.raises(Conflict) as exc:
+            exports.download_url(db, EX.ctx(school, person, "principal"), export_id)
+        assert exc.value.code == "export_expired"
+        moment = dt.datetime.now(dt.UTC) + later
+        assert exports.purge_expired(school.tenant_id, now=moment) >= 1
+        assert EX.export_row(admin_engine, export_id)["status"] == "expired"
+    finally:
+        with admin_engine.begin() as c:
+            c.execute(
+                text(upsert),
+                {"t": school.tenant_id, "r": json.dumps(before) if before else "{}"},
+            )
 
 
 def _list_profiles(school: Any, *, include_all: bool = False) -> list[Any]:

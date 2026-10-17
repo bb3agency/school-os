@@ -330,6 +330,30 @@ class CertificateLetterhead(BaseModel):
     place: LetterheadText = Field(default="", max_length=80)
 
 
+# --- R2-1A certificates (ADR-0045; FR-CERT-015, FR-CERT-018) ---------------------------------
+# TC format keys a school may choose: the built-in generic format and the versioned format files
+# in app/certificates/formats/ (kept equal by tests/certificates/test_formats.py).
+TcFormatKey = Literal["generic-v1", "ap-tc-2027"]
+# Restricted (C3) attributes a TC prints only with print_restricted_tc_fields (owner decision D15);
+# audited with these keys when the setting changes.
+RESTRICTED_TC_FIELDS: tuple[str, ...] = ("caste", "religion")
+
+
+class CertificateFormatChoice(BaseModel):
+    """The certificate format a school uses per certificate type (only the TC has a choice)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    transfer: TcFormatKey = Field(
+        default="generic-v1",
+        description="``generic-v1`` (built in) or ``ap-tc-2027`` (Andhra Pradesh layout, built "
+        "from public sources and not yet confirmed with a school; ADR-0045).",
+    )
+
+
+# --- end R2-1A ----------------------------------------------------------------------------------
+
+
 class TenantSettings(BaseModel):
     """Validated school settings stored in ``core.tenants.settings`` (FR-TEN-012).
 
@@ -373,8 +397,20 @@ class TenantSettings(BaseModel):
         "pages, printed parent slips and forms (ADR-0044, FR-LANG-001). Independent of the "
         "staff UI language; a guardian's own choice overrides it.",
     )
+    # R2-1A certificates (ADR-0045).
+    certificate_format: CertificateFormatChoice = Field(
+        default_factory=CertificateFormatChoice,
+        description="Certificate format per type (FR-CERT-015); issued certificates keep the "
+        "format they were issued in.",
+    )
+    print_restricted_tc_fields: bool = Field(
+        default_factory=bool,  # False; optional in the schema, like certificate_format
+        description="Print religion and caste on transfer certificates instead of labelled "
+        "blanks (FR-CERT-018, owner decision D15; an exception to FR-CERT-009 for the TC only). "
+        "Audited with the field keys.",
+    )
     fees_enabled: bool = Field(
-        default=False,
+        default_factory=bool,  # False; optional in the schema
         description="The school keeps its fee ledger and receipts in SchoolOS (R2-1B, FR-FEE-001; "
         "also needs the platform flag ``fees.enabled``). In ``alongside`` mode this is how the "
         "owner turns fees on despite the ERP (ADR-0042 decision 12). Audited with its value.",
@@ -411,6 +447,9 @@ class TenantSettingsPatch(_In):
         description="``en`` or ``te``: the language parents receive (ADR-0044). Audited with "
         "its new value.",
     )
+    # R2-1A certificates (ADR-0045). Both audited with their new values.
+    certificate_format: CertificateFormatChoice | None = None
+    print_restricted_tc_fields: bool | None = None
     fees_enabled: bool | None = Field(
         default=None,
         description="Turn the fee ledger and receipts on or off for the school (FR-FEE-001). "

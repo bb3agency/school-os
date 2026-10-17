@@ -1,0 +1,138 @@
+# Andhra Pradesh transfer certificate (ADR-0045 decision 1; FR-CERT-015..018; US-2001).
+# Versioned format file read and validated by app/certificates/formats.py. An issued certificate
+# stores this key and version (sis.certificates.format_key / format_version) and its frozen
+# content; changing this file never changes an issued certificate. A change to the lines, their
+# order or the inputs needs version + 1 (a pending request prepared on the older version must be
+# prepared again: 409 certificate_format_changed).
+#
+# Built from public sources only and NOT confirmed with a school (owner decision D3): the research
+# found an unofficial template circulated by schools and no notification text (docs/research/
+# 2026-10-market/notes/regulation_portals.md §3). `verified` stays false until a pilot school
+# confirms the layout against its own TC book.
+key: ap-tc-2027
+version: 1
+certificate_type: transfer
+label_en: Andhra Pradesh transfer certificate
+label_te: ఆంధ్రప్రదేశ్ బదిలీ ధృవీకరణ పత్రం
+title_en: Transfer certificate
+title_te: బదిలీ ధృవీకరణ పత్రం
+verified: false
+sources:
+  - title: "TC form (unofficial template circulated by AP schools)"
+    url: https://www.scribd.com/document/361127524/TC
+  - title: "AP Registered Schools (Establishment, Recognition, Registration, Regulation) Rules 1987"
+    url: https://www.legitquest.com/act/the-andhra-pradesh-registered-schools-establishment-recognition-registration-regulation-rules-1987/D646
+notes: >-
+  Lines follow the unofficial template (pupil and parent names, nationality, religion, caste
+  status "as specified in AP Educational Rules", date of birth as in the admission register in
+  figures and words, class at leaving, languages studied). The UDISE+ PEN and the APAAR ID lines
+  are SchoolOS additions (ADR-0039): printed only under the rules in app/certificates/formats.py.
+  There is no fee line: a TC is never withheld or annotated for dues (owner decision D16).
+
+# Typed when the TC is prepared, validated (lengths, Aadhaar refusal) and frozen with the
+# content (FR-CERT-016). Keys shared with the generic format keep their meaning (the TC register
+# reads leaving_date, leaving_reason and conduct).
+inputs:
+  identification_mark_1: {kind: text, required: true, max_length: 120}
+  identification_mark_2: {kind: text, required: false, max_length: 120}
+  languages_studied: {kind: text, required: true, max_length: 200}
+  medium:
+    kind: choice
+    required: true
+    choices: [medium_telugu, medium_english, medium_urdu, medium_hindi, medium_other]
+  promotion:
+    kind: choice
+    required: true
+    choices: [promoted, not_promoted, not_applicable]
+  working_days: {kind: number, required: false, max_value: 366}
+  days_attended: {kind: number, required: false, max_value: 366}
+  application_date: {kind: date, required: true}
+  leaving_date: {kind: date, required: true}
+  leaving_reason:
+    kind: choice
+    required: true
+    choices: [parent_request, parent_transferred, course_completed, other]
+  conduct:
+    kind: choice
+    required: true
+    choices: [very_good, good, satisfactory]
+  remarks: {kind: text, required: false, max_length: 200}
+
+# Labels of the choices this format adds (the others come from config.yaml choice_labels).
+choice_labels:
+  medium_telugu: {en: "Telugu", te: "తెలుగు"}
+  medium_english: {en: "English", te: "ఆంగ్లం"}
+  medium_urdu: {en: "Urdu", te: "ఉర్దూ"}
+  medium_hindi: {en: "Hindi", te: "హిందీ"}
+  medium_other: {en: "Other", te: "ఇతర"}
+
+# The lines in the order the certificate prints them. fill:
+#   attribute   the canonical value of a C1/C2 student attribute (admission register first, BR-01)
+#   input       a value typed when the TC was prepared (inputs above)
+#   derived     worked out from the record: dob_in_words, admission_class, class_at_leaving
+#   identifier  udise_pen (only a verified value) or apaar_id (only a verified value with the
+#               parent's current consent `given`); otherwise "—", never a blank to fill (FR-CERT-017)
+#   restricted  a C3 attribute (religion, caste): a labelled blank unless the school turned on
+#               print_restricted_tc_fields (FR-CERT-018, owner decision D15)
+lines:
+  - {key: full_name, fill: attribute, attribute: full_name, required: true,
+     label_en: "Name of the pupil", label_te: "విద్యార్థి పేరు"}
+  - {key: father_name, fill: attribute, attribute: father_name, required: true,
+     label_en: "Name of the father or guardian", label_te: "తండ్రి లేదా సంరక్షకుని పేరు"}
+  - {key: mother_name, fill: attribute, attribute: mother_name,
+     label_en: "Name of the mother", label_te: "తల్లి పేరు"}
+  - {key: nationality, fill: attribute, attribute: nationality,
+     label_en: "Nationality", label_te: "జాతీయత"}
+  - {key: religion, fill: restricted, attribute: religion,
+     label_en: "Religion", label_te: "మతం"}
+  - {key: caste, fill: restricted, attribute: caste,
+     label_en: "Caste status (SC, ST, BC or other) as specified in the AP Educational Rules",
+     label_te: "ఆం.ప్ర. విద్యా నియమాల ప్రకారం కుల స్థితి (ఎస్సీ, ఎస్టీ, బీసీ లేదా ఇతర)"}
+  - {key: mother_tongue, fill: attribute, attribute: mother_tongue,
+     label_en: "Mother tongue", label_te: "మాతృభాష"}
+  - {key: dob, fill: attribute, attribute: dob, required: true,
+     label_en: "Date of birth as entered in the admission register (in figures)",
+     label_te: "ప్రవేశ రిజిస్టర్ ప్రకారం పుట్టిన తేదీ (అంకెల్లో)"}
+  - {key: dob_in_words, fill: derived, derived: dob_in_words,
+     label_en: "Date of birth (in words)", label_te: "పుట్టిన తేదీ (అక్షరాల్లో)"}
+  - {key: identification_mark_1, fill: input, input: identification_mark_1,
+     label_en: "Personal marks of identification (1)", label_te: "గుర్తింపు చిహ్నాలు (1)"}
+  - {key: identification_mark_2, fill: input, input: identification_mark_2,
+     label_en: "Personal marks of identification (2)", label_te: "గుర్తింపు చిహ్నాలు (2)"}
+  - {key: admission_no, fill: attribute, attribute: admission_no, required: true,
+     label_en: "Admission number", label_te: "ప్రవేశ సంఖ్య"}
+  - {key: admission_date, fill: attribute, attribute: admission_date,
+     label_en: "Date of admission", label_te: "ప్రవేశ తేదీ"}
+  - {key: admission_class, fill: derived, derived: admission_class,
+     label_en: "Class to which admitted", label_te: "ప్రవేశం పొందిన తరగతి"}
+  - {key: class_at_leaving, fill: derived, derived: class_at_leaving,
+     label_en: "Class in which the pupil was studying at the time of leaving",
+     label_te: "విడిచిపెట్టే సమయానికి చదువుతున్న తరగతి"}
+  - {key: languages_studied, fill: input, input: languages_studied,
+     label_en: "First language and languages studied", label_te: "ప్రథమ భాష, చదివిన భాషలు"}
+  - {key: medium, fill: input, input: medium,
+     label_en: "Medium of instruction", label_te: "బోధనా మాధ్యమం"}
+  - {key: promotion, fill: input, input: promotion,
+     label_en: "Whether qualified for promotion to a higher class",
+     label_te: "పై తరగతికి అర్హులా"}
+  - {key: working_days, fill: input, input: working_days,
+     label_en: "Number of working days up to the date of leaving",
+     label_te: "విడిచిన తేదీ వరకు పని దినాలు"}
+  - {key: days_attended, fill: input, input: days_attended,
+     label_en: "Number of working days the pupil attended", label_te: "హాజరైన పని దినాలు"}
+  - {key: application_date, fill: input, input: application_date,
+     label_en: "Date of application for the certificate",
+     label_te: "ధృవీకరణ పత్రం కోసం దరఖాస్తు తేదీ"}
+  - {key: leaving_date, fill: input, input: leaving_date,
+     label_en: "Date of leaving the school", label_te: "పాఠశాల విడిచిన తేదీ"}
+  - {key: leaving_reason, fill: input, input: leaving_reason,
+     label_en: "Reason for leaving", label_te: "విడిచిపెట్టడానికి కారణం"}
+  - {key: conduct, fill: input, input: conduct,
+     label_en: "Conduct and character", label_te: "ప్రవర్తన, నడవడిక"}
+  - {key: udise_pen, fill: identifier, identifier: udise_pen,
+     label_en: "UDISE+ PEN (Permanent Education Number)",
+     label_te: "యూడైస్+ పెన్ (శాశ్వత విద్యా సంఖ్య)"}
+  - {key: apaar_id, fill: identifier, identifier: apaar_id,
+     label_en: "APAAR ID", label_te: "అపార్ ఐడీ"}
+  - {key: remarks, fill: input, input: remarks,
+     label_en: "Remarks", label_te: "వ్యాఖ్యలు"}

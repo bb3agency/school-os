@@ -35,6 +35,7 @@ from app.fees.models import ALL_MODELS
 pytestmark = pytest.mark.db
 DB = "schoolos_fees_migration"
 REVISION = "0057_fees_core"
+PREVIOUS = "0056_certificate_verifications"  # re-chained at merge (docs/14 R2)
 SETTINGS = Settings(
     env=Environment.CI,
     key_wrapper=KeyWrapperKind.LOCAL_DEV,
@@ -185,7 +186,7 @@ def _seed_fees(admin: Engine) -> uuid.UUID:
 def test_CLAUDE_6_12_fees_migration_reversible_with_data(populated: _Walk) -> None:
     admin = populated.admin
     before = ScriptDirectory.from_config(populated.cfg).get_revision(REVISION).down_revision
-    assert before == "0055_public_handles"
+    assert before == PREVIOUS
     _seed_fees(admin)
     assert _scalar(admin, "SELECT count(*) FROM fin.receipts") == 1
     students = _scalar(admin, "SELECT count(*) FROM sis.students")

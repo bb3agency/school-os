@@ -221,3 +221,16 @@ def test_text_limits() -> None:
     with pytest.raises(ValidationFailed) as exc:
         validate_value(NAME, "admission_register", "   ")
     assert _codes(exc) == ["missing"]
+
+
+def test_L_04_today_is_the_indian_date(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Between midnight and 05:30 IST the UTC date is still yesterday: today's date (IST) is
+    not in the future and tomorrow's is, as when an import validates the same row."""
+    from app.students import definitions
+
+    late = dt.datetime(2026, 10, 17, 20, 0, tzinfo=dt.UTC)  # 18 October, 01:30 IST
+    monkeypatch.setattr(definitions, "_utc_now", lambda: late)
+    assert validate_value(DOB, "admission_register", "2026-10-18").plain == "2026-10-18"
+    with pytest.raises(ValidationFailed) as exc:
+        validate_value(DOB, "admission_register", "2026-10-19")
+    assert _codes(exc) == ["date_in_future"]

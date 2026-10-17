@@ -47,6 +47,7 @@ from app.core.logging import get_context
 from app.tenancy import offboarding
 from app.tenancy import repository as repo
 from app.tenancy.schemas import (
+    RESTRICTED_TC_FIELDS,
     AcademicYearCreate,
     AcademicYearOut,
     AcademicYearUpdate,
@@ -1090,14 +1091,18 @@ def update_tenant_settings(
     if boards_changed:
         fields.add("boards")
         summary["boards"] = list(new_boards)
-    if "operating_mode" in fields:
-        summary["operating_mode"] = merged.operating_mode
-    if "parent_language" in fields:
-        # ADR-0044, FR-LANG-001: the language parents receive is audited with its value.
-        summary["parent_language"] = merged.parent_language
-    if "fees_enabled" in fields:
-        # FR-FEE-001 (R2-1B): turning fees on or off is audited with its value.
-        summary["fees_enabled"] = merged.fees_enabled
+    # Settings audited with their new value: the operating mode (FR-TEN-022), the language
+    # parents receive (ADR-0044, FR-LANG-001) and the school's fee switch (R2-1B, FR-FEE-001).
+    for key in ("operating_mode", "parent_language", "fees_enabled"):
+        if key in fields:
+            summary[key] = getattr(merged, key)
+    # R2-1A (ADR-0045; FR-CERT-015, FR-CERT-018): the TC format and the restricted-fields switch
+    # are audited with their values, the switch also with the field keys it prints.
+    if "certificate_format" in fields:
+        summary["certificate_format"] = merged.certificate_format.model_dump(mode="json")
+    if "print_restricted_tc_fields" in fields:
+        summary["print_restricted_tc_fields"] = merged.print_restricted_tc_fields
+        summary["restricted_tc_fields"] = list(RESTRICTED_TC_FIELDS)
     _audit(
         session,
         action="tenant.settings_updated",

@@ -21,6 +21,7 @@ import {
   DownloadPdfButton,
   inputText,
   PrintViewLink,
+  useInputLabel,
   useCertificateTitle,
   useCertificateTypes,
 } from "./parts";
@@ -32,6 +33,7 @@ import {
   type Certificate,
   type ContentLine,
 } from "./types";
+import { VerificationCard } from "./VerificationCard";
 
 const reasonText = z
   .string()
@@ -269,6 +271,7 @@ export function CertificateDetailScreen({ certificateId }: { certificateId: stri
   const api = useBffClient("staff");
   const me = useStaffMe();
   const types = useCertificateTypes();
+  const inputLabel = useInputLabel();
   const title = useCertificateTitle();
   const query = useApiQuery(CERT_KEYS.one(certificateId), () =>
     unwrap(
@@ -409,6 +412,7 @@ export function CertificateDetailScreen({ certificateId }: { certificateId: stri
             <Card title={td("printedTitle")} description={td("printedBody")}>
               <Lines lines={data.content.fields} locale={locale} />
               <Lines lines={data.content.details} locale={locale} />
+              <Lines lines={data.content.blanks} locale={locale} />
             </Card>
           ) : (
             <Card title={td("requestedTitle")} description={td("requestedBody")}>
@@ -423,7 +427,7 @@ export function CertificateDetailScreen({ certificateId }: { certificateId: stri
                     return (
                       <div key={key} className="grid gap-1 py-3 sm:grid-cols-[16rem_1fr] sm:gap-4">
                         <dt className="text-sm text-ink-muted">
-                          {input ? t(`inputs.${input.key}` as "inputs.remarks") : key}
+                          {input ? inputLabel(input) : key}
                         </dt>
                         <dd className="break-words text-ink">
                           {inputText(catalog, data, key, value, locale)}
@@ -460,6 +464,8 @@ export function CertificateDetailScreen({ certificateId }: { certificateId: stri
               ) : null}
             </Card>
           ) : null}
+          {/* R2-1A (ADR-0045; US-2002, US-2004): the code, its checks, add and withdraw. */}
+          {issued ? <VerificationCard certificateId={data.id} /> : null}
           {data.status === "issued" && (data.can_duplicate || data.can_cancel) ? (
             <Card title={td("issuedActionsTitle")} description={td("issuedActionsBody")}>
               <IssuedActions certificate={data} />

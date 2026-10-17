@@ -14,6 +14,7 @@ import { Toggle } from "@/components/ui/Toggle";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Value } from "@/components/ui/Value";
+import { CertificateFormatCard } from "@/features/certificates/CertificateFormatCard";
 import { LetterheadCard } from "@/features/certificates/LetterheadCard";
 import { BoardsCard } from "./BoardsCard";
 import { ParentLanguageCard } from "./ParentLanguageCard";
@@ -107,6 +108,8 @@ export function SchoolSettingsScreen() {
           manage={manage}
           tenantKey={TENANT_KEY}
         />
+        {/* US-2001, FR-CERT-015, FR-CERT-018 (ADR-0045): the TC format, religion and caste. */}
+        <CertificateFormatCard tenant={tenant.data} manage={manage} tenantKey={TENANT_KEY} />
       </>
     );
   }

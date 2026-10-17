@@ -264,12 +264,18 @@ def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
         ("GET", "/api/v1/certificates"): CERT_READERS,
         ("GET", "/api/v1/certificates/{certificate_id}"): CERT_READERS,
         ("GET", "/api/v1/certificates/{certificate_id}/print"): CERT_READERS,
+        # R2-1A (ADR-0045): TC formats and a certificate's verification code.
+        ("GET", "/api/v1/certificates/formats"): CERT_READERS,
+        ("GET", "/api/v1/certificates/{certificate_id}/verification"): CERT_READERS,
         # Task assignees (FR-TASK-002, FR-CIR-004): whoever creates tasks or confirms suggested
         # deadlines picks an owner; the service requires a school-wide grant of either.
         ("GET", "/api/v1/task-assignees"): ("task.manage", ("circular.review",), False),
         # Exams (FR-MRK-001): the current year's exam list (C1: names and dates) for whoever
         # reads or records marks or manages exams; marks themselves stay section-scoped.
         ("GET", "/api/v1/exams"): ("marks.read", ("marks.record", "exam.manage"), False),
+        # Ask source links (FR-KB-042): askers, or document readers for a document page (search
+        # results); the service then applies the source's own permission and scope (404).
+        ("GET", "/api/v1/knowledge/resolve"): ("kb.ask", ("document.read",), False),
         # Tally connector status (ADR-0032, FR-TALLY-007): finance readers, the owner (agents) and
         # the accountant (mapping) share it; money totals only for school-wide finance.read.
         ("GET", "/api/v1/tally/status"): (

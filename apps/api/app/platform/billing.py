@@ -466,7 +466,7 @@ def extend_trial(actor: Actor, sub_id: uuid.UUID, trial_ends_at: dt.datetime) ->
             raise ValidationFailed(
                 [{"field": "trial_ends_at", "code": "not_later", "message_key": "errors.not_later"}]
             )
-        end_day = trial_ends_at.astimezone(dt.UTC).date()
+        end_day = today_ist(trial_ends_at)  # billing days are IST days (audit L-07)
         sub = repo.update_row(
             s,
             m.subscriptions,
@@ -959,13 +959,21 @@ def roll_periods(*, today: dt.date | None = None) -> int:
                     {"at_period_end": True},
                     tenant_id=sub["tenant_id"],
                 )
+                _closing_draft(s, sub)
             else:
                 plan = repo.get(s, m.plans, sub["pending_plan_id"] or sub["plan_id"])
                 plan = must(plan)
                 start = sub["current_period_end"]
                 end = add_months(start, _period_months(plan))
+                starts = [start]
                 while end <= today:  # catch up if the job did not run for a while
                     start, end = end, add_months(end, _period_months(plan))
+                    starts.append(start)
+                if sub["status"] in ("active", "past_due"):
+                    # Billing in advance: each period gets its draft, also the ones a stopped
+                    # job skipped (create_draft is idempotent per period; audit L-11).
+                    for period_start in starts:
+                        create_draft(s, SYSTEM, sub, period_start)
                 repo.update_row(
                     s,
                     m.subscriptions,
@@ -1077,25 +1085,58 @@ def _ai_lines(
             unit_price_inr=Decimal(bundle["price_inr"]),
         )
     ]
-    month = add_months(period_start.replace(day=1), -1)
-    if month < sub["ai_bundle_from"] or repo.subscription_has_line(
-        s, sub["id"], kind="usage_overage", usage_month=month
+    overage = _overage_line(s, sub, bundle, add_months(period_start.replace(day=1), -1))
+    if overage is not None:
+        lines.append(overage)
+    return lines
+
+
+def _overage_line(
+    s: Session, sub: Mapping[Any, Any], bundle: Mapping[Any, Any], month: dt.date
+) -> InvoiceLineIn | None:
+    """The overage line of calendar month ``month``, unless the bundle did not count yet,
+    a live invoice of the subscription already bills that month (one line per month, ever),
+    or nothing went over the quota."""
+    if (
+        sub["ai_bundle_from"] is None
+        or month < sub["ai_bundle_from"]
+        or repo.subscription_has_line(s, sub["id"], kind="usage_overage", usage_month=month)
     ):
-        return lines
+        return None
     answers = repo.ai_answers_between(s, sub["tenant_id"], month, next_month(month))
     rate = Decimal(bundle["overage_rate_inr"])
     extra, _ = ai_overage(answers, int(bundle["included_answers"]), rate)
-    if extra > 0:
-        lines.append(
-            InvoiceLineIn(
-                kind="usage_overage",
-                description=overage_description(bundle["name"], month, extra, rate),
-                quantity=Decimal(extra),
-                unit_price_inr=rate,
-                usage_month=month,
-            )
-        )
-    return lines
+    if extra <= 0:
+        return None
+    return InvoiceLineIn(
+        kind="usage_overage",
+        description=overage_description(bundle["name"], month, extra, rate),
+        quantity=Decimal(extra),
+        unit_price_inr=rate,
+        usage_month=month,
+    )
+
+
+def _closing_draft(s: Session, sub: Mapping[Any, Any]) -> RowMapping | None:
+    """A subscription ending at period end (audit 2026-10-17 L-11): one closing draft with
+    the AI overage of every month not billed yet, from the month before its last period
+    began to the month of its last day. Its period is the day after the end (it bills no
+    service days and overlaps no invoice). None without a bundle or anything to bill."""
+    if sub["ai_bundle_id"] is None:
+        return None
+    bundle = must(repo.get(s, m.ai_bundles, sub["ai_bundle_id"]))
+    end = sub["current_period_end"]
+    last = (end - dt.timedelta(days=1)).replace(day=1)
+    month = add_months(sub["current_period_start"].replace(day=1), -1)
+    lines: list[InvoiceLineIn] = []
+    while month <= last:
+        line = _overage_line(s, sub, bundle, month)
+        if line is not None:
+            lines.append(line)
+        month = next_month(month)
+    if not lines:
+        return None
+    return create_draft(s, SYSTEM, sub, end, lines=lines, period_end=end + dt.timedelta(days=1))
 
 
 def ai_answers_in_month(tenant_id: uuid.UUID, month: dt.date) -> int:
@@ -1183,6 +1224,7 @@ def create_draft(
     period_start: dt.date,
     *,
     lines: Sequence[InvoiceLineIn] | None = None,
+    period_end: dt.date | None = None,
 ) -> RowMapping | None:
     """Create a draft for (subscription, period) unless a live invoice already covers any part
     of that period, or the school is closing. Returns the draft, or None.
@@ -1198,7 +1240,7 @@ def create_draft(
     plan = repo.get(s, m.plans, sub["pending_plan_id"] if use_pending else sub["plan_id"])
     account = must(account)
     plan = must(plan)
-    period_end = add_months(period_start, _period_months(plan))
+    period_end = period_end or add_months(period_start, _period_months(plan))
     existing = repo.get_by(
         s,
         m.invoices,

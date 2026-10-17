@@ -1,4 +1,4 @@
-"""Certificate and register print pages (HTML/CSS templates, template version ``v1``;
+"""Certificate and register print pages (HTML/CSS templates, template version ``v2``;
 FR-CERT-001, FR-CERT-011, FR-REG-001..004; CLAUDE.md §10 "print is first-class").
 
 Pure module: the service passes finished data (:class:`~app.certificates.schemas
@@ -32,7 +32,7 @@ from app.core.pdf import FONT_FAMILY, font_face_css
 from app.core.redaction import mask_aadhaar
 
 IST: Final = ZoneInfo("Asia/Kolkata")
-TEMPLATE_VERSION: Final = "v1"
+TEMPLATE_VERSION: Final = "v2"
 
 Mark = Literal["draft", "cancelled"] | None
 
@@ -81,6 +81,12 @@ td.no {{ width: 7%; text-align: center; }}
 .signatures div {{ flex: 1; border-top: 1px solid #111; padding-top: 2mm; line-height: 1.7;
   text-align: center; }}
 footer {{ margin-top: 6mm; font-size: 8.5pt; color: #444; line-height: 1.7; }}
+.verify {{ display: flex; align-items: center; gap: 5mm; margin-top: 6mm;
+  border: 1px solid #555; padding: 2.5mm 3mm; page-break-inside: avoid; }}
+.verify svg {{ width: 26mm; height: 26mm; flex: none; }}
+.verify p {{ margin: 0; font-size: 9.5pt; line-height: 1.7; }}
+.verify .code {{ font-family: "Noto Sans Mono", "Consolas", monospace; font-size: 12pt;
+  font-weight: 700; letter-spacing: 0.08em; }}
 @media screen {{ body {{ background: #e9e9e9; }} main {{ max-width: 190mm; margin: 6mm auto;
   background: #fff; }} }}
 """
@@ -277,6 +283,28 @@ class DuplicateMark:
     issued_on: dt.date
 
 
+@dataclass(frozen=True, slots=True)
+class VerificationMark:
+    """The verification block (FR-CERT-020): the code in four groups, the QR of its link (an
+    inline SVG made by :mod:`app.certificates.qr`, never user input) and the host of the page."""
+
+    code: str
+    host: str
+    qr_svg: str
+
+
+def _verification(mark: VerificationMark | None) -> str:
+    if mark is None:
+        return ""
+    return (
+        f'<section class="verify">{mark.qr_svg}<p>'
+        f'Verification code: <span class="code">{_e(mark.code)}</span><br>'
+        f"Check this certificate at {_e(mark.host)}/v"
+        + _te(f'<span class="te">ఈ ధృవీకరణ పత్రాన్ని {_e(mark.host)}/v లో తనిఖీ చేయండి</span>')
+        + "</p></section>"
+    )
+
+
 def _line(lines: Sequence[ContentLine], key: str) -> str:
     for line in lines:
         if line.key == key:
@@ -417,12 +445,15 @@ def render_certificate(
     reference: str,
     mark: Mark = None,
     duplicate: DuplicateMark | None = None,
+    verification: VerificationMark | None = None,
     for_pdf: bool = False,
 ) -> str:
     """The A4 certificate page. ``reference``: short record reference printed in the footer;
     ``mark``: ``draft`` (awaiting approval, not valid) or ``cancelled``; ``duplicate``: the
-    copy number and date of a duplicate (FR-CERT-007). English only while Telugu is hidden
-    (ADR-0036)."""
+    copy number and date of a duplicate (FR-CERT-007); ``verification``: the code and QR
+    (FR-CERT-020; never on a draft). English only while Telugu is hidden (ADR-0036)."""
+    if mark == "draft":
+        verification = None
     content = shown(content)
     watermark = ""
     if mark == "draft":
@@ -499,6 +530,7 @@ def render_certificate(
         + _te(f'<span class="title-te">{_e(content.title_te)}</span>')
         + f"</h1>{meta}{dup}<section>{body}</section>"
         f"<section><p>{_slash('Place', 'స్థలం')}: {place}</p></section>{signatures}"
+        f"{_verification(verification)}"
         f"<footer>Generated from the school's records by SchoolOS · record reference "
         f"{_e(reference)} · template {TEMPLATE_VERSION}"
         + _te('<span class="te">పాఠశాల రికార్డుల నుండి SchoolOS తయారు చేసింది</span>')
@@ -582,6 +614,7 @@ __all__ = [
     "DuplicateMark",
     "Mark",
     "RegisterPage",
+    "VerificationMark",
     "certificate_style",
     "date_in_words",
     "english_only",

@@ -9,6 +9,7 @@ from app.admin.api import router as admin_router
 from app.apaar.api import router as apaar_router
 from app.audit.api import router as audit_router
 from app.breakglass.api import router as breakglass_router
+from app.certificates.api import public_router as certificates_public_router
 from app.certificates.api import router as certificates_router
 from app.changes.api import router as changes_router
 from app.circulars.api import router as circulars_router
@@ -93,6 +94,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # R2 public surface (ADR-0047): parent link pages through the BFF's service token only;
     # every route is pinned in app/public/public_routes.yaml.
     app.include_router(public_router)
+    # R2-1A: certificate verification by code (ADR-0045), pinned in public_routes.yaml.
+    app.include_router(certificates_public_router)
     # Control plane + fleet heartbeat: shared deployment only (ADR-0017); 404 on dedicated hosts.
     if settings.deployment_mode is DeploymentMode.SHARED:
         app.include_router(platform_router)

@@ -45,7 +45,7 @@ ledger and receipt book are removed; receipt PDFs stay as documents), re-adds th
 purpose CHECK as ``NOT VALID`` and deletes the permission keys unless a role still holds them.
 
 Revision ID: 0057_fees_core
-Revises: 0055_public_handles
+Revises: 0056_certificate_verifications
 Create Date: 2026-10-17
 """
 
@@ -55,7 +55,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "0057_fees_core"
-down_revision = "0055_public_handles"
+down_revision = "0056_certificate_verifications"
 branch_labels = None
 depends_on = None
 

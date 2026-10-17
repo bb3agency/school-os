@@ -1,5 +1,5 @@
-"""``sis.certificates`` and ``sis.certificate_counters`` (migration 0033_certificates, docs/05
-§5.7).
+"""``sis.certificates``, ``sis.certificate_counters`` (migration 0033_certificates) and
+``sis.certificate_verifications`` (0056_certificate_verifications); docs/05 §5.7, §15.4.
 
 Describes the tables for typed queries only; DDL (RLS, CHECKs, the frozen-row and append-only
 triggers, column grants) lives in the migration. FKs into other modules' tables are enforced by
@@ -41,6 +41,10 @@ class Certificate(Base):
     content: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     content_sha256: Mapped[bytes | None] = mapped_column(LargeBinary)
     template_version: Mapped[str | None] = mapped_column(Text)
+    # R2 (migration 0056): the TC format the request was prepared in; NULL = generic-v1 / no
+    # format (other types).
+    format_key: Mapped[str | None] = mapped_column(Text)
+    format_version: Mapped[int | None] = mapped_column(Integer)
     requested_by: Mapped[uuid.UUID]
     requested_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
     decided_by: Mapped[uuid.UUID | None]
@@ -69,3 +73,28 @@ class CertificateCounter(Base):
     academic_year_id: Mapped[uuid.UUID]
     last_no: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     updated_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
+
+
+class CertificateVerification(Base):
+    """One verification code of a certificate and its ``cert_verify`` public handle (R2;
+    ADR-0045, ADR-0047). Column UPDATE grants: withdrawal and check counters only."""
+
+    __tablename__ = "certificate_verifications"
+    __table_args__ = (UniqueConstraint("tenant_id", "id"), {"schema": "sis"})
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    tenant_id: Mapped[uuid.UUID]
+    certificate_id: Mapped[uuid.UUID]
+    code: Mapped[str] = mapped_column(Text)
+    handle_id: Mapped[uuid.UUID]
+    created_reason: Mapped[str] = mapped_column(Text)
+    created_note: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[uuid.UUID]
+    created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
+    withdrawn_at: Mapped[dt.datetime | None]
+    withdrawn_by: Mapped[uuid.UUID | None]
+    withdraw_reason: Mapped[str | None] = mapped_column(Text)
+    check_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    last_checked_at: Mapped[dt.datetime | None]
+    updated_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
+    version: Mapped[int] = mapped_column(Integer, server_default=text("1"))

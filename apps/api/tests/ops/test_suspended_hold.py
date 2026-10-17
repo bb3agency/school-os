@@ -123,3 +123,55 @@ def test_A_12_suspended_schools_get_no_task_reminders() -> None:
     from app.circulars import tasks as circular_tasks
 
     assert circular_tasks.TENANT_STATUSES == ("active",)
+
+
+def test_L_14_an_event_delivered_twice_has_its_outside_effects_once(
+    admin_engine: Engine, engines: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Delivery is at least once (L-05, acks_late). A consumer with outside effects (email,
+    PDF, OCR or LLM calls) runs once per event: a second delivery of the same ``event_id`` is
+    skipped, a failed run frees the event for its retry, and other events still run."""
+    from app.authz.kv import InMemoryKV, set_kv_store
+
+    set_kv_store(InMemoryKV())
+    try:
+        app = Celery("l14-test", set_as_current=False)
+        ran: list[dict[str, Any]] = []
+        probe = _probe(app, ran)
+        monkeypatch.setattr(service, "DEDUPE_BY_EVENT", frozenset({"tests.a12_probe"}))
+        tid = _tenant(admin_engine)
+        first = {"tenant_id": str(tid), "event_id": str(uuid.uuid4()), "payload": {}}
+        assert probe(**first) == "done"
+        assert probe(**first) is None  # the same event again: skipped
+        assert len(ran) == 1
+        other = {**first, "event_id": str(uuid.uuid4())}
+        assert probe(**other) == "done"
+        assert len(ran) == 2
+
+        failing = {**first, "event_id": str(uuid.uuid4()), "payload": {"fail": "1"}}
+
+        @app.task(name="tests.l14_flaky", base=TenantTask, shared=False)
+        def flaky(tenant_id: str, event_id: str, payload: dict[str, Any]) -> str:
+            ran.append(payload)
+            if len([p for p in ran if p == payload]) == 1:
+                raise RuntimeError("provider down")
+            return "done"
+
+        monkeypatch.setattr(
+            service, "DEDUPE_BY_EVENT", frozenset({"tests.a12_probe", "tests.l14_flaky"})
+        )
+        with pytest.raises(RuntimeError):
+            flaky(**failing)
+        assert flaky(**failing) == "done"  # the retry is not mistaken for a duplicate
+        assert flaky(**failing) is None
+    finally:
+        set_kv_store(None)
+
+
+def test_L_14_every_deduplicated_consumer_is_a_registered_outbox_consumer() -> None:
+    from sos_worker.celery_app import celery_app
+
+    celery_app.loader.import_default_modules()
+    consumers = set(service.OUTBOX_ROUTES.values())
+    assert consumers >= service.DEDUPE_BY_EVENT
+    assert all(isinstance(celery_app.tasks[n], TenantTask) for n in service.DEDUPE_BY_EVENT)
