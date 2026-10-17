@@ -22,6 +22,7 @@ import { SelectField } from "@/components/ui/Select";
 import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { planTone, subscriptionTone } from "@/features/status";
+import { Pager, usePagedList } from "@/features/students/paging";
 import { ApiError, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import type { FieldErrors } from "@/lib/forms";
 import { formatCount, formatDate, formatInr } from "@/lib/format";
@@ -895,9 +896,12 @@ export function InvoicesScreen({ filters = {} }: { filters?: InvoiceFilters }) {
       : {}),
     ...(filters.tenantId ? { tenant_id: filters.tenantId } : {}),
   };
-  const invoices = useApiQuery(
-    [...PK.invoices, "list", query],
-    async () => (await unwrap(api.GET("/api/v1/platform/invoices", { params: { query } }))).data,
+  const { rows: invoices, pager } = usePagedList([...PK.invoices, "list", query], (cursor) =>
+    unwrap(
+      api.GET("/api/v1/platform/invoices", {
+        params: { query: { ...query, ...(cursor ? { cursor } : {}) } },
+      }),
+    ),
   );
 
   return (
@@ -989,6 +993,7 @@ export function InvoicesScreen({ filters = {} }: { filters?: InvoiceFilters }) {
         />
       </FilterCard>
       <InvoiceTable invoices={invoices} caption={t("title")} schoolName={nameOf} />
+      <Pager label={t("pagesLabel")} {...pager} />
     </div>
   );
 }

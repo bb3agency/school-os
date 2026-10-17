@@ -1,6 +1,8 @@
 "use client";
 
-import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
+import { useTranslations } from "next-intl";
+import { Pager, usePagedList } from "@/features/students/paging";
+import { unwrap, useBffClient } from "@/lib/bff/query";
 import { auditQuery, type AuditFilters } from "./audit-filters";
 import { AuditView } from "./AuditView";
 
@@ -14,10 +16,20 @@ export { toIsoDate, type AuditFilters } from "./audit-filters";
 /** FR-AUD-005: GET /audit/events with the URL's filters. */
 export function AuditScreen({ filters = {} }: { filters?: AuditFilters }) {
   const api = useBffClient("staff");
+  const t = useTranslations("school.audit");
   const query = { limit: 100, ...auditQuery(filters) };
-  const events = useApiQuery(
-    ["staff", "audit-events", query],
-    async () => (await unwrap(api.GET("/api/v1/audit/events", { params: { query } }))).data,
+  // Every page (docs/09 §2): one day of a busy school is more than 100 events.
+  const { rows, pager } = usePagedList(["staff", "audit-events", query], (cursor) =>
+    unwrap(
+      api.GET("/api/v1/audit/events", {
+        params: { query: { ...query, ...(cursor ? { cursor } : {}) } },
+      }),
+    ),
   );
-  return <AuditView events={events} filters={filters} />;
+  return (
+    <div className="space-y-4">
+      <AuditView events={rows} filters={filters} />
+      <Pager label={t("pagesLabel")} {...pager} />
+    </div>
+  );
 }

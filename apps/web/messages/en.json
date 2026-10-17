@@ -597,7 +597,8 @@
           "title": "Too many events for one file",
           "body": "Choose a shorter date range with the From and To dates, then download again."
         }
-      }
+      },
+      "pagesLabel": "Pages of the audit log"
     },
     "switchSchool": "Switch school",
     "announcements": {
@@ -726,7 +727,8 @@
       "emptyBody": "Clear the filters, or provision a school to create its tenant, encryption key and owner invite.",
       "clearFilters": "Clear filters",
       "noMatchTitle": "No schools match these filters",
-      "noMatchBody": "Change the search or filters, or clear them to see every school."
+      "noMatchBody": "Change the search or filters, or clear them to see every school.",
+      "pagesLabel": "Pages of schools"
     },
     "schoolDetail": {
       "title": "School details",
@@ -1250,7 +1252,8 @@
             "body": "It may have been changed by someone else. The list has been reloaded; check it and try again."
           }
         }
-      }
+      },
+      "pagesLabel": "Pages of invoices"
     },
     "usage": {
       "title": "Usage and quotas",
@@ -1463,7 +1466,8 @@
         "done": "Done:",
         "next": "Next:",
         "pending": "Not yet:"
-      }
+      },
+      "pagesLabel": "Pages of tickets"
     },
     "breakGlass": {
       "title": "Break-glass requests",

@@ -22,6 +22,7 @@ import { DataTable, type Column } from "@/components/ui/Table";
 import { TicketThread } from "@/features/support/TicketThread";
 import { known, priorityTone, ticketTone } from "@/features/status";
 import { Link } from "@/i18n/navigation";
+import { Pager, usePagedList } from "@/features/students/paging";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { useApiForm } from "@/lib/forms";
 import type { Loadable } from "@/lib/loadable";
@@ -157,10 +158,14 @@ export function PlatformSupportScreen({ filters = {} }: { filters?: TicketFilter
     ...(filters.priority ? { priority: filters.priority } : {}),
     ...(filters.mine && me ? { assigned_to: me.operator_id } : {}),
   };
-  const tickets = useApiQuery(
+  const { rows: tickets, pager } = usePagedList(
     [...PK.tickets, "list", query],
-    async () =>
-      (await unwrap(api.GET("/api/v1/platform/support/tickets", { params: { query } }))).data,
+    (cursor) =>
+      unwrap(
+        api.GET("/api/v1/platform/support/tickets", {
+          params: { query: { ...query, ...(cursor ? { cursor } : {}) } },
+        }),
+      ),
     { enabled: !filters.mine || me !== undefined },
   );
 
@@ -282,6 +287,7 @@ export function PlatformSupportScreen({ filters = {} }: { filters?: TicketFilter
         </label>
       </FilterCard>
       <TicketTable tickets={tickets} caption={t("title")} schoolName={nameOf} />
+      <Pager label={t("pagesLabel")} {...pager} />
     </div>
   );
 }

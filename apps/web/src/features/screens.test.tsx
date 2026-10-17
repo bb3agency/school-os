@@ -1,4 +1,5 @@
 import { screen, waitFor, within } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { forgetSessionInfo } from "@/lib/bff/session-client";
 import { setNavigateForTesting } from "@/lib/bff/query";
@@ -218,6 +219,46 @@ describe("school screens wired to the BFF (US-202, US-102, FR-AUD-005)", () => {
     expect(url?.searchParams.get("from")).toBe("2026-06-01T00:00:00+05:30");
     expect(url?.searchParams.has("to")).toBe(false);
     expect(url?.searchParams.has("action")).toBe(false);
+  });
+
+  it("audit: pages past 100 events; new filters start at the first page (docs/09 §2)", async () => {
+    const event = (seq: number, action: string) => ({
+      id: `0192f3a4-0000-7000-8000-0000000000${seq.toString(16).padStart(2, "0")}`,
+      seq,
+      occurred_at: "2026-09-26T04:30:00Z",
+      actor_type: "user",
+      actor_id: "0192f3a4-0000-7000-8000-0000000000d1",
+      action,
+      resource_type: "class",
+      resource_id: CLASS_6.id,
+      summary: { count: seq },
+      request_id: `req_${seq}`,
+    });
+    routes["/bff/api/v1/audit/events"] = (url) =>
+      url.searchParams.get("cursor") === "audit-2"
+        ? page([event(1, "tenant.class.created")])
+        : Response.json({ data: [event(2, "tenant.class.updated")], next_cursor: "audit-2" });
+    function Harness() {
+      const [actor, setActor] = useState<string | undefined>(undefined);
+      return (
+        <>
+          <button type="button" onClick={() => setActor("clerk")}>
+            Filter by clerk
+          </button>
+          <AuditScreen filters={actor ? { actor } : {}} />
+        </>
+      );
+    }
+    renderWithIntl(<Harness />);
+    expect(await screen.findByText("count: 2")).toBeInTheDocument();
+    const pager = screen.getByRole("navigation", { name: messages.en.school.audit.pagesLabel });
+    within(pager).getByRole("button", { name: /Next/ }).click();
+    expect(await screen.findByText("count: 1")).toBeInTheDocument();
+    const audit = () => seen.filter((u) => u.pathname === "/bff/api/v1/audit/events");
+    expect(audit().at(-1)?.searchParams.get("cursor")).toBe("audit-2");
+    screen.getByRole("button", { name: "Filter by clerk" }).click();
+    await waitFor(() => expect(audit().at(-1)?.searchParams.get("actor")).toBe("clerk"));
+    expect(audit().at(-1)?.searchParams.has("cursor")).toBe(false);
   });
 
   it("toIsoDate only accepts real dates", () => {
