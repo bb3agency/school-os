@@ -138,7 +138,7 @@ def test_L_02_a_record_back_to_active_may_not_share_a_live_pen(
     assert problem["code"] == "national_id_in_use"
     assert problem["student_id"] == second.json()["id"]
     with admin_engine.connect() as c:
-        status = c.execute(
+        status: str = c.execute(
             text("SELECT status FROM sis.students WHERE id = :i"), {"i": first["id"]}
         ).scalar_one()
     assert status == "left"

@@ -85,11 +85,13 @@ def test_L_05_an_event_the_broker_refused_is_dispatched_again(
     with pytest.raises(ConnectionError):
         service.dispatch_outbox(broker_down, batch=50)
     with admin_engine.connect() as c:
-        pending = c.execute(
-            text("SELECT id FROM ops.outbox WHERE dispatched_at IS NULL AND id = ANY(:i)"),
-            {"i": [first, second]},
-        ).scalars()
-        assert set(pending) == {first, second}
+        pending: set[uuid.UUID] = set(
+            c.execute(
+                text("SELECT id FROM ops.outbox WHERE dispatched_at IS NULL AND id = ANY(:i)"),
+                {"i": [first, second]},
+            ).scalars()
+        )
+    assert pending == {first, second}
     sent: list[str] = []
     result = service.dispatch_outbox(lambda task, kwargs: sent.append(kwargs["event_id"]))
     assert result.sent == 2
