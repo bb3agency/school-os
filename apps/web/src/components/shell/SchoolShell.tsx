@@ -271,6 +271,14 @@ export function SchoolShell({
           icon: "chart",
         },
         {
+          // R2-2E (US-2109): bank statements, UPI confirmations and exceptions.
+          href: "/fees/reconcile",
+          label: t("fees.nav.reconcile"),
+          permission: "fee.reconcile",
+          feature: "fees",
+          icon: "refresh",
+        },
+        {
           href: "/fees/setup",
           label: t("fees.nav.setup"),
           permission: ["fee.manage", "finance.read"],
@@ -331,6 +339,14 @@ export function SchoolShell({
           permission: ["tally.device.manage", "tally.configure", "finance.read"],
           feature: "tally",
           icon: "server",
+        },
+        {
+          // R2-2E (US-2109 AC1, FR-FEE-015): the school's UPI ID and static QR.
+          href: "/settings/upi",
+          label: t("fees.nav.upiSettings"),
+          permission: ["fee.manage", "fee.collect", "finance.read", "fee.reconcile"],
+          feature: "fees",
+          icon: "creditCard",
         },
         {
           // R2-1C (US-2201, ADR-0043): the school's own WhatsApp number and its settings.

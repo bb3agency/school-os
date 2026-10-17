@@ -26,7 +26,6 @@ LineException = Literal[
     "amount_mismatch",
     "receipt_cancelled",
     "receipt_already_confirmed",
-    "several_candidates",
     "confirmed_receipt_cancelled",
 ]
 UtrState = Literal["free", "in_use", "invalid"]
@@ -91,7 +90,7 @@ class StatementImportIn(_In):
     )
 
 
-class PresetOut(_Out):
+class StatementPresetOut(_Out):
     preset: str
     version: int
     name: str
@@ -237,12 +236,12 @@ __all__ = [
     "ConfirmOut",
     "IgnoreIn",
     "MatchIn",
-    "PresetOut",
     "RematchOut",
     "StatementDetailOut",
     "StatementImportIn",
     "StatementImportOut",
     "StatementLineOut",
+    "StatementPresetOut",
     "UpiExceptionsOut",
     "UpiReportOut",
     "UpiSettingsIn",

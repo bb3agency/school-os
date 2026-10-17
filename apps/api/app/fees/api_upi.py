@@ -23,12 +23,12 @@ from app.fees.upi_schemas import (
     ConfirmOut,
     IgnoreIn,
     MatchIn,
-    PresetOut,
     RematchOut,
     StatementDetailOut,
     StatementImportIn,
     StatementImportOut,
     StatementLineOut,
+    StatementPresetOut,
     UpiExceptionsOut,
     UpiReportOut,
     UpiSettingsIn,
@@ -99,8 +99,8 @@ def check_utr(ctx: Collector, db: TenantDB, body: UtrCheckIn) -> UtrCheckOut:
 # --- statements (FR-FEE-016) ---------------------------------------------------------------------
 
 
-@router.get("/fees/bank-statement-presets", response_model=list[PresetOut])
-def bank_statement_presets(ctx: Reconciler, db: TenantDB) -> list[PresetOut]:
+@router.get("/fees/bank-statement-presets", response_model=list[StatementPresetOut])
+def bank_statement_presets(ctx: Reconciler, db: TenantDB) -> list[StatementPresetOut]:
     """The bank statement formats SchoolOS reads (``fee.reconcile``)."""
     return service.statement_presets(db, ctx)
 

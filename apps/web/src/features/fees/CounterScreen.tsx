@@ -46,6 +46,7 @@ import {
   type Receipt,
 } from "./data";
 import { Amount, FeesGate, NoAccess } from "./parts";
+import { UpiCounterHelp } from "./UpiCounter";
 
 const MODES: readonly CounterMode[] = ["cash", "cheque", "bank_transfer", "upi_qr"];
 const MNEMONIC: Record<CounterMode, string> = {
@@ -527,6 +528,7 @@ function PaymentForm({
                 onChange={(event) => update("utr", event.target.value)}
               />
             ) : null}
+            {form.mode === "upi_qr" ? <UpiCounterHelp utr={form.utr} /> : null}
           </div>
         )}
       </Card>

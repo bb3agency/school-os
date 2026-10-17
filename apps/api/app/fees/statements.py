@@ -54,13 +54,13 @@ from app.fees.upi_schemas import (
     ConfirmSkipped,
     IgnoreIn,
     MatchIn,
-    PresetOut,
     ReceiptRef,
     RematchOut,
     StatementDetailOut,
     StatementImportIn,
     StatementImportOut,
     StatementLineOut,
+    StatementPresetOut,
     UpiExceptionsOut,
 )
 from app.identity import service as identity
@@ -110,12 +110,12 @@ def _refused(code: str, issues: Sequence[tuple[int, str, str]] = ()) -> Validati
 # --- presets ------------------------------------------------------------------------------------
 
 
-def presets(session: Session, ctx: UserContext) -> list[PresetOut]:
+def presets(session: Session, ctx: UserContext) -> list[StatementPresetOut]:
     """The bank formats SchoolOS reads (``fee.reconcile``)."""
     c.require_on(session, ctx)
     c.require_school_wide(ctx, c.RECONCILE)
     return [
-        PresetOut(preset=p.key, version=p.version, name=p.name, verified=p.verified)
+        StatementPresetOut(preset=p.key, version=p.version, name=p.name, verified=p.verified)
         for p in _cfg().presets
     ]
 

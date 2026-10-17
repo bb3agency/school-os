@@ -6,6 +6,7 @@ import * as z from "@/lib/zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
+import { Pill } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
@@ -185,6 +186,15 @@ export function ReceiptDetailScreen({ receiptId }: { receiptId: string }) {
                       <ModeText mode={r.mode} />
                       {r.utr ? (
                         <span className="block font-mono">{t("utr", { utr: r.utr })}</span>
+                      ) : null}
+                      {r.mode === "upi_qr" ? (
+                        <span className="mt-1 block">
+                          <Pill variant={r.bank_confirmed_at ? "done" : "review"}>
+                            {r.bank_confirmed_at
+                              ? t("bankSeen", { date: formatDate(r.bank_confirmed_at) ?? "" })
+                              : t("bankNotSeen")}
+                          </Pill>
+                        </span>
                       ) : null}
                       {Object.entries(r.mode_details).map(([k, v]) => (
                         <span key={k} className="block text-sm">
