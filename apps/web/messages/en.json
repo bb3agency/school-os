@@ -157,7 +157,8 @@
         "ask": "Ask",
         "admin": "School admin",
         "work": "Circulars and tasks",
-        "classroom": "Classroom"
+        "classroom": "Classroom",
+        "fees": "Fees"
       }
     },
     "home": {
@@ -2014,7 +2015,8 @@
     "noAadhaar": "This looks like a full Aadhaar number. SchoolOS never stores one: remove it.",
     "emergencyReason": "Emergency access is only for a security incident or a legal obligation. Choose one of those, or untick Emergency.",
     "penInvalid": "Enter the 11-digit PEN, for example 21345678901.",
-    "penRequiredForTransfer": "A child from another school needs the PEN from the transfer certificate."
+    "penRequiredForTransfer": "A child from another school needs the PEN from the transfer certificate.",
+    "invalidHeadCode": "Use up to 20 letters, digits, - or _, starting with a letter or digit, for example TUI."
   },
   "support": {
     "piiWarningTitle": "Do not include student personal data",
@@ -4426,7 +4428,8 @@
       "evidence": "Evidence for corrections",
       "register_scan": "Register photos",
       "import_file": "Spreadsheet imports",
-      "certificate": "Issued certificates"
+      "certificate": "Issued certificates",
+      "fee_receipt": "Fee receipts"
     },
     "docStatus": {
       "active": "In use",
@@ -7634,6 +7637,502 @@
     "busy": {
       "title": "Please try again in a few minutes",
       "body": "Too many tries from this connection, or the page is busy. Wait a few minutes and open the link again."
+    }
+  },
+  "fees": {
+    "off": {
+      "title": "Fees are not switched on",
+      "body": "This school does not keep its fee ledger in SchoolOS yet. The owner or principal turns fees on in school settings once SchoolOS has enabled them for the school."
+    },
+    "newTab": "opens in a new tab",
+    "noAccessTitle": "You cannot see fee records",
+    "noAccessBody": "Fee records are shown only to the principal, accountant and office staff who collect fees. Ask the principal if you need access.",
+    "online": "Online",
+    "previous": "Previous page",
+    "next": "Next page",
+    "nav": {
+      "collect": "Collect fees",
+      "receipts": "Receipts",
+      "approvals": "Fee approvals",
+      "daily": "Daily collection",
+      "dues": "Fee dues",
+      "setup": "Fee setup"
+    },
+    "modes": {
+      "cash": "Cash",
+      "cheque": "Cheque",
+      "bank_transfer": "Bank transfer",
+      "upi_qr": "UPI (school QR)",
+      "razorpay": "Online (Razorpay)"
+    },
+    "modeDetails": {
+      "cheque_number": "Cheque number",
+      "bank_name": "Bank",
+      "cheque_date": "Cheque date",
+      "reference": "Bank reference",
+      "payment_id": "Payment id"
+    },
+    "receiptStatus": {
+      "issued": "Issued",
+      "cancelled": "Cancelled"
+    },
+    "requestStatus": {
+      "pending": "Waiting for approval",
+      "approved": "Approved",
+      "processed": "Paid out",
+      "rejected": "Rejected",
+      "withdrawn": "Withdrawn",
+      "processing": "In progress",
+      "failed": "Failed"
+    },
+    "cancelReasons": {
+      "wrong_student": "Wrong student",
+      "wrong_amount": "Wrong amount",
+      "cheque_dishonoured": "Cheque bounced",
+      "duplicate_entry": "Entered twice",
+      "other": "Other reason"
+    },
+    "concessionTypes": {
+      "sibling": "Sibling",
+      "staff_ward": "Staff ward",
+      "merit": "Merit",
+      "hardship": "Hardship",
+      "rte": "RTE",
+      "other": "Other"
+    },
+    "adjustmentReasons": {
+      "late_fee_waiver": "Late fee waiver",
+      "plan_change": "Fee plan changed",
+      "concession_reversal": "Concession undone",
+      "correction": "Correction",
+      "other": "Other reason"
+    },
+    "approvalKinds": {
+      "concession": "Concession",
+      "adjustment": "Adjustment",
+      "cancellation": "Receipt cancellation",
+      "refund": "Refund"
+    },
+    "entryKinds": {
+      "charge": "Fee charged",
+      "concession": "Concession",
+      "late_fee": "Late fee",
+      "adjustment": "Adjustment",
+      "payment": "Payment",
+      "payment_reversal": "Payment cancelled",
+      "refund": "Refund"
+    },
+    "headKinds": {
+      "tuition": "Tuition",
+      "admission": "Admission",
+      "exam": "Exam",
+      "books": "Books",
+      "transport": "Transport",
+      "other": "Other"
+    },
+    "counter": {
+      "title": "Collect fees",
+      "description": "Find the student, check what is due, take the payment and print the receipt.",
+      "findTitle": "Find the student",
+      "searchLabel": "Student name or admission number",
+      "searchHint": "Type at least 2 letters, then use the arrow keys and Enter. Press / or F2 to come back here.",
+      "searching": "Searching…",
+      "noMatches": "No student with a fee account matches. Check the spelling or the admission number.",
+      "matchesLabel": "Matching students",
+      "noName": "Name not recorded",
+      "balance": "Balance",
+      "duesTitle": "What is due",
+      "columns": {
+        "instalment": "Instalment",
+        "head": "Fee head",
+        "dueOn": "Due date",
+        "charged": "Charged",
+        "concession": "Concession",
+        "lateFee": "Late fee",
+        "adjustment": "Adjustment",
+        "paid": "Paid",
+        "due": "Due"
+      },
+      "lateFee": "Late fee",
+      "taxable": "Taxable: invoice in Tally",
+      "overdue": "Overdue",
+      "nothingDue": "Nothing is due on this account now.",
+      "nothingDueTitle": "Nothing to collect",
+      "totalDue": "Total due now:",
+      "openAccount": "Open the fee account",
+      "amount": "Amount (₹)",
+      "amountHint": "Filled with the total due; type a smaller amount for a part payment. Advances are not taken.",
+      "mode": "Paid by",
+      "modeHint": "Press C for cash, Q for cheque, B for bank transfer, U for UPI.",
+      "chequeNumber": "Cheque number",
+      "bankName": "Bank name",
+      "chequeDate": "Cheque date",
+      "reference": "Bank reference",
+      "referenceHint": "12 to 22 letters or digits from the bank's message.",
+      "utr": "UPI reference (UTR)",
+      "utrHint": "The 12-digit number shown on the parent's phone after paying.",
+      "allocationTitle": "Where the money goes",
+      "upTo": "Up to {amount}",
+      "useOldestFirst": "Use oldest due first",
+      "changeAllocation": "Change allocation",
+      "save": "Save and print",
+      "todayNote": "The receipt is dated today, {date}.",
+      "dayClosedTitle": "Today's collection is closed",
+      "dayClosedBody": "No more receipts can be dated today. Ask the accountant; collection opens again tomorrow.",
+      "savedTitle": "Receipt saved",
+      "receiptNumber": "Receipt number",
+      "print": "Print",
+      "next": "Next student",
+      "openReceipt": "Open the receipt",
+      "errors": {
+        "amount": "Enter an amount in rupees greater than zero, like 2500 or 2500.50.",
+        "amountAboveDue": "The amount is more than what is due now. Lower it to the total due or less.",
+        "chequeNumber": "Enter the 6-digit cheque number.",
+        "required": "Fill in this field.",
+        "reference": "Enter the bank reference: 12 to 22 letters or digits.",
+        "utr": "Enter the 12-digit UPI reference (UTR).",
+        "allocation": "Enter each amount in rupees, or leave it empty.",
+        "allocationSum": "The amounts must add up to the receipt amount.",
+        "utrInUse": "This UTR is already on another receipt. Open that receipt."
+      }
+    },
+    "receipts": {
+      "title": "Receipts",
+      "description": "Every receipt issued, newest first. Cancelled receipts keep their number.",
+      "filterDate": "Receipt date",
+      "filterMode": "Paid by",
+      "filterStatus": "Status",
+      "any": "Any",
+      "listTitle": "Receipts",
+      "emptyTitle": "No receipts",
+      "emptyBody": "No receipt matches these filters.",
+      "columns": {
+        "number": "Receipt",
+        "date": "Date",
+        "student": "Student",
+        "mode": "Paid by",
+        "collector": "Collected by",
+        "status": "Status",
+        "amount": "Amount"
+      },
+      "cancelledOn": "Cancelled on {date}",
+      "cancellationPending": "Cancellation waiting for approval"
+    },
+    "receipt": {
+      "title": "Receipt {number}",
+      "loading": "Receipt",
+      "downloadPdf": "Download PDF",
+      "pdfFailed": "The PDF could not be made. Print from the print view instead.",
+      "pdfPreparing": "The PDF is being made. It is ready in a few seconds.",
+      "cancelledTitle": "Cancelled on {date}",
+      "cancelledBody": "This receipt was cancelled with a second person's approval. It keeps its number and prints marked CANCELLED.",
+      "detailsTitle": "Receipt details",
+      "student": "Student",
+      "date": "Date",
+      "mode": "Paid by",
+      "utr": "UTR {utr}",
+      "collectedBy": "Collected by",
+      "linesTitle": "Fee lines",
+      "instalment": "Instalment",
+      "head": "Fee head",
+      "amount": "Amount",
+      "total": "Total",
+      "hash": "Content fingerprint (SHA-256): {hash}",
+      "actionsTitle": "Print and requests",
+      "print": "Open print view",
+      "requestCancel": "Request cancellation",
+      "cancelTitle": "Request cancellation",
+      "cancelBody": "A wrong receipt is never edited. A second person (principal or accountant) approves the cancellation.",
+      "cancelConsequence": "Nothing changes until the cancellation is approved.",
+      "reasonCode": "Reason",
+      "reason": "Explain what happened",
+      "reasonHint": "10 to 1000 characters. Do not type Aadhaar numbers.",
+      "requestRefund": "Request refund",
+      "refundTitle": "Request a refund",
+      "refundBody": "The money goes back to the payer with a refund voucher once a second person approves.",
+      "refundConsequence": "The voucher is written only after approval.",
+      "refundAmount": "Refund amount (₹)",
+      "refundMode": "Refund by",
+      "cancellationTitle": "Cancellation",
+      "requestedBy": "Requested by {name} on {when}",
+      "toApprovals": "Go to fee approvals",
+      "refundsTitle": "Refunds"
+    },
+    "account": {
+      "title": "Fee account",
+      "collect": "Collect fees",
+      "charged": "Charged",
+      "paid": "Paid",
+      "balance": "Balance",
+      "overdue": "Overdue",
+      "pending": "{count, plural, one {# request is} other {# requests are}} waiting for approval",
+      "tabsLabel": "Fee account sections",
+      "tabDues": "Dues",
+      "tabStatement": "Statement",
+      "tabRequests": "Concessions and adjustments",
+      "statementTitle": "Statement",
+      "columns": {
+        "date": "Date",
+        "kind": "Entry",
+        "line": "Line",
+        "receipt": "Receipt",
+        "amount": "Amount",
+        "balance": "Running balance"
+      },
+      "instalmentShort": "Inst. {no}",
+      "lateFee": "late fee",
+      "requestConcession": "Request concession",
+      "concessionTitle": "Request a concession",
+      "concessionBody": "A percentage of the charge, or an amount, on one fee line. A second person approves it.",
+      "needsApproval": "Dues change only after a second person approves.",
+      "concessionType": "Type",
+      "basis": "Given as",
+      "basisAmount": "An amount in rupees",
+      "basisPercent": "A percentage of the charge",
+      "value": "Amount or percentage",
+      "line": "Fee line",
+      "reason": "Reason",
+      "reasonHint": "10 to 1000 characters. Do not type Aadhaar numbers.",
+      "requestAdjustment": "Request adjustment",
+      "adjustmentTitle": "Request an adjustment",
+      "adjustmentBody": "Adds to or reduces what is due on one line, for example a late fee waiver. A second person approves it.",
+      "adjustmentAmount": "Amount (₹)",
+      "adjustmentAmountHint": "Positive adds to the dues; negative reduces them (a waiver is negative).",
+      "reasonCode": "Why",
+      "concessionsTitle": "Concessions",
+      "adjustmentsTitle": "Adjustments",
+      "none": "None yet."
+    },
+    "approvals": {
+      "title": "Fee approvals",
+      "description": "Concessions, adjustments, receipt cancellations and refunds waiting for a second person. You never decide your own request.",
+      "listTitle": "Waiting for a decision",
+      "emptyTitle": "Nothing is waiting",
+      "emptyBody": "When someone asks for a concession, adjustment, cancellation or refund, it appears here.",
+      "student": "Student",
+      "requestedBy": "Asked by {name} on {when}",
+      "approve": "Approve",
+      "approveTitle": "Approve this request",
+      "approveBody": "Check the reason first. You need to confirm it's you with a recent sign-in.",
+      "consequence": {
+        "concession": "The concession is posted to the student's account at once.",
+        "adjustment": "The adjustment is posted to the student's account at once.",
+        "cancellation": "The receipt is cancelled today and the payment is reversed in the ledger.",
+        "refund": "A refund voucher is written today and the refund is posted."
+      },
+      "note": "Note (optional)",
+      "reject": "Reject",
+      "rejectTitle": "Reject this request",
+      "rejectConsequence": "Nothing changes; the person who asked sees your reason.",
+      "rejectReason": "Why it is rejected",
+      "mine": "You made this request, so someone else decides it.",
+      "withdraw": "Withdraw",
+      "withdrawTitle": "Withdraw your request",
+      "withdrawConsequence": "The request is closed and nothing changes."
+    },
+    "daily": {
+      "title": "Daily collection",
+      "description": "Receipts of a day by mode and collector, cancellations and refunds, and the cash and cheques to hand over.",
+      "date": "Date",
+      "closedTitle": "This day is closed",
+      "closedBody": "Closed by {name} with {count, plural, one {# receipt} other {# receipts}}. Nothing more can be dated this day.",
+      "receipts": "Receipts",
+      "net": "Net collection",
+      "cash": "Cash to hand over",
+      "cheques": "Cheques to hand over",
+      "print": "Print (A4)",
+      "csv": "Download day book (CSV)",
+      "close": "Close day",
+      "closeTitle": "Close {date}?",
+      "closeBody": "Count the cash and cheques against these totals first.",
+      "closeConsequence": "{count, plural, one {# receipt} other {# receipts}}, net {net}. After closing, no receipt, cancellation or refund can be dated this day.",
+      "byMode": "By mode",
+      "byCollector": "By collector",
+      "none": "No receipts.",
+      "count": "{count, plural, one {# receipt} other {# receipts}}",
+      "online": "Online",
+      "receiptsTitle": "Receipts of the day",
+      "emptyTitle": "No receipts",
+      "emptyBody": "No receipt was issued on this day.",
+      "columns": {
+        "number": "Receipt",
+        "student": "Student",
+        "mode": "Paid by",
+        "status": "Status",
+        "amount": "Amount"
+      },
+      "reversalsTitle": "Cancellations and refunds of the day",
+      "cancelled": "Receipt {number} cancelled",
+      "refunded": "Voucher {voucher} for receipt {number}"
+    },
+    "dues": {
+      "title": "Fee dues",
+      "description": "Students with overdue fees, oldest due first.",
+      "class": "Class",
+      "allClasses": "All classes",
+      "csv": "Download dues (CSV)",
+      "students": "Students with overdue fees",
+      "total": "Total overdue",
+      "listTitle": "Overdue fees",
+      "emptyTitle": "No overdue fees",
+      "emptyBody": "No student in this list has an overdue fee.",
+      "noName": "Name not recorded",
+      "columns": {
+        "student": "Student",
+        "class": "Class",
+        "oldest": "Oldest due date",
+        "lastPayment": "Last payment",
+        "overdue": "Overdue"
+      }
+    },
+    "setup": {
+      "title": "Fee setup",
+      "description": "Fee heads and the fee plan of each class for the year, with instalments and late fees.",
+      "headsTitle": "Fee heads",
+      "headsBody": "The kinds of fee the school charges. Taxable heads are planned here but invoiced in Tally.",
+      "addHead": "Add fee head",
+      "addHeadTitle": "Add a fee head",
+      "headCode": "Code",
+      "headCodeHint": "Short and unique, for example TUI or EXAM.",
+      "headName": "Name",
+      "headKind": "Kind",
+      "headTaxable": "Taxable (GST)",
+      "headTaxableHint": "A taxable head is never collected with a SchoolOS receipt.",
+      "noHeads": "No fee heads yet. Add the heads first, then make a plan.",
+      "inactive": "not in use",
+      "taxable": "taxable",
+      "plansTitle": "Fee plans",
+      "newPlan": "New fee plan",
+      "noPlans": "No fee plans yet.",
+      "version": "version {no}",
+      "status": {
+        "draft": "Draft",
+        "active": "Active",
+        "superseded": "Replaced"
+      },
+      "planSummary": "{total} a year in {count, plural, one {# instalment} other {# instalments}}; {accounts, plural, one {# student} other {# students}} on this plan.",
+      "activate": "Activate",
+      "activateTitle": "Activate this plan",
+      "activateConsequence": "Once active, the plan cannot be edited; changes are made as a new version.",
+      "activateNewVersion": "The current version is replaced. Propose the differences as adjustments afterwards.",
+      "applyPreview": "Apply to class…",
+      "newVersion": "New version",
+      "newVersionTitle": "Make a new version",
+      "newVersionBody": "A draft copy you can change. Charges already posted are never rewritten.",
+      "proposeDifferences": "Propose differences",
+      "proposeTitle": "Propose the differences as adjustments",
+      "proposeBody": "For each student on the earlier version, what changed is asked as an adjustment.",
+      "proposeConsequence": "A second person approves each adjustment before dues change.",
+      "proposeReason": "Reason for the change",
+      "previewTitle": "Preview of applying the plan",
+      "appliedTitle": "Plan applied",
+      "applySummary": "{students, plural, one {# student} other {# students}} in the class: {created} new accounts, {present} already present, {charges} charges, {skipped} skipped.",
+      "applyNow": "Apply now",
+      "editorTitle": "New fee plan",
+      "editorBody": "Enter each head's amount per instalment; the annual amount is the row total.",
+      "year": "Academic year",
+      "class": "Class",
+      "planName": "Plan name",
+      "category": "Category (optional)",
+      "categoryHint": "For example new_admission; leave empty for everyone.",
+      "gridLabel": "Fee heads by instalment",
+      "head": "Fee head",
+      "instalmentLabel": "Name of instalment {no}",
+      "instalmentDue": "Due date of instalment {no}",
+      "cellLabel": "{head}, instalment {no}",
+      "annual": "Year total",
+      "instalmentTotal": "Instalment total",
+      "addInstalment": "Add instalment",
+      "removeInstalment": "Remove last instalment",
+      "term": "Term {no}",
+      "lateRule": "Late fee",
+      "lateNone": "No late fee",
+      "lateFlat": "Flat amount per overdue instalment",
+      "latePerDay": "Amount per day, up to a cap",
+      "lateAmount": "Late fee amount (₹)",
+      "lateGrace": "Grace days",
+      "lateCap": "Cap per instalment (₹)",
+      "saveDraft": "Save draft",
+      "editorIncomplete": "The plan is not complete",
+      "editorIncompleteBody": "Give the plan a name, at least one amount, and a name and due date for every instalment. Amounts are rupees with at most two decimals."
+    },
+    "errors": {
+      "module_hidden": {
+        "title": "Fees are not switched on",
+        "body": "The owner or principal turns fees on in school settings."
+      },
+      "amount_exceeds_due": {
+        "title": "More than what is due",
+        "body": "Advances are not taken. Lower the amount to the total due or less."
+      },
+      "head_not_collectable": {
+        "title": "Taxable fee head",
+        "body": "A taxable fee is invoiced in Tally, not collected with a SchoolOS receipt."
+      },
+      "utr_in_use": {
+        "title": "UTR already used",
+        "body": "This UPI reference is already on another receipt. Open that receipt instead."
+      },
+      "day_closed": {
+        "title": "The day is closed",
+        "body": "Nothing more can be dated today. Collection opens again tomorrow."
+      },
+      "self_approval_forbidden": {
+        "title": "Someone else must decide",
+        "body": "You made this request, so another principal or accountant must decide it."
+      },
+      "request_not_pending": {
+        "title": "Already decided",
+        "body": "This request was already decided or withdrawn. Reload the page."
+      },
+      "receipt_cancelled": {
+        "title": "Receipt cancelled",
+        "body": "This receipt was cancelled. Open its print view to print it marked CANCELLED."
+      },
+      "refund_exceeds_paid": {
+        "title": "Refund too large",
+        "body": "The refund is more than this receipt took and was not refunded yet."
+      },
+      "receipt_has_refunds": {
+        "title": "Receipt has a refund",
+        "body": "A receipt with a refund cannot be cancelled."
+      },
+      "plan_in_use": {
+        "title": "Plan in use",
+        "body": "An active plan cannot be edited. Make a new version instead."
+      },
+      "plan_exists": {
+        "title": "Plan already exists",
+        "body": "A plan for this class, year and category already exists. Open it or make a new version."
+      },
+      "nothing_to_concede": {
+        "title": "Nothing to concede",
+        "body": "These lines have nothing left to concede."
+      },
+      "pdf_not_ready": {
+        "title": "PDF not ready",
+        "body": "The PDF is still being made. Try again in a moment."
+      },
+      "payments_not_connected": {
+        "title": "Online payments not connected",
+        "body": "Collect the fee at the counter for now."
+      },
+      "head_code_taken": {
+        "title": "Code already used",
+        "body": "Another fee head has this code. Choose a different code."
+      },
+      "account_closed": {
+        "title": "Account closed",
+        "body": "This fee account is closed."
+      },
+      "not_requester": {
+        "title": "Not your request",
+        "body": "Only the person who made the request can withdraw it."
+      },
+      "cancellation_exists": {
+        "title": "Cancellation already asked",
+        "body": "A cancellation of this receipt is already waiting or approved."
+      }
     }
   }
 }

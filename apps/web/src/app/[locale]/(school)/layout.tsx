@@ -13,6 +13,19 @@ import { apiGetAsSession, PATH_HEADER, requireStaff } from "@/server/session/rsc
 /** Permissions that use the Tally connector screens (M6); nobody else needs its status. */
 const TALLY_PERMISSIONS = ["finance.read", "tally.device.manage", "tally.configure"];
 
+/** Permissions that use the fee screens (R2-1B); nobody else needs the fee status. */
+const FEE_PERMISSIONS = [
+  "finance.read",
+  "fee.collect",
+  "fee.manage",
+  "fee.concession.request",
+  "fee.concession.approve",
+  "fee.receipt.cancel",
+  "fee.refund.request",
+  "fee.refund.approve",
+  "fee.report",
+];
+
 /** Codes that mean "this session has no usable school right now: pick one". */
 const CHOOSE_AGAIN = new Set(["active_tenant_required", "no_membership", "invalid_active_tenant"]);
 
@@ -61,6 +74,12 @@ export default async function SchoolLayout({ children }: { children: ReactNode }
     : [null, null];
   const tally =
     tallyStatus?.status === 200 && !(tenant?.data?.modules_hidden ?? []).includes("tally");
+  // R2-1B (FR-FEE-001): the fee menu shows while fees are on for the school; its status route
+  // answers 404 module_hidden while the flag or the school's own switch is off.
+  const feeUser =
+    !suspended && (profile?.permissions ?? []).some((key) => FEE_PERMISSIONS.includes(key));
+  const feeStatus = feeUser ? await apiGetAsSession<unknown>("staff", "/api/v1/fees/status") : null;
+  const fees = feeStatus?.status === 200;
 
   const activeTenantId = profile?.tenant_id ?? session.activeTenantId;
   const schoolName =
@@ -78,7 +97,7 @@ export default async function SchoolLayout({ children }: { children: ReactNode }
       permissions={profile?.permissions ?? (suspended ? [] : null)}
       canSwitchSchool={(profile?.tenant_ids.length ?? 0) > 1}
       languages={settings?.languages ?? null}
-      features={{ tally }}
+      features={{ tally, fees }}
       banner={
         <>
           {support ? <SupportAccessBanner /> : null}
