@@ -1010,6 +1010,9 @@ type = forbidden
 source_modules =
     app.certificates.config
     app.certificates.templates
+    app.certificates.formats
+    app.certificates.codes
+    app.certificates.qr
 forbidden_modules =
     sqlalchemy
     fastapi
