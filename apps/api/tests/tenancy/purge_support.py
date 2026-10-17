@@ -874,6 +874,166 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             s=ids["student"],
             u=u["user"],
         )
+        # --- R2-1B fees (0057_fees_core): one row in every fin table --------------------------
+        f = {
+            k: uuid.uuid4() for k in ("head", "plan", "acct", "rcpt", "conc", "adj", "canc", "rfd")
+        }
+        _run(
+            c,
+            "INSERT INTO fin.fee_settings (id, tenant_id) VALUES (:i, :t)",
+            i=uuid.uuid4(),
+            t=t,
+        )
+        _run(
+            c,
+            "INSERT INTO fin.fee_heads (id, tenant_id, code, name, kind, created_by) "
+            "VALUES (:i, :t, 'TUI', 'Tuition', 'tuition', :m)",
+            i=f["head"],
+            t=t,
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.fee_plans (id, tenant_id, academic_year_id, class_id, name, "
+            "created_by) VALUES (:i, :t, :y, :k, 'Synthetic plan', :m)",
+            i=f["plan"],
+            t=t,
+            y=ids["year1"],
+            k=ids["class"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.fee_plan_lines (id, tenant_id, plan_id, head_id, annual_amount) "
+            "VALUES (:i, :t, :p, :h, 100)",
+            i=uuid.uuid4(),
+            t=t,
+            p=f["plan"],
+            h=f["head"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.fee_plan_instalments (id, tenant_id, plan_id, instalment_no, label, "
+            "due_on, amounts) VALUES (:i, :t, :p, 1, 'Term 1', '2026-07-01', "
+            "CAST(:a AS jsonb))",
+            i=uuid.uuid4(),
+            t=t,
+            p=f["plan"],
+            a=f'{{"{f["head"]}": "100.00"}}',
+        )
+        _run(
+            c,
+            "UPDATE fin.fee_plans SET status = 'active', activated_by = :m, activated_at = now() "
+            "WHERE id = :i",
+            i=f["plan"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.student_fee_accounts (id, tenant_id, student_id, academic_year_id, "
+            "plan_id, opened_by) VALUES (:i, :t, :s, :y, :p, :m)",
+            i=f["acct"],
+            t=t,
+            s=ids["student"],
+            y=ids["year1"],
+            p=f["plan"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.receipt_counters (id, tenant_id, series, financial_year, last_no) "
+            "VALUES (:i, :t, 'RCT', '2026-27', 1)",
+            i=uuid.uuid4(),
+            t=t,
+        )
+        _run(
+            c,
+            "INSERT INTO fin.receipts (id, tenant_id, account_id, financial_year, receipt_no, "
+            "receipt_number, receipt_date, amount, mode, collected_by, content, content_sha256, "
+            "document_id) VALUES (:i, :t, :a, '2026-27', 1, 'RCT/2026-27/000001', '2026-09-01', "
+            "50, 'cash', :m, '{}'::jsonb, :h, :d)",
+            i=f["rcpt"],
+            t=t,
+            a=f["acct"],
+            m=ids["m1"],
+            h=b"\x00" * 32,
+            d=ids["doc"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.receipt_allocations (id, tenant_id, receipt_id, instalment_no, "
+            "head_id, amount) VALUES (:i, :t, :r, 1, :h, 50)",
+            i=uuid.uuid4(),
+            t=t,
+            r=f["rcpt"],
+            h=f["head"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.concessions (id, tenant_id, account_id, concession_type, basis, "
+            "value, targets, reason, requested_by) VALUES (:i, :t, :a, 'merit', 'amount', 10, "
+            "'[{\"instalment_no\": 1}]'::jsonb, 'Synthetic merit reason', :m)",
+            i=f["conc"],
+            t=t,
+            a=f["acct"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.adjustments (id, tenant_id, account_id, instalment_no, head_id, "
+            "amount, reason_code, reason, requested_by) VALUES (:i, :t, :a, 1, :h, 5, "
+            "'correction', 'Synthetic correction', :m)",
+            i=f["adj"],
+            t=t,
+            a=f["acct"],
+            h=f["head"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.receipt_cancellations (id, tenant_id, receipt_id, reason_code, "
+            "reason, requested_by) VALUES (:i, :t, :r, 'other', 'Synthetic cancel reason', :m)",
+            i=f["canc"],
+            t=t,
+            r=f["rcpt"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.refunds (id, tenant_id, receipt_id, account_id, amount, mode, "
+            "reason, requested_by) VALUES (:i, :t, :r, :a, 5, 'cash', "
+            "'Synthetic refund reason', :m)",
+            i=f["rfd"],
+            t=t,
+            r=f["rcpt"],
+            a=f["acct"],
+            m=ids["m1"],
+        )
+        for kind, amount, extra, values in (
+            ("charge", 100, "", ""),
+            ("payment", -50, ", receipt_id", ", :r"),
+        ):
+            _run(
+                c,
+                "INSERT INTO fin.ledger_entries (id, tenant_id, account_id, entry_kind, amount, "
+                f"instalment_no, head_id, entry_date{extra}) VALUES (:i, :t, :a, :k, :n, 1, :h, "
+                f"'2026-09-01'{values})",
+                i=uuid.uuid4(),
+                t=t,
+                a=f["acct"],
+                k=kind,
+                n=amount,
+                h=f["head"],
+                r=f["rcpt"],
+            )
+        _run(
+            c,
+            "INSERT INTO fin.day_closes (id, tenant_id, close_date, receipt_count, receipt_total, "
+            "totals, closed_by) VALUES (:i, :t, '2026-09-01', 1, 50, '{}'::jsonb, :m)",
+            i=uuid.uuid4(),
+            t=t,
+            m=ids["m1"],
+        )
         # --- audit chain (retained by design; ADR-0029) -------------------------------------
         _run(
             c,

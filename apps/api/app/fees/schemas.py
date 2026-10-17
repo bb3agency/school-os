@@ -180,7 +180,7 @@ class InstalmentIn(_In):
     amounts: dict[uuid.UUID, Money] = Field(max_length=30)
 
 
-class PlanCreate(_In):
+class FeePlanCreate(_In):
     academic_year_id: uuid.UUID
     class_id: uuid.UUID
     category_code: CategoryCode | None = None
@@ -190,7 +190,7 @@ class PlanCreate(_In):
     late_fee_rule: LateFeeRule = Field(default_factory=LateFeeRule)
 
 
-class PlanPatch(_In):
+class FeePlanPatch(_In):
     """Change a draft plan (``If-Match``). Lists replace the plan's lines or instalments."""
 
     name: Line | None = None
@@ -215,7 +215,7 @@ class InstalmentOut(_Out):
     total: Money
 
 
-class PlanOut(_Out):
+class FeePlanOut(_Out):
     id: uuid.UUID
     academic_year_id: uuid.UUID
     class_id: uuid.UUID
@@ -521,7 +521,7 @@ class ReceiptListItem(_Out):
     refunded: Money
 
 
-class DownloadUrlOut(_Out):
+class ReceiptDownloadOut(_Out):
     url: str
     expires_at: dt.datetime
     filename: str
@@ -699,6 +699,12 @@ class DayCloseOut(_Out):
     closed_by: uuid.UUID
     closed_by_name: str | None
     closed_at: dt.datetime
+
+
+class DayCloseIn(_In):
+    """The IST date to close (today or a recent day; never in the future)."""
+
+    date: dt.date
 
 
 class DailyReportOut(_Out):

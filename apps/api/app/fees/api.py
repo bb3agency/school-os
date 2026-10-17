@@ -41,9 +41,12 @@ from app.fees.schemas import (
     ConcessionCreate,
     ConcessionOut,
     DailyReportOut,
+    DayCloseIn,
     DecisionIn,
-    DownloadUrlOut,
     DuesOut,
+    FeePlanCreate,
+    FeePlanOut,
+    FeePlanPatch,
     FeeSettingsIn,
     FeeSettingsOut,
     FeeStatusOut,
@@ -52,13 +55,11 @@ from app.fees.schemas import (
     HeadPatch,
     PlanApplyIn,
     PlanApplyOut,
-    PlanCreate,
     PlanDifferencesOut,
-    PlanOut,
-    PlanPatch,
     ProposeAdjustmentsIn,
     ProposeAdjustmentsOut,
     ReceiptCreate,
+    ReceiptDownloadOut,
     ReceiptListItem,
     ReceiptMode,
     ReceiptOut,
@@ -234,19 +235,21 @@ def update_fee_head(
 # --- plans ---------------------------------------------------------------------------------------
 
 
-@router.get("/fees/plans", response_model=list[PlanOut])
+@router.get("/fees/plans", response_model=list[FeePlanOut])
 def list_fee_plans(
     ctx: SetupReader,
     db: TenantDB,
     academic_year_id: uuid.UUID | None = None,
     class_id: uuid.UUID | None = None,
-) -> list[PlanOut]:
+) -> list[FeePlanOut]:
     """Fee plans, optionally of one year and class (``finance.read`` or ``fee.manage``)."""
     return service.list_plans(db, ctx, academic_year_id=academic_year_id, class_id=class_id)
 
 
-@router.post("/fees/plans", response_model=PlanOut, status_code=201)
-def create_fee_plan(ctx: Manager, db: TenantDB, body: PlanCreate, idem: IdempotencyDep) -> Response:
+@router.post("/fees/plans", response_model=FeePlanOut, status_code=201)
+def create_fee_plan(
+    ctx: Manager, db: TenantDB, body: FeePlanCreate, idem: IdempotencyDep
+) -> Response:
     """A draft plan with lines and an instalment schedule (``fee.manage``;
     ``Idempotency-Key``). 422 ``instalments_do_not_add_up``; 409 ``plan_exists``."""
     return idem.run(
@@ -257,33 +260,35 @@ def create_fee_plan(ctx: Manager, db: TenantDB, body: PlanCreate, idem: Idempote
     )
 
 
-@router.get("/fees/plans/{plan_id}", response_model=PlanOut)
-def get_fee_plan(ctx: SetupReader, db: TenantDB, plan_id: uuid.UUID, response: Response) -> PlanOut:
+@router.get("/fees/plans/{plan_id}", response_model=FeePlanOut)
+def get_fee_plan(
+    ctx: SetupReader, db: TenantDB, plan_id: uuid.UUID, response: Response
+) -> FeePlanOut:
     out = service.get_plan(db, ctx, plan_id)
     _etag(response, out.version)
     return out
 
 
-@router.patch("/fees/plans/{plan_id}", response_model=PlanOut)
+@router.patch("/fees/plans/{plan_id}", response_model=FeePlanOut)
 def update_fee_plan(
     *,
     ctx: Manager,
     db: TenantDB,
     plan_id: uuid.UUID,
-    body: PlanPatch,
+    body: FeePlanPatch,
     expected: IfMatch,
     response: Response,
-) -> PlanOut:
+) -> FeePlanOut:
     """Change a draft plan (``fee.manage``, ``If-Match``); 409 ``plan_in_use`` when active."""
     out = service.update_plan(db, ctx, plan_id, body, expected_version=expected)
     _etag(response, out.version)
     return out
 
 
-@router.post("/fees/plans/{plan_id}/activate", response_model=PlanOut)
+@router.post("/fees/plans/{plan_id}/activate", response_model=FeePlanOut)
 def activate_fee_plan(
     ctx: Manager, db: TenantDB, plan_id: uuid.UUID, expected: IfMatch, response: Response
-) -> PlanOut:
+) -> FeePlanOut:
     """Make a draft active; a new version supersedes the one it was made from (``fee.manage``,
     ``If-Match``)."""
     out = service.activate_plan(db, ctx, plan_id, expected_version=expected)
@@ -291,10 +296,18 @@ def activate_fee_plan(
     return out
 
 
-@router.post("/fees/plans/{plan_id}/new-version", response_model=PlanOut, status_code=201)
-def new_fee_plan_version(ctx: Manager, db: TenantDB, plan_id: uuid.UUID) -> PlanOut:
-    """A draft copy of an active plan with the next version (``fee.manage``)."""
-    return service.new_version(db, ctx, plan_id)
+@router.post("/fees/plans/{plan_id}/new-version", response_model=FeePlanOut, status_code=201)
+def new_fee_plan_version(
+    ctx: Manager, db: TenantDB, plan_id: uuid.UUID, idem: IdempotencyDep
+) -> Response:
+    """A draft copy of an active plan with the next version (``fee.manage``;
+    ``Idempotency-Key``)."""
+    return idem.run(
+        db,
+        None,
+        lambda: service.new_version(db, ctx, plan_id),
+        headers=lambda o: {"Location": f"/api/v1/fees/plans/{o.id}", "ETag": etag(o.version)},
+    )
 
 
 @router.post("/fees/plans/{plan_id}/apply", response_model=PlanApplyOut)
@@ -409,8 +422,10 @@ def print_fee_receipt(ctx: Viewer, db: TenantDB, receipt_id: uuid.UUID) -> HTMLR
     return _html(service.print_page(db, ctx, receipt_id), f"receipt-{str(receipt_id)[:8]}.html")
 
 
-@router.get("/fees/receipts/{receipt_id}/download-url", response_model=DownloadUrlOut)
-def fee_receipt_download_url(ctx: Viewer, db: TenantDB, receipt_id: uuid.UUID) -> DownloadUrlOut:
+@router.get("/fees/receipts/{receipt_id}/download-url", response_model=ReceiptDownloadOut)
+def fee_receipt_download_url(
+    ctx: Viewer, db: TenantDB, receipt_id: uuid.UUID
+) -> ReceiptDownloadOut:
     """A short-lived link to the stored PDF. 409 ``pdf_not_ready``, ``receipt_cancelled``."""
     return service.download_url(db, ctx, receipt_id)
 
@@ -653,10 +668,11 @@ def fee_day_book_csv(ctx: Reporter, db: TenantDB, date: dt.date | None = None) -
     return _csv(filename, text)
 
 
-@router.post("/fees/days/{date}/close", response_model=DailyReportOut)
-def close_fee_day(ctx: Manager, db: TenantDB, date: dt.date) -> DailyReportOut:
-    """Close a day (``fee.manage``): nothing more can be dated that day. 409 ``day_closed``."""
-    return service.close_day(db, ctx, date)
+@router.post("/fees/day-closes", response_model=DailyReportOut)
+def close_fee_day(ctx: Manager, db: TenantDB, body: DayCloseIn) -> DailyReportOut:
+    """Close a day (``fee.manage``): nothing more can be dated that day; today or up to 31 days
+    back. 409 ``day_closed`` when it is closed already."""
+    return service.close_day(db, ctx, body.date)
 
 
 @router.get("/fees/dues", response_model=DuesOut)

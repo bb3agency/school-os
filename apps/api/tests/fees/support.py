@@ -33,11 +33,11 @@ from app.authz.context import UserContext
 from app.core.db import tenant_session
 from app.fees import service as fees
 from app.fees.schemas import (
+    FeePlanCreate,
     HeadCreate,
     InstalmentIn,
     LateFeeRule,
     PlanApplyIn,
-    PlanCreate,
     PlanLineIn,
     ReceiptCreate,
 )
@@ -188,7 +188,7 @@ def ensure_setup(school: Any, *, late_fee: LateFeeRule | None = None) -> Setup:
         school,
         "accountant",
         fees.create_plan,
-        PlanCreate(
+        FeePlanCreate(
             academic_year_id=school.ids["year"],
             class_id=school.ids["class_ix"],
             name="Class IX 2026-27",

@@ -27,6 +27,9 @@ from app.fees import repository as repo
 from app.fees.models import FeeHead, FeePlan, FeePlanInstalment, FeePlanLine, FeeSettings
 from app.fees.money import ZERO, total
 from app.fees.schemas import (
+    FeePlanCreate,
+    FeePlanOut,
+    FeePlanPatch,
     FeeSettingsIn,
     FeeSettingsOut,
     FeeStatusOut,
@@ -38,13 +41,10 @@ from app.fees.schemas import (
     LateFeeRule,
     PlanApplyIn,
     PlanApplyOut,
-    PlanCreate,
     PlanDifference,
     PlanDifferencesOut,
     PlanLineIn,
     PlanLineOut,
-    PlanOut,
-    PlanPatch,
     ProposeAdjustmentsIn,
     ProposeAdjustmentsOut,
     SkippedStudent,
@@ -224,7 +224,7 @@ def _plan_out(
     instalments: Sequence[FeePlanInstalment],
     heads: dict[uuid.UUID, FeeHead],
     accounts: int,
-) -> PlanOut:
+) -> FeePlanOut:
     out_lines = []
     for line in lines:
         head = heads.get(line.head_id)
@@ -247,7 +247,7 @@ def _plan_out(
         )
         for i in instalments
     ]
-    return PlanOut(
+    return FeePlanOut(
         id=plan.id,
         academic_year_id=plan.academic_year_id,
         class_id=plan.class_id,
@@ -265,7 +265,7 @@ def _plan_out(
     )
 
 
-def _plans_out(session: Session, plans: Sequence[FeePlan]) -> list[PlanOut]:
+def _plans_out(session: Session, plans: Sequence[FeePlan]) -> list[FeePlanOut]:
     ids = [p.id for p in plans]
     lines: dict[uuid.UUID, list[FeePlanLine]] = defaultdict(list)
     for line in repo.plan_lines(session, ids):
@@ -291,7 +291,7 @@ def list_plans(
     *,
     academic_year_id: uuid.UUID | None,
     class_id: uuid.UUID | None,
-) -> list[PlanOut]:
+) -> list[FeePlanOut]:
     c.require_on(session, ctx)
     c.require_school_wide(ctx, c.READ, c.MANAGE)
     return _plans_out(
@@ -299,7 +299,7 @@ def list_plans(
     )
 
 
-def get_plan(session: Session, ctx: UserContext, plan_id: uuid.UUID) -> PlanOut:
+def get_plan(session: Session, ctx: UserContext, plan_id: uuid.UUID) -> FeePlanOut:
     c.require_on(session, ctx)
     c.require_school_wide(ctx, c.READ, c.MANAGE)
     return _plans_out(session, [_load_plan(session, plan_id)])[0]
@@ -425,7 +425,7 @@ def _instalment_rows(
     ]
 
 
-def create_plan(session: Session, ctx: UserContext, data: PlanCreate) -> PlanOut:
+def create_plan(session: Session, ctx: UserContext, data: FeePlanCreate) -> FeePlanOut:
     """A draft plan for (year, class, category) (FR-FEE-003; ``fee.manage``). 409
     ``plan_exists`` when one exists already (make a new version of it instead)."""
     c.require_on(session, ctx)
@@ -482,10 +482,10 @@ def update_plan(
     session: Session,
     ctx: UserContext,
     plan_id: uuid.UUID,
-    data: PlanPatch,
+    data: FeePlanPatch,
     *,
     expected_version: int,
-) -> PlanOut:
+) -> FeePlanOut:
     """Change a draft plan (``fee.manage``, ``If-Match``); an active plan answers 409
     ``plan_in_use`` (make a new version)."""
     c.require_on(session, ctx)
@@ -547,7 +547,7 @@ def update_plan(
 
 def activate_plan(
     session: Session, ctx: UserContext, plan_id: uuid.UUID, *, expected_version: int
-) -> PlanOut:
+) -> FeePlanOut:
     """Make a draft the active plan (``fee.manage``, ``If-Match``). A new version supersedes
     the plan it was made from; its differences are then proposed with
     ``POST /fees/plans/{id}/adjustments`` (FR-FEE-004)."""
@@ -585,7 +585,7 @@ def activate_plan(
     return _plans_out(session, [plan])[0]
 
 
-def new_version(session: Session, ctx: UserContext, plan_id: uuid.UUID) -> PlanOut:
+def new_version(session: Session, ctx: UserContext, plan_id: uuid.UUID) -> FeePlanOut:
     """A draft copy of the active plan with the next version number (``fee.manage``)."""
     c.require_on(session, ctx)
     c.require_school_wide(ctx, c.MANAGE)

@@ -540,6 +540,21 @@ def _staff_tables(session: Session) -> list[RecordTable]:
     return out
 
 
+# Audit summaries hold at most 50 keys (app.audit.schemas.MAX_KEYS). From R2 the archive has more
+# record tables than that (fees: 15 tables), so the completion event names the tables that hold
+# rows (the empty ones add nothing to the record) and folds any beyond the limit into one count.
+_AUDITED_TABLES_MAX = 45
+
+
+def _audited_table_counts(counts: dict[str, int]) -> dict[str, int]:
+    filled = {name: rows for name, rows in sorted(counts.items()) if rows}
+    if len(filled) <= _AUDITED_TABLES_MAX:
+        return filled
+    kept = dict(list(filled.items())[: _AUDITED_TABLES_MAX - 1])
+    kept["other_tables_rows"] = sum(filled.values()) - sum(kept.values())
+    return kept
+
+
 def _collect(session: Session, snap: _Snapshot) -> tuple[list[RecordTable], dict[str, Any]]:
     """Every module's record tables, through their public services (CLAUDE.md §4)."""
     withheld = _never_exported()
@@ -798,7 +813,7 @@ def _complete(
             snap.id,
             {
                 "include_sensitive": snap.include_sensitive,
-                "tables": built.counts.tables,
+                "tables": _audited_table_counts(built.counts.tables),
                 "documents": built.counts.documents,
                 "document_kib": -(-built.counts.document_bytes // 1024),
                 "audit_events": built.counts.audit_events,

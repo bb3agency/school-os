@@ -21,6 +21,8 @@ from app.fees.schemas import (
     ConcessionCreate,
     ConcessionTarget,
     DecisionIn,
+    FeePlanCreate,
+    FeePlanPatch,
     FeeSettingsIn,
     HeadCreate,
     HeadPatch,
@@ -28,9 +30,7 @@ from app.fees.schemas import (
     LateFeeRule,
     ModeDetailsIn,
     PlanApplyIn,
-    PlanCreate,
     PlanLineIn,
-    PlanPatch,
     ProposeAdjustmentsIn,
     RefundCreate,
     RejectIn,
@@ -130,7 +130,7 @@ def test_FR_FEE_003_instalments_must_add_up(school: Any) -> None:
             school,
             "accountant",
             fees.create_plan,
-            PlanCreate(
+            FeePlanCreate(
                 academic_year_id=school.ids["year"],
                 class_id=school.ids["class_x"],
                 category_code="odd_sum",
@@ -156,7 +156,7 @@ def test_FR_FEE_003_due_dates_inside_the_year(school: Any) -> None:
             school,
             "accountant",
             fees.create_plan,
-            PlanCreate(
+            FeePlanCreate(
                 academic_year_id=school.ids["year"],
                 class_id=school.ids["class_x"],
                 category_code="late_date",
@@ -185,7 +185,7 @@ def test_FR_FEE_004_active_plan_is_frozen_new_version_proposes_adjustments(schoo
             "accountant",
             fees.update_plan,
             plan.id,
-            PlanPatch(name="Edited"),
+            FeePlanPatch(name="Edited"),
             expected_version=plan.version,
         )
     assert err.value.code == "plan_in_use"
@@ -197,7 +197,7 @@ def test_FR_FEE_004_active_plan_is_frozen_new_version_proposes_adjustments(schoo
         "accountant",
         fees.update_plan,
         draft.id,
-        PlanPatch(
+        FeePlanPatch(
             lines=[PlanLineIn(head_id=setup.tui, annual_amount=D("1100.00"))],
             instalments=[
                 InstalmentIn(
@@ -693,7 +693,7 @@ def _late_plan(school: Any, rule: LateFeeRule, category: str) -> tuple[uuid.UUID
         school,
         "accountant",
         fees.create_plan,
-        PlanCreate(
+        FeePlanCreate(
             academic_year_id=school.ids["year"],
             class_id=school.ids["class_x"],
             category_code=category,

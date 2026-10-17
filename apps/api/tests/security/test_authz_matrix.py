@@ -2057,6 +2057,26 @@ SPECS.update(
 )
 
 
+# --- R2-1B fees (ADR-0042): fees on for school A around each call ---------------------------------
+
+
+def _fees() -> ModuleType:
+    """tests/fees/security_support.py (fee requests built through the real services)."""
+    name = "sos_test_fees_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "fees" / "security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+SPECS.update(_fees().matrix_specs())
+
+
 def _success(method: str, path: str) -> int:
     creates = {
         "/api/v1/users",
@@ -2111,6 +2131,8 @@ def _success(method: str, path: str) -> int:
     }
     if method == "POST" and path in accepted:
         return 202
+    if method == "POST" and path in _fees().MATRIX_CREATES:
+        return 201
     if (method, path) == ("POST", "/api/v1/users/{user_id}/invitation-email"):
         return 409  # guard passed; the service refuses (email off in tests)
     if method == "POST" and path.startswith("/api/v1/me/invitations/"):
@@ -2128,6 +2150,11 @@ def _success(method: str, path: str) -> int:
 
 
 def _call(api: Any, w: Any, admin: Engine, role: str, key: tuple[str, str], **kw: Any) -> Any:
+    if _fees().is_fee_path(key[1]):
+        # R2-1B: fees are on for school A only while the request is built and sent.
+        with _fees().on(admin, w.a.tenant_id, key[1]):
+            path, body, headers = SPECS[key](w, role, admin)
+            return api.call(w.person(role), key[0], path, json=body, headers=headers, **kw)
     path, body, headers = SPECS[key](w, role, admin)
     if key[1].startswith("/api/v1/tally/"):
         # The Tally connector is behind a per-school flag (default off, ADR-0032): on for the call.

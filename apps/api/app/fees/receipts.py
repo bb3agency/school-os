@@ -39,8 +39,8 @@ from app.fees.money import group_indian, in_words, spread, total
 from app.fees.schemas import (
     AllocationIn,
     CancellationOut,
-    DownloadUrlOut,
     ReceiptCreate,
+    ReceiptDownloadOut,
     ReceiptLineOut,
     ReceiptListItem,
     ReceiptOut,
@@ -562,7 +562,7 @@ def print_page(session: Session, ctx: UserContext, receipt_id: uuid.UUID) -> str
     return page
 
 
-def download_url(session: Session, ctx: UserContext, receipt_id: uuid.UUID) -> DownloadUrlOut:
+def download_url(session: Session, ctx: UserContext, receipt_id: uuid.UUID) -> ReceiptDownloadOut:
     """A presigned PDF download (≤ 5 minutes) once stored. 409 ``pdf_not_ready`` before; 409
     ``receipt_cancelled`` for a cancelled receipt (its stored PDF predates the cancellation; the
     print view shows it marked). Audit ``fee.receipt.downloaded``."""
@@ -587,7 +587,7 @@ def download_url(session: Session, ctx: UserContext, receipt_id: uuid.UUID) -> D
         resource_id=row.id,
         summary={"receipt_number": row.receipt_number, "document_id": row.document_id},
     )
-    return DownloadUrlOut(url=url, expires_at=expires_at, filename=filename)
+    return ReceiptDownloadOut(url=url, expires_at=expires_at, filename=filename)
 
 
 def retry_render(session: Session, ctx: UserContext, receipt_id: uuid.UUID) -> ReceiptOut:

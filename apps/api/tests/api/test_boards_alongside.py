@@ -64,7 +64,8 @@ def test_FR_TEN_020_owner_declares_boards_and_class_boards(
     body = got.json()
     assert body["settings"]["class_boards"] == {}
     assert body["settings"]["operating_mode"] == "full"
-    assert body["modules_hidden"] == []
+    # R2-1B: fees stay off until the school turns them on (FR-FEE-001).
+    assert body["modules_hidden"] == ["fees"]
     etag = got.headers["ETag"]
 
     # 403 for a role without tenant.settings.manage; 428 without a recent MFA sign-in.
@@ -133,7 +134,7 @@ def test_FR_TEN_022_alongside_mode_hides_tally_and_is_audited(
     assert ok.status_code == 200, ok.text
     assert ok.json()["settings"]["operating_mode"] == "alongside"
     assert ok.json()["settings"]["current_erp_name"] == "Synthetic ERP"
-    assert ok.json()["modules_hidden"] == ["tally"]
+    assert ok.json()["modules_hidden"] == ["fees", "tally"]
     (event,) = W.audit_events(admin_engine, school.tenant_id, "tenant.settings_updated")
     assert event["summary"] == {
         "fields": ["current_erp_name", "operating_mode"],
@@ -141,7 +142,7 @@ def test_FR_TEN_022_alongside_mode_hides_tally_and_is_audited(
     }
     # Every member sees the mode (the web hides the modules for everyone).
     staff_view = api.call(school.people["office_staff"], "GET", "/api/v1/tenant").json()
-    assert staff_view["modules_hidden"] == ["tally"]
+    assert staff_view["modules_hidden"] == ["fees", "tally"]
 
     # No new Tally agent can be set up while the mode hides the connector.
     with _tally().flag_on(admin_engine, school.tenant_id):
@@ -152,7 +153,7 @@ def test_FR_TEN_022_alongside_mode_hides_tally_and_is_audited(
         assert refused.json()["code"] == "module_hidden"
         back = _patch(api, owner, {"operating_mode": "full"}, ok.headers["ETag"])
         assert back.status_code == 200
-        assert back.json()["modules_hidden"] == []
+        assert back.json()["modules_hidden"] == ["fees"]
         allowed = api.call(
             owner, "POST", "/api/v1/tally/enrolment-codes", json={"device_name": "Office PC"}
         )

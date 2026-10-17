@@ -192,6 +192,22 @@ EXPECTED_TABLES = {
     "ask_memories",
     "ask_memory_settings",
     "retention_settings",
+    # R2-1B fees (0057_fees_core, FR-FEE-027): every fin table, empty ones too.
+    "fees_fee_settings",
+    "fees_fee_heads",
+    "fees_fee_plans",
+    "fees_fee_plan_lines",
+    "fees_fee_plan_instalments",
+    "fees_student_fee_accounts",
+    "fees_ledger_entries",
+    "fees_concessions",
+    "fees_adjustments",
+    "fees_receipt_counters",
+    "fees_receipts",
+    "fees_receipt_allocations",
+    "fees_receipt_cancellations",
+    "fees_refunds",
+    "fees_day_closes",
     # DL-07: restricted document files left out of an export without restricted details.
     "documents_withheld",
 }

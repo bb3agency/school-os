@@ -706,6 +706,33 @@ def _tally_flag(path: str, w: Any) -> contextlib.AbstractContextManager[None]:
     return contextlib.nullcontext()
 
 
+def _fees() -> ModuleType:
+    """tests/fees/security_support.py (fee objects of school B, fees switched on per call)."""
+    name = "sos_test_fees_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "fees" / "security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+def _b_fee(w: Any, key: str) -> uuid.UUID:
+    value: uuid.UUID = _fees().b_objects(_ADMIN[0], w)[key]
+    return value
+
+
+def _module_on(path: str, w: Any) -> contextlib.AbstractContextManager[None]:
+    """Tally routes need school A's connector flag; fee routes school A's fees switched on."""
+    if _fees().is_fee_path(path):
+        on: contextlib.AbstractContextManager[None] = _fees().on(_ADMIN[0], w.a.tenant_id, path)
+        return on
+    return _tally_flag(path, w)
+
+
 def _b_invitation(w: Any) -> uuid.UUID:
     """An open invitation in school B (one per session)."""
     if "bola_invitation" not in w.b.ids:
@@ -765,6 +792,15 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     # Tally connector (M6): an agent and a ledger of school B.
     "device_id": lambda w: _b_tally(w, "bola_tally_device"),
     "party_id": lambda w: _b_tally(w, "bola_tally_party"),
+    # R2-1B fees (ADR-0042): school B's fee objects are 404 like a random id.
+    "head_id": lambda w: _b_fee(w, "head_id"),
+    "plan_id": lambda w: _b_fee(w, "plan_id"),
+    "account_id": lambda w: _b_fee(w, "account_id"),
+    "receipt_id": lambda w: _b_fee(w, "receipt_id"),
+    "cancellation_id": lambda w: _b_fee(w, "cancellation_id"),
+    "concession_id": lambda w: _b_fee(w, "concession_id"),
+    "adjustment_id": lambda w: _b_fee(w, "adjustment_id"),
+    "refund_id": lambda w: _b_fee(w, "refund_id"),
 }
 
 
@@ -783,6 +819,8 @@ def _id_routes() -> list[tuple[str, str]]:
 
 ID_ROUTES = _id_routes()
 
+
+BODIES.update(_fees().BOLA_BODIES)
 
 # Required query parameters of ID routes, so the request reaches the object lookup.
 QUERY: dict[tuple[str, str], dict[str, str]] = {
@@ -825,9 +863,9 @@ def test_SEC_001_other_school_ids_are_404(
     before = W.audit_events(admin_engine, world.b.tenant_id)
     bodies = []
     for target in (b_id, uuid.uuid4()):
-        with _tally_flag(template, world):
+        with _module_on(template, world):
             res = api.call(
-                world.person(ACTOR.get(key, "owner")),
+                world.person(ACTOR.get(key, "principal" if "/fees/" in template else "owner")),
                 method,
                 _fill(template, target),
                 json=BODIES.get(key),
