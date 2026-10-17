@@ -546,7 +546,7 @@ CREATE OR REPLACE FUNCTION core.resolve_public_handle(p_kind text, p_key_hash by
     AND (t.status = 'active'
          OR (t.status = 'suspended' AND h.kind IN ({suspended_kinds})))
 $$;
-"""
+"""  # noqa: S608 - DDL; only constant kind lists are interpolated
 
 
 # ADR-0047 amendment (R2-1C, 2026-10-18): a parent's STOP must be honoured while the school is
