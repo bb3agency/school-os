@@ -148,8 +148,10 @@ test.describe("accessibility and keyboard: signed in (stand-in IdP)", () => {
       ["te", "/settings/structure", "6వ తరగతి"],
       ["en", PROMOTIONS, "Plan the promotion"],
       ["te", PROMOTIONS, "ప్రమోషన్ ప్రణాళిక"],
-      ["en", "/settings/school", "STATE_AP, CBSE"],
-      ["te", "/settings/school", "STATE_AP, CBSE"],
+      // The school code from GET /tenant. (Not the boards line: that is the read-only view,
+      // shown only until /me says this principal may manage settings, so it raced.)
+      ["en", "/settings/school", "sshs"],
+      ["te", "/settings/school", "sshs"],
       ["en", "/settings/users", "Synthetic Teacher"],
       ["en", "/settings/users/new", "Invite"],
       ["en", "/settings/users/0192f3a4-0000-7000-8000-0000000000d1", "teacher@school.example"],
