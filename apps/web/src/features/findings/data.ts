@@ -4,7 +4,7 @@ import type { AcademicYear, SchoolClass, Section } from "@schoolos/api-client";
 import { useQuery } from "@tanstack/react-query";
 import { useLocale } from "next-intl";
 import { useMemo } from "react";
-import { unwrap, useBffClient } from "@/lib/bff/query";
+import { listAll, unwrap, useBffClient } from "@/lib/bff/query";
 import type { AttributeDef, DqProfile, DqRule } from "./types";
 
 /** Query-key roots; mutations invalidate by these prefixes. */
@@ -92,6 +92,8 @@ export interface SectionOption {
 }
 
 const PAGE = { limit: 200 } as const;
+/** One page of a structure list, from `cursor` (all pages are read: listAll). */
+const page = (cursor: string | undefined) => (cursor ? { ...PAGE, cursor } : PAGE);
 
 /**
  * Sections of the current academic year with their class names, for filters and the "run
@@ -107,11 +109,17 @@ export function useSectionOptions(): {
     queryKey: DQ_KEYS.structure,
     queryFn: async () => {
       const [years, classes, sections] = await Promise.all([
-        unwrap(api.GET("/api/v1/academic-years", { params: { query: PAGE } })),
-        unwrap(api.GET("/api/v1/classes", { params: { query: PAGE } })),
-        unwrap(api.GET("/api/v1/sections", { params: { query: PAGE } })),
+        listAll((cursor) =>
+          unwrap(api.GET("/api/v1/academic-years", { params: { query: page(cursor) } })),
+        ),
+        listAll((cursor) =>
+          unwrap(api.GET("/api/v1/classes", { params: { query: page(cursor) } })),
+        ),
+        listAll((cursor) =>
+          unwrap(api.GET("/api/v1/sections", { params: { query: page(cursor) } })),
+        ),
       ]);
-      return { years: years.data, classes: classes.data, sections: sections.data };
+      return { years, classes, sections };
     },
     staleTime: CATALOG_STALE_MS,
     retry: false,
