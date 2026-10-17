@@ -66,6 +66,9 @@ apps/api/app/
   apaar/         APAAR consent register (append-only), consent forms (ADR-0039)
   tally/         read-only Tally connector and fee dues (edge agent in apps/edge-agent)
   breakglass/    support access to a school with approval, visible to the school
+  public/        public handles and core.resolve_public_handle (ADR-0047), parent links (ADR-0046),
+                 guards for unauthenticated routes (require_public_handle, require_webhook_signature,
+                 require_meta_verify_token; pinned in public/public_routes.yaml)
   notifications/ in-app notifications, bilingual templates
   admin/         tenant admin, retention settings, data export
   ops/           tenant-side job runs, outbox, idempotency keys
@@ -73,7 +76,7 @@ apps/api/app/
                  payments (billing), usage, fleet + heartbeat, feature flags, announcements,
                  support tickets, platform audit (DB role sos_platform; routes /api/v1/platform/*)
   devtools/      synthetic data generator (make seed-synthetic; local/ci only)
-apps/api/migrations/  Alembic revisions 0001_baseline … 0054_r1_finish (linear chain; `alembic heads` shows the current head)
+apps/api/migrations/  Alembic revisions 0001_baseline … 0055_public_handles (linear chain; `alembic heads` shows the current head)
 apps/api/tests/  tests per module (tests/<module>/) + cross-module suites (tests/security/, tests/migrations/, tests/api/, tests/deploy/)
 apps/api/openapi.json  committed OpenAPI document (make openapi; freshness test)
 apps/worker/     Celery entrypoint (sos_worker.celery_app; imports app.* tasks and beat schedules)
