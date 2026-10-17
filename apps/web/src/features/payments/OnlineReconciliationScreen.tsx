@@ -22,7 +22,7 @@ import {
   ITEM_KINDS,
   ITEM_STATUSES,
   KEYS,
-  MANAGE,
+  RECONCILE,
   NOTE_MAX,
   explainSchema,
   ifMatch,
@@ -124,7 +124,7 @@ function Summary() {
  * Online reconciliation (US-2111; FR-PAY-009, FR-PAY-010; docs/17 §5.8): every online payment
  * that did not become a receipt the normal way, each morning's comparison with Razorpay's
  * payments, refunds and settlements, and webhook events that could not be applied. Nothing is
- * changed automatically: a person explains each item with a note (`fee.manage`); a late webhook
+ * changed automatically: a person explains each item with a note (`fee.reconcile`); a late webhook
  * that issues the receipt resolves its item by itself.
  */
 export function OnlineReconciliationScreen() {
@@ -133,8 +133,8 @@ export function OnlineReconciliationScreen() {
   const tn = useTranslations("school.nav");
   const can = useStaffCan();
   const me = useStaffMe();
-  const allowed = can([FINANCE_READ, MANAGE]);
-  const canExplain = can(MANAGE);
+  const allowed = can([RECONCILE, FINANCE_READ]);
+  const canExplain = can(RECONCILE);
   const [status, setStatus] = useState<ItemStatus | "">("open");
   const [kind, setKind] = useState<ItemKind | "">("");
   const [cursors, setCursors] = useState<(string | null)[]>([null]);

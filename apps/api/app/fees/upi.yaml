@@ -1,0 +1,144 @@
+# UPI and bank statement rules (R2-2E; ADR-0042 decision 9, P7; owner decision D19; docs/03 §3.20
+# FR-FEE-014..017; docs/05 §15.1). Versioned configuration shipped inside the package (invariant
+# 13). Read by app/fees/upi_config.py, which validates every rule at start-up.
+version: 1
+
+# School UPI settings (FR-FEE-015; fee.manage). SchoolOS never receives money: the QR shown at the
+# counter (and later on the parent dues page) is the school's own static UPI QR, generated from
+# the school's UPI ID and payee name with no amount: upi://pay?pa=<vpa>&pn=<payee>&cu=INR.
+upi:
+  # The UPI ID's shape only; SchoolOS never checks it with a bank (FR-FEE-015). Pinned by the
+  # CHECK upi_settings_vpa_shape of migration 0060_fees_upi.
+  vpa_pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{1,63}@[A-Za-z][A-Za-z0-9]{1,63}$"
+  payee_name_min_length: 2
+  payee_name_max_length: 60
+  # FR-FEE-017: a UPI receipt not confirmed from a bank statement after this many days is an
+  # exception (the school may choose 1-30).
+  confirm_within_days_default: 7
+  # QR error correction: M (15 %) survives a crease or a stamp on a printed QR.
+  qr_error: m
+
+# Bank statement import (FR-FEE-016; fee.reconcile). The uploaded file is read and deleted in one
+# transaction (documents retention reason bank_statement_read); only credits are stored.
+statements:
+  max_file_bytes: 2097152          # 2 MB (CSV or XLSX of one statement)
+  max_lines: 5000                  # transaction rows per file (FR-FEE-016); more is refused
+  # Reader limits (SEC-017: zip bombs are refused before any XML is parsed).
+  max_scanned_rows: 5200           # header block, transactions and footer
+  xlsx_max_uncompressed_bytes: 26214400
+  xlsx_max_compression_ratio: 100
+  xlsx_max_members: 200
+  header_search_rows: 40           # the column headings must be in the first 40 rows
+  # A credit's value date must lie within these days of today (IST): statements are recent.
+  max_days_back: 400
+  max_days_ahead: 1
+  # The narration (payer name, bank's text) is kept encrypted for the accountant and erased after
+  # 90 days (docs/05 §13, PRV-024). Stored narrations are cut to this length after masking.
+  narration_keep_days: 90
+  narration_max_length: 300
+  # Digit runs this long or longer in a narration (account, card, mobile and Aadhaar-like
+  # numbers, UTRs) are masked to their last 4 digits before storage; the UTR has its own column.
+  narration_mask_digits_from: 9
+
+# Matching rules (FR-FEE-016). A rule only PROPOSES; a person confirms (bulk allowed), and a
+# confirmation never edits a receipt. Lines whose UTR is on a receipt with a different amount stay
+# unmatched and are listed as exceptions (never "corrected").
+matching:
+  # Exact: the line's UTR equals an issued, unconfirmed UPI receipt's UTR and the amounts are
+  # equal. Proposed and pre-selected in the review screen.
+  utr_exact: true
+  # Amount and date: only for credits WITHOUT a UTR. Exactly one issued, unconfirmed UPI receipt
+  # with the same amount, dated between `days_before` days before and `days_after` days after the
+  # credit's value date, and no other credit competing for it. Proposed but NOT pre-selected.
+  amount_date:
+    enabled: true
+    days_before: 3                 # receipt date at most this many days before the value date
+    days_after: 1                  # ... or this many days after it
+  # "Find matches again" looks at unmatched credits whose value date is this recent.
+  rematch_window_days: 120
+  max_review_lines: 5000
+
+# Exceptions each morning (FR-FEE-026): an in-app notification to fee.reconcile holders with the
+# counts, when there is anything to look at. 01:30 UTC = 07:00 IST.
+exceptions:
+  notify_hour_utc: 1
+  notify_minute_utc: 30
+  list_max: 500
+
+# Bank statement presets. Column headings are compared lower-case with punctuation removed;
+# the first heading row (within statements.header_search_rows) that has a date, a narration and
+# a credit (or amount plus type) column is the header. `verified: false`: built from the banks'
+# published statement layouts and synthetic samples; confirmed with a pilot school before use
+# (the same rule as the R1 formats, owner decision D3).
+presets:
+  - key: generic
+    version: 1
+    name: "Any bank (Date, Description, Reference, Credit)"
+    verified: false
+    date_columns: ["value date", "value dt", "date", "txn date", "transaction date", "tran date"]
+    narration_columns: ["description", "narration", "particulars", "transaction remarks", "remarks", "details"]
+    reference_columns: ["reference", "ref no", "reference no", "utr", "chq ref no", "cheque no", "ref no cheque no"]
+    credit_columns: ["credit", "deposit", "deposits", "cr", "credit amount", "deposit amt", "deposit amount"]
+    debit_columns: ["debit", "withdrawal", "withdrawals", "dr", "debit amount", "withdrawal amt", "withdrawal amount"]
+    date_formats: ["%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y", "%d-%b-%Y", "%d %b %Y", "%d-%b-%y", "%d/%m/%y", "%Y-%m-%d"]
+  - key: sbi
+    version: 1
+    name: "State Bank of India (account statement, Excel or CSV)"
+    verified: false
+    date_columns: ["value date", "txn date"]
+    narration_columns: ["description"]
+    reference_columns: ["ref no cheque no", "ref nocheque no"]
+    credit_columns: ["credit"]
+    debit_columns: ["debit"]
+    date_formats: ["%d %b %Y", "%d-%b-%Y", "%d/%m/%Y", "%d-%m-%Y"]
+  - key: hdfc
+    version: 1
+    name: "HDFC Bank (account statement, Excel or delimited)"
+    verified: false
+    date_columns: ["value dt", "date"]
+    narration_columns: ["narration"]
+    reference_columns: ["chq ref no", "chqref no"]
+    credit_columns: ["deposit amt", "deposit amount"]
+    debit_columns: ["withdrawal amt", "withdrawal amount"]
+    date_formats: ["%d/%m/%y", "%d/%m/%Y"]
+  - key: icici
+    version: 1
+    name: "ICICI Bank (detailed statement)"
+    verified: false
+    date_columns: ["value date", "transaction date"]
+    narration_columns: ["transaction remarks"]
+    reference_columns: ["cheque number"]
+    credit_columns: ["deposit amount inr", "deposit amount"]
+    debit_columns: ["withdrawal amount inr", "withdrawal amount"]
+    date_formats: ["%d/%m/%Y", "%d-%m-%Y", "%d-%b-%Y"]
+  - key: axis
+    version: 1
+    name: "Axis Bank (account statement)"
+    verified: false
+    date_columns: ["tran date", "value date"]
+    narration_columns: ["particulars"]
+    reference_columns: ["chqno", "cheque no"]
+    credit_columns: ["cr"]
+    debit_columns: ["dr"]
+    date_formats: ["%d-%m-%Y", "%d/%m/%Y", "%d-%b-%Y"]
+  - key: kotak
+    version: 1
+    name: "Kotak Mahindra Bank (amount with Dr / Cr)"
+    verified: false
+    date_columns: ["value date", "transaction date", "date"]
+    narration_columns: ["description", "narration"]
+    reference_columns: ["chq ref no", "chqref no", "ref no"]
+    amount_columns: ["amount"]
+    type_columns: ["dr cr", "drcr", "type"]
+    credit_markers: ["cr", "c", "credit"]
+    date_formats: ["%d-%m-%Y", "%d/%m/%Y", "%d %b %Y"]
+
+# How a UPI reference (UTR) is found in a credit (every preset). A credit is a UPI credit when
+# its narration matches `upi_marker`; its UTR is the first standalone 12-digit group of the
+# narration, else the reference column when that is 12 digits (banks pad it to 16 with zeros).
+utr:
+  upi_marker: "(?i)(?:^|[^A-Za-z])UPI(?:[^A-Za-z]|$)"
+  narration_group: "(?:^|[/\\-\\s:|])([0-9]{12})(?=$|[/\\-\\s:|])"
+  reference: "^0{0,4}([0-9]{12})$"
+  # Any other reference kept (NEFT/IMPS/cheque): letters and digits only, 6-35 characters.
+  other_reference: "^[A-Za-z0-9]{6,35}$"

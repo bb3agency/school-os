@@ -12,7 +12,7 @@ import {
   CONFIGURE,
   FINANCE_READ,
   KEY_ID,
-  MANAGE,
+  RECONCILE,
   COLLECT,
   isOpen,
   type Connection,
@@ -345,7 +345,7 @@ describe("Payment links (US-2108)", () => {
 
 describe("Online reconciliation (US-2111)", () => {
   it("lists exceptions and explains one with a note", async () => {
-    signedIn([MANAGE, FINANCE_READ]);
+    signedIn([RECONCILE, FINANCE_READ]);
     stub.routes["GET /bff/api/v1/fees/reconciliation/online"] = () =>
       Response.json({ items: [item()], next_cursor: null, open_count: 1 });
     stub.routes["GET /bff/api/v1/fees/reconciliation/online/summary"] = () =>

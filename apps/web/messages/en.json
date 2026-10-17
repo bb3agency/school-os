@@ -8205,7 +8205,9 @@
       "approvals": "Fee approvals",
       "daily": "Daily collection",
       "dues": "Fee dues",
-      "setup": "Fee setup"
+      "setup": "Fee setup",
+      "reconcile": "Reconcile UPI",
+      "upiSettings": "UPI QR"
     },
     "modes": {
       "cash": "Cash",
@@ -8344,6 +8346,13 @@
         "allocation": "Enter each amount in rupees, or leave it empty.",
         "allocationSum": "The amounts must add up to the receipt amount.",
         "utrInUse": "This UTR is already on another receipt. Open that receipt."
+      },
+      "upi": {
+        "showQr": "Show the school's UPI QR",
+        "hideQr": "Hide the QR",
+        "noQr": "The school's UPI QR is not set yet. The accountant adds it in Settings > UPI QR.",
+        "inUse": "This UTR is already on receipt",
+        "seenInBank": "The bank statement already shows a credit with this UTR."
       }
     },
     "receipts": {
@@ -8408,7 +8417,9 @@
       "toApprovals": "Go to fee approvals",
       "refundsTitle": "Refunds",
       "printVoucher": "Print voucher",
-      "refundOnlineBody": "Razorpay returns the money to the payer's card, bank or UPI after a second person approves. The refund voucher is written when Razorpay confirms the refund."
+      "refundOnlineBody": "Razorpay returns the money to the payer's card, bank or UPI after a second person approves. The refund voucher is written when Razorpay confirms the refund.",
+      "bankSeen": "Seen in the bank statement on {date}",
+      "bankNotSeen": "Not yet seen in a bank statement"
     },
     "account": {
       "title": "Fee account",
@@ -8684,7 +8695,169 @@
       "cancellation_exists": {
         "title": "Cancellation already asked",
         "body": "A cancellation of this receipt is already waiting or approved."
+      },
+      "statement_already_imported": {
+        "title": "Statement already imported",
+        "body": "This file was imported before. Download a newer statement from the bank."
+      },
+      "amount_mismatch": {
+        "title": "Amounts differ",
+        "body": "The bank credit and the receipt have different amounts, so they are not matched. Check the receipt; a wrong receipt is cancelled and issued again."
+      },
+      "utr_differs": {
+        "title": "UPI references differ",
+        "body": "The bank shows a different UTR than the receipt, so they are not matched. Check the receipt; a wrong receipt is cancelled and issued again."
+      },
+      "receipt_already_confirmed": {
+        "title": "Already confirmed",
+        "body": "This receipt is already confirmed from another bank credit."
+      },
+      "line_decided": {
+        "title": "Already decided",
+        "body": "Someone already decided this bank credit. Reload the page."
+      },
+      "line_taken": {
+        "title": "Credit already used",
+        "body": "This bank credit already confirms another receipt."
+      },
+      "receipt_taken": {
+        "title": "Receipt already matched",
+        "body": "This receipt is already matched with another bank credit."
+      },
+      "receipt_not_confirmable": {
+        "title": "Not a UPI receipt",
+        "body": "Only an issued UPI receipt can be confirmed from the bank statement."
+      },
+      "upi_not_set": {
+        "title": "UPI not set",
+        "body": "The school's UPI ID is not set yet. The accountant adds it in Settings > UPI QR."
       }
+    },
+    "upi": {
+      "title": "UPI QR",
+      "description": "The school's UPI ID and payee name, shown as a QR at the counter. Parents pay the school's bank account directly.",
+      "moneyTitle": "SchoolOS never holds money",
+      "moneyBody": "The QR is your bank's UPI ID with no amount in it. Money goes straight to the school's bank account. Each UPI receipt is issued at the counter with the parent's UTR and confirmed later from the bank statement.",
+      "formTitle": "UPI details",
+      "payee": "Payee name",
+      "payeeHint": "As the bank shows it, for example the school's account name. 2 to 60 characters.",
+      "vpa": "UPI ID",
+      "vpaHint": "For example schoolname@sbi. SchoolOS checks only how it is written, not with the bank.",
+      "days": "Confirm within (days)",
+      "daysHint": "A UPI receipt not seen in a bank statement after this many days is listed as an exception. 1 to 30.",
+      "daysValue": "{days, plural, one {# day} other {# days}}",
+      "save": "Save UPI details",
+      "saved": "UPI details saved.",
+      "previewTitle": "As parents will see it",
+      "previewBody": "Print it or show it on the counter screen. Check the name before using it.",
+      "notSet": "Not set yet.",
+      "qrAlt": "UPI QR code for {payee}",
+      "errors": {
+        "payee": "Enter the payee name (2 to 60 characters).",
+        "vpa": "Enter a UPI ID like schoolname@bank.",
+        "days": "Enter a whole number of days from 1 to 30."
+      }
+    },
+    "reconcile": {
+      "title": "Reconcile UPI",
+      "description": "Import the bank statement, confirm the UPI receipts it shows and look into anything not seen in the bank.",
+      "tabs": "Reconciliation",
+      "bankTab": "Bank statement",
+      "exceptionsTab": "UPI exceptions",
+      "uploadTitle": "Import a bank statement",
+      "uploadBody": "Download the statement from your bank as Excel (XLSX) or CSV, at most 2 MB and 5,000 transactions, and upload it unchanged.",
+      "deletedNote": "The file is read and deleted at once. Only the credits are kept: date, amount, UPI reference and the bank's description (erased after 90 days). Account numbers are never kept.",
+      "bank": "Bank format",
+      "bankHint": "Leave on automatic unless the statement is not recognised.",
+      "detect": "Find automatically",
+      "file": "Statement file",
+      "read": "Read statement",
+      "reading": "Reading the statement…",
+      "statementsTitle": "Imported statements",
+      "noStatements": "No bank statement imported yet.",
+      "importedAt": "Imported",
+      "period": "Period",
+      "credits": "Credits",
+      "proposed": "Proposed",
+      "importedBy": "Imported by",
+      "actions": "Actions",
+      "review": "Review",
+      "reviewTitle": "Statement {from} to {to}",
+      "reviewBody": "{credits, plural, one {# credit} other {# credits}} read; {duplicates, plural, =0 {none already imported} one {# already imported} other {# already imported}}.",
+      "confirmN": "{count, plural, =0 {Confirm matches} one {Confirm # match} other {Confirm # matches}}",
+      "confirmTitle": "{count, plural, one {Confirm # match} other {Confirm # matches}}",
+      "confirmBody": "Each ticked UPI receipt is marked as seen in the bank. Receipts themselves are never changed.",
+      "confirmConsequence": "A match that no longer holds is skipped and shown as an exception.",
+      "confirmed": "{count, plural, =0 {Nothing confirmed} one {# receipt confirmed} other {# receipts confirmed}}{skipped, plural, =0 {.} other {; # skipped (see the exceptions).}}",
+      "noCredits": "This statement has no credits.",
+      "linesCaption": "Credits of the statement",
+      "select": "Select",
+      "selectLine": "Confirm the match of row {row}",
+      "valueDate": "Value date",
+      "amount": "Amount",
+      "reference": "UTR or reference",
+      "utr": "UPI reference",
+      "narration": "Bank description",
+      "narrationErased": "Erased after 90 days",
+      "statusColumn": "Status",
+      "receipt": "Receipt",
+      "notCorrected": "Not matched: the receipt is never corrected. Cancel and issue it again if it is wrong.",
+      "status": {
+        "unmatched": "Needs a person",
+        "proposed": "Proposed",
+        "confirmed": "Confirmed",
+        "ignored": "Not a fee"
+      },
+      "kinds": {
+        "utr_exact": "Same UTR and amount",
+        "amount_date": "Same amount, near date: check it",
+        "manual": "Matched by a person"
+      },
+      "exceptions": {
+        "no_receipt": "No receipt has this payment yet",
+        "amount_mismatch": "The receipt with this UTR has a different amount",
+        "receipt_cancelled": "The receipt with this UTR was cancelled",
+        "receipt_already_confirmed": "The receipt with this UTR is already confirmed by another credit",
+        "confirmed_receipt_cancelled": "Its receipt was cancelled after confirming: match the new receipt"
+      },
+      "ignoreReasons": {
+        "not_a_fee": "Not a fee payment",
+        "recorded_elsewhere": "Recorded elsewhere",
+        "duplicate_credit": "Duplicate credit",
+        "other": "Other"
+      },
+      "match": "Match receipt",
+      "matchTitle": "Match this credit with a receipt",
+      "matchBody": "Choose the UPI receipt this credit paid. Only issued UPI receipts of the same amount are listed.",
+      "matchConsequence": "The receipt is marked as seen in the bank; it is not changed.",
+      "matchConfirm": "Match and confirm",
+      "chooseReceipt": "Choose a receipt",
+      "loadingReceipts": "Loading receipts…",
+      "noCandidates": "No issued UPI receipt has this amount. Issue the receipt at the counter first if the payment was missed.",
+      "lineLabel": "Row {row} of the statement",
+      "dismiss": "Not a fee",
+      "dismissTitle": "Mark this credit as not a fee payment",
+      "dismissBody": "For interest, grants or payments recorded elsewhere.",
+      "dismissConsequence": "The credit leaves the exceptions list. This cannot be undone.",
+      "dismissReason": "Reason",
+      "unconfirmedTitle": "UPI receipts not seen in the bank after {days, plural, one {# day} other {# days}}",
+      "unconfirmedBody": "Import a newer statement first. A receipt still missing may need checking with the parent.",
+      "noUnconfirmed": "Every older UPI receipt was seen in the bank.",
+      "receiptDate": "Receipt date",
+      "student": "Student",
+      "daysWaiting": "Days waiting",
+      "more": "{count, plural, one {# more not shown} other {# more not shown}}",
+      "creditsTitle": "Bank credits that need a person",
+      "creditsBody": "Credits no rule could match, and confirmed credits whose receipt was cancelled. A missed counter payment is issued at the counter, then matched here.",
+      "rematch": "Find matches again",
+      "rematched": "{count, plural, =0 {No new match found.} one {# new match proposed.} other {# new matches proposed.}}",
+      "proposedWaiting": "{count, plural, one {# proposed match is} other {# proposed matches are}} waiting in the Bank statement tab.",
+      "noCreditExceptions": "Nothing to look into.",
+      "reportConfirmed": "Confirmed from the bank (30 days)",
+      "reportUnconfirmed": "Not yet seen in the bank",
+      "reportOverdue": "Past the confirmation window",
+      "reportPeriod": "Period",
+      "onlineLink": "Online payments (Razorpay) are reconciled on their own page"
     }
   },
   "payments": {

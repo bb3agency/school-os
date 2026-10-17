@@ -272,10 +272,19 @@ export function SchoolShell({
           icon: "chart",
         },
         {
+          // R2-2E (US-2109): bank statements, UPI confirmations and exceptions.
+          href: "/fees/reconcile",
+          label: t("fees.nav.reconcile"),
+          permission: "fee.reconcile",
+          feature: "fees",
+          icon: "refresh",
+          activePattern: "^/fees/reconcile/?$",
+        },
+        {
           // R2-2D (US-2111, FR-PAY-010): online payment exceptions and the daily check.
           href: "/fees/reconcile/online",
           label: t("payments.nav.reconcile"),
-          permission: ["finance.read", "fee.manage"],
+          permission: "fee.reconcile",
           feature: "fees",
           icon: "check",
         },
@@ -340,6 +349,14 @@ export function SchoolShell({
           permission: ["tally.device.manage", "tally.configure", "finance.read"],
           feature: "tally",
           icon: "server",
+        },
+        {
+          // R2-2E (US-2109 AC1, FR-FEE-015): the school's UPI ID and static QR.
+          href: "/settings/upi",
+          label: t("fees.nav.upiSettings"),
+          permission: ["fee.manage", "fee.collect", "finance.read", "fee.reconcile"],
+          feature: "fees",
+          icon: "creditCard",
         },
         {
           // R2-2D (US-2107, ADR-0042): the school's own Razorpay account (online fee payments).

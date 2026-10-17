@@ -5954,6 +5954,71 @@
         "title": "ConfirmExportIn",
         "type": "object"
       },
+      "ConfirmIn": {
+        "additionalProperties": false,
+        "properties": {
+          "line_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 5000,
+            "minItems": 1,
+            "title": "Line Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "line_ids"
+        ],
+        "title": "ConfirmIn",
+        "type": "object"
+      },
+      "ConfirmOut": {
+        "properties": {
+          "already_confirmed": {
+            "title": "Already Confirmed",
+            "type": "integer"
+          },
+          "confirmed": {
+            "title": "Confirmed",
+            "type": "integer"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/ConfirmSkipped"
+            },
+            "title": "Skipped",
+            "type": "array"
+          }
+        },
+        "required": [
+          "confirmed",
+          "already_confirmed",
+          "skipped"
+        ],
+        "title": "ConfirmOut",
+        "type": "object"
+      },
+      "ConfirmSkipped": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "line_id": {
+            "format": "uuid",
+            "title": "Line Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "line_id",
+          "code"
+        ],
+        "title": "ConfirmSkipped",
+        "type": "object"
+      },
       "ConfirmTeardownIn": {
         "additionalProperties": false,
         "description": "Dedicated tier: the host's KMS key is scheduled for deletion and the host destroyed\n(Terraform, docs/16 \u00a713.4); references to those runs.",
@@ -11825,6 +11890,26 @@
         "title": "HeartbeatOut",
         "type": "object"
       },
+      "IgnoreIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "enum": [
+              "not_a_fee",
+              "recorded_elsewhere",
+              "duplicate_credit",
+              "other"
+            ],
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "IgnoreIn",
+        "type": "object"
+      },
       "ImportCreate": {
         "additionalProperties": false,
         "description": "Start importing an uploaded file (purpose ``import_file``, scanned) from one source.",
@@ -14996,6 +15081,21 @@
           "entries"
         ],
         "title": "MarksWrite",
+        "type": "object"
+      },
+      "MatchIn": {
+        "additionalProperties": false,
+        "properties": {
+          "receipt_id": {
+            "format": "uuid",
+            "title": "Receipt Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "receipt_id"
+        ],
+        "title": "MatchIn",
         "type": "object"
       },
       "MemoryIn": {
@@ -23390,6 +23490,18 @@
             "title": "Amount In Words",
             "type": "string"
           },
+          "bank_confirmed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bank Confirmed At"
+          },
           "cancellation": {
             "anyOf": [
               {
@@ -23574,6 +23686,65 @@
           "version"
         ],
         "title": "ReceiptOut",
+        "type": "object"
+      },
+      "ReceiptRef": {
+        "description": "The receipt a line is proposed for or confirms (or conflicts with).",
+        "properties": {
+          "amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Amount",
+            "type": "string"
+          },
+          "class_section": {
+            "title": "Class Section",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "receipt_date": {
+            "format": "date",
+            "title": "Receipt Date",
+            "type": "string"
+          },
+          "receipt_number": {
+            "title": "Receipt Number",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "student_name": {
+            "title": "Student Name",
+            "type": "string"
+          },
+          "utr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utr"
+          }
+        },
+        "required": [
+          "id",
+          "receipt_number",
+          "receipt_date",
+          "amount",
+          "status",
+          "utr",
+          "student_name",
+          "class_section"
+        ],
+        "title": "ReceiptRef",
         "type": "object"
       },
       "ReconciliationItemOut": {
@@ -24220,6 +24391,24 @@
           "reason"
         ],
         "title": "RejectIn",
+        "type": "object"
+      },
+      "RematchOut": {
+        "properties": {
+          "looked_at": {
+            "title": "Looked At",
+            "type": "integer"
+          },
+          "proposed": {
+            "title": "Proposed",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "looked_at",
+          "proposed"
+        ],
+        "title": "RematchOut",
         "type": "object"
       },
       "ResolveIn": {
@@ -26339,6 +26528,26 @@
         "title": "StaffRef",
         "type": "object"
       },
+      "StatementDetailOut": {
+        "properties": {
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/StatementLineOut"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "statement": {
+            "$ref": "#/components/schemas/StatementImportOut"
+          }
+        },
+        "required": [
+          "statement",
+          "lines"
+        ],
+        "title": "StatementDetailOut",
+        "type": "object"
+      },
       "StatementEntry": {
         "properties": {
           "amount": {
@@ -26440,6 +26649,336 @@
         "title": "StatementEntry",
         "type": "object"
       },
+      "StatementImportIn": {
+        "additionalProperties": false,
+        "properties": {
+          "document_id": {
+            "description": "An import_file the caller uploaded (CSV or XLSX)",
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "preset": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z][a-z0-9_-]{1,39}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A preset key from GET /fees/bank-statement-presets; none: detect",
+            "title": "Preset"
+          }
+        },
+        "required": [
+          "document_id"
+        ],
+        "title": "StatementImportIn",
+        "type": "object"
+      },
+      "StatementImportOut": {
+        "properties": {
+          "credit_count": {
+            "title": "Credit Count",
+            "type": "integer"
+          },
+          "duplicate_count": {
+            "title": "Duplicate Count",
+            "type": "integer"
+          },
+          "file_deleted_at": {
+            "format": "date-time",
+            "title": "File Deleted At",
+            "type": "string"
+          },
+          "file_kind": {
+            "title": "File Kind",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "imported_at": {
+            "format": "date-time",
+            "title": "Imported At",
+            "type": "string"
+          },
+          "imported_by": {
+            "format": "uuid",
+            "title": "Imported By",
+            "type": "string"
+          },
+          "imported_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Imported By Name"
+          },
+          "line_count": {
+            "title": "Line Count",
+            "type": "integer"
+          },
+          "period_from": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period From"
+          },
+          "period_to": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period To"
+          },
+          "preset": {
+            "title": "Preset",
+            "type": "string"
+          },
+          "preset_version": {
+            "title": "Preset Version",
+            "type": "integer"
+          },
+          "proposed_count": {
+            "title": "Proposed Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "preset",
+          "preset_version",
+          "file_kind",
+          "period_from",
+          "period_to",
+          "line_count",
+          "credit_count",
+          "duplicate_count",
+          "proposed_count",
+          "imported_by",
+          "imported_by_name",
+          "imported_at",
+          "file_deleted_at"
+        ],
+        "title": "StatementImportOut",
+        "type": "object"
+      },
+      "StatementLineOut": {
+        "properties": {
+          "amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Amount",
+            "type": "string"
+          },
+          "conflict_receipt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReceiptRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The receipt with this line's UTR when it does not match (never corrected)"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "decided_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By Name"
+          },
+          "exception": {
+            "anyOf": [
+              {
+                "enum": [
+                  "no_receipt",
+                  "amount_mismatch",
+                  "receipt_cancelled",
+                  "receipt_already_confirmed",
+                  "confirmed_receipt_cancelled"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why an unmatched (or confirmed) line needs a person; computed when read",
+            "title": "Exception"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "ignore_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "not_a_fee",
+                  "recorded_elsewhere",
+                  "duplicate_credit",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ignore Reason"
+          },
+          "import_id": {
+            "format": "uuid",
+            "title": "Import Id",
+            "type": "string"
+          },
+          "line_no": {
+            "title": "Line No",
+            "type": "integer"
+          },
+          "match_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "utr_exact",
+                  "amount_date",
+                  "manual"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Match Kind"
+          },
+          "match_status": {
+            "enum": [
+              "unmatched",
+              "proposed",
+              "confirmed",
+              "ignored"
+            ],
+            "title": "Match Status",
+            "type": "string"
+          },
+          "narration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Masked; null once erased (90 days)",
+            "title": "Narration"
+          },
+          "narration_erased": {
+            "title": "Narration Erased",
+            "type": "boolean"
+          },
+          "receipt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReceiptRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ref_kind": {
+            "enum": [
+              "utr",
+              "reference",
+              "none"
+            ],
+            "title": "Ref Kind",
+            "type": "string"
+          },
+          "utr_or_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utr Or Ref"
+          },
+          "value_date": {
+            "format": "date",
+            "title": "Value Date",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "import_id",
+          "line_no",
+          "value_date",
+          "amount",
+          "ref_kind",
+          "utr_or_ref",
+          "narration",
+          "narration_erased",
+          "match_status",
+          "match_kind",
+          "receipt",
+          "exception",
+          "conflict_receipt",
+          "ignore_reason",
+          "decided_by_name",
+          "decided_at",
+          "version"
+        ],
+        "title": "StatementLineOut",
+        "type": "object"
+      },
       "StatementOut": {
         "properties": {
           "account_id": {
@@ -26466,6 +27005,34 @@
           "balance"
         ],
         "title": "StatementOut",
+        "type": "object"
+      },
+      "StatementPresetOut": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "preset": {
+            "title": "Preset",
+            "type": "string"
+          },
+          "verified": {
+            "title": "Verified",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "preset",
+          "version",
+          "name",
+          "verified"
+        ],
+        "title": "StatementPresetOut",
         "type": "object"
       },
       "StatusCounts": {
@@ -29844,6 +30411,77 @@
         "title": "TimelineOut",
         "type": "object"
       },
+      "UnconfirmedReceipt": {
+        "properties": {
+          "amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Amount",
+            "type": "string"
+          },
+          "class_section": {
+            "title": "Class Section",
+            "type": "string"
+          },
+          "days_waiting": {
+            "title": "Days Waiting",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "proposed_line_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Line Id"
+          },
+          "receipt_date": {
+            "format": "date",
+            "title": "Receipt Date",
+            "type": "string"
+          },
+          "receipt_number": {
+            "title": "Receipt Number",
+            "type": "string"
+          },
+          "student_name": {
+            "title": "Student Name",
+            "type": "string"
+          },
+          "utr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utr"
+          }
+        },
+        "required": [
+          "id",
+          "receipt_number",
+          "receipt_date",
+          "amount",
+          "utr",
+          "student_name",
+          "class_section",
+          "days_waiting",
+          "proposed_line_id"
+        ],
+        "title": "UnconfirmedReceipt",
+        "type": "object"
+      },
       "UnreadCountOut": {
         "properties": {
           "count": {
@@ -29855,6 +30493,237 @@
           "count"
         ],
         "title": "UnreadCountOut",
+        "type": "object"
+      },
+      "UpiExceptionsOut": {
+        "properties": {
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "confirm_within_days": {
+            "title": "Confirm Within Days",
+            "type": "integer"
+          },
+          "lines": {
+            "description": "Unmatched credits and lines whose receipt was cancelled after confirmation",
+            "items": {
+              "$ref": "#/components/schemas/StatementLineOut"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "lines_count": {
+            "title": "Lines Count",
+            "type": "integer"
+          },
+          "proposed_count": {
+            "title": "Proposed Count",
+            "type": "integer"
+          },
+          "unconfirmed_count": {
+            "title": "Unconfirmed Count",
+            "type": "integer"
+          },
+          "unconfirmed_receipts": {
+            "items": {
+              "$ref": "#/components/schemas/UnconfirmedReceipt"
+            },
+            "title": "Unconfirmed Receipts",
+            "type": "array"
+          }
+        },
+        "required": [
+          "as_of",
+          "confirm_within_days",
+          "unconfirmed_receipts",
+          "unconfirmed_count",
+          "lines",
+          "lines_count",
+          "proposed_count"
+        ],
+        "title": "UpiExceptionsOut",
+        "type": "object"
+      },
+      "UpiReportOut": {
+        "properties": {
+          "confirmed_count": {
+            "title": "Confirmed Count",
+            "type": "integer"
+          },
+          "confirmed_total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Confirmed Total",
+            "type": "string"
+          },
+          "date_from": {
+            "format": "date",
+            "title": "Date From",
+            "type": "string"
+          },
+          "date_to": {
+            "format": "date",
+            "title": "Date To",
+            "type": "string"
+          },
+          "overdue_count": {
+            "title": "Overdue Count",
+            "type": "integer"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/UpiReportRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "unconfirmed_count": {
+            "title": "Unconfirmed Count",
+            "type": "integer"
+          },
+          "unconfirmed_total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Unconfirmed Total",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date_from",
+          "date_to",
+          "rows",
+          "confirmed_count",
+          "confirmed_total",
+          "unconfirmed_count",
+          "unconfirmed_total",
+          "overdue_count"
+        ],
+        "title": "UpiReportOut",
+        "type": "object"
+      },
+      "UpiReportRow": {
+        "properties": {
+          "confirmed_count": {
+            "title": "Confirmed Count",
+            "type": "integer"
+          },
+          "confirmed_total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Confirmed Total",
+            "type": "string"
+          },
+          "receipt_date": {
+            "format": "date",
+            "title": "Receipt Date",
+            "type": "string"
+          },
+          "unconfirmed_count": {
+            "title": "Unconfirmed Count",
+            "type": "integer"
+          },
+          "unconfirmed_total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Unconfirmed Total",
+            "type": "string"
+          }
+        },
+        "required": [
+          "receipt_date",
+          "confirmed_count",
+          "confirmed_total",
+          "unconfirmed_count",
+          "unconfirmed_total"
+        ],
+        "title": "UpiReportRow",
+        "type": "object"
+      },
+      "UpiSettingsIn": {
+        "additionalProperties": false,
+        "properties": {
+          "confirm_within_days": {
+            "default": 7,
+            "maximum": 30.0,
+            "minimum": 1.0,
+            "title": "Confirm Within Days",
+            "type": "integer"
+          },
+          "payee_name": {
+            "maxLength": 60,
+            "minLength": 2,
+            "title": "Payee Name",
+            "type": "string"
+          },
+          "vpa": {
+            "title": "Vpa",
+            "type": "string"
+          }
+        },
+        "required": [
+          "payee_name",
+          "vpa"
+        ],
+        "title": "UpiSettingsIn",
+        "type": "object"
+      },
+      "UpiSettingsOut": {
+        "description": "The school's UPI details. ``configured`` false: nothing set yet (no QR at the counter).",
+        "properties": {
+          "configured": {
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "confirm_within_days": {
+            "title": "Confirm Within Days",
+            "type": "integer"
+          },
+          "payee_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payee Name"
+          },
+          "upi_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "upi://pay?pa=..&pn=..&cu=INR (no amount): what the static QR encodes",
+            "title": "Upi Uri"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "vpa": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vpa"
+          }
+        },
+        "required": [
+          "configured",
+          "payee_name",
+          "vpa",
+          "confirm_within_days",
+          "upi_uri",
+          "version"
+        ],
+        "title": "UpiSettingsOut",
         "type": "object"
       },
       "UploadCreate": {
@@ -30412,6 +31281,69 @@
           }
         },
         "title": "UserUpdateIn",
+        "type": "object"
+      },
+      "UtrCheckIn": {
+        "additionalProperties": false,
+        "properties": {
+          "utr": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Utr",
+            "type": "string"
+          }
+        },
+        "required": [
+          "utr"
+        ],
+        "title": "UtrCheckIn",
+        "type": "object"
+      },
+      "UtrCheckOut": {
+        "description": "The counter's UTR check (FR-FEE-014): ``invalid`` (not 12 digits), ``in_use`` (on another\nissued receipt: its id and number), ``free``. ``seen_in_bank``: a bank credit with this UTR is\nalready imported (the amount is not shown at the counter).",
+        "properties": {
+          "receipt_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Id"
+          },
+          "receipt_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Number"
+          },
+          "seen_in_bank": {
+            "default": false,
+            "title": "Seen In Bank",
+            "type": "boolean"
+          },
+          "state": {
+            "enum": [
+              "free",
+              "in_use",
+              "invalid"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "title": "UtrCheckOut",
         "type": "object"
       },
       "ValidationError": {
@@ -41990,6 +42922,564 @@
         ]
       }
     },
+    "/api/v1/fees/bank-statement-lines/{line_id}/confirm": {
+      "post": {
+        "description": "Match one credit with a UPI receipt a person chose and confirm it (``fee.reconcile``).\n409 ``amount_mismatch`` / ``utr_differs`` when they disagree (never corrected),\n``receipt_already_confirmed``, ``line_decided``.",
+        "operationId": "confirm_bank_statement_line_api_v1_fees_bank_statement_lines__line_id__confirm_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "line_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Line Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatementLineOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Confirm Bank Statement Line",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/bank-statement-lines/{line_id}/dismiss": {
+      "post": {
+        "description": "Mark a credit as not a fee payment with a reason code (``fee.reconcile``). 409\n``line_decided`` for a confirmed credit.",
+        "operationId": "dismiss_bank_statement_line_api_v1_fees_bank_statement_lines__line_id__dismiss_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "line_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Line Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IgnoreIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatementLineOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Dismiss Bank Statement Line",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/bank-statement-presets": {
+      "get": {
+        "description": "The bank statement formats SchoolOS reads (``fee.reconcile``).",
+        "operationId": "bank_statement_presets_api_v1_fees_bank_statement_presets_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StatementPresetOut"
+                  },
+                  "title": "Response Bank Statement Presets Api V1 Fees Bank Statement Presets Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Bank Statement Presets",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/bank-statements": {
+      "get": {
+        "description": "Imported statements, newest first (``fee.reconcile``).",
+        "operationId": "list_bank_statements_api_v1_fees_bank_statements_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StatementImportOut"
+                  },
+                  "title": "Response List Bank Statements Api V1 Fees Bank Statements Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List Bank Statements",
+        "tags": [
+          "fees"
+        ]
+      },
+      "post": {
+        "description": "Read an uploaded bank statement (CSV or XLSX, at most 2 MB and 5,000 transactions;\n``fee.reconcile``). The file is deleted as soon as it is read; credits are stored and the\nmatching rules propose UPI receipts (nothing is confirmed). 422 with row numbers when the\nfile cannot be read; 409 ``statement_already_imported``, ``document_not_ready``.",
+        "operationId": "import_bank_statement_api_v1_fees_bank_statements_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatementImportIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatementImportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Import Bank Statement",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/bank-statements/rematch": {
+      "post": {
+        "description": "Look again for UPI receipts for recent unmatched credits (receipts issued after the\nstatement was imported); proposals only (``fee.reconcile``).",
+        "operationId": "rematch_bank_statements_api_v1_fees_bank_statements_rematch_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RematchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Rematch Bank Statements",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/bank-statements/{statement_id}": {
+      "get": {
+        "description": "A statement's credits with their proposals and exceptions (``fee.reconcile``).",
+        "operationId": "get_bank_statement_api_v1_fees_bank_statements__statement_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "statement_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Statement Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "unmatched",
+                    "proposed",
+                    "confirmed",
+                    "ignored"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatementDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get Bank Statement",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/bank-statements/{statement_id}/confirm": {
+      "post": {
+        "description": "Confirm proposed matches in one step (``fee.reconcile``): each becomes a UPI\nconfirmation; receipts are never changed. Lines whose proposal no longer holds are listed in\n``skipped``; confirming again is harmless.",
+        "operationId": "confirm_bank_statement_api_v1_fees_bank_statements__statement_id__confirm_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "statement_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Statement Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfirmOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Confirm Bank Statement",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
     "/api/v1/fees/cancellations/{cancellation_id}/approve": {
       "post": {
         "description": "Cancel the receipt (``fee.receipt.cancel``, step-up, not the requester).",
@@ -44352,7 +45842,7 @@
     },
     "/api/v1/fees/reconciliation/online": {
       "get": {
-        "description": "Online payment exceptions, newest first (``finance.read`` or ``fee.manage``).",
+        "description": "Online payment exceptions, newest first (``fee.reconcile`` or ``finance.read``).",
         "operationId": "list_online_reconciliation_api_v1_fees_reconciliation_online_get",
         "parameters": [
           {
@@ -44489,7 +45979,7 @@
     },
     "/api/v1/fees/reconciliation/online/items/{recon_item_id}/explain": {
       "post": {
-        "description": "Mark an exception explained with a note of 10-500 characters (``fee.manage``; audited\nwithout the note). 409 ``item_closed``.",
+        "description": "Mark an exception explained with a note of 10-500 characters (``fee.reconcile``; audited\nwithout the note). 409 ``item_closed``.",
         "operationId": "explain_online_item_api_v1_fees_reconciliation_online_items__recon_item_id__explain_post",
         "parameters": [
           {
@@ -45126,6 +46616,98 @@
         ]
       }
     },
+    "/api/v1/fees/reports/upi": {
+      "get": {
+        "description": "UPI receipts per day: confirmed from the bank vs not yet (``fee.reconcile`` or\n``finance.read``). Default the last 30 days; at most a year.",
+        "operationId": "upi_report_api_v1_fees_reports_upi_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpiReportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Upi Report",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
     "/api/v1/fees/settings": {
       "get": {
         "description": "Receipt paper size, GST note and reminder defaults (``finance.read`` or\n``fee.manage``).",
@@ -45277,6 +46859,270 @@
           }
         },
         "summary": "Fee Status",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/upi-exceptions": {
+      "get": {
+        "description": "UPI receipts not seen in a bank statement within the school's window, credits nobody\nmatched and confirmed credits whose receipt was cancelled (``fee.reconcile``).",
+        "operationId": "upi_exceptions_api_v1_fees_upi_exceptions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpiExceptionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Upi Exceptions",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/upi-settings": {
+      "get": {
+        "description": "The school's payee name, UPI ID and confirmation window (``fee.collect``, ``fee.manage``,\n``finance.read`` or ``fee.reconcile``). ``configured`` is false until set.",
+        "operationId": "get_upi_settings_api_v1_fees_upi_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpiSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get Upi Settings",
+        "tags": [
+          "fees"
+        ]
+      },
+      "put": {
+        "description": "Set the payee name and UPI ID (shape checked only, never with a bank) and the days\nwithin which a UPI receipt should be seen in a bank statement (``fee.manage``; ``If-Match``\nonce set).",
+        "operationId": "put_upi_settings_api_v1_fees_upi_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpiSettingsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpiSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Put Upi Settings",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/upi-settings/qr.svg": {
+      "get": {
+        "description": "The school's static UPI QR (its UPI ID and payee name, no amount) as SVG for the counter\nand the settings preview. 404 ``upi_not_set`` until the settings exist.",
+        "operationId": "upi_qr_api_v1_fees_upi_settings_qr_svg_get",
+        "responses": {
+          "200": {
+            "content": {
+              "image/svg+xml": {}
+            },
+            "description": "The school's static UPI QR (SVG)"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Upi Qr",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/upi/utr-check": {
+      "post": {
+        "description": "Check a UTR before issuing a UPI receipt (``fee.collect``): 12 digits, not on another\nissued receipt, and whether the bank already reported it.",
+        "operationId": "check_utr_api_v1_fees_upi_utr_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UtrCheckIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UtrCheckOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Check Utr",
         "tags": [
           "fees"
         ]

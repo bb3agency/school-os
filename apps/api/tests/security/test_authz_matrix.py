@@ -2296,6 +2296,23 @@ def _fees() -> ModuleType:
 SPECS.update(_fees().matrix_specs())
 
 
+def _upi() -> ModuleType:
+    """tests/fees/upi_security_support.py (R2-2E UPI and bank statement requests)."""
+    name = "sos_test_fees_upi_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "fees" / "upi_security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+SPECS.update(_upi().matrix_specs())
+
+
 def _success(method: str, path: str) -> int:  # noqa: PLR0911 - one answer per route family
     creates = {
         "/api/v1/users",
@@ -2357,7 +2374,7 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911 - one answer per r
     }
     if method == "POST" and path in accepted:
         return 202
-    if method == "POST" and path in _fees().MATRIX_CREATES:
+    if method == "POST" and path in _fees().MATRIX_CREATES | _upi().MATRIX_CREATES:
         return 201
     if (method, path) in _fees().ONLINE_REFUSED:
         return 409  # guard passed; no Razorpay partner application in tests (R2-2D)

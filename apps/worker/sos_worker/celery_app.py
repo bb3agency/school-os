@@ -24,6 +24,7 @@ from app.core.telemetry import setup_telemetry
 from app.documents.tasks import beat_schedule as documents_beat_schedule
 from app.exports.tasks import beat_schedule as exports_beat_schedule
 from app.fees.tasks import beat_schedule as fees_beat_schedule
+from app.fees.upi_tasks import beat_schedule as fees_upi_beat_schedule
 from app.fees.tasks_online import beat_schedule as payments_beat_schedule
 from app.imports.tasks import beat_schedule as imports_beat_schedule
 from app.insights.tasks import beat_schedule as insights_beat_schedule
@@ -91,6 +92,8 @@ TASK_MODULES: list[str] = [
     "app.messaging.tasks",
     # R2-1B fees: receipt PDFs (queue pdf) and nightly late fees.
     "app.fees.tasks",
+    # R2-2E UPI: narration erasure and the morning exceptions notification.
+    "app.fees.upi_tasks",
     # R2-2D online payments: webhook inbox, online refunds, link cancels, reconciliation.
     "app.fees.tasks_online",
 ]
@@ -155,6 +158,7 @@ def create_celery() -> Celery:
             # FR-FEE-011: receipt PDFs on the Chromium workers; FR-FEE-009 late fees nightly.
             "fees.render_receipt": {"queue": "pdf"},
             "fees.post_late_fees": {"queue": "maintenance"},
+            "fees.upi_morning": {"queue": "maintenance"},
             # FR-PAY-008..012 (R2-2D): inbox, refunds, link cancels and the daily jobs.
             "fees.process_payment_events": {"queue": "maintenance"},
             "fees.send_online_refund": {"queue": "maintenance"},
@@ -243,6 +247,8 @@ def create_celery() -> Celery:
             **messaging_beat_schedule(),
             # FR-FEE-009 (R2-1B): late fees posted once each, nightly at 00:30 IST.
             **fees_beat_schedule(),
+            # FR-FEE-017/026 (R2-2E): UPI exceptions notified and old narrations erased, 07:00 IST.
+            **fees_upi_beat_schedule(),
             # FR-PAY-008..012 (R2-2D): inbox sweep (1 min), link expiry and refund polling
             # (hourly), online reconciliation (06:00 IST), token refresh and inbox retention.
             **payments_beat_schedule(),

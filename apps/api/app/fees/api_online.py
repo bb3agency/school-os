@@ -4,9 +4,9 @@ US-2111; FR-PAY-*; ADR-0042, ADR-0047).
 Every route declares its guard (invariant 2). Connecting, testing, rotating and disconnecting the
 school's Razorpay account need ``payments.configure`` with step-up (owner); reading the
 connection ``payments.configure`` or ``finance.read``. Payment links need ``fee.collect`` (reads
-also ``finance.read``); the online reconciliation list ``finance.read`` or ``fee.manage`` and
-explaining an item ``fee.manage``. Fee permissions are school-wide only (FR-FEE-024). While
-fees are off for the school every route answers 404 ``module_hidden``.
+also ``finance.read``); the online reconciliation list ``fee.reconcile`` or ``finance.read`` and
+explaining an item ``fee.reconcile`` (R2-2E). Fee permissions are school-wide only (FR-FEE-024).
+While fees are off for the school every route answers 404 ``module_hidden``.
 
 ``POST /api/v1/webhooks/razorpay/{route}`` takes no member: ``require_webhook_signature
 ("razorpay")`` (route handle, the school's secret, ``X-Razorpay-Signature`` over the raw body,
@@ -53,8 +53,8 @@ Configurer = Annotated[
 ]
 Collector = Annotated[UserContext, Depends(require(c.COLLECT, scope="school"))]
 LinkReader = Annotated[UserContext, Depends(require_any(c.COLLECT, c.READ))]
-ReconReader = Annotated[UserContext, Depends(require_any(c.READ, c.MANAGE))]
-Manager = Annotated[UserContext, Depends(require(c.MANAGE, scope="school"))]
+ReconReader = Annotated[UserContext, Depends(require_any(c.RECONCILE, c.READ))]
+Reconciler = Annotated[UserContext, Depends(require(c.RECONCILE, scope="school"))]
 RazorpayDelivery = Annotated[WebhookCaller, Depends(require_webhook_signature("razorpay"))]
 # The route value of the school's razorpay_route handle (24 letters and digits, ADR-0047); the
 # guard resolves it (an unknown value is the uniform 404).
@@ -192,7 +192,7 @@ def list_online_reconciliation(
     limit: Limit = 50,
     cursor: Cursor = None,
 ) -> ReconciliationPage:
-    """Online payment exceptions, newest first (``finance.read`` or ``fee.manage``)."""
+    """Online payment exceptions, newest first (``fee.reconcile`` or ``finance.read``)."""
     return online.list_items(db, ctx, status=status, kind=kind, limit=limit, cursor=cursor)
 
 
@@ -208,14 +208,14 @@ def online_reconciliation_summary(ctx: ReconReader, db: TenantDB) -> Reconciliat
 )
 def explain_online_item(
     *,
-    ctx: Manager,
+    ctx: Reconciler,
     db: TenantDB,
     recon_item_id: uuid.UUID,
     body: ExplainIn,
     expected: OptionalIfMatch,
     response: Response,
 ) -> ReconciliationItemOut:
-    """Mark an exception explained with a note of 10-500 characters (``fee.manage``; audited
+    """Mark an exception explained with a note of 10-500 characters (``fee.reconcile``; audited
     without the note). 409 ``item_closed``."""
     out = online.explain_item(db, ctx, recon_item_id, body, expected_version=expected)
     _etag(response, out.version)

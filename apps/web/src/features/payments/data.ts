@@ -18,6 +18,8 @@ export const CONFIGURE = "payments.configure";
 export const FINANCE_READ = "finance.read";
 export const COLLECT = "fee.collect";
 export const MANAGE = "fee.manage";
+/** Online reconciliation (R2-2E permission, shared with bank statements). */
+export const RECONCILE = "fee.reconcile";
 export const NOTE_MIN = 10;
 export const NOTE_MAX = 500;
 

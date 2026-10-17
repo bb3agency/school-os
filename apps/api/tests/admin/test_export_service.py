@@ -216,6 +216,11 @@ EXPECTED_TABLES = {
     "fees_receipt_cancellations",
     "fees_refunds",
     "fees_day_closes",
+    # R2-2E UPI (0060_fees_upi): no narration ciphertext, no file hash.
+    "fees_upi_settings",
+    "fees_bank_statement_imports",
+    "fees_bank_statement_lines",
+    "fees_upi_confirmations",
     # R2-2D online payments (the webhook inbox is not exported; no secret columns).
     "fees_payment_connections",
     "fees_payment_intents",

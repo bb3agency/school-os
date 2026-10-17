@@ -240,6 +240,7 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | fee.refund.request (R2-1B) | — | ✓ | — | — | ✓ | — | — | — | — |
 | fee.refund.approve (R2-1B: maker-checker; principal or accountant, D17) | — | ✓ᴿ | — | — | ✓ᴿ | — | — | — | — |
 | fee.report (R2-1B: download the day book and dues lists, bulk personal financial data) | ✓ᴿ | ✓ᴿ | — | — | ✓ᴿ | — | — | — | ✓ᴿ |
+| fee.reconcile (R2-2E: import bank statements, confirm UPI receipts seen in the bank, work through UPI exceptions; school-wide only) | — | ✓ | — | — | ✓ | — | — | — | — |
 | payments.configure (R2-2D: connect, test, rotate the webhook secret of, or disconnect the school's own Razorpay account; ADR-0042) | ✓ᴿ | — | — | — | — | — | — | — | — |
 
 `auditor_readonly` memberships are time-bound (default 14 days) and read-only.
@@ -335,6 +336,8 @@ Platform roles belong to SchoolOS staff (operators), not to schools (ADR-0013). 
 **R2-1B (2026-10-18):** the eight `fee.*` keys of the table above except `fee.reconcile` (R2-2E) are in the catalog, `roles.yaml` and the §6.2 matrix; every fee route requires them school-wide (a section-scoped custom role holding `fee.collect` gets 403). `finance.read` now also reads fee accounts, plans, dues and the daily report. The messaging keys moved with R2-1C.
 
 **R2-2D (2026-10-18):** `payments.configure`ᴿ (owner) is in the catalog, `roles.yaml` and the §6.2 matrix (migration `0059_payments_online`). Payment links use `fee.collect` (reads also `finance.read`); online refunds keep `fee.refund.request` / `fee.refund.approve`ᴿ (maker-checker before anything is sent to Razorpay); the online reconciliation list is read with `finance.read` or `fee.manage` and an exception is explained with `fee.manage` (principal, accountant: the holders `fee.reconcile` will have; the lead may switch the explain route to `fee.reconcile` when R2-2E lands).
+
+**R2-2E (2026-10-18):** `fee.reconcile` is in the catalog, `roles.yaml` and the §6.2 matrix (principal and accountant, school-wide, no step-up; migration `0060_fees_upi`). It guards statement import, proposals review, confirmations (bulk and one by one), dismissing a credit, "find matches again" and the UPI exceptions list; the UPI report also opens to `finance.read`. Since the merge with R2-2D, the online reconciliation list and summary (`GET /fees/reconciliation/online*`) need `fee.reconcile` or `finance.read` and explaining an online item needs `fee.reconcile` (was `fee.manage`). UPI settings are read by any of `fee.collect`, `fee.manage`, `finance.read`, `fee.reconcile` and changed with `fee.manage`; the counter's UTR check needs `fee.collect`. Release note: run the system-role sync after migrating.
 
 Unchanged keys used by R2: `certificate.approve`ᴿ (add or withdraw a verification code), `tenant.settings.manage`ᴿ (parent language, TC format), `student.update_nonidentity` (guardian language), `tenant.billing.read` (AI answer usage numbers).
 

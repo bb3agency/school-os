@@ -742,6 +742,25 @@ def _b_fee(w: Any, key: str) -> uuid.UUID:
     return value
 
 
+def _upi() -> ModuleType:
+    """tests/fees/upi_security_support.py (R2-2E: a bank statement and a line of school B)."""
+    name = "sos_test_fees_upi_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "fees" / "upi_security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+def _b_upi(w: Any, key: str) -> uuid.UUID:
+    value: uuid.UUID = _upi().b_objects(_ADMIN[0], w)[key]
+    return value
+
+
 def _module_on(path: str, w: Any) -> contextlib.AbstractContextManager[None]:
     """Tally routes need school A's connector flag; fee routes school A's fees switched on."""
     if _fees().is_fee_path(path):
@@ -818,6 +837,9 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "concession_id": lambda w: _b_fee(w, "concession_id"),
     "adjustment_id": lambda w: _b_fee(w, "adjustment_id"),
     "refund_id": lambda w: _b_fee(w, "refund_id"),
+    # R2-2E UPI (ADR-0042 decision 9): school B's bank statement and its credit line.
+    "statement_id": lambda w: _b_upi(w, "statement_id"),
+    "line_id": lambda w: _b_upi(w, "line_id"),
     # R2-2D online payments: a payment link and a reconciliation item of school B.
     "intent_id": lambda w: _b_fee(w, "intent_id"),
     "recon_item_id": lambda w: _b_fee(w, "recon_item_id"),
@@ -845,6 +867,7 @@ ID_ROUTES = _id_routes()
 
 
 BODIES.update(_fees().BOLA_BODIES)
+BODIES.update(_upi().BOLA_BODIES)
 
 # Required query parameters of ID routes, so the request reaches the object lookup.
 QUERY: dict[tuple[str, str], dict[str, str]] = {

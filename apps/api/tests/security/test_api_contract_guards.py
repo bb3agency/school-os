@@ -464,6 +464,13 @@ IDEMPOTENCY_EXEMPT = {
     ("POST", "/api/v1/fees/plans/{plan_id}/adjustments"): "idempotent by design: one proposal per "
     "account, instalment, head and plan version",
     ("POST", "/api/v1/fees/day-closes"): "a state transition (409 day_closed on repeat)",
+    # R2-2E UPI and bank statements (ADR-0042 decision 9).
+    ("POST", "/api/v1/fees/bank-statements"): "the first call reads and deletes the uploaded "
+    "file (a repeat answers 404) and the same file is refused (409 statement_already_imported); "
+    "a replay store would keep statement lines",
+    ("POST", "/api/v1/fees/upi/utr-check"): "a read (the UTR travels in the body, out of URLs)",
+    ("POST", "/api/v1/fees/bank-statements/rematch"): "idempotent by design: proposals only, a "
+    "repeat proposes nothing new",
     # R2-2D online payments (ADR-0042).
     ("POST", "/api/v1/webhooks/razorpay/{route}"): "machine route; signed, and event ids are "
     "unique per school (FR-PAY-007)",

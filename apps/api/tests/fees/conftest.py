@@ -35,6 +35,8 @@ def _load(name: str, path: Path) -> ModuleType:
 
 
 F = _load("sos_test_fees_support", Path(__file__).with_name("support.py"))
+# R2-2E: synthetic bank statements and UPI helpers.
+U = _load("sos_test_fees_upi_support", Path(__file__).with_name("upi_support.py"))
 P = _load("sos_test_fees_online_support", Path(__file__).with_name("online_support.py"))
 W = F.W
 world = W.world

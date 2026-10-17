@@ -1926,7 +1926,7 @@ def reconcile(tenant_id: uuid.UUID, day: dt.date | None = None) -> dict[str, int
             notifications.notify(
                 session,
                 tenant_id=tenant_id,
-                recipients=notifications.PermissionSelector(c.MANAGE),
+                recipients=notifications.PermissionSelector(c.RECONCILE),
                 template_key=EXCEPTIONS_TEMPLATE,
                 params={"count": open_count, "run_id": str(run_id)},
                 resource_id=run_id,
@@ -2234,7 +2234,7 @@ def _item_out(
 
 def _require_recon_reader(session: Session, ctx: UserContext) -> None:
     c.require_on(session, ctx)
-    c.require_school_wide(ctx, c.READ, c.MANAGE)
+    c.require_school_wide(ctx, c.RECONCILE, c.READ)
 
 
 def list_items(
@@ -2303,11 +2303,11 @@ def explain_item(
     *,
     expected_version: int | None,
 ) -> ReconciliationItemOut:
-    """Mark an exception explained with a note (``fee.manage``; FR-PAY-010). The note (10-500
+    """Mark an exception explained with a note (``fee.reconcile``; FR-PAY-010). The note (10-500
     characters, never a full Aadhaar number) is stored, never logged or audited. Audit
     ``fee.reconciliation.explained`` (kind)."""
     c.require_on(session, ctx)
-    c.require_school_wide(ctx, c.MANAGE)
+    c.require_school_wide(ctx, c.RECONCILE)
     item = orepo.get_item(session, item_id, lock=True)
     if item is None:
         raise NotFound("Reconciliation item not found")

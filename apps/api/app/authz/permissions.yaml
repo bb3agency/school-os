@@ -326,6 +326,12 @@ permissions:
     description: Download the day book and dues lists (bulk personal financial data; recent MFA sign-in)
     sensitivity: sensitive
     step_up: true
+  # --- R2-2E UPI and bank statements (ADR-0042 decision 9; FR-FEE-016/017). Migration
+  # 0060_fees_upi upserts it. School-wide only (FR-FEE-024).
+  fee.reconcile:
+    description: Import bank statements, confirm UPI receipts seen in the bank and work through reconciliation exceptions
+    sensitivity: sensitive
+    step_up: false
   # --- R2-2D online payments (ADR-0042 decisions 2, 6; docs/07 §6.2; FR-PAY-002..004,
   # FR-PAY-013, FR-PAY-014). Migration 0059_payments_online upserts it.
   payments.configure:
