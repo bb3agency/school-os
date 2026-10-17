@@ -84,6 +84,7 @@ Budgets are versioned in `apps/api/app/core/rate_limits.yaml` (invariant 13); th
 | `public_lookup_fail` | 20 / 600 s, cost 2 per failed lookup | client IP | closed | public handle guards: room checked before every lookup (refuses even a valid key once used up), charged after a miss (R2-0) |
 | `public_token` | 30 / 60 s | handle | open | public handle guards, per live handle (R2-0) |
 | `public_pay` | 5 / 86400 s | handle | closed | `POST /public/links/current/pay` (R2-3H) |
+| `cert_verify_ip` | 20 / 600 s | client IP | closed | `GET /public/certificates/{code}`, every lookup, charged before the guard resolves the code (ADR-0045 decision 7; R2-1A) |
 | `webhook_route` | 600 / 60 s | handle | closed | webhook guard, per route handle after the signature check; `/api/v1/webhooks/*` also get `machine_ip` (R2-0) |
 | `platform_audit_verify` | `rate_limits.yaml` (1 / 600 s) | operator | open | `POST /platform/audit/verify` (R-19) |
 
@@ -281,7 +282,7 @@ Certificate notes (M3, as built; data model 05 §5.7). The stories and requireme
   - `?check=true` on a register route only checks that it can be printed now (step-up, year, type, row cap) and answers `204` without the page; it is not audited. The registers screen checks first and then links to the print view, so one view is audited once.
 - **Download** gives `{url, expires_at, filename}` (`attachment`, ≤ 5 min), or `409 pdf_not_ready` / `document_not_ready`. Audited as `certificate.downloaded`.
 - **Scope**: certificates are reached through their student. Holders of a scoped role see only their sections' students. Another school's id, or a student out of scope, gives `404`.
-- **No public verification route** (QR or serial lookup). It would need an ADR (PO question).
+- **Public verification** by code only (no serial lookup): ADR-0045, built in R2-1A; see "Certificates: format and verification" and "Public" in the R2 endpoints below.
 
 ### Imports and extraction
 | Method | Path | Permission |
@@ -570,11 +571,13 @@ Conventions as above: `Idempotency-Key` on creating POSTs, `If-Match` on changes
 
 | Method | Path | Guard |
 |---|---|---|
-| GET | `/certificates/formats` (format keys, versions, `verified`, fields with `restricted`) | `certificate.read`, `.issue` or `.approve` (`require_any`) |
-| PATCH | `/tenant` with `settings.certificate_format.transfer` = `generic-v1` \| `ap-tc-2027` | `tenant.settings.manage`ᴿ (existing route) |
-| GET | `/certificates/{certificate_id}/verification` (code, created reason, check count, last checked, withdrawn) | as `GET /certificates/{id}` |
-| POST | `/certificates/{certificate_id}/verification` (`{"reason"}`; add a code to a certificate issued before R2) → 201 | `certificate.approve`ᴿ (`Idempotency-Key`); 409 `verification_exists` |
-| POST | `/certificates/{certificate_id}/verification/withdraw` (`{"reason"}`) | `certificate.approve`ᴿ (`If-Match`) |
+| GET | `/certificates/formats` (format keys, versions, `verified`, `builtin`, `sources`, lines with `fill` and `restricted`, inputs) (**built R2-1A**) | `certificate.read`, `.issue` or `.approve` (`require_any`) |
+| PATCH | `/tenant` with `settings.certificate_format.transfer` = `generic-v1` \| `ap-tc-2027` and `settings.print_restricted_tc_fields` (bool, default false); both audited with their values, the switch with `restricted_tc_fields` (**built R2-1A**) | `tenant.settings.manage`ᴿ (existing route) |
+| GET | `/certificates/{certificate_id}/verification` → `{status: active\|withdrawn\|none, code (four groups), url, created_reason, created_at, check_count, last_checked_at, withdrawn_at, withdraw_reason, version, can_add, can_withdraw}`, `ETag` (**built R2-1A**) | as `GET /certificates/{id}` |
+| POST | `/certificates/{certificate_id}/verification` (`{"reason"}` 10..500; add a code to a certificate issued before R2) → 201 (**built R2-1A**) | `certificate.approve`ᴿ (`Idempotency-Key`); 409 `verification_exists` (it has or had a code), `certificate_not_issued` |
+| POST | `/certificates/{certificate_id}/verification/withdraw` (`{"reason"}` 10..500) (**built R2-1A**) | `certificate.approve`ᴿ (`If-Match` = the verification's ETag); 409 `verification_not_active` |
+
+As built (R2-1A): `GET /certificates/types` gives the transfer certificate in the school's format (`format_key`, `format_version`, `format_verified`; inputs carry `label_en`/`label_te`, kind `number` with `max_value`); the preview's `fields` list a format TC's lines in print order with `fill` (`record`, `input`, `derived`, `identifier`, `restricted`) and `masked`; `CertificateOut` carries `format_key`/`format_version`; a pending TC whose format version changed is refused with 409 `certificate_format_changed`. Every issued certificate and duplicate gets a code; the print view and PDF (template `v2`) print it with its QR while `SOS_VERIFY_BASE_URL` is set.
 
 #### Fees (R2.2; FR-FEE-*)
 
@@ -649,7 +652,7 @@ Conventions as above: `Idempotency-Key` on creating POSTs, `If-Match` on changes
 
 | Method | Path | Guard |
 |---|---|---|
-| GET | `/public/certificates/{code}` (code normalised: case, spaces and dashes ignored) | `require_public_handle("cert_verify")`; limits `public_ip`, `public_lookup_fail` |
+| GET | `/public/certificates/{code}` → `{status: valid\|cancelled, certificate_type, title_en, school_name, school_place, serial, issued_on, duplicate: {copy_no, original_serial, issued_on}\|null, cancelled_on, content\|null}` (**built R2-1A**; the BFF normalises the code (case, spaces, dashes, `O`→`0`, `I`/`L`→`1`) and sends 16 characters; anything else is the uniform 404; `Cache-Control: private, no-store`, `X-Robots-Tag: noindex, nofollow`; each check counted and audited `certificate.verified_publicly`) | `require_public_handle("cert_verify")` (key from the path); limits `public_ip`, `cert_verify_ip` (before the resolve), `public_lookup_fail`, `public_token` |
 | POST | `/public/links/exchange` (`{"token"}`; the BFF's `/p/{token}` handler calls it and sets the `__Host-sos_parent` cookie) → `{kind, expires_at}` (**built R2-0**; no `handle_ref`: the cookie carries the token itself and the BFF sends it back in `X-SOS-Public-Token`, so every request re-resolves it; not a view) | `require_public_handle(parent_*)`; limits `public_ip`, `public_lookup_fail` |
 | GET | `/public/links/current` (the page content for the cookie's handle: notice, receipt or dues per ADR-0046 decision 2, in the parent language). **Built R2-0 as the frame** `{kind, expires_at, language, school_name}` (counts the view; first view audited); R2-3H adds the content | `require_public_handle(parent_*)` (token from `X-SOS-Public-Token`, re-resolved every time); `public_token` |
 | GET | `/public/links/current/document-url` (notice PDF or receipt PDF, presigned ≤ 5 min) | as above |
