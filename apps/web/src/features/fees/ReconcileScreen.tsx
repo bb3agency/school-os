@@ -292,14 +292,7 @@ function StatementReview({ id }: { id: string }) {
   );
   return (
     <FeesGate data={detail}>
-      {(d) => (
-        <ReviewBody
-          key={id}
-          id={id}
-          lines={d.lines}
-          statement={d.statement}
-        />
-      )}
+      {(d) => <ReviewBody key={id} id={id} lines={d.lines} statement={d.statement} />}
     </FeesGate>
   );
 }

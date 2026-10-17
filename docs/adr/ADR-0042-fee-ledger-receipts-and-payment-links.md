@@ -85,6 +85,16 @@ Decisions 1, 4, 5, 11, 12, 13 and 14 and choices P2-P6, P8, P9 and P10 are imple
 - **Applying a plan** runs in one transaction with a dry-run summary, not a background job (classes of up to 2,000 students).
 - **Audit summaries** of the full data export name only tables that hold rows (the archive passed 50 tables, the audit summary limit).
 
+## Follow-up (R2-2E, built 2026-10-18)
+
+Decision 9 (P7) is implemented in `app/fees/upi.py`, `statements.py`, `statements_parse.py`, `upi_config.py` (+ `upi.yaml`), `upi_qr.py`, `api_upi.py` and `upi_tasks.py` (migration `0060_fees_upi`, permission `fee.reconcile`). Choices the build made (details in docs/03 §3.20 "As built (R2-2E)"):
+
+- **Generated static QR instead of an uploaded image.** The school types its UPI ID and payee name once; SchoolOS draws the QR of `upi://pay?pa=<vpa>&pn=<payee>&cu=INR` (no amount) with segno. It is the content of a bank's static QR, needs no image upload, scan or storage, and cannot be swapped for another payee's picture. A bank QR that carries merchant fields (a merchant code) is a follow-up if a pilot school needs it.
+- **Synchronous import, parse then delete.** A statement (≤ 2 MB, ≤ 5,000 transactions) is read and its file deleted in one committed transaction, then parsed in memory with versioned bank presets (generic, SBI, HDFC, ICICI, Axis, Kotak; `verified: false` until a pilot confirms, D3). The import answers 201, not 202.
+- **UTRs are not Aadhaar numbers.** The file is refused for an Aadhaar number written as printed (groups of four); unbroken 12-digit numbers are UPI references (decision 9's exemption), masked in the narration with every other long number.
+- **Two rules, both only proposals.** Exact UTR and amount (pre-ticked); for credits without a UTR, the single unconfirmed UPI receipt of the same amount near the date (not ticked). No maker-checker for confirmations: a confirmation is a fact about a receipt, moves no money and edits nothing; the database checks each one (same amount, same UTR when the bank shows one, an issued UPI receipt).
+- **Never auto-correct.** A credit whose UTR is on a receipt with another amount stays an exception next to that receipt; the remedy is the normal cancellation and a new receipt, after which a person matches the credit again (a confirmed credit can confirm the receipt issued in place of a cancelled one).
+
 ## Related requirements
 
 FR-FEE-001..030, FR-PAY-001..016 (docs/03 §3.19-3.20), SEC-034..038, PRV-022..024; US-2101..US-2112 (docs/02 C21). Docs: 01 §7.3, 02 §9, 05 §15.1-15.2, 07 §3 TB10, §6.7, 08 §15, 09 §4 "Fees", "Webhooks", 10 §11.2, 14 R2, 17 §5.8, 18 §3.

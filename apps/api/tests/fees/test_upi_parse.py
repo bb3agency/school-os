@@ -14,7 +14,7 @@ from typing import Any
 import pytest
 from openpyxl import Workbook
 
-from app.core.spreadsheet import SpreadsheetError, raw_rows
+from app.core.spreadsheet import FileKind, SpreadsheetError, raw_rows
 from app.fees.statements_parse import (
     StatementRefused,
     find_reference,
@@ -34,7 +34,7 @@ UTR_A = "629112345678"
 UTR_B = "629187654321"
 
 
-def _parse(data: bytes, kind: str = "csv", preset: str | None = None) -> Any:
+def _parse(data: bytes, kind: FileKind = "csv", preset: str | None = None) -> Any:
     return parse_statement(
         raw_rows(data, kind, CFG.statements), CFG, today=TODAY, preset_key=preset
     )
@@ -54,7 +54,7 @@ def _credits() -> list[Any]:
 
 @pytest.mark.parametrize("preset", ["generic", "sbi", "hdfc", "icici", "axis", "kotak"])
 @pytest.mark.parametrize("kind", ["csv", "xlsx"])
-def test_FR_FEE_016_each_preset_reads_credits_only(preset: str, kind: str) -> None:
+def test_FR_FEE_016_each_preset_reads_credits_only(preset: str, kind: FileKind) -> None:
     data = S.statement(preset, _credits(), kind=kind)
     out = _parse(data, kind)
     assert out.preset.key == preset, "detected without being told"

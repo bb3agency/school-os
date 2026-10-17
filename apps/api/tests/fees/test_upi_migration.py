@@ -65,7 +65,7 @@ def test_INV_1_new_tables_have_forced_rls_and_narrow_grants(admin_engine: Engine
     with admin_engine.connect() as c:
         for name in TABLES:
             schema, table = name.split(".")
-            forced = c.execute(
+            forced: object = c.execute(
                 text(
                     "SELECT relrowsecurity AND relforcerowsecurity FROM pg_class k JOIN "
                     "pg_namespace n ON n.oid = k.relnamespace WHERE n.nspname = :s "
@@ -74,17 +74,17 @@ def test_INV_1_new_tables_have_forced_rls_and_narrow_grants(admin_engine: Engine
                 {"s": schema, "t": table},
             ).scalar_one()
             assert forced is True, name
-            deletes = c.execute(
+            deletes: object = c.execute(
                 text("SELECT has_table_privilege('sos_app', :n, 'DELETE')"), {"n": name}
             ).scalar_one()
             assert deletes is False, name
-            platform = c.execute(
+            platform: object = c.execute(
                 text("SELECT has_table_privilege('sos_platform', :n, 'SELECT')"), {"n": name}
             ).scalar_one()
             assert platform is False, name
         # Statement imports and confirmations are insert-only for the app.
         for name in ("fin.bank_statement_imports", "fin.upi_confirmations"):
-            updates = c.execute(
+            updates: object = c.execute(
                 text("SELECT has_any_column_privilege('sos_app', :n, 'UPDATE')"), {"n": name}
             ).scalar_one()
             assert updates is False, name

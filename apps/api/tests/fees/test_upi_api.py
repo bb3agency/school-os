@@ -157,7 +157,7 @@ def test_INV_3_other_school_statement_and_line_ids_are_404(
 ) -> None:
     stmt = _import(api, school, admin_engine, [U.Credit(U.today(), _amount(), upi=False)])
     with admin_engine.connect() as c:
-        line_id = c.execute(
+        line_id: object = c.execute(
             text("SELECT id FROM fin.bank_statement_lines WHERE import_id = :i"),
             {"i": uuid.UUID(stmt["id"])},
         ).scalar_one()
