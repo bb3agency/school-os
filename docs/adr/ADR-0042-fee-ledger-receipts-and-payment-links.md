@@ -73,6 +73,18 @@ Facts checked on 2026-10-14 (sources at the end):
 | Auto-post bank-statement matches | Wrong postings are hard to undo; a person confirms in one step |
 | Build on the Tally connector (write vouchers to Tally) | Writing to Tally from SchoolOS breaks its read-only design (ADR-0032) and needs the office PC online |
 
+## Follow-up (R2-1B, built 2026-10-18)
+
+Decisions 1, 4, 5, 11, 12, 13 and 14 and choices P2-P6, P8, P9 and P10 are implemented in `app/fees` (migration `0057_fees_core`); the provider interface, online payments and UPI statements (decisions 3, 6-10) follow in waves R2-2D and R2-2E. Choices the build made (owner-visible ones in docs/03 §3.20 "as built"):
+
+- **Fees on/off (decision 12).** Besides the flag `fees.enabled`, the school setting `fees_enabled` must be true; in `alongside` mode it is the owner's way to turn fees on despite the ERP.
+- **Frozen plans (P-none).** Every active plan is frozen, not only one with posted charges; changes are new versions whose per-student differences become adjustment requests (FR-FEE-004).
+- **Late-fee keys (P5).** Posted once per instalment (flat) or per day (per-day, capped); a new plan version does not post the same flat late fee again; "never compounding" = late fees are computed on collectable fee lines only.
+- **Taxable heads (P6).** Planned and charged, never collected through a receipt; they are left out of "overdue" and the counter's collectable total.
+- **Cancellations and refunds (decision 5, P3, P4, P9).** A receipt with a refund is not cancelled; a dishonoured cheque is a cancellation with reason `cheque_dishonoured`; cash, cheque and bank-transfer refunds are written as vouchers on approval.
+- **Applying a plan** runs in one transaction with a dry-run summary, not a background job (classes of up to 2,000 students).
+- **Audit summaries** of the full data export name only tables that hold rows (the archive passed 50 tables, the audit summary limit).
+
 ## Related requirements
 
 FR-FEE-001..030, FR-PAY-001..016 (docs/03 §3.19-3.20), SEC-034..038, PRV-022..024; US-2101..US-2112 (docs/02 C21). Docs: 01 §7.3, 02 §9, 05 §15.1-15.2, 07 §3 TB10, §6.7, 08 §15, 09 §4 "Fees", "Webhooks", 10 §11.2, 14 R2, 17 §5.8, 18 §3.

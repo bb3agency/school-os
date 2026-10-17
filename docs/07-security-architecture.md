@@ -330,6 +330,8 @@ Platform roles belong to SchoolOS staff (operators), not to schools (ADR-0013). 
 | message.send (send an approved notice, resend, revoke a parent link) | — | ✓ | ✓ | — | — | — | — | — | — |
 | message.read (delivery reports and message history) | ✓ | ✓ | ✓ | ✓ | ✓ | — | S | — | ✓ |
 
+**R2-1B (2026-10-18):** the eight `fee.*` keys of the table above except `fee.reconcile` (R2-2E) are in the catalog, `roles.yaml` and the §6.2 matrix; every fee route requires them school-wide (a section-scoped custom role holding `fee.collect` gets 403). `finance.read` now also reads fee accounts, plans, dues and the daily report. `payments.configure` (R2-2D) and the messaging keys (R2-1C) stay planned here.
+
 Unchanged keys used by R2: `certificate.approve`ᴿ (add or withdraw a verification code), `tenant.settings.manage`ᴿ (parent language, TC format), `student.update_nonidentity` (guardian language), `tenant.billing.read` (AI answer usage numbers).
 
 **Machine and public guards (R2; not permissions; built in R2-0, 2026-10-17, `app/public/guards.py`).** Routes without a member use only these dependencies, each pinned to its paths in `app/public/public_routes.yaml` by the route-enumeration test (invariant 2; ADR-0047): `require_public_handle(kind)` (parent and verification pages through the BFF's service token), `require_webhook_signature("razorpay")`, `require_webhook_signature("meta")`, `require_meta_verify_token()`. They join `require_fleet_signature()` and the Tally agent guards as the only non-member guards.

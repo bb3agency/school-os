@@ -882,6 +882,8 @@ stacked lists below 640px only, 44px touch targets, dialogs that fit (sheets on 
 
 **Receipt print.** A5 portrait (default) or A4 half-page with a counterfoil line; school letterhead, receipt number and date prominent, student name, class, admission number, table of heads and instalments, amount in figures and words, mode details (UTR last 4 shown in full on the receipt only, since the parent needs it), "Education services: exempt from GST", collector's name, "Computer-generated receipt; verify at <public link>" only when the parent link exists. A cancelled receipt reprints with a diagonal "CANCELLED" mark.
 
+**Fees as built (R2-1B, 2026-10-18; `apps/web/src/features/fees/`).** The fee screens above are built except `/fees/reconcile` and `/settings/payments` (R2-2E, R2-2D) and the WhatsApp actions (R2-3G). The sidebar has a "Fees" group (Collect fees, Receipts, Fee approvals, Daily collection, Fee dues, Fee setup) shown while `GET /fees/status` answers 200 for someone holding a fee permission; the Tally dues page stays at `/fees`. Counter: the search is a WAI-ARIA combobox (POST body only), `/` or `F2` returns to it, the mode radios take C/Q/B/U while one has focus, `Ctrl+Enter` saves with one `Idempotency-Key` per student, the success panel focuses Print (`P`) and offers Next student (`N`); amounts are added as whole paise in the browser (never floating-point rupees). The plan editor is a heads × instalments grid with live totals whose annual amount is the row total (so instalments always add up). CSV downloads go through the API client so the step-up prompt can run first, then save a file; nothing is kept in browser storage.
+
 #### Messages screens
 
 | Route | Screen | Key interaction notes |

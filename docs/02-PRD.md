@@ -617,6 +617,8 @@ Stories of the 2026-27 plan, release R2 (docs/18 §3 R2; owner decisions D4-D9 o
 - AC1: At 06:00 IST SchoolOS compares yesterday's Razorpay payments, refunds and settlements with our receipts and lists: paid but no receipt, receipt but not captured, amount mismatch, refunded, settlement not seen after three working days.
 - AC2: Each line links to the receipt or the Razorpay payment id; I can mark a line explained with a note (audited). Nothing is changed automatically.
 
+*As built (R2-1B, 2026-10-18):* US-2101..US-2106 and US-2110 work for cash, cheque, bank transfer and UPI (UTR recorded at the counter); sending on WhatsApp (US-2102 AC3, US-2110 AC3), Razorpay (US-2107, US-2108, online refunds in US-2106 AC2), bank statements (US-2109) and the online reconciliation report (US-2111) follow in later R2 waves (docs/14). Applying a plan shows a preview and then applies at once (no waiting job). Fees appear once SchoolOS enables them for the school and the owner or principal switches them on in school settings.
+
 **US-2112** · As management, I want to ask "How much is due from Class 9?" in Ask the school and get the ledger figure with a source chip, when fees are on. [FR-KB-044]
 - AC1: Given fees are on and I hold `finance.read`, the fee tool reads the SchoolOS ledger (as of now) instead of Tally; the source chip opens the dues list.
 - AC2: Without `finance.read` the tool is not offered.
