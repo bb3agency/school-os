@@ -826,12 +826,20 @@
         "additionalProperties": false,
         "properties": {
           "form_language": {
-            "enum": [
-              "en",
-              "te"
+            "anyOf": [
+              {
+                "enum": [
+                  "en",
+                  "te"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Form Language",
-            "type": "string"
+            "description": "``en`` or ``te`` for this form only, or null to follow the school's parent language (ADR-0044).",
+            "title": "Form Language"
           }
         },
         "required": [
@@ -842,13 +850,30 @@
       },
       "ApaarSettingsOut": {
         "properties": {
-          "form_language": {
+          "effective_language": {
+            "description": "The language forms print in now: ``form_language``, else the school's parent language, else English.",
             "enum": [
               "en",
               "te"
             ],
-            "title": "Form Language",
+            "title": "Effective Language",
             "type": "string"
+          },
+          "form_language": {
+            "anyOf": [
+              {
+                "enum": [
+                  "en",
+                  "te"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The consent form's own language, or null to follow the school's parent language (ADR-0044 decision 7).",
+            "title": "Form Language"
           },
           "version": {
             "title": "Version",
@@ -857,6 +882,7 @@
         },
         "required": [
           "form_language",
+          "effective_language",
           "version"
         ],
         "title": "ApaarSettingsOut",
@@ -8710,6 +8736,22 @@
             ],
             "title": "Phone"
           },
+          "preferred_language": {
+            "anyOf": [
+              {
+                "enum": [
+                  "en",
+                  "te"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The guardian's own parent language (ADR-0044); null = the school's.",
+            "title": "Preferred Language"
+          },
           "relationship": {
             "title": "Relationship",
             "type": "string"
@@ -8736,7 +8778,7 @@
       },
       "GuardianPatch": {
         "additionalProperties": false,
-        "description": "Omit a field to keep it; ``phone``/``address`` ``null`` clears it.",
+        "description": "Omit a field to keep it; ``phone``/``address`` ``null`` clears it;\n``preferred_language`` ``null`` goes back to the school's parent language (ADR-0044).",
         "properties": {
           "address": {
             "anyOf": [
@@ -8787,6 +8829,22 @@
               }
             ],
             "title": "Phone"
+          },
+          "preferred_language": {
+            "anyOf": [
+              {
+                "enum": [
+                  "en",
+                  "te"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Language this guardian receives WhatsApp messages and parent pages in (FR-LANG-003); null = the school's parent language.",
+            "title": "Preferred Language"
           },
           "relationship": {
             "anyOf": [
@@ -11277,6 +11335,91 @@
           "secret"
         ],
         "title": "KeyRotationOut",
+        "type": "object"
+      },
+      "LinkEnvelopeOut": {
+        "additionalProperties": false,
+        "description": "The parent page's frame for the cookie's link (``/p/view``): which page it is, until when\nit works, its language (the guardian's choice, else the school's parent language, else\nEnglish: ADR-0044) and the school's name for the page heading. The page content per kind is\nadded by wave R2-3H (``app/public/pages.py``).",
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "parent_notice",
+              "parent_receipt",
+              "parent_dues",
+              "parent_optin"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "language": {
+            "enum": [
+              "en",
+              "te"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "school_name": {
+            "title": "School Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "expires_at",
+          "language",
+          "school_name"
+        ],
+        "title": "LinkEnvelopeOut",
+        "type": "object"
+      },
+      "LinkExchangeIn": {
+        "additionalProperties": false,
+        "description": "The token from ``/p/{token}`` (the BFF's exchange-and-redirect handler sends it here).",
+        "properties": {
+          "token": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "LinkExchangeIn",
+        "type": "object"
+      },
+      "LinkExchangeOut": {
+        "additionalProperties": false,
+        "description": "What the BFF needs to set the ``__Host-sos_parent`` cookie (max-age = until\n``expires_at``). Exchanging does not count as a view.",
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "parent_notice",
+              "parent_receipt",
+              "parent_dues",
+              "parent_optin"
+            ],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "expires_at"
+        ],
+        "title": "LinkExchangeOut",
         "type": "object"
       },
       "LinkIn": {
@@ -22098,6 +22241,14 @@
             "title": "Name",
             "type": "string"
           },
+          "parent_language_unreviewed": {
+            "description": "Parent-facing Telugu texts the school would use that a fluent reviewer has not signed off yet (FR-LANG-005); empty while the parent language is English.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Parent Language Unreviewed",
+            "type": "array"
+          },
           "plan_tier": {
             "enum": [
               "shared",
@@ -22230,6 +22381,16 @@
               "alongside"
             ],
             "title": "Operating Mode",
+            "type": "string"
+          },
+          "parent_language": {
+            "default": "en",
+            "description": "Language of everything parents receive: WhatsApp messages, parent link pages, printed parent slips and forms (ADR-0044, FR-LANG-001). Independent of the staff UI language; a guardian's own choice overrides it.",
+            "enum": [
+              "en",
+              "te"
+            ],
+            "title": "Parent Language",
             "type": "string"
           }
         },
@@ -22401,6 +22562,22 @@
               }
             ],
             "title": "Operating Mode"
+          },
+          "parent_language": {
+            "anyOf": [
+              {
+                "enum": [
+                  "en",
+                  "te"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "``en`` or ``te``: the language parents receive (ADR-0044). Audited with its new value.",
+            "title": "Parent Language"
           }
         },
         "title": "TenantSettingsPatch",
@@ -45295,6 +45472,82 @@
         "summary": "All Usage",
         "tags": [
           "platform"
+        ]
+      }
+    },
+    "/api/v1/public/links/current": {
+      "get": {
+        "description": "The parent page frame for the cookie's link (the BFF sends the cookie's token in\n``X-SOS-Public-Token``): kind, expiry, language (guardian, else school, else English;\nFR-PUB-008) and the school's name. Counts a view (FR-PUB-012).",
+        "operationId": "current_link_api_v1_public_links_current_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkEnvelopeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Unknown, expired or revoked link (always the same body)."
+          },
+          "429": {
+            "description": "Too many requests or failed lookups from this address."
+          }
+        },
+        "summary": "Current Link",
+        "tags": [
+          "public"
+        ]
+      }
+    },
+    "/api/v1/public/links/exchange": {
+      "post": {
+        "description": "Check a parent link token for the BFF's exchange-and-redirect (FR-PUB-010). No user\ntoken; the BFF's service token only. Answers what the cookie needs; not counted as a view.",
+        "operationId": "exchange_link_api_v1_public_links_exchange_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkExchangeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkExchangeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Unknown, expired or revoked link (always the same body)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests or failed lookups from this address."
+          }
+        },
+        "summary": "Exchange Link",
+        "tags": [
+          "public"
         ]
       }
     },

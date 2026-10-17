@@ -4374,6 +4374,18 @@
       "save": "Save boards and mode",
       "saved": "Boards and mode saved.",
       "unchanged": "Nothing changed, so nothing was saved."
+    },
+    "parentLanguage": {
+      "title": "Parent language",
+      "description": "The language parents receive WhatsApp messages, link pages and printed forms in. Staff screens stay in English.",
+      "current": "Parents receive:",
+      "switchTo": "Switch to {language}",
+      "saved": "Parent language saved.",
+      "unreviewed": "Some parent texts in this language have not been checked by a fluent reviewer yet.",
+      "languages": {
+        "en": "English",
+        "te": "Telugu"
+      }
     }
   },
   "documents": {
@@ -7494,7 +7506,9 @@
       "languages": {
         "en": "English",
         "te": "Telugu"
-      }
+      },
+      "followSchool": "Follow the school's parent language",
+      "followingSchool": "(the school's parent language)"
     },
     "student": {
       "title": "APAAR consent of a student",
@@ -7589,5 +7603,32 @@
     },
     "pdfPending": "PDF of pending forms",
     "pdfAll": "PDF of all forms"
+  },
+  "public": {
+    "meta": {
+      "title": "Message from the school"
+    },
+    "kind": {
+      "parent_notice": "Notice from the school",
+      "parent_receipt": "Fee receipt",
+      "parent_dues": "Fees due",
+      "parent_optin": "School messages on WhatsApp"
+    },
+    "view": {
+      "validUntil": "This link works until {date}.",
+      "detailsSoon": "The details of this page will appear here soon."
+    },
+    "footer": {
+      "fromSchool": "From {school}, sent through SchoolOS",
+      "doNotForward": "Anyone with this link can see this page. Do not forward it."
+    },
+    "expired": {
+      "title": "This link has expired or is not valid",
+      "body": "Ask the school office, or reply to the school's WhatsApp message, for a new one."
+    },
+    "busy": {
+      "title": "Please try again in a few minutes",
+      "body": "Too many tries from this connection, or the page is busy. Wait a few minutes and open the link again."
+    }
   }
 }

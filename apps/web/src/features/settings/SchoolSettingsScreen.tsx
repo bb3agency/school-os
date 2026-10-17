@@ -16,6 +16,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Value } from "@/components/ui/Value";
 import { LetterheadCard } from "@/features/certificates/LetterheadCard";
 import { BoardsCard } from "./BoardsCard";
+import { ParentLanguageCard } from "./ParentLanguageCard";
 import { known, schoolTone } from "@/features/status";
 import { ApiError, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { refreshSessionInfo } from "@/lib/bff/session-client";
@@ -94,6 +95,8 @@ export function SchoolSettingsScreen() {
           saved={boardsSaved === tenant.data.version}
           onSaved={setBoardsSaved}
         />
+        {/* US-2301, FR-LANG-001 (ADR-0044): the language parents receive. */}
+        <ParentLanguageCard tenant={tenant.data} manage={manage} tenantKey={TENANT_KEY} />
         {/* US-1108, FR-CERT-013: what certificates print at the top and at the signature. */}
         <LetterheadCard
           key={tenant.data.version}

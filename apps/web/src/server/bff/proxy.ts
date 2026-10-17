@@ -222,7 +222,14 @@ export async function proxyToApi(request: Request, runtime: AuthRuntime): Promis
   // the machine-only and control-plane checks look at the decoded path too.
   const routed = decodedPath(apiPath);
   if (routed === null) return problem(requestId, 400, "bad_request", "Bad request");
-  if (routed === "/api/v1/edge" || routed.startsWith("/api/v1/edge/")) {
+  // Machine-only and public-only API paths are never proxied for a staff session: the Tally
+  // edge agent and provider webhooks call the API directly, and the parent pages call
+  // /api/v1/public/* only through the public client with no user token (ADR-0047, FR-PUB-001).
+  if (
+    ["/api/v1/edge", "/api/v1/webhooks", "/api/v1/public"].some(
+      (prefix) => routed === prefix || routed.startsWith(`${prefix}/`),
+    )
+  ) {
     return problem(requestId, 404, "not_found", "Not found");
   }
   const isPlatform = routed === "/api/v1/platform" || routed.startsWith("/api/v1/platform/");

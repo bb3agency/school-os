@@ -241,6 +241,23 @@ describe("BFF proxy /bff/api/v1/* (SEC-004)", () => {
       expect(h.apiCalls).toHaveLength(0);
     });
 
+    it("webhook and public API paths are never proxied for staff (ADR-0047, FR-PUB-001)", async () => {
+      await h.signIn("staff", clerk);
+      h.apiCalls.length = 0;
+      for (const path of [
+        "/bff/api/v1/webhooks/razorpay/abc",
+        "/bff/api/v1/webhooks/meta",
+        "/bff/api/v1/public/links/current",
+        "/bff/api/v1/public/links/exchange",
+        "/bff/api/v1/%70ublic/links/current",
+        "/bff/api/v1/public",
+      ]) {
+        const response = await call(path, { method: "GET" });
+        expect(response.status, path).toBe(404);
+      }
+      expect(h.apiCalls).toHaveLength(0);
+    });
+
     it("edge-agent routes stay unproxied when the path is percent-encoded (ADR-0032)", async () => {
       // The API decodes the path before routing, so /api/v1/%65dge/... IS /api/v1/edge/...
       await h.signIn("staff", clerk);

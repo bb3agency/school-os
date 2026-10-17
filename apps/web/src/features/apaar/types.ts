@@ -13,7 +13,8 @@ export type ConsentSummary = Schemas["ConsentSummaryOut"];
 export type StatusCounts = Schemas["StatusCounts"];
 export type ConsentInput = Schemas["ConsentIn"];
 export type ConsentStatus = ConsentInput["status"];
-export type FormLanguage = Schemas["ApaarSettingsIn"]["form_language"];
+/** A form language (`en`/`te`); the setting itself may be null = follow the school (ADR-0044). */
+export type FormLanguage = NonNullable<Schemas["ApaarSettingsIn"]["form_language"]>;
 export type Relationship = NonNullable<ConsentInput["relationship"]>;
 
 type Exhaustive<T extends string, L extends readonly T[]> = [T] extends [L[number]] ? L : never;
