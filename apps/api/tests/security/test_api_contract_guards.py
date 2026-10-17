@@ -284,6 +284,8 @@ NON_UUID_PATH_PARAMS = {
     ("GET", "/api/v1/dq/readiness/{profile_key}/slips", "profile_key"),
     # R2-1A: a certificate verification code (ADR-0045), bounded; the guard shape-checks it.
     ("GET", "/api/v1/public/certificates/{code}", "code"),
+    # R2-2D: the Razorpay webhook route value (ADR-0047 decision 3), bounded; the guard resolves.
+    ("POST", "/api/v1/webhooks/razorpay/{route}", "route"),
 }
 
 
@@ -365,6 +367,10 @@ RESPONSE_FIELD_ALLOWLIST = {
     "operator who rotates it (docs/16 §12)",
     "app.platform.schemas.ProvisionOut.heartbeat_key": "heartbeat key of a new dedicated host, "
     "shown once at provisioning (docs/16 §12)",
+    # R2-2D (ADR-0042 decision 6, FR-PAY-003/014): the school's own Razorpay webhook secret,
+    # shown once to the owner who pastes it in the school's dashboard.
+    "app.fees.online_schemas.WebhookSetupOut.secret": "webhook secret, shown once to the owner "
+    "when connecting or rotating",
 }
 
 
@@ -465,6 +471,22 @@ IDEMPOTENCY_EXEMPT = {
     ("POST", "/api/v1/fees/upi/utr-check"): "a read (the UTR travels in the body, out of URLs)",
     ("POST", "/api/v1/fees/bank-statements/rematch"): "idempotent by design: proposals only, a "
     "repeat proposes nothing new",
+    # R2-2D online payments (ADR-0042).
+    ("POST", "/api/v1/webhooks/razorpay/{route}"): "machine route; signed, and event ids are "
+    "unique per school (FR-PAY-007)",
+    ("POST", "/api/v1/payments/connection/manual"): "the answer carries the webhook secret once; "
+    "a replay store would keep it (as R-15); a repeat is 409 payments_already_connected",
+    ("POST", "/api/v1/payments/connection/rotate-webhook-secret"): "returns a one-time secret "
+    "(as R-15)",
+    ("POST", "/api/v1/payments/connection/oauth/start"): "makes a single-use state; nothing is "
+    "created until the callback",
+    ("POST", "/api/v1/payments/connection/oauth/callback"): "the state is single use: a repeat is "
+    "403 oauth_state_invalid",
+    ("POST", "/api/v1/payments/connection/test"): "a read call to the provider",
+    ("POST", "/api/v1/fees/payment-intents/{intent_id}/cancel"): "a state transition (409 "
+    "intent_closed on repeat)",
+    ("POST", "/api/v1/fees/reconciliation/online/items/{recon_item_id}/explain"): "a state "
+    "transition (409 item_closed on repeat)",
 }
 
 

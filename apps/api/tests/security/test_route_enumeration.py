@@ -243,8 +243,9 @@ def test_FR_PUB_003_check_fails_for_unlisted_and_misplaced_public_guards() -> No
     """Self-test with synthetic apps: the allowlist check is not vacuous."""
 
     def unlisted_webhook(app: FastAPI) -> None:
+        # POST /api/v1/webhooks/razorpay/{route} is listed since R2-2D: an unlisted twin fails.
         @app.post(
-            "/api/v1/webhooks/razorpay/{route}",
+            "/api/v1/webhooks/razorpay/{route}/again",
             dependencies=[Depends(require_webhook_signature("razorpay"))],
         )
         def razorpay() -> None: ...

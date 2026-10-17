@@ -37,7 +37,7 @@ and confirmations go; receipts are untouched) and deletes ``fee.reconcile`` unle
 holds it.
 
 Revision ID: 0060_fees_upi
-Revises: 0058_fees_core
+Revises: 0059_payments_online
 Create Date: 2026-10-18
 """
 
@@ -47,7 +47,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "0060_fees_upi"
-down_revision = "0058_fees_core"  # R2-2D adds 0059_payments_online; re-chained at merge
+down_revision = "0059_payments_online"
 branch_labels = None
 depends_on = None
 

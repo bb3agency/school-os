@@ -2,22 +2,14 @@ import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import { cn } from "@/lib/cn";
-import { BrandMark } from "./Brand";
+import { Wordmark } from "./Brand";
 import { SkipLink } from "./SkipLink";
 
-/** Round "S" mark + wordmark (the same as the console sidebar's), for pages outside it. */
-export function Wordmark({ className }: { className?: string }) {
-  const t = useTranslations("common");
-  return (
-    <span className={cn("inline-flex items-center gap-2.5", className)}>
-      <BrandMark />
-      <span className="text-lg font-semibold text-ink">{t("appName")}</span>
-    </span>
-  );
-}
+/** The wordmark lives in Brand.tsx; re-exported for older imports. */
+export { Wordmark };
 
 /**
- * Floating top bar + centred main on the gradient canvas, for pages outside a school
+ * Floating top bar + centred main on the flat canvas, for pages outside a school
  * (school picker, "no access yet", signed-out, dev helpers). `wide` for tables.
  */
 export function MinimalShell({

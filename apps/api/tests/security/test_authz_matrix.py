@@ -2313,7 +2313,7 @@ def _upi() -> ModuleType:
 SPECS.update(_upi().matrix_specs())
 
 
-def _success(method: str, path: str) -> int:
+def _success(method: str, path: str) -> int:  # noqa: PLR0911 - one answer per route family
     creates = {
         "/api/v1/users",
         "/api/v1/academic-years",
@@ -2376,6 +2376,8 @@ def _success(method: str, path: str) -> int:
         return 202
     if method == "POST" and path in _fees().MATRIX_CREATES | _upi().MATRIX_CREATES:
         return 201
+    if (method, path) in _fees().ONLINE_REFUSED:
+        return 409  # guard passed; no Razorpay partner application in tests (R2-2D)
     if (method, path) == ("POST", "/api/v1/users/{user_id}/invitation-email"):
         return 409  # guard passed; the service refuses (email off in tests)
     if method == "POST" and path.startswith("/api/v1/me/invitations/"):

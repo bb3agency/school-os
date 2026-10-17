@@ -25,6 +25,7 @@ from app.documents.tasks import beat_schedule as documents_beat_schedule
 from app.exports.tasks import beat_schedule as exports_beat_schedule
 from app.fees.tasks import beat_schedule as fees_beat_schedule
 from app.fees.upi_tasks import beat_schedule as fees_upi_beat_schedule
+from app.fees.tasks_online import beat_schedule as payments_beat_schedule
 from app.imports.tasks import beat_schedule as imports_beat_schedule
 from app.insights.tasks import beat_schedule as insights_beat_schedule
 from app.knowledge.service import check_provider_agreements
@@ -93,6 +94,8 @@ TASK_MODULES: list[str] = [
     "app.fees.tasks",
     # R2-2E UPI: narration erasure and the morning exceptions notification.
     "app.fees.upi_tasks",
+    # R2-2D online payments: webhook inbox, online refunds, link cancels, reconciliation.
+    "app.fees.tasks_online",
 ]
 
 
@@ -156,6 +159,12 @@ def create_celery() -> Celery:
             "fees.render_receipt": {"queue": "pdf"},
             "fees.post_late_fees": {"queue": "maintenance"},
             "fees.upi_morning": {"queue": "maintenance"},
+            # FR-PAY-008..012 (R2-2D): inbox, refunds, link cancels and the daily jobs.
+            "fees.process_payment_events": {"queue": "maintenance"},
+            "fees.send_online_refund": {"queue": "maintenance"},
+            "fees.cancel_payment_links": {"queue": "maintenance"},
+            "fees.reconcile_online": {"queue": "maintenance"},
+            "fees.payments_daily": {"queue": "maintenance"},
             "exports.purge_expired": {"queue": "maintenance"},
             # FR-ADM-001: the school's full data export on "exports"; the hourly purge of
             # archives past their 24 hours on "maintenance".
@@ -240,6 +249,9 @@ def create_celery() -> Celery:
             **fees_beat_schedule(),
             # FR-FEE-017/026 (R2-2E): UPI exceptions notified and old narrations erased, 07:00 IST.
             **fees_upi_beat_schedule(),
+            # FR-PAY-008..012 (R2-2D): inbox sweep (1 min), link expiry and refund polling
+            # (hourly), online reconciliation (06:00 IST), token refresh and inbox retention.
+            **payments_beat_schedule(),
             # FR-PLT-*: control-plane jobs on shared; heartbeat client on dedicated (ADR-0017).
             **platform_beat_schedule(settings),
         },

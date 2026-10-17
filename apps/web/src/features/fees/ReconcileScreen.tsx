@@ -675,7 +675,7 @@ function ExceptionsTab() {
  * `/fees/reconcile` (US-2109 AC2-AC3; FR-FEE-016/017; docs/17 §5.8): the Bank statement tab
  * (upload, proposed matches with checkboxes, "Confirm N matches") and UPI exceptions (receipts
  * not seen in the bank, credits nobody matched, the confirmed vs unconfirmed report). Holders of
- * `fee.reconcile` only. The online payments tab is wave R2-2D's.
+ * `fee.reconcile` only. Online payments (R2-2D) have their own page, linked from here.
  */
 export function ReconcileScreen() {
   const t = useTranslations("fees.reconcile");
@@ -702,6 +702,14 @@ export function ReconcileScreen() {
   return (
     <div className="space-y-6">
       {header}
+      <p>
+        <Link
+          href="/fees/reconcile/online"
+          className="font-semibold text-primary underline underline-offset-4"
+        >
+          {t("onlineLink")}
+        </Link>
+      </p>
       <Tabs
         label={t("tabs")}
         items={[

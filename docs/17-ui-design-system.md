@@ -2,35 +2,42 @@
 
 | Field            | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Version          | 0.9 · 2026-10-06                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| Changes          | 0.9: mobile and touch (§5.7): breakpoints, 44px touch targets on coarse pointers, stacked record lists and reflowing field tables below 640px, dialogs as bottom sheets, safe areas, keyboard-safe composer, tap to edit in the sheet grid, tap citations. 0.8: calmer app (design-research review, owner decisions): solid tinted status pills instead of gradients (§4, §7); a near-neutral canvas behind dense record screens, chosen once by the shell (§3.2); separate app and marketing radius scales (§3); "Ask on WhatsApp" beside "Talk to us" (`SOS_PUBLIC_WHATSAPP_NUMBER`) and the pricing page as a packaging explainer without prices (§5.6); consequence line in decision dialogs and numeric table columns (§4). 0.7: fixes from the review of the motion and marketing work: reveals use the Web Animations API with a root margin (never stuck hidden at high zoom, shown at once for keyboard focus), the phone menu closes when focus or a click leaves it, fading panels are `inert`, Motion features load after hydration, the marketing press feedback respects reduced motion and focus clears the sticky header; e2e for every public page. 0.6: §5.6 public marketing pages (layout, settings, reveal pattern, dedicated hosts); §5.5 motion (tokens shared with Motion, CSP-safe pattern, what moves and what never does, reduced motion), §3.1 type scale and weights for PP Mori, §2 rule 6, component states (Button loading, dialog exits). 0.5: §5.4 English first, Telugu hidden behind `SOS_TELUGU_ENABLED` (ADR-0036); §2 rules 2 and 8, §3 fonts. 0.4: §5.3 Ask chat patterns (anatomy, motion tokens, reduced motion, a11y), sidebar sub-lists (`sub`, `subActivePattern`). 0.3: §5.2 one sidebar (the icon rail and the separate list panel are gone): anatomy, compact mode, drawer, themes, a11y; §7 sidebar contrast pairs. 0.2: §5.1 responsive layout (spacing scale, menu drawer, TableScroll, dialogs, checks). 0.1: new document: tokens, fonts, primitives, shells, do/don't, contrast table (UI refresh foundation) |
+| Version          | 1.0 · 2026-10-18 |
+| Changes          | 1.0: "Quiet ledger" (owner decisions 2026-10-18; docs/research/2026-10-ui/report.md §6.1, §12): OKLCH warm neutral tokens behind the same names, one ink-blue accent, fixed status colours, one flat canvas (no gradient), hairline cards with shadows only on overlays, SOS Figures (Inter digits and ₹, tabular) for numbers, sentence-case group labels, density toggle (§3.4), wordmark (§3.5); shell: 240/56px sidebar, 48px top bar with "Where you are", Ctrl/⌘+K command palette, preferences menu, Ctrl+\ compact sidebar, phone bottom bars for teachers and principals, dark neutral operator chrome with amber (§5.2, §5.9); plain PageHeader; new components Menu, Popover, Drawer, Toaster, Pagination, ErrorSummary, Steps, SaveBar, FilterChips, Kbd, DataTableV2, CommandPalette (§4); page recipe for the redesign wave (§5); contrast table recomputed from OKLCH (§7). 0.9: mobile and touch (§5.7): breakpoints, 44px touch targets on coarse pointers, stacked record lists and reflowing field tables below 640px, dialogs as bottom sheets, safe areas, keyboard-safe composer, tap to edit in the sheet grid, tap citations. 0.8: calmer app (design-research review, owner decisions): solid tinted status pills instead of gradients (§4, §7); a near-neutral canvas behind dense record screens, chosen once by the shell (§3.2); separate app and marketing radius scales (§3); "Ask on WhatsApp" beside "Talk to us" (`SOS_PUBLIC_WHATSAPP_NUMBER`) and the pricing page as a packaging explainer without prices (§5.6); consequence line in decision dialogs and numeric table columns (§4). 0.7: fixes from the review of the motion and marketing work: reveals use the Web Animations API with a root margin (never stuck hidden at high zoom, shown at once for keyboard focus), the phone menu closes when focus or a click leaves it, fading panels are `inert`, Motion features load after hydration, the marketing press feedback respects reduced motion and focus clears the sticky header; e2e for every public page. 0.6: §5.6 public marketing pages (layout, settings, reveal pattern, dedicated hosts); §5.5 motion (tokens shared with Motion, CSP-safe pattern, what moves and what never does, reduced motion), §3.1 type scale and weights for PP Mori, §2 rule 6, component states (Button loading, dialog exits). 0.5: §5.4 English first, Telugu hidden behind `SOS_TELUGU_ENABLED` (ADR-0036); §2 rules 2 and 8, §3 fonts. 0.4: §5.3 Ask chat patterns (anatomy, motion tokens, reduced motion, a11y), sidebar sub-lists (`sub`, `subActivePattern`). 0.3: §5.2 one sidebar (the icon rail and the separate list panel are gone): anatomy, compact mode, drawer, themes, a11y; §7 sidebar contrast pairs. 0.2: §5.1 responsive layout (spacing scale, menu drawer, TableScroll, dialogs, checks). 0.1: new document: tokens, fonts, primitives, shells, do/don't, contrast table (UI refresh foundation) |
 | Requirements     | NFR-A11Y-001 (WCAG 2.2 AA), NFR-I18N-001 (English; Telugu hidden while `SOS_TELUGU_ENABLED` is off, ADR-0036), SEC-010 (CSP, self-hosted assets)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Related          | 02-PRD §8 (UX principles), 13 §5 (TypeScript/Next.js standards), CLAUDE.md §10                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Code             | `apps/web/src/app/globals.css` (tokens), `apps/web/src/components/ui/` (primitives, exported from `index.ts`), `apps/web/src/components/shell/` (shells)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Code             | `apps/web/src/app/globals.css` (tokens), `apps/web/src/components/ui/` (primitives, exported from `index.ts`), `apps/web/src/components/console/` (CommandPalette, DataTableV2), `apps/web/src/components/shell/` (shells)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Living reference | `/dev/ui`: every primitive and variant with synthetic content. Local development only (same guard as `/dev/sign-in`: `next dev` + local stub issuer; a 404 everywhere else)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 ---
 
 ## 1. The look in one paragraph
 
-Content sits on **white cards** (12px radius in the app, 1px hairline border, soft large shadow)
-laid on a **very soft sky-blue to pale-aqua gradient canvas** on the dashboards and a
-**near-neutral flat canvas** on dense record screens (§3.2). Text is PP Mori, a licensed neo-grotesk (Inter as fallback for ₹ and missing glyphs);
-**big numbers** use a light serif (Instrument Serif); small **eyebrow labels** are mono uppercase
-(JetBrains Mono). The primary button is **near-black**; brand blue is for links, focus and the one
-brand call to action. Status uses **solid tinted pills** (soft tint, strong text, hairline, icon);
-colour appears only where it means something.
-Navigation is **one calm sidebar** (brand, school, grouped menu, signed-in account) that can be
-made compact (icons only); every page starts with a **page-header card** (breadcrumb, title,
-actions). The platform admin panel keeps a **dark violet** sidebar and top bar so operators always
-know they are in the control plane.
+**Quiet ledger** (v1.0, owner decision 2026-10-18). One **flat warm near-white canvas**
+(`oklch(0.985 0.002 85)`) everywhere, dashboards included; content sits on **white surfaces
+with a hairline border** and no shadow. Shadows exist only on things that float: popovers,
+menus, the command palette, dialogs, drawers and toasts. Greys are warm and low in chroma
+(hue 85). There is **one accent, ink blue** `oklch(0.50 0.13 258)` (#2f62ac): links, focus,
+the current navigation item, selection and info. Status colours are fixed and independent of
+the accent (success green, warning amber, danger red), always with text or an icon. The
+primary button stays **near-black** (one per view). Text is PP Mori (two weights, 400 and
+600); **figures** (amounts, counts, KPIs, numeric cells) use **SOS Figures**, Inter's
+tabular digits and ₹ mapped into the sans, so columns line up; Instrument Serif is kept for
+one page-level hero figure or a marketing headline only. Group labels are sentence case,
+12px, semibold; JetBrains Mono is for IDs only (admission number, PEN, receipt number).
+Navigation is **one grouped sidebar** (240px, compact 56px) plus a **48px top bar** with
+"Where you are", **Ctrl/⌘+K "Search or jump to"** and a preferences menu (row density). Every
+page starts with a **plain header row** (title, status, one line, actions). The operator
+console (`/platform`) has **dark neutral chrome with amber markers** so operators always know
+they are in the control plane. Motion is subtle (150-200ms, transform and opacity) and off
+under reduced motion. Light theme only.
 
 ## 2. Hard rules (never traded for looks)
 
 1. **WCAG 2.2 AA.** Text 4.5:1 (3:1 for large text and UI boundaries). Every token pair a primitive
    uses is listed in §7 and recomputed by `components/ui/tokens.test.ts`; add a row there when you add
    a pair. Gradients are checked at their **lightest** stop. Focus is always visible (3px ring,
-   `--color-focus`; yellow on platform chrome; white on the blue AI panel). Colour is never the only
+   `--color-focus`, the accent; amber on the operator chrome; white on the blue AI panel). Colour is never the only
    signal: pills carry text, rings carry a number, the switch knob moves.
 2. **Telugu (only while it is switched on, §5.4).** Noto Sans Telugu is then the fallback of the
    sans and mono stacks, `:lang(te)` keeps the taller line height, and the serif display and mono
@@ -40,7 +47,7 @@ know they are in the control plane.
 3. **CSP (SEC-010).** No `style` attributes, no external resources. Colours come from classes;
    SVG geometry uses presentation attributes (`strokeDashoffset`, `points`), which CSP allows.
    Fonts are self-hosted (`@fontsource` packages and the licensed PP Mori WOFF2 files; `font-src 'self'`).
-4. **Baseline Widely Available** only (CLAUDE.md §10). Used: CSS gradients, `:has()` (segmented
+4. **Baseline Widely Available** only (CLAUDE.md §10). Used: `oklch()` colours, CSS gradients, `:has()` (segmented
    control, drawer scroll lock), `:modal`, native `<dialog>`, `<details>`, `accent-color`,
    `env()`, `dvh` (after a `vh` fallback), `@media (prefers-reduced-motion)`,
    `@media (forced-colors)`, `:where()` (the `collapsed:` variant), `inert` (via the modal
@@ -49,8 +56,9 @@ know they are in the control plane.
 5. **Print.** Gradients, shadows and tints disappear; cards print as plain bordered boxes; chrome
    (`data-print="hide"`) is hidden; A4 margins; Telugu line height 1.8.
 6. **Motion.** Few, short motions on transform and opacity only, from the shared tokens (§5.5):
-   press feedback, dialog and drawer enter/exit, the notification panel, live alerts, a changed
-   KPI number, content replacing a skeleton, the skeleton shimmer and the Ask chat (§5.3).
+   press feedback, dialog and drawer enter/exit, the command palette, menus and popovers, the
+   bulk bar and toasts, the notification panel, live alerts, a changed KPI number, content
+   replacing a skeleton, the skeleton shimmer and the Ask chat (§5.3).
    Never on page load, keyboard navigation, tables or high-frequency actions. Under
    `prefers-reduced-motion` nothing moves (Motion keeps opacity fades only). No `style`
    attribute is ever server-rendered (§5.5, CSP). The sidebar's compact switch is instant (no
@@ -66,29 +74,32 @@ know they are in the control plane.
 
 ## 3. Tokens (`globals.css`, Tailwind v4 `@theme`)
 
-Use them as Tailwind utilities (`bg-surface`, `text-ink-muted`, `border-border`, `rounded-xl`,
-`shadow-card`, `font-display`). Old names still work (`primary`, `border-strong`, `canvas`, …).
+Use them as Tailwind utilities (`bg-surface`, `text-ink-muted`, `border-border`, `bg-accent-soft`,
+`rounded-xl`, `num`). Values are `oklch()` (Baseline widely available); `tokens.test.ts`
+converts each to sRGB and re-checks every pair in §7. Old names still work and point at the
+new values (`primary` and `brand` are the accent, `canvas-from/via/to` and `canvas-neutral`
+are the canvas).
 
-| Group    | Tokens                                                                                                                                                                                                                                                                                                                 | Use                                                                                                 |
-| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Canvas   | `canvas` (flat), `canvas-from`, `canvas-via`, `canvas-to`, `canvas-neutral`                                                                                                                                                                                                                                            | Body gradient (set globally; do not repeat it); `canvas-neutral` behind dense record screens (§3.2) |
-| Surfaces | `surface` (white), `surface-muted` (filled inputs, table header), `surface-sunken` (segmented track), `surface-hover` (row hover)                                                                                                                                                                                      | Cards and controls                                                                                  |
-| Borders  | `border` (hairline, decorative), `border-soft` (secondary buttons), `border-control` (inputs, switch: 3:1), `border-strong` (legacy)                                                                                                                                                                                   |                                                                                                     |
-| Ink      | `ink`, `ink-muted`, `ink-subtle`                                                                                                                                                                                                                                                                                       | Body, secondary, "1,157 last month" lines                                                           |
-| Action   | `action`, `action-hover`, `on-action`                                                                                                                                                                                                                                                                                  | Near-black primary button, dark pills                                                               |
-| Brand    | `primary` (links, focus, active nav), `primary-soft`, `brand`, `brand-strong`                                                                                                                                                                                                                                          |                                                                                                     |
-| Status   | `info-*`, `success`, `success-*`, `positive-*`, `warning-*`, `danger*`, `violet-*`, `teal`, `teal-*`                                                                                                                                                                                                                   | Alerts, chips, badges                                                                               |
-| Pills    | the status tokens: `info-soft`/`info-ink`, `violet-soft`/`violet-ink`, `teal-soft`/`teal-ink`                                                                                                                                                                                                                          | Solid tinted status pills (no gradients, no pill tokens)                                            |
-| AI       | `ai-from`, `ai-to`                                                                                                                                                                                                                                                                                                     | `.ai-gradient` panel                                                                                |
-| Charts   | `chart-1` blue, `chart-2` amber, `chart-3` teal, `chart-4` violet, `chart-track`                                                                                                                                                                                                                                       | Series colours (3:1 on white)                                                                       |
-| Platform | `platform`, `platform-hover`, `platform-ink`, `platform-muted`, `platform-accent`, `platform-accent-ink`, `platform-soft`                                                                                                                                                                                              | Control-plane chrome only                                                                           |
-| Radii    | App: `xs` 4, `sm` 6, `md` 8 (buttons, inputs, selects), `lg` 10 (alerts, segmented track), `xl` 12 (cards, dialogs, panels, drawer), `2xl` 14 (large panels), `3xl` 16, `full`. Marketing (`.mk`): `sm` 8, `md` 10, `lg` 14, `xl` 20, `2xl` 24, `3xl` 32                                                               | Same `rounded-*` class names; the scope picks the scale                                             |
-| Shadows  | `shadow-card`, `shadow-raised` (buttons, selected segment), `shadow-popover` (dialogs, menus)                                                                                                                                                                                                                          |                                                                                                     |
-| Fonts    | `font-sans` (PP Mori, self-hosted WOFF2 in `src/app/fonts/pp-mori/`, commercial web licence (see `LICENSE-NOTE.md`); falls back to Inter for ₹ and missing glyphs, → Noto Sans Telugu while Telugu is on), `font-display` / `font-serif` (Instrument Serif), `font-mono` (JetBrains Mono; → Noto Sans Telugu while on) |                                                                                                     |
+| Group    | Tokens (value) | Use |
+| -------- | -------------- | --- |
+| Canvas   | `canvas` oklch(0.985 0.002 85) #fbfaf9; aliases `canvas-from`, `canvas-via`, `canvas-to`, `canvas-neutral` | The body; the school sidebar and top bar sit on it |
+| Surfaces | `surface` white; `surface-muted` 0.97 0.003 85 (table header, filled inputs, dialog footers); `surface-sunken` 0.955 0.005 85 (segmented track, sidebar hover); `surface-hover` 0.955 0.004 85 (row hover) | Cards, panels, controls |
+| Borders  | `border` 0.92 0.004 85 (hairline, decorative); `border-soft` 0.86 0.008 85 (secondary buttons); `border-control` 0.62 0.006 85 (inputs, checkboxes, switch: 3:1); `border-strong` (legacy) | |
+| Ink      | `ink` 0.22 0.006 85 #1c1a17; `ink-muted` 0.45 0.008 85 #575550; `ink-subtle` 0.53 0.008 85 #6e6b67 | Body, secondary, notes and group labels |
+| Action   | `action` (= ink), `action-hover`, `on-action` | The near-black primary button (one per view) |
+| Accent   | `accent` 0.50 0.13 258 #2f62ac; `accent-strong` 0.40 0.11 258 (hover, selected text); `accent-soft` 0.95 0.025 258 (current nav item, selected rows, chips); `on-accent`. Aliases `primary`, `primary-hover`, `primary-soft`, `brand`, `brand-strong`, `focus`, `chart-1` | Links, focus ring, current item, selection, info. Never a second accent |
+| Status   | `success` 0.52 0.12 150 (graphics), `success-ink` 0.40 0.10 150 on `success-soft` 0.95 0.04 150; `warning-ink` 0.50 0.10 65 on `warning-soft` 0.95 0.05 70; `danger` 0.53 0.19 27 on `danger-soft`; `info-ink`/`info-soft` (the accent); `positive-*` (= success); `violet-*`, `teal-*` (Review and Done pills only) | Pills, alerts, toasts, error summary |
+| AI       | `ai-from` (accent strong), `ai-to` (accent) | `.ai-gradient` panel (the Ask wave moves it to an accent tint) |
+| Charts   | `chart-1` accent, `chart-2` amber, `chart-3` teal, `chart-4` violet, `chart-track` | Series colours (3:1 on white) |
+| Operator | `platform` 0.22 0.01 85 (dark neutral), `platform-hover`, `platform-ink`, `platform-muted`, `platform-accent` amber 0.86 0.15 88, `platform-accent-ink`, `platform-soft` | Control-plane chrome only |
+| Radii    | App: `xs` 4, `sm` 6, `md` 8 (buttons, inputs), `lg` 10 (menus, alerts), `xl` 12 (cards, dialogs, palette), `2xl` 14, `3xl` 16, `full`. Marketing (`.mk`): unchanged larger scale | Same `rounded-*` names; the scope picks the scale |
+| Shadows  | `shadow-card` none (kept so the class compiles); `shadow-raised` 1px (selected segment, buttons); `shadow-popover` (overlays only) | Hairlines carry structure |
+| Fonts    | `font-sans` PP Mori; `font-figures` / `num` (SOS Figures then the sans, tabular); `font-display` / `font-serif` Instrument Serif; `font-mono` JetBrains Mono (IDs) | See §3.1 |
+| Density  | `--row-height` 44px / 32px compact, `--cell-px`, `--cell-py`; variant `compact:` | §3.4 |
 
 Component classes (in `@layer components`): `.eyebrow`, `.select-chevron`, `.skeleton`,
 `.canvas-neutral` (§3.2), `.ai-gradient`, `.ai-chrome` (white focus ring),
-`.quote-gradient`, `.platform-chrome` (yellow focus ring), `.pressable` (press feedback, §5.5).
+`.quote-gradient`, `.platform-chrome` (amber focus ring), `.pressable` (press feedback, §5.5).
 Motion classes: `.dialog-motion`, `.alert-in`, `.value-tick`, `.content-in` (§5.5).
 
 ### 3.1 Type scale
@@ -106,9 +117,9 @@ shaping. Only the serif display figures get optical tracking (`-0.01em`, reset b
 | `base` | 16 / 24            | reading text, page descriptions                      |
 | `lg`   | 18 / 26            | card, dialog and section titles (`font-semibold`)    |
 | `xl`   | 20 / 28            | page title on phones                                 |
-| `2xl`  | 24 / 32            | page title (`PageHeader` `h1`, `font-semibold`)      |
-| `4xl`  | 36 / 40            | `StatCard` number (serif)                            |
-| `5xl`  | 48 / 48            | `KpiCard` number (serif)                             |
+| 22/28  | `sm:text-[1.375rem] sm:leading-7` | page title (`PageHeader` `h1`, `font-semibold`) |
+| 28/32  | `text-[1.75rem] leading-8` | `KpiCard`, `StatCard` number (`num`, semibold) |
+| `4xl`, `5xl` | 36/40, 48/48 | Instrument Serif hero figure (one per dashboard) and marketing only |
 
 Weights: PP Mori has 200/400/600 only, so there are **two weights, default (400) and
 `font-semibold` (600)**. `font-medium` renders as 400 and `font-bold`/`font-extrabold` snap to a
@@ -128,9 +139,14 @@ on purpose:
   (size carries it), and anything in `font-mono` (JetBrains Mono ships 500 only, so the default
   already renders 500 and semibold would be synthesised).
 
-Numbers: tables, KPI and stat cards and the
-unread badge set `tabular-nums` (PP Mori itself has no tabular figures; the serif display,
-mono and Inter fallback do).
+Numbers (v1.0): amounts, counts, KPIs and numeric table cells use the `num` utility
+(`font-family: var(--font-figures)` + `tabular-nums`). **SOS Figures** is an `@font-face` in
+`globals.css` whose `unicode-range` covers only digits, `+ , - .`, `%`, `−` and `₹`, pointing
+at the self-hosted Inter variable files from `@fontsource-variable/inter` (OFL-1.1; the same
+hashed files the layout loads for Inter, so no extra download). Every other glyph stays PP
+Mori. `Td numeric`, `Th numeric`, `KpiCard`, `StatCard`, `Pagination` and `DataTableV2` use it.
+KPI and stat values are 28/32 semibold figures; Instrument Serif is for one page-level hero
+figure or a marketing headline only.
 
 UI text: PP Mori (Pangram Pangram, commercial web licence; `src/app/fonts/pp-mori/`, `@font-face` in `globals.css`; weights 200/400/600, so `font-medium` renders as 400; no tabular figures). Open fonts (all OFL-1.1, pinned exact in `apps/web/package.json`): `@fontsource-variable/inter`
 (variable weights), `@fontsource/instrument-serif` (400), `@fontsource/jetbrains-mono` (500),
@@ -140,23 +156,14 @@ bundled: `globals.css` names no Telugu font, and the locale layout links
 `/fonts/telugu/noto-sans-telugu.css` (faces plus the two stacks above) only while Telugu is on;
 that route answers 404 while it is off (§5.4).
 
-### 3.2 Canvas: gradient or near-neutral
+### 3.2 Canvas: one flat canvas
 
-The gradient canvas is for places where people orient themselves: the **school home
-dashboard**, the **platform dashboard** and the **public marketing pages**. **Dense record
-screens** get the flat `canvas-neutral` (#f4f6f9), so the only colour on the page is colour
-that means something (a status pill, an error):
-
-- school: students (list and profile), findings, change requests, imports, register photos,
-  exports, documents, audit and settings (every page under these paths);
-- platform: every page except the dashboard (`/platform`).
-
-The rule lives in one place, `components/shell/canvas.ts` (`canvasFor(theme, path)`,
-`NEUTRAL_CANVAS_PATHS`); `AppShell` applies it to its root (`data-canvas`, class
-`.canvas-neutral`, which covers the body gradient). A page that needs the other canvas passes
-`canvas="neutral" | "gradient"` to the shell; never paint a background per screen. A new dense
-record screen is added to `NEUTRAL_CANVAS_PATHS`. Text pairs on the neutral canvas are in §7;
-print is white either way.
+Since v1.0 every console page, the school home and the platform dashboard included, is on
+the same flat `canvas` (owner decision 2026-10-18, report §12.4). The body has no gradient
+(`tokens.test.ts` fails if one comes back). `components/shell/canvas.ts` keeps its API
+(`canvasFor`, `ShellCanvas`, the shell's `canvas` prop) so older callers compile, but it always
+answers `"neutral"`, which paints the same colour. Never paint a background per screen. The
+marketing pages keep their own `.mk` bands (Direction B, a later wave).
 
 ### 3.3 Radii: two scales, one set of class names
 
@@ -167,6 +174,40 @@ public marketing pages keep their larger, softer corners: `.mk` (the `MarketingS
 `rounded-*` utilities read those variables, so a component needs no marketing variant.
 Write `rounded-xl` for a card in both places; never hard-code a pixel radius.
 `tokens.test.ts` pins both ranges.
+
+### 3.4 Density: comfortable or compact
+
+Comfortable is the default (44px rows). The viewer can choose **compact** (32px rows, 13px
+table text) from the top bar's preferences menu ("Your preferences" → Row density) or the
+palette ("Use compact rows"). The choice is `<html data-density="compact">` (absent means
+comfortable), remembered per viewer on this computer (`localStorage` `sos.density`, a UI
+preference only, every access in try/catch, `lib/ui-prefs.ts`) and applied before the first
+paint by the root layout's nonce'd head script (`SHELL_STATE_SCRIPT`, with the compact
+sidebar), read in React through `useDensity()` (`components/shell/density.ts`,
+`useSyncExternalStore`, so hydration never mismatches).
+
+- CSS: the `compact:` variant applies while an ancestor carries `data-density="compact"` and
+  no nearer ancestor says `comfortable`, **and only on fine pointers** (touch keeps 44px
+  targets). Variables `--row-height`, `--cell-px`, `--cell-py` follow the same rule.
+- `Table`, `Th`, `Td` and `DataTable` follow the viewer's choice unless a page pins
+  `density`. `DataTableV2` also offers a per-table choice in its Columns panel, remembered
+  under `sos.table.<id>.density`.
+
+### 3.5 Wordmark and icons
+
+`Wordmark` (`components/shell/Brand.tsx`): an inline SVG mark (a 22px rounded square in the
+accent with two white "ledger lines"; amber with dark lines on the operator chrome) plus
+"SchoolOS" (`common.appName`) in PP Mori semibold. The text is the accessible name; the mark
+is `aria-hidden`. `BrandMark` is the mark alone. Used by the sidebar, the phone top bar, the
+minimal shell and the marketing header, footer and dedicated sign-in card. `size="lg"` for
+sign-in cards and marketing.
+
+Icons stay the in-house inline SVG set in `ui/Icon.tsx` (24×24, 2px stroke, `aria-hidden`,
+CSP-safe). **lucide-react was not added**: the existing set already covers the shell and the
+new components, and a new dependency would need the licence, maintenance and CVE review of
+CLAUDE.md §11 for no gain (lucide-react is ISC-licensed; revisit only if the page wave needs
+many new icons, pinning an exact version at least two weeks old after `npm audit`). Add a
+missing icon to `Icon.tsx` in the same style.
 
 ## 4. Components (`@/components/ui`)
 
@@ -181,14 +222,14 @@ marked (client).
 | `Icon`, `ICON_NAMES`                                                              | `name`                                                                                                                                                                                                                                         | Decorative 24×24 stroke icons; a size class replaces the 20px default                                                                                                                                                                                                                                                     |
 | `Card`                                                                            | `title`, `eyebrow`, `description`, `actions`, `headingLevel` 2/3, `padding` `none`·`sm`·`md`·`lg`, `tone` `default`·`muted`·`outline`                                                                                                          | `<section>` named by its title                                                                                                                                                                                                                                                                                            |
 | `CardHeader`, `cardClasses({padding, tone})`                                      | as above, `headingId`                                                                                                                                                                                                                          | For cards that are not a `<section>`                                                                                                                                                                                                                                                                                      |
-| `PageHeader`                                                                      | `title` (the page's one `h1`), `description`, `actions`, `badge`, `breadcrumb` (`Crumb[]`), `eyebrow`, `plain`                                                                                                                                 | Card by default; `plain` inside other cards                                                                                                                                                                                                                                                                               |
+| `PageHeader`                                                                      | `title` (the page's one `h1`), `description`, `actions`, `badge`, `breadcrumb` (`Crumb[]`), `eyebrow`, `plain` (kept, no effect)                                                                                                              | v1.0: a plain row on the canvas, never a card. A `breadcrumb` of two crumbs ("Home › This page") is not shown: the top bar says where you are; three or more (a record under its list) show above the title |
 | `Breadcrumb`                                                                      | `items: {label, href?}[]`, `label`                                                                                                                                                                                                             | Last crumb is `aria-current="page"`                                                                                                                                                                                                                                                                                       |
 | `Eyebrow`                                                                         | `as` `p`·`span`·`div`·`h2`·`h3`, `tone` `muted`·`ink`·`brand`·`inverse`, `id`                                                                                                                                                                  | Mono uppercase label                                                                                                                                                                                                                                                                                                      |
 | `Badge`                                                                           | `tone`: `neutral` · `info` · `success` · `warning` · `danger` · `platform` · `violet` · `teal`                                                                                                                                                 | Soft status label                                                                                                                                                                                                                                                                                                         |
 | `Pill`                                                                            | `variant`: `progress` · `review` · `done` (solid tints: blue, violet, teal) · `dark` · `date` · `tag` · `sample` · `positive` · `negative` · `command`; `size` `sm`·`md`; `icon` (name, or `null`)                                             | Always with text. Status variants: soft tint, strong text, hairline and a decorative icon (clock, eye, check; `icon={null}` removes it), so meaning never rests on colour                                                                                                                                                 |
 | `DeltaPill`                                                                       | `value` ("+2.7%"), `direction` `up`·`down`·`flat`, `label` (read instead of the value)                                                                                                                                                         | Dark pill with arrow                                                                                                                                                                                                                                                                                                      |
-| `StatCard`                                                                        | `label`, `value` (string or null), `unavailableLabel`, `hint`                                                                                                                                                                                  | Inside a `<dl>`; serif number                                                                                                                                                                                                                                                                                             |
-| `KpiCard`                                                                         | `label`, `value`, `unavailableLabel`, `delta` (`{value, direction?, label?}`), `comparison`, `sparkline`, `aside`                                                                                                                              | `role="group"` named by the label; serif number; never invent numbers                                                                                                                                                                                                                                                     |
+| `StatCard`                                                                        | `label`, `value` (string or null), `unavailableLabel`, `hint`                                                                                                                                                                                  | Inside a `<dl>`; 28px `num` figure |
+| `KpiCard`                                                                         | `label`, `value`, `unavailableLabel`, `delta` (`{value, direction?, label?}`), `comparison`, `sparkline`, `aside`, `href` (the label links to the list behind the number)                                                                       | `role="group"` named by the label; 28px `num` figure; never invent numbers |
 | `Sparkline`                                                                       | `values: number[]`, `label` (text alternative, required), `color` 1–4, `area`                                                                                                                                                                  | Inline SVG, `aria-hidden` + sr-only label                                                                                                                                                                                                                                                                                 |
 | `ProgressRing`                                                                    | `value` 0–100, `label` (required), `size` `sm`·`md`·`lg`, `color` 1–4, `showValue`                                                                                                                                                             | `role="progressbar"` with `aria-valuetext`                                                                                                                                                                                                                                                                                |
 | `Input`, `Textarea`, `TextField`, `TextAreaField`, `Field`, `controlClasses`      | unchanged                                                                                                                                                                                                                                      | Filled look (soft grey, 3:1 boundary)                                                                                                                                                                                                                                                                                     |
@@ -211,14 +252,61 @@ marked (client).
 | `AiPanel`                                                                         | `greeting` (its heading), `eyebrow`, `description`, `suggestions` `{id,label,href?                                                                                                                                                             | onSelect?}[]`, `suggestionsLabel`, children (question form)                                                                                                                                                                                                                                                               | For the Ask screens. Answers go in normal cards **with source chips** (invariant 8) |
 | `QuoteBlock`                                                                      | `label`, children                                                                                                                                                                                                                              | Pale green quote                                                                                                                                                                                                                                                                                                          |
 | `SidebarNav` (client)                                                             | `label`, `items` **or** `sections` (`NavSection[]`: `{id, label, items}`; items `{href, label, icon?, exact?, nested?, activePattern?, sub?, subActivePattern?}`), `theme` `school`·`platform`, `id`                                           | One current page (`aria-current="page"` + accent bar); group headings name their lists; `collapsed:` compact styles. Used by the shell's `Sidebar`. `sub`: a client sub-list under an item (Ask: New chat, recents, All chats, Memory), hidden when compact; `subActivePattern`: paths whose current link is inside `sub` |
-| `UsageMeter`, `LanguageSwitcher`, `Value`, `Label`, `SecretOnce`, `ApiErrorAlert` | unchanged                                                                                                                                                                                                                                      |                                                                                                                                                                                                                                                                                                                           |
+| `UsageMeter`, `LanguageSwitcher`, `Value`, `Label`, `SecretOnce`, `ApiErrorAlert` | unchanged | |
+| `Menu` (client) | `label` (names the trigger and the menu), `entries` (`action` · `link` · `radio` · `separator` · `label`; `danger`, `disabled`, `icon`), `trigger` (default "⋯"), `variant` `icon`·`button`·`bare`, `align` | APG menu button: Enter/Space/Down open on the first item, Up on the last; arrows, Home/End, first-letter jump; Escape returns focus; Tab and a click outside close. Row menus, "More" actions, the top bar's preferences |
+| `Popover` (client) | `trigger`, `label` (icon-only trigger), `title` (names the panel), `align` | Disclosure + non-modal `role="dialog"` panel: Escape returns focus, outside click and focus leaving close it. Column chooser, filter choices, help. (Native Popover API is not Baseline widely available until mid-2027) |
+| `Drawer` (client) | `open`, `onClose`, `title`, `description`, `closeLabel`, `footer` | End-edge side sheet on the native modal `<dialog>` (focus trapped, page inert, Escape and backdrop close, focus returns). Record details, filter panels |
+| `ToastProvider`, `useToast()` (client) | `show({title, body?, tone: success·info·warning})` | CSS-only toasts in one polite `role="status"` region (bottom end), max 3, 6s each, held on hover/focus, dismiss button. Mounted once by `AppShell`. Background results only; **form errors stay inline** |
+| `Pagination` (client) | `from`, `to`, `total?`, `hasPrevious`, `hasNext`, `onPrevious`, `onNext`, `pageSize`, `pageSizes`, `onPageSizeChange` | "1–50 of 1,240" (polite), rows per page, Previous/Next; works with cursor APIs |
+| `ErrorSummary` (client) | `errors` (`{fieldId, message}[]`), `title` ("There is a problem"), `attempt` | GOV.UK pattern: at the top of a form after a failed submit, takes focus, each message links to and focuses its field; the field still shows its own message |
+| `Steps` | `steps` (`{id, label, href?}[]`), `current`, `label` | Ordered list: done (check + "Done", may link back), current (`aria-current="step"`), upcoming |
+| `SaveBar` | `dirty`, children (Save, Discard), `savedLabel` | Sticky footer of an explicit-save form: "Changes not saved" / "No changes"; last child of the `<form>` |
+| `FilterChips` | `chips` (`{id, label, value}[]`), `onRemove`, `onClear` | Active filters with named remove buttons ("Remove filter Class: 7-B") and "Clear all" |
+| `Kbd` | children | A key as printed ("Ctrl", "K") |
+
+**Console patterns** (`@/components/console`):
+
+| Component | Props | Notes |
+| --- | --- | --- |
+| `DataTableV2` (client) | `caption`, `columns` (`ColumnV2`: `Column` + `name`, `hideable`, `defaultHidden`), `state` (`Loadable`), `rowKey`, `id` (remembers hidden columns and density), `toolbar`, `chips`/`onRemoveChip`/`onClearFilters`, `emptyTitle`/`emptyBody`/`emptyAction`, `noResultsTitle`, `onRetry`, `selection` (`rowLabel`, `actions(selected, clear)`), `footer` (Pagination), `stacked`, `density` | The record list (§4.3 below). Use it for new and redesigned lists; `DataTable` stays for existing callers |
+| `CommandPalette` (client) | `open`, `onClose`, `items` (`{id, label, group, href? \| onRun?, hint, keywords, icon, shortcut}`), `groups` | Mounted by `AppShell` (§5.9); pages do not mount their own |
+
+### 4.3 DataTable v2
+
+- **Toolbar** (white card header): the page's search (`SearchInput` in a `<form role="search">`)
+  and 1-3 filter controls in `toolbar`; the **Columns** button (popover: show/hide columns, the
+  first stays; this table's row density) on the right.
+- **Chips** under the toolbar for active filters, with "Clear all".
+- **Header** sticky inside the table's own scroll box (`max-h` 70dvh, focusable, named by the
+  caption), header tint `surface-muted`.
+- **Rows**: 44px (32px compact); hover `surface-hover`; numeric columns `num`, right-aligned
+  (put ₹ in the header, "Due (₹)"); a trailing `Menu` for row actions.
+- **Selection** only when the table has bulk actions: a named checkbox per row, "Select all rows
+  on this page" (indeterminate when some are), a **bulk bar** pinned to the bottom of the card
+  with "n selected", the actions and "Clear selection". New rows (paging, sorting, filtering)
+  clear the selection. Record-changing bulk actions confirm through `ActionDialog` with the
+  count and the consequence line.
+- **States**: loading (skeleton), error (with "Try again" when `onRetry`), unavailable, first use
+  (`emptyTitle` + one action), no results while filters are active ("Clear filters").
+- **Paging** server-side under the table (`footer` = `Pagination`, 25/50/100).
+- No motion on rows, sorting, paging or density (§5.5). Below 640px `stacked` shows cards.
+
+### 4.4 Forms
+
+Labels above fields; mark *optional* fields, not required ones. Errors under the field
+(`Field`) and, after a failed submit, an `ErrorSummary` at the top that takes focus. **Explicit
+save** for official records, fees, settings and structure: a `SaveBar` as the form's last
+child; never autosave official records or maker-checker changes (drafts such as notices may
+autosave with a "Saved 10:42" line). Multi-step jobs show `Steps`. One primary button per
+view.
 
 Shells (`@/components/shell`): `SchoolShell` (`permissions`, `features`, `schoolName`,
 `canSwitchSchool`, `account`, `topbarActions`, `languages`, `banner`) and `PlatformShell`
 (`permissions`, `account`) render `AppShell` (client): skip link, **one `Sidebar`** (beside the
-page from lg, in the menu drawer below lg), a top bar (bell, language; below lg also the "Menu"
-button and wordmark) and `<main id="main">`. See §5.2. `MinimalShell` (`wide` for tables) and
-`Wordmark` serve pages outside a school; `BrandMark` is the round "S" both use.
+page from lg, in the menu drawer below lg), the top bar ("Where you are", "Search or jump to",
+bell, language, preferences; below lg the "Menu" button and wordmark), `<main id="main">`, the
+command palette, the phone bottom bar and the toast region. See §5.2 and §5.9. `MinimalShell`
+(`wide` for tables) and `Wordmark` serve pages outside a school.
 
 ### 4.1 Sheet grid: editable tables (`@/features/sheets`)
 
@@ -244,29 +332,62 @@ first 10 rows on the document page (FR-IMP-008, FR-DOC-009..011).
 | Downloads                | CSV (UTF-8 with BOM) and Excel buttons in the page header, through the BFF with the step-up prompt; the note under the grid says changes are included, Aadhaar-like numbers masked and formulas turned into text                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Motion                   | None (§2 rule 6: never on tables or keyboard navigation)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
-## 5. Page recipe (for screen agents)
+## 5. Page recipe (for the page-redesign agents)
+
+Redesign a page **inside** the shell; never add chrome. The shell already gives the sidebar,
+the top bar with "Where you are" (section › page) and the palette.
 
 ```tsx
-<PageHeader
-  title={t("title")}
-  description={t("description")}
-  breadcrumb={[{ label: t("nav.home"), href: "/" }, { label: t("title") }]}
-  actions={<ButtonLink href="/students/new">{t("add")}</ButtonLink>}
-/>
-<div className="grid gap-4 md:grid-cols-3">{/* KpiCard × n, only real numbers */}</div>
-<Card title={t("list.title")} actions={<SearchInput label={t("search")} name="q" />}>
-  <DataTable caption={t("list.caption")} captionHidden … />
-</Card>
+<div className="space-y-5">
+  <PageHeader
+    title={t("title")}                       // the page's one h1, 22px semibold
+    badge={<Badge tone="success">{t("status.active")}</Badge>}  // record pages only
+    description={t("description")}           // one line
+    // breadcrumb only for records under a list (3+ crumbs): Home › Students › Sample student A
+    actions={
+      <>
+        <ButtonLink href="/students/new">{t("add")}</ButtonLink>        {/* the one primary */}
+        <Menu label={t("more")} variant="button" trigger={t("more")} entries={…} />
+      </>
+    }
+  />
+  <section aria-label={t("kpi.label")} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    {/* ≤ 4 KpiCard, real numbers only, each with href to the list behind it */}
+  </section>
+  <DataTableV2
+    id="students" caption={t("list.caption")} captionHidden
+    columns={columns} state={rows} rowKey={(row) => row.id}
+    toolbar={<form role="search" …><SearchInput label={t("search")} name="q" />…</form>}
+    chips={chips} onRemoveChip={removeChip} onClearFilters={clearAll}
+    emptyTitle={t("empty.title")} emptyBody={t("empty.body")} emptyAction={…}
+    footer={<Pagination … />} stacked
+  />
+</div>
 ```
 
-- One `h1` per page (PageHeader); sections are `h2` (Card default); cards inside cards use `headingLevel={3}`.
-- Grids: `gap-4` between cards, `space-y-6` between page blocks; cards pad themselves.
-- Filters: `<form role="search">` with `SearchInput` + `Select` + `Button variant="secondary"` "Filter".
-- Status: `Badge` for record states (active/suspended), `Pill` status tints for workflow states
-  (in progress/review/done), `Pill positive/negative` for matches/mismatches.
-- Numbers: counts and amounts in tables are `numeric` columns (right-aligned, tabular figures).
-- Decisions: a dialog whose confirm button changes a record (or deliberately does not) says so
-  in `consequence`, in plain words, just above the buttons.
+- **Spacing**: `space-y-5` between page blocks, `gap-3` between KPI cards, `gap-4` between
+  cards; cards pad themselves (`Card` `md`). No shadows on cards; hairline only.
+- **Headings**: one `h1` (PageHeader); sections `h2` (Card title, 16-18px semibold); cards
+  inside cards `headingLevel={3}`.
+- **Lists**: `DataTableV2` for record lists (selection only with bulk actions); `Table` +
+  `TableScroll` for grids, ledgers and registers; `SheetGrid` for editable sheets (§4.1).
+- **Numbers**: `num` on every amount, count and KPI; numeric columns `numeric`; ₹ in the
+  header; Indian grouping from `lib/format`.
+- **Status**: `Badge` for record states, `Pill` status tints for workflow states, always with
+  text; colour never alone.
+- **Forms** (§4.4): labels above, errors under the field plus `ErrorSummary` after a failed
+  submit, `SaveBar` for explicit save, `Steps` for multi-step jobs, one primary button.
+- **Empty states**: first use = what this is + one action; no results = "Clear filters"; no
+  permission = who can grant access; error = "Try again".
+- **Overlays**: `ActionDialog` (with `consequence`) for decisions, `Drawer` for details or
+  filters, `Menu` for row and "More" actions, `Popover` for small choices, `useToast()` for
+  background results (never for form errors).
+- **Strings**: every new string in `en` (and `te` for parity; `i18n/messages.test.ts`); reuse the
+  `ui` namespace for generic component text.
+- **Do not** change BFF routes, API calls or query keys while restyling; do not add
+  dependencies; no `style` attributes; keyboard and 1366×768 first, then phones (§5.7).
+- **Checks** per page: its feature tests, `app/english-only.test.tsx`, `npm run lint`,
+  `typecheck`, `test`, `build` (apps/web), and the e2e responsive and a11y suites.
 
 ### 5.1 Responsive layout
 
@@ -314,29 +435,34 @@ accessibility tree.
 
 | Part       | School                                                                                                                                               | Platform                                    |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| Brand      | Round "S" (`BrandMark`) + "SchoolOS", a link home; the collapse button at the right                                                                  | Same, yellow mark, link to `/platform`      |
-| Context    | "Current school" + the school's name (GET `/me/schools`); "Switch school" for people in several schools                                              | The yellow "Platform admin" badge           |
-| Navigation | `<nav aria-label="Main">`, permission- and feature-filtered groups under small headings; each item is icon + label in a 40px row; scrolls on its own | `<nav aria-label="Platform">`, same pattern |
+| Brand      | `Wordmark` (accent mark + "SchoolOS"), a link home; the collapse button at the right                                                                | Same, amber mark, link to `/platform`       |
+| Context    | "Current school" + the school's name (GET `/me/schools`); "Switch school" for people in several schools                                              | The amber "Platform admin" badge            |
+| Navigation | `<nav aria-label="Main">`, permission- and feature-filtered groups under sentence-case 12px headings; each item is icon + label in a 32px row (44px on touch); scrolls on its own | `<nav aria-label="Platform">`, same pattern |
 | Account    | `<section aria-label="Your account">`: initials, name (heard as "Signed in as …"), role (system roles by name), "Lock now"                           | Same with "Sign out"                        |
 
-The **top bar** holds page-wide tools only: the notification bell and the language switch (and,
-below lg, the "Menu" button and wordmark). Page titles and breadcrumbs stay in each page's
-`PageHeader`. Nothing is shown twice: "Switch school", the signed-in name and "Lock now" moved
+The **top bar** (48px, sticky, on the canvas with a hairline under it) holds, from lg, **"Where
+you are"** (`<nav aria-label="Where you are">`: the current item's section, then the item, a
+link back to its list on a sub-page; computed with `activeHref` from the same `sections` the
+sidebar renders, so it never names a page the menu hides), then **"Search or jump to…"**
+(`Ctrl K`, opens the palette, §5.9), the notification bell, the language switch and the
+**preferences** menu ("Your preferences": Row density, Search or jump to). Below lg: the "Menu"
+button, the wordmark (text hidden below sm) and the same tools. Page titles stay in each
+page's `PageHeader`. Nothing is shown twice: "Switch school", the signed-in name and "Lock now" moved
 from the top bar into the sidebar; the idle-timeout warning is mounted once by the shell
 (`AppShell` `session`), never inside the sidebar.
 
 **States.** Item: muted text and icon; hover: filled row (`surface-muted`, platform
-`platform-hover`) with full-contrast text; keyboard focus: the 3px focus ring (blue; yellow on
-the platform chrome); current page: `aria-current="page"`, tinted row, bold text and a 3px
-accent bar at the start edge (blue `primary`; platform yellow `platform-accent`), so the state
+`platform-hover`) with full-contrast text; keyboard focus: the 3px focus ring (accent; amber on
+the platform chrome); current page: `aria-current="page"`, `accent-soft` row, semibold text and a 2px
+accent bar at the start edge (the accent; platform amber `platform-accent`), so the state
 never relies on colour alone. Exactly one item is current (the most specific match;
 `activePattern` for sub-pages).
 
 **Breakpoints.**
 
-- **lg (1024px) and up:** sticky, full-height sidebar (`h-viewport`), 272px wide (compact 72px);
+- **lg (1024px) and up:** sticky, full-height sidebar (`h-viewport`), 240px wide (compact 56px);
   the menu scrolls inside it (`overflow-y: auto`, `overscroll-behavior: contain`) while the
-  header and the account stay put. At 1366×768 the page keeps 1094px minus gutters.
+  header and the account stay put. At 1366×768 the page keeps 1126px minus gutters.
 - **Below lg:** the "Menu" button (44px) opens the same sidebar in the **modal `<dialog>`
   drawer** (`.drawer`, 20rem or the screen minus 48px): focus moves to its close button and
   cannot leave it (the page behind is inert and does not scroll), Escape, the close button, a
@@ -344,7 +470,7 @@ never relies on colour alone. Exactly one item is current (the most specific mat
   returns to the button. It renders its content only while open, so there is one "Main"
   landmark. It is never compact.
 
-**Compact mode.** The collapse button ("Collapse menu" / "Expand menu") switches the wide
+**Compact mode.** The collapse button ("Collapse menu" / "Expand menu") or **Ctrl+\\** switches the wide
 sidebar to icons only. Labels, headings and the school name stay in the DOM as `sr-only`, so
 every link keeps its accessible name; headings become thin dividers. On hover and keyboard focus
 a label appears beside the item (`.sidebar-tip`: fixed, so the scrolling menu does not clip it;
@@ -358,9 +484,10 @@ variant (`globals.css`) styles only inside the inline sidebar. React reads the a
 `useSyncExternalStore` (server snapshot "expanded"), so hydration never mismatches. Without
 storage the sidebar simply starts expanded.
 
-**Themes.** School: white sidebar with a hairline on the canvas, top bar without a card.
-Platform: dark violet sidebar and top bar (`platform-chrome`: yellow focus ring), yellow mark,
-badge and active bar. Pairs in §7.
+**Themes.** School: the sidebar and top bar sit on the canvas tone (so they read quieter than
+the white content) with hairlines. Operator console: dark neutral sidebar and top bar
+(`platform-chrome`: amber focus ring), amber mark, badge and active bar (owner decision
+2026-10-18). Pairs in §7.
 
 **Telugu.** Every label is in `messages/*.json` (`shell` namespace plus the existing nav keys);
 the language switch in the top bar shows only while Telugu is switched on (§5.4).
@@ -486,8 +613,8 @@ plain text and the caret `CanvasText`.
 **Accessibility.** One polite status region announces the step names (not counts, not words) and
 then "The answer is ready." with the checked answer as plain text once; the log itself is silent.
 Everything is reachable by keyboard with the visible focus ring; popovers and menus close with
-Escape and return focus. Colours reuse §7 pairs (`ink-muted` on white 7.56:1, `violet-ink` on
-`violet-soft` 7.96:1, `primary` on `primary-soft` 5.82:1, `on-action` on `action` 17.74:1).
+Escape and return focus. Colours reuse §7 pairs (`ink-muted` on white 7.45:1, `violet-ink` on
+`violet-soft` 6.77:1, `primary` on `primary-soft` 5.22:1, `on-action` on `action` 17.36:1).
 Telugu: the sans with `:lang(te)` line height; chat titles are the one place the sidebar
 truncates (single line, `leading-relaxed` so glyphs are not clipped; full title in `title` and
 the accessible name; the responsive check allows exactly this one-line ellipsis). Everything
@@ -626,15 +753,20 @@ than entrances. The Ask chat keeps its own `--motion-*` durations (§5.3) on the
 | `KpiCard` / `StatCard` value                         | a change from one real value to another rises in (`TickValue`); first value and "—"→value do not                      | CSS (`.value-tick`)                                     |
 | `DataTable`, home work cards                         | content that replaces a skeleton fades in (`LoadFade`); cached/server data does not                                   | CSS (`.content-in`)                                     |
 | Skeleton                                             | shimmer (flat under reduced motion)                                                                                   | CSS                                                     |
+| Command palette                                      | fade + scale 0.98→1, 150ms; closes at once                                                                            | CSS (`dialog.palette[open]`)                            |
+| `Menu`, `Popover` panels                             | fade + scale 0.97 from the trigger corner, 120ms                                                                      | CSS (`.menu-in`), only after a user action              |
+| Bulk bar, toasts                                     | rise 8px + fade, 150ms                                                                                                | CSS (`.bar-in`)                                         |
+| `Drawer` (end side sheet)                            | slides in from the end, 260ms drawer curve; leaves with the modal fade                                                | CSS + WAAPI                                             |
 
 **Deliberately not animated** (the skills' frequency and keyboard gates): sidebar navigation,
 active item and compact switch; tabs and segmented controls (arrow keys move the selection,
 so a sliding indicator would animate keyboard input); `<details>` (often opened from the
 keyboard; no Baseline height animation); table rows, sorting and keyboard movement in grids;
-page and route loads; the Escape close of the notification panel. No toasts: results stay
-inline next to the form as `Alert live` (Sonner was considered and rejected: it injects a
-`<style>` element at run time, which the nonce CSP without `'unsafe-inline'` blocks, and
-inline results suit office users better).
+page and route loads; the Escape close of the notification panel; density, column, sort and
+paging changes. **Toasts (v1.0, owner decision 2026-10-18):** a CSS-only `ToastProvider`
+(classes only, no injected `<style>`, so the nonce CSP holds) for results of background work;
+form results and errors stay inline (`Alert live`, `ErrorSummary`). Sonner stays rejected (it
+injects a `<style>` element at run time).
 
 **Reduced motion.** Every rule sits in `@media (prefers-reduced-motion: no-preference)`; the
 reduce query still cuts any leftover transition to 0.01ms. `closeDialog()` closes at once.
@@ -886,6 +1018,8 @@ stacked lists below 640px only, 44px touch targets, dialogs that fit (sheets on 
 
 **UPI as built (R2-2E, 2026-10-18; `features/fees/UpiSettingsScreen.tsx`, `ReconcileScreen.tsx`, `UpiCounter.tsx`, `upi.ts`).** `/settings/upi` ("UPI QR" in the admin group, for any fee reader; editing needs `fee.manage`): the plain statement "SchoolOS never holds money", payee name, UPI ID and confirmation window, and a preview of the generated static QR with the payee name and UPI ID under it (an `<img>` of `/bff/api/v1/fees/upi-settings/qr.svg` with an alt text naming the payee); no image is uploaded. `/fees/reconcile` ("Reconcile UPI" in the Fees group, `fee.reconcile` only) has two tabs: **Bank statement** (bank format, "Find automatically" by default, file input; the note that the file is deleted once read and account numbers are never kept; the imported statements; "Review" opens the credits table with a checkbox for each proposal, exact UTR matches ticked and amount-and-date matches left for the person, the reason a credit needs a person, the receipt next to it (a conflicting receipt is marked "never corrected"), "Match receipt" (issued UPI receipts of the same amount) and "Not a fee" (reason code) per credit, and "Confirm N matches" with the consequence in the dialog) and **UPI exceptions** (confirmed vs not-yet-seen counts for 30 days, UPI receipts not seen in the bank after the window with days waiting, credits needing a person, "Find matches again"). The Online tab is R2-2D's. At the counter, choosing UPI shows "Show the school's UPI QR" (folded, so the counter still fits 1366×768) and checks a 12-digit UTR as it is typed (POST body), warning with a link when another receipt holds it and noting when the bank already reported it. The receipt page shows a "Seen in the bank statement on …" or "Not yet seen in a bank statement" pill for UPI receipts.
 
+**Online payments as built (R2-2D, 2026-10-18; `apps/web/src/features/payments/`).** `/settings/payments` (sidebar "Online payments" under the school's admin items, `payments.configure` or `finance.read`, shown while fees are on): before connecting, the merchant statement as a four-point notice (own account, never held by SchoolOS, Razorpay's fees, cash and UPI QR unchanged); "Connect with Razorpay sign-in" (only when the partner application is configured) and "Connect with API keys" (pilot switch) in a step-up dialog whose result panel shows the webhook URL, the events to tick and the secret through `SecretOnce` (copy, "I have added it"); once connected, status, mode, environment, account, open links, waiting messages, webhook URL, "Test connection", "New webhook secret" (shown once, old one valid 7 days) and "Disconnect" (danger, step-up). `/settings/payments/callback` finishes Razorpay sign-in (the code and state leave the address before the request). The student's fee account has a fifth tab "Payment links": instalment checkboxes with their collectable due, the link in a read-only field with Copy, a table of links (code, instalments, amount, status pill, works until, receipt link, Cancel for open ones). `/fees/reconcile/online` (sidebar "Online reconciliation", `finance.read` or `fee.manage`): today's counts and last daily check, status and kind filters, a table of items with kind, plain reason, Razorpay payment id, receipt or account link, amounts (expected when it differs) and "Explain" (note 10-500 characters) for `fee.manage` holders; R2-2E adds the bank tab at `/fees/reconcile`. A receipt paid online offers "Request refund" back to the payer only. Nothing is kept in browser storage; no personal data in URLs.
+
 #### Messages screens
 
 | Route | Screen | Key interaction notes |
@@ -919,11 +1053,47 @@ On the Ask page header for `tenant.billing.read` holders: a small meter "312 of 
 
 **As built (R2.4, 2026-10-17).** `features/ask/UsageNotices.tsx` (`AskUsageMeter` in the chat header, `AskUsageBanner` above the composer) over `useAskUsage` (`features/ask/usage.ts`, `GET /knowledge/usage`, refetched when an answer finishes). The meter shows only when the API sent numbers: "312 of 1,000 answers this month" with a native `<meter>` (`aria-label` "AI answers used this month"), or "312 answers this month" without a bundle; "Near your monthly answers" in `warning-ink` text from `near_limit`. The banner (`Alert`, warning for search-only, info for near-limit; dismiss button with an accessible name, keyed by month and state so a new state shows again) gives the reason (`kbErrors.*`) and the next step per reason; billing readers are pointed to SchoolOS support for a bigger bundle, other staff to the principal; near-limit only for billing readers. Stored answers keep their reason after a reload (`search_only_reason`); a search-only answer without one reads "could not be checked" (`kbErrors.unchecked`), not "unavailable". A `sos://` source of a kind this build does not know opens through `GET /knowledge/resolve` (`ResolveSource.tsx`; only app-relative paths are followed) and reads "Source you can no longer open" on 404. Checks: `features/ask/usage.test.tsx` (vitest), `e2e/ask.spec.ts` (meter, near-limit dismissed by keyboard at 1366×768, search-only banner and the stored reason after reload, axe).
 
+### 5.9 Command palette, shortcuts and phone bottom bars
+
+**Palette** (`components/console/CommandPalette.tsx`, mounted once by `AppShell`). **Ctrl+K**
+(⌘K on macOS; it overrides the browser's own Ctrl+K on these pages, owner decision) or the
+top bar's "Search or jump to…" opens a native modal `<dialog class="palette">` near the top of
+the screen: focus goes to the search box (WAI-ARIA combobox with `aria-activedescendant`),
+Up/Down move (wrapping), Ctrl+Home/End jump, Enter runs, Escape or a backdrop click closes,
+the result count is announced politely after typing stops. Matching is a fuzzy subsequence
+ranker (word starts first; adapted from interior.dev, MIT, `components/console/LICENSE-interior`).
+Groups:
+
+- **Go to**: exactly the items of the sidebar (`sections` after the permission and feature
+  filter), with the section as a hint. A page the menu hides is never offered.
+- **Actions**: quick actions passed by the console. School: `components/shell/school-actions.ts`
+  (`SCHOOL_ACTIONS`: Add a student, Collect fees, Take attendance, Enter marks, New change
+  request, Upload a document, Ask the school, Download a student list, Invite a staff member),
+  each an existing page with its permission (and feature), filtered by the same `allowed()`
+  as the menu. Operators: Set up a new school (`platform.tenants.provision`).
+- **Preferences**: Use compact / comfortable rows, Collapse or expand the menu (Ctrl+\\).
+
+Recents and student search are not built yet (student search needs a scoped server query;
+recents must store pages and actions only, never record names).
+
+**Shortcuts**: Ctrl/⌘+K palette, Ctrl+\\ compact sidebar (both `aria-keyshortcuts` on their
+buttons), plus the existing Ask (`/`, Alt+N) and fee counter keys. Never single-key shortcuts
+outside a focused widget.
+
+**Phone bottom bars** (below md, `AppShell` `bottomBar`, `bottomBarFor()` in
+`school-actions.ts`): teachers (`class_teacher`, `teacher`) get Home, Attendance, Marks, Ask;
+principals and owners get Home, Approvals (change requests), Ask, Messages. Only destinations
+their permission-filtered sidebar shows are kept; with fewer than two, there is no bar. It is a
+`<nav aria-label="Quick links">` of 56px tap targets above the home indicator; the page gets
+bottom padding so nothing hides under it. Menu stays in the top bar.
+
 ## 6. Do and don't
 
 | Do                                                                                      | Don't                                                                                                         |
 | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Use the near-black `primary` for the main action of a card and `secondary` for the rest | Put two `brand` (blue) buttons on one screen                                                                  |
+| Use the near-black `primary` for the main action of a view and `secondary` for the rest | Put two primary buttons on one view, or use the accent as a second brand colour                               |
+| Put figures in `num`; align numeric columns end                                          | Use Instrument Serif for table or KPI numbers                                                                 |
+| Keep cards hairline (`border-border`), shadows only on overlays                          | Add shadows or gradients to cards or the canvas                                                               |
 | Use `KpiCard` only for numbers the API returns; show "—" (`value={null}`) when missing  | Invent or estimate statistics, even on the welcome page                                                       |
 | Give every icon-only control a `label`; give charts a text alternative                  | Rely on colour alone (always text in pills, a number in rings)                                                |
 | Use `SegmentedControl` for a small choice, `Tabs` for panels, `TabNav` for pages        | Build tab-like controls from `div`s                                                                           |
@@ -934,80 +1104,104 @@ On the Ask page header for `tenant.billing.read` holders: a small meter "312 of 
 
 ## 7. Contrast table (recomputed by `tokens.test.ts`)
 
-| Foreground                    | Background                | Ratio   | Needs | Used for                                                  |
-| ----------------------------- | ------------------------- | ------- | ----- | --------------------------------------------------------- |
-| `ink` #111827                 | `surface` #ffffff         | 17.74:1 | 4.5:1 | body text on cards                                        |
-| `ink` #111827                 | `canvas-from` #dbe9fa     | 14.40:1 | 4.5:1 | text on the canvas                                        |
-| `ink-muted` #4b5563           | `surface` #ffffff         | 7.56:1  | 4.5:1 | secondary text on cards                                   |
-| `ink-muted` #4b5563           | `canvas-from` #dbe9fa     | 6.14:1  | 4.5:1 | secondary text on the canvas                              |
-| `ink-muted` #4b5563           | `canvas-to` #dcf2f0       | 6.48:1  | 4.5:1 | secondary text on the canvas                              |
-| `ink-muted` #4b5563           | `surface-muted` #f3f5f8   | 6.92:1  | 4.5:1 | table header, filled input                                |
-| `ink-muted` #4b5563           | `surface-sunken` #eef1f5  | 6.67:1  | 4.5:1 | unselected segment                                        |
-| `ink-subtle` #5b6576          | `surface` #ffffff         | 5.89:1  | 4.5:1 | comparison line on KPI cards                              |
-| `ink-subtle` #5b6576          | `canvas-from` #dbe9fa     | 4.78:1  | 4.5:1 | notes on the canvas                                       |
-| `ink-subtle` #5b6576          | `canvas-to` #dcf2f0       | 5.05:1  | 4.5:1 | notes on the canvas                                       |
-| `ink-subtle` #5b6576          | `surface-muted` #f3f5f8   | 5.39:1  | 4.5:1 | placeholder in filled inputs                              |
-| `ink` #111827                 | `surface-muted` #f3f5f8   | 16.24:1 | 4.5:1 | typed text in filled inputs                               |
-| `primary` #1d4ed8             | `surface` #ffffff         | 6.70:1  | 4.5:1 | links on cards                                            |
-| `primary` #1d4ed8             | `canvas-from` #dbe9fa     | 5.44:1  | 4.5:1 | links on the canvas                                       |
-| `primary` #1d4ed8             | `primary-soft` #e8efff    | 5.82:1  | 4.5:1 | active nav item                                           |
-| `primary` #1d4ed8             | `info-soft` #eff4ff       | 6.08:1  | 4.5:1 | date chip                                                 |
-| `on-primary` #ffffff          | `primary` #1d4ed8         | 6.70:1  | 4.5:1 | legacy brand fill                                         |
-| `white` #ffffff               | `brand` #2563eb           | 5.17:1  | 4.5:1 | brand button                                              |
-| `white` #ffffff               | `brand-strong` #1e40af    | 8.72:1  | 4.5:1 | brand button hover                                        |
-| `on-action` #ffffff           | `action` #111827          | 17.74:1 | 4.5:1 | primary (near-black) button, delta pill                   |
-| `on-action` #ffffff           | `action-hover` #1f2937    | 14.68:1 | 4.5:1 | primary button hover                                      |
-| `white` #ffffff               | `danger` #b42318          | 6.57:1  | 4.5:1 | danger button                                             |
-| `danger` #b42318              | `danger-soft` #fef3f2     | 6.05:1  | 4.5:1 | danger alert, negative chip                               |
-| `danger` #b42318              | `surface` #ffffff         | 6.57:1  | 4.5:1 | error text                                                |
-| `warning-ink` #7a2e0e         | `warning-soft` #fffaeb    | 9.05:1  | 4.5:1 | warning alert                                             |
-| `success-ink` #05603a         | `success-soft` #ecfdf3    | 7.26:1  | 4.5:1 | success alert                                             |
-| `positive-ink` #166534        | `positive-soft` #f0fdf4   | 6.81:1  | 4.5:1 | positive chip                                             |
-| `info-ink` #1e40af            | `info-soft` #eff4ff       | 7.91:1  | 4.5:1 | info alert                                                |
-| `violet-ink` #5b21b6          | `violet-soft` #f3efff     | 7.96:1  | 4.5:1 | violet chip                                               |
-| `teal-ink` #115e59            | `teal-soft` #e6f7f5       | 6.86:1  | 4.5:1 | teal chip                                                 |
-| `info-ink` #1e40af            | `info-soft` #eff4ff       | 7.91:1  | 4.5:1 | In progress pill                                          |
-| `violet-ink` #5b21b6          | `violet-soft` #f3efff     | 7.96:1  | 4.5:1 | Review pill                                               |
-| `teal-ink` #115e59            | `teal-soft` #e6f7f5       | 6.86:1  | 4.5:1 | Done pill                                                 |
-| `positive-ink` #166534        | `positive-soft` #f0fdf4   | 6.81:1  | 4.5:1 | Positive pill                                             |
-| `danger` #b42318              | `danger-soft` #fef3f2     | 6.05:1  | 4.5:1 | Negative pill                                             |
-| `primary` #1d4ed8             | `info-soft` #eff4ff       | 6.08:1  | 4.5:1 | Date pill                                                 |
-| `ink-muted` #4b5563           | `surface-muted` #f3f5f8   | 6.92:1  | 4.5:1 | Tag pill                                                  |
-| `ink-muted` #4b5563           | `surface` #ffffff         | 7.56:1  | 4.5:1 | Sample pill                                               |
-| `ink` #111827                 | `canvas-neutral` #f4f6f9  | 16.39:1 | 4.5:1 | text on the neutral canvas                                |
-| `ink-muted` #4b5563           | `canvas-neutral` #f4f6f9  | 6.98:1  | 4.5:1 | secondary text on the neutral canvas                      |
-| `ink-subtle` #5b6576          | `canvas-neutral` #f4f6f9  | 5.44:1  | 4.5:1 | notes on the neutral canvas                               |
-| `primary` #1d4ed8             | `canvas-neutral` #f4f6f9  | 6.19:1  | 4.5:1 | links and breadcrumbs on the neutral canvas               |
-| `focus` #1d4ed8               | `canvas-neutral` #f4f6f9  | 6.19:1  | 3:1   | focus ring on the neutral canvas                          |
-| `white` #ffffff               | `ai-from` #1e3a8a         | 10.36:1 | 4.5:1 | AI panel text (dark stop)                                 |
-| `white` #ffffff               | `ai-to` #2563eb           | 5.17:1  | 4.5:1 | AI panel text (light stop)                                |
-| `platform-ink` #ffffff        | `platform` #3b0764        | 15.00:1 | 4.5:1 | platform sidebar and top bar text                         |
-| `platform-ink` #ffffff        | `platform-hover` #581c87  | 10.88:1 | 4.5:1 | platform sidebar hover and active row                     |
-| `platform-muted` #e9d5ff      | `platform` #3b0764        | 11.02:1 | 4.5:1 | platform sidebar items, headings, role line               |
-| `platform-accent` #fcd34d     | `platform` #3b0764        | 10.40:1 | 3:1   | platform focus ring and active marker                     |
-| `platform-accent-ink` #3b0764 | `platform-accent` #fcd34d | 10.40:1 | 4.5:1 | platform badge                                            |
-| `platform` #3b0764            | `platform-soft` #f5f0ff   | 13.42:1 | 4.5:1 | active platform nav item                                  |
-| `primary` #1d4ed8             | `primary-soft` #e8efff    | 5.82:1  | 3:1   | sidebar active bar on the active row                      |
-| `ink-subtle` #5b6576          | `surface-muted` #f3f5f8   | 5.39:1  | 4.5:1 | "Current school" label                                    |
-| `primary` #1d4ed8             | `surface-muted` #f3f5f8   | 6.14:1  | 4.5:1 | "Switch school" link                                      |
-| `platform-accent` #fcd34d     | `platform-hover` #581c87  | 7.54:1  | 3:1   | platform sidebar active bar, focus ring on the active row |
-| `on-action` #ffffff           | `action` #111827          | 17.74:1 | 4.5:1 | compact sidebar label (tooltip)                           |
-| `border-control` #7b8494      | `surface` #ffffff         | 3.77:1  | 3:1   | input and switch boundary on cards                        |
-| `border-control` #7b8494      | `surface-muted` #f3f5f8   | 3.45:1  | 3:1   | input boundary against its fill                           |
-| `border-strong` #6b7280       | `surface` #ffffff         | 4.83:1  | 3:1   | legacy control boundary                                   |
-| `focus` #1d4ed8               | `surface` #ffffff         | 6.70:1  | 3:1   | focus ring on cards                                       |
-| `focus` #1d4ed8               | `canvas-from` #dbe9fa     | 5.44:1  | 3:1   | focus ring on the canvas                                  |
-| `success` #15803d             | `surface` #ffffff         | 5.02:1  | 3:1   | switch on, timeline check                                 |
-| `chart-1` #2563eb             | `surface` #ffffff         | 5.17:1  | 3:1   | chart series 1                                            |
-| `chart-2` #d97706             | `surface` #ffffff         | 3.19:1  | 3:1   | chart series 2 (amber)                                    |
-| `chart-3` #0d9488             | `surface` #ffffff         | 3.74:1  | 3:1   | chart series 3 (teal)                                     |
-| `chart-4` #7c3aed             | `surface` #ffffff         | 5.70:1  | 3:1   | chart series 4 (violet)                                   |
+Every pair below is computed from the `oklch()` values in `globals.css` (converted to sRGB as
+the browser shows them) by `components/ui/tokens.test.ts`. `canvas-from`, `canvas-to` and
+`canvas-neutral` are aliases of `canvas` and `primary`/`brand`/`focus` of `accent` since v1.0;
+their rows are kept so older components stay covered.
+
+| Foreground | Background | Ratio | Needs | Used for |
+| --- | --- | --- | --- | --- |
+| `ink` #1c1a17 | `surface` #ffffff | 17.36:1 | 4.5:1 | body text on cards |
+| `ink` #1c1a17 | `canvas-from` #fbfaf9 | 16.65:1 | 4.5:1 | text on the canvas |
+| `ink-muted` #575550 | `surface` #ffffff | 7.45:1 | 4.5:1 | secondary text on cards |
+| `ink-muted` #575550 | `canvas-from` #fbfaf9 | 7.14:1 | 4.5:1 | secondary text on the canvas |
+| `ink-muted` #575550 | `canvas-to` #fbfaf9 | 7.14:1 | 4.5:1 | secondary text on the canvas |
+| `ink-muted` #575550 | `surface-muted` #f6f5f3 | 6.83:1 | 4.5:1 | table header, filled input |
+| `ink-muted` #575550 | `surface-sunken` #f2f0ec | 6.54:1 | 4.5:1 | unselected segment |
+| `ink-subtle` #6e6b67 | `surface` #ffffff | 5.30:1 | 4.5:1 | comparison line on KPI cards |
+| `ink-subtle` #6e6b67 | `canvas-from` #fbfaf9 | 5.08:1 | 4.5:1 | notes on the canvas |
+| `ink-subtle` #6e6b67 | `canvas-to` #fbfaf9 | 5.08:1 | 4.5:1 | notes on the canvas |
+| `ink-subtle` #6e6b67 | `surface-muted` #f6f5f3 | 4.86:1 | 4.5:1 | placeholder in filled inputs |
+| `ink` #1c1a17 | `surface-muted` #f6f5f3 | 15.94:1 | 4.5:1 | typed text in filled inputs |
+| `primary` #2f62ac | `surface` #ffffff | 6.06:1 | 4.5:1 | links on cards |
+| `primary` #2f62ac | `canvas-from` #fbfaf9 | 5.82:1 | 4.5:1 | links on the canvas |
+| `primary` #2f62ac | `primary-soft` #e4efff | 5.22:1 | 4.5:1 | active nav item |
+| `primary` #2f62ac | `info-soft` #e4efff | 5.22:1 | 4.5:1 | date chip |
+| `on-primary` #ffffff | `primary` #2f62ac | 6.06:1 | 4.5:1 | legacy brand fill |
+| `white` #ffffff | `brand` #2f62ac | 6.06:1 | 4.5:1 | brand button |
+| `white` #ffffff | `brand-strong` #1d4682 | 9.33:1 | 4.5:1 | brand button hover |
+| `on-action` #ffffff | `action` #1c1a17 | 17.36:1 | 4.5:1 | primary (near-black) button, delta pill |
+| `on-action` #ffffff | `action-hover` #35332e | 12.62:1 | 4.5:1 | primary button hover |
+| `white` #ffffff | `danger` #c22826 | 5.79:1 | 4.5:1 | danger button |
+| `danger` #c22826 | `danger-soft` #ffece9 | 5.08:1 | 4.5:1 | danger alert, negative chip |
+| `danger` #c22826 | `surface` #ffffff | 5.79:1 | 4.5:1 | error text |
+| `warning-ink` #8a5619 | `warning-soft` #ffe9cb | 5.19:1 | 4.5:1 | warning alert |
+| `success-ink` #115629 | `success-soft` #dcf7e1 | 7.72:1 | 4.5:1 | success alert |
+| `positive-ink` #115629 | `positive-soft` #dcf7e1 | 7.72:1 | 4.5:1 | positive chip |
+| `info-ink` #1d4682 | `info-soft` #e4efff | 8.04:1 | 4.5:1 | info alert |
+| `violet-ink` #5d4099 | `violet-soft` #efebff | 6.77:1 | 4.5:1 | violet chip |
+| `teal-ink` #00635b | `teal-soft` #d9f6f1 | 6.27:1 | 4.5:1 | teal chip |
+| `ink` #1c1a17 | `canvas-neutral` #fbfaf9 | 16.65:1 | 4.5:1 | text on the neutral canvas |
+| `ink-muted` #575550 | `canvas-neutral` #fbfaf9 | 7.14:1 | 4.5:1 | secondary text on the neutral canvas |
+| `ink-subtle` #6e6b67 | `canvas-neutral` #fbfaf9 | 5.08:1 | 4.5:1 | notes on the neutral canvas |
+| `primary` #2f62ac | `canvas-neutral` #fbfaf9 | 5.82:1 | 4.5:1 | links and breadcrumbs on the neutral canvas |
+| `focus` #2f62ac | `canvas-neutral` #fbfaf9 | 5.82:1 | 3:1 | focus ring on the neutral canvas |
+| `white` #ffffff | `ai-from` #1d4682 | 9.33:1 | 4.5:1 | AI panel text (dark stop) |
+| `white` #ffffff | `ai-to` #2f62ac | 6.06:1 | 4.5:1 | AI panel text (light stop) |
+| `platform-ink` #ffffff | `platform` #1d1a15 | 17.34:1 | 4.5:1 | platform sidebar and top bar text |
+| `platform-ink` #ffffff | `platform-hover` #312d27 | 13.68:1 | 4.5:1 | platform sidebar hover and active row |
+| `platform-muted` #d4d1ca | `platform` #1d1a15 | 11.37:1 | 4.5:1 | platform sidebar items, headings, role line |
+| `platform-accent` #faca4b | `platform` #1d1a15 | 11.24:1 | 3:1 | platform focus ring and active marker |
+| `platform-accent-ink` #1d1a15 | `platform-accent` #faca4b | 11.24:1 | 4.5:1 | platform badge |
+| `platform` #1d1a15 | `platform-soft` #fdf5df | 15.94:1 | 4.5:1 | active platform nav item |
+| `primary` #2f62ac | `primary-soft` #e4efff | 5.22:1 | 3:1 | sidebar active bar on the active row |
+| `primary` #2f62ac | `surface-muted` #f6f5f3 | 5.56:1 | 4.5:1 | "Switch school" link on the school block |
+| `platform-accent` #faca4b | `platform-hover` #312d27 | 8.87:1 | 3:1 | platform sidebar active bar |
+| `border-control` #888682 | `surface` #ffffff | 3.63:1 | 3:1 | input and switch boundary on cards |
+| `border-control` #888682 | `surface-muted` #f6f5f3 | 3.34:1 | 3:1 | input boundary against its fill |
+| `border-strong` #7c7a75 | `surface` #ffffff | 4.29:1 | 3:1 | legacy control boundary |
+| `focus` #2f62ac | `surface` #ffffff | 6.06:1 | 3:1 | focus ring on cards |
+| `focus` #2f62ac | `canvas-from` #fbfaf9 | 5.82:1 | 3:1 | focus ring on the canvas |
+| `success` #287c42 | `surface` #ffffff | 5.18:1 | 3:1 | switch on, timeline check |
+| `chart-1` #2f62ac | `surface` #ffffff | 6.06:1 | 3:1 | chart series 1 |
+| `chart-2` #be7100 | `surface` #ffffff | 3.78:1 | 3:1 | chart series 2 (amber) |
+| `chart-3` #1b8278 | `surface` #ffffff | 4.66:1 | 3:1 | chart series 3 (teal) |
+| `chart-4` #6b4cae | `surface` #ffffff | 6.42:1 | 3:1 | chart series 4 (violet) |
+| `ink` #1c1a17 | `canvas` #fbfaf9 | 16.65:1 | 4.5:1 | text on the flat canvas |
+| `ink-muted` #575550 | `canvas` #fbfaf9 | 7.14:1 | 4.5:1 | secondary text on the flat canvas |
+| `ink-subtle` #6e6b67 | `canvas` #fbfaf9 | 5.08:1 | 4.5:1 | notes and group labels on the canvas |
+| `ink-subtle` #6e6b67 | `surface-sunken` #f2f0ec | 4.66:1 | 4.5:1 | notes on the sunken track |
+| `accent` #2f62ac | `surface` #ffffff | 6.06:1 | 4.5:1 | links, breadcrumb links on white |
+| `accent` #2f62ac | `canvas` #fbfaf9 | 5.82:1 | 4.5:1 | links and the top bar breadcrumb on the canvas |
+| `accent` #2f62ac | `accent-soft` #e4efff | 5.22:1 | 4.5:1 | current nav item, selected row text |
+| `accent-strong` #1d4682 | `accent-soft` #e4efff | 8.04:1 | 4.5:1 | selected chip text |
+| `on-accent` #ffffff | `accent` #2f62ac | 6.06:1 | 4.5:1 | selection count badge, accent fill |
+| `on-accent` #ffffff | `accent-strong` #1d4682 | 9.33:1 | 4.5:1 | accent fill hover |
+| `accent` #2f62ac | `accent-soft` #e4efff | 5.22:1 | 3:1 | current nav item marker on its tint |
+| `focus` #2f62ac | `canvas` #fbfaf9 | 5.82:1 | 3:1 | focus ring on the flat canvas |
+| `focus` #2f62ac | `surface-muted` #f6f5f3 | 5.56:1 | 3:1 | focus ring on table headers and filled inputs |
+| `ink` #1c1a17 | `surface-hover` #f1f0ed | 15.24:1 | 4.5:1 | row text on hover |
+| `ink-muted` #575550 | `surface-hover` #f1f0ed | 6.53:1 | 4.5:1 | secondary row text on hover |
+| `border-control` #888682 | `canvas` #fbfaf9 | 3.49:1 | 3:1 | checkbox boundary on the canvas |
+| `platform-muted` #d4d1ca | `platform-hover` #312d27 | 8.97:1 | 4.5:1 | operator sidebar muted text on hover |
+| `ink` #1c1a17 | `accent-soft` #e4efff | 14.96:1 | 4.5:1 | current sidebar item, palette option text |
+| `ink-muted` #575550 | `accent-soft` #e4efff | 6.41:1 | 4.5:1 | filter chip label |
+| `warning-ink` #8a5619 | `surface` #ffffff | 6.13:1 | 4.5:1 | "Changes not saved" on the save bar |
 
 Secondary buttons and round icon buttons use the decorative `border-soft`: a text label or the
 icon itself identifies the control, so WCAG 1.4.11 does not require a 3:1 boundary there. Inputs
 and the switch have no text inside when empty, so they use `border-control` (3:1).
 
 ## 8. Open points
+
+- v1.0 foundation (2026-10-18), for the page-redesign wave: screens still use their own layouts
+  on the new tokens; each list screen moves to `DataTableV2` + `Pagination` + `FilterChips`,
+  each form to `ErrorSummary` + `SaveBar` (+ `Steps`), per §5. Not built yet: palette student
+  search and recents, sticky record page headers, the Ask panel on an accent tint (it still
+  uses `.ai-gradient` in accent colours), marketing in Direction B, illustrations, a
+  `/dev/ui` section for the new components. Pages that pass a two-crumb `breadcrumb` no
+  longer show it (the top bar does); pages with deeper trails still show theirs, so the
+  record trail and the top bar overlap slightly until each page is redesigned.
 
 - Motion (§5.5), for the product owner: the owner asked for a sliding tab/segmented indicator,
   an animated accordion and toasts; they were left out on purpose (keyboard-driven, no Baseline

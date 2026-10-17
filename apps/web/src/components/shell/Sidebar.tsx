@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { SidebarNav, type NavSection, type SidebarTheme } from "@/components/ui/SidebarNav";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
-import { BrandMark } from "./Brand";
+import { Wordmark } from "./Brand";
 import { sidebarThemes } from "./sidebar-theme";
 
 export interface SidebarProps {
@@ -42,44 +42,39 @@ export function Sidebar({
 }: SidebarProps) {
   const t = useTranslations("common");
   const styles = sidebarThemes[theme];
-  const wordmark = (
-    <>
-      <BrandMark tone={theme} />
-      <span className="min-w-0 text-lg font-semibold collapsed:sr-only">{t("appName")}</span>
-    </>
-  );
+  const wordmark = <Wordmark tone={theme} textClassName="collapsed:sr-only" />;
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-center gap-2 px-3 pt-4 pb-3 collapsed:flex-col collapsed:gap-3">
+      <div className="flex items-center gap-1 px-2 pt-3 pb-2 collapsed:flex-col collapsed:gap-2">
         {mode === "inline" ? (
           <Link
             href={homeHref}
             data-tooltip={t("appName")}
             className={cn(
-              "flex min-h-10 min-w-0 flex-1 items-center gap-2.5 rounded-md px-1.5 py-1 transition-colors",
-              "collapsed:flex-none collapsed:px-0.5",
+              "flex min-h-9 min-w-0 flex-1 items-center rounded-md px-2 py-1 transition-colors",
+              "collapsed:flex-none collapsed:px-1",
               styles.brand,
             )}
           >
             {wordmark}
           </Link>
         ) : (
-          <p className="flex min-w-0 flex-1 items-center gap-2.5 px-1.5 py-1">{wordmark}</p>
+          <p className="flex min-w-0 flex-1 items-center px-2 py-1">{wordmark}</p>
         )}
         {control}
       </div>
-      {context ? <div className="px-3 pb-3">{context}</div> : null}
+      {context ? <div className="px-2 pb-2">{context}</div> : null}
       <SidebarNav
         label={navLabel}
         sections={sections}
         theme={theme}
         className={cn(
-          "min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pt-1 pb-4",
+          "min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pt-1 pb-4",
           // The menu scrolls on its own; its edge shows where the account area starts.
           account ? cn("border-b", styles.divider) : undefined,
         )}
       />
-      {account ? <div className="px-3 py-3">{account}</div> : null}
+      {account ? <div className="px-2 py-3">{account}</div> : null}
     </div>
   );
 }

@@ -10,8 +10,8 @@ type PlatformNavItem = NavItem & { anyOf?: readonly string[] };
 
 /**
  * Platform admin panel chrome (C14). Same single sidebar as the school console (AppShell,
- * docs/17 §5.2), but deliberately different: a dark violet sidebar and top bar, a yellow
- * "Platform admin" badge, yellow active markers and a yellow focus ring, so an operator
+ * docs/17 §5.2), but deliberately different: a dark neutral sidebar and top bar, an amber
+ * "Platform admin" badge, amber active markers and an amber focus ring, so an operator
  * always knows they are in the control plane.
  */
 export function PlatformShell({
@@ -144,6 +144,18 @@ export function PlatformShell({
       .filter((key) => tr.has(key as "platform_owner"))
       .map((key) => tr(key as "platform_owner"))
       .join(", ") || null;
+  // Palette quick actions, filtered like the menu.
+  const actions =
+    permissions === null || permissions.includes("platform.tenants.provision")
+      ? [
+          {
+            id: "provision",
+            label: t("ui.palette.provisionSchool"),
+            href: "/platform/provision",
+            icon: "plus" as const,
+          },
+        ]
+      : [];
   const badge = <Badge tone="platform">{t("platform.badge")}</Badge>;
   return (
     <AppShell
@@ -151,6 +163,7 @@ export function PlatformShell({
       homeHref="/platform"
       navLabel={t("platform.nav.label")}
       sections={sections}
+      actions={actions}
       context={<div className="px-1.5 collapsed:sr-only">{badge}</div>}
       brandBadge={badge}
       account={

@@ -33,7 +33,7 @@ AdjustmentReason = Literal[
 CancelReason = Literal[
     "wrong_student", "wrong_amount", "cheque_dishonoured", "duplicate_entry", "other"
 ]
-RefundMode = Literal["cash", "cheque", "bank_transfer"]
+RefundMode = Literal["original_method", "cash", "cheque", "bank_transfer"]
 RefundStatus = Literal[
     "pending", "approved", "processing", "processed", "failed", "rejected", "withdrawn"
 ]

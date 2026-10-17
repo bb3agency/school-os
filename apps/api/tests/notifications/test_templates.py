@@ -50,6 +50,11 @@ NUMERIC = {
     "hours",
     "suggestions",
     "days",
+    # R2-2D: open online reconciliation items.
+    "count",
+    # R2-2E: UPI receipts not yet seen in the bank and credits needing a person.
+    "unconfirmed",
+    "credits",
 }
 
 

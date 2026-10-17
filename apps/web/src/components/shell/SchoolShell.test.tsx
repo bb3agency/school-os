@@ -167,7 +167,12 @@ describe("school sidebar: school, account and top bar (docs/17 §5.2)", () => {
     // Nothing duplicated: one account area, the idle warning outside the sidebar.
     expect(screen.getAllByRole("region", { name: "Your account" })).toHaveLength(1);
     const dialogs = Array.from(document.querySelectorAll("dialog"));
-    expect(dialogs.filter((dialog) => !dialog.classList.contains("drawer"))).toHaveLength(1);
+    // The menu drawer and the command palette are the shell's own dialogs.
+    expect(
+      dialogs.filter(
+        (dialog) => !dialog.classList.contains("drawer") && !dialog.classList.contains("palette"),
+      ),
+    ).toHaveLength(1);
     expect(sidebar().querySelector("dialog")).toBeNull();
   });
 

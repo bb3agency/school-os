@@ -3,7 +3,7 @@ docs/05 §15.1; ADR-0042 decision 9; FR-FEE-016).
 
 A fresh database is migrated to head, seeded with a synthetic school (``seed-synthetic``) and given
 a UPI receipt, UPI settings, a bank statement with one credit and the confirmation of that
-receipt; head -> 0058 -> head must succeed with that data present: the four tables, their
+receipt; head -> 0059 -> head must succeed with that data present: the four tables, their
 triggers and ``fee.reconcile`` go (the lossy part, as documented), receipts and student records
 are untouched, and the upgrade brings the tables back empty.
 """
@@ -35,7 +35,7 @@ from app.fees.upi_models import UPI_MODELS
 pytestmark = pytest.mark.db
 DB = "schoolos_fees_upi_migration"
 REVISION = "0060_fees_upi"
-PREVIOUS = "0058_fees_core"  # R2-2D adds 0059_payments_online; re-chained at merge (docs/14 R2)
+PREVIOUS = "0059_payments_online"  # re-chained after R2-2D at merge (docs/14 R2)
 SETTINGS = Settings(
     env=Environment.CI,
     key_wrapper=KeyWrapperKind.LOCAL_DEV,

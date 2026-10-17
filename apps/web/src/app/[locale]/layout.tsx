@@ -18,7 +18,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import type { ReactNode } from "react";
 import { QueryProvider } from "@/components/providers/QueryProvider";
-import { SIDEBAR_STATE_SCRIPT } from "@/components/shell/sidebar-script";
+import { SHELL_STATE_SCRIPT } from "@/components/shell/sidebar-script";
 import { enabledLocales, isEnabledLocale, teluguEnabled } from "@/i18n/languages";
 import { LanguagesProvider } from "@/i18n/LanguagesProvider";
 import { TELUGU_STYLESHEET_HREF } from "@/i18n/telugu-font";
@@ -69,10 +69,10 @@ export default async function LocaleLayout({ children, params }: LayoutProps) {
     // the server cannot know), so <html> alone may differ from the server markup.
     <html lang={locale} suppressHydrationWarning>
       <head>
-        {/* Compact sidebar on the first paint, no layout shift (docs/17 §5.2). Constant
+        {/* Compact sidebar and density on the first paint, no layout shift (docs/17 §3.4, §5.2). Constant
             text; browsers hide the nonce attribute after parsing, hence the suppression. */}
         <script nonce={nonce} suppressHydrationWarning>
-          {SIDEBAR_STATE_SCRIPT}
+          {SHELL_STATE_SCRIPT}
         </script>
         {teluguEnabled() ? <link rel="stylesheet" href={TELUGU_STYLESHEET_HREF} /> : null}
       </head>

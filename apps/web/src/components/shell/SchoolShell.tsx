@@ -8,6 +8,7 @@ import { AskRecents } from "@/features/ask/AskRecents";
 import { Link } from "@/i18n/navigation";
 import type { SessionKind } from "@/lib/bff/session-client";
 import { AppShell } from "./AppShell";
+import { SCHOOL_ACTIONS, bottomBarFor } from "./school-actions";
 
 interface SchoolNavItem extends NavItem {
   /** Effective permission (or any of several) needed to see the item (UX only: the API checks every call). */
@@ -277,6 +278,15 @@ export function SchoolShell({
           permission: "fee.reconcile",
           feature: "fees",
           icon: "refresh",
+          activePattern: "^/fees/reconcile/?$",
+        },
+        {
+          // R2-2D (US-2111, FR-PAY-010): online payment exceptions and the daily check.
+          href: "/fees/reconcile/online",
+          label: t("payments.nav.reconcile"),
+          permission: "fee.reconcile",
+          feature: "fees",
+          icon: "check",
         },
         {
           href: "/fees/setup",
@@ -349,6 +359,14 @@ export function SchoolShell({
           icon: "creditCard",
         },
         {
+          // R2-2D (US-2107, ADR-0042): the school's own Razorpay account (online fee payments).
+          href: "/settings/payments",
+          label: t("payments.nav.settings"),
+          permission: ["payments.configure", "finance.read"],
+          feature: "fees",
+          icon: "creditCard",
+        },
+        {
           // R2-1C (US-2201, ADR-0043): the school's own WhatsApp number and its settings.
           href: "/settings/whatsapp",
           label: t("messaging.nav.settings"),
@@ -377,7 +395,7 @@ export function SchoolShell({
       ],
     },
   ];
-  const allowed = (item: SchoolNavItem) =>
+  const allowed = (item: Pick<SchoolNavItem, "permission" | "feature">) =>
     (!item.feature || features[item.feature] === true) &&
     (!item.permission ||
       permissions === null ||
@@ -400,6 +418,14 @@ export function SchoolShell({
         ...(subActivePattern ? { subActivePattern } : {}),
       })),
   }));
+  // Palette quick actions and the phone bottom bar: the same filter as the menu (docs/17 §5.9).
+  const actions = SCHOOL_ACTIONS.filter(allowed).map((action) => ({
+    id: action.id,
+    label: t(`ui.palette.${action.labelKey}`),
+    href: action.href,
+    icon: action.icon,
+  }));
+  const bottomBar = bottomBarFor(account?.roles, sections);
   // System roles by name ("Principal, Class teacher"); custom roles have no fixed label here.
   const role =
     (account?.roles ?? [])
@@ -435,6 +461,8 @@ export function SchoolShell({
       homeHref="/"
       navLabel={t("school.nav.label")}
       sections={sections}
+      actions={actions}
+      bottomBar={bottomBar}
       context={context}
       account={
         account ? (

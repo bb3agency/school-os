@@ -6039,6 +6039,36 @@
         "title": "ConfirmTeardownIn",
         "type": "object"
       },
+      "ConnectionTestOut": {
+        "properties": {
+          "checked_at": {
+            "format": "date-time",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "checked_at"
+        ],
+        "title": "ConnectionTestOut",
+        "type": "object"
+      },
       "ConnectorStatus": {
         "description": "The connector at a glance. Money totals only for school-wide ``finance.read`` holders.",
         "properties": {
@@ -9423,6 +9453,21 @@
           "version"
         ],
         "title": "ExamOut",
+        "type": "object"
+      },
+      "ExplainIn": {
+        "additionalProperties": false,
+        "properties": {
+          "note": {
+            "maxLength": 500,
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "note"
+        ],
+        "title": "ExplainIn",
         "type": "object"
       },
       "ExportDownloadOut": {
@@ -14659,6 +14704,22 @@
         "title": "ManualConnectIn",
         "type": "object"
       },
+      "ManualConnectOut": {
+        "properties": {
+          "connection": {
+            "$ref": "#/components/schemas/PaymentConnectionOut"
+          },
+          "webhook": {
+            "$ref": "#/components/schemas/WebhookSetupOut"
+          }
+        },
+        "required": [
+          "connection",
+          "webhook"
+        ],
+        "title": "ManualConnectOut",
+        "type": "object"
+      },
       "ManualFlagIn": {
         "additionalProperties": false,
         "properties": {
@@ -14688,6 +14749,31 @@
           "indicator"
         ],
         "title": "ManualFlagIn",
+        "type": "object"
+      },
+      "ManualKeysIn": {
+        "additionalProperties": false,
+        "description": "The key id and key secret from the school's own Razorpay dashboard (pilots, D13). The\nsecret is checked with a read call, stored wrapped and never returned.",
+        "properties": {
+          "key_id": {
+            "pattern": "^rzp_(test|live)_[A-Za-z0-9]{6,30}$",
+            "title": "Key Id",
+            "type": "string"
+          },
+          "key_secret": {
+            "format": "password",
+            "maxLength": 100,
+            "minLength": 8,
+            "title": "Key Secret",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "key_id",
+          "key_secret"
+        ],
+        "title": "ManualKeysIn",
         "type": "object"
       },
       "MappingIn": {
@@ -17007,6 +17093,42 @@
         "title": "NotificationOut",
         "type": "object"
       },
+      "OAuthCallbackIn": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "maxLength": 512,
+            "minLength": 4,
+            "pattern": "^[!-~]+$",
+            "title": "Code",
+            "type": "string"
+          },
+          "state": {
+            "pattern": "^[A-Za-z0-9_-]{20,100}$",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "state"
+        ],
+        "title": "OAuthCallbackIn",
+        "type": "object"
+      },
+      "OAuthStartOut": {
+        "properties": {
+          "authorize_url": {
+            "title": "Authorize Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "authorize_url"
+        ],
+        "title": "OAuthStartOut",
+        "type": "object"
+      },
       "OffboardRequestIn": {
         "additionalProperties": false,
         "properties": {
@@ -19253,6 +19375,265 @@
         "title": "PartySearchIn",
         "type": "object"
       },
+      "PaymentConnectionOut": {
+        "description": "The school's connection, never its secrets (FR-PAY-002/003).",
+        "properties": {
+          "access_expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Access Expires At"
+          },
+          "connected": {
+            "title": "Connected",
+            "type": "boolean"
+          },
+          "connected_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connected At"
+          },
+          "connected_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connected By Name"
+          },
+          "environment": {
+            "anyOf": [
+              {
+                "enum": [
+                  "test",
+                  "live"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Environment"
+          },
+          "failed_events": {
+            "default": 0,
+            "title": "Failed Events",
+            "type": "integer"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "key_id_hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Id Hint"
+          },
+          "last_checked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Checked At"
+          },
+          "last_error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error Code"
+          },
+          "manual_keys_allowed": {
+            "title": "Manual Keys Allowed",
+            "type": "boolean"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "oauth",
+                  "manual_keys"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
+          "oauth_available": {
+            "title": "Oauth Available",
+            "type": "boolean"
+          },
+          "open_links": {
+            "default": 0,
+            "title": "Open Links",
+            "type": "integer"
+          },
+          "pending_events": {
+            "default": 0,
+            "title": "Pending Events",
+            "type": "integer"
+          },
+          "previous_valid_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Valid Until"
+          },
+          "provider": {
+            "default": "razorpay",
+            "title": "Provider",
+            "type": "string"
+          },
+          "provider_account_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Account Id"
+          },
+          "refresh_expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refresh Expires At"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "secret_rotated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Secret Rotated At"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "active",
+                  "revoked",
+                  "disconnected"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "webhook_events": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Webhook Events",
+            "type": "array"
+          },
+          "webhook_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Webhook Url"
+          }
+        },
+        "required": [
+          "connected",
+          "manual_keys_allowed",
+          "oauth_available"
+        ],
+        "title": "PaymentConnectionOut",
+        "type": "object"
+      },
       "PaymentIn": {
         "additionalProperties": false,
         "properties": {
@@ -19323,6 +19704,205 @@
           "reference"
         ],
         "title": "PaymentIn",
+        "type": "object"
+      },
+      "PaymentIntentCreate": {
+        "additionalProperties": false,
+        "description": "A payment link for chosen instalments of one account (FR-PAY-005): the amount is what is\nstill due on them now, never typed.",
+        "properties": {
+          "expires_in_days": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires In Days"
+          },
+          "instalments": {
+            "items": {
+              "maximum": 24.0,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            "maxItems": 24,
+            "minItems": 1,
+            "title": "Instalments",
+            "type": "array"
+          }
+        },
+        "required": [
+          "instalments"
+        ],
+        "title": "PaymentIntentCreate",
+        "type": "object"
+      },
+      "PaymentIntentOut": {
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Amount",
+            "type": "string"
+          },
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Name"
+          },
+          "created_via": {
+            "enum": [
+              "staff",
+              "parent_page",
+              "reminder"
+            ],
+            "title": "Created Via",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "instalments": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Instalments",
+            "type": "array"
+          },
+          "intent_code": {
+            "title": "Intent Code",
+            "type": "string"
+          },
+          "paid_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paid At"
+          },
+          "receipt_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Id"
+          },
+          "receipt_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Number"
+          },
+          "reused": {
+            "default": false,
+            "title": "Reused",
+            "type": "boolean"
+          },
+          "short_url": {
+            "title": "Short Url",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "created",
+              "paid",
+              "expired",
+              "cancelled",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "account_id",
+          "intent_code",
+          "amount",
+          "instalments",
+          "status",
+          "short_url",
+          "expires_at",
+          "created_via",
+          "created_by",
+          "created_by_name",
+          "created_at",
+          "paid_at",
+          "receipt_id",
+          "receipt_number",
+          "cancelled_at",
+          "version"
+        ],
+        "title": "PaymentIntentOut",
         "type": "object"
       },
       "PaymentOut": {
@@ -23167,6 +23747,390 @@
         "title": "ReceiptRef",
         "type": "object"
       },
+      "ReconciliationItemOut": {
+        "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expected_amount": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Amount"
+          },
+          "explained_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Explained At"
+          },
+          "explained_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Explained By"
+          },
+          "explained_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Explained By Name"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "intent_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intent Code"
+          },
+          "intent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intent Id"
+          },
+          "kind": {
+            "enum": [
+              "paid_not_receipted",
+              "receipted_not_captured",
+              "amount_mismatch",
+              "refunded",
+              "refund_failed",
+              "settlement_missing",
+              "unknown_intent"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "provider_payment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Payment Id"
+          },
+          "provider_refund_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Refund Id"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "receipt_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Id"
+          },
+          "receipt_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Number"
+          },
+          "refund_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refund Id"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          },
+          "run_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Date"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "explained",
+              "resolved"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "reason_code",
+          "status",
+          "provider_payment_id",
+          "provider_refund_id",
+          "intent_id",
+          "intent_code",
+          "receipt_id",
+          "receipt_number",
+          "refund_id",
+          "account_id",
+          "amount",
+          "expected_amount",
+          "note",
+          "explained_by",
+          "explained_by_name",
+          "explained_at",
+          "resolved_at",
+          "created_at",
+          "run_date",
+          "version"
+        ],
+        "title": "ReconciliationItemOut",
+        "type": "object"
+      },
+      "ReconciliationPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReconciliationItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "open_count": {
+            "title": "Open Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "open_count"
+        ],
+        "title": "ReconciliationPage",
+        "type": "object"
+      },
+      "ReconciliationRunOut": {
+        "properties": {
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "exceptions_opened": {
+            "title": "Exceptions Opened",
+            "type": "integer"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "payments_seen": {
+            "title": "Payments Seen",
+            "type": "integer"
+          },
+          "run_date": {
+            "format": "date",
+            "title": "Run Date",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "done",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_date",
+          "status",
+          "payments_seen",
+          "exceptions_opened",
+          "error_code",
+          "finished_at"
+        ],
+        "title": "ReconciliationRunOut",
+        "type": "object"
+      },
+      "ReconciliationSummaryOut": {
+        "properties": {
+          "connected": {
+            "title": "Connected",
+            "type": "boolean"
+          },
+          "failed_events": {
+            "title": "Failed Events",
+            "type": "integer"
+          },
+          "open_count": {
+            "title": "Open Count",
+            "type": "integer"
+          },
+          "pending_events": {
+            "title": "Pending Events",
+            "type": "integer"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/ReconciliationRunOut"
+            },
+            "title": "Runs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "connected",
+          "open_count",
+          "pending_events",
+          "failed_events",
+          "runs"
+        ],
+        "title": "ReconciliationSummaryOut",
+        "type": "object"
+      },
       "RecordSectionOut": {
         "properties": {
           "academic_year_id": {
@@ -23218,6 +24182,7 @@
           },
           "mode": {
             "enum": [
+              "original_method",
               "cash",
               "cheque",
               "bank_transfer"
@@ -31187,6 +32152,45 @@
           "reason"
         ],
         "title": "WaiveIn",
+        "type": "object"
+      },
+      "WebhookSetupOut": {
+        "description": "Shown once after connecting with manual keys or rotating the secret: the school adds this\nwebhook (URL, secret, events) in its own Razorpay dashboard.",
+        "properties": {
+          "events": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "previous_valid_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Valid Until"
+          },
+          "secret": {
+            "title": "Secret",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "secret",
+          "events"
+        ],
+        "title": "WebhookSetupOut",
         "type": "object"
       },
       "WriteResultOut": {
@@ -41431,6 +42435,154 @@
         ]
       }
     },
+    "/api/v1/fees/accounts/{account_id}/payment-intents": {
+      "get": {
+        "description": "The account's payment links with their status (``fee.collect`` or ``finance.read``).",
+        "operationId": "list_payment_intents_api_v1_fees_accounts__account_id__payment_intents_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Account Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PaymentIntentOut"
+                  },
+                  "title": "Response List Payment Intents Api V1 Fees Accounts  Account Id  Payment Intents Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List Payment Intents",
+        "tags": [
+          "payments"
+        ]
+      },
+      "post": {
+        "description": "A payment link for chosen instalments (``fee.collect``; send ``Idempotency-Key``): the\namount is what is due on them now; an open link for the same instalments is reused\n(``reused: true``). Errors (409): ``payments_not_connected``, ``nothing_due``,\n``account_closed``, ``too_many_links``; (502) ``payment_link_failed``.",
+        "operationId": "create_payment_intent_api_v1_fees_accounts__account_id__payment_intents_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Account Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentIntentCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentIntentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create Payment Intent",
+        "tags": [
+          "payments"
+        ]
+      }
+    },
     "/api/v1/fees/accounts/{account_id}/statement": {
       "get": {
         "description": "Every ledger entry with the running balance.",
@@ -43214,6 +44366,141 @@
         ]
       }
     },
+    "/api/v1/fees/payment-intents/{intent_id}": {
+      "get": {
+        "operationId": "get_payment_intent_api_v1_fees_payment_intents__intent_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "intent_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Intent Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentIntentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get Payment Intent",
+        "tags": [
+          "payments"
+        ]
+      }
+    },
+    "/api/v1/fees/payment-intents/{intent_id}/cancel": {
+      "post": {
+        "description": "Cancel an unpaid link at Razorpay (``fee.collect``). 409 ``intent_closed``,\n``intent_paid``.",
+        "operationId": "cancel_payment_intent_api_v1_fees_payment_intents__intent_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "intent_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Intent Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentIntentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cancel Payment Intent",
+        "tags": [
+          "payments"
+        ]
+      }
+    },
     "/api/v1/fees/plans": {
       "get": {
         "description": "Fee plans, optionally of one year and class (``finance.read`` or ``fee.manage``).",
@@ -44550,6 +45837,267 @@
         "summary": "Render Fee Receipt",
         "tags": [
           "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/reconciliation/online": {
+      "get": {
+        "description": "Online payment exceptions, newest first (``fee.reconcile`` or ``finance.read``).",
+        "operationId": "list_online_reconciliation_api_v1_fees_reconciliation_online_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "open",
+                    "explained",
+                    "resolved"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "paid_not_receipted",
+                    "receipted_not_captured",
+                    "amount_mismatch",
+                    "refunded",
+                    "refund_failed",
+                    "settlement_missing",
+                    "unknown_intent"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "description": "Page size (max 200).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Page size (max 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque cursor from next_cursor.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque cursor from next_cursor.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciliationPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List Online Reconciliation",
+        "tags": [
+          "payments"
+        ]
+      }
+    },
+    "/api/v1/fees/reconciliation/online/items/{recon_item_id}/explain": {
+      "post": {
+        "description": "Mark an exception explained with a note of 10-500 characters (``fee.reconcile``; audited\nwithout the note). 409 ``item_closed``.",
+        "operationId": "explain_online_item_api_v1_fees_reconciliation_online_items__recon_item_id__explain_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "recon_item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Recon Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExplainIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciliationItemOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Explain Online Item",
+        "tags": [
+          "payments"
+        ]
+      }
+    },
+    "/api/v1/fees/reconciliation/online/summary": {
+      "get": {
+        "description": "Open exceptions, webhook events waiting or failed, and the last 14 daily runs.",
+        "operationId": "online_reconciliation_summary_api_v1_fees_reconciliation_online_summary_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciliationSummaryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Online Reconciliation Summary",
+        "tags": [
+          "payments"
         ]
       }
     },
@@ -51288,6 +52836,366 @@
         "summary": "Mark Read",
         "tags": [
           "notifications"
+        ]
+      }
+    },
+    "/api/v1/payments/connection": {
+      "delete": {
+        "description": "Disconnect: open links cancelled, webhook route revoked, secrets erased, history kept\n(FR-PAY-013).",
+        "operationId": "disconnect_payments_api_v1_payments_connection_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentConnectionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Disconnect Payments",
+        "tags": [
+          "payments"
+        ]
+      },
+      "get": {
+        "description": "The school's Razorpay connection: mode, environment, status, account id, webhook URL,\nexpiry dates and counts; never a secret (``payments.configure`` or ``finance.read``).",
+        "operationId": "get_payment_connection_api_v1_payments_connection_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentConnectionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get Payment Connection",
+        "tags": [
+          "payments"
+        ]
+      }
+    },
+    "/api/v1/payments/connection/manual": {
+      "post": {
+        "description": "Connect with the school's own key id and secret (pilots, D13; ``payments.configure``,\nstep-up). The answer carries the webhook URL and secret **once** (``Cache-Control:\nno-store``; no idempotency replay, which would store the secret). Errors: 403\n``manual_keys_not_allowed``; 409 ``payments_already_connected``; 422 ``keys_rejected``.",
+        "operationId": "connect_payments_manual_api_v1_payments_connection_manual_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualKeysIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManualConnectOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Connect Payments Manual",
+        "tags": [
+          "payments"
+        ]
+      }
+    },
+    "/api/v1/payments/connection/oauth/callback": {
+      "post": {
+        "description": "Finish the sign-in: the BFF's callback page posts Razorpay's ``code`` and ``state`` here\n(body, never a URL the API logs). 403 ``oauth_state_invalid``.",
+        "operationId": "finish_payments_oauth_api_v1_payments_connection_oauth_callback_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OAuthCallbackIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentConnectionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Finish Payments Oauth",
+        "tags": [
+          "payments"
+        ]
+      }
+    },
+    "/api/v1/payments/connection/oauth/start": {
+      "post": {
+        "description": "The Razorpay sign-in URL with a single-use ``state`` (10 minutes) bound to the member\n(``payments.configure``, step-up). 409 ``oauth_not_available`` before partner approval.",
+        "operationId": "start_payments_oauth_api_v1_payments_connection_oauth_start_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthStartOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Start Payments Oauth",
+        "tags": [
+          "payments"
+        ]
+      }
+    },
+    "/api/v1/payments/connection/rotate-webhook-secret": {
+      "post": {
+        "description": "A new webhook secret, shown once; the previous one verifies retries for 7 more days\n(FR-PAY-014).",
+        "operationId": "rotate_payment_webhook_secret_api_v1_payments_connection_rotate_webhook_secret_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookSetupOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Rotate Payment Webhook Secret",
+        "tags": [
+          "payments"
+        ]
+      }
+    },
+    "/api/v1/payments/connection/test": {
+      "post": {
+        "description": "Check the connection with a read call; a refusal marks it revoked (FR-PAY-012).",
+        "operationId": "test_payment_connection_api_v1_payments_connection_test_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionTestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Test Payment Connection",
+        "tags": [
+          "payments"
         ]
       }
     },
@@ -64761,6 +66669,82 @@
           }
         },
         "summary": "Meta Webhook",
+        "tags": [
+          "webhooks"
+        ]
+      }
+    },
+    "/api/v1/webhooks/razorpay/{route}": {
+      "post": {
+        "description": "One school's Razorpay events. The signature (the school's secret over the raw body) was\nchecked by the guard; the minimised event is stored encrypted, deduplicated by Razorpay's\nevent id, and the worker re-fetches the payment before any receipt. A replayed event is\nacknowledged without effect.",
+        "operationId": "razorpay_webhook_api_v1_webhooks_razorpay__route__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "route",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Route",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Bad or missing X-Razorpay-Signature (no detail)."
+          },
+          "404": {
+            "description": "Unknown or disconnected route."
+          },
+          "413": {
+            "description": "Larger than 256 KB."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Razorpay Webhook",
         "tags": [
           "webhooks"
         ]
