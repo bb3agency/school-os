@@ -6574,6 +6574,7 @@
     },
     "emptyTitle": "No tasks here",
     "emptyBody": "Tasks appear when someone confirms a circular's deadline or adds a task for you.",
+    "pagesLabel": "Pages of tasks",
     "columns": {
       "task": "Task",
       "due": "Due date",
@@ -6664,6 +6665,7 @@
     "listTitle": "Notices",
     "emptyTitle": "No notices yet",
     "emptyBody": "Start one below, or from a circular's page.",
+    "pagesLabel": "Pages of notices",
     "untitled": "Untitled notice",
     "columns": {
       "notice": "Notice",
@@ -6929,6 +6931,7 @@
     "overdue": "Overdue",
     "emptyTitle": "No flags here",
     "emptyBody": "Flags appear when a rule notices a pattern, like three school days absent in a row.",
+    "pagesLabel": "Pages of students to follow up",
     "columns": {
       "student": "Student",
       "why": "Why",
