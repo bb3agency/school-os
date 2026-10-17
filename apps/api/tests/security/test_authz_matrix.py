@@ -1951,6 +1951,8 @@ def _route_table() -> dict[tuple[str, str], Any]:
             continue  # control plane: tests/platform/test_authz_matrix.py (operator roles)
         if str(rc.path).startswith("/api/v1/edge/"):
             continue  # Tally edge agent, device-signed (ADR-0032): tests/tally/test_api.py
+        if str(rc.path).startswith(("/api/v1/public/", "/api/v1/webhooks/")):
+            continue  # no member (ADR-0047): tests/public/, pinned by test_route_enumeration.py
         for method in rc.methods or ():
             table[(method, str(rc.path))] = guard[0]
     return table

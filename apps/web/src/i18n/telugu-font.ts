@@ -25,14 +25,14 @@ const UNICODE_RANGE = "U+0951-0952,U+0964-0965,U+0C00-0C7F,U+1CDA,U+1CF2,U+200C-
  * fallback for Telugu glyphs (the stacks in globals.css, plus Telugu). Unlayered, so it wins
  * over the Tailwind theme layer whatever the order the two stylesheets load in.
  */
-export function teluguStylesheet(): string {
+export function teluguStylesheet(base: string = TELUGU_FONT_BASE): string {
   const faces = WEIGHTS.map(
     (weight) => `@font-face {
   font-family: "Noto Sans Telugu";
   font-style: normal;
   font-display: swap;
   font-weight: ${weight};
-  src: url(${TELUGU_FONT_BASE}/noto-sans-telugu-telugu-${weight}-normal.woff2) format("woff2");
+  src: url(${base}/noto-sans-telugu-telugu-${weight}-normal.woff2) format("woff2");
   unicode-range: ${UNICODE_RANGE};
 }`,
   );

@@ -40,3 +40,7 @@ ADR-0036 hid Telugu everywhere behind `SOS_TELUGU_ENABLED` (off). R1 made one ex
 ## Related requirements
 
 FR-LANG-001..006 (docs/03 §3.23), FR-APC-004 (amended), FR-MSG-006, FR-PUB-008; US-2301..US-2303 (docs/02 C23). Docs: 02 §1 principle 6, 05 §1 (Telugu columns), 09 §2 Language, 17 §5.4, §5.8.
+
+## Follow-up (2026-10-17, wave R2-0 built)
+
+`app.core.languages.parent_language(school, guardian)` (guardian, then school, then English) is built, with the school setting `parent_language` (audited with its value), `sis.guardians.preferred_language` (via the existing guardian PATCH) and the APAAR form language nullable (null follows the school; existing explicit values kept). FR-LANG-005's list of unreviewed Telugu texts comes from `app/core/parent_texts.yaml` (sources: the APAAR consent form, the readiness slip, the public page shell; later waves add templates and the parent catalogue). The staff "no Telugu with the switch off" test is narrowed to allow the word "Telugu" in the parent-language settings card; no Telugu script reaches a staff screen. The public pages load the self-hosted Telugu font from `/p/fonts/telugu/*` only when the page is Telugu.

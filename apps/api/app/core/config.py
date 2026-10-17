@@ -364,6 +364,14 @@ class Settings(BaseSettings):
     email_app_url: str | None = None
     email_ses_configuration_set: str | None = None
 
+    # R2 public surface (ADR-0046, ADR-0045, ADR-0047; docs/10 §11). Origins only (scheme, host,
+    # optional port). Unset: no parent link pages / no verification links. The web app answers
+    # the (public) route group only on these hosts. Meta's webhook verify token is a platform
+    # secret (Secrets Manager); unset, GET /api/v1/webhooks/meta always answers 403.
+    public_base_url: str | None = None
+    verify_base_url: str | None = None
+    meta_webhook_verify_token: SecretStr | None = None
+
     # Control plane / fleet (docs/16 §10, §12; ADR-0015). Supplier identity for GST invoices.
     billing_supplier_legal_name: str = DEV_SUPPLIER_NAME
     billing_supplier_gstin: str = DEV_SUPPLIER_GSTIN
@@ -509,6 +517,54 @@ class Settings(BaseSettings):
         if self.is_production_like and not _is_public_https(self.email_app_url or ""):
             raise ValueError(f"SOS_EMAIL_APP_URL must be a public https URL in {self.env}")
 
+    def _guard_public_origins(self) -> None:
+        """``SOS_PUBLIC_BASE_URL`` / ``SOS_VERIFY_BASE_URL`` (docs/10 §11): an origin without a
+        path anywhere; in staging/prod a public https origin that is not the staff app's, and on
+        the shared tier the verification host differs from the parent host (owner decision D29).
+        Locally http on a loopback host is fine (``next dev`` serves both on one origin)."""
+        origins: dict[str, str] = {}
+        for name, value in (
+            ("SOS_PUBLIC_BASE_URL", self.public_base_url),
+            ("SOS_VERIFY_BASE_URL", self.verify_base_url),
+        ):
+            if value is None:
+                continue
+            parts = urlsplit(value)
+            if (
+                parts.scheme not in ("http", "https")
+                or not parts.hostname
+                or parts.path not in ("", "/")
+                or parts.query
+                or parts.fragment
+                or parts.username
+                or parts.password
+            ):
+                raise ValueError(f"{name} must be an origin (scheme and host, no path)")
+            origin = f"{parts.scheme}://{parts.netloc}".lower()
+            if self.is_production_like:
+                if not _is_public_https(value):
+                    raise ValueError(f"{name} must be a public https origin in {self.env}")
+                if self.email_app_url is not None:
+                    app_parts = urlsplit(self.email_app_url)
+                    if origin == f"{app_parts.scheme}://{app_parts.netloc}".lower():
+                        raise ValueError(f"{name} must not be the staff app's origin")
+            origins[name] = origin
+        if (
+            self.is_production_like
+            and self.deployment_mode is DeploymentMode.SHARED
+            and len(origins) == 2
+            and origins["SOS_PUBLIC_BASE_URL"] == origins["SOS_VERIFY_BASE_URL"]
+        ):
+            raise ValueError("SOS_VERIFY_BASE_URL must differ from SOS_PUBLIC_BASE_URL (D29)")
+        token = self.meta_webhook_verify_token
+        if token is not None and self.is_production_like:
+            value = token.get_secret_value()
+            if "dev-only" in value or len(value) < 32:
+                raise ValueError(
+                    "SOS_META_WEBHOOK_VERIFY_TOKEN must be a random value of 32 or more "
+                    f"characters in {self.env}"
+                )
+
     def _guard_postgres_tls(self) -> None:
         """Shared tier, staging/prod: the database is RDS across the VPC, so TLS must check the
         server's certificate and host name (audit 2026-10-05; Terraform writes
@@ -530,6 +586,7 @@ class Settings(BaseSettings):
         self._guard_support_client()
         self._guard_email()
         self._guard_llm_credentials()
+        self._guard_public_origins()
         if self.is_production_like:
             # Anti-automation is a production control (OWASP API4:2023, ASVS 2.2.1).
             if not self.rate_limit_enabled:

@@ -103,7 +103,7 @@ SQL_ALLOWED = frozenset(
         ("repository.py", "core.create_owner_invite"),  # definer, first owner invite
     }
 )
-_RELATION = re.compile(r"\b(core|sis|kb|ops|audit)\.([a-z_][a-z0-9_]*)")
+_RELATION = re.compile(r"\b(core|sis|kb|ops|audit|fin|msg)\.([a-z_][a-z0-9_]*)")
 
 
 @dataclass

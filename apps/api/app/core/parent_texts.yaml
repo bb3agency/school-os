@@ -1,0 +1,15 @@
+# Parent-facing Telugu texts and whether a fluent reviewer has signed them off (ADR-0044
+# decision 6, FR-LANG-005; owner decision D23 of 2026-10-14: a fluent Telugu reviewer signs off
+# before any Telugu school goes live). Read by app.core.languages.unreviewed_parent_texts().
+# The school settings response lists the unreviewed keys while the school's parent_language is
+# te (PATCH/GET /tenant, parent_language_unreviewed). Meta approval of a Telugu template does
+# not count as review. Each wave adds its own sources in its own block:
+#   R2-1C messaging: one key per WhatsApp template (messaging.template.<key>);
+#   R2-3H parent pages: public.pages (the parent catalogue parent.te.json).
+version: 1
+sources:
+  # R1 printed parent forms (ADR-0039, ADR-0040); docs/18 §9: wording review still open.
+  apaar.consent_form: {reviewed: false}
+  dq.readiness_slip: {reviewed: false}
+  # R2-0 public page shell (apps/web messages te.json "public" namespace).
+  public.shell: {reviewed: false}

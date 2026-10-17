@@ -78,6 +78,13 @@ Budgets are versioned in `apps/api/app/core/rate_limits.yaml` (invariant 13); th
 | `platform_emergency` | 60 / 600 s | operator | open | `POST /platform/invoice-runs` |
 | `kb_ask` | `models.yaml` (10 / 60 s) | person | open | `POST /knowledge/ask`, and one unit per AI notice draft (`POST /notices` except `blank`, `POST /notices/{notice_id}/draft`) and per circular reading asked for (`POST /circulars/{document_id}/read`; audit 2026-10-06 R-20) (429 `ai_rate_limited` with `Retry-After` and the RateLimit headers) |
 | `audit_verify` | `rate_limits.yaml` (1 / 600 s) | school | open | `POST /audit/verify`, charged after the permission check (R-19) |
+| `readiness_reads` | 30 / 60 s | person | open | `GET /dq/readiness/{profile_key}`, `GET /dq/readiness/{profile_key}/students` (each call assesses every student; SEC-046) |
+| `readiness_school` | 300 / 60 s | school | open | the same two routes, charged after authorization (SEC-046) |
+| `public_ip` | 60 / 60 s | client IP | closed | every `/api/v1/public/*` request (layer 1, instead of `ip`; R2-0) |
+| `public_lookup_fail` | 20 / 600 s, cost 2 per failed lookup | client IP | closed | public handle guards: room checked before every lookup (refuses even a valid key once used up), charged after a miss (R2-0) |
+| `public_token` | 30 / 60 s | handle | open | public handle guards, per live handle (R2-0) |
+| `public_pay` | 5 / 86400 s | handle | closed | `POST /public/links/current/pay` (R2-3H) |
+| `webhook_route` | 600 / 60 s | handle | closed | webhook guard, per route handle after the signature check; `/api/v1/webhooks/*` also get `machine_ip` (R2-0) |
 | `platform_audit_verify` | `rate_limits.yaml` (1 / 600 s) | operator | open | `POST /platform/audit/verify` (R-19) |
 
 The shared ALB's WAF adds coarse per-IP rules in front (docs/10 §5); dedicated hosts have no WAF and rely on these limits.
@@ -628,8 +635,8 @@ Conventions as above: `Idempotency-Key` on creating POSTs, `If-Match` on changes
 
 | Method | Path | Guard |
 |---|---|---|
-| PATCH | `/tenant` with `settings.parent_language` (`en`/`te`); response adds `parent_language_unreviewed` (keys of unreviewed Telugu entries the school would use) | `tenant.settings.manage`ᴿ (existing route) |
-| PATCH | `/guardians/{guardian_id}` with `preferred_language` (`en`/`te`/null) | `student.update_nonidentity` (student in scope) |
+| PATCH | `/tenant` with `settings.parent_language` (`en`/`te`); response adds `parent_language_unreviewed` (keys of unreviewed Telugu entries the school would use, from `app/core/parent_texts.yaml`) (**built R2-0**; `GET/PUT /apaar/settings` now take `form_language: null` = follow the school and answer `effective_language`) | `tenant.settings.manage`ᴿ (existing route) |
+| PATCH | `/students/{student_id}/guardians/{guardian_id}` (the existing guardian route; **built R2-0**) with `preferred_language` (`en`/`te`/null), audited with the code; scoped editors only when every linked student is in reach | `student.update_nonidentity` (student in scope) |
 
 #### Ask finish-up (R2.4; FR-KB-040..045)
 
@@ -643,8 +650,8 @@ Conventions as above: `Idempotency-Key` on creating POSTs, `If-Match` on changes
 | Method | Path | Guard |
 |---|---|---|
 | GET | `/public/certificates/{code}` (code normalised: case, spaces and dashes ignored) | `require_public_handle("cert_verify")`; limits `public_ip`, `public_lookup_fail` |
-| POST | `/public/links/exchange` (`{"token"}`; the BFF's `/p/{token}` handler calls it and sets the `__Host-sos_parent` cookie) → `{kind, expires_at, handle_ref}` | `require_public_handle(parent_*)`; limits `public_ip`, `public_lookup_fail` |
-| GET | `/public/links/current` (the page content for the cookie's handle: notice, receipt or dues per ADR-0046 decision 2, in the parent language) | `require_public_handle(parent_*)` (handle ref from the cookie, re-resolved every time); `public_token` |
+| POST | `/public/links/exchange` (`{"token"}`; the BFF's `/p/{token}` handler calls it and sets the `__Host-sos_parent` cookie) → `{kind, expires_at}` (**built R2-0**; no `handle_ref`: the cookie carries the token itself and the BFF sends it back in `X-SOS-Public-Token`, so every request re-resolves it; not a view) | `require_public_handle(parent_*)`; limits `public_ip`, `public_lookup_fail` |
+| GET | `/public/links/current` (the page content for the cookie's handle: notice, receipt or dues per ADR-0046 decision 2, in the parent language). **Built R2-0 as the frame** `{kind, expires_at, language, school_name}` (counts the view; first view audited); R2-3H adds the content | `require_public_handle(parent_*)` (token from `X-SOS-Public-Token`, re-resolved every time); `public_token` |
 | GET | `/public/links/current/document-url` (notice PDF or receipt PDF, presigned ≤ 5 min) | as above |
 | POST | `/public/links/current/pay` (`{"instalments"}`, CSRF token bound to the cookie) → `{redirect_url}` | `require_public_handle("parent_dues")`; `public_pay` (5 per handle per day) |
 | POST | `/public/links/current/optin` (opt-in page: categories, language) | `require_public_handle("parent_optin")` |

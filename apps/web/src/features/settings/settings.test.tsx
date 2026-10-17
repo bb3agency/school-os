@@ -34,6 +34,7 @@ const SETTINGS = {
   ai_monthly_budget_inr: 5000,
   operating_mode: "full" as const,
   current_erp_name: "",
+  parent_language: "en" as const,
 };
 const TENANT = {
   id: "0192f3a4-0000-7000-8000-000000000001",
@@ -63,6 +64,52 @@ beforeEach(() => {
 afterEach(() => {
   uninstallBffStub();
   expect(intlErrors).toEqual([]);
+});
+
+/**
+ * ADR-0036 narrowed by ADR-0044: with Telugu switched off no Telugu script appears anywhere, and
+ * the word "Telugu" only in the parent-language card (parents may get Telugu messages and pages
+ * while staff screens stay English).
+ */
+function expectNoStaffTelugu(container: HTMLElement) {
+  const text = container.textContent ?? "";
+  expect(text).not.toMatch(/[\u0C00-\u0C7F]/);
+  const card = screen.queryByRole("region", {
+    name: messages.en.schoolSettings.parentLanguage.title,
+  });
+  const outside = card ? text.replace(card.textContent ?? "", "") : text;
+  expect(outside).not.toMatch(/Telugu/);
+}
+
+describe("parent language (ADR-0044, FR-LANG-001, FR-LANG-005)", () => {
+  const pl = messages.en.schoolSettings.parentLanguage;
+
+  it("switches the parent language with If-Match and names it in English", async () => {
+    school([MANAGE]);
+    stub.routes["PATCH /bff/api/v1/tenant"] = () =>
+      Response.json({ ...TENANT, settings: { ...SETTINGS, parent_language: "te" }, version: 8 });
+    renderWithIntl(<SchoolSettingsScreen />);
+    const button = await screen.findByRole("button", { name: "Switch to Telugu" });
+    expect(screen.getByText(pl.current, { exact: false })).toBeInTheDocument();
+    await userEvent.click(button);
+    await waitFor(() => expect(stub.callsTo("PATCH /bff/api/v1/tenant")).toHaveLength(1));
+    const call = stub.callsTo("PATCH /bff/api/v1/tenant")[0];
+    expect(call?.headers.get("If-Match")).toBe('W/"7"');
+    expect(JSON.parse(call?.body ?? "{}")).toEqual({ parent_language: "te" });
+    expect(await screen.findByText(pl.saved)).toBeInTheDocument();
+  });
+
+  it("warns about unreviewed Telugu texts and is read-only without the permission", async () => {
+    tenant = {
+      ...TENANT,
+      settings: { ...SETTINGS, parent_language: "te" as "en" },
+      parent_language_unreviewed: ["public.shell"],
+    } as typeof TENANT;
+    school(["student.read_basic"]);
+    renderWithIntl(<SchoolSettingsScreen />);
+    expect(await screen.findByText(pl.unreviewed)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Switch to English" })).toBeNull();
+  });
 });
 
 describe("school settings (FR-TEN-012)", () => {
@@ -211,7 +258,7 @@ describe("school settings (FR-TEN-012)", () => {
     expect(screen.getByRole("region", { name: off.groups.languages.title })).toBeInTheDocument();
     expect(screen.queryByRole("group", { name: en.form.languagesField })).toBeNull();
     expect(screen.queryByRole("checkbox", { name: "English" })).toBeNull();
-    expect(container.textContent ?? "").not.toMatch(/Telugu|[\u0C00-\u0C7F]/);
+    expectNoStaffTelugu(container);
     await userEvent.clear(idle);
     await userEvent.type(idle, "20");
     await userEvent.click(screen.getByRole("button", { name: en.form.save }));
@@ -226,7 +273,7 @@ describe("school settings (FR-TEN-012)", () => {
     const { container } = renderWithIntl(<SchoolSettingsScreen />);
     expect(await screen.findByText("15 minutes")).toBeInTheDocument();
     expect(screen.queryByText(en.form.languagesField)).toBeNull();
-    expect(container.textContent ?? "").not.toMatch(/Telugu|[\u0C00-\u0C7F]/);
+    expectNoStaffTelugu(container);
   });
 
   it("on 412 says someone else changed the settings and reloads the latest on request", async () => {

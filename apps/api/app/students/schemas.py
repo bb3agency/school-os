@@ -46,6 +46,8 @@ Source = Literal[
 ]
 StudentStatus = Literal["provisional", "active", "left", "graduated"]
 Relationship = Literal["father", "mother", "guardian"]
+# ADR-0044: the language a guardian receives messages and parent pages in (null = the school's).
+ParentLanguage = Literal["en", "te"]
 AdmissionKind = Literal["new", "transfer_in"]
 NationalIdKey = Literal["udise_pen", "apaar_id"]
 Verification = Literal["unverified", "verified", "rejected"]
@@ -521,13 +523,19 @@ class GuardianCreate(_In):
 
 
 class GuardianPatch(_In):
-    """Omit a field to keep it; ``phone``/``address`` ``null`` clears it."""
+    """Omit a field to keep it; ``phone``/``address`` ``null`` clears it;
+    ``preferred_language`` ``null`` goes back to the school's parent language (ADR-0044)."""
 
     full_name: PersonName | None = None
     phone: PhoneText | None = None
     address: ShortText | None = None
     relationship: Relationship | None = None
     is_primary: bool | None = None
+    preferred_language: ParentLanguage | None = Field(
+        default=None,
+        description="Language this guardian receives WhatsApp messages and parent pages in "
+        "(FR-LANG-003); null = the school's parent language.",
+    )
 
 
 class GuardianOut(_Out):
@@ -540,4 +548,8 @@ class GuardianOut(_Out):
     phone: str | None
     address: str | None
     masked: bool
+    preferred_language: ParentLanguage | None = Field(
+        default=None,
+        description="The guardian's own parent language (ADR-0044); null = the school's.",
+    )
     version: int

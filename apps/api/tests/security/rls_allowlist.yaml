@@ -2,7 +2,7 @@
 # Every change to this file needs a security review (CODEOWNERS).
 
 # Tenant-scoped schemas checked by the catalog test.
-tenant_schemas: [core, sis, kb, audit, ops]
+tenant_schemas: [core, sis, kb, audit, ops, fin, msg]  # fin, msg: R2 (D14)
 
 # Tables in tenant schemas WITHOUT a tenant_id column. They must still be listed here so that
 # adding a global table is always a deliberate, reviewed decision.
@@ -33,6 +33,7 @@ definer_access_tables:
   - audit.chain_heads
   - audit.events
   - ops.outbox
+  - core.public_handles  # ADR-0047 (R2-0): read by core.resolve_public_handle only
 
 # The only SECURITY DEFINER functions permitted (owned by sos_definer, search_path pinned).
 definer_functions:
@@ -51,6 +52,7 @@ definer_functions:
   - core.respond_to_invitation  # ADR-0023 amendment (DL-09): accept or decline one of them
   - core.user_membership_count  # ADR-0028: a count for one member of the current school
   - ops.claim_outbox
+  - core.resolve_public_handle  # ADR-0047 (R2-0): (tenant_id, handle_id) of a live public key
 
 # Schema platform: sos_app may only read these tables.
 platform_tables_readable_by_app:

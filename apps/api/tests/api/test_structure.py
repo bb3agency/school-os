@@ -233,6 +233,8 @@ def test_FR_TEN_012_settings_read_and_update(school: Any, api: Any, admin_engine
         "class_boards": {},
         "operating_mode": "full",
         "current_erp_name": "",
+        # ADR-0044 (FR-LANG-001): parents receive English until the school chooses.
+        "parent_language": "en",
     }
     owner = school.people["owner"]
     etag = got.headers["ETag"]

@@ -4910,6 +4910,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/links/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Current Link
+         * @description The parent page frame for the cookie's link (the BFF sends the cookie's token in
+         *     ``X-SOS-Public-Token``): kind, expiry, language (guardian, else school, else English;
+         *     FR-PUB-008) and the school's name. Counts a view (FR-PUB-012).
+         */
+        get: operations["current_link_api_v1_public_links_current_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/links/exchange": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Exchange Link
+         * @description Check a parent link token for the BFF's exchange-and-redirect (FR-PUB-010). No user
+         *     token; the BFF's service token only. Answers what the cookie needs; not counted as a view.
+         */
+        post: operations["exchange_link_api_v1_public_links_exchange_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/registers/admission-withdrawal": {
         parameters: {
             query?: never;
@@ -6758,17 +6801,23 @@ export interface components {
         ApaarSettingsIn: {
             /**
              * Form Language
-             * @enum {string}
+             * @description ``en`` or ``te`` for this form only, or null to follow the school's parent language (ADR-0044).
              */
-            form_language: "en" | "te";
+            form_language: ("en" | "te") | null;
         };
         /** ApaarSettingsOut */
         ApaarSettingsOut: {
             /**
-             * Form Language
+             * Effective Language
+             * @description The language forms print in now: ``form_language``, else the school's parent language, else English.
              * @enum {string}
              */
-            form_language: "en" | "te";
+            effective_language: "en" | "te";
+            /**
+             * Form Language
+             * @description The consent form's own language, or null to follow the school's parent language (ADR-0044 decision 7).
+             */
+            form_language: ("en" | "te") | null;
             /** Version */
             version: number;
         };
@@ -9708,6 +9757,11 @@ export interface components {
             masked: boolean;
             /** Phone */
             phone: string | null;
+            /**
+             * Preferred Language
+             * @description The guardian's own parent language (ADR-0044); null = the school's.
+             */
+            preferred_language?: ("en" | "te") | null;
             /** Relationship */
             relationship: string;
             /** Version */
@@ -9715,7 +9769,8 @@ export interface components {
         };
         /**
          * GuardianPatch
-         * @description Omit a field to keep it; ``phone``/``address`` ``null`` clears it.
+         * @description Omit a field to keep it; ``phone``/``address`` ``null`` clears it;
+         *     ``preferred_language`` ``null`` goes back to the school's parent language (ADR-0044).
          */
         GuardianPatch: {
             /** Address */
@@ -9726,6 +9781,11 @@ export interface components {
             is_primary?: boolean | null;
             /** Phone */
             phone?: string | null;
+            /**
+             * Preferred Language
+             * @description Language this guardian receives WhatsApp messages and parent pages in (FR-LANG-003); null = the school's parent language.
+             */
+            preferred_language?: ("en" | "te") | null;
             /** Relationship */
             relationship?: ("father" | "mother" | "guardian") | null;
         };
@@ -10667,6 +10727,57 @@ export interface components {
              * Format: uuid
              */
             student_id: string;
+        };
+        /**
+         * LinkEnvelopeOut
+         * @description The parent page's frame for the cookie's link (``/p/view``): which page it is, until when
+         *     it works, its language (the guardian's choice, else the school's parent language, else
+         *     English: ADR-0044) and the school's name for the page heading. The page content per kind is
+         *     added by wave R2-3H (``app/public/pages.py``).
+         */
+        LinkEnvelopeOut: {
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "parent_notice" | "parent_receipt" | "parent_dues" | "parent_optin";
+            /**
+             * Language
+             * @enum {string}
+             */
+            language: "en" | "te";
+            /** School Name */
+            school_name: string;
+        };
+        /**
+         * LinkExchangeIn
+         * @description The token from ``/p/{token}`` (the BFF's exchange-and-redirect handler sends it here).
+         */
+        LinkExchangeIn: {
+            /** Token */
+            token: string;
+        };
+        /**
+         * LinkExchangeOut
+         * @description What the BFF needs to set the ``__Host-sos_parent`` cookie (max-age = until
+         *     ``expires_at``). Exchanging does not count as a view.
+         */
+        LinkExchangeOut: {
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "parent_notice" | "parent_receipt" | "parent_dues" | "parent_optin";
         };
         /** LinkIn */
         LinkIn: {
@@ -14545,6 +14656,11 @@ export interface components {
             /** Name */
             name: string;
             /**
+             * Parent Language Unreviewed
+             * @description Parent-facing Telugu texts the school would use that a fluent reviewer has not signed off yet (FR-LANG-005); empty while the parent language is English.
+             */
+            parent_language_unreviewed?: string[];
+            /**
              * Plan Tier
              * @enum {string}
              */
@@ -14618,6 +14734,13 @@ export interface components {
              * @enum {string}
              */
             operating_mode: "full" | "alongside";
+            /**
+             * Parent Language
+             * @description Language of everything parents receive: WhatsApp messages, parent link pages, printed parent slips and forms (ADR-0044, FR-LANG-001). Independent of the staff UI language; a guardian's own choice overrides it.
+             * @default en
+             * @enum {string}
+             */
+            parent_language: "en" | "te";
         };
         /**
          * TenantSettingsPatch
@@ -14650,6 +14773,11 @@ export interface components {
             languages?: ("en" | "te")[] | null;
             /** Operating Mode */
             operating_mode?: ("full" | "alongside") | null;
+            /**
+             * Parent Language
+             * @description ``en`` or ``te``: the language parents receive (ADR-0044). Audited with its new value.
+             */
+            parent_language?: ("en" | "te") | null;
         };
         /**
          * TenantSummaryOut
@@ -27288,6 +27416,87 @@ export interface operations {
                     "RateLimit-Policy"?: string;
                     /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
                     "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    current_link_api_v1_public_links_current_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkEnvelopeOut"];
+                };
+            };
+            /** @description Unknown, expired or revoked link (always the same body). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many requests or failed lookups from this address. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    exchange_link_api_v1_public_links_exchange_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkExchangeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkExchangeOut"];
+                };
+            };
+            /** @description Unknown, expired or revoked link (always the same body). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests or failed lookups from this address. */
+            429: {
+                headers: {
                     [name: string]: unknown;
                 };
                 content?: never;

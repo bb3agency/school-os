@@ -122,6 +122,7 @@ function freshTenant(): Schemas["TenantOut"] {
       class_boards: {},
       operating_mode: "full",
       current_erp_name: "",
+      parent_language: "en",
     },
     version: 3,
   };

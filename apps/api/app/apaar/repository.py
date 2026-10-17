@@ -114,7 +114,7 @@ def insert_settings(session: Session, **values: Any) -> ApaarConsentSettings:
 
 
 def update_settings(
-    session: Session, settings_id: uuid.UUID, *, form_language: str, updated_by: uuid.UUID
+    session: Session, settings_id: uuid.UUID, *, form_language: str | None, updated_by: uuid.UUID
 ) -> ApaarConsentSettings:
     session.execute(
         update(ApaarConsentSettings)

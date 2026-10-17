@@ -95,30 +95,36 @@ CREATE SCHEMA IF NOT EXISTS kb       AUTHORIZATION sos_owner;
 CREATE SCHEMA IF NOT EXISTS audit    AUTHORIZATION sos_owner;
 CREATE SCHEMA IF NOT EXISTS ops      AUTHORIZATION sos_owner;
 CREATE SCHEMA IF NOT EXISTS platform AUTHORIZATION sos_owner;
+-- R2 tenant schemas (ADR-0042 P10, owner decision D14 of 2026-10-14): fin = fees and payments,
+-- msg = WhatsApp messaging. Same grants pattern as sis; their tables arrive with the R2 waves.
+CREATE SCHEMA IF NOT EXISTS fin      AUTHORIZATION sos_owner;
+CREATE SCHEMA IF NOT EXISTS msg      AUTHORIZATION sos_owner;
 
-REVOKE ALL ON SCHEMA core, sis, kb, audit, ops, platform FROM PUBLIC;
-GRANT USAGE ON SCHEMA core, sis, kb, audit, ops TO sos_app, sos_readonly, sos_definer;
+REVOKE ALL ON SCHEMA core, sis, kb, audit, ops, fin, msg, platform FROM PUBLIC;
+GRANT USAGE ON SCHEMA core, sis, kb, audit, ops, fin, msg TO sos_app, sos_readonly, sos_definer;
 -- sos_app needs USAGE on platform only to read platform.feature_flags and call definer functions.
 GRANT USAGE ON SCHEMA platform TO sos_app, sos_platform, sos_definer;
 -- sos_platform gets USAGE on core only to call allowlisted definer functions (no table grants).
 GRANT USAGE ON SCHEMA core TO sos_platform;
-GRANT USAGE, CREATE ON SCHEMA core, sis, kb, audit, ops, platform TO sos_owner;
+GRANT USAGE, CREATE ON SCHEMA core, sis, kb, audit, ops, fin, msg, platform TO sos_owner;
 -- ADR-0029: table grants for sos_purger are made per table in migration 0032.
-GRANT USAGE ON SCHEMA core, sis, kb, audit, ops TO sos_purger;
+GRANT USAGE ON SCHEMA core, sis, kb, audit, ops, fin, msg TO sos_purger;
 
 -- 4. Default privileges for objects created by sos_owner -----------------------------------
 -- Functions are NOT executable by PUBLIC by default; each migration grants EXECUTE explicitly.
 ALTER DEFAULT PRIVILEGES FOR ROLE sos_owner   REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
 ALTER DEFAULT PRIVILEGES FOR ROLE sos_definer REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
 
-ALTER DEFAULT PRIVILEGES FOR ROLE sos_owner IN SCHEMA core, sis, kb, ops
+ALTER DEFAULT PRIVILEGES FOR ROLE sos_owner IN SCHEMA core, sis, kb, ops, fin, msg
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO sos_app;
-ALTER DEFAULT PRIVILEGES FOR ROLE sos_owner IN SCHEMA core, sis, kb, ops
+ALTER DEFAULT PRIVILEGES FOR ROLE sos_owner IN SCHEMA core, sis, kb, ops, fin, msg
   GRANT USAGE, SELECT ON SEQUENCES TO sos_app;
 -- Audit is append-only for the app: no UPDATE, DELETE or TRUNCATE (FR-AUD-002).
 ALTER DEFAULT PRIVILEGES FOR ROLE sos_owner IN SCHEMA audit
   GRANT SELECT, INSERT ON TABLES TO sos_app;
-ALTER DEFAULT PRIVILEGES FOR ROLE sos_owner IN SCHEMA core, sis, kb, audit
+-- fin/msg: tables holding secrets or raw provider payloads revoke this in their migration
+-- (docs/05 §15: fin.provider_events, fin.payment_connections, msg.accounts, msg.provider_events).
+ALTER DEFAULT PRIVILEGES FOR ROLE sos_owner IN SCHEMA core, sis, kb, audit, fin, msg
   GRANT SELECT ON TABLES TO sos_readonly;
 -- The control plane only ever touches schema platform.
 ALTER DEFAULT PRIVILEGES FOR ROLE sos_owner IN SCHEMA platform

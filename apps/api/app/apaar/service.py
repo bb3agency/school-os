@@ -460,17 +460,22 @@ def summary(
 
 
 def parent_language(session: Session) -> FormLanguage:
-    """The language the school prints parent forms in (``en`` until set; owner decision D9).
-    Parent verification slips (``app.dq``) follow it too."""
+    """The language the school prints parent forms in (owner decision D9; ADR-0044 decision 7):
+    the consent form's own setting when the school chose one, else the school's parent language
+    (``tenancy.parent_language``), else English. Parent verification slips (``app.dq``) follow
+    it too. Independent of ``SOS_TELUGU_ENABLED``."""
     return _form_language(session, None)
 
 
 def _form_language(session: Session, language: FormLanguage | None) -> FormLanguage:
+    """Per-print override, then the form setting, then the school's parent language."""
     if language is not None:
         return language
     row = repo.get_settings(session)
-    chosen: FormLanguage = "te" if row is not None and row.form_language == "te" else "en"
-    return chosen
+    if row is not None and row.form_language in ("en", "te"):
+        chosen: FormLanguage = "te" if row.form_language == "te" else "en"
+        return chosen
+    return tenancy.parent_language(session)
 
 
 def _form_students(
@@ -670,25 +675,37 @@ def _section_in_reach(session: Session, ctx: UserContext, section_id: uuid.UUID)
 # --- settings ---------------------------------------------------------------------------------
 
 
+def _settings_out(session: Session, form_language: str | None, version: int) -> ApaarSettingsOut:
+    own: FormLanguage | None = None
+    if form_language in ("en", "te"):
+        own = "te" if form_language == "te" else "en"
+    return ApaarSettingsOut(
+        form_language=own,
+        effective_language=own or tenancy.parent_language(session),
+        version=version,
+    )
+
+
 def get_settings(session: Session) -> ApaarSettingsOut:
-    """The school's parent-form language (``en`` until set; version 0 before the first save)."""
+    """The consent form's language setting (null = the school's parent language; version 0
+    before the first save) and the language forms print in now."""
     row = repo.get_settings(session)
     if row is None:
-        return ApaarSettingsOut(form_language="en", version=0)
-    return ApaarSettingsOut(form_language=row.form_language, version=row.version)
+        return _settings_out(session, None, 0)
+    return _settings_out(session, row.form_language, row.version)
 
 
 def update_settings(
     session: Session, ctx: UserContext, data: ApaarSettingsIn, *, expected_version: int
 ) -> ApaarSettingsOut:
-    """Set the language of the printed parent form (owner decision D9; permission
-    ``tenant.settings.manage``, step-up; ``If-Match``: 0 for the first save). Audit
-    ``apaar.settings.updated``."""
+    """Set the language of the printed parent form, or ``null`` to follow the school's parent
+    language (owner decision D9; ADR-0044 decision 7; permission ``tenant.settings.manage``,
+    step-up; ``If-Match``: 0 for the first save). Audit ``apaar.settings.updated``."""
     row = repo.get_settings(session, lock=True)
     current = row.version if row is not None else 0
     if expected_version != current:
         raise PreconditionFailed("The setting was changed by someone else. Reload it.")
-    before = row.form_language if row is not None else "en"
+    before = row.form_language if row is not None else None
     if row is None:
         row = repo.insert_settings(
             session, id=new_id(), form_language=data.form_language, updated_by=ctx.user_id
@@ -698,7 +715,7 @@ def update_settings(
             session, row.id, form_language=data.form_language, updated_by=ctx.user_id
         )
     else:
-        return ApaarSettingsOut(form_language=row.form_language, version=row.version)
+        return _settings_out(session, row.form_language, row.version)
     _audit(
         session,
         action="apaar.settings.updated",
@@ -706,7 +723,7 @@ def update_settings(
         resource_id=row.id,
         summary={"form_language": data.form_language, "previous_form_language": before},
     )
-    return ApaarSettingsOut(form_language=row.form_language, version=row.version)
+    return _settings_out(session, row.form_language, row.version)
 
 
 # --- for other modules ------------------------------------------------------------------------

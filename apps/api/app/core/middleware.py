@@ -17,9 +17,10 @@
   text (values or keys) holds a Unicode text-direction control (``Bidi_Control``: ALM, LRM, RLM,
   LRE..RLO, LRI..PDI) gets 422 ``invalid_characters``, so a name or note can never read
   differently on screen than it is stored. The signed machine routes (edge agents, fleet
-  heartbeats) are exempt: they clean their own text.
+  heartbeats, provider webhooks) are exempt: they clean their own text.
 - ``RateLimitMiddleware`` (P2-07, docs/09 §2.7): resolves the client IP from the trusted proxy
-  chain, applies the per-IP layer (``machine_ip`` on the machine paths) and the IP's
+  chain, applies the per-IP layer (``machine_ip`` on the machine paths, ``public_ip`` on the
+  public parent and verification routes, ADR-0046) and the IP's
   authentication backoff before the body is read, answers 429 problem+json with ``Retry-After``,
   and writes the ``RateLimit-Policy`` / ``RateLimit`` headers of every policy the request met
   (the route guards add theirs: ``app.core.ratelimit.enforce``). Health checks and CORS
@@ -309,7 +310,9 @@ _BIDI_HINT = re.compile(
     rb"|\\u(?:061[cC]|200[eEfF]|202[a-eA-E]|206[6-9])"
 )
 _BODY_METHODS = frozenset({"POST", "PUT", "PATCH"})
-MACHINE_PATH_PREFIXES = ("/api/v1/edge/", "/api/v1/fleet/")
+# Signed machine routes: edge agents, fleet heartbeats and (R2, ADR-0047) provider webhooks,
+# whose raw bodies are signed by the provider and must reach the signature check unchanged.
+MACHINE_PATH_PREFIXES = ("/api/v1/edge/", "/api/v1/fleet/", "/api/v1/webhooks/")
 
 
 def _has_bidi(value: Any) -> bool:
@@ -415,7 +418,7 @@ class RateLimitMiddleware:
         exempt = method == "OPTIONS" or path in config.exempt_paths
         if limiter.enabled and not exempt:
             hashed = limiter.ip_hash(ip)
-            policy = config.policy("machine_ip" if config.is_machine_path(path) else "ip")
+            policy = config.policy(config.ip_policy_for(path))
             buckets = [] if internal else [ratelimit.Bucket(policy, hashed)]
             decision = limiter.check(buckets, [limiter.block_key("ip", hashed)])
             ratelimit.remember(scope, decision)

@@ -1,0 +1,30 @@
+# The public allowlist (ADR-0047 decision 4; FR-PUB-003; CLAUDE.md invariant 2 as amended by
+# ADR-0047). Every route that takes no signed-in member besides the health checks and the
+# existing machine routes (fleet heartbeat, Tally edge agent) is listed here with its one guard.
+# The route-enumeration test (tests/security/test_route_enumeration.py) fails when:
+#   - a route carries a public guard but is not listed here, or is listed with another guard,
+#     other handle kinds or another provider;
+#   - a listed route is not mounted (stale entry);
+#   - a route under /api/v1/public/ or /api/v1/webhooks/ has any other guard (or none);
+#   - a public_handle guard sits outside /api/v1/public/, or a webhook guard outside
+#     /api/v1/webhooks/.
+# Each wave adds only its own routes, in its own block, with a comment naming the wave.
+#
+# guard: public_handle      require_public_handle(*kinds): the BFF's service token, no user
+#                           token; per-IP failed-lookup budget; resolver; per-handle budget.
+#        webhook_signature  require_webhook_signature(provider): provider calls straight to the
+#                           API; body limit, registered verifier, replay detection.
+#        meta_verify_token  require_meta_verify_token(): Meta's GET subscription challenge.
+version: 1
+routes:
+  # --- R2-0 foundation: parent link exchange and the current link's envelope (ADR-0046) -------
+  POST /api/v1/public/links/exchange:
+    guard: public_handle
+    kinds: [parent_notice, parent_receipt, parent_dues, parent_optin]
+  GET /api/v1/public/links/current:
+    guard: public_handle
+    kinds: [parent_notice, parent_receipt, parent_dues, parent_optin]
+  # --- R2-1A certificates: GET /api/v1/public/certificates/{code} (cert_verify) --------------
+  # --- R2-1C messaging: GET and POST /api/v1/webhooks/meta -----------------------------------
+  # --- R2-2D online payments: POST /api/v1/webhooks/razorpay/{route} -------------------------
+  # --- R2-3H parent pages: the other /api/v1/public/links/current/* routes ------------------
