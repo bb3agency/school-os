@@ -803,13 +803,14 @@ def slips(
         section_id=section_id,
         include_ready=include_ready,
     )
+    reveal_ids = _sensitive_reach(session, ctx)
     page, revealed, _ = _slip_page(
         session,
         profile,
         ordered,
         assessed,
         refs,
-        reveal_ids=_sensitive_reach(session, ctx),
+        reveal_ids=reveal_ids,
         for_pdf=False,
     )
     summary: dict[str, Any] = {
@@ -817,6 +818,10 @@ def slips(
         "students": len(ordered),
         "sensitive_shown": revealed,
     }
+    if revealed:
+        # SEC-043: whose restricted (C3) values the page showed, ids only, so the school can
+        # answer "who saw this child's Aadhaar-as-printed details" for a section print too.
+        summary["sensitive_student_ids"] = [str(s) for s in ordered if s in reveal_ids]
     if section_id is not None:
         summary["section_id"] = str(section_id)
     dq._audit(

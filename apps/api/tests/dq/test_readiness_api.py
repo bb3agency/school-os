@@ -350,3 +350,27 @@ def test_US_504_findings_list_explains_readiness_findings(world: Any, api: Any) 
         "Ask the MEO or MIS coordinator to correct UDISE+."
     )
     assert finding["routes"][0]["code"] == "ROUTE-UDISE"
+
+
+def test_SEC_043_section_slips_audit_whose_restricted_values_were_shown(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """Invariant 7, SEC-043: a section print of slips that shows Aadhaar-as-printed values
+    (the printer holds ``student.read_sensitive``) names the students in its audit event, ids
+    only; a print without restricted values names nobody."""
+    sid, _ = ssc_student(world.a)
+    section = str(world.a.ids["section_9a"])
+    office = world.person("office_admin")  # holds student.read_sensitive
+    res = api.call(office, "GET", f"{BASE}/slips", params={"section_id": section})
+    assert res.status_code == 200, res.text
+    event = W.audit_events(admin_engine, world.a.tenant_id, "dq.readiness.slips_printed")[-1]
+    assert event["summary"]["section_id"] == section
+    assert event["summary"]["sensitive_shown"] >= 1
+    assert str(sid) in event["summary"]["sensitive_student_ids"]
+    assert len(event["summary"]["sensitive_student_ids"]) == event["summary"]["sensitive_shown"]
+    staff = world.person("office_staff")  # no student.read_sensitive
+    plain = api.call(staff, "GET", f"{BASE}/slips", params={"section_id": section})
+    assert plain.status_code == 200
+    latest = W.audit_events(admin_engine, world.a.tenant_id, "dq.readiness.slips_printed")[-1]
+    assert latest["summary"]["sensitive_shown"] == 0
+    assert "sensitive_student_ids" not in latest["summary"]
