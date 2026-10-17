@@ -104,6 +104,7 @@ from app.core.records import RecordTable
 from app.documents import service as documents
 from app.documents.service import ObjectStore, ObjectWriter
 from app.dq import service as dq
+from app.fees import service as fees
 from app.identity import service as identity
 from app.identity.principal import STEP_UP_MAX_AGE
 from app.imports import service as imports
@@ -563,6 +564,8 @@ def _collect(session: Session, snap: _Snapshot) -> tuple[list[RecordTable], dict
         *academics.export_records(session),
         *insights.export_records(session, include_sensitive=snap.include_sensitive),
         *tally.export_records(session),
+        # R2-1B (FR-FEE-027): fee heads, plans, accounts, ledger, receipts and requests.
+        *fees.export_records(session),
         # ADR-0034: each person's Ask memory items and switch (their own work context; the
         # query log and conversations are not in the archive, docs/05 §12).
         *knowledge.export_records(session),

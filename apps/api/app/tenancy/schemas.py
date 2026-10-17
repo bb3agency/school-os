@@ -373,6 +373,12 @@ class TenantSettings(BaseModel):
         "pages, printed parent slips and forms (ADR-0044, FR-LANG-001). Independent of the "
         "staff UI language; a guardian's own choice overrides it.",
     )
+    fees_enabled: bool = Field(
+        default=False,
+        description="The school keeps its fee ledger and receipts in SchoolOS (R2-1B, FR-FEE-001; "
+        "also needs the platform flag ``fees.enabled``). In ``alongside`` mode this is how the "
+        "owner turns fees on despite the ERP (ADR-0042 decision 12). Audited with its value.",
+    )
 
     @field_validator("languages")
     @classmethod
@@ -404,6 +410,11 @@ class TenantSettingsPatch(_In):
         default=None,
         description="``en`` or ``te``: the language parents receive (ADR-0044). Audited with "
         "its new value.",
+    )
+    fees_enabled: bool | None = Field(
+        default=None,
+        description="Turn the fee ledger and receipts on or off for the school (FR-FEE-001). "
+        "Recorded data is kept when it is turned off.",
     )
 
     @field_validator("languages")

@@ -221,7 +221,7 @@ class SearchDocumentsTool:
 
 
 LIST_NAME: Final = "list_documents"
-NOT_LISTED_PURPOSES: Final = frozenset({"evidence", "import_file"})
+NOT_LISTED_PURPOSES: Final = frozenset({"evidence", "import_file", "fee_receipt"})
 """Student-record files (identity evidence, raw imports) are never listed to the model."""
 
 

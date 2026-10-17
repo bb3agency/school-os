@@ -357,3 +357,22 @@ templates:
     te:
       title: Tally ఏజెంట్ సింక్ ఆగిపోయింది
       body: "కార్యాలయ PCలోని Tally ఏజెంట్ {hours} గంటలకు పైగా SchoolOSను సంప్రదించలేదు, కాబట్టి ఫీజు బకాయిలు పాతవి కావచ్చు. PC ఆన్‌లో ఉందా, TallyPrime తెరిచి ఉందా, ఇంటర్నెట్ పనిచేస్తోందా చూడండి."
+  # --- R2-1B fees (ADR-0042; FR-FEE-026): maker-checker requests and decisions (ids only) ---
+  fee.approval_requested:
+    params: [request_id, kind, account_id]
+    resource_type: fee_request
+    en:
+      title: "{kind, select, concession {Fee concession} adjustment {Fee adjustment} cancellation {Receipt cancellation} refund {Fee refund} other {Fee request}} waiting for your approval"
+      body: "A {kind, select, concession {fee concession} adjustment {fee adjustment} cancellation {receipt cancellation} refund {fee refund} other {fee request}} is waiting for a second person's approval. Open Fees > Approvals to check it, then approve or reject it."
+    te:
+      title: "మీ ఆమోదం కోసం {kind, select, concession {ఫీజు రాయితీ} adjustment {ఫీజు సర్దుబాటు} cancellation {రసీదు రద్దు} refund {ఫీజు వాపసు} other {ఫీజు అభ్యర్థన}} వేచి ఉంది"
+      body: "ఒక {kind, select, concession {ఫీజు రాయితీ} adjustment {ఫీజు సర్దుబాటు} cancellation {రసీదు రద్దు} refund {ఫీజు వాపసు} other {ఫీజు అభ్యర్థన}} రెండవ వ్యక్తి ఆమోదం కోసం వేచి ఉంది. ఫీజులు > ఆమోదాలు తెరిచి చూసి ఆమోదించండి లేదా తిరస్కరించండి."
+  fee.request_decided:
+    params: [request_id, kind, account_id, decision]
+    resource_type: fee_request
+    en:
+      title: "Your fee request was {decision, select, approved {approved} other {rejected}}"
+      body: "Your {kind, select, concession {fee concession} adjustment {fee adjustment} cancellation {receipt cancellation} refund {fee refund} other {fee request}} request was {decision, select, approved {approved and the student's fee account is updated} other {rejected; open it to read the reason}}."
+    te:
+      title: "మీ ఫీజు అభ్యర్థన {decision, select, approved {ఆమోదించబడింది} other {తిరస్కరించబడింది}}"
+      body: "మీ {kind, select, concession {ఫీజు రాయితీ} adjustment {ఫీజు సర్దుబాటు} cancellation {రసీదు రద్దు} refund {ఫీజు వాపసు} other {ఫీజు}} అభ్యర్థన {decision, select, approved {ఆమోదించబడింది, విద్యార్థి ఫీజు ఖాతా నవీకరించబడింది} other {తిరస్కరించబడింది; కారణం చూడటానికి తెరవండి}}."

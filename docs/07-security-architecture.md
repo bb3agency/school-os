@@ -203,7 +203,7 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | export.read_all (see every export's details, not its files; ADR-0021) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
 | export.download_any (download other staff's exports; ADR-0021) | ✓ᴿ | — | — | — | — | — | — | — | — |
 | audit.read | ✓ | ✓ | ✓ | — | — | — | — | — | ✓ |
-| finance.read (M6) | ✓ | ✓ | — | — | ✓ | — | — | — | ✓ |
+| finance.read (M6; from R2-1B also fee accounts, dues, the daily collection report and plans) | ✓ | ✓ | — | — | ✓ | — | — | — | ✓ |
 | insights.read (M5: see behaviour notes, flags, indicators and the student timeline; educational roles only, 08 PRV-004, so not the owner; also needs student.read_sensitive in the same scope; proposed, PO to confirm) | — | ✓ | — | — | — | — | S | — | — |
 | insights.note (M5: write behaviour notes) | — | ✓ | — | — | — | — | S | — | — |
 | insights.act (M5: record actions on flags, raise and close flags) | — | ✓ | — | — | — | — | S | — | — |
@@ -229,6 +229,14 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | task.manage (M4: create, assign, change, cancel tasks) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
 | notice.draft (M4: draft and edit parent notices, download approved ones) | ✓ | ✓ | ✓ | ✓ | — | — | — | — | — |
 | notice.approve (M4: approve parent notices) | ✓ | ✓ | — | — | — | — | — | — | — |
+| fee.collect (R2-1B: take payments at the counter, issue receipts, request receipt cancellations; fee permissions are school-wide only, FR-FEE-024) | — | ✓ | ✓ | ✓ | ✓ | — | — | — | — |
+| fee.manage (R2-1B: fee heads, plans, applying plans, adjustment requests, fee settings, day close) | — | ✓ | — | — | ✓ | — | — | — | — |
+| fee.concession.request (R2-1B) | — | ✓ | ✓ | — | ✓ | — | — | — | — |
+| fee.concession.approve (R2-1B: concessions and adjustments; maker-checker; principal or accountant, D17) | — | ✓ᴿ | — | — | ✓ᴿ | — | — | — | — |
+| fee.receipt.cancel (R2-1B: approve a receipt cancellation; maker-checker; principal or accountant, D17) | — | ✓ᴿ | — | — | ✓ᴿ | — | — | — | — |
+| fee.refund.request (R2-1B) | — | ✓ | — | — | ✓ | — | — | — | — |
+| fee.refund.approve (R2-1B: maker-checker; principal or accountant, D17) | — | ✓ᴿ | — | — | ✓ᴿ | — | — | — | — |
+| fee.report (R2-1B: download the day book and dues lists, bulk personal financial data) | ✓ᴿ | ✓ᴿ | — | — | ✓ᴿ | — | — | — | ✓ᴿ |
 
 `auditor_readonly` memberships are time-bound (default 14 days) and read-only.
 

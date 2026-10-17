@@ -8,6 +8,9 @@ purge_order:
   # R2-0 (ADR-0047): public handles first (they reference guardians and the school's keys'
   # tenant); R2 fees and messaging insert themselves after it, before students (docs/05 §15.6).
   - public
+  # R2-1B (ADR-0042): the fee ledger references students, documents, the structure and
+  # members, so it goes before all of them.
+  - fees
   - tally
   - circulars
   - insights

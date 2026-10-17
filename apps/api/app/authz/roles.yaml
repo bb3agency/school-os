@@ -57,6 +57,8 @@ roles:
       certificate.approve: school_step_up
       register.read: school_step_up
       apaar.consent.read: school
+      # R2-1B fees (ADR-0042; docs/07 §6.2): school-wide only, never scoped (FR-FEE-024)
+      fee.report: school_step_up
 
   principal:
     name_en: Principal
@@ -117,6 +119,15 @@ roles:
       register.read: school_step_up
       apaar.consent.read: school
       apaar.consent.record: school
+      # R2-1B fees (ADR-0042; docs/07 §6.2): school-wide only, never scoped (FR-FEE-024)
+      fee.collect: school
+      fee.manage: school
+      fee.concession.request: school
+      fee.concession.approve: school_step_up
+      fee.receipt.cancel: school_step_up
+      fee.refund.request: school
+      fee.refund.approve: school_step_up
+      fee.report: school_step_up
 
   office_admin:
     name_en: Office admin
@@ -161,6 +172,9 @@ roles:
       attendance.read: school
       apaar.consent.read: school
       apaar.consent.record: school
+      # R2-1B fees (ADR-0042; docs/07 §6.2): school-wide only, never scoped (FR-FEE-024)
+      fee.collect: school
+      fee.concession.request: school
 
   office_staff:
     name_en: Office staff
@@ -187,6 +201,8 @@ roles:
       certificate.issue: school
       apaar.consent.read: school
       apaar.consent.record: school
+      # R2-1B fees (ADR-0042; docs/07 §6.2): school-wide only, never scoped (FR-FEE-024)
+      fee.collect: school
 
   accountant:
     name_en: Accountant
@@ -202,6 +218,15 @@ roles:
       finance.read: school
       tally.configure: school
       support.ticket.create: school
+      # R2-1B fees (ADR-0042; docs/07 §6.2): school-wide only, never scoped (FR-FEE-024)
+      fee.collect: school
+      fee.manage: school
+      fee.concession.request: school
+      fee.concession.approve: school_step_up
+      fee.receipt.cancel: school_step_up
+      fee.refund.request: school
+      fee.refund.approve: school_step_up
+      fee.report: school_step_up
 
   exam_coordinator:
     name_en: Exam coordinator
@@ -278,6 +303,8 @@ roles:
       certificate.read: school
       register.read: school_step_up
       apaar.consent.read: school
+      # R2-1B fees (ADR-0042; docs/07 §6.2): school-wide only, never scoped (FR-FEE-024)
+      fee.report: school_step_up
 
 # Break-glass support access (docs/07 §6.4, US-103, FR-OPS-004). NOT a system role: it is not
 # cloned at provisioning, not listed for assignment and never assignable by staff. It is created

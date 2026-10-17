@@ -23,6 +23,7 @@ from app.core.logging import bind_task_context, clear_context, reset_context, se
 from app.core.telemetry import setup_telemetry
 from app.documents.tasks import beat_schedule as documents_beat_schedule
 from app.exports.tasks import beat_schedule as exports_beat_schedule
+from app.fees.tasks import beat_schedule as fees_beat_schedule
 from app.imports.tasks import beat_schedule as imports_beat_schedule
 from app.insights.tasks import beat_schedule as insights_beat_schedule
 from app.knowledge.service import check_provider_agreements
@@ -49,6 +50,7 @@ import app.documents.service  # isort: skip
 import app.dq.service  # isort: skip
 import app.exports.service  # isort: skip
 import app.extraction.service  # isort: skip
+import app.fees.service  # isort: skip
 import app.imports.service  # isort: skip
 import app.insights.service  # isort: skip
 import app.knowledge.service  # isort: skip
@@ -82,6 +84,8 @@ TASK_MODULES: list[str] = [
     "app.insights.tasks",
     "app.tally.tasks",
     "app.public.tasks",
+    # R2-1B fees: receipt PDFs (queue pdf) and nightly late fees.
+    "app.fees.tasks",
 ]
 
 
@@ -141,6 +145,9 @@ def create_celery() -> Celery:
             "offboarding.certify": {"queue": "pdf"},
             # FR-CERT-010: certificate PDFs render on the Chromium workers.
             "certificates.render": {"queue": "pdf"},
+            # FR-FEE-011: receipt PDFs on the Chromium workers; FR-FEE-009 late fees nightly.
+            "fees.render_receipt": {"queue": "pdf"},
+            "fees.post_late_fees": {"queue": "maintenance"},
             "exports.purge_expired": {"queue": "maintenance"},
             # FR-ADM-001: the school's full data export on "exports"; the hourly purge of
             # archives past their 24 hours on "maintenance".
@@ -215,6 +222,8 @@ def create_celery() -> Celery:
             **tally_beat_schedule(),
             # FR-PUB-006: expired parent link handles deleted 30 days after expiry (daily).
             **public_beat_schedule(),
+            # FR-FEE-009 (R2-1B): late fees posted once each, nightly at 00:30 IST.
+            **fees_beat_schedule(),
             # FR-PLT-*: control-plane jobs on shared; heartbeat client on dedicated (ADR-0017).
             **platform_beat_schedule(settings),
         },

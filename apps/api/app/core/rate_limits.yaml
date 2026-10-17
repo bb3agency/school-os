@@ -203,6 +203,14 @@ routes:
   POST /api/v1/platform/invoice-runs: [platform_emergency]
   # audit-chain verification (R-19)
   POST /api/v1/platform/audit/verify: [platform_audit_verify]
+  # R2-1B fees (ADR-0042): counter search, print views, CSV downloads, applying a plan
+  POST /api/v1/fees/accounts/search: [search]
+  GET /api/v1/fees/receipts/{receipt_id}/print: [render]
+  POST /api/v1/fees/receipts/{receipt_id}/render: [render]
+  GET /api/v1/fees/reports/daily/print: [render]
+  GET /api/v1/fees/reports/daily.csv: [exports]
+  GET /api/v1/fees/dues.csv: [exports]
+  POST /api/v1/fees/plans/{plan_id}/apply: [heavy_jobs]
   # support tickets
   POST /api/v1/support/tickets: [support_tickets]
   POST /api/v1/platform/support/tickets: [support_tickets]

@@ -1882,6 +1882,7 @@ class ActiveEnrolment:
     section_id: uuid.UUID
     academic_year_id: uuid.UUID
     roll_no: str | None = None  # exports: class lists and "ready to enter" sheets
+    started_on: dt.date | None = None  # fees: instalments due before admission (FR-FEE-005)
 
 
 def active_enrolments(
@@ -1902,6 +1903,32 @@ def active_enrolments(
             )
         )
     return out
+
+
+def enrolled_in_sections(
+    session: Session, *, academic_year_id: uuid.UUID, section_ids: Collection[uuid.UUID]
+) -> list[ActiveEnrolment]:
+    """Active enrolments of one academic year in the given sections, with their start dates
+    (system read for fee plans applied to a class, FR-FEE-005; the caller authorised the class).
+    IDs, sections, roll numbers and dates only."""
+    if not section_ids:
+        return []
+    ids = repo.student_ids_in_sections(
+        session, academic_year_id=academic_year_id, section_ids=section_ids
+    )
+    wanted = set(section_ids)
+    return [
+        ActiveEnrolment(
+            enrollment_id=row.id,
+            student_id=row.student_id,
+            section_id=row.section_id,
+            academic_year_id=row.academic_year_id,
+            roll_no=row.roll_no,
+            started_on=row.started_on,
+        )
+        for row in repo.active_enrollments_of(session, ids)
+        if row.academic_year_id == academic_year_id and row.section_id in wanted
+    ]
 
 
 def ensure_in_scope(
