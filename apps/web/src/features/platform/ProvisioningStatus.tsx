@@ -3,7 +3,7 @@
 import type { TenantDetail } from "@schoolos/api-client";
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
-import { z } from "zod";
+import * as z from "@/lib/zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { Pill } from "@/components/ui/Badge";

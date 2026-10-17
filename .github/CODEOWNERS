@@ -18,8 +18,8 @@
 # Cross-module security suites (route enumeration, BOLA, RLS catalog) — never weaken
 /apps/api/tests/security/           @bb3agency
 # Versioned prompts, model IDs and thresholds (CLAUDE.md §6 invariant 13)
-/config/prompts/                    @bb3agency
-/config/models.yaml                 @bb3agency
+/apps/api/app/knowledge/prompts/    @bb3agency
+/apps/api/app/knowledge/config/     @bb3agency
 
 # Infrastructure and deployment
 /infra/                             @bb3agency

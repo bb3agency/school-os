@@ -390,6 +390,29 @@ describe("tasks (US-1603, US-1604)", () => {
     expect(stub.callsTo("GET /bff/api/v1/tasks")[0]?.url.searchParams.get("view")).toBe("mine");
   });
 
+  it("pages through more than 100 tasks (docs/09 §2)", async () => {
+    signedIn(["task.read"]);
+    stub.routes["GET /bff/api/v1/tasks"] = (_request, url) =>
+      url.searchParams.get("cursor") === "tasks-2"
+        ? page([task({ id: "0192f3a4-0000-7000-8000-00000000a7f2", title: "Second page task" })])
+        : Response.json({ data: [task()], next_cursor: "tasks-2" });
+    renderWithIntl(<TasksScreen />);
+    expect(
+      await screen.findByRole("button", { name: `${en.tasks.move.done}: ${task().title}` }),
+    ).toBeVisible();
+    const pager = screen.getByRole("navigation", { name: en.tasks.pagesLabel });
+    await userEvent.click(within(pager).getByRole("button", { name: /Next/ }));
+    expect(
+      await screen.findByRole("button", { name: `${en.tasks.move.done}: Second page task` }),
+    ).toBeVisible();
+    // The list (and its pager) is drawn again for the new page.
+    const again = screen.getByRole("navigation", { name: en.tasks.pagesLabel });
+    await userEvent.click(within(again).getByRole("button", { name: /Previous/ }));
+    expect(
+      await screen.findByRole("button", { name: `${en.tasks.move.done}: ${task().title}` }),
+    ).toBeVisible();
+  });
+
   it("managers see the whole school and can add a task", async () => {
     signedIn(["task.read", "task.read_all", "task.manage"]);
     stub.routes["GET /bff/api/v1/tasks"] = () => page([]);
@@ -425,6 +448,22 @@ describe("tasks (US-1603, US-1604)", () => {
 });
 
 describe("parent notices (US-1605, US-1606)", () => {
+  it("pages through more than 50 notices (docs/09 §2)", async () => {
+    signedIn(["notice.draft"]);
+    stub.routes["GET /bff/api/v1/notices"] = (_request, url) =>
+      url.searchParams.get("cursor") === "notices-2"
+        ? page([notice({ id: "0192f3a4-0000-7000-8000-00000000b0f2", title_en: "Older notice" })])
+        : Response.json({
+            data: [notice({ title_en: "Newest notice" })],
+            next_cursor: "notices-2",
+          });
+    renderWithIntl(<NoticesScreen />);
+    expect(await screen.findByRole("link", { name: "Newest notice" })).toBeVisible();
+    const pager = screen.getByRole("navigation", { name: en.notices.pagesLabel });
+    await userEvent.click(within(pager).getByRole("button", { name: /Next/ }));
+    expect(await screen.findByRole("link", { name: "Older notice" })).toBeVisible();
+  });
+
   it("refuses personal numbers before drafting from staff text", async () => {
     signedIn(["notice.draft"]);
     stub.routes["GET /bff/api/v1/notices"] = () => page([]);

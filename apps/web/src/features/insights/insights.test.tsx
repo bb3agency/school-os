@@ -293,6 +293,34 @@ describe("flags list (US-1705, US-1706, US-1708; FR-EW-009, FR-EW-015)", () => {
     expect(screen.queryByRole("button", { name: en.insights.rules.save })).toBeNull();
   });
 
+  it("pages through more than 100 flags; a new filter starts at the first page (docs/09 §2)", async () => {
+    signedIn(TEACHER);
+    const second = "0192f3a4-0000-7000-8000-00000000f5f2";
+    stub.routes["GET /bff/api/v1/insights/flags"] = (_request, url) =>
+      url.searchParams.get("cursor") === "flags-2"
+        ? page([
+            flag({ id: second, student: { ...flag().student, full_name: "Synthetica Page Two" } }),
+          ])
+        : Response.json({ data: [flag()], next_cursor: "flags-2" });
+    renderWithIntl(<FlagsScreen />);
+    expect(await screen.findByRole("link", { name: "Synthetica Ravi" })).toBeVisible();
+    const pager = screen.getByRole("navigation", { name: en.insights.pagesLabel });
+    await userEvent.click(within(pager).getByRole("button", { name: /Next/ }));
+    expect(await screen.findByRole("link", { name: "Synthetica Page Two" })).toBeVisible();
+    expect(
+      stub.callsTo("GET /bff/api/v1/insights/flags").at(-1)?.url.searchParams.get("cursor"),
+    ).toBe("flags-2");
+    await userEvent.selectOptions(screen.getByLabelText(en.insights.statusLabel), "closed");
+    await waitFor(() =>
+      expect(
+        stub.callsTo("GET /bff/api/v1/insights/flags").at(-1)?.url.searchParams.get("status"),
+      ).toBe("closed"),
+    );
+    expect(
+      stub.callsTo("GET /bff/api/v1/insights/flags").at(-1)?.url.searchParams.get("cursor"),
+    ).toBeNull();
+  });
+
   it("asks for the school view and a status filter", async () => {
     signedIn(TEACHER);
     stub.routes["GET /bff/api/v1/insights/flags"] = () => page([]);

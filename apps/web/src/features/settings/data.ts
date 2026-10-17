@@ -1,5 +1,5 @@
 import type { components } from "@schoolos/api-client";
-import { z } from "zod";
+import * as z from "@/lib/zod";
 import { checkbox, requiredInt } from "@/lib/validation";
 
 /**

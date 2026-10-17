@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useDeferredValue, useState } from "react";
-import { z } from "zod";
+import * as z from "@/lib/zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { Pill, type PillVariant } from "@/components/ui/Badge";

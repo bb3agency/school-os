@@ -13,6 +13,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Table, TableScroll, TBody, Td, Th, THead, Tr } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { useTeluguEnabled } from "@/i18n/LanguagesProvider";
+import { Pager, useCursorStack } from "@/features/students/paging";
 import { Link, useRouter } from "@/i18n/navigation";
 import { newIdempotencyKey, unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
@@ -106,7 +107,9 @@ export function NoticesScreen() {
   const can = useStaffCan();
   const meLoaded = useStaffMe() !== undefined;
   const allowed = can(NOTICE_DRAFT);
-  const list = useNotices(allowed);
+  // Cursor paging (docs/09 §2): a page holds 50 notices, newest first.
+  const pages = useCursorStack();
+  const list = useNotices(allowed, pages.cursor);
 
   return (
     <div className="space-y-6">
@@ -124,48 +127,58 @@ export function NoticesScreen() {
           <NewNoticeCard />
           <Card title={t("listTitle")}>
             <LoadGate data={meLoaded ? list : { status: "loading" }}>
-              {(page) =>
-                page.data.length === 0 ? (
-                  <EmptyState icon="megaphone" title={t("emptyTitle")} body={t("emptyBody")} />
-                ) : (
-                  <TableScroll label={t("listTitle")}>
-                    <Table>
-                      <THead>
-                        <Tr>
-                          <Th>{t("columns.notice")}</Th>
-                          <Th>{t("columns.status")}</Th>
-                          <Th>{t("columns.updated")}</Th>
-                        </Tr>
-                      </THead>
-                      <TBody>
-                        {page.data.map((notice) => (
-                          <Tr key={notice.id}>
-                            <Td>
-                              <Link
-                                href={`/notices/${notice.id}`}
-                                className="font-semibold text-primary underline underline-offset-4 hover:no-underline"
-                              >
-                                {notice.title_en || t("untitled")}
-                              </Link>
-                              {telugu && notice.title_te ? (
-                                <p lang="te" className="text-sm text-ink-muted">
-                                  {notice.title_te}
-                                </p>
-                              ) : null}
-                            </Td>
-                            <Td>
-                              <NoticeStatusPill status={notice.status} />
-                            </Td>
-                            <Td>
-                              <Value>{formatDateTime(notice.updated_at)}</Value>
-                            </Td>
+              {(page) => (
+                <div className="space-y-4">
+                  {page.data.length === 0 ? (
+                    <EmptyState icon="megaphone" title={t("emptyTitle")} body={t("emptyBody")} />
+                  ) : (
+                    <TableScroll label={t("listTitle")}>
+                      <Table>
+                        <THead>
+                          <Tr>
+                            <Th>{t("columns.notice")}</Th>
+                            <Th>{t("columns.status")}</Th>
+                            <Th>{t("columns.updated")}</Th>
                           </Tr>
-                        ))}
-                      </TBody>
-                    </Table>
-                  </TableScroll>
-                )
-              }
+                        </THead>
+                        <TBody>
+                          {page.data.map((notice) => (
+                            <Tr key={notice.id}>
+                              <Td>
+                                <Link
+                                  href={`/notices/${notice.id}`}
+                                  className="font-semibold text-primary underline underline-offset-4 hover:no-underline"
+                                >
+                                  {notice.title_en || t("untitled")}
+                                </Link>
+                                {telugu && notice.title_te ? (
+                                  <p lang="te" className="text-sm text-ink-muted">
+                                    {notice.title_te}
+                                  </p>
+                                ) : null}
+                              </Td>
+                              <Td>
+                                <NoticeStatusPill status={notice.status} />
+                              </Td>
+                              <Td>
+                                <Value>{formatDateTime(notice.updated_at)}</Value>
+                              </Td>
+                            </Tr>
+                          ))}
+                        </TBody>
+                      </Table>
+                    </TableScroll>
+                  )}
+                  <Pager
+                    label={t("pagesLabel")}
+                    page={pages.page}
+                    onPrevious={pages.hasPrevious ? pages.previous : undefined}
+                    onNext={
+                      page.next_cursor ? () => pages.next(page.next_cursor as string) : undefined
+                    }
+                  />
+                </div>
+              )}
             </LoadGate>
           </Card>
         </>

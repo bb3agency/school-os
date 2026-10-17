@@ -138,7 +138,7 @@ const TENANT_SUMMARY = {
   app_version: "2026.09.1",
   last_heartbeat_at: "2026-09-26T04:30:00Z",
   created_at: "2026-06-01T04:30:00Z",
-};
+} satisfies components["schemas"]["TenantSummaryOut"];
 
 /** Typed against the generated schemas so a new API field fails typecheck here. */
 const PLAN: components["schemas"]["PlanOut"] = {
@@ -203,6 +203,7 @@ const STAMP = {
 };
 
 /** School console fixtures for the screens added on 2026-09-27 (synthetic only). */
+const SECTION_A_ID = "0192f3a4-0000-7000-8000-000000000500";
 const STRUCTURE = {
   years: [
     {
@@ -234,13 +235,17 @@ const STRUCTURE = {
     },
   ],
   sections: ["A", "B"].map((name, index) => ({
-    id: `0192f3a4-0000-7000-8000-0000000005${index}0`,
+    id: index === 0 ? SECTION_A_ID : `0192f3a4-0000-7000-8000-0000000005${index}0`,
     academic_year_id: YEAR_ID,
     class_id: CLASS_ID,
     name,
     class_teacher_membership_id: null,
     ...STAMP,
   })),
+} satisfies {
+  years: components["schemas"]["AcademicYearOut"][];
+  classes: components["schemas"]["ClassOut"][];
+  sections: components["schemas"]["SectionOut"][];
 };
 
 /** Staff directory (class teacher picker) and a promotion preview (FR-TEN-011). */
@@ -249,8 +254,9 @@ const STAFF = [
     membership_id: "0192f3a4-0000-7000-8000-0000000000e2",
     display_name: "Synthetic Teacher",
     roles: ["class_teacher"],
+    status: "active",
   },
-];
+] satisfies components["schemas"]["StaffMemberOut"][];
 const PROMOTIONS_PATH = `/api/v1/academic-years/${YEAR_ID}/promotions`;
 const PROMOTION_PREVIEW = {
   from_academic_year_id: YEAR_ID,
@@ -258,7 +264,7 @@ const PROMOTION_PREVIEW = {
   counts: { promoted: 1, held_back: 0, graduated: 0, skipped: 0 },
   groups: [
     {
-      from_section_id: STRUCTURE.sections[0]?.id,
+      from_section_id: SECTION_A_ID,
       from_label: "6-A",
       outcome: "promoted",
       to_section_id: null,
@@ -269,7 +275,7 @@ const PROMOTION_PREVIEW = {
   problems: [
     {
       code: "no_target_section",
-      from_section_id: STRUCTURE.sections[0]?.id,
+      from_section_id: SECTION_A_ID,
       from_label: "6-A",
       target_class_id: CLASS_ID,
       count: 1,
@@ -279,7 +285,7 @@ const PROMOTION_PREVIEW = {
     {
       student_id: "0192f3a4-0000-7000-8000-00000000d001",
       enrollment_id: "0192f3a4-0000-7000-8000-00000000e101",
-      from_section_id: STRUCTURE.sections[0]?.id,
+      from_section_id: SECTION_A_ID,
       outcome: "promoted",
       to_section_id: null,
       reason: "no_target_section",
@@ -287,7 +293,7 @@ const PROMOTION_PREVIEW = {
   ],
   plan_fingerprint: "a".repeat(64),
   can_commit: false,
-};
+} satisfies components["schemas"]["PromotionPreviewOut"];
 
 const TENANT = {
   id: T1,
@@ -304,9 +310,12 @@ const TENANT = {
     idle_timeout_minutes: 15,
     ai_features_enabled: true,
     ai_monthly_budget_inr: 5000,
+    ai_memory_enabled: true,
+    operating_mode: "full",
+    current_erp_name: "",
   },
   version: 7,
-};
+} satisfies components["schemas"]["TenantOut"];
 
 const ROLES = [
   { key: "office_admin", name_en: "Office admin", name_te: "ఆఫీసు అడ్మిన్", scoped: false },
@@ -315,9 +324,10 @@ const ROLES = [
   id: `0192f3a4-0000-7000-8000-0000000007${index}0`,
   ...role,
   is_system: true,
+  needs_mfa: false,
   permissions: ["student.read_basic"],
   grantable: true,
-}));
+})) satisfies components["schemas"]["RoleOut"][];
 
 const USER = {
   id: USER_ID,
@@ -328,11 +338,13 @@ const USER = {
   status: "active",
   expires_at: null,
   roles: ["class_teacher"],
-  scopes: [{ type: "section", ref: STRUCTURE.sections[0]?.id }],
+  scopes: [{ type: "section", ref: SECTION_A_ID }],
   last_login_at: "2026-09-20T04:30:00Z",
   created_at: "2026-06-01T04:30:00Z",
+  contact_hidden: false,
+  profile_shared: false,
   version: 3,
-};
+} satisfies components["schemas"]["UserOut"];
 
 const DOC_VERSION = {
   id: "0192f3a4-0000-7000-8000-00000000d101",
@@ -341,8 +353,9 @@ const DOC_VERSION = {
   size_bytes: 204_800,
   status: "ready",
   error: null,
+  uploaded_by_me: false,
   created_at: "2026-09-20T05:00:00Z",
-};
+} satisfies components["schemas"]["DocumentDetail"]["current_version"];
 const DOCUMENT = {
   id: DOC_ID,
   purpose: "circular",
@@ -365,7 +378,7 @@ const DOCUMENT = {
   created_at: "2026-09-20T05:00:00Z",
   updated_at: "2026-09-21T05:00:00Z",
   version: 3,
-};
+} satisfies components["schemas"]["DocumentOut"];
 
 /**
  * Ask the school (docs/06 §5.1): a synthetic cited answer about the holiday circular. The events
@@ -393,7 +406,7 @@ const VERIFIED_ANSWER = {
   review_due: null,
   version: 1,
   created_at: "2026-09-27T05:30:00Z",
-};
+} satisfies components["schemas"]["VerifiedAnswerOut"];
 
 /**
  * Stream a canned answer as Server-Sent Events, one event at a time (FR-KB-008). A question
@@ -427,7 +440,7 @@ const INSIGHT_FLAG = {
   close_reason: null,
   raised_by: null,
   version: 2,
-};
+} satisfies components["schemas"]["InsightFlagOut"];
 const INSIGHT_FLAG_DETAIL = {
   ...INSIGHT_FLAG,
   actions: [
@@ -448,7 +461,7 @@ const INSIGHT_FLAG_DETAIL = {
       created_at: "2026-09-25T05:00:00Z",
     },
   ],
-};
+} satisfies components["schemas"]["InsightFlagDetail"];
 const INSIGHT_SUMMARY = {
   since: "2026-08-30",
   raised: 4,
@@ -457,8 +470,15 @@ const INSIGHT_SUMMARY = {
   not_actioned: 1,
   overdue: 1,
   open: 2,
-};
-const rule = (key: string, indicator: string, threshold: number, min: number, max: number) => ({
+} satisfies components["schemas"]["InsightSummaryOut"];
+type RuleOut = components["schemas"]["SettingsOut"]["rules"][number];
+const rule = (
+  key: string,
+  indicator: RuleOut["indicator"],
+  threshold: number,
+  min: number,
+  max: number,
+): RuleOut => ({
   key,
   indicator,
   enabled: true,
@@ -482,7 +502,7 @@ const INSIGHT_SETTINGS = {
   due_days: 7,
   version: 0,
   updated_at: null,
-};
+} satisfies components["schemas"]["SettingsOut"];
 const EXAMS = [
   {
     id: "0192f3a4-0000-7000-8000-00000000ea01",
@@ -491,7 +511,7 @@ const EXAMS = [
     held_on: "2026-08-10",
     version: 1,
   },
-];
+] satisfies components["schemas"]["ExamOut"][];
 
 function streamAnswer(
   response: ServerResponse,
@@ -547,9 +567,9 @@ const PROVISIONING_DETAIL = {
     resumable: true,
     updated_at: "2026-09-27T04:30:00Z",
   },
-};
+} satisfies components["schemas"]["TenantDetailOut"];
 
-function provisioningSummary() {
+function provisioningSummary(): components["schemas"]["TenantSummaryOut"] {
   return {
     ...TENANT_SUMMARY,
     tenant_id: T3,
@@ -593,7 +613,7 @@ const AUDIT_NOT_VERIFIED = {
   last_full_at: null,
   pending: false,
   requested_at: null,
-};
+} satisfies components["schemas"]["AuditVerificationOut"];
 const AUDIT_VERIFIED = {
   ...AUDIT_NOT_VERIFIED,
   ok: true,
@@ -604,7 +624,7 @@ const AUDIT_VERIFIED = {
   checkpoint_seq: 1234,
   checkpoint_at: "2026-10-06T05:00:00Z",
   last_full_at: "2026-10-06T05:00:00Z",
-};
+} satisfies components["schemas"]["AuditVerificationOut"];
 
 function apiAnswer(method: string, path: string, subject: string): [number, unknown] {
   const multi = subject === "multi";
@@ -714,7 +734,10 @@ function apiAnswer(method: string, path: string, subject: string): [number, unkn
   if (path === `/api/v1/users/${USER_ID}`) return [200, USER];
   if (path === "/api/v1/documents") return [200, page([DOCUMENT])];
   if (path === `/api/v1/documents/${DOC_ID}`)
-    return [200, { ...DOCUMENT, versions: [DOC_VERSION] }];
+    return [
+      200,
+      { ...DOCUMENT, versions: [DOC_VERSION] } satisfies components["schemas"]["DocumentDetail"],
+    ];
   if (path === "/api/v1/knowledge/verified-answers" && method === "GET")
     return [200, page([VERIFIED_ANSWER])];
   if (/^\/api\/v1\/knowledge\/queries\/[^/]+\/feedback$/.test(path) && method === "POST")

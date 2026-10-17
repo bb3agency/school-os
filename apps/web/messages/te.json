@@ -118,7 +118,7 @@
       "draft": "డ్రాఫ్ట్",
       "scheduled": "షెడ్యూల్ చేయబడింది",
       "cancelled": "రద్దు చేయబడింది",
-      "ended": "Ended",
+      "ended": "ముగిసింది",
       "pending_approval": "ఆమోదం కోసం వేచి ఉంది"
     },
     "breakGlass": {
@@ -230,7 +230,6 @@
         "colYear": "సంవత్సరం",
         "colStarts": "ప్రారంభ తేదీ",
         "colEnds": "ముగింపు తేదీ",
-        "colCurrent": "ప్రస్తుత సంవత్సరం",
         "emptyTitle": "ఇంకా విద్యా సంవత్సరాలు లేవు",
         "emptyBody": "ప్రారంభించడానికి ప్రస్తుత విద్యా సంవత్సరాన్ని జోడించండి, ఉదాహరణకు 2026-27."
       },
@@ -327,7 +326,7 @@
         "breakGlassLink": "సపోర్ట్ యాక్సెస్‌కు వెళ్లండి",
         "invitedTitle": "వారు సైన్ ఇన్ అయ్యే వరకు వేచి ఉంది",
         "invitedBody": "ఈ వ్యక్తి తమ సైన్-ఇన్ IDతో మొదటిసారి సైన్ ఇన్ అయినప్పుడు ఆహ్వానం సక్రియమవుతుంది.",
-        "contactHidden": "This person already has a SchoolOS account, so they accept or decline the invitation themselves when they sign in. Their email appears here only after they accept.",
+        "contactHidden": "ఈ వ్యక్తికి ఇప్పటికే SchoolOS ఖాతా ఉంది, కాబట్టి వారు సైన్ ఇన్ చేసినప్పుడు ఆహ్వానాన్ని స్వయంగా అంగీకరిస్తారు లేదా తిరస్కరిస్తారు. వారు అంగీకరించిన తర్వాతే వారి ఇమెయిల్ ఇక్కడ కనిపిస్తుంది.",
         "removedTitle": "ఈ వ్యక్తిని తొలగించారు",
         "removedBody": "వారు ఇకపై ఈ పాఠశాలలో సైన్ ఇన్ కాలేరు. మళ్లీ యాక్సెస్ ఇవ్వాలంటే కొత్త ఆహ్వానం పంపండి.",
         "aboutTitle": "వివరాలు",
@@ -379,12 +378,12 @@
         },
         "profileShared": "వీరు SchoolOSలో మరో పాఠశాలలో కూడా పని చేస్తున్నారు, కాబట్టి వారి పేరు, ఈమెయిల్, భాష పంచుకోబడ్డాయి, వాటిని ఇక్కడ మార్చలేరు. వారినే తమ ప్రొఫైల్ మార్చుకోమని అడగండి, లేదా SchoolOS సపోర్ట్‌ను సంప్రదించండి.",
         "resend": {
-          "button": "Send the invitation again",
-          "title": "Send the invitation email again?",
-          "body": "We'll email the invitation to {email} again. It can be sent once every 10 minutes.",
-          "sentTitle": "Invitation email on its way",
-          "sentBody": "It should arrive in a few minutes. The invitation works until {date}.",
-          "noEmail": "There is no email address for this person, so the invitation can't be emailed. Add one with Edit details, or give them their sign-in ID yourself."
+          "button": "ఆహ్వానాన్ని మళ్లీ పంపండి",
+          "title": "ఆహ్వాన ఇమెయిల్‌ను మళ్లీ పంపాలా?",
+          "body": "ఆహ్వానాన్ని {email}కి మళ్లీ ఇమెయిల్ చేస్తాము. దీన్ని ప్రతి 10 నిమిషాలకు ఒకసారి మాత్రమే పంపవచ్చు.",
+          "sentTitle": "ఆహ్వాన ఇమెయిల్ పంపబడింది",
+          "sentBody": "కొన్ని నిమిషాల్లో చేరాలి. ఆహ్వానం {date} వరకు పనిచేస్తుంది.",
+          "noEmail": "ఈ వ్యక్తికి ఇమెయిల్ చిరునామా లేదు, కాబట్టి ఆహ్వానాన్ని ఇమెయిల్ చేయలేము. వివరాలను సవరించు ద్వారా ఒకటి జోడించండి, లేదా వారి సైన్-ఇన్ IDని మీరే ఇవ్వండి."
         }
       },
       "errors": {
@@ -425,24 +424,24 @@
           "body": "సిబ్బంది సభ్యులకు కనీసం ఒక పాత్ర ఉండాలి. వారి యాక్సెస్ ఆపాలంటే, బదులుగా నిలిపివేయండి లేదా తీసివేయండి ఉపయోగించండి."
         },
         "email_disabled": {
-          "title": "Email isn't switched on for this school",
-          "body": "Give the person their sign-in ID yourself, or contact SchoolOS support to switch email on."
+          "title": "ఈ పాఠశాలకు ఇమెయిల్ ఆన్ చేయలేదు",
+          "body": "ఆ వ్యక్తికి వారి సైన్-ఇన్ IDని మీరే ఇవ్వండి, లేదా ఇమెయిల్ ఆన్ చేయడానికి SchoolOS సపోర్ట్‌ను సంప్రదించండి."
         },
         "not_invited": {
-          "title": "This person is no longer waiting for an invitation",
-          "body": "They have already signed in, or they were removed. Reload the page to see their status."
+          "title": "ఈ వ్యక్తి ఇక ఆహ్వానం కోసం ఎదురుచూడటం లేదు",
+          "body": "వారు ఇప్పటికే సైన్ ఇన్ చేశారు, లేదా తొలగించబడ్డారు. వారి స్థితిని చూడటానికి పేజీని మళ్లీ లోడ్ చేయండి."
         },
         "invitation_expired": {
-          "title": "This invitation has expired",
-          "body": "Remove this person and invite them again to send a new invitation."
+          "title": "ఈ ఆహ్వానం గడువు ముగిసింది",
+          "body": "కొత్త ఆహ్వానం పంపడానికి ఈ వ్యక్తిని తొలగించి మళ్లీ ఆహ్వానించండి."
         },
         "email_missing": {
-          "title": "There is no email address for this person",
-          "body": "Add their email address with Edit details, then send the invitation again."
+          "title": "ఈ వ్యక్తికి ఇమెయిల్ చిరునామా లేదు",
+          "body": "వివరాలను సవరించు ద్వారా వారి ఇమెయిల్ చిరునామాను జోడించి, ఆహ్వానాన్ని మళ్లీ పంపండి."
         },
         "rate_limited": {
-          "title": "The invitation was sent a few minutes ago",
-          "body": "Wait 10 minutes before sending it again, and ask them to check their spam folder."
+          "title": "ఆహ్వానం కొన్ని నిమిషాల క్రితమే పంపబడింది",
+          "body": "మళ్లీ పంపే ముందు 10 నిమిషాలు ఆగండి, మరియు వారి స్పామ్ ఫోల్డర్‌ను చూడమని అడగండి."
         }
       },
       "inviteForm": {
@@ -507,24 +506,25 @@
       "emptyBody": "మీ సబ్‌స్క్రిప్షన్ సక్రియమైన తర్వాత ప్రతి నెలా ఇన్వాయిస్‌లు ఇక్కడ కనిపిస్తాయి.",
       "home": "హోమ్",
       "ai": {
-        "title": "AI answers",
-        "description": "Answers from Ask the school with sources, counted each calendar month.",
-        "none": "No AI answer bundle. Ask SchoolOS support to add one.",
-        "bundle": "Bundle",
-        "bundleName": "{name} bundle",
-        "included": "Included answers",
-        "perMonth": "{value} a month",
-        "price": "Bundle price",
-        "pricePerMonth": "{amount} a month plus GST",
-        "overage": "Each extra answer",
-        "overageRate": "{amount} plus GST",
-        "thisMonth": "Answers this month",
-        "usedOf": "{used} of {included}",
-        "countedTo": "Counted up to {date}. Each day is added the next morning.",
-        "notCountedYet": "No answers counted yet this month. Each day is added the next morning.",
-        "countsFrom": "Answers count against this bundle from {date}.",
-        "overageNote": "Answers above the included number are billed on the next month's invoice. To change the bundle, contact SchoolOS support."
-      }
+        "title": "AI సమాధానాలు",
+        "description": "మూలాలతో 'పాఠశాలను అడగండి' ఇచ్చే సమాధానాలు, ప్రతి క్యాలెండర్ నెలకు లెక్కించబడతాయి.",
+        "none": "AI సమాధానాల బండిల్ లేదు. ఒకటి జోడించమని SchoolOS సపోర్ట్‌ను అడగండి.",
+        "bundle": "బండిల్",
+        "bundleName": "{name} బండిల్",
+        "included": "చేర్చబడిన సమాధానాలు",
+        "perMonth": "నెలకు {value}",
+        "price": "బండిల్ ధర",
+        "pricePerMonth": "నెలకు {amount} మరియు GST",
+        "overage": "ప్రతి అదనపు సమాధానం",
+        "overageRate": "{amount} మరియు GST",
+        "thisMonth": "ఈ నెల సమాధానాలు",
+        "usedOf": "{included}లో {used}",
+        "countedTo": "{date} వరకు లెక్కించబడింది. ప్రతి రోజు మరుసటి ఉదయం జోడించబడుతుంది.",
+        "notCountedYet": "ఈ నెలలో ఇంకా సమాధానాలు లెక్కించబడలేదు. ప్రతి రోజు మరుసటి ఉదయం జోడించబడుతుంది.",
+        "countsFrom": "{date} నుండి సమాధానాలు ఈ బండిల్‌లో లెక్కించబడతాయి.",
+        "overageNote": "చేర్చబడిన సంఖ్య కంటే ఎక్కువ సమాధానాలకు మరుసటి నెల ఇన్‌వాయిస్‌లో బిల్లు వేయబడుతుంది. బండిల్ మార్చడానికి SchoolOS సపోర్ట్‌ను సంప్రదించండి."
+      },
+      "invoicesNote": "మీ చివరి 24 ఇన్‌వాయిస్‌లు, కొత్తవి ముందు. పాత ఇన్‌వాయిస్ కోసం SchoolOS సపోర్ట్‌ను సంప్రదించండి."
     },
     "audit": {
       "title": "ఆడిట్ లాగ్",
@@ -598,7 +598,8 @@
           "title": "ఒక ఫైల్‌కు ఈవెంట్‌లు చాలా ఎక్కువ",
           "body": "'నుండి' మరియు 'వరకు' తేదీలతో తక్కువ తేదీల పరిధిని ఎంచుకుని, మళ్లీ డౌన్‌లోడ్ చేయండి."
         }
-      }
+      },
+      "pagesLabel": "ఆడిట్ లాగ్ పేజీలు"
     },
     "switchSchool": "పాఠశాల మార్చండి",
     "announcements": {
@@ -634,7 +635,8 @@
       "closedNote": "ఈ టికెట్ మూసివేయబడింది. ఇంకా సహాయం కావాలంటే కొత్త టికెట్ తెరవండి.",
       "backToList": "అన్ని టికెట్లకు తిరిగి",
       "priorityLine": "ప్రాధాన్యత: {priority}",
-      "home": "హోమ్"
+      "home": "హోమ్",
+      "pagesLabel": "టికెట్ల పేజీలు"
     }
   },
   "platform": {
@@ -727,7 +729,8 @@
       "emptyBody": "ఫిల్టర్లు తీసివేయండి, లేదా టెనెంట్, ఎన్‌క్రిప్షన్ కీ, యజమాని ఆహ్వానం సృష్టించడానికి పాఠశాలను ఏర్పాటు చేయండి.",
       "clearFilters": "ఫిల్టర్లు తీసివేయండి",
       "noMatchTitle": "ఈ ఫిల్టర్లకు సరిపోయే పాఠశాలలు లేవు",
-      "noMatchBody": "వెతికే పదం లేదా ఫిల్టర్లను మార్చండి, లేదా అన్ని పాఠశాలలను చూడటానికి వాటిని తీసివేయండి."
+      "noMatchBody": "వెతికే పదం లేదా ఫిల్టర్లను మార్చండి, లేదా అన్ని పాఠశాలలను చూడటానికి వాటిని తీసివేయండి.",
+      "pagesLabel": "పాఠశాలల పేజీలు"
     },
     "schoolDetail": {
       "title": "పాఠశాల వివరాలు",
@@ -1054,24 +1057,24 @@
       "retireBody": "కొత్త సబ్‌స్క్రిప్షన్‌లు దీన్ని వాడలేవు. ఉన్నవి కొనసాగుతాయి.",
       "emptyTitle": "ఇంకా ప్లాన్లు లేవు",
       "emptyBody": "పాఠశాలలను ఏర్పాటు చేసే ముందు ధరలు, పరిమితులతో ప్లాన్ సృష్టించి ప్రచురించండి.",
-      "oneTimeFee": "One-time fee (₹)",
-      "oneTimeFeeHint": "Implementation and data verification, before GST. Charged once, on the school's first invoice. Leave empty for none.",
-      "colOneTimeFee": "One-time fee",
-      "planDescription": "Description",
-      "planDescriptionHint": "Plain words about what the plan gives a school, up to 300 characters.",
-      "bundlesTitle": "AI answer bundles",
-      "bundlesBody": "A monthly add-on for monthly plans. Each bundle includes a number of AI answers a month; answers above it are billed on the next invoice at the price per extra answer. Prices are before GST.",
-      "colBundle": "Bundle",
-      "colIncluded": "Answers a month",
-      "colBundlePrice": "Price a month (before GST)",
-      "colExtra": "Each extra answer",
-      "bundlesEmptyTitle": "No AI answer bundles",
-      "bundlesEmptyBody": "AI answer bundles come from the billing catalogue.",
-      "edit": "Edit",
-      "editTitle": "Edit {name} version {version} (draft)",
-      "editBody": "Only drafts can change. Once published, a plan's prices and limits are fixed.",
-      "fixedFieldsNote": "The plan code, deployment, billing period, pricing, GST rate and SAC code stay as they are. To change them, save a new version instead.",
-      "saveChanges": "Save changes"
+      "oneTimeFee": "ఒకసారి చెల్లించే రుసుము (₹)",
+      "oneTimeFeeHint": "అమలు మరియు డేటా ధృవీకరణ, GSTకి ముందు. పాఠశాల మొదటి ఇన్‌వాయిస్‌లో ఒకసారి వసూలు చేయబడుతుంది. లేకపోతే ఖాళీగా వదిలేయండి.",
+      "colOneTimeFee": "ఒకసారి రుసుము",
+      "planDescription": "వివరణ",
+      "planDescriptionHint": "ప్లాన్ పాఠశాలకు ఏమి ఇస్తుందో సరళమైన మాటల్లో, 300 అక్షరాల వరకు.",
+      "bundlesTitle": "AI సమాధానాల బండిల్‌లు",
+      "bundlesBody": "నెలవారీ ప్లాన్‌లకు నెలవారీ అదనపు సేవ. ప్రతి బండిల్‌లో నెలకు కొన్ని AI సమాధానాలు ఉంటాయి; దాని కంటే ఎక్కువ సమాధానాలకు మరుసటి ఇన్‌వాయిస్‌లో ప్రతి అదనపు సమాధానం ధరతో బిల్లు వేయబడుతుంది. ధరలు GSTకి ముందు.",
+      "colBundle": "బండిల్",
+      "colIncluded": "నెలకు సమాధానాలు",
+      "colBundlePrice": "నెలకు ధర (GSTకి ముందు)",
+      "colExtra": "ప్రతి అదనపు సమాధానం",
+      "bundlesEmptyTitle": "AI సమాధానాల బండిల్‌లు లేవు",
+      "bundlesEmptyBody": "AI సమాధానాల బండిల్‌లు బిల్లింగ్ కేటలాగ్ నుండి వస్తాయి.",
+      "edit": "సవరించండి",
+      "editTitle": "{name} వెర్షన్ {version} (డ్రాఫ్ట్) సవరించండి",
+      "editBody": "డ్రాఫ్ట్‌లు మాత్రమే మారగలవు. ప్రచురించిన తర్వాత ప్లాన్ ధరలు మరియు పరిమితులు స్థిరంగా ఉంటాయి.",
+      "fixedFieldsNote": "ప్లాన్ కోడ్, డిప్లాయ్‌మెంట్, బిల్లింగ్ వ్యవధి, ధర విధానం, GST రేటు మరియు SAC కోడ్ అలాగే ఉంటాయి. వాటిని మార్చడానికి, బదులుగా కొత్త వెర్షన్‌ను సేవ్ చేయండి.",
+      "saveChanges": "మార్పులను సేవ్ చేయండి"
     },
     "subscriptions": {
       "title": "సబ్‌స్క్రిప్షన్‌లు",
@@ -1108,39 +1111,40 @@
       "cancelTitle": "ఈ సబ్‌స్క్రిప్షన్ రద్దు చేయాలా?",
       "cancelBody": "ప్రస్తుత కాలం చివరి వరకు సక్రియంగా ఉండి, తర్వాత ముగుస్తుంది.",
       "cancelTrialBody": "ట్రయల్ ఇప్పుడే ముగుస్తుంది.",
-      "oneTimeFeeValue": "One-time fee {amount} on the first invoice",
-      "colAiBundle": "AI answers",
-      "noAiBundle": "No bundle",
-      "aiBundleValue": "{name}: {answers} answers a month",
-      "aiBundleFrom": "Counts from {date}",
-      "chooseAiBundle": "AI answer bundle",
-      "chooseAiBundleTitle": "Choose the AI answer bundle",
-      "chooseAiBundleBody": "Billed every month with the plan. Answers count from the first full calendar month; answers above the bundle are billed on the next invoice.",
-      "aiBundle": "Bundle",
-      "aiBundleOption": "{name}: {answers} answers, {price} a month, {rate} each extra answer",
-      "removeAiBundle": "Remove AI bundle",
-      "removeAiBundleTitle": "Remove the AI answer bundle?",
-      "removeAiBundleBody": "From the next invoice there is no bundle charge and no charge for extra answers.",
-      "setOverride": "Set negotiated price",
-      "changeOverride": "Change negotiated price",
-      "setOverrideTitle": "Negotiated price for this school",
-      "overrideBody": "Replaces the plan's base price on this school's subscription invoices.",
-      "overrideAmount": "Negotiated price (₹, before GST)",
-      "overrideAmountHint": "For each billing period, for example 3999.00. GST is added on the invoice.",
-      "overrideConsequence": "Invoices made from now on use this price instead of the plan's base price. Invoices already made don't change.",
-      "removeOverride": "Remove negotiated price",
-      "removeOverrideTitle": "Remove the negotiated price?",
-      "removeOverrideBody": "Invoices made from now on use the plan's base price again. Invoices already made don't change.",
-      "overrideValue": "Negotiated price: {amount}",
-      "suspend": "Suspend subscription",
-      "suspendTitle": "Suspend this subscription for non-payment?",
-      "suspendBody": "This is a billing suspension: only for a past-due subscription whose 15-day grace period has ended (grace ended {date}). It is not the school suspension on the Overview tab, which is for security or abuse.",
-      "suspendSharedConsequence": "The school is suspended too: staff can't sign in until you reactivate the subscription after the overdue invoices are paid. Records are kept.",
-      "suspendDedicatedConsequence": "Only the subscription changes. The school's dedicated environment keeps running; it is not switched off from here.",
-      "suspendUnknownConsequence": "A school on the shared platform is suspended too, so staff can't sign in until you reactivate the subscription. For a dedicated school only the subscription changes.",
-      "examWindowOverride": "Today is inside a protected board-exam window and I approve this suspension as platform owner",
-      "reactivateBody": "Overdue invoices must be paid first. A school suspended for non-payment can sign in again straight away.",
-      "overrideReason": "Reason for the negotiated price"
+      "oneTimeFeeValue": "మొదటి ఇన్‌వాయిస్‌లో ఒకసారి రుసుము {amount}",
+      "colAiBundle": "AI సమాధానాలు",
+      "noAiBundle": "బండిల్ లేదు",
+      "aiBundleValue": "{name}: నెలకు {answers} సమాధానాలు",
+      "aiBundleFrom": "{date} నుండి లెక్కింపు",
+      "chooseAiBundle": "AI సమాధానాల బండిల్",
+      "chooseAiBundleTitle": "AI సమాధానాల బండిల్‌ను ఎంచుకోండి",
+      "chooseAiBundleBody": "ప్లాన్‌తో పాటు ప్రతి నెలా బిల్లు వేయబడుతుంది. మొదటి పూర్తి క్యాలెండర్ నెల నుండి సమాధానాలు లెక్కించబడతాయి; బండిల్ కంటే ఎక్కువ సమాధానాలకు మరుసటి ఇన్‌వాయిస్‌లో బిల్లు వేయబడుతుంది.",
+      "aiBundle": "బండిల్",
+      "aiBundleOption": "{name}: {answers} సమాధానాలు, నెలకు {price}, ప్రతి అదనపు సమాధానానికి {rate}",
+      "removeAiBundle": "AI బండిల్‌ను తీసివేయండి",
+      "removeAiBundleTitle": "AI సమాధానాల బండిల్‌ను తీసివేయాలా?",
+      "removeAiBundleBody": "తదుపరి ఇన్‌వాయిస్ నుండి బండిల్ రుసుము ఉండదు, అదనపు సమాధానాలకు కూడా రుసుము ఉండదు.",
+      "setOverride": "చర్చించిన ధరను నిర్ణయించండి",
+      "changeOverride": "చర్చించిన ధరను మార్చండి",
+      "setOverrideTitle": "ఈ పాఠశాలకు చర్చించిన ధర",
+      "overrideBody": "ఈ పాఠశాల సబ్‌స్క్రిప్షన్ ఇన్‌వాయిస్‌లలో ప్లాన్ మూల ధరకు బదులుగా ఉపయోగించబడుతుంది.",
+      "overrideAmount": "చర్చించిన ధర (₹, GSTకి ముందు)",
+      "overrideAmountHint": "ప్రతి బిల్లింగ్ వ్యవధికి, ఉదాహరణకు 3999.00. ఇన్‌వాయిస్‌లో GST జోడించబడుతుంది.",
+      "overrideConsequence": "ఇప్పటి నుండి తయారయ్యే ఇన్‌వాయిస్‌లు ప్లాన్ మూల ధరకు బదులుగా ఈ ధరను ఉపయోగిస్తాయి. ఇప్పటికే తయారైన ఇన్‌వాయిస్‌లు మారవు.",
+      "removeOverride": "చర్చించిన ధరను తీసివేయండి",
+      "removeOverrideTitle": "చర్చించిన ధరను తీసివేయాలా?",
+      "removeOverrideBody": "ఇప్పటి నుండి తయారయ్యే ఇన్‌వాయిస్‌లు మళ్లీ ప్లాన్ మూల ధరను ఉపయోగిస్తాయి. ఇప్పటికే తయారైన ఇన్‌వాయిస్‌లు మారవు.",
+      "overrideValue": "చర్చించిన ధర: {amount}",
+      "suspend": "సబ్‌స్క్రిప్షన్‌ను నిలిపివేయండి",
+      "suspendTitle": "చెల్లింపు జరగనందుకు ఈ సబ్‌స్క్రిప్షన్‌ను నిలిపివేయాలా?",
+      "suspendBody": "ఇది బిల్లింగ్ నిలిపివేత: 15 రోజుల గ్రేస్ వ్యవధి ముగిసిన గడువు దాటిన సబ్‌స్క్రిప్షన్‌కు మాత్రమే (గ్రేస్ {date}న ముగిసింది). ఇది అవలోకనం ట్యాబ్‌లోని పాఠశాల నిలిపివేత కాదు, అది భద్రత లేదా దుర్వినియోగం కోసం.",
+      "suspendSharedConsequence": "పాఠశాల కూడా నిలిపివేయబడుతుంది: గడువు దాటిన ఇన్‌వాయిస్‌లు చెల్లించిన తర్వాత మీరు సబ్‌స్క్రిప్షన్‌ను మళ్లీ ప్రారంభించే వరకు సిబ్బంది సైన్ ఇన్ చేయలేరు. రికార్డులు భద్రంగా ఉంటాయి.",
+      "suspendDedicatedConsequence": "సబ్‌స్క్రిప్షన్ మాత్రమే మారుతుంది. పాఠశాల ప్రత్యేక వాతావరణం నడుస్తూనే ఉంటుంది; ఇక్కడి నుండి అది ఆపివేయబడదు.",
+      "suspendUnknownConsequence": "షేర్డ్ ప్లాట్‌ఫారమ్‌లోని పాఠశాల కూడా నిలిపివేయబడుతుంది, కాబట్టి మీరు సబ్‌స్క్రిప్షన్‌ను మళ్లీ ప్రారంభించే వరకు సిబ్బంది సైన్ ఇన్ చేయలేరు. ప్రత్యేక పాఠశాలకు సబ్‌స్క్రిప్షన్ మాత్రమే మారుతుంది.",
+      "examWindowOverride": "ఈ రోజు రక్షిత బోర్డు పరీక్షల వ్యవధిలో ఉంది, ప్లాట్‌ఫారమ్ యజమానిగా నేను ఈ నిలిపివేతను ఆమోదిస్తున్నాను",
+      "reactivateBody": "ముందుగా గడువు దాటిన ఇన్‌వాయిస్‌లు చెల్లించాలి. చెల్లింపు జరగనందుకు నిలిపివేయబడిన పాఠశాల వెంటనే మళ్లీ సైన్ ఇన్ చేయగలదు.",
+      "overrideReason": "చర్చించిన ధరకు కారణం",
+      "pagesLabel": "సబ్‌స్క్రిప్షన్‌ల పేజీలు"
     },
     "invoices": {
       "title": "ఇన్వాయిస్‌లు",
@@ -1251,7 +1255,8 @@
             "body": "దీన్ని వేరొకరు మార్చి ఉండవచ్చు. జాబితా మళ్లీ లోడ్ చేయబడింది; దాన్ని చూసి మళ్లీ ప్రయత్నించండి."
           }
         }
-      }
+      },
+      "pagesLabel": "ఇన్‌వాయిస్‌ల పేజీలు"
     },
     "usage": {
       "title": "వినియోగం మరియు కోటాలు",
@@ -1396,15 +1401,15 @@
       "cancelAnnouncement": "రద్దు చేయండి",
       "cancelTitle": "ఈ ప్రకటన రద్దు చేయాలా?",
       "cancelBody": "పాఠశాలలకు వెంటనే కనిపించడం ఆగిపోతుంది.",
-      "edit": "Edit",
-      "editTitle": "Edit announcement",
-      "editBody": "Schools see the change within a minute on the shared platform, and at the next heartbeat on dedicated hosts.",
-      "editSave": "Save changes",
-      "updated": "Announcement updated.",
+      "edit": "సవరించండి",
+      "editTitle": "ప్రకటనను సవరించండి",
+      "editBody": "షేర్డ్ ప్లాట్‌ఫారమ్‌లో పాఠశాలలు ఒక నిమిషంలో మార్పును చూస్తాయి, ప్రత్యేక హోస్ట్‌లలో తదుపరి హార్ట్‌బీట్‌లో.",
+      "editSave": "మార్పులను సేవ్ చేయండి",
+      "updated": "ప్రకటన నవీకరించబడింది.",
       "errors": {
         "invalid_state": {
-          "title": "This announcement can't be changed any more",
-          "body": "It has ended or was cancelled, so it is read-only. The list now shows its current status. To show the message again, create a new announcement."
+          "title": "ఈ ప్రకటనను ఇక మార్చలేము",
+          "body": "ఇది ముగిసింది లేదా రద్దు చేయబడింది, కాబట్టి చదవడానికి మాత్రమే. జాబితా ఇప్పుడు దాని ప్రస్తుత స్థితిని చూపుతుంది. సందేశాన్ని మళ్లీ చూపడానికి కొత్త ప్రకటనను సృష్టించండి."
         }
       },
       "emptyTitle": "ఇంకా ప్రకటనలు లేవు",
@@ -1464,7 +1469,8 @@
         "done": "పూర్తయింది:",
         "next": "తదుపరి:",
         "pending": "ఇంకా కాలేదు:"
-      }
+      },
+      "pagesLabel": "టికెట్ల పేజీలు"
     },
     "breakGlass": {
       "title": "బ్రేక్-గ్లాస్ అభ్యర్థనలు",
@@ -1668,8 +1674,8 @@
       "citation_not_current": "ఇది పత్రం యొక్క ప్రస్తుత వెర్షన్ కాదు. కొత్త వెర్షన్ పేజీని వాడండి.",
       "citation_text_not_found": "ఈ వాక్యం ఆ పేజీలో లేదు. పత్రంలోని ఖచ్చితమైన పదాలను కాపీ చేయండి.",
       "answer_personal_data": "ఫోన్ నంబర్లు, ఇమెయిల్ చిరునామాలు మరియు ఆధార్ నంబర్లను తీసివేయండి. పాఠశాలలో అందరూ ఈ సమాధానాన్ని చదవగలరు.",
-      "owner_not_active": "This person can no longer be given tasks. Choose someone else.",
-      "aadhaar_last4_only": "Don't enter Aadhaar numbers. Use only the last 4 digits.",
+      "owner_not_active": "ఈ వ్యక్తికి ఇక పనులు ఇవ్వలేము. వేరొకరిని ఎంచుకోండి.",
+      "aadhaar_last4_only": "ఆధార్ నంబర్లు నమోదు చేయవద్దు. చివరి 4 అంకెలు మాత్రమే ఉపయోగించండి.",
       "not_approved": "ఈ సవరణ అభ్యర్థన ఇంకా ఆమోదించబడలేదు. అది ఆమోదించబడిన తర్వాత ఫైండింగ్‌ను పరిష్కరించండి.",
       "other_attribute": "ఈ సవరణ అభ్యర్థన వేరే వివరానికి సంబంధించినది. ఈ వివరం కోసం ఒకదాన్ని ఎంచుకోండి.",
       "digits11_required": "11 అంకెల PEN నమోదు చేయండి, ఉదాహరణకు 21345678901.",
@@ -1802,7 +1808,7 @@
       "rate_limited": {
         "title": "చాలా ఎక్కువ ప్రయత్నాలు",
         "body": "ఒక నిమిషం ఆగి మళ్లీ ప్రయత్నించండి.",
-        "bodyWait": "Too many requests. Wait {seconds} seconds and try again."
+        "bodyWait": "చాలా ఎక్కువ అభ్యర్థనలు. {seconds} సెకన్లు ఆగి మళ్లీ ప్రయత్నించండి."
       },
       "bad_gateway": {
         "title": "సర్వర్ స్పందించడం లేదు",
@@ -1872,8 +1878,8 @@
         "body": "ప్రస్తుత స్థితిని చూడటానికి పేజీని మళ్లీ లోడ్ చేయండి."
       },
       "value_out_of_range": {
-        "title": "The number or date is too large",
-        "body": "This number or date is too large. Check it and try again."
+        "title": "సంఖ్య లేదా తేదీ చాలా పెద్దది",
+        "body": "ఈ సంఖ్య లేదా తేదీ చాలా పెద్దది. దాన్ని చూసి మళ్లీ ప్రయత్నించండి."
       },
       "idempotency_access_changed": {
         "title": "మీ యాక్సెస్ మారింది",
@@ -1918,8 +1924,8 @@
     "signOut": "సైన్ అవుట్",
     "signingOut": "సైన్ అవుట్ అవుతోంది…",
     "signOutFailed": "సైన్ అవుట్ చేయలేకపోయాం. మీ ఇంటర్నెట్ కనెక్షన్ చూసి మళ్లీ ప్రయత్నించండి.",
-    "signOutEverywhere": "Sign out everywhere",
-    "signOutEverywhereHint": "Sign out on every computer and phone where you are signed in, including this one.",
+    "signOutEverywhere": "అన్ని చోట్లా సైన్ అవుట్ చేయండి",
+    "signOutEverywhereHint": "మీరు సైన్ ఇన్ చేసిన ప్రతి కంప్యూటర్ మరియు ఫోన్‌లో, ఇది కూడా కలిపి, సైన్ అవుట్ చేయండి.",
     "idle": {
       "title": "మీరు ఇంకా ఉన్నారా?",
       "body": "షేర్ చేసిన కంప్యూటర్లలో పాఠశాల రికార్డులు సురక్షితంగా ఉండేందుకు, సుమారు 1 నిమిషంలో మీరు సైన్ అవుట్ అవుతారు.",
@@ -1948,7 +1954,7 @@
       "step_up_failed": "ఇది మీరేనని నిర్ధారించలేకపోయాం. కొనసాగడానికి మళ్లీ సైన్ ఇన్ చేయండి.",
       "support_not_allowed": "సపోర్ట్ యాక్సెస్ తెరవలేకపోయాం. ఆమోదించిన అభ్యర్థనను అడిగిన ఆపరేటర్ మాత్రమే, అది యాక్టివ్‌గా ఉన్నప్పుడు మాత్రమే వాడగలరు. అడ్మిన్ ప్యానెల్‌లో అభ్యర్థనను సరిచూడండి.",
       "support_ended": "ఈ సపోర్ట్ యాక్సెస్ ముగిసింది లేదా పాఠశాల రద్దు చేసింది. కొత్త అభ్యర్థనను ఆమోదించమని పాఠశాలను అడగండి.",
-      "too_many_attempts": "Too many sign-in attempts from this network. Wait a few minutes, then sign in again."
+      "too_many_attempts": "ఈ నెట్‌వర్క్ నుండి చాలా ఎక్కువ సైన్-ఇన్ ప్రయత్నాలు జరిగాయి. కొన్ని నిమిషాలు ఆగి, మళ్లీ సైన్ ఇన్ చేయండి."
     }
   },
   "validation": {
@@ -2048,13 +2054,13 @@
     "loadErrorBody": "ఇంటర్నెట్ కనెక్షన్ చూసి పేజీని మళ్లీ లోడ్ చేయండి. ఇలాగే జరుగుతుంటే, సహాయాన్ని సంప్రదించండి."
   },
   "invitations": {
-    "title": "Invitations waiting for you",
-    "body": "A school invited you. It sees your contact details only after you accept.",
-    "accept": "Accept",
-    "decline": "Decline",
-    "acceptLabel": "Accept the invitation from {school}",
-    "declineLabel": "Decline the invitation from {school}",
-    "failed": "We couldn't answer this invitation. Reload the page and try again."
+    "title": "మీ కోసం ఎదురుచూస్తున్న ఆహ్వానాలు",
+    "body": "ఒక పాఠశాల మిమ్మల్ని ఆహ్వానించింది. మీరు అంగీకరించిన తర్వాతే అది మీ సంప్రదింపు వివరాలను చూస్తుంది.",
+    "accept": "అంగీకరించండి",
+    "decline": "తిరస్కరించండి",
+    "acceptLabel": "{school} నుండి వచ్చిన ఆహ్వానాన్ని అంగీకరించండి",
+    "declineLabel": "{school} నుండి వచ్చిన ఆహ్వానాన్ని తిరస్కరించండి",
+    "failed": "ఈ ఆహ్వానానికి సమాధానం ఇవ్వలేకపోయాము. పేజీని మళ్లీ లోడ్ చేసి మళ్లీ ప్రయత్నించండి."
   },
   "noAccess": {
     "title": "మీకు ఇంకా ఏ పాఠశాలకూ యాక్సెస్ లేదు",
@@ -2155,8 +2161,8 @@
       "currentYear": "ప్రస్తుత సంవత్సరం",
       "crumbHome": "హోమ్",
       "apaarLabel": "APAAR ID",
-      "apaarHint": "Finds the student with exactly this 12-digit APAAR ID.",
-      "apaarInvalid": "Enter the 12 digits of the APAAR ID, for example 1234 5678 9012.",
+      "apaarHint": "సరిగ్గా ఈ 12 అంకెల APAAR ID ఉన్న విద్యార్థిని కనుగొంటుంది.",
+      "apaarInvalid": "APAAR IDలోని 12 అంకెలను నమోదు చేయండి, ఉదాహరణకు 1234 5678 9012.",
       "penLabel": "UDISE+ PEN",
       "penHint": "11 అంకెలు",
       "penInvalid": "11 అంకెల PEN నమోదు చేయండి, ఉదాహరణకు 21345678901."
@@ -2217,7 +2223,7 @@
       "identityField": "గుర్తింపు ఫీల్డ్: మార్పులకు సవరణ అభ్యర్థన అవసరం",
       "restrictedField": "పరిమితం: చూపించండి నొక్కే వరకు దాచబడి ఉంటుంది",
       "provisional": "తాత్కాలికం",
-      "apaarNotVerified": "Not verified yet. An APAAR ID counts once someone checks it against the UDISE+ portal or the APAAR card and marks it verified.",
+      "apaarNotVerified": "ఇంకా ధృవీకరించబడలేదు. ఎవరైనా UDISE+ పోర్టల్ లేదా APAAR కార్డుతో సరిచూసి ధృవీకరించినట్లు గుర్తించిన తర్వాతే APAAR ID లెక్కలోకి వస్తుంది.",
       "conflicts": "వీటితో తేడా ఉంది: {sources}",
       "recordedOn": "{date} న నమోదైంది",
       "hasEvidence": "ఆధారం జత చేయబడింది",
@@ -2258,8 +2264,8 @@
       "value": "విలువ",
       "digits4Hint": "ఆధార్ నంబర్ చివరి 4 అంకెలు మాత్రమే, ఉదాహరణకు 1234.",
       "digits4Invalid": "సరిగ్గా 4 అంకెలు ఇవ్వండి: ఆధార్ నంబర్ చివరి 4 అంకెలు.",
-      "digits12Hint": "The 12-digit APAAR ID as shown in the UDISE+ portal or on the APAAR card. Spaces between groups of 4 are fine.",
-      "digits12Invalid": "Enter the 12 digits of the APAAR ID, for example 1234 5678 9012.",
+      "digits12Hint": "UDISE+ పోర్టల్‌లో లేదా APAAR కార్డుపై ఉన్నట్లుగా 12 అంకెల APAAR ID. 4 అంకెల గుంపుల మధ్య ఖాళీలు ఉన్నా పర్వాలేదు.",
+      "digits12Invalid": "APAAR IDలోని 12 అంకెలను నమోదు చేయండి, ఉదాహరణకు 1234 5678 9012.",
       "identityNote": "ఇది గుర్తింపు ఫీల్డ్. ప్రవేశ రిజిస్టర్ విలువ నమోదైన తర్వాత దాన్ని మార్చడానికి ఆధారంతో సవరణ అభ్యర్థన, ప్రిన్సిపాల్ ఆమోదం అవసరం.",
       "submit": "విలువను నమోదు చేయండి",
       "goToChangeRequests": "ఈ విద్యార్థి సవరణ అభ్యర్థనలు తెరవండి",
@@ -3176,8 +3182,8 @@
         "body": "పూర్తి ఆధార్ సంఖ్యను ఎప్పుడూ టైప్ చేయవద్దు. దాన్ని సూచించాల్సి వస్తే, చివరి 4 అంకెలు మాత్రమే వాడండి."
       },
       "blocker_needs_waive": {
-        "title": "Only the office admin or principal can resolve this",
-        "body": "This problem stops certificates and submissions. Ask someone who may accept problems, or request a correction of the record."
+        "title": "ఆఫీసు అడ్మిన్ లేదా ప్రధానోపాధ్యాయులు మాత్రమే దీన్ని పరిష్కరించగలరు",
+        "body": "ఈ సమస్య సర్టిఫికేట్‌లను మరియు సమర్పణలను ఆపుతుంది. సమస్యలను అంగీకరించగల వారిని అడగండి, లేదా రికార్డు సవరణను అభ్యర్థించండి."
       }
     },
     "detail": {
@@ -3223,10 +3229,10 @@
       "stillOpen": "ఇంకా తెరిచి ఉంది",
       "problem": "సమస్య",
       "relatedLabel": "సంబంధిత పేజీలు",
-      "resolveConsequence": "Nothing on the student's record changes. The next check looks at it again.",
-      "waiveConsequence": "Nothing on the student's record changes.",
+      "resolveConsequence": "విద్యార్థి రికార్డులో ఏమీ మారదు. తదుపరి తనిఖీ దాన్ని మళ్లీ చూస్తుంది.",
+      "waiveConsequence": "విద్యార్థి రికార్డులో ఏమీ మారదు.",
       "blockerResolveBody": "This problem stops certificates and submissions. Say what was done, or link the correction request that fixes it. You will be asked to confirm it's you. If the problem is still there at the next check, it opens again.",
-      "blockerNeedsWaive": "This problem stops certificates and submissions. It closes when the correction request that fixes the record is approved, or the office admin or principal can resolve or accept it.",
+      "blockerNeedsWaive": "ఈ సమస్య సర్టిఫికేట్‌లను మరియు సమర్పణలను ఆపుతుంది. రికార్డును సరిచేసే సవరణ అభ్యర్థన ఆమోదించబడినప్పుడు ఇది మూసివేయబడుతుంది, లేదా ఆఫీసు అడ్మిన్ లేదా ప్రధానోపాధ్యాయులు దీన్ని పరిష్కరించవచ్చు లేదా అంగీకరించవచ్చు.",
       "needsConfirmationTitle": "ఈ సవరణ లెక్కలోకి వచ్చే ముందు తనిఖీ చేయండి",
       "needsConfirmationBody": "ఇప్పుడు విలువలు సరిపోతున్నాయి, కానీ ఆధారం లేకుండా మార్చబడ్డాయి. ఆఫీస్ అడ్మిన్ లేదా ప్రిన్సిపాల్ కాగితపు రికార్డును తనిఖీ చేసి సవరణను నిర్ధారించే వరకు సర్టిఫికెట్లు మరియు సమర్పణలు ఆగి ఉంటాయి. విలువలు మళ్లీ వేరుగా ఉంటే, సమస్య తిరిగి వస్తుంది."
     },
@@ -3615,9 +3621,9 @@
       "decideHint": "సాక్ష్యాన్ని చూసి, ఈ అభ్యర్థనను ఆమోదించండి లేదా తిరస్కరించండి.",
       "timelineLabel": "ఈ అభ్యర్థన దశలు",
       "relatedLabel": "సంబంధిత పేజీలు",
-      "approveConsequence": "The student's record changes as soon as you approve. The old value stays in the history.",
-      "rejectConsequence": "Nothing on the student's record changes.",
-      "cancelConsequence": "Nothing on the student's record changes."
+      "approveConsequence": "మీరు ఆమోదించిన వెంటనే విద్యార్థి రికార్డు మారుతుంది. పాత విలువ చరిత్రలో ఉంటుంది.",
+      "rejectConsequence": "విద్యార్థి రికార్డులో ఏమీ మారదు.",
+      "cancelConsequence": "విద్యార్థి రికార్డులో ఏమీ మారదు."
     },
     "crumbHome": "హోమ్"
   },
@@ -3670,7 +3676,7 @@
     "durationHours": "{hours, plural, one {# గంట} other {# గంటలు}}",
     "durationMinutes": "{minutes} నిమిషాలు",
     "scopeWholeSchool": "మొత్తం పాఠశాల",
-    "scopeIgnored": "Also sent by SchoolOS, but these do not limit what they can see: {items}.",
+    "scopeIgnored": "SchoolOS ఇవి కూడా పంపింది, కానీ ఇవి వారు చూడగలిగే దాన్ని పరిమితం చేయవు: {items}.",
     "status": {
       "requested": "మీ కోసం వేచి ఉంది",
       "approved": "SchoolOS నిర్ధారించింది",
@@ -4709,7 +4715,7 @@
     }
   },
   "touch": {
-    "sheetHelp": "On a touch screen, tap a cell to change it, then tap Save or Cancel."
+    "sheetHelp": "టచ్ స్క్రీన్‌పై, మార్చడానికి ఒక సెల్‌ను తాకండి, ఆపై సేవ్ లేదా రద్దు తాకండి."
   },
   "sheets": {
     "grid": {
@@ -4731,13 +4737,13 @@
         "tooLong": "గరిష్ఠంగా 1,000 అక్షరాలు వాడండి.",
         "control": "విలువను ఒకే లైన్‌లో ఉంచండి."
       },
-      "pending": "Not saved yet",
-      "searchLabel": "Find on this page",
-      "searchColumn": "In column",
-      "allColumns": "All columns",
-      "searchCount": "{shown, plural, one {# row} other {# rows}} of {total} on this page match.",
-      "noMatch": "No rows on this page match. Clear the search or try another page.",
-      "leaveDraft": "You have a change you haven't saved. Leave this page and lose it?"
+      "pending": "ఇంకా సేవ్ కాలేదు",
+      "searchLabel": "ఈ పేజీలో వెతకండి",
+      "searchColumn": "కాలమ్‌లో",
+      "allColumns": "అన్ని కాలమ్‌లు",
+      "searchCount": "ఈ పేజీలోని {total}లో {shown, plural, one {# వరుస} other {# వరుసలు}} సరిపోలాయి.",
+      "noMatch": "ఈ పేజీలో ఏ వరుసలూ సరిపోలలేదు. వెతుకులాటను తీసివేయండి లేదా వేరే పేజీని ప్రయత్నించండి.",
+      "leaveDraft": "మీరు సేవ్ చేయని మార్పు ఉంది. ఈ పేజీని వదిలి దాన్ని కోల్పోతారా?"
     },
     "import": {
       "title": "షీట్‌ను తనిఖీ చేయండి",
@@ -4776,9 +4782,9 @@
       "openDescriptionEdit": "ప్రతి వరుసను మీ ఫైల్‌లో ఉన్నట్లే చూడండి, వరుసలను జోడించే ముందు గడులను సరిచేయండి. దీన్ని డౌన్‌లోడ్ కూడా చేయవచ్చు.",
       "openDescriptionRead": "ప్రతి వరుసను మీ ఫైల్‌లో ఉన్నట్లే చూడండి, లేదా డౌన్‌లోడ్ చేయండి.",
       "open": "షీట్ తెరవండి",
-      "rowWarning": "Has warnings",
-      "fixInSheet": "Correct cells in the sheet",
-      "fixInSheetHint": "Open your file as a sheet, correct the cells with problems and each row is checked again at once."
+      "rowWarning": "హెచ్చరికలు ఉన్నాయి",
+      "fixInSheet": "షీట్‌లో సెల్‌లను సరిచేయండి",
+      "fixInSheetHint": "మీ ఫైల్‌ను షీట్‌గా తెరిచి, సమస్యలున్న సెల్‌లను సరిచేయండి; ప్రతి వరుస వెంటనే మళ్లీ తనిఖీ చేయబడుతుంది."
     },
     "document": {
       "title": "షీట్",
@@ -4817,15 +4823,15 @@
       "pagesLabel": "షీట్ పేజీలు",
       "open": "షీట్‌గా తెరవండి",
       "openHint": "వరుసలను పట్టికలో చూడండి, గడులను సరిచేయండి లేదా షీట్‌ను డౌన్‌లోడ్ చేయండి.",
-      "leaveUnsaved": "Your changes to this sheet are not saved. Leave this page and lose them?",
-      "conflictTitle": "This document changed while you were working",
-      "conflictBody": "Someone saved a newer version. Your changes are still on this page: download them to keep a copy, then reload the sheet and make them again on the newest version.",
-      "conflictDownload": "Download my changes (CSV)",
-      "conflictReload": "Reload the sheet",
-      "previewTitle": "Sheet preview",
-      "previewDescription": "The first rows of the first worksheet. Open the sheet to see every row, correct cells or download it.",
-      "previewCaption": "First rows of the sheet",
-      "previewUnavailable": "This file can't be shown as a table here. Download it instead."
+      "leaveUnsaved": "ఈ షీట్‌లో మీ మార్పులు సేవ్ కాలేదు. ఈ పేజీని వదిలి వాటిని కోల్పోతారా?",
+      "conflictTitle": "మీరు పనిచేస్తుండగా ఈ డాక్యుమెంట్ మారింది",
+      "conflictBody": "ఎవరో కొత్త వెర్షన్‌ను సేవ్ చేశారు. మీ మార్పులు ఇంకా ఈ పేజీలోనే ఉన్నాయి: కాపీ కోసం వాటిని డౌన్‌లోడ్ చేసి, షీట్‌ను మళ్లీ లోడ్ చేసి, కొత్త వెర్షన్‌లో మళ్లీ చేయండి.",
+      "conflictDownload": "నా మార్పులను డౌన్‌లోడ్ చేయండి (CSV)",
+      "conflictReload": "షీట్‌ను మళ్లీ లోడ్ చేయండి",
+      "previewTitle": "షీట్ ముందుచూపు",
+      "previewDescription": "మొదటి వర్క్‌షీట్‌లోని మొదటి వరుసలు. ప్రతి వరుసను చూడటానికి, సెల్‌లను సరిచేయడానికి లేదా డౌన్‌లోడ్ చేయడానికి షీట్‌ను తెరవండి.",
+      "previewCaption": "షీట్‌లోని మొదటి వరుసలు",
+      "previewUnavailable": "ఈ ఫైల్‌ను ఇక్కడ పట్టికగా చూపలేము. బదులుగా దాన్ని డౌన్‌లోడ్ చేయండి."
     },
     "errors": {
       "aadhaar_full_number_rejected": {
@@ -4941,9 +4947,7 @@
     "form": {
       "question": "మీ ప్రశ్న",
       "hint": "ఇంగ్లీష్, తెలుగు లేదా రెండూ కలిపి 1000 అక్షరాల వరకు రాయండి. ఆధార్ సంఖ్యలు టైప్ చేయవద్దు.",
-      "shortcut": "అడగడానికి Ctrl+Enter నొక్కండి.",
       "submit": "అడగండి",
-      "asking": "సమాధానం వస్తోంది…",
       "stop": "ఆపండి"
     },
     "status": {
@@ -4956,7 +4960,6 @@
     },
     "answer": {
       "heading": "సమాధానం",
-      "yourQuestion": "మీ ప్రశ్న",
       "sources": "ఆధారాలు",
       "sourceLink": "ఆధారం {index}: {title}",
       "untitled": "పేరు లేని ఆధారం",
@@ -4975,11 +4978,8 @@
       "previewLabel": "ముసాయిదా సమాధానం, ఇంకా తనిఖీ చేయలేదు",
       "replacedNote": "ముసాయిదాను ఆధారాలతో సరిచూసి, అవి సమర్థించే విషయానికి మాత్రమే మార్చాము.",
       "countNote": "విద్యార్థుల సంఖ్య (సంఖ్యలు మాత్రమే)",
-      "assistant": "SchoolOS సమాధానం",
-      "draftPill": "ముసాయిదా",
       "sourcesCount": "{count, plural, one {# ఆధారం} other {# ఆధారాలు}}",
       "verifiedBadge": "ధృవీకరించిన సమాధానం నుండి",
-      "followUp": "మరో ప్రశ్న అడగండి",
       "tableLabel": "సమాధానంలోని పట్టిక",
       "withheld": "మీరు ఇక తెరవలేని ఆధారం",
       "withheldNote": "ఈ ఆధారానికి మీకు ఇక అనుమతి లేదు, అందుకే దాని వచనం దాచాము.",
@@ -5234,7 +5234,6 @@
     "chat": {
       "newChat": "కొత్త చాట్",
       "recent": "ఇటీవలివి",
-      "recentLabel": "ఇటీవలి చాట్‌లు",
       "allChats": "అన్ని చాట్‌లు",
       "untitled": "కొత్త చాట్",
       "pinnedMark": "పిన్ చేసినది",
@@ -5384,7 +5383,6 @@
       "deleted": "జ్ఞాపకం తొలగించబడింది.",
       "forgotten": "జ్ఞాపకం ఖాళీ చేశాము.",
       "edited": "జ్ఞాపకం మారింది.",
-      "loadFailed": "జ్ఞాపకాన్ని తెరవలేకపోయాము.",
       "userOff": "మీకు జ్ఞాపకం ఆఫ్‌లో ఉంది, కాబట్టి Ask జ్ఞాపకాలను వాడదు, చేర్చదు. అంశాలను చేర్చడానికి, మార్చడానికి లేదా సేవ్ చేయడానికి దాన్ని ఆన్ చేయండి; తొలగించడం మాత్రం ఇప్పుడూ చేయవచ్చు.",
       "fullHint": "జ్ఞాపకం నిండిపోయింది (30 అంశాలు). మరిన్ని చేర్చడానికి ఇక అవసరం లేనిదాన్ని తొలగించండి."
     }
@@ -6513,10 +6511,10 @@
       "owner": "బాధ్యులు",
       "chooseOwner": "ఒకరిని ఎంచుకోండి",
       "taskTitle": "పని",
-      "defaultTaskTitle": "Follow up circular",
+      "defaultTaskTitle": "సర్క్యులర్‌పై తదుపరి చర్య",
       "dueOn": "గడువు తేదీ",
-      "dueHint": "Use {format}, for example {example}.",
-      "dueInvalid": "Enter a real date as {format}, for example {example}.",
+      "dueHint": "{format} ఉపయోగించండి, ఉదాహరణకు {example}.",
+      "dueInvalid": "నిజమైన తేదీని {format}గా నమోదు చేయండి, ఉదాహరణకు {example}.",
       "confirm": "పనిగా నిర్ధారించండి",
       "dismiss": "తీసివేయండి",
       "openTasks": "పనుల్లో చూడండి",
@@ -6599,6 +6597,7 @@
     },
     "emptyTitle": "ఇక్కడ పనులు లేవు",
     "emptyBody": "సర్క్యులర్ గడువును ఎవరైనా నిర్ధారించినప్పుడు లేదా మీకు పని జోడించినప్పుడు పనులు కనిపిస్తాయి.",
+    "pagesLabel": "పనుల పేజీలు",
     "columns": {
       "task": "పని",
       "due": "గడువు తేదీ",
@@ -6632,25 +6631,25 @@
       "owner": "బాధ్యులు",
       "chooseOwner": "ఒకరిని ఎంచుకోండి",
       "dueOn": "గడువు తేదీ",
-      "dueHint": "Use {format}, for example {example}.",
-      "dueInvalid": "Enter a real date as {format}, for example {example}.",
+      "dueHint": "{format} ఉపయోగించండి, ఉదాహరణకు {example}.",
+      "dueInvalid": "నిజమైన తేదీని {format}గా నమోదు చేయండి, ఉదాహరణకు {example}.",
       "details": "వివరాలు (ఐచ్ఛికం)",
       "submit": "పని జోడించండి",
       "saved": "పని జోడించబడింది."
     },
     "edit": {
-      "action": "Edit",
-      "title": "Edit task",
-      "description": "Change the task, its owner, due date or details. A new owner is told in the app.",
-      "taskTitle": "Task",
-      "owner": "Owner",
-      "formerOwner": "{name} (no longer active)",
-      "dueOn": "Due date",
-      "dueHint": "Use {format}, for example {example}.",
-      "dueInvalid": "Enter a real date as {format}, for example {example}.",
-      "details": "Details (optional)",
-      "save": "Save changes",
-      "updated": "Task updated."
+      "action": "సవరించండి",
+      "title": "పనిని సవరించండి",
+      "description": "పనిని, దాని బాధ్యుడిని, గడువు తేదీని లేదా వివరాలను మార్చండి. కొత్త బాధ్యుడికి యాప్‌లో తెలియజేయబడుతుంది.",
+      "taskTitle": "పని",
+      "owner": "బాధ్యుడు",
+      "formerOwner": "{name} (ఇక క్రియాశీలంగా లేరు)",
+      "dueOn": "గడువు తేదీ",
+      "dueHint": "{format} ఉపయోగించండి, ఉదాహరణకు {example}.",
+      "dueInvalid": "నిజమైన తేదీని {format}గా నమోదు చేయండి, ఉదాహరణకు {example}.",
+      "details": "వివరాలు (ఐచ్ఛికం)",
+      "save": "మార్పులను సేవ్ చేయండి",
+      "updated": "పని నవీకరించబడింది."
     },
     "errors": {
       "task_closed": {
@@ -6689,6 +6688,7 @@
     "listTitle": "సూచనలు",
     "emptyTitle": "ఇంకా సూచనలు లేవు",
     "emptyBody": "కింద ఒకటి ప్రారంభించండి, లేదా సర్క్యులర్ పేజీ నుండి.",
+    "pagesLabel": "నోటీసుల పేజీలు",
     "untitled": "పేరు లేని సూచన",
     "columns": {
       "notice": "సూచన",
@@ -6954,6 +6954,7 @@
     "overdue": "గడువు దాటింది",
     "emptyTitle": "ఇక్కడ ఫ్లాగ్‌లు లేవు",
     "emptyBody": "వరుసగా మూడు పాఠశాల రోజులు గైర్హాజరు వంటి సరళిని నియమం గమనించినప్పుడు ఫ్లాగ్‌లు కనిపిస్తాయి.",
+    "pagesLabel": "అనుసరించాల్సిన విద్యార్థుల పేజీలు",
     "columns": {
       "student": "విద్యార్థి",
       "why": "ఎందుకు",

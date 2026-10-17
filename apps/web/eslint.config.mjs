@@ -84,9 +84,19 @@ export default defineConfig([
           paths: [
             { name: "next/font/google", message: "Fonts are self-hosted via @fontsource." },
             { name: "next/link", message: "Use Link from @/i18n/navigation (locale-aware)." },
+            {
+              name: "zod",
+              message:
+                "Import zod as: import * as z from '@/lib/zod'. The zod namespace object ships every locale to the browser (WEB-10).",
+            },
           ],
         },
       ],
     },
+  },
+  {
+    // The one module that re-exports zod's builders by name.
+    files: ["src/lib/zod.ts"],
+    rules: { "no-restricted-imports": "off" },
   },
 ]);

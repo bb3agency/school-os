@@ -125,6 +125,26 @@ describe("school settings (FR-TEN-012)", () => {
     expect(screen.queryByRole("textbox")).toBeNull();
   });
 
+  it("a manager never sees the read-only view while /me is still loading (WEB-16)", async () => {
+    school([MANAGE]);
+    let answerMe: () => void = () => {};
+    const meReady = new Promise<void>((resolve) => (answerMe = resolve));
+    stub.routes["GET /bff/api/v1/me"] = async () => {
+      await meReady;
+      return Response.json(me([MANAGE]));
+    };
+    renderWithIntl(<SchoolSettingsScreen />);
+    // The tenant has loaded, /me has not: still the loading state, no read-only content.
+    await waitFor(() => expect(stub.callsTo("GET /bff/api/v1/tenant")).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByText("STATE_AP, CBSE")).toBeNull();
+    expect(screen.queryByText("15 minutes")).toBeNull();
+    expect(screen.queryByText("Synthetic Model School A")).toBeNull();
+    answerMe();
+    expect(await screen.findByLabelText(en.form.idleField)).toHaveValue("15");
+    expect(screen.queryByText("STATE_AP, CBSE")).toBeNull();
+  });
+
   it("the page renders under its own title", async () => {
     school([]);
     renderWithIntl(<SchoolSettingsPage />);

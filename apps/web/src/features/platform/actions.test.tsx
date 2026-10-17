@@ -562,6 +562,28 @@ describe("plans, subscriptions and invoices (FR-PLT-010..019)", () => {
     );
   });
 
+  it("pages through more than 200 subscriptions (WEB-05)", async () => {
+    stub.routes["GET /bff/api/v1/platform/subscriptions"] = (_request, url) =>
+      url.searchParams.get("cursor") === "subs-2"
+        ? page([{ ...SUB, id: "0192f3a4-0000-7000-8000-00000000b0b2" }])
+        : Response.json({ data: [SUB], next_cursor: "subs-2" });
+    const user = userEvent.setup();
+    renderWithIntl(<SubscriptionsScreen />);
+    expect((await screen.findAllByText("Sri Saraswati High School (sshs)")).length).toBeGreaterThan(
+      0,
+    );
+    const pager = screen.getByRole("navigation", { name: pm.subscriptions.pagesLabel });
+    await user.click(within(pager).getByRole("button", { name: /Next/ }));
+    await waitFor(() =>
+      expect(
+        stub
+          .callsTo("GET /bff/api/v1/platform/subscriptions")
+          .at(-1)
+          ?.url.searchParams.get("cursor"),
+      ).toBe("subs-2"),
+    );
+  });
+
   it("changes a subscription's plan to another published plan of the same tier", async () => {
     stub.routes["GET /bff/api/v1/platform/subscriptions"] = () => page([SUB]);
     stub.routes[`POST /bff/api/v1/platform/subscriptions/${SUB.id}/change-plan`] = () =>

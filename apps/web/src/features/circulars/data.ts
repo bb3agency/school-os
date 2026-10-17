@@ -2,7 +2,7 @@
 
 import type { components } from "@schoolos/api-client";
 import { useQuery, type Query } from "@tanstack/react-query";
-import { z } from "zod";
+import * as z from "@/lib/zod";
 import { AuthRedirectError } from "@/lib/bff/fetch";
 import { ApiError, NotAvailableError, toLoadable, unwrap, useBffClient } from "@/lib/bff/query";
 import { typedDateToIso } from "@/lib/date-format";
@@ -140,10 +140,14 @@ export interface TaskFilters {
 }
 
 /** GET /tasks with the screen's filters (soonest due first). */
-export function useTasks(filters: TaskFilters, enabled: boolean): Loadable<Paged<Task>> {
+export function useTasks(
+  filters: TaskFilters,
+  enabled: boolean,
+  cursor?: string,
+): Loadable<Paged<Task>> {
   const api = useBffClient("staff");
   const query = useQuery({
-    queryKey: KEYS.taskList(filters),
+    queryKey: [...KEYS.taskList(filters), cursor ?? null],
     queryFn: () =>
       unwrap(
         api.GET("/api/v1/tasks", {
@@ -151,6 +155,7 @@ export function useTasks(filters: TaskFilters, enabled: boolean): Loadable<Paged
             query: {
               view: filters.view,
               limit: 100,
+              ...(cursor ? { cursor } : {}),
               ...(filters.status !== "active" ? { status: filters.status } : {}),
               ...(filters.due !== "any" ? { due: filters.due } : {}),
             },
@@ -177,11 +182,16 @@ export function useAssignees(enabled: boolean): Loadable<Assignee[]> {
 }
 
 /** GET /notices (newest first; polls, with backoff, while one is being drafted). */
-export function useNotices(enabled: boolean): Loadable<Paged<Notice>> {
+export function useNotices(enabled: boolean, cursor?: string): Loadable<Paged<Notice>> {
   const api = useBffClient("staff");
   const query = useQuery({
-    queryKey: KEYS.noticeList,
-    queryFn: () => unwrap(api.GET("/api/v1/notices", { params: { query: { limit: 50 } } })),
+    queryKey: [...KEYS.noticeList, cursor ?? null],
+    queryFn: () =>
+      unwrap(
+        api.GET("/api/v1/notices", {
+          params: { query: { limit: 50, ...(cursor ? { cursor } : {}) } },
+        }),
+      ),
     enabled,
     retry,
     refetchInterval: (q: Query<Paged<Notice>, Error, Paged<Notice>, readonly unknown[]>) =>

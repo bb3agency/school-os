@@ -3,7 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
-import { z } from "zod";
+import * as z from "@/lib/zod";
 import { Alert } from "@/components/ui/Alert";
 import { Badge, Pill, type PillVariant } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";

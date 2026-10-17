@@ -2,7 +2,7 @@
 
 import type { Deployment } from "@schoolos/api-client";
 import { useTranslations } from "next-intl";
-import { z } from "zod";
+import * as z from "@/lib/zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { TextField } from "@/components/ui/Input";
 import { SecretOnce } from "@/components/ui/SecretOnce";

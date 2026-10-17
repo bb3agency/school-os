@@ -11,7 +11,7 @@
  * Below the parser: the typed payloads of the Ask events (`parseAskEvent`).
  */
 
-import { z } from "zod";
+import * as z from "@/lib/zod";
 
 export interface SseMessage {
   event: string;

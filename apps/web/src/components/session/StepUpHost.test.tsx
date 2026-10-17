@@ -63,6 +63,17 @@ describe("StepUpHost (ADR-0018, SEC-005)", () => {
     expect(navigate).not.toHaveBeenCalled();
   });
 
+  it("a SchoolOS support session signs in again through the support route (ADR-0023)", async () => {
+    stubSession(["Support Operator"]);
+    const open = vi.fn(() => ({}) as Window);
+    renderWithIntl(<StepUpHost sessionKind="support" open={open} navigate={vi.fn()} />);
+    await act(async () => {
+      void stepUpHandler("staff")?.("/bff/auth/support/step-up?next=%2Fstudents");
+    });
+    await userEvent.click(await screen.findByRole("button", { name: "Sign in again" }));
+    expect(open).toHaveBeenCalledWith("/bff/auth/support/step-up?next=%2Fstep-up-complete");
+  });
+
   it("Cancel answers false (nothing is retried)", async () => {
     stubSession(["Office Clerk"]);
     renderWithIntl(<StepUpHost open={vi.fn()} navigate={vi.fn()} />);

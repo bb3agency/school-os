@@ -15,6 +15,7 @@ import { SelectField } from "@/components/ui/Select";
 import { NarrowSwitch } from "@/components/ui/NarrowSwitch";
 import { StackedRows, Table, TableScroll, TBody, Td, Th, THead, Tr } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
+import { Pager, useCursorStack } from "@/features/students/paging";
 import { Link } from "@/i18n/navigation";
 import { newIdempotencyKey, unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
@@ -227,12 +228,18 @@ export function TasksScreen() {
   const meLoaded = useStaffMe() !== undefined;
   const allowed = can(TASK_READ);
   const manager = can(TASK_MANAGE);
-  const [filters, setFilters] = useState<TaskFilters>({
+  const [filters, setFilterState] = useState<TaskFilters>({
     view: "mine",
     status: "active",
     due: "any",
   });
-  const list = useTasks(filters, allowed);
+  // Cursor paging (docs/09 §2): a page holds 100 tasks; new filters start at the first page.
+  const pages = useCursorStack();
+  const setFilters = (next: TaskFilters) => {
+    pages.reset();
+    setFilterState(next);
+  };
+  const list = useTasks(filters, allowed, pages.cursor);
   const [edited, setEdited] = useState(false);
   const today = todayIst();
   const taskCell = (task: Task) => (
@@ -311,99 +318,109 @@ export function TasksScreen() {
               </Alert>
             ) : null}
             <LoadGate data={meLoaded ? list : { status: "loading" }}>
-              {(page) =>
-                page.data.length === 0 ? (
-                  <EmptyState icon="calendar" title={t("emptyTitle")} body={t("emptyBody")} />
-                ) : (
-                  // Below 640px the tasks are cards (docs/17 §5.7); the table from there.
-                  <NarrowSwitch
-                    narrow={
-                      <StackedRows
-                        caption={t("listTitle")}
-                        captionHidden
-                        rows={page.data}
-                        rowKey={(task) => task.id}
-                        columns={[
-                          { key: "task", header: t("columns.task"), cell: taskCell },
-                          {
-                            key: "due",
-                            header: t("columns.due"),
-                            cell: (task) => (
-                              <span className="flex flex-wrap items-center gap-1">
-                                <Value>{formatDate(task.due_on)}</Value>
-                                <DuePill state={dueState(task, today)} />
-                              </span>
-                            ),
-                          },
-                          {
-                            key: "owner",
-                            header: t("columns.owner"),
-                            cell: (task) => task.owner.display_name ?? t("formerStaff"),
-                          },
-                          {
-                            key: "status",
-                            header: t("columns.status"),
-                            cell: (task) => <TaskStatusPill status={task.status} />,
-                          },
-                          {
-                            key: "actions",
-                            header: t("columns.actions"),
-                            stack: "actions",
-                            cell: (task) => (
-                              <RowActions
-                                task={task}
-                                manager={manager}
-                                onEdited={() => setEdited(true)}
-                              />
-                            ),
-                          },
-                        ]}
-                      />
-                    }
-                    wide={
-                      <TableScroll label={t("listTitle")}>
-                        <Table>
-                          <THead>
-                            <Tr>
-                              <Th>{t("columns.task")}</Th>
-                              <Th>{t("columns.due")}</Th>
-                              <Th>{t("columns.owner")}</Th>
-                              <Th>{t("columns.status")}</Th>
-                              <Th>
-                                <span className="sr-only">{t("columns.actions")}</span>
-                              </Th>
-                            </Tr>
-                          </THead>
-                          <TBody>
-                            {page.data.map((task) => (
-                              <Tr key={task.id}>
-                                <Td>{taskCell(task)}</Td>
-                                <Td>
-                                  <span className="flex flex-wrap items-center gap-1">
-                                    <Value>{formatDate(task.due_on)}</Value>
-                                    <DuePill state={dueState(task, today)} />
-                                  </span>
-                                </Td>
-                                <Td>{task.owner.display_name ?? t("formerStaff")}</Td>
-                                <Td>
-                                  <TaskStatusPill status={task.status} />
-                                </Td>
-                                <Td>
-                                  <RowActions
-                                    task={task}
-                                    manager={manager}
-                                    onEdited={() => setEdited(true)}
-                                  />
-                                </Td>
+              {(page) => (
+                <div className="space-y-4">
+                  {page.data.length === 0 ? (
+                    <EmptyState icon="calendar" title={t("emptyTitle")} body={t("emptyBody")} />
+                  ) : (
+                    // Below 640px the tasks are cards (docs/17 §5.7); the table from there.
+                    <NarrowSwitch
+                      narrow={
+                        <StackedRows
+                          caption={t("listTitle")}
+                          captionHidden
+                          rows={page.data}
+                          rowKey={(task) => task.id}
+                          columns={[
+                            { key: "task", header: t("columns.task"), cell: taskCell },
+                            {
+                              key: "due",
+                              header: t("columns.due"),
+                              cell: (task) => (
+                                <span className="flex flex-wrap items-center gap-1">
+                                  <Value>{formatDate(task.due_on)}</Value>
+                                  <DuePill state={dueState(task, today)} />
+                                </span>
+                              ),
+                            },
+                            {
+                              key: "owner",
+                              header: t("columns.owner"),
+                              cell: (task) => task.owner.display_name ?? t("formerStaff"),
+                            },
+                            {
+                              key: "status",
+                              header: t("columns.status"),
+                              cell: (task) => <TaskStatusPill status={task.status} />,
+                            },
+                            {
+                              key: "actions",
+                              header: t("columns.actions"),
+                              stack: "actions",
+                              cell: (task) => (
+                                <RowActions
+                                  task={task}
+                                  manager={manager}
+                                  onEdited={() => setEdited(true)}
+                                />
+                              ),
+                            },
+                          ]}
+                        />
+                      }
+                      wide={
+                        <TableScroll label={t("listTitle")}>
+                          <Table>
+                            <THead>
+                              <Tr>
+                                <Th>{t("columns.task")}</Th>
+                                <Th>{t("columns.due")}</Th>
+                                <Th>{t("columns.owner")}</Th>
+                                <Th>{t("columns.status")}</Th>
+                                <Th>
+                                  <span className="sr-only">{t("columns.actions")}</span>
+                                </Th>
                               </Tr>
-                            ))}
-                          </TBody>
-                        </Table>
-                      </TableScroll>
+                            </THead>
+                            <TBody>
+                              {page.data.map((task) => (
+                                <Tr key={task.id}>
+                                  <Td>{taskCell(task)}</Td>
+                                  <Td>
+                                    <span className="flex flex-wrap items-center gap-1">
+                                      <Value>{formatDate(task.due_on)}</Value>
+                                      <DuePill state={dueState(task, today)} />
+                                    </span>
+                                  </Td>
+                                  <Td>{task.owner.display_name ?? t("formerStaff")}</Td>
+                                  <Td>
+                                    <TaskStatusPill status={task.status} />
+                                  </Td>
+                                  <Td>
+                                    <RowActions
+                                      task={task}
+                                      manager={manager}
+                                      onEdited={() => setEdited(true)}
+                                    />
+                                  </Td>
+                                </Tr>
+                              ))}
+                            </TBody>
+                          </Table>
+                        </TableScroll>
+                      }
+                    />
+                  )}
+                  <Pager
+                    label={t("pagesLabel")}
+                    page={pages.page}
+                    onPrevious={pages.hasPrevious ? pages.previous : undefined}
+                    onNext={
+                      page.next_cursor ? () => pages.next(page.next_cursor as string) : undefined
                     }
                   />
-                )
-              }
+                </div>
+              )}
             </LoadGate>
           </Card>
           {manager ? <NewTaskCard /> : null}

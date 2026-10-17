@@ -51,6 +51,8 @@ describe("ApiErrorAlert for the 2026-10-06 decisions", () => {
     expect(screen.getByText(body)).toBeTruthy();
     unmount();
     renderWithIntl(<ApiErrorAlert error={error} />, "te");
-    expect(screen.getByText(body)).toBeTruthy();
+    expect(
+      screen.getByText("ఈ సంఖ్య లేదా తేదీ చాలా పెద్దది. దాన్ని చూసి మళ్లీ ప్రయత్నించండి."),
+    ).toBeTruthy();
   });
 });
