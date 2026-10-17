@@ -168,6 +168,13 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
         "reason": "Synthetic BOLA duplicate reason"
     },
     ("POST", "/api/v1/certificates/{certificate_id}/render"): None,
+    # R2-1A (ADR-0045): adding or withdrawing another school's verification code is 404.
+    ("POST", "/api/v1/certificates/{certificate_id}/verification"): {
+        "reason": "Synthetic BOLA verification reason"
+    },
+    ("POST", "/api/v1/certificates/{certificate_id}/verification/withdraw"): {
+        "reason": "Synthetic BOLA verification reason"
+    },
     # M4: circulars (document ids), suggestions, tasks and notices of school B are 404.
     ("POST", "/api/v1/circulars/{document_id}/read"): {},
     ("POST", "/api/v1/circulars/{document_id}/review"): {},
@@ -773,6 +780,10 @@ def _id_routes() -> list[tuple[str, str]]:
     for rc in iter_route_contexts(create_app().routes):
         # Control-plane routes are operator-only and not tenant scoped (tests/platform).
         if str(rc.path).startswith(("/api/v1/platform/", "/api/v1/fleet/")):
+            continue
+        # Public routes take no member and no school id (ADR-0047): a key resolves to one school
+        # or to the uniform 404 (tests/public/, tests/certificates/test_verification.py).
+        if str(rc.path).startswith(("/api/v1/public/", "/api/v1/webhooks/")):
             continue
         params = set(re.findall(r"{(\w+)}", str(rc.path)))
         # A readiness profile key (ADR-0040) names configuration, not an object of the school.

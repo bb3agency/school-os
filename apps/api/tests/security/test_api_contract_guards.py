@@ -282,6 +282,8 @@ NON_UUID_PATH_PARAMS = {
     ("GET", "/api/v1/dq/readiness/{profile_key}/students/{student_id}", "profile_key"),
     ("POST", "/api/v1/dq/readiness/{profile_key}/runs", "profile_key"),
     ("GET", "/api/v1/dq/readiness/{profile_key}/slips", "profile_key"),
+    # R2-1A: a certificate verification code (ADR-0045), bounded; the guard shape-checks it.
+    ("GET", "/api/v1/public/certificates/{code}", "code"),
 }
 
 
@@ -323,6 +325,12 @@ RESPONSE_FIELD_ALLOWLIST = {
     "app.certificates.schemas.ContentLine.key": "printed field code",
     "app.certificates.schemas.Blocker.attribute_key": "attribute catalog key",
     "app.certificates.schemas.PreviewWarning.attribute_key": "attribute catalog key",
+    # R2-1A (ADR-0045): TC format codes and printed line codes.
+    "app.certificates.schemas.CertificateFormatOut.key": "TC format code",
+    "app.certificates.schemas.FormatLineOut.key": "printed line code",
+    "app.certificates.schemas.CertificateTypeOut.format_key": "TC format code",
+    "app.certificates.schemas.CertificatePreview.format_key": "TC format code",
+    "app.certificates.schemas.CertificateOut.format_key": "TC format code",
     "app.dq.schemas.FindingOut.attribute_key": "attribute catalog key",
     "app.dq.schemas.FindingValue.attribute_key": "attribute catalog key",
     "app.dq.schemas.FindingOut.profile_key": "DQ profile code",

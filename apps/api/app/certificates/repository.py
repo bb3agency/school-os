@@ -17,7 +17,7 @@ from sqlalchemy import and_, false, func, insert, or_, select, text, update
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
-from app.certificates.models import Certificate, CertificateCounter
+from app.certificates.models import Certificate, CertificateCounter, CertificateVerification
 from app.core.errors import Conflict, DomainError, Forbidden, ValidationFailed
 from app.core.ids import new_id
 from app.core.record_tables import dump_table
@@ -64,6 +64,15 @@ _CONFLICTS: dict[str, tuple[str, str]] = {
     "certificates_duplicate_no_unique": (
         "serial_number_conflict",
         "The copy number is already used. Try again.",
+    ),
+    # R2 (0056): one live code per certificate; codes and withdrawals never change.
+    "certificate_verifications_one_live": (
+        "verification_exists",
+        "This certificate already has a verification code. Reload to see it.",
+    ),
+    "certificate_verifications_fixed": (
+        "verification_not_active",
+        "This verification code was already withdrawn. Reload to see it.",
     ),
 }
 
@@ -238,8 +247,74 @@ def transfer_certificates_of(
     return {r.student_id: r for r in rows}
 
 
+# --- verification codes (R2, 0056; ADR-0045) ------------------------------------------------
+
+V = CertificateVerification
+
+
+def insert_verification(session: Session, **values: Any) -> CertificateVerification:
+    return session.scalars(insert(V).values(**values).returning(V)).one()
+
+
+def verifications_of(
+    session: Session, certificate_id: uuid.UUID, *, lock: bool = False
+) -> list[CertificateVerification]:
+    """Every code of one certificate, newest first."""
+    stmt = select(V).where(V.certificate_id == certificate_id).order_by(V.created_at.desc())
+    if lock:
+        stmt = stmt.with_for_update()
+    return list(session.scalars(stmt, execution_options={"populate_existing": True}).all())
+
+
+def live_verifications(
+    session: Session, certificate_ids: Collection[uuid.UUID]
+) -> dict[uuid.UUID, CertificateVerification]:
+    """The live (not withdrawn) code of each certificate that has one."""
+    if not certificate_ids:
+        return {}
+    rows = session.scalars(
+        select(V).where(V.certificate_id.in_(list(certificate_ids)), V.withdrawn_at.is_(None))
+    )
+    return {r.certificate_id: r for r in rows}
+
+
+def verification_by_handle(
+    session: Session, handle_id: uuid.UUID
+) -> CertificateVerification | None:
+    return session.scalars(select(V).where(V.handle_id == handle_id)).one_or_none()
+
+
+def withdraw_verification(
+    session: Session, verification_id: uuid.UUID, *, by: uuid.UUID, reason: str
+) -> CertificateVerification:
+    stmt = (
+        update(V)
+        .where(V.id == verification_id, V.withdrawn_at.is_(None))
+        .values(
+            withdrawn_at=func.now(),
+            withdrawn_by=by,
+            withdraw_reason=reason,
+            version=V.version + 1,
+        )
+        .returning(V)
+        .execution_options(synchronize_session=False)
+    )
+    return session.scalars(stmt, execution_options={"populate_existing": True}).one()
+
+
+def count_check(session: Session, verification_id: uuid.UUID) -> None:
+    """One more successful public lookup (the ETag ``version`` does not move: a check must not
+    make the principal's withdrawal fail)."""
+    session.execute(
+        update(V)
+        .where(V.id == verification_id)
+        .values(check_count=V.check_count + 1, last_checked_at=func.now())
+        .execution_options(synchronize_session=False)
+    )
+
+
 def export_tables(session: Session) -> list[RecordTable]:
-    """Both tables of the current school for its full data export (FR-ADM-001)."""
+    """The tables of the current school for its full data export (FR-ADM-001)."""
     return [
         dump_table(
             session,
@@ -253,21 +328,35 @@ def export_tables(session: Session) -> list[RecordTable]:
             name="certificate_counters",
             order_by=("certificate_type", "academic_year_id"),
         ),
+        # The printed codes are the school's own record of what its papers carry; the handle's
+        # key hash never leaves (docs/05 §15.6).
+        dump_table(
+            session,
+            V.__table__,
+            name="certificate_verifications",
+            order_by=("created_at", "id"),
+        ),
     ]
 
 
 __all__ = [
     "allocate_serial",
+    "count_check",
     "current_tenant_id",
     "export_tables",
     "get_certificate",
     "get_many",
     "insert_certificate",
+    "insert_verification",
     "list_certificates",
+    "live_verifications",
     "next_duplicate_no",
     "now",
     "register_entries",
     "transfer_certificates_of",
     "translate_db_error",
     "update_certificate",
+    "verification_by_handle",
+    "verifications_of",
+    "withdraw_verification",
 ]

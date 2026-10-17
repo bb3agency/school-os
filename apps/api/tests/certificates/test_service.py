@@ -70,6 +70,7 @@ def test_FR_CERT_006_bonafide_issued_at_once_with_the_next_serial(
     assert C.actions(admin_engine, school.tenant_id, first.id) == [
         "certificate.requested",
         "certificate.issued",
+        "certificate.verification_added",  # R2: every certificate gets a code (FR-CERT-019)
     ]
     assert C.outbox(admin_engine, school.tenant_id, first.id) == ["certificate.render_requested"]
 
@@ -673,7 +674,8 @@ def test_ADR_0036_tc_content_print_page_and_catalog_are_english_while_telugu_is_
     assert not any(d.key.endswith("_te") for d in issued.content.details)
     details = {d.key: d.value for d in issued.content.details}
     assert details["class_at_leaving"] == "Class IX A (2026-27)"
-    catalog = certificates.types_catalog()
+    with tenant_session(school.tenant_id) as db:
+        catalog = certificates.types_catalog(db)
     assert all(t.label_te == "" for t in catalog)
     assert not contains_telugu("".join(t.model_dump_json() for t in catalog))
 

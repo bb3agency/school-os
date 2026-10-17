@@ -1683,7 +1683,8 @@
       "apaar_id_in_use": "This APAAR ID is already on another student's record. Search by this APAAR ID to open it.",
       "pen_required_for_transfer_in": "A child from another school needs the PEN from the transfer certificate.",
       "signed_form_required": "Upload the signed form. Consent is recorded only with it.",
-      "before_current_decision": "This date is before the decision already recorded. Check the date on the form."
+      "before_current_decision": "This date is before the decision already recorded. Check the date on the form.",
+      "invalid_number": "Enter a whole number."
     },
     "api": {
       "generic": {
@@ -6205,7 +6206,14 @@
       "conduct": "Conduct and character",
       "remarks": "Remarks",
       "purpose": "Purpose",
-      "purpose_note": "Purpose (details)"
+      "purpose_note": "Purpose (details)",
+      "identification_mark_1": "Personal mark of identification (1)",
+      "identification_mark_2": "Personal mark of identification (2)",
+      "languages_studied": "First language and languages studied",
+      "medium": "Medium of instruction",
+      "working_days": "Working days up to the date of leaving",
+      "days_attended": "Working days the pupil attended",
+      "application_date": "Date of application for the certificate"
     },
     "errors": {
       "certificate_blocked": {
@@ -6275,6 +6283,22 @@
       "requester_inactive": {
         "title": "The person who prepared it has left",
         "body": "They are no longer an active member of the school. Reject this request; someone active must prepare it again."
+      },
+      "verification_exists": {
+        "title": "This certificate already has a verification code",
+        "body": "A certificate gets one code. If the code was withdrawn, issue a duplicate: the duplicate gets a new code."
+      },
+      "verification_not_active": {
+        "title": "There is no code to withdraw",
+        "body": "The code was already withdrawn. Reload the page to see it."
+      },
+      "certificate_format_changed": {
+        "title": "The TC format changed",
+        "body": "This request was prepared in an older version of the format. Reject it and prepare the TC again."
+      },
+      "verification_code_unavailable": {
+        "title": "The code could not be made",
+        "body": "Try again in a moment."
       }
     },
     "detail": {
@@ -6385,6 +6409,18 @@
         "openStructure": "Open school structure",
         "openCertificates": "Open the student's certificates",
         "change_request_pending": "A correction to a detail it prints is waiting for approval. Decide the correction first."
+      },
+      "formatTitle": "Format: {format}",
+      "formatUnverified": "This layout was built from public sources and is not yet confirmed with a school. Compare it with your TC book before you hand it out.",
+      "typedBelow": "Typed below",
+      "notPrinted": "Not printed",
+      "blankByHand": "Blank, filled by hand",
+      "hidden": "Printed, hidden from you",
+      "fill": {
+        "input": "You type it",
+        "derived": "Worked out from the record",
+        "identifier": "Printed only when verified",
+        "restricted": "Restricted"
       }
     },
     "registers": {
@@ -6436,6 +6472,51 @@
       "logoNote": "A school logo cannot be added yet.",
       "save": "Save letterhead",
       "saved": "Letterhead saved. New certificates use it."
+    },
+    "verification": {
+      "title": "Online check",
+      "description": "The code and QR printed on the certificate. Anyone holding the paper can check it at the verification page.",
+      "code": "Verification code",
+      "link": "Verification page",
+      "off": "Online checking is not switched on for this school yet. The code is kept and printed once it is.",
+      "checks": "Checked online",
+      "checkCount": "{count, plural, =0 {Not checked yet} one {Checked # time} other {Checked # times}}",
+      "lastChecked": "Last checked",
+      "reasons": {
+        "issued": "Made when the certificate was issued",
+        "duplicate": "Made when this duplicate was issued",
+        "added_later": "Added later by the principal"
+      },
+      "withdrawnTitle": "This code was withdrawn",
+      "withdrawnBody": "The verification page now says it cannot find this certificate. Issue a duplicate to give the paper a new code.",
+      "noneTitle": "No verification code",
+      "noneBody": "This certificate was issued before online checking. Add a code to keep a record; the paper does not show it, so the next duplicate carries one.",
+      "add": "Add verification code",
+      "addTitle": "Add a verification code",
+      "addBody": "Say why the code is needed. You need a recent sign-in with your second step.",
+      "withdraw": "Withdraw code",
+      "withdrawTitle": "Withdraw this verification code",
+      "withdrawBody": "Use this when the code was misused, for example posted online by mistake. The page will no longer find the certificate with it. This cannot be undone.",
+      "reason": "Reason",
+      "reasonHint": "10 to 500 characters. Do not enter Aadhaar numbers."
+    },
+    "format": {
+      "title": "Transfer certificate format",
+      "description": "The layout new transfer certificates are prepared in. Certificates already issued keep the format they were issued in.",
+      "current": "Current format:",
+      "names": {
+        "generic-v1": "SchoolOS standard",
+        "ap-tc-2027": "Andhra Pradesh TC"
+      },
+      "unverified": "Built from public sources and not yet confirmed with a school. Compare it with your TC book first.",
+      "switchTo": "Use {format}",
+      "restrictedTitle": "Religion and caste on the TC",
+      "restrictedOff": "Left blank on the certificate, to fill by hand. This is the default.",
+      "restrictedOn": "Printed from the student record.",
+      "restrictedHint": "Printing them is an exception to the rule that restricted details are never printed. The change is recorded with the field names and needs a recent second-step sign-in.",
+      "printThem": "Print religion and caste",
+      "leaveBlank": "Leave them blank",
+      "saved": "Saved."
     }
   },
   "circulars": {
@@ -7635,6 +7716,33 @@
     "busy": {
       "title": "Please try again in a few minutes",
       "body": "Too many tries from this connection, or the page is busy. Wait a few minutes and open the link again."
+    },
+    "verify": {
+      "meta": "Check a certificate",
+      "title": "Check a certificate",
+      "intro": "Type the verification code printed on the certificate, or scan its QR code with your phone camera.",
+      "codeLabel": "Verification code",
+      "codeHint": "16 letters and numbers, for example 7K4M-Q2XP-9HD3-RT6W. Dashes and spaces do not matter.",
+      "check": "Check",
+      "invalid": "This is not a verification code. Check the 16 characters printed on the certificate.",
+      "noSearch": "Certificates can only be found by their code, not by name, date of birth or serial number.",
+      "notFoundTitle": "We could not find a certificate with this code",
+      "notFoundBody": "Check the code or contact the school that issued it.",
+      "again": "Check another code",
+      "busyBody": "Too many checks from this connection, or the page is busy. Wait a few minutes and try again.",
+      "valid": "Valid: issued by {school} on {date}",
+      "duplicate": "Duplicate copy {copy} of serial {serial}, issued on {date}",
+      "cancelled": "Cancelled on {date}",
+      "cancelledNoContent": "The school cancelled this certificate, so its details are not shown.",
+      "school": "School",
+      "serial": "Serial number",
+      "issuedOn": "Date of issue",
+      "code": "Code",
+      "printedTitle": "What the certificate says",
+      "printedOnly": "This page shows only what the certificate prints.",
+      "leftBlank": "Left blank on the certificate",
+      "anyoneWithCode": "Anyone with this code can see what the certificate shows.",
+      "footer": "Certificate check by SchoolOS for the school that issued it."
     }
   }
 }
