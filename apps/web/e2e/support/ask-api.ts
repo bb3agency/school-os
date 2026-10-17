@@ -7,7 +7,10 @@
  * Synthetic content only.
  */
 
+import type { components } from "@schoolos/api-client";
+
 type Json = Record<string, unknown>;
+type MemoryOut = components["schemas"]["MemoryOut"];
 
 const CONVERSATION_ID = "0192f3a4-0000-7000-8000-00000000e901";
 const MEMORY_ID = "0192f3a4-0000-7000-8000-00000000e801";
@@ -43,7 +46,7 @@ export function resetAsk(): void {
       updated_at: "2026-09-20T05:00:00Z",
       expires_at: null,
       version: 1,
-    },
+    } satisfies MemoryOut,
   ];
   memoryEnabled = true;
   asked = 0;
@@ -263,7 +266,7 @@ export function askAnswer(method: string, path: string, body: Json): [number, un
         updated_at: now(),
         expires_at: null,
         version: 1,
-      };
+      } satisfies MemoryOut;
       memories = [item, ...memories];
       return [201, item];
     }

@@ -287,9 +287,7 @@ describe("step-up and retry (ADR-0018, SEC-005)", () => {
 
   it("the step-up window returns to the completion page, never elsewhere", () => {
     expect(stepUpWindowUrl()).toBe("/bff/auth/step-up?next=%2Fstep-up-complete");
-    expect(stepUpWindowUrl("support")).toBe(
-      "/bff/auth/support/step-up?next=%2Fstep-up-complete",
-    );
+    expect(stepUpWindowUrl("support")).toBe("/bff/auth/support/step-up?next=%2Fstep-up-complete");
   });
 
   it("a SchoolOS support session keeps the BFF's support step-up URL (ADR-0023)", async () => {
