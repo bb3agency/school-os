@@ -32,7 +32,7 @@ import uuid
 from collections import Counter
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Final
 from zoneinfo import ZoneInfo
 
@@ -543,7 +543,7 @@ def _exam(session: Session, exam_id: uuid.UUID) -> Exam:
 
 def percent_of(rows: Iterable[tuple[Decimal | None, Decimal, bool]]) -> float | None:
     """FR-MRK-005: sum of marks / sum of maximum marks over the papers with marks (absent papers
-    left out), as a percentage with one decimal; None when no paper has marks."""
+    left out), as a percentage with one decimal rounded half up; None when no paper has marks."""
     got = total = Decimal(0)
     for marks, max_marks, absent in rows:
         if absent or marks is None:
@@ -552,7 +552,7 @@ def percent_of(rows: Iterable[tuple[Decimal | None, Decimal, bool]]) -> float | 
         total += max_marks
     if total <= 0:
         return None
-    return float(round(got * 100 / total, 1))
+    return float((got * 100 / total).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP))
 
 
 def section_marks(

@@ -108,6 +108,51 @@ def test_FR_STU_018_apaar_id_is_guarded_too_and_left_students_free_the_number(
     assert new_student(api, admin, ("apaar_id", "parent_form", apaar)).status_code == 201
 
 
+def test_L_02_a_record_back_to_active_may_not_share_a_live_pen(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """A left record frees its PEN; making it active again while another live record holds that
+    PEN would give the school two live records with one PEN (FR-STU-018)."""
+    admin = world.person("office_admin")
+    number = pen()
+    first = new_student(api, admin, ("udise_pen", "udise_plus", number)).json()
+    left = api.call(
+        admin,
+        "PATCH",
+        f"{BASE}/{first['id']}",
+        json={"status": "left"},
+        headers={"If-Match": f'W/"{first["version"]}"'},
+    )
+    assert left.status_code == 200, left.text
+    second = new_student(api, admin, ("udise_pen", "tc_incoming", number))
+    assert second.status_code == 201, second.text
+    back = api.call(
+        admin,
+        "PATCH",
+        f"{BASE}/{first['id']}",
+        json={"status": "active"},
+        headers={"If-Match": f'W/"{left.json()["version"]}"'},
+    )
+    assert back.status_code == 422, back.text
+    (problem,) = back.json()["errors"]
+    assert problem["code"] == "national_id_in_use"
+    assert problem["student_id"] == second.json()["id"]
+    with admin_engine.connect() as c:
+        status: str = c.execute(
+            text("SELECT status FROM sis.students WHERE id = :i"), {"i": first["id"]}
+        ).scalar_one()
+    assert status == "left"
+    # Graduated -> provisional is not a way around it either; left -> graduated is fine.
+    done = api.call(
+        admin,
+        "PATCH",
+        f"{BASE}/{first['id']}",
+        json={"status": "graduated"},
+        headers={"If-Match": f'W/"{left.json()["version"]}"'},
+    )
+    assert done.status_code == 200, done.text
+
+
 def test_FR_STU_018_transfer_in_needs_a_pen(world: Any, api: Any, admin_engine: Engine) -> None:
     admin = world.person("office_admin")
     missing = new_student(api, admin, admission_kind="transfer_in")

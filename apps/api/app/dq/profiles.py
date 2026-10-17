@@ -343,3 +343,14 @@ def load_profiles() -> dict[str, Profile]:
         if entry.name.endswith(".yaml")
     }
     return parse_profiles(raw)
+
+
+def profile_board(profile: Profile) -> str | None:
+    """The board ``profile`` belongs to; a superseded profile written before boards were
+    recorded (cisce-registration-2026) takes the board of the profile that replaces it."""
+    if profile.board is not None:
+        return profile.board
+    for other in load_profiles().values():
+        if other.supersedes == profile.key:
+            return other.board
+    return None

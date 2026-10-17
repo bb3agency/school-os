@@ -235,7 +235,8 @@ def post_sync(
 ) -> SyncOut:
     """One complete snapshot of the party ledgers under the selected groups. Idempotent by
     ``batch_id`` (a repeat returns the first result with ``repeat: true``). 409
-    ``no_groups_selected`` / ``agent_outdated``; 422 ``group_not_selected`` or
+    ``no_groups_selected`` / ``agent_outdated`` / ``snapshot_outdated`` (older ``as_of`` than the
+    balances already applied; nothing changes); 422 ``group_not_selected`` or
     ``total_too_large`` (the positive balances add up to more than ₹999,999,999,999.99)."""
     return service.accept_sync(caller, body)
 

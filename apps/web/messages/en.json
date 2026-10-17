@@ -1682,7 +1682,8 @@
       "udise_pen_in_use": "This PEN is already on another student's record. Search by this PEN to open it.",
       "apaar_id_in_use": "This APAAR ID is already on another student's record. Search by this APAAR ID to open it.",
       "pen_required_for_transfer_in": "A child from another school needs the PEN from the transfer certificate.",
-      "signed_form_required": "Upload the signed form. Consent is recorded only with it."
+      "signed_form_required": "Upload the signed form. Consent is recorded only with it.",
+      "before_current_decision": "This date is before the decision already recorded. Check the date on the form."
     },
     "api": {
       "generic": {

@@ -23,7 +23,7 @@ from app.core.db import platform_session
 from app.core.errors import Conflict
 from app.platform import billing, usage
 from app.platform import repository as repo
-from app.platform.common import today_ist
+from app.platform.common import add_months, today_ist
 
 from .conftest import Api, MakeOperator, Operator, billing_account_payload, provision_payload
 
@@ -364,6 +364,64 @@ def test_FR_PLT_015_bundle_and_overage_lines_with_gst(
     # February was before the bundle counted: no overage.
     march_inv = billing.create_manual_draft(billing_admin.actor, sub, dt.date(2073, 3, 10))
     assert "usage_overage" not in [k for k, _, _ in _lines(march_inv)]
+
+
+def _set_period(sub: uuid.UUID, start: dt.date, end: dt.date, *, cancel: bool) -> None:
+    with platform_session() as s:
+        s.execute(
+            text(
+                "UPDATE platform.subscriptions SET current_period_start = :a, "
+                "current_period_end = :b, cancel_at_period_end = :c, "
+                "cancel_reason = CASE WHEN :c THEN 'School leaves' END WHERE id = :i"
+            ),
+            {"a": start, "b": end, "c": cancel, "i": sub},
+        )
+
+
+def test_L_11_a_subscription_ending_gets_a_closing_invoice_for_unbilled_overage(
+    api: Api, billing_admin: Operator, owner: Operator, make_plan: Callable[..., uuid.UUID]
+) -> None:
+    """Overage is billed in arrears on the next period's invoice, so a subscription cancelled
+    at period end gets one closing draft with each month's overage not billed yet (one line
+    per month, ever); the month already billed is not billed again."""
+    school = _school(api, owner, make_plan(base_price_inr="4999.00"))
+    sub, tenant = uuid.UUID(school["subscription_id"]), uuid.UUID(school["tenant_id"])
+    billing.set_ai_bundle(billing_admin.actor, sub, _bundle_id("ai-lite"))
+    end = today_ist()
+    start = add_months(end, -1)
+    billed = add_months(start.replace(day=1), -1)
+    months = []
+    month = start.replace(day=1)
+    while month <= (end - dt.timedelta(days=1)).replace(day=1):
+        months.append(month)
+        month = billing.next_month(month)
+    _bundle_from(sub, billed)
+    _answers(tenant, billed, [310])
+    for i, month in enumerate(months, start=2):
+        _answers(tenant, month, [300 + 10 * i])
+    for draft in billing.list_invoices(tenant_id=tenant, status="draft")[0]:
+        billing.discard_draft(billing_admin.actor, draft.id)
+    billing.create_manual_draft(billing_admin.actor, sub, start)  # bills the month before
+    _set_period(sub, start, end, cancel=True)
+    billing.roll_periods(today=end)
+    assert billing.get_subscription(sub).status == "cancelled"
+    with platform_session() as s:
+        closing_id: Any = s.execute(
+            text(
+                "SELECT id FROM platform.invoices WHERE subscription_id = :s AND period_start = :d"
+            ),
+            {"s": sub, "d": end},
+        ).scalar_one()
+    closing = billing.get_invoice(closing_id)
+    assert [ln.usage_month for ln in closing.lines] == months
+    assert [ln.kind for ln in closing.lines] == ["usage_overage"] * len(months)
+    assert [int(ln.quantity) for ln in closing.lines] == [10 * i for i in range(2, 2 + len(months))]
+    assert billing.roll_periods(today=end) >= 0
+    with platform_session() as s:
+        count: int = s.execute(
+            text("SELECT count(*) FROM platform.invoices WHERE subscription_id = :s"), {"s": sub}
+        ).scalar_one()
+    assert count == 2
 
 
 def test_FR_PLT_017_overage_invoice_inter_state_is_igst(

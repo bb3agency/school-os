@@ -790,6 +790,29 @@ def _guard_national_ids(
         raise ValidationFailed(problems, detail=NATIONAL_ID_DETAIL)
 
 
+def _held_national_ids(
+    session: Session, student_ids: Collection[uuid.UUID]
+) -> dict[uuid.UUID, set[tuple[str, str]]]:
+    """Student -> its current, not rejected (PEN / APAAR ID key, value) pairs."""
+    out: dict[uuid.UUID, set[tuple[str, str]]] = {}
+    for row in repo.current_values(session, student_ids, NATIONAL_ID_KEYS):
+        if row.verification_status != "rejected" and (plain := _plain(session, row)):
+            out.setdefault(row.student_id, set()).add((row.attribute_key, plain))
+    return out
+
+
+def _national_ids_taken(session: Session, student_ids: Collection[uuid.UUID]) -> bool:
+    """Whether another live record now holds a PEN or APAAR ID of ``student_ids`` (records
+    about to become live again; FR-STU-018). The numbers are locked for the transaction."""
+    mine = set(student_ids)
+    for _sid, pairs in sorted(_held_national_ids(session, mine).items(), key=lambda i: str(i[0])):
+        for key, value in sorted(pairs):
+            repo.lock_national_id(session, key, value)
+            if any(s not in mine for _, s in repo.national_id_holders(session, key, [value])):
+                return True
+    return False
+
+
 def national_id_holders(
     session: Session, attribute_key: str, values: Collection[str]
 ) -> dict[str, list[uuid.UUID]]:
@@ -1249,13 +1272,25 @@ def update_student_status(
 ) -> StudentOut:
     """Change the record status (active, left, graduated, provisional); ``If-Match`` required.
 
-    Audit: ``student.status_changed`` with {from, to}.
+    Making a left or graduated record active or provisional again is refused with 422
+    ``national_id_in_use`` (field ``status``) while another live record holds its PEN or APAAR
+    ID (FR-STU-018). Audit: ``student.status_changed`` with {from, to}.
     """
     structure = _structure(session)
     student = _visible_student(
         session, ctx, student_id, permission=UPDATE, structure=structure, lock=True
     )
     previous = student.status
+    if status in repo.LIVE_STATUSES and previous not in repo.LIVE_STATUSES:
+        # FR-STU-018 (audit L-02): a left or graduated record freed its PEN and APAAR ID;
+        # making it live again must not give the school two live records with one number.
+        held = _held_national_ids(session, [student_id]).get(student_id, set())
+        _guard_national_ids(
+            session,
+            ctx,
+            [("status", key, value) for key, value in sorted(held)],
+            student_id=student_id,
+        )
     with _db_errors():
         updated = repo.update_student(
             session, student_id, values={"status": status}, expected_version=expected_version
@@ -2966,7 +3001,8 @@ def undo_promotion(session: Session, ctx: UserContext, year_id: uuid.UUID) -> Pr
     Refused with 409 ``no_promotion`` when there is none, 409 ``promotion_undo_expired`` after
     24 hours, and 409 ``promotion_has_dependents`` when anything was recorded on top of it: an
     enrolment it closed or opened changed since (version or status), or a graduate's record
-    status changed, and 409 ``structure_archived`` when an enrolment it would reopen is in
+    status changed or another live record took its PEN or APAAR ID (FR-STU-018), and 409
+    ``structure_archived`` when an enrolment it would reopen is in
     archived structure. Otherwise, in the caller's transaction: the enrolments it opened are
     removed, the ones it closed are active again, graduates get their previous status back.
 
@@ -2999,6 +3035,14 @@ def undo_promotion(session: Session, ctx: UserContext, year_id: uuid.UUID) -> Pr
             raise _promotion_has_dependents()
     if repo.students_active_in_year(session, [i.student_id for i in items], year.id):
         raise _promotion_has_dependents()  # re-enrolled in the old year since the commit
+    reviving = [
+        i.student_id
+        for i in items
+        if i.outcome == "graduated" and i.previous_student_status in repo.LIVE_STATUSES
+    ]
+    if reviving and _national_ids_taken(session, reviving):
+        # A graduate freed its PEN / APAAR ID and a live record holds it now (audit L-02).
+        raise _promotion_has_dependents()
     # The reopened enrolments must not land in archived structure (409 structure_archived);
     # their sections stay locked against a concurrent archive (FR-TEN-010).
     tenancy.lock_enrolment_targets(session, repo.enrollment_section_ids(session, old_ids))

@@ -20,7 +20,7 @@ from sqlalchemy import Engine, text
 from app.core.db import platform_session
 from app.core.errors import Conflict
 from app.platform import billing
-from app.platform.common import config, today_ist
+from app.platform.common import add_months, config, today_ist
 from app.platform.schemas import InvoiceLineIn, PaymentIn
 
 from .conftest import (
@@ -909,6 +909,31 @@ def test_FR_PLT_012_plan_change_applies_next_period_and_cancel_at_period_end(
     assert billing.get_subscription(sub).status == "cancelled"
 
 
+def test_L_11_roll_catch_up_drafts_every_skipped_period(
+    api: Api, owner: Operator, make_plan: Callable[..., uuid.UUID]
+) -> None:
+    """When the daily job did not run for months, each period it skips gets its draft
+    (billing in advance), once; a rerun adds nothing."""
+    sub = _school(api, owner, make_plan())["subscription_id"]
+    today = today_ist()
+    first = add_months(today, -2)
+    with platform_session() as s:
+        s.execute(
+            text(
+                "UPDATE platform.subscriptions SET current_period_start = :a, "
+                "current_period_end = :b WHERE id = :i"
+            ),
+            {"a": add_months(today, -3), "b": first, "i": sub},
+        )
+    billing.roll_periods(today=today)
+    rolled = billing.get_subscription(uuid.UUID(sub))
+    assert rolled.current_period_start == today
+    starts = [d["period_start"] for d in _drafts(sub)]
+    assert {first, add_months(today, -1), today} <= set(starts)
+    billing.roll_periods(today=today)
+    assert [d["period_start"] for d in _drafts(sub)] == starts
+
+
 def test_FR_PLT_011_trial_activate_and_extend(
     api: Api, owner: Operator, billing_admin: Operator, make_plan: Callable[..., uuid.UUID]
 ) -> None:
@@ -923,6 +948,24 @@ def test_FR_PLT_011_trial_activate_and_extend(
     assert act.json()["status"] == "active"
     assert len(_drafts(sub)) == 1
     assert api.call("POST", f"/subscriptions/{sub}/activate", billing_admin).status_code == 409
+
+
+def test_L_07_a_trial_ending_at_ist_midnight_ends_on_that_indian_date(
+    api: Api, owner: Operator, billing_admin: Operator, make_plan: Callable[..., uuid.UUID]
+) -> None:
+    """Billing days are IST days (docs/16 §10): a trial extended to midnight IST on a date
+    ends its period on that date, not on the UTC date before it."""
+    sub = _school(api, owner, make_plan(), start_as="trial")["subscription_id"]
+    day = (dt.datetime.now(dt.UTC) + dt.timedelta(days=60)).date()
+    ist_midnight = dt.datetime.combine(day, dt.time(), dt.timezone(dt.timedelta(hours=5.5)))
+    ext = api.call(
+        "POST",
+        f"/subscriptions/{sub}/extend-trial",
+        billing_admin,
+        json={"trial_ends_at": ist_midnight.isoformat()},
+    )
+    assert ext.status_code == 200, ext.text
+    assert ext.json()["current_period_end"] == day.isoformat()
 
 
 def test_FR_PLT_013_negotiated_price_returns_its_reason(
