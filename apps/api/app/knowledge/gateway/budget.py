@@ -460,6 +460,20 @@ class Admission:
     reservation: Reservation
 
 
+BudgetState = Literal["ok", "alert", "exhausted", "disabled", "unavailable"]
+"""What a question asked now would meet (read-only; :meth:`BudgetGuard.status`)."""
+
+
+@dataclass(frozen=True, slots=True)
+class BudgetStatus:
+    month: str
+    """``YYYY-MM`` in IST."""
+    state: BudgetState
+    """``disabled``: the school's switch or flag is off. ``exhausted``: a call of the probed
+    role would be refused for budget now. ``alert``: spend is at or above ``alert_fraction``.
+    ``unavailable``: the spend store cannot be read (calls fail closed meanwhile)."""
+
+
 _RESERVATION = "kb_budget_reservation"
 DEFERRED_KEEP_S: Final = 2 * 24 * 3600
 """How long a deferred settlement's id is remembered (longer than the task's retries), so it is
@@ -547,6 +561,31 @@ class BudgetGuard:
             self.release(admission)
             raise
         return admission
+
+    def status(self, tenant_id: uuid.UUID, role_config: RoleConfig) -> BudgetStatus:
+        """The school's budget state for this IST month, as :meth:`admit` would see a call of
+        ``role_config`` now (FR-KB-040): no reservation, no alert, no rate-limit count, no
+        log. ``exhausted`` when ``spent + reserved + estimate`` is above the limit (the
+        reservation rule, so it matches what the next question meets)."""
+        settings = self._policy.settings_for(tenant_id)
+        now = self._now()
+        month = budget_month(now)
+        if not settings.ai_enabled:
+            return BudgetStatus(month, "disabled")
+        budget = self.budget_usd(settings)
+        limit = budget * Decimal(str(self._config.budget.degrade_fraction))
+        if limit <= 0:
+            return BudgetStatus(month, "exhausted")
+        try:
+            spent = self._ledger.spent_usd(tenant_id, month)
+            reserved = self._ledger.reserved_usd(tenant_id, month, int(now.timestamp() * 1000))
+        except KVUnavailable:
+            return BudgetStatus(month, "unavailable")
+        if spent + reserved + self.estimate_usd(role_config) > limit:
+            return BudgetStatus(month, "exhausted")
+        if spent >= budget * Decimal(str(self._config.budget.alert_fraction)):
+            return BudgetStatus(month, "alert")
+        return BudgetStatus(month, "ok")
 
     def _report_exhausted(self, tenant_id: uuid.UUID, month: str) -> None:
         """NFR-CST-001 100 % alert (owner decision 2026-10-03): the first reservation refused
@@ -640,6 +679,8 @@ __all__ = [
     "Admission",
     "BudgetGuard",
     "BudgetLevel",
+    "BudgetState",
+    "BudgetStatus",
     "InMemorySpendLedger",
     "Reservation",
     "Settlement",

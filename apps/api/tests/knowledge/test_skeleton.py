@@ -64,6 +64,10 @@ KNOWLEDGE_ROUTES = {
     ("POST", "/api/v1/knowledge/memories/{memory_id}/confirm"): "kb.ask",
     ("GET", "/api/v1/knowledge/memory-settings"): "kb.ask",
     ("PUT", "/api/v1/knowledge/memory-settings"): "kb.ask",
+    # R2.4 (FR-KB-040, FR-KB-042): usage for every asker (numbers for billing readers only);
+    # source links for askers or document readers (require_any; the service checks the source).
+    ("GET", "/api/v1/knowledge/usage"): "kb.ask",
+    ("GET", "/api/v1/knowledge/resolve"): "kb.ask",
 }
 
 

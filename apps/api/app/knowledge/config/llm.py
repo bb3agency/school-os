@@ -197,6 +197,10 @@ class BundleBudget(ConfigModel):
     overage_headroom_fraction: float = Field(ge=0, le=2)
     """Extra budget above the bundle's quota, for billed overage answers and non-billable
     questions and ingestion calls."""
+    billable_statuses: tuple[str, ...] = Field(min_length=1)
+    """``kb.queries`` statuses that count as one billable AI answer (ADR-0038 decision 4).
+    ``GET /knowledge/usage`` counts with these; kept equal to ``app/platform/billing.yaml``
+    ``ai_answers.billable_statuses`` (the control plane's daily count; a test pins them)."""
 
 
 class Budget(ConfigModel):
