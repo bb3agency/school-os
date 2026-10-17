@@ -48,7 +48,6 @@ export function SiteHeader({
   whatsappNumber?: string | null;
 }) {
   const t = useTranslations("marketing");
-  const tc = useTranslations("common");
   const [open, setOpen] = useState(false);
   const scrolled = useSyncExternalStore(subscribeScroll, scrolledSnapshot, serverSnapshot);
   const headerRef = useRef<HTMLElement>(null);

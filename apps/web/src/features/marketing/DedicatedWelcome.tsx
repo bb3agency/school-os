@@ -12,7 +12,6 @@ import { SIGN_IN_HREF } from "./links";
  */
 export function DedicatedWelcome() {
   const t = useTranslations("marketing");
-  const tc = useTranslations("common");
   return (
     <div className="mk mk-hero-bg relative flex min-h-viewport flex-col">
       <div aria-hidden="true" className="mk-grid pointer-events-none absolute inset-0" />
