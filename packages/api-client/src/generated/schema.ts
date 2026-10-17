@@ -1722,8 +1722,11 @@ export interface paths {
          * Readiness Slips
          * @description Parent verification slips (one A4 page per student) for one student or one section:
          *     the value each record holds, the differences and who must fix them, and a signature line
-         *     for the parent (permission ``dq.readiness.read``). Aadhaar-as-printed values are shown
-         *     only with ``student.read_sensitive``; never an Aadhaar number. Printing is audited.
+         *     for the parent (permission ``dq.readiness.read``). Aadhaar-as-printed values are masked
+         *     unless ``include_sensitive=true``, which needs ``student.read_sensitive`` for every student
+         *     (403 ``sensitive_not_allowed``) and a recent sign-in with MFA (428 ``step_up_required``),
+         *     like the PDF print; never an Aadhaar number. Printing is audited, naming the students whose
+         *     restricted values were shown; with ``check=true`` 204 only, not audited.
          */
         get: operations["readiness_slips_api_v1_dq_readiness__profile_key__slips_get"];
         put?: never;
@@ -19231,7 +19234,10 @@ export interface operations {
     readiness_slips_api_v1_dq_readiness__profile_key__slips_get: {
         parameters: {
             query?: {
+                /** @description true: only check that the slips can be printed now (permission, reach, step-up for include_sensitive) and answer 204 without the page; the print view itself is audited once. */
+                check?: boolean;
                 include_ready?: boolean;
+                include_sensitive?: boolean;
                 section_id?: string | null;
                 student_id?: string | null;
             };
@@ -19252,6 +19258,13 @@ export interface operations {
                 content: {
                     "text/html": string;
                 };
+            };
+            /** @description With check=true: the slips can be printed now (nothing audited) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

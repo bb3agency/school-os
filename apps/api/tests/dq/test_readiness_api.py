@@ -406,12 +406,17 @@ def test_SEC_043_section_slips_audit_whose_restricted_values_were_shown(
     world: Any, api: Any, admin_engine: Engine
 ) -> None:
     """Invariant 7, SEC-043: a section print of slips that shows Aadhaar-as-printed values
-    (the printer holds ``student.read_sensitive``) names the students in its audit event, ids
-    only; a print without restricted values names nobody."""
+    (asked for, by a holder of ``student.read_sensitive``) names the students in its audit
+    event, ids only; a print without restricted values names nobody."""
     sid, _ = ssc_student(world.a)
     section = str(world.a.ids["section_9a"])
     office = world.person("office_admin")  # holds student.read_sensitive
-    res = api.call(office, "GET", f"{BASE}/slips", params={"section_id": section})
+    res = api.call(
+        office,
+        "GET",
+        f"{BASE}/slips",
+        params={"section_id": section, "include_sensitive": "true"},
+    )
     assert res.status_code == 200, res.text
     event = W.audit_events(admin_engine, world.a.tenant_id, "dq.readiness.slips_printed")[-1]
     assert event["summary"]["section_id"] == section
@@ -424,3 +429,69 @@ def test_SEC_043_section_slips_audit_whose_restricted_values_were_shown(
     latest = W.audit_events(admin_engine, world.a.tenant_id, "dq.readiness.slips_printed")[-1]
     assert latest["summary"]["sensitive_shown"] == 0
     assert "sensitive_student_ids" not in latest["summary"]
+
+
+def test_SEC_045_slips_mask_restricted_values_unless_asked_for_with_step_up(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """SEC-045 (docs/07 §11, ADR-0021): the HTML slips mask Aadhaar-as-printed values by
+    default, also for a holder of ``student.read_sensitive``. ``include_sensitive=true`` shows
+    them, and needs that permission (403) and a recent sign-in with MFA (428), like the PDF."""
+    name = fresh_name()
+    aadhaar_name = name.replace(" Sai Kumar", " Saikumarr")
+    sid, _ = ssc_student(world.a, name=name, aadhaar_name=aadhaar_name)
+    section = str(world.a.ids["section_9a"])
+    office = world.person("office_admin")  # holds student.read_sensitive
+    for params in ({"student_id": str(sid)}, {"section_id": section}):
+        masked = api.call(office, "GET", f"{BASE}/slips", params=params)
+        assert masked.status_code == 200, masked.text
+        assert "Saikumarr" not in masked.text
+        event = W.audit_events(admin_engine, world.a.tenant_id, "dq.readiness.slips_printed")[-1]
+        assert event["summary"]["sensitive_shown"] == 0
+        shown = api.call(
+            office, "GET", f"{BASE}/slips", params={**params, "include_sensitive": "true"}
+        )
+        assert shown.status_code == 200, shown.text
+        assert "Saikumarr" in shown.text
+        stale = api.call(
+            office,
+            "GET",
+            f"{BASE}/slips",
+            params={**params, "include_sensitive": "true"},
+            auth_age_s=600,
+        )
+        assert stale.status_code == 428, stale.text
+        no_mfa = api.call(
+            office,
+            "GET",
+            f"{BASE}/slips",
+            params={**params, "include_sensitive": "true"},
+            mfa=False,
+        )
+        assert no_mfa.status_code in (403, 428)  # office_admin needs MFA for everything
+    # check=true: every check, no page and no audit event (the screen confirms the sign-in).
+    before = len(W.audit_events(admin_engine, world.a.tenant_id, "dq.readiness.slips_printed"))
+    checked = api.call(
+        office,
+        "GET",
+        f"{BASE}/slips",
+        params={"student_id": str(sid), "include_sensitive": "true", "check": "true"},
+    )
+    assert checked.status_code == 204, checked.text
+    assert checked.content == b""
+    stale_check = api.call(
+        office,
+        "GET",
+        f"{BASE}/slips",
+        params={"student_id": str(sid), "include_sensitive": "true", "check": "true"},
+        auth_age_s=600,
+    )
+    assert stale_check.status_code == 428
+    after = W.audit_events(admin_engine, world.a.tenant_id, "dq.readiness.slips_printed")
+    assert len(after) == before
+    staff = world.person("office_staff")  # no student.read_sensitive
+    refused = api.call(
+        staff, "GET", f"{BASE}/slips", params={"student_id": str(sid), "include_sensitive": "true"}
+    )
+    assert refused.status_code == 403
+    assert refused.json()["code"] == "sensitive_not_allowed"
