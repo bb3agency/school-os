@@ -1,4 +1,5 @@
 import { useId, type ReactNode } from "react";
+import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
 import { DeltaPill, type DeltaDirection } from "./Badge";
 import { cardClasses } from "./Card";
@@ -60,6 +61,8 @@ export interface KpiCardProps {
   sparkline?: ReactNode;
   /** Optional icon or action in the top-right corner. */
   aside?: ReactNode;
+  /** The filtered list behind the number: the label becomes its link (docs/17 §7.4). */
+  href?: string;
   className?: string;
 }
 
@@ -75,6 +78,7 @@ export function KpiCard({
   comparison,
   sparkline,
   aside,
+  href,
   className,
 }: KpiCardProps) {
   const labelId = useId();
@@ -86,7 +90,13 @@ export function KpiCard({
     >
       <div className="flex items-start justify-between gap-3">
         <p id={labelId} className="text-sm text-ink-muted">
-          {label}
+          {href ? (
+            <Link href={href} className="underline-offset-4 hover:text-ink hover:underline">
+              {label}
+            </Link>
+          ) : (
+            label
+          )}
         </p>
         {aside}
       </div>
