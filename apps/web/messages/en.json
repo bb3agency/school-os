@@ -2024,7 +2024,8 @@
     "emergencyReason": "Emergency access is only for a security incident or a legal obligation. Choose one of those, or untick Emergency.",
     "penInvalid": "Enter the 11-digit PEN, for example 21345678901.",
     "penRequiredForTransfer": "A child from another school needs the PEN from the transfer certificate.",
-    "invalidHeadCode": "Use up to 20 letters, digits, - or _, starting with a letter or digit, for example TUI."
+    "invalidHeadCode": "Use up to 20 letters, digits, - or _, starting with a letter or digit, for example TUI.",
+    "invalidKeyId": "Enter the key id as Razorpay shows it: rzp_live_ or rzp_test_ and letters or digits."
   },
   "support": {
     "piiWarningTitle": "Do not include student personal data",
@@ -8128,7 +8129,8 @@
       "cheque": "Cheque",
       "bank_transfer": "Bank transfer",
       "upi_qr": "UPI (school QR)",
-      "razorpay": "Online (Razorpay)"
+      "razorpay": "Online (Razorpay)",
+      "original_method": "Back to the payer (Razorpay)"
     },
     "modeDetails": {
       "cheque_number": "Cheque number",
@@ -8322,7 +8324,8 @@
       "requestedBy": "Requested by {name} on {when}",
       "toApprovals": "Go to fee approvals",
       "refundsTitle": "Refunds",
-      "printVoucher": "Print voucher"
+      "printVoucher": "Print voucher",
+      "refundOnlineBody": "Razorpay returns the money to the payer's card, bank or UPI after a second person approves. The refund voucher is written when Razorpay confirms the refund."
     },
     "account": {
       "title": "Fee account",
@@ -8598,6 +8601,278 @@
       "cancellation_exists": {
         "title": "Cancellation already asked",
         "body": "A cancellation of this receipt is already waiting or approved."
+      }
+    }
+  },
+  "payments": {
+    "nav": {
+      "settings": "Online payments",
+      "reconcile": "Online reconciliation"
+    },
+    "settingsTitle": "Online payments",
+    "settingsDescription": "Connect the school's own Razorpay account so parents can pay fees online. The money goes straight to the school's Razorpay account and bank.",
+    "noAccessTitle": "You cannot see online payments",
+    "noAccessBody": "The owner connects online payments. Accountants and the principal can see the connection.",
+    "off": {
+      "title": "Fees are not switched on for this school",
+      "body": "Online payments work with SchoolOS fees. The owner or principal turns fees on in school settings."
+    },
+    "connect": {
+      "title": "Connect Razorpay",
+      "description": "Use the school's own Razorpay account. SchoolOS makes payment links in it and reads its payments to issue receipts.",
+      "noticeTitle": "Before you connect",
+      "ownAccount": "The school is Razorpay's customer: payments go to the school's Razorpay account and from there to the school's bank.",
+      "neverHeld": "SchoolOS never holds or moves the school's money and takes no commission.",
+      "razorpayFees": "Razorpay charges the school its own fees on online payments (about 2% + GST unless the school agreed otherwise).",
+      "cashStays": "Cash, cheque and the school's own UPI QR keep working as before.",
+      "askOwner": "Only the owner can connect online payments.",
+      "oauth": "Connect with Razorpay sign-in",
+      "oauthPending": "Opening Razorpay…",
+      "oauthHint": "Razorpay asks you to sign in to the school's account and allow SchoolOS. You come back here afterwards.",
+      "manual": "Connect with API keys",
+      "manualHint": "Until SchoolOS is an approved Razorpay partner, pilot schools paste a key id and key secret from their own Razorpay dashboard.",
+      "manualTitle": "Connect with the school's API keys",
+      "manualDescription": "In the Razorpay dashboard open Account & Settings > API keys and create a key. Paste the key id and key secret here. The secret is stored encrypted and never shown again.",
+      "keyId": "Key id",
+      "keyIdHint": "Starts with rzp_live_ (real payments) or rzp_test_ (test mode).",
+      "keySecret": "Key secret",
+      "keySecretHint": "Shown by Razorpay only when the key is made. SchoolOS never shows it again.",
+      "connect": "Connect",
+      "notConfigured": "Online payments are not offered on this deployment yet. Ask SchoolOS support.",
+      "revokedTitle": "Razorpay stopped accepting SchoolOS",
+      "revokedBody": "The school's keys or its permission for SchoolOS no longer work, so no new payment links can be made. Connect again to continue."
+    },
+    "webhook": {
+      "steps": "Add this webhook in the Razorpay dashboard (Account & Settings > Webhooks > Add new webhook): paste the URL and the secret, and tick the events below. Receipts appear by themselves only after this is done.",
+      "url": "Webhook URL",
+      "events": "Events to tick",
+      "secret": "Webhook secret",
+      "previousUntil": "The old secret keeps working until {when}, so Razorpay's retries still arrive. Change it in the dashboard before then.",
+      "done": "I have added it"
+    },
+    "account": {
+      "title": "Razorpay account",
+      "description": "The school's own account. Payment links are made in it and its payments become receipts.",
+      "none": "Not available",
+      "status": "Status",
+      "statuses": {
+        "active": "Connected",
+        "revoked": "Stopped",
+        "disconnected": "Disconnected"
+      },
+      "mode": "Connected with",
+      "modes": {
+        "oauth": "Razorpay sign-in",
+        "manual_keys": "API keys"
+      },
+      "environment": "Mode",
+      "environments": {
+        "live": "Live payments",
+        "test": "Test mode"
+      },
+      "accountId": "Account",
+      "connectedAt": "Connected on",
+      "checkedAt": "Last checked",
+      "openLinks": "Open payment links",
+      "pendingEvents": "Razorpay messages waiting",
+      "accessUntil": "Access ends",
+      "webhookUrl": "Webhook URL",
+      "previousUntil": "The old webhook secret keeps working until {when}.",
+      "test": "Test connection",
+      "testOk": "Razorpay accepted the connection.",
+      "testFailed": "Razorpay refused the connection. Connect again.",
+      "rotate": "New webhook secret",
+      "rotateTitle": "Make a new webhook secret",
+      "rotateBody": "The new secret is shown once. The old one keeps working for 7 days so no payment is missed; paste the new one in the Razorpay dashboard before then.",
+      "disconnect": "Disconnect",
+      "disconnectTitle": "Disconnect Razorpay",
+      "disconnectBody": "Open payment links are cancelled and no new links can be made. Receipts and history stay. Payments already made stay in the school's Razorpay account.",
+      "failedEventsTitle": "Some Razorpay messages could not be applied",
+      "failedEventsBody": "{count, plural, one {# message} other {# messages}} could not be applied. Open Online reconciliation to check the payments."
+    },
+    "callback": {
+      "title": "Connecting Razorpay",
+      "working": "Finishing the connection…",
+      "doneTitle": "Razorpay is connected",
+      "doneBody": "Payment links can now be made from a student's fee account.",
+      "missingTitle": "Nothing to finish",
+      "missingBody": "This page is opened by Razorpay after you allow SchoolOS. Start again from Online payments.",
+      "back": "Back to Online payments"
+    },
+    "links": {
+      "tab": "Payment links",
+      "title": "Payment links",
+      "none": "No payment links yet.",
+      "create": "Make payment link",
+      "createTitle": "Make a payment link",
+      "createBody": "Choose the instalments to pay. The amount is what is still due on them now. Razorpay gets no name, phone number or email.",
+      "createConsequence": "An open link for the same instalments is reused; other open links for them are cancelled.",
+      "instalments": "Instalments",
+      "nothingDue": "Nothing is due that can be paid online.",
+      "createdTitle": "Payment link ready",
+      "reusedTitle": "This link is still open",
+      "createdBody": "Share it with the parent. It works until {date}. The receipt is issued by itself when the parent pays.",
+      "url": "Payment link",
+      "copy": "Copy link",
+      "copied": "Copied.",
+      "copyFailed": "Could not copy. Select the link and copy it.",
+      "done": "Done",
+      "cancel": "Cancel link",
+      "cancelFor": "Cancel payment link {code}",
+      "cancelTitle": "Cancel this payment link",
+      "cancelBody": "The parent can no longer pay with it. A link the parent has already paid cannot be cancelled.",
+      "notConnectedTitle": "Online payments are not connected",
+      "notConnectedBody": "The owner connects the school's Razorpay account in Settings > Online payments.",
+      "statuses": {
+        "created": "Open",
+        "paid": "Paid",
+        "expired": "Expired",
+        "cancelled": "Cancelled",
+        "failed": "Failed"
+      },
+      "columns": {
+        "code": "Link",
+        "instalments": "Instalments",
+        "amount": "Amount",
+        "status": "Status",
+        "expires": "Works until",
+        "receipt": "Receipt",
+        "action": "Action"
+      }
+    },
+    "recon": {
+      "title": "Online reconciliation",
+      "description": "Online payments that need a person: each morning SchoolOS compares yesterday's Razorpay payments, refunds and settlements with the receipt book. Nothing is changed automatically.",
+      "summaryTitle": "Today",
+      "notConnectedTitle": "Online payments are not connected",
+      "notConnectedBody": "The daily check runs only while the school's Razorpay account is connected.",
+      "open": "Open items",
+      "waiting": "Razorpay messages waiting",
+      "failedEvents": "Messages not applied",
+      "lastRun": "Last daily check",
+      "lastRunValue": "{date}: {status}",
+      "noRun": "Not run yet",
+      "runStatuses": {
+        "running": "running",
+        "done": "done",
+        "failed": "could not finish"
+      },
+      "filterStatus": "Status",
+      "filterKind": "Kind",
+      "any": "Any",
+      "listTitle": "Items",
+      "emptyTitle": "Nothing to check",
+      "emptyBody": "Every online payment matches a receipt.",
+      "explain": "Explain",
+      "explainFor": "Explain: {kind}",
+      "explainTitle": "Explain this item",
+      "explainBody": "Say what happened and what was done (for example, refunded in the Razorpay dashboard). The note is kept with the item.",
+      "explainConsequence": "The item is closed. Nothing in receipts or the ledger changes.",
+      "note": "Note",
+      "noteHint": "10 to 500 characters. Do not type Aadhaar numbers or card details.",
+      "link": "Link {code}",
+      "receipt": "Receipt",
+      "account": "Fee account",
+      "expected": "Expected",
+      "statuses": {
+        "open": "Open",
+        "explained": "Explained",
+        "resolved": "Resolved"
+      },
+      "kinds": {
+        "paid_not_receipted": "Paid, no receipt",
+        "receipted_not_captured": "Receipt, payment not captured",
+        "amount_mismatch": "Amount differs",
+        "refunded": "Refunded at Razorpay",
+        "refund_failed": "Refund failed",
+        "settlement_missing": "Not settled to the bank",
+        "unknown_intent": "Payment for an unknown link"
+      },
+      "reasons": {
+        "no_receipt": "Razorpay shows the payment but no receipt was issued.",
+        "dues_already_paid": "The dues were paid another way first. Refund the parent or record what happened.",
+        "intent_already_paid": "The link was already paid by another payment.",
+        "account_closed": "The student's fee account is closed.",
+        "student_not_found": "The student's record could not be read.",
+        "amount": "Razorpay's amount differs from the link's.",
+        "currency": "The payment is not in rupees.",
+        "receipt_amount": "Razorpay's amount differs from the receipt's.",
+        "refunded_before_receipt": "The payment was refunded before a receipt was issued.",
+        "refund_without_voucher": "Razorpay shows a refund that has no SchoolOS voucher.",
+        "refund_outside_schoolos": "The payment was refunded outside SchoolOS.",
+        "refund_amount_differs": "Razorpay's refund amount differs from the approved refund.",
+        "provider_failed": "Razorpay could not refund the payment.",
+        "not_settled": "Razorpay has not settled this payment to the bank after 3 working days.",
+        "not_captured": "Razorpay says this payment was not captured.",
+        "payment_not_found": "Razorpay does not know this payment.",
+        "intent_not_found": "The payment names a link this school does not have."
+      },
+      "columns": {
+        "found": "Found",
+        "kind": "What",
+        "payment": "Razorpay payment",
+        "receipt": "Receipt",
+        "amount": "Amount",
+        "status": "Status",
+        "action": "Action"
+      }
+    },
+    "errors": {
+      "payments_not_connected": {
+        "title": "Online payments are not connected",
+        "body": "The owner connects the school's Razorpay account in Settings > Online payments."
+      },
+      "payments_already_connected": {
+        "title": "Already connected",
+        "body": "Disconnect the current Razorpay account first."
+      },
+      "manual_keys_not_allowed": {
+        "title": "Keys cannot be used here",
+        "body": "Connecting with API keys is not offered on this deployment. Use Razorpay sign-in."
+      },
+      "oauth_not_available": {
+        "title": "Razorpay sign-in is not available yet",
+        "body": "Ask SchoolOS support about connecting with the school's API keys."
+      },
+      "oauth_state_invalid": {
+        "title": "This connection attempt expired",
+        "body": "Start again from Online payments. The same person must finish within 10 minutes."
+      },
+      "payments_auth_failed": {
+        "title": "Razorpay refused the school's credentials",
+        "body": "Check the connection in Settings > Online payments and connect again."
+      },
+      "payments_provider_error": {
+        "title": "Razorpay did not accept the request",
+        "body": "Try again in a few minutes."
+      },
+      "payment_link_failed": {
+        "title": "The payment link was not made",
+        "body": "Razorpay did not accept the request. Try again in a few minutes."
+      },
+      "nothing_due": {
+        "title": "Nothing is due",
+        "body": "Nothing is due on the chosen instalments, so no payment link is needed."
+      },
+      "too_many_links": {
+        "title": "Too many open links",
+        "body": "This student has too many open payment links. Cancel one first."
+      },
+      "intent_closed": {
+        "title": "This link is closed",
+        "body": "It was already paid, expired or cancelled. Reload to see it."
+      },
+      "intent_paid": {
+        "title": "The parent has paid",
+        "body": "This link was paid, so it cannot be cancelled. The receipt appears shortly."
+      },
+      "item_closed": {
+        "title": "Already explained",
+        "body": "Someone else explained or resolved this item. Reload to see it."
+      },
+      "account_closed": {
+        "title": "The fee account is closed",
+        "body": "Payment links are made only for open fee accounts."
       }
     }
   }

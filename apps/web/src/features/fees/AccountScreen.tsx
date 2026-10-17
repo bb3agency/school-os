@@ -29,6 +29,7 @@ import {
   useAccount,
   type Account,
 } from "./data";
+import { PaymentLinks } from "@/features/payments/PaymentLinks";
 import { Amount, FeesGate, NoAccess, RequestStatusPill } from "./parts";
 
 const reason = z
@@ -409,6 +410,7 @@ export function AccountScreen({ accountId }: { accountId: string }) {
   const tf = useTranslations("fees");
   const tn = useTranslations("school.nav");
   const tc = useTranslations("common");
+  const tp = useTranslations("payments.links");
   const locale = useLocale() as Locale;
   const can = useStaffCan();
   const me = useStaffMe();
@@ -483,6 +485,7 @@ export function AccountScreen({ accountId }: { accountId: string }) {
               { id: "dues", label: t("tabDues"), panel: <Dues account={a} /> },
               { id: "statement", label: t("tabStatement"), panel: <Statement accountId={a.id} /> },
               { id: "requests", label: t("tabRequests"), panel: <Requests account={a} /> },
+              { id: "links", label: tp("tab"), panel: <PaymentLinks account={a} /> },
             ]}
           />
         </div>

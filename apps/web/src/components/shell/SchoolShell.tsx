@@ -271,6 +271,14 @@ export function SchoolShell({
           icon: "chart",
         },
         {
+          // R2-2D (US-2111, FR-PAY-010): online payment exceptions and the daily check.
+          href: "/fees/reconcile/online",
+          label: t("payments.nav.reconcile"),
+          permission: ["finance.read", "fee.manage"],
+          feature: "fees",
+          icon: "check",
+        },
+        {
           href: "/fees/setup",
           label: t("fees.nav.setup"),
           permission: ["fee.manage", "finance.read"],
@@ -331,6 +339,14 @@ export function SchoolShell({
           permission: ["tally.device.manage", "tally.configure", "finance.read"],
           feature: "tally",
           icon: "server",
+        },
+        {
+          // R2-2D (US-2107, ADR-0042): the school's own Razorpay account (online fee payments).
+          href: "/settings/payments",
+          label: t("payments.nav.settings"),
+          permission: ["payments.configure", "finance.read"],
+          feature: "fees",
+          icon: "creditCard",
         },
         {
           // R2-1C (US-2201, ADR-0043): the school's own WhatsApp number and its settings.

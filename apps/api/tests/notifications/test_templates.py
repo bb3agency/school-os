@@ -50,6 +50,8 @@ NUMERIC = {
     "hours",
     "suggestions",
     "days",
+    # R2-2D: open online reconciliation items.
+    "count",
 }
 
 

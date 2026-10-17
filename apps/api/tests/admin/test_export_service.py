@@ -216,6 +216,12 @@ EXPECTED_TABLES = {
     "fees_receipt_cancellations",
     "fees_refunds",
     "fees_day_closes",
+    # R2-2D online payments (the webhook inbox is not exported; no secret columns).
+    "fees_payment_connections",
+    "fees_payment_intents",
+    "fees_provider_payments",
+    "fees_reconciliation_runs",
+    "fees_reconciliation_items",
     # DL-07: restricted document files left out of an export without restricted details.
     "documents_withheld",
 }

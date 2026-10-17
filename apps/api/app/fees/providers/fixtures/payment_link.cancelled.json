@@ -1,0 +1,44 @@
+{
+  "entity": "event",
+  "account_id": "acc_SYNTHETIC0001",
+  "event": "payment_link.cancelled",
+  "contains": [
+    "payment_link"
+  ],
+  "payload": {
+    "payment_link": {
+      "entity": {
+        "id": "plink_SYNTHETIC0001",
+        "entity": "payment_link",
+        "accept_partial": false,
+        "amount": 350000,
+        "amount_paid": 0,
+        "cancelled_at": 1790000200,
+        "created_at": 1790000000,
+        "currency": "INR",
+        "customer": {},
+        "description": "School fees · Synthetic School · ABCD1234",
+        "expire_by": 1790600000,
+        "expired_at": 0,
+        "first_min_partial_amount": 0,
+        "notes": {
+          "intent": "00000000000000000000000000000000"
+        },
+        "notify": {
+          "email": false,
+          "sms": false,
+          "whatsapp": false
+        },
+        "order_id": null,
+        "reference_id": "00000000000000000000000000000000",
+        "reminder_enable": false,
+        "short_url": "https://rzp.example.test/synthetic",
+        "status": "cancelled",
+        "updated_at": 1790000100,
+        "upi_link": false,
+        "user_id": ""
+      }
+    }
+  },
+  "created_at": 1790000100
+}

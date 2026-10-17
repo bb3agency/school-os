@@ -1127,6 +1127,78 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             t=t,
             m=ids["m1"],
         )
+        # --- R2-2D online payments (0059_payments_online): one row in every online table ------
+        o = {k: uuid.uuid4() for k in ("handle", "conn", "intent", "run")}
+        _run(
+            c,
+            "INSERT INTO core.public_handles (id, tenant_id, kind, key_hash, target_type, "
+            "target_id) VALUES (:i, :t, 'razorpay_route', :k, 'payment_connection', :c)",
+            i=o["handle"],
+            t=t,
+            k=uuid.uuid4().bytes * 2,
+            c=o["conn"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.payment_connections (id, tenant_id, mode, environment, status, "
+            "key_id, key_secret_ciphertext, webhook_secret_ciphertext, route_ciphertext, "
+            "route_handle_id, connected_by) VALUES (:i, :t, 'manual_keys', 'test', 'active', "
+            "'rzp_test_SYNTHPURGE', '\\x01', '\\x02', '\\x03', :h, :m)",
+            i=o["conn"],
+            t=t,
+            h=o["handle"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.payment_intents (id, tenant_id, account_id, connection_id, "
+            "intent_code, amount, instalments, provider_link_id, short_url, expires_at, "
+            "created_via, created_by) VALUES (:i, :t, :a, :c, 'PURGE123', 50, '{1}', "
+            "'plink_SYNTHPURGE', 'https://rzp.example.test/purge', now() + interval '7 days', "
+            "'staff', :m)",
+            i=o["intent"],
+            t=t,
+            a=f["acct"],
+            c=o["conn"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.provider_events (id, tenant_id, connection_id, event_id, event_type, "
+            "payload_ciphertext) VALUES (:i, :t, :c, 'evt_SYNTHPURGE', 'payment.captured', "
+            "'\\x00')",
+            i=uuid.uuid4(),
+            t=t,
+            c=o["conn"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.provider_payments (id, tenant_id, connection_id, "
+            "provider_payment_id, intent_id, amount, currency, method, status) VALUES (:i, :t, "
+            ":c, 'pay_SYNTHPURGE', :n, 50, 'INR', 'upi', 'captured')",
+            i=uuid.uuid4(),
+            t=t,
+            c=o["conn"],
+            n=o["intent"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.reconciliation_runs (id, tenant_id, run_date) "
+            "VALUES (:i, :t, '2026-09-01')",
+            i=o["run"],
+            t=t,
+        )
+        _run(
+            c,
+            "INSERT INTO fin.reconciliation_items (id, tenant_id, run_id, kind, reason_code, "
+            "dedupe_key, provider_payment_id, intent_id) VALUES (:i, :t, :r, "
+            "'paid_not_receipted', 'no_receipt', 'paid_not_receipted:pay_SYNTHPURGE', "
+            "'pay_SYNTHPURGE', :n)",
+            i=uuid.uuid4(),
+            t=t,
+            r=o["run"],
+            n=o["intent"],
+        )
         # --- audit chain (retained by design; ADR-0029) -------------------------------------
         _run(
             c,

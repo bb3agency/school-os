@@ -334,6 +334,14 @@ def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
             False,
         ),
         ("GET", "/api/v1/fees/approvals"): ("finance.read", FEE_ALL[1:-1], False),
+        # R2-2D online payments (ADR-0042): the connection is read by its configurer (owner)
+        # and finance readers; links by collectors and readers; online reconciliation by
+        # readers and fee managers (who explain items).
+        ("GET", "/api/v1/payments/connection"): ("payments.configure", ("finance.read",), False),
+        ("GET", "/api/v1/fees/accounts/{account_id}/payment-intents"): FEE_VIEWERS,
+        ("GET", "/api/v1/fees/payment-intents/{intent_id}"): FEE_VIEWERS,
+        ("GET", "/api/v1/fees/reconciliation/online"): FEE_SETUP_READERS,
+        ("GET", "/api/v1/fees/reconciliation/online/summary"): FEE_SETUP_READERS,
     }
     assert {
         (m, p): (g.sos_permission, g.sos_any_of, g.sos_step_up) for m, p, g in guards

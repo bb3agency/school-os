@@ -51,6 +51,11 @@ const LINKS: Record<string, (id: string) => string> = {
   tally_device: () => "/settings/tally",
   // R2-1C (FR-MSG-007, FR-MSG-021): sending paused, or a template moved out of utility.
   messaging_account: () => "/settings/whatsapp",
+  // R2-2D (FR-PAY-010..012): online payments stopped or expiring; refunds that failed and the
+  // morning's exceptions are on the online reconciliation screen.
+  payment_connection: () => "/settings/payments",
+  fee_refund: () => "/fees/reconcile/online",
+  fee_reconciliation_run: () => "/fees/reconcile/online",
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

@@ -32,9 +32,9 @@ from app.core.logging import get_logger
 from app.core.pdf import PdfRenderer, get_renderer
 from app.documents import service as documents
 from app.fees import _common as c
-from app.fees import ledger, setup, templates
+from app.fees import ledger, links, setup, templates
 from app.fees import repository as repo
-from app.fees.models import Receipt, ReceiptCancellation, Refund
+from app.fees.models import Receipt, ReceiptCancellation, Refund, StudentFeeAccount
 from app.fees.money import group_indian, in_words, spread, total
 from app.fees.schemas import (
     AllocationIn,
@@ -49,6 +49,7 @@ from app.fees.schemas import (
 from app.identity import service as identity
 from app.ops import service as ops
 from app.students import service as students
+from app.students.schemas import StudentSummary
 from app.tenancy import service as tenancy
 
 log = get_logger(__name__)
@@ -192,7 +193,8 @@ def issue_receipt(session: Session, ctx: UserContext, data: ReceiptCreate) -> Re
     """Issue a counter receipt (``fee.collect``, ``Idempotency-Key``). Errors: 409
     ``amount_exceeds_due``, ``head_not_collectable``, ``utr_in_use``, ``day_closed``,
     ``account_closed``; 422 for mode details, UTR shape and allocations. Audit
-    ``fee.receipt.issued`` (number, mode, amount)."""
+    ``fee.receipt.issued`` (number, mode, amount). Open payment links on the instalments it
+    pays are closed in the same transaction (FR-PAY-006)."""
     c.require_on(session, ctx)
     c.require_school_wide(ctx, c.COLLECT)
     account = ledger.load_account(session, data.account_id, lock=True)
@@ -214,10 +216,54 @@ def issue_receipt(session: Session, ctx: UserContext, data: ReceiptCreate) -> Re
     student = students.summaries(session, ctx, [account.student_id]).get(account.student_id)
     if student is None:
         raise NotFound("Fee account not found")
+    collector = identity.member_display_names(session, [ctx.membership_id]).get(ctx.membership_id)
+    row = write_receipt(
+        session,
+        account=account,
+        amount=data.amount,
+        mode=data.mode,
+        details=details,
+        utr=utr,
+        parts=parts,
+        dues=dues,
+        receipt_date=today,
+        student=student,
+        collected_by=ctx.membership_id,
+        collector_name=collector,
+        actor_user_id=ctx.user_id,
+    )
+    links.close_overlapping(
+        session, account.id, {p[0] for p in parts}, cancelled_by=ctx.membership_id
+    )
+    return receipt_out(session, row)
+
+
+def write_receipt(
+    session: Session,
+    *,
+    account: StudentFeeAccount,
+    amount: Decimal,
+    mode: str,
+    details: dict[str, str],
+    utr: str | None,
+    parts: Sequence[tuple[int, uuid.UUID | None, Decimal]],
+    dues: ledger.Dues,
+    receipt_date: dt.date,
+    student: StudentSummary,
+    collected_by: uuid.UUID | None,
+    collector_name: str | None,
+    actor_user_id: uuid.UUID,
+    provider_payment_id: str | None = None,
+    payment_intent_id: uuid.UUID | None = None,
+    system: bool = False,
+) -> Receipt:
+    """Write one receipt in the caller's transaction (counter or online, FR-FEE-010/011): the
+    frozen content and its SHA-256, the number from the locked counter row LAST (gap-free), the
+    allocations and the payment ledger entries, the audit event and the PDF job. The caller has
+    locked the account, checked the day and computed ``parts`` from ``dues``."""
     heads = repo.heads_by_id(session)
     fee_settings = setup.settings_row(session)
     year = tenancy.get_academic_year(session, account.academic_year_id)
-    collector = identity.member_display_names(session, [ctx.membership_id]).get(ctx.membership_id)
     lines = []
     for inst_no, head_id, part in parts:
         found = dues.line(inst_no, head_id)
@@ -234,7 +280,7 @@ def issue_receipt(session: Session, ctx: UserContext, data: ReceiptCreate) -> Re
                 "amount_text": _amount_text(part),
             }
         )
-    financial_year = c.fy(today)
+    financial_year = c.fy(receipt_date)
     numbering = c.settings().numbering.receipt
     # Last: the counter row stays locked until commit (gap-free, FR-FEE-010).
     number = repo.allocate_number(session, numbering.series, financial_year)
@@ -243,7 +289,7 @@ def issue_receipt(session: Session, ctx: UserContext, data: ReceiptCreate) -> Re
         "school": _school(session),
         "receipt_number": receipt_number,
         "financial_year": financial_year,
-        "receipt_date": today.isoformat(),
+        "receipt_date": receipt_date.isoformat(),
         "academic_year": year.label,
         "student": {
             "id": str(account.student_id),
@@ -252,13 +298,13 @@ def issue_receipt(session: Session, ctx: UserContext, data: ReceiptCreate) -> Re
             "class_section": student.class_section or "—",
         },
         "lines": lines,
-        "amount": f"{data.amount:.2f}",
-        "amount_text": _amount_text(data.amount),
-        "amount_in_words": in_words(data.amount),
-        "mode": data.mode,
+        "amount": f"{amount:.2f}",
+        "amount_text": _amount_text(amount),
+        "amount_in_words": in_words(amount),
+        "mode": mode,
         "mode_details": details,
         "utr": utr,
-        "collected_by_name": collector,
+        "collected_by_name": collector_name,
         "gst_note": fee_settings.gst_note,
         "paper_size": fee_settings.paper_size,
         "template_version": c.settings().receipt.template_version,
@@ -274,12 +320,14 @@ def issue_receipt(session: Session, ctx: UserContext, data: ReceiptCreate) -> Re
             financial_year=financial_year,
             receipt_no=number,
             receipt_number=receipt_number,
-            receipt_date=today,
-            amount=data.amount,
-            mode=data.mode,
+            receipt_date=receipt_date,
+            amount=amount,
+            mode=mode,
             mode_details=details,
             utr=utr,
-            collected_by=ctx.membership_id,
+            provider_payment_id=provider_payment_id,
+            payment_intent_id=payment_intent_id,
+            collected_by=collected_by,
             issued_at=c.now(session),
             content=content,
             content_sha256=content_digest(content),
@@ -309,34 +357,38 @@ def issue_receipt(session: Session, ctx: UserContext, data: ReceiptCreate) -> Re
                     "amount": -part,
                     "instalment_no": inst_no,
                     "head_id": head_id,
-                    "entry_date": today,
+                    "entry_date": receipt_date,
                     "receipt_id": receipt_id,
-                    "posted_by": ctx.membership_id,
+                    "posted_by": collected_by,
                 }
                 for inst_no, head_id, part in parts
             ],
         )
+    summary: dict[str, Any] = {
+        "receipt_number": receipt_number,
+        "mode": mode,
+        "amount": c.money_text(amount),
+        "account_id": account.id,
+        "student_id": account.student_id,
+        "lines": len(parts),
+    }
+    if payment_intent_id is not None:
+        summary["intent_id"] = payment_intent_id
     c.record(
         session,
         action="fee.receipt.issued",
         resource_type="fee_receipt",
         resource_id=row.id,
-        summary={
-            "receipt_number": receipt_number,
-            "mode": data.mode,
-            "amount": c.money_text(data.amount),
-            "account_id": account.id,
-            "student_id": account.student_id,
-            "lines": len(parts),
-        },
+        summary=summary,
+        system=system,
     )
     ops.enqueue_event(
         session,
         RENDER_EVENT,
-        {"receipt_id": str(row.id), "user_id": str(ctx.user_id), "account_id": str(account.id)},
+        {"receipt_id": str(row.id), "user_id": str(actor_user_id), "account_id": str(account.id)},
     )
     log.info("fee.receipt.issued", resource_type="fee_receipt", resource_id=row.id)
-    return receipt_out(session, row)
+    return row
 
 
 # --- reads ---------------------------------------------------------------------------------------

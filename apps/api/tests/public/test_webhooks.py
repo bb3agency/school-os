@@ -71,6 +71,9 @@ def _app() -> FastAPI:
 @pytest.fixture
 def client(app_engine: Engine) -> Iterator[TestClient]:
     set_kv_store(InMemoryKV())
+    # The API factory registers the real Razorpay verifier (R2-2D); set it aside here.
+    real = webhooks.webhook_verifier("razorpay")
+    webhooks.unregister_webhook_verifier("razorpay")
     webhooks.register_webhook_verifier(
         FakeWebhookVerifier("razorpay", SECRET, route_kind="razorpay_route")
     )
@@ -79,6 +82,8 @@ def client(app_engine: Engine) -> Iterator[TestClient]:
             yield c
     finally:
         webhooks.unregister_webhook_verifier("razorpay")
+        if real is not None:
+            webhooks.register_webhook_verifier(real)
         set_kv_store(None)
 
 
