@@ -103,6 +103,7 @@ approve_refund = approvals.approve_refund
 reject_refund = approvals.reject_refund
 withdraw_refund = approvals.withdraw_refund
 approvals_inbox = approvals.approvals
+voucher_page = approvals.voucher_page
 
 daily_report = reports.daily_report
 daily_print = reports.daily_print

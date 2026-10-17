@@ -28,6 +28,7 @@ from app.fees.schemas import (
     CancellationRequest,
     ConcessionCreate,
     ConcessionTarget,
+    DecisionIn,
     FeePlanCreate,
     InstalmentIn,
     PlanLineIn,
@@ -196,6 +197,18 @@ def _refund(w: Any, role: str, *, own: bool = False) -> Any:
         r.id,
         RefundCreate(amount=Decimal("1.00"), mode="cash", reason=REASON),
     )
+
+
+def _shared_voucher(w: Any) -> uuid.UUID:
+    def make() -> uuid.UUID:
+        refund = _refund(w, "office_staff")
+        out = F.call(
+            w.a, "principal", fees.approve_refund, refund.id, DecisionIn(), expected_version=None
+        )
+        value: uuid.UUID = out.id
+        return value
+
+    return _shared(w, "fees_matrix_voucher", make)
 
 
 def _draft(w: Any) -> Any:
@@ -467,6 +480,9 @@ def matrix_specs() -> dict[tuple[str, str], Builder]:
             f"/api/v1/fees/receipts/{_receipt(w).id}/refunds",
             {"amount": "1.00", "mode": "cash", "reason": REASON},
             {},
+        ),
+        ("GET", "/api/v1/fees/refunds/{refund_id}/print"): g(
+            lambda w, a: f"/api/v1/fees/refunds/{_shared_voucher(w)}/print"
         ),
         ("POST", "/api/v1/fees/refunds/{refund_id}/approve"): _decide("refund", "approve"),
         ("POST", "/api/v1/fees/refunds/{refund_id}/reject"): _decide("refund", "reject"),

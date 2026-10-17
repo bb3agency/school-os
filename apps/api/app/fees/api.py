@@ -603,6 +603,13 @@ def request_fee_refund(
     return idem.run(db, body, lambda: service.request_refund(db, ctx, receipt_id, body))
 
 
+@router.get("/fees/refunds/{refund_id}/print", response_class=HTMLResponse, responses=_PAGE)
+def print_fee_refund_voucher(ctx: Viewer, db: TenantDB, refund_id: uuid.UUID) -> HTMLResponse:
+    """The refund voucher as a print-ready A5 page (``fee.collect`` or ``finance.read``). 409
+    ``voucher_not_ready`` until the refund is paid out. Audited."""
+    return _html(service.voucher_page(db, ctx, refund_id), f"voucher-{str(refund_id)[:8]}.html")
+
+
 @router.post("/fees/refunds/{refund_id}/approve", response_model=RefundOut)
 def approve_fee_refund(
     ctx: RefundApprover,

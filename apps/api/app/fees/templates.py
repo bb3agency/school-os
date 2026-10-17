@@ -215,6 +215,47 @@ def render_receipt(
     return _page(f"Receipt {content.get('receipt_number', '')}", style, body, for_pdf=for_pdf)
 
 
+def render_voucher(content: Mapping[str, Any]) -> str:
+    """The refund voucher page (A5, the receipt style) from its frozen content (FR-FEE-013)."""
+    school: Mapping[str, Any] = content.get("school") or {}
+    student: Mapping[str, Any] = content.get("student") or {}
+    mode = str(content.get("mode", ""))
+    details: Mapping[str, Any] = content.get("mode_details") or {}
+    extra = ""
+    if details.get("cheque_number"):
+        extra = f" · Cheque no. {_e(details.get('cheque_number'))}"
+    elif details.get("reference"):
+        extra = f' · Reference <span class="ref">{_raw(details.get("reference"))}</span>'
+    body = (
+        f'<main><header><p class="school">{_e(school.get("name"))}</p>'
+        + (f'<p class="address">{_e(school.get("address"))}</p>' if school.get("address") else "")
+        + "</header><h1>REFUND VOUCHER</h1>"
+        '<div class="meta">'
+        f"<span>Voucher no.: <strong>{_e(content.get('voucher_number'))}</strong></span>"
+        f"<span>Date: <strong>{_e(format_date(content.get('voucher_date')))}</strong></span>"
+        "</div>"
+        '<div class="meta">'
+        f"<span>Student: <strong>{_e(student.get('name'))}</strong></span>"
+        f"<span>Admission no.: <strong>{_e(student.get('admission_no'))}</strong></span>"
+        f"<span>Class: <strong>{_e(student.get('class_section'))}</strong></span>"
+        "</div>"
+        f"<p>Against receipt <strong>{_e(content.get('receipt_number'))}</strong></p>"
+        "<table><tbody>"
+        f'<tr><th>Amount refunded (₹)</th><td class="num">{_e(content.get("amount_text"))}</td>'
+        "</tr></tbody></table>"
+        f'<p class="words">{_e(content.get("amount_in_words"))}</p>'
+        f'<p class="mode">Refunded by: <strong>{_e(MODE_LABELS.get(mode, mode))}</strong>'
+        f"{extra}</p>"
+        '<div class="signatures"><div>Received by (payer)</div><div>Accountant</div>'
+        "<div>Principal</div></div>"
+        f"<footer>Computer-generated voucher · SchoolOS · {_e(content.get('financial_year'))}"
+        "</footer></main>"
+    )
+    return _page(
+        f"Refund voucher {content.get('voucher_number', '')}", RECEIPT_STYLE_A5, body, for_pdf=False
+    )
+
+
 def render_daily_report(
     *,
     school_name: str,
@@ -304,4 +345,5 @@ __all__ = [
     "format_date",
     "render_daily_report",
     "render_receipt",
+    "render_voucher",
 ]

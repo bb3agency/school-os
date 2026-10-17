@@ -8321,7 +8321,8 @@
       "cancellationTitle": "రద్దు",
       "requestedBy": "{name} {when}న అభ్యర్థించారు",
       "toApprovals": "ఫీజు ఆమోదాలకు వెళ్లండి",
-      "refundsTitle": "వాపసులు"
+      "refundsTitle": "వాపసులు",
+      "printVoucher": "వోచర్ ముద్రించండి"
     },
     "account": {
       "title": "ఫీజు ఖాతా",

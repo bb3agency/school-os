@@ -24,7 +24,7 @@ from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.core.ids import new_id
 from app.documents import service as documents
 from app.fees import _common as c
-from app.fees import ledger, receipts
+from app.fees import ledger, receipts, templates
 from app.fees import repository as repo
 from app.fees.models import Adjustment, Concession, Receipt, ReceiptCancellation, Refund
 from app.fees.money import ZERO, group_indian, in_words, percent_of, spread, total
@@ -1024,6 +1024,33 @@ def withdraw_refund(session: Session, ctx: UserContext, row_id: uuid.UUID) -> Re
         summary={"receipt_id": receipt.id},
     )
     return _refund_out(session, row, receipt)
+
+
+def voucher_page(session: Session, ctx: UserContext, refund_id: uuid.UUID) -> str:
+    """The print view (HTML, A5) of a processed refund voucher (FR-FEE-013; ``fee.collect`` or
+    ``finance.read``). 409 ``voucher_not_ready`` before the refund is paid out. Audit
+    ``fee.refund.print_viewed``."""
+    c.require_on(session, ctx)
+    c.require_school_wide(ctx, c.COLLECT, c.READ)
+    row = repo.get_refund(session, refund_id)
+    if row is None:
+        raise NotFound("Refund not found")
+    if row.status != "processed" or row.content is None:
+        raise Conflict(
+            "This refund has no voucher yet: it is written when the refund is approved.",
+            code="voucher_not_ready",
+        )
+    receipt = receipts.load_receipt(session, row.receipt_id)
+    content = {**row.content, "school": dict(receipt.content.get("school") or {})}
+    page = templates.render_voucher(content)
+    c.record(
+        session,
+        action="fee.refund.print_viewed",
+        resource_type="fee_refund",
+        resource_id=row.id,
+        summary={"voucher_number": row.voucher_number},
+    )
+    return page
 
 
 # --- the approvals inbox -------------------------------------------------------------------------

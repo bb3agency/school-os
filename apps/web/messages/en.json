@@ -8321,7 +8321,8 @@
       "cancellationTitle": "Cancellation",
       "requestedBy": "Requested by {name} on {when}",
       "toApprovals": "Go to fee approvals",
-      "refundsTitle": "Refunds"
+      "refundsTitle": "Refunds",
+      "printVoucher": "Print voucher"
     },
     "account": {
       "title": "Fee account",

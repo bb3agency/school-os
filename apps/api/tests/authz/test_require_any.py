@@ -320,6 +320,7 @@ def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
         ("GET", "/api/v1/fees/receipts/{receipt_id}"): FEE_VIEWERS,
         ("GET", "/api/v1/fees/receipts/{receipt_id}/print"): FEE_VIEWERS,
         ("GET", "/api/v1/fees/receipts/{receipt_id}/download-url"): FEE_VIEWERS,
+        ("GET", "/api/v1/fees/refunds/{refund_id}/print"): FEE_VIEWERS,
         ("POST", "/api/v1/fees/receipts/{receipt_id}/cancellation"): FEE_CANCEL_MAKERS,
         ("POST", "/api/v1/fees/cancellations/{cancellation_id}/withdraw"): FEE_CANCEL_MAKERS,
         ("GET", "/api/v1/fees/accounts/{account_id}/concessions"): (

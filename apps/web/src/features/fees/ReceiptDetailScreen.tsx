@@ -25,6 +25,7 @@ import {
   REASON_MAX,
   REASON_MIN,
   REFUND_REQUEST,
+  printHref,
   toPaise,
   type Receipt,
 } from "./data";
@@ -371,6 +372,17 @@ export function ReceiptDetailScreen({ receiptId }: { receiptId: string }) {
                       <RequestStatusPill status={x.status} /> <Amount value={x.amount} /> ·{" "}
                       {tf(`modes.${x.mode === "original_method" ? "razorpay" : x.mode}`)}
                       {x.voucher_number ? ` · ${x.voucher_number}` : ""} · {x.reason}
+                      {x.status === "processed" ? (
+                        <a
+                          href={printHref(`/api/v1/fees/refunds/${x.id}/print`)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ml-2 font-semibold text-primary underline underline-offset-4"
+                        >
+                          {t("printVoucher")}
+                          <span className="sr-only"> ({tf("newTab")})</span>
+                        </a>
+                      ) : null}
                     </li>
                   ))}
                 </ul>

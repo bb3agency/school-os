@@ -43141,6 +43141,74 @@
         ]
       }
     },
+    "/api/v1/fees/refunds/{refund_id}/print": {
+      "get": {
+        "description": "The refund voucher as a print-ready A5 page (``fee.collect`` or ``finance.read``). 409\n``voucher_not_ready`` until the refund is paid out. Audited.",
+        "operationId": "print_fee_refund_voucher_api_v1_fees_refunds__refund_id__print_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "refund_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Refund Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Print-ready page (no scripts)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Print Fee Refund Voucher",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
     "/api/v1/fees/refunds/{refund_id}/reject": {
       "post": {
         "operationId": "reject_fee_refund_api_v1_fees_refunds__refund_id__reject_post",

@@ -799,6 +799,20 @@ def test_US_2106_cash_refund_voucher_on_approval(school: Any) -> None:
             CancellationRequest(reason_code="other", reason="Cancel after a refund"),
         )
     assert err.value.code == "receipt_has_refunds"
+    page = F.call(school, "accountant", fees.voucher_page, out.id)
+    assert "REFUND VOUCHER" in page
+    assert out.voucher_number in page
+    assert r.receipt_number in page
+    pending = F.call(
+        school,
+        "accountant",
+        fees.request_refund,
+        r.id,
+        RefundCreate(amount=D("1.00"), mode="cash", reason="Second synthetic refund request"),
+    )
+    with pytest.raises(Conflict) as err:
+        F.call(school, "accountant", fees.voucher_page, pending.id)
+    assert err.value.code == "voucher_not_ready"
 
 
 # --- reports, day close, dues (US-2110) ----------------------------------------------------------
