@@ -137,13 +137,16 @@ export function SessionControls({
         <span id={hintId} className="sr-only">
           {t("lockNowHint")}
         </span>
+        {/* Compact sidebar: hidden, not sr-only. A visually hidden button still takes focus,
+            so a keyboard user would land on an invisible 1px control (WCAG 2.4.7, 2.5.8);
+            widening the sidebar brings it back. */}
         <button
           type="button"
           onClick={() => void everywhere()}
           disabled={busy}
           aria-describedby={everywhereHintId}
           className={cn(
-            "min-h-10 w-full rounded-md px-3 py-2 text-sm underline-offset-2 hover:underline disabled:opacity-60 collapsed:sr-only",
+            "min-h-10 w-full rounded-md px-3 py-2 text-sm underline-offset-2 hover:underline disabled:opacity-60 collapsed:hidden",
             dark ? "text-platform-muted" : "text-ink-subtle",
           )}
         >
