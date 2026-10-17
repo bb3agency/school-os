@@ -432,6 +432,12 @@ IDEMPOTENCY_EXEMPT = {
     # FR-STU-018 (ADR-0039): a lookup like POST /students/search, numbers kept out of the URL.
     ("POST", "/api/v1/students/national-id-check"): "read-only lookup (the PEN or APAAR ID "
     "travels in the body, SEC-008); nothing is created",
+    # R2-1B fees (ADR-0042).
+    ("POST", "/api/v1/fees/plans/{plan_id}/apply"): "idempotent by design: accounts and charges "
+    "are unique per student and line, a repeat posts nothing",
+    ("POST", "/api/v1/fees/plans/{plan_id}/adjustments"): "idempotent by design: one proposal per "
+    "account, instalment, head and plan version",
+    ("POST", "/api/v1/fees/day-closes"): "a state transition (409 day_closed on repeat)",
 }
 
 

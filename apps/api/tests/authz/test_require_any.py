@@ -219,6 +219,20 @@ def _any_of_guards() -> list[tuple[str, str, Any]]:
 
 CERT_READERS = ("certificate.read", ("certificate.issue", "certificate.approve"), False)
 APAAR_READERS = ("apaar.consent.read", ("apaar.consent.record",), False)
+FEE_ALL = (
+    "finance.read",
+    "fee.collect",
+    "fee.manage",
+    "fee.concession.request",
+    "fee.concession.approve",
+    "fee.receipt.cancel",
+    "fee.refund.request",
+    "fee.refund.approve",
+    "fee.report",
+)
+FEE_SETUP_READERS = ("finance.read", ("fee.manage",), False)
+FEE_VIEWERS = ("fee.collect", ("finance.read",), False)
+FEE_CANCEL_MAKERS = ("fee.collect", ("fee.manage",), False)
 
 
 def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
@@ -274,6 +288,35 @@ def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
             ("apaar.consent.record", "tenant.settings.manage"),
             False,
         ),
+        # R2-1B fees (ADR-0042): reads shared by collectors, readers and approvers; every fee
+        # permission is school-wide, re-checked by the service (FR-FEE-024).
+        ("GET", "/api/v1/fees/status"): ("finance.read", FEE_ALL[1:], False),
+        ("GET", "/api/v1/fees/settings"): FEE_SETUP_READERS,
+        ("GET", "/api/v1/fees/plans"): FEE_SETUP_READERS,
+        ("GET", "/api/v1/fees/plans/{plan_id}"): FEE_SETUP_READERS,
+        ("GET", "/api/v1/fees/plans/{plan_id}/differences"): FEE_SETUP_READERS,
+        ("GET", "/api/v1/fees/heads"): ("finance.read", ("fee.collect", "fee.manage"), False),
+        ("POST", "/api/v1/fees/accounts/search"): FEE_VIEWERS,
+        ("GET", "/api/v1/fees/accounts/{account_id}"): FEE_VIEWERS,
+        ("GET", "/api/v1/fees/accounts/{account_id}/statement"): FEE_VIEWERS,
+        ("GET", "/api/v1/students/{student_id}/fee-accounts"): FEE_VIEWERS,
+        ("GET", "/api/v1/fees/receipts"): FEE_VIEWERS,
+        ("GET", "/api/v1/fees/receipts/{receipt_id}"): FEE_VIEWERS,
+        ("GET", "/api/v1/fees/receipts/{receipt_id}/print"): FEE_VIEWERS,
+        ("GET", "/api/v1/fees/receipts/{receipt_id}/download-url"): FEE_VIEWERS,
+        ("POST", "/api/v1/fees/receipts/{receipt_id}/cancellation"): FEE_CANCEL_MAKERS,
+        ("POST", "/api/v1/fees/cancellations/{cancellation_id}/withdraw"): FEE_CANCEL_MAKERS,
+        ("GET", "/api/v1/fees/accounts/{account_id}/concessions"): (
+            "finance.read",
+            ("fee.concession.request", "fee.concession.approve"),
+            False,
+        ),
+        ("GET", "/api/v1/fees/accounts/{account_id}/adjustments"): (
+            "finance.read",
+            ("fee.manage", "fee.concession.approve"),
+            False,
+        ),
+        ("GET", "/api/v1/fees/approvals"): ("finance.read", FEE_ALL[1:-1], False),
     }
     assert {
         (m, p): (g.sos_permission, g.sos_any_of, g.sos_step_up) for m, p, g in guards
