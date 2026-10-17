@@ -238,7 +238,7 @@ def test_FR_PUB_011_unknown_expired_revoked_and_malformed_resolve_to_nothing(
     assert service.resolve("parent_notice", revoked.key) is None
 
 
-def test_ADR_0047_suspended_school_resolves_only_receipts_and_certificates(
+def test_ADR_0047_suspended_school_resolves_only_receipts_certificates_and_meta(
     world: Any, admin_engine: Engine
 ) -> None:
     school = W.School(W.provision_school())
@@ -247,6 +247,8 @@ def test_ADR_0047_suspended_school_resolves_only_receipts_and_certificates(
     notice = P.issue(school, "parent_notice")
     receipt = P.issue(school, "parent_receipt", target_type="receipt")
     code = P.issue(school, "cert_verify", key="SUSP2345EFGH6789", target_type="certificate")
+    waba = "4" + uuid.uuid4().hex[:12].translate(str.maketrans("abcdef", "123456"))
+    P.issue(school, "meta_waba", key=waba, target_type="messaging_account")
     assert notice.key is not None
     assert receipt.key is not None
     P.set_tenant_status(admin_engine, school.tenant_id, "suspended")
@@ -254,9 +256,12 @@ def test_ADR_0047_suspended_school_resolves_only_receipts_and_certificates(
         assert service.resolve("parent_notice", notice.key) is None
         assert service.resolve("parent_receipt", receipt.key) is not None
         assert service.resolve("cert_verify", "SUSP2345EFGH6789") is not None
+        # R2-1C amendment: a parent's STOP still reaches a suspended school (opt-outs only).
+        assert service.resolve("meta_waba", waba) is not None
         assert code.handle_id
         P.set_tenant_status(admin_engine, school.tenant_id, "offboarding")
         assert service.resolve("parent_receipt", receipt.key) is None
+        assert service.resolve("meta_waba", waba) is None
     finally:
         P.set_tenant_status(admin_engine, school.tenant_id, "active")
 

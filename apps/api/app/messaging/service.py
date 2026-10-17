@@ -1693,6 +1693,16 @@ def store_events(
         ):
             log.warning("messaging.webhook.no_account", tenant_id=tenant_id, outcome="dropped")
             return 0
+        if tenancy.get_tenant(session).status == "suspended":
+            # ADR-0047 amendment (R2-1C): while the school is suspended only a parent's STOP is
+            # taken in (consent withdrawal, PRV-025); everything else is acknowledged and dropped.
+            events = [
+                e
+                for e in events
+                if e.event_type == "inbound_message" and e.payload.get("kind") == "stop"
+            ]
+            if not events:
+                return 0
         stored = 0
         for event in events:
             event_id = new_id()
@@ -1831,7 +1841,12 @@ def _join(
 
 
 def _apply_inbound(  # noqa: PLR0911 - one return per inbound outcome
-    session: Session, event_id: uuid.UUID, payload: Mapping[str, Any], outbox: _Outbox
+    session: Session,
+    event_id: uuid.UUID,
+    payload: Mapping[str, Any],
+    outbox: _Outbox,
+    *,
+    stop_only: bool = False,
 ) -> str:
     mobile = rules.mobile_from_wa_id(payload.get("wa_id"))
     if mobile is None:
@@ -1855,6 +1870,10 @@ def _apply_inbound(  # noqa: PLR0911 - one return per inbound outcome
             repo.mark_inbound(session, inbound.id, replied=False, outcome="unknown_number")
             return "processed"
         _stop(session, guardian_ids, today)
+        if stop_only:
+            # Suspended school: the opt-out and link revocation apply; nothing is sent.
+            repo.mark_inbound(session, inbound.id, replied=False, outcome="stopped_suspended")
+            return "processed"
         queued = queue_message(
             session,
             purpose="optin_stopped",
@@ -1973,7 +1992,7 @@ def _apply_account_event(
     return "ignored"
 
 
-def process_inbox(tenant_id: uuid.UUID) -> dict[str, int]:  # noqa: PLR0912 - one branch per event type
+def process_inbox(tenant_id: uuid.UUID) -> dict[str, int]:  # noqa: PLR0912, PLR0915 - one branch per event type
     """Apply the school's stored webhook events in arrival order (worker; FR-MSG-010,
     FR-MSG-016, FR-MSG-021): statuses, inbound keywords, template and account updates. Each
     event is applied in a savepoint (a broken one is retried, then marked ``failed``). Sends
@@ -1981,11 +2000,20 @@ def process_inbox(tenant_id: uuid.UUID) -> dict[str, int]:  # noqa: PLR0912 - on
     ``messaging.statuses.applied`` with counts per run (not one event per status)."""
     cfg = load_config().inbox
     totals: Counter[str] = Counter()
+    with tenant_session(tenant_id) as session:
+        status = tenancy.get_tenant(session).status
+    if status not in ("active", "suspended"):
+        return {}
+    # A suspended school (ADR-0047 amendment): STOP messages only, applied without sending.
+    stop_only = status == "suspended"
     for _ in range(50):
         outbox = _Outbox(deliveries=[], replies=[])
         statuses: Counter[str] = Counter()
+        finished = 0
         with tenant_session(tenant_id) as session:
-            events = repo.pending_events(session, cfg.batch_size)
+            events = repo.pending_events(
+                session, cfg.batch_size, event_types=("inbound_message",) if stop_only else None
+            )
             if not events:
                 break
             account = repo.live_account(session)
@@ -2001,12 +2029,17 @@ def process_inbox(tenant_id: uuid.UUID) -> dict[str, int]:  # noqa: PLR0912 - on
                             row_id=event.id,
                         )
                     )
+                    if stop_only and payload.get("kind") != "stop":
+                        savepoint.commit()
+                        continue  # kept for when the school is active again
                     if account is None or account.id != event.account_id:
                         outcome = "ignored"
                     elif event.event_type == "message_status":
                         outcome = _apply_status(session, payload, statuses)
                     elif event.event_type == "inbound_message":
-                        outcome = _apply_inbound(session, event.id, payload, outbox)
+                        outcome = _apply_inbound(
+                            session, event.id, payload, outbox, stop_only=stop_only
+                        )
                     elif event.event_type in ("template_status", "template_category"):
                         outcome = _apply_template_event(session, account, event.event_type, payload)
                     elif event.event_type in ("phone_quality", "account_update"):
@@ -2036,6 +2069,7 @@ def process_inbox(tenant_id: uuid.UUID) -> dict[str, int]:  # noqa: PLR0912 - on
                 repo.finish_event(
                     session, event.id, status=outcome, attempts=event.attempts + 1, error_code=None
                 )
+                finished += 1
                 totals[outcome] += 1
             if statuses:
                 _audit(
@@ -2058,7 +2092,7 @@ def process_inbox(tenant_id: uuid.UUID) -> dict[str, int]:  # noqa: PLR0912 - on
                     provider.send_text(reply_token[0], reply_token[1], to, body)
                 except ProviderError as exc:
                     log.warning("messaging.reply_failed", tenant_id=tenant_id, error_code=exc.code)
-        if len(events) < cfg.batch_size:
+        if len(events) < cfg.batch_size or finished == 0:
             break
     return dict(totals)
 
@@ -2089,9 +2123,9 @@ def purge_expired(tenant_id: uuid.UUID) -> dict[str, int]:
     return dict(out)
 
 
-def live_tenant_ids() -> list[uuid.UUID]:
+def live_tenant_ids(statuses: tuple[str, ...] = ("active",)) -> list[uuid.UUID]:
     with context_free_session() as session:
-        return tenancy.list_tenant_ids(session, ("active",))
+        return tenancy.list_tenant_ids(session, statuses)
 
 
 # --- full data export and offboarding (FR-ADM-001, FR-PLT-005, ADR-0029) ----------------------
