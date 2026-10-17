@@ -208,11 +208,13 @@ def test_L_09_students_documents_and_storage_are_counted(
         1300,
     )
     with platform_session() as s:
-        crossed = s.execute(
-            text(
-                "SELECT threshold FROM platform.usage_threshold_events "
-                "WHERE tenant_id = :t AND metric = 'students' ORDER BY threshold"
-            ),
-            {"t": tid},
-        ).scalars()
-        assert list(crossed) == [80, 100]
+        crossed: list[int] = list(
+            s.execute(
+                text(
+                    "SELECT threshold FROM platform.usage_threshold_events "
+                    "WHERE tenant_id = :t AND metric = 'students' ORDER BY threshold"
+                ),
+                {"t": tid},
+            ).scalars()
+        )
+    assert crossed == [80, 100]
