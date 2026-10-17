@@ -107,6 +107,7 @@ from app.notifications import service as notifications
 from app.ops import service as ops
 from app.public import service as public
 from app.students import crypto
+from app.students import rotation as key_rotation
 from app.students import service as students
 from app.tenancy import service as tenancy
 
@@ -2094,6 +2095,59 @@ def live_tenant_ids() -> list[uuid.UUID]:
 
 
 # --- full data export and offboarding (FR-ADM-001, FR-PLT-005, ADR-0029) ----------------------
+
+
+def reencrypt_batch(
+    session: Session, keyring: crypto.TenantKeyring, target_version: int, limit: int
+) -> int:
+    """DEK rotation (``app.students.rotation.Reencryptor``; SEC-012): message variables and
+    inbox payloads under another key version are re-encrypted to ``target_version`` with the
+    same associated data, and opt-in phone indexes are recomputed under it (an index that no
+    longer matches the guardian's number becomes one that matches nothing, as before: the
+    number changed). Rows are locked (``SKIP LOCKED``); returns how many were rewritten."""
+    done = 0
+    for message in repo.stale_message_vars(session, target_version, limit):
+        blob = crypto.reencrypt_value(
+            session,
+            bytes(message.vars_ciphertext or b""),
+            table=MESSAGES_TABLE,
+            column="vars_ciphertext",
+            row_id=message.id,
+            key_version=target_version,
+            keyring=keyring,
+        )
+        repo.set_message_vars(session, message.id, blob)
+        done += 1
+    for event in repo.stale_event_payloads(session, target_version, limit - done):
+        blob = crypto.reencrypt_value(
+            session,
+            bytes(event.payload_ciphertext or b""),
+            table=EVENTS_TABLE,
+            column="payload_ciphertext",
+            row_id=event.id,
+            key_version=target_version,
+            keyring=keyring,
+        )
+        repo.set_event_payload(session, event.id, blob)
+        done += 1
+    for optin in repo.stale_optin_indexes(session, target_version, limit - done):
+        still_same = _for_current_number(session, optin.guardian_id, optin)
+        fresh = (
+            students.guardian_phone_index(session, optin.guardian_id, key_version=target_version)
+            if still_same
+            else None
+        )
+        digest = (
+            fresh.digest
+            if fresh is not None
+            else hashlib.sha256(b"sos-optin-other-number|" + optin.id.bytes).digest()
+        )
+        repo.set_optin_index(session, optin.id, digest, target_version)
+        done += 1
+    return done
+
+
+key_rotation.register_reencryptor("messaging", reencrypt_batch)
 
 
 def export_records(session: Session) -> list[RecordTable]:

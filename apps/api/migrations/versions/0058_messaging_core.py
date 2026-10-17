@@ -20,7 +20,8 @@ composite FKs, the restrictive ``offboarding_purge`` policy and ``SELECT, DELETE
   (NULL = Meta's limit minus 10%), the office phone for automatic replies.
 - ``msg.optins``: opt-in and opt-out decisions, **append-only** (SELECT and INSERT for the app;
   ``seq`` per guardian and category, ``UNIQUE`` so a concurrent write fails instead of forking
-  the history). CHECKs per method: ``signed_form`` needs an evidence document, ``in_person`` and
+  the history; only the phone blind index is refreshed when the school's key rotates). CHECKs
+  per method: ``signed_form`` needs an evidence document, ``in_person`` and
   ``staff_recorded_stop`` name the recorder, ``whatsapp_join`` / ``whatsapp_stop`` have none;
   ``opted_in`` rows keep the guardian's phone blind index and key version at the time (a new
   number needs a new opt-in, docs/05 §15.3). Deleted with the guardian (``ON DELETE CASCADE``;
@@ -462,7 +463,9 @@ GRANT UPDATE (provider_template_id, status, provider_category, paused_by_sos, re
 GRANT UPDATE (notices_enabled, absence_alerts_enabled, fee_reminders_enabled,
   fee_receipts_enabled, absence_alert_time, quiet_start, quiet_end, daily_cap, office_phone,
   updated_by, updated_at, version) ON msg.settings TO sos_app;
--- msg.optins is append-only for the app (SELECT, INSERT only).
+-- msg.optins is append-only for the app (SELECT, INSERT), except the phone blind index the DEK
+-- rotation recomputes under the new key version (SEC-012; the decision itself never changes).
+GRANT UPDATE (phone_bidx, phone_key_version) ON msg.optins TO sos_app;
 GRANT UPDATE (used_at) ON msg.join_codes TO sos_app;
 GRANT DELETE ON msg.join_codes TO sos_app;
 GRANT UPDATE (status, skip_reason, error_code, attempts, billable, pricing_category,

@@ -492,6 +492,74 @@ def purge_provider_events(session: Session, before: dt.datetime, batch: int) -> 
     return int(result.rowcount or 0)  # type: ignore[attr-defined]
 
 
+# --- DEK rotation (SEC-012) ----------------------------------------------------------------
+
+
+def _header_version(value: Any) -> Any:
+    # Ciphertext header: format(1) | key_version(2, big-endian) | ... (app.core.crypto).
+    return func.get_byte(value, 1) * 256 + func.get_byte(value, 2)
+
+
+def stale_message_vars(session: Session, version: int, limit: int) -> list[Message]:
+    return list(
+        session.scalars(
+            select(Message)
+            .where(
+                Message.vars_ciphertext.is_not(None),
+                _header_version(Message.vars_ciphertext) != version,
+            )
+            .order_by(Message.id)
+            .limit(limit)
+            .with_for_update(skip_locked=True)
+        )
+    )
+
+
+def stale_event_payloads(session: Session, version: int, limit: int) -> list[ProviderEvent]:
+    return list(
+        session.scalars(
+            select(ProviderEvent)
+            .where(
+                ProviderEvent.payload_ciphertext.is_not(None),
+                _header_version(ProviderEvent.payload_ciphertext) != version,
+            )
+            .order_by(ProviderEvent.id)
+            .limit(limit)
+            .with_for_update(skip_locked=True)
+        )
+    )
+
+
+def stale_optin_indexes(session: Session, version: int, limit: int) -> list[Optin]:
+    return list(
+        session.scalars(
+            select(Optin)
+            .where(Optin.phone_bidx.is_not(None), Optin.phone_key_version != version)
+            .order_by(Optin.id)
+            .limit(limit)
+            .with_for_update(skip_locked=True)
+        )
+    )
+
+
+def set_message_vars(session: Session, message_id: uuid.UUID, blob: bytes) -> None:
+    session.execute(
+        update(Message)
+        .where(Message.id == message_id)
+        .values(vars_ciphertext=blob)
+        .execution_options(synchronize_session=False)
+    )
+
+
+def set_optin_index(session: Session, optin_id: uuid.UUID, digest: bytes, version: int) -> None:
+    session.execute(
+        update(Optin)
+        .where(Optin.id == optin_id)
+        .values(phone_bidx=digest, phone_key_version=version)
+        .execution_options(synchronize_session=False)
+    )
+
+
 # --- full data export (FR-ADM-001) ------------------------------------------------------------
 
 

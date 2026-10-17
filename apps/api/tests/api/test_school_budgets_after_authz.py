@@ -85,7 +85,13 @@ def test_school_budgets_moved_after_authz_are_the_per_school_route_policies() ->
     school_route_policies = {name for names in config.routes.values() for name in names} & {
         name for name, p in config.policies.items() if p.per == "school"
     }
-    assert school_route_policies == {"data_export", "heavy_jobs", "school_invitations"}
+    # readiness_school: SEC-046 (R2-0) charges readiness reads per school after authorization.
+    assert school_route_policies == {
+        "data_export",
+        "heavy_jobs",
+        "readiness_school",
+        "school_invitations",
+    }
     assert "audit_verify" not in {n for names in config.routes.values() for n in names}
 
 
