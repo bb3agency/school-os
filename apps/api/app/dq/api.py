@@ -283,7 +283,10 @@ def start_readiness_run(
 @router.get(
     "/readiness/{profile_key}/slips",
     response_class=HTMLResponse,
-    responses={200: {"content": {"text/html": {}}, "description": "Print-ready A4 slips"}},
+    responses={
+        200: {"content": {"text/html": {}}, "description": "Print-ready A4 slips"},
+        204: {"description": "With check=true: the slips can be printed now (nothing audited)"},
+    },
 )
 def readiness_slips(
     *,
@@ -293,11 +296,23 @@ def readiness_slips(
     student_id: uuid.UUID | None = None,
     section_id: uuid.UUID | None = None,
     include_ready: bool = True,
-) -> HTMLResponse:
+    include_sensitive: bool = False,
+    check: Annotated[
+        bool,
+        Query(
+            description="true: only check that the slips can be printed now (permission, "
+            "reach, step-up for include_sensitive) and answer 204 without the page; the print "
+            "view itself is audited once."
+        ),
+    ] = False,
+) -> Response:
     """Parent verification slips (one A4 page per student) for one student or one section:
     the value each record holds, the differences and who must fix them, and a signature line
-    for the parent (permission ``dq.readiness.read``). Aadhaar-as-printed values are shown
-    only with ``student.read_sensitive``; never an Aadhaar number. Printing is audited."""
+    for the parent (permission ``dq.readiness.read``). Aadhaar-as-printed values are masked
+    unless ``include_sensitive=true``, which needs ``student.read_sensitive`` for every student
+    (403 ``sensitive_not_allowed``) and a recent sign-in with MFA (428 ``step_up_required``),
+    like the PDF print; never an Aadhaar number. Printing is audited, naming the students whose
+    restricted values were shown; with ``check=true`` 204 only, not audited."""
     page = readiness.slips(
         db,
         ctx,
@@ -305,7 +320,11 @@ def readiness_slips(
         student_id=student_id,
         section_id=section_id,
         include_ready=include_ready,
+        include_sensitive=include_sensitive,
+        check=check,
     )
+    if page is None:
+        return Response(status_code=204, headers={"Cache-Control": "no-store"})
     name = f"verification-slips-{profile_key}.html"
     return HTMLResponse(
         page, headers={**_SLIP_HEADERS, "Content-Disposition": f'inline; filename="{name}"'}

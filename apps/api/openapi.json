@@ -31537,7 +31537,7 @@
     },
     "/api/v1/dq/readiness/{profile_key}/slips": {
       "get": {
-        "description": "Parent verification slips (one A4 page per student) for one student or one section:\nthe value each record holds, the differences and who must fix them, and a signature line\nfor the parent (permission ``dq.readiness.read``). Aadhaar-as-printed values are shown\nonly with ``student.read_sensitive``; never an Aadhaar number. Printing is audited.",
+        "description": "Parent verification slips (one A4 page per student) for one student or one section:\nthe value each record holds, the differences and who must fix them, and a signature line\nfor the parent (permission ``dq.readiness.read``). Aadhaar-as-printed values are masked\nunless ``include_sensitive=true``, which needs ``student.read_sensitive`` for every student\n(403 ``sensitive_not_allowed``) and a recent sign-in with MFA (428 ``step_up_required``),\nlike the PDF print; never an Aadhaar number. Printing is audited, naming the students whose\nrestricted values were shown; with ``check=true`` 204 only, not audited.",
         "operationId": "readiness_slips_api_v1_dq_readiness__profile_key__slips_get",
         "parameters": [
           {
@@ -31596,6 +31596,28 @@
               "title": "Include Ready",
               "type": "boolean"
             }
+          },
+          {
+            "in": "query",
+            "name": "include_sensitive",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Sensitive",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "true: only check that the slips can be printed now (permission, reach, step-up for include_sensitive) and answer 204 without the page; the print view itself is audited once.",
+            "in": "query",
+            "name": "check",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "true: only check that the slips can be printed now (permission, reach, step-up for include_sensitive) and answer 204 without the page; the print view itself is audited once.",
+              "title": "Check",
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -31608,6 +31630,9 @@
               }
             },
             "description": "Print-ready A4 slips"
+          },
+          "204": {
+            "description": "With check=true: the slips can be printed now (nothing audited)"
           },
           "422": {
             "content": {

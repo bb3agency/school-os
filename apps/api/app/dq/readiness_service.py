@@ -32,7 +32,7 @@ from sqlalchemy.orm import Session
 
 from app.apaar import service as apaar
 from app.authz.context import UserContext
-from app.core.errors import NotFound, ValidationFailed
+from app.core.errors import Forbidden, NotFound, ValidationFailed
 from app.core.languages import telugu_enabled, telugu_text
 from app.core.logging import get_logger
 from app.core.pdf import PrintDocument
@@ -596,7 +596,9 @@ def request_run(
                 detail="This school has none of the classes this check is for.",
             )
         scope = RunScopeIn(class_ids=class_ids)
-    return dq.request_run(session, ctx, RunCreate(scope=scope, profile_key=profile.key))
+    return dq.request_run(
+        session, ctx, RunCreate(scope=scope, profile_key=profile.key), also=(MANAGE,)
+    )
 
 
 # --- parent verification slips ----------------------------------------------------------------
@@ -791,10 +793,26 @@ def slips(
     student_id: uuid.UUID | None = None,
     section_id: uuid.UUID | None = None,
     include_ready: bool = True,
-) -> str:
+    include_sensitive: bool = False,
+    check: bool = False,
+) -> str | None:
     """Printable parent verification slips (A4 HTML), for one student or one section
-    (US-505 AC2). Audit ``dq.readiness.slips_printed`` (counts and ids only)."""
+    (US-505 AC2). Audit ``dq.readiness.slips_printed`` (counts and ids only). ``check``: run
+    every check (permission, reach, step-up) and return ``None`` without a page or an audit
+    event, so the screen can confirm the sign-in before it opens the print view.
+
+    Aadhaar-as-printed (C3) values are masked unless ``include_sensitive`` (SEC-045, docs/07
+    §11, the same rule as the PDF print): that needs ``student.read_sensitive`` reaching every
+    student on the page (403 ``sensitive_not_allowed``) and a sign-in with MFA within 5 minutes
+    (428 ``step_up_required``). The audit event then names those students (SEC-043)."""
     profile = readiness_profile(profile_key)
+    if include_sensitive:
+        if not ctx.has(SENSITIVE):
+            raise Forbidden(
+                "Restricted details can be shown only to staff allowed to see them.",
+                code="sensitive_not_allowed",
+            )
+        dq._require_step_up(ctx)
     ordered, target, assessed, refs = _slip_targets(
         session,
         ctx,
@@ -803,13 +821,23 @@ def slips(
         section_id=section_id,
         include_ready=include_ready,
     )
+    reveal_ids: frozenset[uuid.UUID] = frozenset()
+    if include_sensitive:
+        reveal_ids = _sensitive_reach(session, ctx)
+        if not set(ordered) <= reveal_ids:
+            raise Forbidden(
+                "Some of these students' restricted details are outside what you may see.",
+                code="sensitive_not_allowed",
+            )
+    if check:
+        return None
     page, revealed, _ = _slip_page(
         session,
         profile,
         ordered,
         assessed,
         refs,
-        reveal_ids=_sensitive_reach(session, ctx),
+        reveal_ids=reveal_ids,
         for_pdf=False,
     )
     summary: dict[str, Any] = {
@@ -817,6 +845,10 @@ def slips(
         "students": len(ordered),
         "sensitive_shown": revealed,
     }
+    if revealed:
+        # SEC-043: whose restricted (C3) values the page showed, ids only, so the school can
+        # answer "who saw this child's Aadhaar-as-printed details" for a section print too.
+        summary["sensitive_student_ids"] = [str(s) for s in ordered if s in reveal_ids]
     if section_id is not None:
         summary["section_id"] = str(section_id)
     dq._audit(

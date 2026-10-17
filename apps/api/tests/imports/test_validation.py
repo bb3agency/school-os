@@ -495,6 +495,7 @@ def test_FR_IMP_010_pen_column_is_compacted_checked_and_guarded() -> None:
             existing=existing,
             specs={**SPECS, "udise_pen": PEN_SPEC},
             national_ids={"udise_pen": {"21345678901": "sid-1", "31345678901": "sid-other"}},
+            visible_holders=frozenset({"sid-1", "sid-other"}),
         ),
     )
     assert result.rows[0].values["udise_pen"] == "21345678901"
@@ -508,6 +509,35 @@ def test_FR_IMP_010_pen_column_is_compacted_checked_and_guarded() -> None:
     clash = result.rows[1].errors[0]
     assert clash["student_id"] == "sid-other"
     assert clash["message_key"] == "errors.udise_pen_in_use"
+
+
+def test_SEC_042_a_pen_clash_names_only_a_record_the_importer_may_read() -> None:
+    """SEC-042 (FR-IMP-010, FR-STU-018): a PEN held by a student outside the importer's
+    reach is still a row error, but the error does not carry that student's id (as
+    ``students.create_student`` does); the clash with a readable record names it."""
+    sheet = read_sheet(
+        S.csv_bytes(
+            [["Adm No", "PEN", "Name"], ["A-1", "31345678901", "x"], ["A-2", "41345678901", "x"]]
+        ),
+        "csv",
+        CFG.limits,
+    )
+    existing = {f"a-{i}": ExistingStudent(f"sid-{i}", None, {}) for i in (1, 2)}
+    result = validate_sheet(
+        sheet,
+        {"0": "admission_no", "1": "udise_pen"},
+        _ctx(
+            source="udise_plus",
+            existing=existing,
+            specs={**SPECS, "udise_pen": PEN_SPEC},
+            national_ids={"udise_pen": {"31345678901": "sid-hidden", "41345678901": "sid-seen"}},
+            visible_holders=frozenset({"sid-seen"}),
+        ),
+    )
+    hidden, seen = (r.errors[0] for r in result.rows)
+    assert hidden["code"] == seen["code"] == "national_id_in_use"
+    assert "student_id" not in hidden
+    assert seen["student_id"] == "sid-seen"
 
 
 def test_FR_IMP_010_header_synonyms_map_pen_and_apaar() -> None:

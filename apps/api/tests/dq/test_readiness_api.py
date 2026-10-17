@@ -8,7 +8,7 @@ import uuid
 from typing import Any
 
 import pytest
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
 
 from app.core.languages import contains_telugu
 from app.students.schemas import ValueIn
@@ -350,3 +350,148 @@ def test_US_504_findings_list_explains_readiness_findings(world: Any, api: Any) 
         "Ask the MEO or MIS coordinator to correct UDISE+."
     )
     assert finding["routes"][0]["code"] == "ROUTE-UDISE"
+
+
+def test_SEC_044_a_scoped_readiness_manager_runs_checks_only_in_their_scope(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """SEC-015, SEC-044: a readiness run is limited by the dq.readiness.manage grant's own
+    scope. A member whose custom role holds it for 9A only (and who reads every student through
+    another role) stores no findings for a 9C student, and a 9C section scope is refused like
+    any section outside reach (422, no existence oracle)."""
+    tid = world.a.tenant_id
+    key = f"readiness_9a_{uuid.uuid4().hex[:8]}"
+    role_id = uuid.uuid4()
+    with admin_engine.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO core.roles (id, tenant_id, key, name_en, name_te) "
+                "VALUES (:r, :t, :k, 'Synthetic readiness 9A', 'కృత్రిమ పాత్ర')"
+            ),
+            {"r": role_id, "t": tid, "k": key},
+        )
+        for perm in ("dq.readiness.read", "dq.readiness.manage"):
+            c.execute(
+                text(
+                    "INSERT INTO core.role_permissions (tenant_id, role_id, permission_key) "
+                    "VALUES (:t, :r, :p)"
+                ),
+                {"t": tid, "r": role_id, "p": perm},
+            )
+    # accountant: student.read_basic for the whole school, no data-quality permission.
+    member = W.add_member(
+        admin_engine, tid, [key, "accountant"], scopes=[("section", world.a.ids["section_9a"])]
+    )
+    name = fresh_name()
+    sid_9c, _ = ssc_student(world.a, name=name, udise_dob="2012-03-15", section_key="section_9c")
+    res = run(api, member, sid_9c)
+    assert res.status_code == 202, res.text
+    assert res.json()["stats"]["students"] == 0
+    assert DS.findings(admin_engine, sid_9c, "DQ-031") == []
+    refused = api.call(
+        member,
+        "POST",
+        f"{BASE}/runs",
+        json={"scope": {"section_ids": [str(world.a.ids["section_9c"])]}},
+        headers={"Idempotency-Key": str(uuid.uuid4())},
+    )
+    assert refused.status_code == 422, refused.text
+    sid_9a, _ = ssc_student(world.a, udise_dob="2012-03-15")
+    own = run(api, member, sid_9a)
+    assert own.status_code == 202, own.text
+    assert own.json()["stats"]["students"] == 1
+
+
+def test_SEC_043_section_slips_audit_whose_restricted_values_were_shown(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """Invariant 7, SEC-043: a section print of slips that shows Aadhaar-as-printed values
+    (asked for, by a holder of ``student.read_sensitive``) names the students in its audit
+    event, ids only; a print without restricted values names nobody."""
+    sid, _ = ssc_student(world.a)
+    section = str(world.a.ids["section_9a"])
+    office = world.person("office_admin")  # holds student.read_sensitive
+    res = api.call(
+        office,
+        "GET",
+        f"{BASE}/slips",
+        params={"section_id": section, "include_sensitive": "true"},
+    )
+    assert res.status_code == 200, res.text
+    event = W.audit_events(admin_engine, world.a.tenant_id, "dq.readiness.slips_printed")[-1]
+    assert event["summary"]["section_id"] == section
+    assert event["summary"]["sensitive_shown"] >= 1
+    assert str(sid) in event["summary"]["sensitive_student_ids"]
+    assert len(event["summary"]["sensitive_student_ids"]) == event["summary"]["sensitive_shown"]
+    staff = world.person("office_staff")  # no student.read_sensitive
+    plain = api.call(staff, "GET", f"{BASE}/slips", params={"section_id": section})
+    assert plain.status_code == 200
+    latest = W.audit_events(admin_engine, world.a.tenant_id, "dq.readiness.slips_printed")[-1]
+    assert latest["summary"]["sensitive_shown"] == 0
+    assert "sensitive_student_ids" not in latest["summary"]
+
+
+def test_SEC_045_slips_mask_restricted_values_unless_asked_for_with_step_up(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """SEC-045 (docs/07 §11, ADR-0021): the HTML slips mask Aadhaar-as-printed values by
+    default, also for a holder of ``student.read_sensitive``. ``include_sensitive=true`` shows
+    them, and needs that permission (403) and a recent sign-in with MFA (428), like the PDF."""
+    name = fresh_name()
+    aadhaar_name = name.replace(" Sai Kumar", " Saikumarr")
+    sid, _ = ssc_student(world.a, name=name, aadhaar_name=aadhaar_name)
+    section = str(world.a.ids["section_9a"])
+    office = world.person("office_admin")  # holds student.read_sensitive
+    for params in ({"student_id": str(sid)}, {"section_id": section}):
+        masked = api.call(office, "GET", f"{BASE}/slips", params=params)
+        assert masked.status_code == 200, masked.text
+        assert "Saikumarr" not in masked.text
+        event = W.audit_events(admin_engine, world.a.tenant_id, "dq.readiness.slips_printed")[-1]
+        assert event["summary"]["sensitive_shown"] == 0
+        shown = api.call(
+            office, "GET", f"{BASE}/slips", params={**params, "include_sensitive": "true"}
+        )
+        assert shown.status_code == 200, shown.text
+        assert "Saikumarr" in shown.text
+        stale = api.call(
+            office,
+            "GET",
+            f"{BASE}/slips",
+            params={**params, "include_sensitive": "true"},
+            auth_age_s=600,
+        )
+        assert stale.status_code == 428, stale.text
+        no_mfa = api.call(
+            office,
+            "GET",
+            f"{BASE}/slips",
+            params={**params, "include_sensitive": "true"},
+            mfa=False,
+        )
+        assert no_mfa.status_code in (403, 428)  # office_admin needs MFA for everything
+    # check=true: every check, no page and no audit event (the screen confirms the sign-in).
+    before = len(W.audit_events(admin_engine, world.a.tenant_id, "dq.readiness.slips_printed"))
+    checked = api.call(
+        office,
+        "GET",
+        f"{BASE}/slips",
+        params={"student_id": str(sid), "include_sensitive": "true", "check": "true"},
+    )
+    assert checked.status_code == 204, checked.text
+    assert checked.content == b""
+    stale_check = api.call(
+        office,
+        "GET",
+        f"{BASE}/slips",
+        params={"student_id": str(sid), "include_sensitive": "true", "check": "true"},
+        auth_age_s=600,
+    )
+    assert stale_check.status_code == 428
+    after = W.audit_events(admin_engine, world.a.tenant_id, "dq.readiness.slips_printed")
+    assert len(after) == before
+    staff = world.person("office_staff")  # no student.read_sensitive
+    refused = api.call(
+        staff, "GET", f"{BASE}/slips", params={"student_id": str(sid), "include_sensitive": "true"}
+    )
+    assert refused.status_code == 403
+    assert refused.json()["code"] == "sensitive_not_allowed"

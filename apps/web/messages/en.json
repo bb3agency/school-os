@@ -3360,7 +3360,11 @@
       "start": "Start the check"
     },
     "pdfSlip": "Make PDF",
-    "pdfSectionSlips": "Make PDF of this section's slips"
+    "pdfSectionSlips": "Make PDF of this section's slips",
+    "showSensitiveSlips": "Show Aadhaar details on slips",
+    "openSensitiveSlips": "Open slips with Aadhaar details",
+    "sensitiveSlipsNote": "These slips show the names and dates as printed on Aadhaar. Opening them is recorded in the audit log. Keep the printouts safe.",
+    "newTab": "opens in a new tab"
   },
   "changeRequests": {
     "nav": "Correction requests",
