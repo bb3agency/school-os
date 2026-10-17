@@ -33,6 +33,7 @@ import {
   useSectionReadiness,
 } from "./data";
 import { OwnerBadge, ReadinessBadge, ReadyBar } from "./parts";
+import { SensitiveSlipLink } from "./SensitiveSlipLink";
 import { slipHref, type ReadinessSection, type ReadinessStudent } from "./types";
 
 const runSchema = z.object({});
@@ -398,6 +399,7 @@ export function ReadinessScreen({
                   },
                 }}
               />
+              <SensitiveSlipLink profileKey={profileKey} target={{ sectionId }} />
             </span>
           }
         >
