@@ -473,6 +473,14 @@ def test_FR_MRK_002_marks_grid_with_percent_and_absent_papers(school: Any) -> No
     assert academics.percent_of([(None, Decimal(50), True)]) is None
 
 
+def test_L_06_percentages_round_half_up() -> None:
+    """FR-MRK-005: a report-card percentage rounds a half up (72.25 -> 72.3, 34.85 -> 34.9),
+    not to the even digit as Python's round() does."""
+    assert academics.percent_of([(Decimal("72.25"), Decimal(100), False)]) == 72.3
+    assert academics.percent_of([(Decimal("34.85"), Decimal(100), False)]) == 34.9
+    assert academics.percent_of([(Decimal(1), Decimal(3), False)]) == 33.3
+
+
 @pytest.mark.parametrize(
     ("entry", "code"),
     [
