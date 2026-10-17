@@ -1090,6 +1090,31 @@ def _cert_path(suffix: str = "") -> Builder:
     return build
 
 
+# --- R2-1A: verification codes (ADR-0045; FR-CERT-023): add needs a certificate without one ---
+
+_VERIFY_REASON = {"reason": "Synthetic matrix verification reason"}
+
+
+def _cert_without_code(w: Any, r: str, a: Engine) -> Request:
+    """A fresh certificate issued as before R2 (no code), so the add succeeds."""
+    from unittest import mock
+
+    from app.certificates import service as certificates
+
+    with mock.patch.object(certificates, "_create_verification", return_value=None):
+        cert = _cert_issued(w, a, fresh=True)
+    return f"/api/v1/certificates/{cert.id}/verification", _VERIFY_REASON, {}
+
+
+def _cert_withdraw_code(w: Any, r: str, a: Engine) -> Request:
+    cert = _cert_issued(w, a, fresh=True)
+    return (
+        f"/api/v1/certificates/{cert.id}/verification/withdraw",
+        _VERIFY_REASON,
+        {"If-Match": 'W/"1"'},
+    )
+
+
 SPECS: dict[tuple[str, str], Builder] = {
     ("GET", "/api/v1/me"): lambda w, r, a: ("/api/v1/me", None, {}),
     ("GET", "/api/v1/me/schools"): lambda w, r, a: ("/api/v1/me/schools", None, {}),
@@ -1687,6 +1712,15 @@ SPECS: dict[tuple[str, str], Builder] = {
     ("POST", "/api/v1/certificates/{certificate_id}/reject"): _cert_decide("reject"),
     ("POST", "/api/v1/certificates/{certificate_id}/withdraw"): _cert_decide("withdraw"),
     ("POST", "/api/v1/certificates/{certificate_id}/cancel"): _cert_cancel,
+    # R2-1A (ADR-0045): formats, verification codes.
+    ("GET", "/api/v1/certificates/formats"): lambda w, r, a: (
+        "/api/v1/certificates/formats",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/certificates/{certificate_id}/verification"): _cert_path("/verification"),
+    ("POST", "/api/v1/certificates/{certificate_id}/verification"): _cert_without_code,
+    ("POST", "/api/v1/certificates/{certificate_id}/verification/withdraw"): (_cert_withdraw_code),
     ("GET", "/api/v1/registers/transfer-certificates"): lambda w, r, a: (
         "/api/v1/registers/transfer-certificates",
         None,
@@ -2076,6 +2110,7 @@ def _success(method: str, path: str) -> int:
         "/api/v1/knowledge/memories",
         "/api/v1/students/{student_id}/certificates",
         "/api/v1/certificates/{certificate_id}/duplicates",
+        "/api/v1/certificates/{certificate_id}/verification",
         "/api/v1/tasks",
         "/api/v1/circular-suggestions/{suggestion_id}/confirm",
         "/api/v1/exams",

@@ -404,7 +404,7 @@ class TenantSettings(BaseModel):
         "format they were issued in.",
     )
     print_restricted_tc_fields: bool = Field(
-        default=False,
+        default_factory=bool,  # False; optional in the schema, like certificate_format
         description="Print religion and caste on transfer certificates instead of labelled "
         "blanks (FR-CERT-018, owner decision D15; an exception to FR-CERT-009 for the TC only). "
         "Audited with the field keys.",

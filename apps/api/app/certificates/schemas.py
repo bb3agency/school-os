@@ -94,8 +94,10 @@ class ChoiceOut(_Out):
 
 class InputOut(_Out):
     key: str
-    label_en: str = ""
-    label_te: str = ""
+    # R2 formats: the input's own label (format inputs have no web catalogue entry). Optional in
+    # the schema (default_factory) so older clients and fixtures stay valid.
+    label_en: str = Field(default_factory=str)
+    label_te: str = Field(default_factory=str)
     kind: Literal["date", "choice", "text", "number"]
     required: bool
     max_length: int | None
@@ -121,6 +123,13 @@ class CertificateTypeOut(_Out):
 # --- preview -------------------------------------------------------------------------------------
 
 
+PrintedFill = Literal["record", "input", "derived", "identifier", "restricted"]
+
+
+def _record_fill() -> PrintedFill:
+    return "record"
+
+
 class PrintedField(_Out):
     """One value the certificate prints, with where it comes from (US-1101 AC1, AC4)."""
 
@@ -134,9 +143,9 @@ class PrintedField(_Out):
     # R2 formats (FR-CERT-015..018): ``record`` (a student value), ``input`` (typed when the TC
     # is prepared), ``derived`` (worked out from the record), ``identifier`` (PEN / APAAR ID under
     # their printing rule), ``restricted`` (religion, caste: blank unless the school prints them).
-    fill: Literal["record", "input", "derived", "identifier", "restricted"] = "record"
+    fill: PrintedFill = Field(default_factory=_record_fill)
     # A restricted value the school prints but the caller may not see (no student.read_sensitive).
-    masked: bool = False
+    masked: bool = Field(default_factory=bool)
 
 
 class Blocker(_Out):

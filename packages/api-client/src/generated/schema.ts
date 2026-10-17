@@ -851,6 +851,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/certificates/{certificate_id}/verification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Certificate Verification
+         * @description The certificate's verification code (as printed, in four groups), the QR link, how
+         *     often it was checked online and when last (US-2004 AC1; read, issue or approve permission).
+         *     ``ETag`` is the version a withdrawal sends in ``If-Match``.
+         */
+        get: operations["get_certificate_verification_api_v1_certificates__certificate_id__verification_get"];
+        put?: never;
+        /**
+         * Add Certificate Verification
+         * @description Add a verification code to a certificate issued before R2 (FR-CERT-023a; permission
+         *     ``certificate.approve``, MFA within 5 minutes; reason 10..500). The original paper has no
+         *     code: the next duplicate carries one. Accepts ``Idempotency-Key``. Errors:
+         *     ``certificate_not_issued``, ``verification_exists`` (409).
+         */
+        post: operations["add_certificate_verification_api_v1_certificates__certificate_id__verification_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/certificates/{certificate_id}/verification/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw Certificate Verification
+         * @description Withdraw the certificate's verification code (FR-CERT-023b; permission
+         *     ``certificate.approve``, MFA within 5 minutes, ``If-Match`` from ``GET .../verification``;
+         *     reason 10..500): the public page answers "not found" for it from then on. Error
+         *     ``verification_not_active`` (409).
+         */
+        post: operations["withdraw_certificate_verification_api_v1_certificates__certificate_id__verification_withdraw_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/certificates/{certificate_id}/withdraw": {
         parameters: {
             query?: never;
@@ -872,6 +924,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/certificates/formats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Certificate Formats
+         * @description The transfer certificate formats a school may choose (``PATCH /tenant`` with
+         *     ``settings.certificate_format.transfer``): lines in print order, inputs, sources and whether
+         *     a school confirmed the layout (``verified``; owner decision D3). Read, issue or approve
+         *     permission (FR-CERT-015).
+         */
+        get: operations["list_certificate_formats_api_v1_certificates_formats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/certificates/types": {
         parameters: {
             query?: never;
@@ -881,8 +956,8 @@ export interface paths {
         };
         /**
          * List Certificate Types
-         * @description Certificate types with the values each one asks for (read, issue or approve
-         *     permission).
+         * @description Certificate types with the values each one asks for; the transfer certificate in the
+         *     school's chosen format (read, issue or approve permission; FR-CERT-015).
          */
         get: operations["list_certificate_types_api_v1_certificates_types_get"];
         put?: never;
@@ -4910,6 +4985,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/certificates/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Verify Certificate
+         * @description Check a certificate by its verification code (FR-CERT-021, FR-CERT-022; ADR-0045),
+         *     called by the web app's verification page with its service token and no user token. The
+         *     caller sends the normalised code (16 characters, upper case, no dashes). A valid code
+         *     answers the school's printed name and place, the type, serial, date of issue and exactly the
+         *     printed content (a cancelled certificate: no content); anything else is the uniform 404.
+         *     Each check is counted and audited. There is no lookup by serial, name or date of birth.
+         */
+        get: operations["verify_certificate_api_v1_public_certificates__code__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/links/current": {
         parameters: {
             query?: never;
@@ -7737,6 +7837,51 @@ export interface components {
             status: string;
         };
         /**
+         * CertificateFormatChoice
+         * @description The certificate format a school uses per certificate type (only the TC has a choice).
+         */
+        CertificateFormatChoice: {
+            /**
+             * Transfer
+             * @description ``generic-v1`` (built in) or ``ap-tc-2027`` (Andhra Pradesh layout, built from public sources and not yet confirmed with a school; ADR-0045).
+             * @default generic-v1
+             * @enum {string}
+             */
+            transfer: "generic-v1" | "ap-tc-2027";
+        };
+        /**
+         * CertificateFormatOut
+         * @description A TC format a school may choose (``GET /certificates/formats``). ``verified`` is false
+         *     until a school confirmed the layout (owner decision D3).
+         */
+        CertificateFormatOut: {
+            /** Builtin */
+            builtin: boolean;
+            /**
+             * Certificate Type
+             * @constant
+             */
+            certificate_type: "transfer";
+            /** Inputs */
+            inputs: components["schemas"]["InputOut"][];
+            /** Key */
+            key: string;
+            /** Label En */
+            label_en: string;
+            /** Label Te */
+            label_te: string;
+            /** Lines */
+            lines: components["schemas"]["FormatLineOut"][];
+            /** Notes */
+            notes: string;
+            /** Sources */
+            sources: components["schemas"]["FormatSourceOut"][];
+            /** Verified */
+            verified: boolean;
+            /** Version */
+            version: number;
+        };
+        /**
          * CertificateLetterhead
          * @description What certificates print at the top and at the signature (FR-CERT-013, US-1108). The
          *     English school name is the school's name; empty fields are left out of the page.
@@ -7842,6 +7987,10 @@ export interface components {
             duplicate_no: number | null;
             /** Duplicate Reason */
             duplicate_reason: string | null;
+            /** Format Key */
+            format_key?: string | null;
+            /** Format Version */
+            format_version?: number | null;
             /**
              * Id
              * Format: uuid
@@ -7908,6 +8057,10 @@ export interface components {
             class_label: string | null;
             /** Fields */
             fields: components["schemas"]["PrintedField"][];
+            /** Format Key */
+            format_key?: string | null;
+            /** Format Version */
+            format_version?: number | null;
             /** Requires Approval */
             requires_approval: boolean;
             /**
@@ -7938,6 +8091,12 @@ export interface components {
         CertificateTypeOut: {
             /** Ends Enrolment */
             ends_enrolment: boolean;
+            /** Format Key */
+            format_key?: string | null;
+            /** Format Verified */
+            format_verified?: boolean | null;
+            /** Format Version */
+            format_version?: number | null;
             /** Inputs */
             inputs: components["schemas"]["InputOut"][];
             /**
@@ -9621,6 +9780,29 @@ export interface components {
             /** Version */
             version: string;
         };
+        /** FormatLineOut */
+        FormatLineOut: {
+            /**
+             * Fill
+             * @enum {string}
+             */
+            fill: "attribute" | "input" | "derived" | "identifier" | "restricted" | "blank";
+            /** Key */
+            key: string;
+            /** Label En */
+            label_en: string;
+            /** Label Te */
+            label_te: string;
+            /** Restricted */
+            restricted: boolean;
+        };
+        /** FormatSourceOut */
+        FormatSourceOut: {
+            /** Title */
+            title: string;
+            /** Url */
+            url: string | null;
+        };
         /**
          * GrantOut
          * @description A support-access request and, once decided, its grant.
@@ -10041,9 +10223,15 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "date" | "choice" | "text";
+            kind: "date" | "choice" | "text" | "number";
+            /** Label En */
+            label_en?: string;
+            /** Label Te */
+            label_te?: string;
             /** Max Length */
             max_length: number | null;
+            /** Max Value */
+            max_value?: number | null;
             /** Required */
             required: boolean;
         };
@@ -12317,12 +12505,19 @@ export interface components {
          * @description One value the certificate prints, with where it comes from (US-1101 AC1, AC4).
          */
         PrintedField: {
+            /**
+             * Fill
+             * @enum {string}
+             */
+            fill?: "record" | "input" | "derived" | "identifier" | "restricted";
             /** Key */
             key: string;
             /** Label En */
             label_en: string;
             /** Label Te */
             label_te: string;
+            /** Masked */
+            masked?: boolean;
             /** Provisional */
             provisional: boolean;
             /** Source */
@@ -12701,6 +12896,54 @@ export interface components {
              * @enum {string}
              */
             tier: "shared" | "dedicated";
+        };
+        /**
+         * PublicCertificateOut
+         * @description What the public verification page shows for a live code (FR-CERT-021; ADR-0045 decision
+         *     5): the school's printed name and place, the type, serial and issue date, and for a valid
+         *     certificate exactly its frozen printed content. A cancelled certificate (or a copy of a
+         *     cancelled original) shows no content. Nothing comes from the live student record.
+         */
+        PublicCertificateOut: {
+            /** Cancelled On */
+            cancelled_on: string | null;
+            /**
+             * Certificate Type
+             * @enum {string}
+             */
+            certificate_type: "transfer" | "bonafide" | "study" | "conduct";
+            content: components["schemas"]["CertificateContent"] | null;
+            duplicate: components["schemas"]["PublicDuplicate"] | null;
+            /**
+             * Issued On
+             * Format: date
+             */
+            issued_on: string;
+            /** School Name */
+            school_name: string;
+            /** School Place */
+            school_place: string;
+            /** Serial */
+            serial: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "valid" | "cancelled";
+            /** Title En */
+            title_en: string;
+        };
+        /** PublicDuplicate */
+        PublicDuplicate: {
+            /** Copy No */
+            copy_no: number;
+            /**
+             * Issued On
+             * Format: date
+             */
+            issued_on: string;
+            /** Original Serial */
+            original_serial: string;
         };
         /** ReadinessCounts */
         ReadinessCounts: {
@@ -14700,6 +14943,8 @@ export interface components {
              * @default 5000
              */
             ai_monthly_budget_inr: number;
+            /** @description Certificate format per type (FR-CERT-015); issued certificates keep the format they were issued in. */
+            certificate_format?: components["schemas"]["CertificateFormatChoice"];
             certificate_letterhead?: components["schemas"]["CertificateLetterhead-Output"];
             /**
              * Class Boards
@@ -14741,6 +14986,11 @@ export interface components {
              * @enum {string}
              */
             parent_language: "en" | "te";
+            /**
+             * Print Restricted Tc Fields
+             * @description Print religion and caste on transfer certificates instead of labelled blanks (FR-CERT-018, owner decision D15; an exception to FR-CERT-009 for the TC only). Audited with the field keys.
+             */
+            print_restricted_tc_fields?: boolean;
         };
         /**
          * TenantSettingsPatch
@@ -14758,6 +15008,7 @@ export interface components {
              * @description The boards the school prepares students for (FR-TEN-020); stored in ``core.tenants.boards``. Board pre-check profiles are listed for these boards only.
              */
             boards?: ("BSEAP" | "CBSE" | "CISCE")[] | null;
+            certificate_format?: components["schemas"]["CertificateFormatChoice"] | null;
             certificate_letterhead?: components["schemas"]["CertificateLetterhead-Input"] | null;
             /** Class Boards */
             class_boards?: {
@@ -14778,6 +15029,8 @@ export interface components {
              * @description ``en`` or ``te``: the language parents receive (ADR-0044). Audited with its new value.
              */
             parent_language?: ("en" | "te") | null;
+            /** Print Restricted Tc Fields */
+            print_restricted_tc_fields?: boolean | null;
         };
         /**
          * TenantSummaryOut
@@ -15284,6 +15537,57 @@ export interface components {
             student_version: number;
             /** Superseded */
             superseded: string | null;
+        };
+        /**
+         * VerificationOut
+         * @description The verification code of a certificate (``GET /certificates/{id}/verification``). ``code``
+         *     is printed on the paper (four groups); ``url`` is the QR's link, ``null`` while verification
+         *     is off (``SOS_VERIFY_BASE_URL`` unset). ``check_count`` counts successful public lookups of
+         *     this code (FR-CERT-024); nothing else about who checked is kept. ``version`` is the ETag for
+         *     a withdrawal.
+         */
+        VerificationOut: {
+            /** Can Add */
+            can_add: boolean;
+            /** Can Withdraw */
+            can_withdraw: boolean;
+            /**
+             * Certificate Id
+             * Format: uuid
+             */
+            certificate_id: string;
+            /** Check Count */
+            check_count: number;
+            /** Code */
+            code: string | null;
+            /** Created At */
+            created_at: string | null;
+            /** Created Reason */
+            created_reason: ("issued" | "duplicate" | "added_later") | null;
+            /** Last Checked At */
+            last_checked_at: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "withdrawn" | "none";
+            /** Url */
+            url: string | null;
+            /** Version */
+            version: number;
+            /** Withdraw Reason */
+            withdraw_reason: string | null;
+            /** Withdrawn At */
+            withdrawn_at: string | null;
+        };
+        /**
+         * VerificationReasonIn
+         * @description Why a code is added to a certificate issued before R2, or withdrawn (10..500 characters,
+         *     no Aadhaar numbers).
+         */
+        VerificationReasonIn: {
+            /** Reason */
+            reason: string;
         };
         /**
          * VerifiedAnswerIn
@@ -17384,6 +17688,146 @@ export interface operations {
             };
         };
     };
+    get_certificate_verification_api_v1_certificates__certificate_id__verification_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                certificate_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerificationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    add_certificate_verification_api_v1_certificates__certificate_id__verification_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                certificate_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerificationReasonIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerificationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    withdraw_certificate_verification_api_v1_certificates__certificate_id__verification_withdraw_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                certificate_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerificationReasonIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerificationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     withdraw_certificate_api_v1_certificates__certificate_id__withdraw_post: {
         parameters: {
             query?: never;
@@ -17411,6 +17855,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_certificate_formats_api_v1_certificates_formats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CertificateFormatOut"][];
                 };
             };
             /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
@@ -27416,6 +27893,51 @@ export interface operations {
                     "RateLimit-Policy"?: string;
                     /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
                     "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    verify_certificate_api_v1_public_certificates__code__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicCertificateOut"];
+                };
+            };
+            /** @description Unknown, mistyped or withdrawn code (always the same body). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many lookups from this address. */
+            429: {
+                headers: {
                     [name: string]: unknown;
                 };
                 content?: never;

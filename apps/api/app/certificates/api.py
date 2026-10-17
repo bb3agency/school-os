@@ -14,7 +14,7 @@ import uuid
 from collections.abc import Callable
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, Path, Query, Request, Response
 from fastapi.responses import HTMLResponse
 from starlette.concurrency import run_in_threadpool
 
@@ -469,7 +469,10 @@ _PUBLIC_RESPONSES: dict[int | str, dict[str, Any]] = {
     dependencies=[Depends(_verify_budget)],
 )
 async def verify_certificate(
-    request: Request, code: str, caller: ByCode, response: Response
+    request: Request,
+    code: Annotated[str, Path(max_length=64)],
+    caller: ByCode,
+    response: Response,
 ) -> PublicCertificateOut:
     """Check a certificate by its verification code (FR-CERT-021, FR-CERT-022; ADR-0045),
     called by the web app's verification page with its service token and no user token. The
