@@ -74,7 +74,7 @@ export function AcademicStructureScreen() {
   const tn = useTranslations("school.nav");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={ts("title")}
         description={ts("description")}
@@ -89,7 +89,7 @@ export function AcademicStructureScreen() {
       />
       {!manage && meLoaded ? <Alert tone="info">{t("readOnlyNote")}</Alert> : null}
       {/* Applies at once (a view filter), so a switch rather than a checkbox. */}
-      <div className="max-w-2xl rounded-xl border border-border bg-surface px-5 py-4 shadow-card">
+      <div className="max-w-2xl rounded-xl border border-border bg-surface px-5 py-4">
         <Toggle
           label={t("showArchived")}
           description={t("showArchivedHint")}
@@ -206,13 +206,13 @@ function YearCard({ year, manage }: { year: AcademicYear; manage: boolean }) {
       <dl className="grid grid-cols-2 gap-3 text-sm">
         <div>
           <dt className="text-ink-muted">{ts("years.colStarts")}</dt>
-          <dd className="font-semibold text-ink">
+          <dd className="num font-semibold whitespace-nowrap text-ink">
             <Value>{formatDate(year.starts_on)}</Value>
           </dd>
         </div>
         <div>
           <dt className="text-ink-muted">{ts("years.colEnds")}</dt>
-          <dd className="font-semibold text-ink">
+          <dd className="num font-semibold whitespace-nowrap text-ink">
             <Value>{formatDate(year.ends_on)}</Value>
           </dd>
         </div>
@@ -285,7 +285,7 @@ function AddYearDialog() {
   return (
     <ActionDialog
       triggerLabel={t("add")}
-      triggerVariant="primary"
+      triggerVariant="secondary"
       title={t("add")}
       description={t("addDescription")}
       confirmLabel={t("addConfirm")}
@@ -364,6 +364,7 @@ function MakeCurrentDialog({ year }: { year: AcademicYear }) {
       triggerDescription={t("makeCurrentDescribe", { label: year.label })}
       title={t("makeCurrentTitle", { label: year.label })}
       description={t("makeCurrentBody", { label: year.label })}
+      consequence={t("makeCurrentConsequence", { label: year.label })}
       confirmLabel={t("makeCurrent")}
       schema={z.object({})}
       invalidate={ALL_STRUCTURE_KEYS}
@@ -414,6 +415,7 @@ function ArchiveDialog({
       }
       title={archive ? t(`${kind}.title`, values) : t(`${kind}.unarchiveTitle`, values)}
       description={archive ? t(`${kind}.body`) : t("unarchiveBody")}
+      consequence={archive ? t("consequence") : undefined}
       confirmLabel={archive ? t("archive") : t("unarchive")}
       confirmVariant={archive ? "danger" : "primary"}
       schema={z.object({})}
@@ -453,10 +455,16 @@ function ClassesCard({
       header: t("classes.colCode"),
       cell: (row) => <span className="font-mono text-sm">{row.code}</span>,
     },
-    { key: "order", header: ts("classes.colOrder"), cell: (row) => row.sort_order },
+    {
+      key: "order",
+      header: ts("classes.colOrder"),
+      numeric: true,
+      cell: (row) => row.sort_order,
+    },
     {
       key: "sections",
       header: t("classes.colSectionsThisYear"),
+      numeric: true,
       cell: (row) => <Value>{count(row.id)}</Value>,
     },
     ...(manage
@@ -565,7 +573,7 @@ function AddClassDialog({ nextOrder }: { nextOrder: number }) {
   return (
     <ActionDialog
       triggerLabel={t("add")}
-      triggerVariant="primary"
+      triggerVariant="secondary"
       title={t("add")}
       description={t("addDescription")}
       confirmLabel={t("add")}
@@ -905,7 +913,7 @@ function AddSectionDialog({
   return (
     <ActionDialog
       triggerLabel={t("add")}
-      triggerVariant="primary"
+      triggerVariant="secondary"
       title={t("addTitle", { year: year.label })}
       description={t("addDescription")}
       confirmLabel={t("add")}

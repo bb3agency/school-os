@@ -37,7 +37,7 @@ export function PromotionsIndexScreen() {
 
   if (me === undefined) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader title={t("titlePlain")} breadcrumb={breadcrumb} />
         <LoadingState label={t("loading")} />
       </div>
@@ -45,7 +45,7 @@ export function PromotionsIndexScreen() {
   }
   if (!manage) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader title={t("titlePlain")} breadcrumb={breadcrumb} />
         <Alert tone="info" title={t("noAccessTitle")}>
           {t("noAccessBody")}
@@ -75,7 +75,12 @@ export function PromotionsIndexScreen() {
     {
       key: "ends",
       header: ts("years.colEnds"),
-      cell: (row) => <Value>{formatDate(row.ends_on)}</Value>,
+      className: "whitespace-nowrap",
+      cell: (row) => (
+        <span className="num">
+          <Value>{formatDate(row.ends_on)}</Value>
+        </span>
+      ),
     },
     {
       key: "promote",
@@ -92,7 +97,7 @@ export function PromotionsIndexScreen() {
     },
   ];
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={t("titlePlain")}
         description={t("indexDescription")}
