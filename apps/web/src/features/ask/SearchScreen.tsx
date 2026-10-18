@@ -6,6 +6,7 @@ import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { TextField } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -56,7 +57,7 @@ export function SearchScreen() {
   if (me.isPending) return <LoadingState label={tc("loading")} />;
   if (!can(ASK_PERM.search)) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader title={ta("title")} />
         <AskTabs active="search" />
         <Alert tone="warning" title={t("noAccessTitle")}>
@@ -96,7 +97,7 @@ export function SearchScreen() {
   const results: SearchResult[] | undefined = search.data?.data;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader title={ta("title")} description={t("description")} />
       <AskTabs active="search" />
       <Card title={t("title")}>
@@ -130,17 +131,15 @@ export function SearchScreen() {
         </form>
       </Card>
       <ApiErrorAlert error={search.error ?? undefined} namespace="ask" />
-      <p role="status" aria-live="polite" className="text-sm">
+      <p role="status" aria-live="polite" className="num text-sm text-ink-muted">
         {results ? t("resultsCount", { count: results.length }) : ""}
       </p>
       {results && results.length === 0 ? (
-        <Alert tone="info" title={t("emptyTitle")}>
-          {t("emptyBody")}
-        </Alert>
+        <EmptyState icon="search" title={t("emptyTitle")} body={t("emptyBody")} />
       ) : null}
       {results && results.length > 0 ? (
         <section aria-label={t("results")}>
-          <ol className="space-y-3">
+          <ol className="space-y-2.5">
             {results.map((result) => (
               <SearchHit key={`${result.source}-${result.snippet.slice(0, 20)}`} result={result} />
             ))}
