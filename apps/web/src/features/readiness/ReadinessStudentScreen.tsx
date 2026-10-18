@@ -4,6 +4,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Badge } from "@/components/ui/Badge";
+import { buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -110,17 +111,17 @@ function FieldCard({ field }: { field: ReadinessFieldDetail }) {
         )
       }
     >
-      <table className="w-full text-sm">
+      <table className="w-full border-collapse text-sm">
         <caption className="sr-only">{t("valuesCaption", { field: label ?? "" })}</caption>
         <thead>
-          <tr className="text-left text-ink-muted">
-            <th scope="col" className="py-1 pr-4 font-semibold">
+          <tr className="border-b border-border text-left text-xs text-ink-muted">
+            <th scope="col" className="py-1.5 pe-4 font-semibold">
               {t("colRecord")}
             </th>
-            <th scope="col" className="py-1 pr-4 font-semibold">
+            <th scope="col" className="py-1.5 pe-4 font-semibold">
               {t("colValue")}
             </th>
-            <th scope="col" className="py-1 font-semibold">
+            <th scope="col" className="py-1.5 font-semibold">
               <span className="sr-only">{t("colNote")}</span>
             </th>
           </tr>
@@ -128,13 +129,13 @@ function FieldCard({ field }: { field: ReadinessFieldDetail }) {
         <tbody>
           {field.values.map((value) => (
             <tr key={value.source} className="border-t border-border-soft">
-              <th scope="row" className="py-1.5 pr-4 text-left font-normal">
+              <th scope="row" className="py-2 pe-4 text-left align-top font-semibold text-ink">
                 {sourceName(value.source)}
               </th>
-              <td className="py-1.5 pr-4">
+              <td className="py-2 pe-4 align-top">
                 <ValueCell value={value} />
               </td>
-              <td className="py-1.5">
+              <td className="py-2 text-end align-top">
                 {field.reference === value.source ? (
                   <Badge tone="success">{t("rightValue")}</Badge>
                 ) : wrong.has(value.source) ? (
@@ -163,7 +164,7 @@ function Detail({ data, profileKey }: { data: ReadinessDetail; profileKey: strin
   const profile =
     locale === "te" && data.profile.label_te ? data.profile.label_te : data.profile.label_en;
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={<Value>{data.student.display_name}</Value>}
         description={t("studentDescription", { profile })}
@@ -179,7 +180,7 @@ function Detail({ data, profileKey }: { data: ReadinessDetail; profileKey: strin
               href={slipHref(profileKey, { studentId: data.student.id })}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex min-h-10 items-center rounded-lg border border-border-soft px-4 text-sm font-semibold text-primary"
+              className={buttonClasses("primary", "md")}
             >
               {t("printSlip")}
             </a>

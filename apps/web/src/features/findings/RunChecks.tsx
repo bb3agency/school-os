@@ -6,8 +6,10 @@ import { useEffect, useRef, type ReactNode } from "react";
 import * as z from "@/lib/zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
+import { Pill } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { SelectField } from "@/components/ui/Select";
+import { StatCard } from "@/components/ui/StatCard";
 import { Link } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
 import { unwrap, useBffClient } from "@/lib/bff/query";
@@ -35,8 +37,18 @@ function stat(run: DqRun, name: string): number | null {
  * Status of one check run (POST /dq/runs answers 202; GET /dq/runs/{id} until it finishes).
  * Announced politely to screen readers; when it finishes the findings and summary reload.
  */
-export function RunProgress({ runId, initial }: { runId: string; initial?: DqRun }) {
+export function RunProgress({
+  runId,
+  initial,
+  detailed = false,
+}: {
+  runId: string;
+  initial?: DqRun;
+  /** The run's own page: the status as a pill and each result count as a figure. */
+  detailed?: boolean;
+}) {
   const t = useTranslations("findings.run");
+  const tc = useTranslations("common");
   const locale = useLocale() as Locale;
   const api = useBffClient("staff");
   const queryClient = useQueryClient();
@@ -114,9 +126,45 @@ export function RunProgress({ runId, initial }: { runId: string; initial?: DqRun
       </Alert>
     );
   }
+  const figures =
+    detailed && run && run.status === "completed"
+      ? (["students", "blockers", "warnings", "new", "reopened", "cleared"] as const).map(
+          (name) => ({ name, value: stat(run, name) }),
+        )
+      : [];
   return (
-    <div role="status" aria-live="polite" aria-atomic="true" className="space-y-3">
-      {body}
+    <div className="space-y-4">
+      {detailed && run ? (
+        <p className="flex flex-wrap items-center gap-2 text-sm text-ink-muted">
+          <span>{t("statusLabel")}</span>
+          <Pill
+            variant={
+              run.status === "completed"
+                ? "done"
+                : run.status === "failed"
+                  ? "negative"
+                  : "progress"
+            }
+          >
+            {t(`statusValue.${run.status}`)}
+          </Pill>
+        </p>
+      ) : null}
+      <div role="status" aria-live="polite" aria-atomic="true" className="space-y-3">
+        {body}
+      </div>
+      {figures.length > 0 ? (
+        <dl aria-label={t("resultsLabel")} className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
+          {figures.map((figure) => (
+            <StatCard
+              key={figure.name}
+              label={t(`stat.${figure.name}`)}
+              value={figure.value === null ? null : count(figure.value)}
+              unavailableLabel={tc("notAvailable")}
+            />
+          ))}
+        </dl>
+      ) : null}
     </div>
   );
 }

@@ -91,7 +91,17 @@ describe("change request list (US-601, FR-CR-002)", () => {
     renderWithIntl(
       <ChangeRequestsScreen filters={parseChangeRequestFilters({ student_id: STUDENT })} />,
     );
-    expect(await screen.findByText("Showing one student only.")).toBeInTheDocument();
+    // The student filter shows as a chip; removing it opens the list without it.
+    expect(
+      await screen.findByRole("button", { name: "Remove filter Student: One student" }),
+    ).toBeInTheDocument();
+    // The inbox tabs are links on the status filter, keeping the student filter.
+    const tabs = screen.getByRole("navigation", { name: "Requests by status" });
+    expect(within(tabs).getByRole("link", { name: "All" })).toHaveAttribute("aria-current", "page");
+    expect(within(tabs).getByRole("link", { name: "Waiting for approval" })).toHaveAttribute(
+      "href",
+      `/change-requests?status=pending&student_id=${STUDENT}`,
+    );
     const call = stub.callsTo("GET /bff/api/v1/change-requests")[0];
     expect(call?.url.searchParams.get("student_id")).toBe(STUDENT);
   });
@@ -160,6 +170,11 @@ describe("change request detail (US-601 AC1–AC4, FR-CR-002, FR-CR-004)", () =>
     expect(within(steps).getByText("Asked on")).toBeInTheDocument();
     expect(within(steps).getByText("Waiting for a decision")).toBeInTheDocument();
     expect(screen.getByText("Evidence document")).toBeInTheDocument();
+    // Before and after are named in words; the old value is struck through, the new inserted.
+    expect(screen.getByText("Before")).toBeInTheDocument();
+    expect(screen.getByText("After")).toBeInTheDocument();
+    expect(document.querySelector("del")).not.toBeNull();
+    expect(document.querySelector("ins")).not.toBeNull();
   });
 
   it("rejecting needs a reason of at least 10 characters", async () => {
@@ -301,10 +316,22 @@ describe("new change request (US-601 AC1, FR-CR-001, BR-04)", () => {
       screen.getByRole("textbox", { name: "Reason" }),
       "Spelling differs from the birth certificate.",
     );
+    // The steps above the form follow the stages: student and field chosen, evidence next.
+    const steps = screen.getByRole("list", { name: "Steps of a correction request" });
+    expect(within(steps).getByText("Evidence").closest("li")).toHaveAttribute(
+      "aria-current",
+      "step",
+    );
     await userEvent.click(screen.getByRole("button", { name: "Send for approval" }));
-    expect(
-      await screen.findByText("Choose the evidence file (a scan or photo of the document)."),
-    ).toBeInTheDocument();
+    // The error summary at the top takes focus and links to the field, which shows it too.
+    const summary = await screen.findByRole("alert", { name: "There is a problem" });
+    const message = "Choose the evidence file (a scan or photo of the document).";
+    expect(within(summary).getByRole("link", { name: message })).toHaveAttribute(
+      "href",
+      `#${screen.getByLabelText("Scan or photo").id}`,
+    );
+    await waitFor(() => expect(summary).toHaveFocus());
+    expect(screen.getAllByText(message)).toHaveLength(2);
     expect(stub.calls.filter((call) => call.method === "POST")).toHaveLength(0);
   });
 

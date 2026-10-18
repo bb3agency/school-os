@@ -2,20 +2,20 @@
 
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
+import { useId, type ReactNode } from "react";
+import { DataTableV2, type ColumnV2 } from "@/components/console";
 import { Alert } from "@/components/ui/Alert";
 import { Pill } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { Button, ButtonLink } from "@/components/ui/Button";
+import { FilterChips, type FilterChip } from "@/components/ui/FilterChips";
 import { Icon } from "@/components/ui/Icon";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SelectField } from "@/components/ui/Select";
 import { KpiCard } from "@/components/ui/StatCard";
-import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
-import { Link } from "@/i18n/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
 import { toLoadable, unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan } from "@/lib/bff/staff-me";
@@ -30,7 +30,13 @@ import {
   useRules,
   useSectionOptions,
 } from "./data";
-import { findingsQuery, type FindingFilters } from "./filters";
+import {
+  findingsHref,
+  findingsQuery,
+  hasCustomStatus,
+  type FindingFilterKey,
+  type FindingFilters,
+} from "./filters";
 import { FindingStatusBadge, FindingValues, SeverityBadge } from "./parts";
 import { RunChecksDialog } from "./RunChecks";
 import { FINDING_STATUSES, pick, RULE_IDS, SEVERITIES, type Finding } from "./types";
@@ -62,19 +68,46 @@ function Checkbox({
   );
 }
 
+/** One group of the list (blockers, warnings): an h2 that names the region, then the table. */
+function FindingGroup({
+  title,
+  hint,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  children: ReactNode;
+}) {
+  const headingId = useId();
+  return (
+    <section aria-labelledby={headingId} className="space-y-3">
+      <div className="space-y-1">
+        <h2 id={headingId} className="text-lg font-semibold text-ink">
+          {title}
+        </h2>
+        {hint ? <p className="text-sm text-ink-muted">{hint}</p> : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 /**
- * Findings list (US-501, US-502; FR-DQ-006): summary counts, filters in the URL, blockers
- * shown before warnings, the conflicting values (masked where sensitive) with their sources,
- * the explanation in the reader's language and the suggested correction. Prints on A4.
+ * Findings list (US-501, US-502; FR-DQ-006): summary counts, filters in the URL (the active
+ * ones as removable chips), blockers separated from and shown before warnings, the
+ * conflicting values (masked where sensitive) with their sources, the explanation in the
+ * reader's language and the suggested correction. Prints on A4.
  */
 export function FindingsScreen({ filters }: { filters: FindingFilters }) {
   const t = useTranslations("findings");
   const tc = useTranslations("common");
+  const ttable = useTranslations("ui.table");
   const tsev = useTranslations("findings.severity");
   const tstatus = useTranslations("findings.status");
   const locale = useLocale() as Locale;
   const api = useBffClient("staff");
   const can = useStaffCan();
+  const router = useRouter();
   const rules = useRules();
   const profiles = useProfiles();
   const attributes = useAttributes();
@@ -123,7 +156,7 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
   const others = rows.filter((row) => !row.blocker);
   const count = (value: number | null | undefined) => formatCount(value, locale);
 
-  const columns: Column<Finding>[] = [
+  const columns: ColumnV2<Finding>[] = [
     {
       key: "severity",
       stack: "field",
@@ -134,6 +167,7 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
       key: "student",
       stack: "title",
       header: t("colStudent"),
+      hideable: false,
       cell: (row) => (
         <span className="block min-w-36">
           <span className="block font-semibold">
@@ -191,11 +225,12 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
       key: "open",
       stack: "actions",
       header: tc("actions"),
+      hideable: false,
       className: "print:hidden",
       cell: (row) => (
         <Link
           href={`/findings/${row.id}`}
-          className="inline-flex items-center gap-1 font-semibold whitespace-nowrap text-primary underline-offset-4 hover:underline"
+          className="inline-flex min-h-6 items-center gap-1 font-semibold whitespace-nowrap text-primary underline-offset-4 hover:underline"
         >
           {t("openFinding")}
           <span className="sr-only">
@@ -207,15 +242,62 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
   ];
 
   const activeRule = filters.ruleId ? ruleText(rules.data, filters.ruleId, locale) : null;
+  const ruleValue = filters.ruleId
+    ? `${filters.ruleId}${activeRule ? ` · ${activeRule}` : ""}`
+    : null;
+  const profileValue = profileLabel(profiles.data, filters.profileKey, locale);
+  const sectionValue = filters.sectionId
+    ? (sections.find((s) => s.id === filters.sectionId)?.label ?? null)
+    : null;
   const filterSummary = [
     filters.status.map((status) => tstatus(status)).join(", "),
     filters.severity.length > 0 ? filters.severity.map((s) => tsev(s)).join(", ") : null,
-    filters.ruleId ? `${filters.ruleId}${activeRule ? ` · ${activeRule}` : ""}` : null,
-    profileLabel(profiles.data, filters.profileKey, locale),
-    filters.sectionId ? (sections.find((s) => s.id === filters.sectionId)?.label ?? null) : null,
+    ruleValue,
+    profileValue,
+    sectionValue,
   ]
     .filter(Boolean)
     .join(" · ");
+
+  // The filters in the URL as chips; removing one opens the list without it (docs/17 §4.3).
+  const chips: FilterChip[] = [
+    ...(hasCustomStatus(filters)
+      ? [
+          {
+            id: "status",
+            label: t("filterStatus"),
+            value: filters.status.map((status) => tstatus(status)).join(", "),
+          },
+        ]
+      : []),
+    ...(filters.severity.length > 0
+      ? [
+          {
+            id: "severity",
+            label: t("filterSeverity"),
+            value: filters.severity.map((s) => tsev(s)).join(", "),
+          },
+        ]
+      : []),
+    ...(ruleValue ? [{ id: "rule_id", label: t("filterRule"), value: ruleValue }] : []),
+    ...(filters.profileKey
+      ? [
+          {
+            id: "profile_key",
+            label: t("filterProfile"),
+            value: profileValue ?? filters.profileKey,
+          },
+        ]
+      : []),
+    ...(filters.sectionId
+      ? [{ id: "section_id", label: t("filterSection"), value: sectionValue ?? t("chipSection") }]
+      : []),
+    ...(filters.studentId
+      ? [{ id: "student_id", label: t("colStudent"), value: t("chipOneStudent") }]
+      : []),
+  ];
+  const removeChip = (id: string) => router.push(findingsHref(filters, id as FindingFilterKey));
+  const clearFilters = () => router.push("/findings");
 
   // Counts by severity exactly as the API returns them (no zero rows invented).
   const bySeverity = SEVERITIES.filter(
@@ -225,8 +307,21 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
   const severityValue = filters.severity.length === 1 ? (filters.severity[0] ?? "") : "";
   const lastRun = formatDateTime(summary.data?.last_run?.finished_at ?? null);
 
+  const groupTable = (id: string, caption: string, data: readonly Finding[], empty: string) => (
+    <DataTableV2
+      id={id}
+      stacked
+      caption={caption}
+      captionHidden
+      columns={columns}
+      state={{ status: "ready", data }}
+      rowKey={(row) => row.id}
+      emptyTitle={empty}
+    />
+  );
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={t("title")}
         description={t("description")}
@@ -236,6 +331,9 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
             {can("dq.findings.resolve") ? (
               <RunChecksDialog defaultProfile={filters.profileKey} />
             ) : null}
+            <ButtonLink href="/findings/rules" variant="secondary">
+              {t("rulesLink")}
+            </ButtonLink>
             <Button variant="secondary" onClick={() => window.print()}>
               {t("print")}
             </Button>
@@ -254,7 +352,7 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
           <Alert tone="warning">{t("summaryUnavailable")}</Alert>
         ) : (
           <>
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-3">
               <KpiCard
                 label={t("summaryBlockers")}
                 value={count(summary.data?.blockers)}
@@ -283,7 +381,7 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
                   {bySeverity.map((item) => (
                     <span key={item.severity} className="inline-flex items-center gap-1">
                       <SeverityBadge severity={item.severity} />
-                      <span className="font-mono text-ink tabular-nums">{count(item.count)}</span>
+                      <span className="num text-ink">{count(item.count)}</span>
                     </span>
                   ))}
                 </p>
@@ -293,18 +391,18 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
         )}
       </section>
 
-      <Card title={t("filtersTitle")} className="print:hidden">
-        <form method="get" className="space-y-5">
+      <div
+        className="min-w-0 rounded-xl border border-border bg-surface print:hidden"
+        data-print="hide"
+      >
+        <form
+          method="get"
+          role="search"
+          aria-label={t("filtersTitle")}
+          className="space-y-4 px-3 py-3 sm:px-4"
+        >
           {filters.studentId ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <input type="hidden" name="student_id" value={filters.studentId} />
-              <Pill variant="date" size="md">
-                {t("oneStudentOnly")}
-              </Pill>
-              <Link href="/findings" className="text-sm text-primary underline">
-                {t("allStudents")}
-              </Link>
-            </div>
+            <input type="hidden" name="student_id" value={filters.studentId} />
           ) : null}
           <div className="flex flex-wrap items-start gap-x-8 gap-y-4">
             <SegmentedControl
@@ -367,66 +465,53 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
                 ...sections.map((section) => ({ value: section.id, label: section.label })),
               ]}
             />
-            <div className="flex flex-wrap items-center gap-3">
-              <Button type="submit">
+            <div>
+              <Button type="submit" variant="secondary">
                 <Icon name="filter" className="size-4" />
                 {tc("applyFilters")}
               </Button>
-              <Link href="/findings/rules" className="text-sm text-primary underline">
-                {t("rulesLink")}
-              </Link>
             </div>
           </div>
         </form>
-      </Card>
+        <FilterChips
+          chips={chips}
+          onRemove={removeChip}
+          onClear={clearFilters}
+          className="border-t border-border px-3 py-2 sm:px-4"
+        />
+      </div>
 
-      {state.status !== "ready" ? (
-        <DataTable
+      {state.status !== "ready" || rows.length === 0 ? (
+        <DataTableV2
+          id="findings"
           stacked
           caption={t("title")}
           captionHidden
           columns={columns}
           state={state}
           rowKey={(row) => row.id}
+          onRetry={() => void findings.refetch()}
           emptyTitle={t("emptyTitle")}
+          emptyBody={t("emptyBody")}
+          emptyAction={
+            chips.length > 0 ? (
+              <ButtonLink href="/findings" variant="secondary" size="sm">
+                {ttable("clearFilters")}
+              </ButtonLink>
+            ) : undefined
+          }
         />
-      ) : rows.length === 0 ? (
-        <EmptyState icon="checkCircle" title={t("emptyTitle")} body={t("emptyBody")} />
       ) : (
         <>
-          <Card
+          <FindingGroup
             title={t("blockersTitle", { count: blockers.length })}
-            description={t("blockersHint")}
+            hint={t("blockersHint")}
           >
-            {blockers.length > 0 ? (
-              <DataTable
-                stacked
-                caption={t("blockersCaption")}
-                captionHidden
-                columns={columns}
-                state={{ status: "ready", data: blockers }}
-                rowKey={(row) => row.id}
-                emptyTitle={t("noBlockers")}
-              />
-            ) : (
-              <p className="text-sm text-ink-muted">{t("noBlockers")}</p>
-            )}
-          </Card>
-          <Card title={t("warningsTitle", { count: others.length })}>
-            {others.length > 0 ? (
-              <DataTable
-                stacked
-                caption={t("warningsCaption")}
-                captionHidden
-                columns={columns}
-                state={{ status: "ready", data: others }}
-                rowKey={(row) => row.id}
-                emptyTitle={t("noWarnings")}
-              />
-            ) : (
-              <p className="text-sm text-ink-muted">{t("noWarnings")}</p>
-            )}
-          </Card>
+            {groupTable("findings-blockers", t("blockersCaption"), blockers, t("noBlockers"))}
+          </FindingGroup>
+          <FindingGroup title={t("warningsTitle", { count: others.length })}>
+            {groupTable("findings-warnings", t("warningsCaption"), others, t("noWarnings"))}
+          </FindingGroup>
           {findings.hasNextPage ? (
             <div className="flex justify-center print:hidden">
               <Button
