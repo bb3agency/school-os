@@ -2,7 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
-import { useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import * as z from "@/lib/zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
@@ -10,9 +10,13 @@ import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Pill, type PillVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorSummary, type SummaryError } from "@/components/ui/ErrorSummary";
 import { TextField } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SaveBar } from "@/components/ui/SaveBar";
+import { Steps } from "@/components/ui/Steps";
 import { Table, TableScroll, TBody, Td, Th, THead, Tr } from "@/components/ui/Table";
 import { Toggle } from "@/components/ui/Toggle";
 import { Value } from "@/components/ui/Value";
@@ -268,6 +272,7 @@ function AccountCard({ account, canConfigure }: { account: Account; canConfigure
                 title={t("resumeTitle")}
                 description={t("resumeBody")}
                 confirmLabel={t("resume")}
+                consequence={t("resumeConsequence")}
                 stepUp
                 schema={z.object({})}
                 invalidate={[KEYS.all]}
@@ -282,6 +287,7 @@ function AccountCard({ account, canConfigure }: { account: Account; canConfigure
               description={t("disconnectBody")}
               confirmLabel={t("disconnect")}
               confirmVariant="danger"
+              consequence={t("disconnectConsequence")}
               stepUp
               schema={z.object({})}
               invalidate={[KEYS.all]}
@@ -309,7 +315,9 @@ function AccountCard({ account, canConfigure }: { account: Account; canConfigure
         </Alert>
       ) : null}
       <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Fact label={t("number")}>{account.display_phone ?? none}</Fact>
+        <Fact label={t("number")}>
+          <span className="num whitespace-nowrap">{account.display_phone ?? none}</span>
+        </Fact>
         <Fact label={t("name")}>{account.display_name ?? none}</Fact>
         <Fact label={t("status")}>
           <Pill variant={STATUS_PILL[status] ?? "sample"}>{t(`statuses.${status}`)}</Pill>
@@ -320,19 +328,25 @@ function AccountCard({ account, canConfigure }: { account: Account; canConfigure
             : none}
         </Fact>
         <Fact label={t("limit")}>
-          {account.messaging_limit_count
-            ? t("limitValue", {
-                count: formatCount(account.messaging_limit_count, locale) ?? "",
-                cap: formatCount(account.default_daily_cap ?? 0, locale) ?? "",
-              })
-            : none}
+          <span className="num">
+            {account.messaging_limit_count
+              ? t("limitValue", {
+                  count: formatCount(account.messaging_limit_count, locale) ?? "",
+                  cap: formatCount(account.default_daily_cap ?? 0, locale) ?? "",
+                })
+              : none}
+          </span>
         </Fact>
         <Fact label={t("currency")}>
           {t(`currencies.${account.currency_state ?? "unknown"}` as "currencies.unknown")}
         </Fact>
         <Fact label={t("mode")}>{account.mode ? t(`modes.${account.mode}`) : none}</Fact>
-        <Fact label={t("connectedAt")}>{formatDateTime(account.connected_at) ?? none}</Fact>
-        <Fact label={t("syncedAt")}>{formatDateTime(account.last_synced_at) ?? none}</Fact>
+        <Fact label={t("connectedAt")}>
+          <span className="num">{formatDateTime(account.connected_at) ?? none}</span>
+        </Fact>
+        <Fact label={t("syncedAt")}>
+          <span className="num">{formatDateTime(account.last_synced_at) ?? none}</span>
+        </Fact>
       </dl>
     </Card>
   );
@@ -358,6 +372,7 @@ function TemplatesCard({
             title={t("syncTitle")}
             description={t("syncBody")}
             confirmLabel={t("sync")}
+            consequence={t("syncConsequence")}
             stepUp
             schema={z.object({})}
             invalidate={[KEYS.all]}
@@ -406,13 +421,87 @@ function TemplatesCard({
   );
 }
 
-function SettingsForm({ settings }: { settings: Settings }) {
+type SwitchName =
+  "notices_enabled" | "absence_alerts_enabled" | "fee_reminders_enabled" | "fee_receipts_enabled";
+
+function formSnapshot(form: HTMLFormElement): string {
+  const pairs: [string, string][] = [];
+  for (const [name, value] of new FormData(form).entries()) {
+    if (typeof value === "string") pairs.push([name, value]);
+  }
+  return JSON.stringify(pairs);
+}
+
+/**
+ * Whether the settings form differs from the values it was first drawn with (the saved
+ * settings), for the save bar. Re-checked after every render (the switches are controlled) and
+ * on every form change; Discard remounts the form.
+ */
+function useSettingsDirty() {
+  const ref = useRef<HTMLFormElement>(null);
+  const initial = useRef<string | null>(null);
+  const [dirty, setDirty] = useState(false);
+  const check = useCallback(() => {
+    const form = ref.current;
+    if (!form) return;
+    const snapshot = formSnapshot(form);
+    if (initial.current === null) initial.current = snapshot;
+    setDirty(snapshot !== initial.current);
+  }, []);
+  const markSaved = useCallback(() => {
+    const form = ref.current;
+    if (!form) return;
+    initial.current = formSnapshot(form);
+    setDirty(false);
+  }, []);
+  useEffect(() => {
+    check();
+  });
+  return { ref, dirty, onChange: check, markSaved };
+}
+
+const SETTINGS_FIELDS = {
+  absence_alert_time: "wa-absence-time",
+  quiet_start: "wa-quiet-start",
+  quiet_end: "wa-quiet-end",
+  daily_cap: "wa-daily-cap",
+  office_phone: "wa-office-phone",
+} as const;
+
+/**
+ * The switches and times, saved explicitly (docs/17 §4.4): a save bar says whether there are
+ * changes not saved yet, Discard brings back the saved values, and a failed save lists its
+ * problems at the top of the form. Nothing is saved by itself.
+ */
+function SettingsForm({
+  settings,
+  saved,
+  onSaved,
+  onEdited,
+  onDiscard,
+}: {
+  settings: Settings;
+  saved: boolean;
+  onSaved: () => void;
+  onEdited: () => void;
+  onDiscard: () => void;
+}) {
   const t = useTranslations("messaging.settings");
+  const tc = useTranslations("common");
   const api = useBffClient("staff");
-  const [saved, setSaved] = useState(false);
+  const { ref: formRef, dirty, onChange: checkDirty, markSaved } = useSettingsDirty();
+  const [attempt, setAttempt] = useState(0);
+  // Controlled so the save bar sees a switch change (a click is not a form change event).
+  const [switchState, setSwitchState] = useState<Record<SwitchName, boolean>>({
+    notices_enabled: settings.notices_enabled,
+    absence_alerts_enabled: settings.absence_alerts_enabled,
+    fee_reminders_enabled: settings.fee_reminders_enabled,
+    fee_receipts_enabled: settings.fee_receipts_enabled,
+  });
   const form = useApiForm({
     schema: settingsSchema,
     invalidate: [KEYS.settings],
+    onInvalid: () => setAttempt((value) => value + 1),
     submit: (input) =>
       unwrap(
         api.PUT("/api/v1/messaging/settings", {
@@ -420,36 +509,49 @@ function SettingsForm({ settings }: { settings: Settings }) {
           body: settingsBody(input),
         }),
       ),
-    onSuccess: () => setSaved(true),
+    onSuccess: () => {
+      markSaved();
+      onSaved();
+    },
   });
-  const switches = [
-    ["notices_enabled", settings.notices_enabled],
-    ["absence_alerts_enabled", settings.absence_alerts_enabled],
-    ["fee_reminders_enabled", settings.fee_reminders_enabled],
-    ["fee_receipts_enabled", settings.fee_receipts_enabled],
-  ] as const;
+  const switches = Object.keys(switchState) as SwitchName[];
+  const summary: SummaryError[] = (
+    Object.keys(SETTINGS_FIELDS) as (keyof typeof SETTINGS_FIELDS)[]
+  ).flatMap((name) =>
+    form.errors[name] ? [{ fieldId: SETTINGS_FIELDS[name], message: form.errors[name] }] : [],
+  );
   return (
     <form
+      ref={formRef}
       onSubmit={form.onSubmit}
-      onChange={() => setSaved(false)}
+      onChange={() => {
+        onEdited();
+        checkDirty();
+      }}
       className="space-y-4"
       noValidate
     >
+      <ErrorSummary errors={summary} attempt={attempt} />
       <fieldset className="space-y-3">
         <legend className="font-semibold text-ink">{t("switches")}</legend>
-        {switches.map(([name, on]) => (
+        {switches.map((name) => (
           <Toggle
             key={name}
             name={name}
             label={t(`switch.${name}`)}
             description={t(`switchHint.${name}`)}
-            defaultChecked={on}
+            checked={switchState[name]}
+            onCheckedChange={(on) => {
+              onEdited();
+              setSwitchState((current) => ({ ...current, [name]: on }));
+            }}
             labelFirst
           />
         ))}
       </fieldset>
       <div className="grid gap-4 sm:grid-cols-3">
         <TextField
+          id={SETTINGS_FIELDS.absence_alert_time}
           name="absence_alert_time"
           type="time"
           label={t("absenceTime")}
@@ -457,6 +559,7 @@ function SettingsForm({ settings }: { settings: Settings }) {
           error={form.errors.absence_alert_time}
         />
         <TextField
+          id={SETTINGS_FIELDS.quiet_start}
           name="quiet_start"
           type="time"
           label={t("quietStart")}
@@ -464,6 +567,7 @@ function SettingsForm({ settings }: { settings: Settings }) {
           error={form.errors.quiet_start}
         />
         <TextField
+          id={SETTINGS_FIELDS.quiet_end}
           name="quiet_end"
           type="time"
           label={t("quietEnd")}
@@ -473,6 +577,7 @@ function SettingsForm({ settings }: { settings: Settings }) {
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <TextField
+          id={SETTINGS_FIELDS.daily_cap}
           name="daily_cap"
           label={t("dailyCap")}
           hint={
@@ -485,6 +590,7 @@ function SettingsForm({ settings }: { settings: Settings }) {
           error={form.errors.daily_cap}
         />
         <TextField
+          id={SETTINGS_FIELDS.office_phone}
           name="office_phone"
           type="tel"
           label={t("officePhone")}
@@ -494,22 +600,28 @@ function SettingsForm({ settings }: { settings: Settings }) {
           error={form.errors.office_phone}
         />
       </div>
-      <div className="flex flex-wrap items-center gap-3">
+      <ApiErrorAlert error={form.error} namespace="messaging" />
+      <SaveBar
+        dirty={dirty}
+        savedLabel={saved ? <span className="text-positive-ink">{t("saved")}</span> : undefined}
+      >
+        <Button
+          variant="secondary"
+          disabled={!dirty || form.pending}
+          aria-disabled={!dirty || form.pending || undefined}
+          onClick={onDiscard}
+        >
+          {t("discard")}
+        </Button>
         <Button
           type="submit"
           variant="primary"
           disabled={form.pending}
           aria-disabled={form.pending || undefined}
         >
-          {t("save")}
+          {form.pending ? tc("working") : t("save")}
         </Button>
-        {saved ? (
-          <p role="status" className="text-sm text-positive-ink">
-            {t("saved")}
-          </p>
-        ) : null}
-      </div>
-      <ApiErrorAlert error={form.error} namespace="messaging" />
+      </SaveBar>
     </form>
   );
 }
@@ -517,12 +629,25 @@ function SettingsForm({ settings }: { settings: Settings }) {
 function SettingsCard({ canConfigure }: { canConfigure: boolean }) {
   const t = useTranslations("messaging.settings");
   const settings = useMessagingSettings();
+  const [saved, setSaved] = useState(false);
+  // Discard: remount the form so every field shows the saved values again.
+  const [generation, setGeneration] = useState(0);
   return (
     <Card title={t("title")} description={t("description")}>
       <MessagingGate data={settings}>
         {(current) =>
           canConfigure ? (
-            <SettingsForm key={current.version} settings={current} />
+            <SettingsForm
+              key={`${current.version}:${generation}`}
+              settings={current}
+              saved={saved}
+              onSaved={() => setSaved(true)}
+              onEdited={() => setSaved(false)}
+              onDiscard={() => {
+                setSaved(false);
+                setGeneration((value) => value + 1);
+              }}
+            />
           ) : (
             <dl className="grid gap-4 sm:grid-cols-2">
               <Fact label={t("switches")}>
@@ -550,6 +675,16 @@ function SettingsCard({ canConfigure }: { canConfigure: boolean }) {
 }
 
 /**
+ * Where the school is in setting up WhatsApp, from the account's state only (the flow itself is
+ * unchanged): 0 check before connecting, 1 connecting (Meta has not finished), 2 connected
+ * (templates and settings).
+ */
+export function connectStep(account: Pick<Account, "connected" | "status">): number {
+  if (account.connected) return 2;
+  return account.status === "connecting" ? 1 : 0;
+}
+
+/**
  * WhatsApp settings (US-2201, US-2209; ADR-0043; docs/17 §5.8): connect the school's own
  * number (Meta's Embedded Signup, or a pasted token for pilots), the account's status, quality
  * and limit with Resume after a pause, template statuses, and switches and times. Changes need
@@ -557,7 +692,6 @@ function SettingsCard({ canConfigure }: { canConfigure: boolean }) {
  */
 export function WhatsAppSettingsScreen() {
   const t = useTranslations("messaging");
-  const tn = useTranslations("school.nav");
   const can = useStaffCan();
   const me = useStaffMe();
   const meLoaded = me !== undefined;
@@ -565,20 +699,23 @@ export function WhatsAppSettingsScreen() {
   const canConfigure = can(CONFIGURE);
   const account = useAccount(meLoaded && can([CONFIGURE, READ]));
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={t("settingsTitle")}
-        description={t("settingsDescription")}
-        breadcrumb={[{ label: tn("home"), href: "/" }, { label: t("settingsTitle") }]}
-      />
+    <div className="space-y-5">
+      <PageHeader title={t("settingsTitle")} description={t("settingsDescription")} />
       {meLoaded && !allowed ? (
-        <Alert tone="info" title={t("noAccessTitle")}>
-          {t("noAccessBody")}
-        </Alert>
+        <EmptyState icon="lock" title={t("noAccessTitle")} body={t("noAccessBody")} />
       ) : (
         <MessagingGate data={meLoaded ? account : { status: "loading" }}>
           {(current) => (
             <>
+              <Steps
+                label={t("steps.label")}
+                current={connectStep(current)}
+                steps={[
+                  { id: "check", label: t("steps.check") },
+                  { id: "connect", label: t("steps.connect") },
+                  { id: "templates", label: t("steps.templates") },
+                ]}
+              />
               {current.unreviewed_texts && current.unreviewed_texts.length > 0 ? (
                 <Alert tone="warning" title={t("unreviewedTitle")}>
                   {t("unreviewedBody")}
