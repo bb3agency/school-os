@@ -36,6 +36,7 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 from collections.abc import Iterable, Mapping, MutableMapping
+from dataclasses import dataclass
 from typing import Any, Final
 from zoneinfo import ZoneInfo
 
@@ -1669,6 +1670,69 @@ def download_url(
     )
 
 
+# --- R2-3H parent notice page (ADR-0046 decision 2 "Notice"; FR-PUB-009; US-2401) --------------
+
+
+@dataclass(frozen=True, slots=True)
+class ParentNoticeView:
+    """What the parent notice page shows: title, body, approval date, whether the PDF can be
+    opened now. Notices never carry student data (docs/08 §8)."""
+
+    title: str
+    body: str
+    approved_on: dt.date | None
+    pdf_available: bool
+
+
+def parent_notice(session: Session, notice_id: uuid.UUID, language: str) -> ParentNoticeView | None:
+    """An approved notice of the current school for a parent link (no permission check: the
+    caller holds a live ``parent_notice`` link); ``None`` for anything else. Telugu text only
+    while Telugu is switched on and the notice has its own Telugu text (ADR-0036: while hidden
+    the stored Telugu fields repeat the English, R-16); otherwise English."""
+    notice = repo.get_notice(session, notice_id)
+    if notice is None or notice.status != "approved":
+        return None
+    title, body = notice.title_en, notice.body_en
+    title_te, body_te = telugu_text(notice.title_te), telugu_text(notice.body_te)
+    if language == "te" and title_te and body_te:
+        title, body = title_te, body_te
+    approved = notice.approved_at.astimezone(IST).date() if notice.approved_at else None
+    return ParentNoticeView(
+        title=title,
+        body=body,
+        approved_on=approved,
+        pdf_available=notice.pdf_key is not None and _files_available(notice),
+    )
+
+
+def parent_notice_pdf(session: Session, notice_id: uuid.UUID) -> tuple[str, dt.datetime] | None:
+    """A presigned link (at most 5 minutes) to the approved notice's PDF for a parent link, or
+    ``None`` when it is not available now. Audit ``notice.downloaded`` (system, via
+    ``parent_link``)."""
+    notice = repo.get_notice(session, notice_id)
+    if notice is None or notice.status != "approved" or notice.pdf_key is None:
+        return None
+    if not _files_available(notice):
+        return None
+    url, expires_at = documents.export_download_url(
+        session,
+        notice.id,
+        notice.pdf_key,
+        content_type=NOTICE_MIME["pdf"],
+        filename=f"notice-{str(notice.id)[:8]}.pdf",
+        ttl_s=DOWNLOAD_TTL_S,
+    )
+    _audit(
+        session,
+        "notice.downloaded",
+        "parent_notice",
+        notice.id,
+        {"format": "pdf", "via": "parent_link"},
+        system=True,
+    )
+    return url, expires_at
+
+
 def render_notice(tenant_id: uuid.UUID, notice_id: uuid.UUID) -> str:
     """Worker (outbox ``circulars.notice.render_requested``, queue ``pdf``): the A4 PDF and the
     PNG of an approved notice, stored under the school's ``exports/`` prefix."""
@@ -1793,6 +1857,7 @@ __all__ = [
     "TASK_ALL",
     "TASK_MANAGE",
     "TASK_READ",
+    "ParentNoticeView",
     "abandon_draft",
     "abandon_reading",
     "abandon_render",
@@ -1812,6 +1877,8 @@ __all__ = [
     "list_tasks",
     "mark_reviewed",
     "on_version_indexed",
+    "parent_notice",
+    "parent_notice_pdf",
     "purge_tenant_data",
     "render_notice",
     "request_reading",

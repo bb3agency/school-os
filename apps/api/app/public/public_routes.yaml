@@ -41,3 +41,16 @@ routes:
     provider: razorpay
   # --- end R2-2D ------------------------------------------------------------------------------
   # --- R2-3H parent pages: the other /api/v1/public/links/current/* routes ------------------
+  GET /api/v1/public/links/current/document:
+    guard: public_handle
+    kinds: [parent_notice, parent_receipt]
+  POST /api/v1/public/links/current/pay:
+    guard: public_handle
+    kinds: [parent_dues]
+  GET /api/v1/public/links/current/payment:
+    guard: public_handle
+    kinds: [parent_dues]
+  POST /api/v1/public/links/current/optin:
+    guard: public_handle
+    kinds: [parent_optin]
+  # --- end R2-3H ------------------------------------------------------------------------------

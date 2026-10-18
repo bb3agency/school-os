@@ -409,6 +409,11 @@ IDEMPOTENCY_EXEMPT = {
     ("POST", "/api/v1/fleet/heartbeat"): "machine route; nonce and timestamp make it replay-safe",
     ("POST", "/api/v1/public/links/exchange"): "a read: checks a parent link token, stores "
     "nothing (ADR-0046; no member, so no per-person replay store)",
+    # R2-3H parent pages (ADR-0046 decision 9, ADR-0044 decision 4).
+    ("POST", "/api/v1/public/links/current/pay"): "idempotent per link and instalments: an open "
+    "payment link for the same choice is returned again (reused), never a second one",
+    ("POST", "/api/v1/public/links/current/optin"): "sets one value (the guardian's message "
+    "language); repeating it changes nothing",
     ("POST", "/api/v1/edge/tally/enrol"): "machine route; the one-time code is consumed",
     ("POST", "/api/v1/edge/tally/syncs"): "machine route; sync ids are unique per device",
     ("POST", "/api/v1/sections/{section_id}/attendance"): "an upsert keyed by student and day",

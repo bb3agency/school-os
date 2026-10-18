@@ -6727,11 +6727,103 @@ export interface paths {
         };
         /**
          * Current Link
-         * @description The parent page frame for the cookie's link (the BFF sends the cookie's token in
+         * @description The parent page for the cookie's link (the BFF sends the cookie's token in
          *     ``X-SOS-Public-Token``): kind, expiry, language (guardian, else school, else English;
-         *     FR-PUB-008) and the school's name. Counts a view (FR-PUB-012).
+         *     FR-PUB-008), the school's name and the content of its kind (ADR-0046 decision 2;
+         *     FR-PUB-009). Counts a view (FR-PUB-012).
          */
         get: operations["current_link_api_v1_public_links_current_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/links/current/document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Current Document
+         * @description The PDF of a notice or receipt link, presigned for at most 5 minutes (FR-PUB-009); 404
+         *     while there is none (a cancelled receipt, a notice whose files were removed). Audited by
+         *     the owning module. Not a view.
+         */
+        get: operations["current_document_api_v1_public_links_current_document_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/links/current/optin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Current Optin
+         * @description The parent's message language on an opt-in link ("Read messages in": English, Telugu or
+         *     the school's choice; ADR-0044 decision 4, FR-LANG-003). Audited ``guardian.updated``. The
+         *     page never records an opt-in or opt-out (ADR-0043 decision 7: STOP on WhatsApp).
+         */
+        post: operations["current_optin_api_v1_public_links_current_optin_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/links/current/pay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Current Pay
+         * @description Pay online from a dues link (ADR-0046 decision 9; FR-PAY-005): creates, or reuses while
+         *     it is valid, one payment link for the ticked instalments on the school's own Razorpay
+         *     account (``created_via parent_page``), and answers where to send the parent. Idempotent per
+         *     link and instalments: the same choice gets the same link back (``reused``) without spending
+         *     the budget; new links are limited to 5 per dues link per day (``public_pay``, 429). The BFF
+         *     checks the CSRF token and the Origin before calling.
+         */
+        post: operations["current_pay_api_v1_public_links_current_pay_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/links/current/payment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Current Payment
+         * @description The status of the payment link Razorpay returned from (``intent`` = the link's reference,
+         *     32 hex characters) or of the newest one this dues link made; 404 for anything else. The
+         *     return page polls it; it never counts as a view.
+         */
+        get: operations["current_payment_api_v1_public_links_current_payment_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -13808,12 +13900,12 @@ export interface components {
         };
         /**
          * LinkEnvelopeOut
-         * @description The parent page's frame for the cookie's link (``/p/view``): which page it is, until when
-         *     it works, its language (the guardian's choice, else the school's parent language, else
-         *     English: ADR-0044) and the school's name for the page heading. The page content per kind is
-         *     added by wave R2-3H (``app/public/pages.py``).
+         * @description The parent page for the cookie's link (``/p/view``): which page it is, until when it
+         *     works, its language (the guardian's choice, else the school's parent language, else English:
+         *     ADR-0044), the school's name, and exactly one content block for its kind (R2-3H).
          */
         LinkEnvelopeOut: {
+            dues?: components["schemas"]["ParentDuesOut"] | null;
             /**
              * Expires At
              * Format: date-time
@@ -13829,6 +13921,9 @@ export interface components {
              * @enum {string}
              */
             language: "en" | "te";
+            notice?: components["schemas"]["ParentNoticeOut"] | null;
+            optin?: components["schemas"]["ParentOptinOut"] | null;
+            receipt?: components["schemas"]["ParentReceiptOut"] | null;
             /** School Name */
             school_name: string;
         };
@@ -15360,6 +15455,210 @@ export interface components {
              * @enum {string}
              */
             status: "queued" | "done" | "failed";
+        };
+        /**
+         * ParentDocumentLinkOut
+         * @description A presigned GET of the notice or receipt PDF, valid at most 5 minutes; the BFF redirects
+         *     the parent to it (303) and never shows the address.
+         */
+        ParentDocumentLinkOut: {
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Url */
+            url: string;
+        };
+        /** ParentDueInstalmentOut */
+        ParentDueInstalmentOut: {
+            /** Due */
+            due: string;
+            /** Due On */
+            due_on: string | null;
+            /** Instalment No */
+            instalment_no: number;
+            /** Label */
+            label: string;
+            /** Late Fee */
+            late_fee: string;
+            /** Overdue */
+            overdue: boolean;
+        };
+        /**
+         * ParentDuesOut
+         * @description ADR-0046 decision 2 "Dues": the child's first name and class only, what is due now per
+         *     instalment (late fee shown separately), "Pay online" when the school takes online payments,
+         *     the UPI QR when set and the office phone.
+         */
+        ParentDuesOut: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Child First Name */
+            child_first_name: string;
+            /** Class Name */
+            class_name: string | null;
+            /** Instalments */
+            instalments: components["schemas"]["ParentDueInstalmentOut"][];
+            /** Late Fee Total */
+            late_fee_total: string;
+            /** Office Phone */
+            office_phone: string | null;
+            /** Pay Online */
+            pay_online: boolean;
+            /** Total Due */
+            total_due: string;
+            upi: components["schemas"]["ParentUpiOut"] | null;
+        };
+        /**
+         * ParentNoticeOut
+         * @description ADR-0046 decision 2 "Notice": the approved notice's title, body and date, and whether its
+         *     PDF can be opened now (``GET /public/links/current/document``).
+         */
+        ParentNoticeOut: {
+            /** Body */
+            body: string;
+            /** Date */
+            date: string | null;
+            /** Has Pdf */
+            has_pdf: boolean;
+            /** Title */
+            title: string;
+        };
+        /** ParentOptinCategoryOut */
+        ParentOptinCategoryOut: {
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "notices" | "attendance" | "fees";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "opted_in" | "opted_out" | "not_asked";
+            /** Stopped By Parent */
+            stopped_by_parent: boolean;
+        };
+        /**
+         * ParentOptinIn
+         * @description The parent's message language from the opt-in page (ADR-0044 decision 4).
+         */
+        ParentOptinIn: {
+            /**
+             * Language
+             * @enum {string}
+             */
+            language: "en" | "te" | "school";
+        };
+        /**
+         * ParentOptinOut
+         * @description ADR-0046 decision 2 "Opt-in": the categories with the choice made and the guardian's
+         *     message language (``school`` = the school's choice).
+         */
+        ParentOptinOut: {
+            /** Categories */
+            categories: components["schemas"]["ParentOptinCategoryOut"][];
+            /**
+             * Language Choice
+             * @enum {string}
+             */
+            language_choice: "en" | "te" | "school";
+            /**
+             * School Language
+             * @enum {string}
+             */
+            school_language: "en" | "te";
+        };
+        /**
+         * ParentPayIn
+         * @description The instalments the parent ticked on the dues page.
+         */
+        ParentPayIn: {
+            /** Instalments */
+            instalments: number[];
+        };
+        /**
+         * ParentPaymentStatusOut
+         * @description The return page's status of one payment link (``created`` = not paid yet).
+         */
+        ParentPaymentStatusOut: {
+            /** Amount */
+            amount: string;
+            /** Receipt Issued */
+            receipt_issued: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "created" | "paid" | "expired" | "cancelled" | "failed";
+        };
+        /**
+         * ParentPayOut
+         * @description Where to send the parent: the school's own Razorpay payment page (FR-PUB-010).
+         */
+        ParentPayOut: {
+            /** Amount */
+            amount: string;
+            /** Redirect Url */
+            redirect_url: string;
+            /** Reused */
+            reused: boolean;
+        };
+        /** ParentReceiptLineOut */
+        ParentReceiptLineOut: {
+            /** Amount */
+            amount: string;
+            /** Head Name */
+            head_name: string;
+            /** Label */
+            label: string;
+        };
+        /**
+         * ParentReceiptOut
+         * @description ADR-0046 decision 2 "Receipt" (owner decision D22): the receipt card as printed.
+         */
+        ParentReceiptOut: {
+            /** Admission No */
+            admission_no: string;
+            /** Amount */
+            amount: string;
+            /** Amount In Words */
+            amount_in_words: string;
+            /** Cancelled On */
+            cancelled_on: string | null;
+            /** Class Section */
+            class_section: string;
+            /** Has Pdf */
+            has_pdf: boolean;
+            /** Lines */
+            lines: components["schemas"]["ParentReceiptLineOut"][];
+            /** Mode */
+            mode: string;
+            /**
+             * Receipt Date
+             * Format: date
+             */
+            receipt_date: string;
+            /** Receipt Number */
+            receipt_number: string;
+            /** Student Name */
+            student_name: string;
+        };
+        /**
+         * ParentUpiOut
+         * @description The school's static UPI QR (SVG, no amount) and payee, when set (R2-2E).
+         */
+        ParentUpiOut: {
+            /** Payee Name */
+            payee_name: string;
+            /** Qr Svg */
+            qr_svg: string;
+            /** Upi Id */
+            upi_id: string;
         };
         /** PartyDetail */
         PartyDetail: {
@@ -36535,6 +36834,193 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Too many requests or failed lookups from this address. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    current_document_api_v1_public_links_current_document_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParentDocumentLinkOut"];
+                };
+            };
+            /** @description Unknown, expired or revoked link (always the same body). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many requests or failed lookups from this address. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    current_optin_api_v1_public_links_current_optin_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParentOptinIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParentOptinOut"];
+                };
+            };
+            /** @description Unknown, expired or revoked link (always the same body). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests or failed lookups from this address. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    current_pay_api_v1_public_links_current_pay_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParentPayIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParentPayOut"];
+                };
+            };
+            /** @description Unknown, expired or revoked link (always the same body). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not connected, nothing due or too many open links. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests or failed lookups from this address. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Razorpay did not make the link; try again. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    current_payment_api_v1_public_links_current_payment_get: {
+        parameters: {
+            query?: {
+                intent?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParentPaymentStatusOut"];
+                };
+            };
+            /** @description Unknown, expired or revoked link (always the same body). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
             /** @description Too many requests or failed lookups from this address. */
             429: {

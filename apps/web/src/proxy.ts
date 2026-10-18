@@ -99,7 +99,12 @@ function publicPage(
   const https = isHttpsDeployment(
     surface === "verify" ? process.env.VERIFY_BASE_URL : process.env.PUBLIC_BASE_URL,
   );
-  const csp = buildPublicCsp({ nonce, isDev: process.env.NODE_ENV === "development", https });
+  const csp = buildPublicCsp({
+    nonce,
+    isDev: process.env.NODE_ENV === "development",
+    https,
+    pay: surface === "public",
+  });
   request.headers.set("x-nonce", nonce);
   request.headers.set("Content-Security-Policy", csp);
   request.headers.delete(PATH_HEADER);

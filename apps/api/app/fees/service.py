@@ -34,6 +34,7 @@ from app.fees import (
     approvals,
     ledger,
     online,
+    parent_pages,
     receipts,
     refund_hooks,
     reports,
@@ -281,6 +282,21 @@ def upi_payee(session: Session) -> tuple[str, str, str] | None:
     return upi.payee(session)
 
 
+# R2-3H parent pages (ADR-0046 decisions 2 and 9; FR-PUB-009): allowlisted reads and the pay
+# step for app.public.pages; no permission check (the caller holds a live parent link).
+ParentReceipt = parent_pages.ParentReceipt
+ParentDues = parent_pages.ParentDues
+ParentPayment = parent_pages.ParentPayment
+ParentPaymentStatus = parent_pages.ParentPaymentStatus
+parent_receipt = parent_pages.receipt
+parent_receipt_pdf = parent_pages.receipt_pdf
+parent_account_student = parent_pages.account_student
+parent_dues = parent_pages.dues
+parent_pay = parent_pages.pay
+parent_payment = parent_pages.payment
+parent_upi_qr = upi.payee_qr
+
+
 def receipt_issued_event() -> str:
     """Outbox event written in the issuing transaction (payload: ``receipt_id``,
     ``account_id``, ``user_id``); the PDF render consumes it today, the receipt message later."""
@@ -368,6 +384,10 @@ __all__ = [
     "REPORT",
     "DayClosed",
     "ModuleHidden",
+    "ParentDues",
+    "ParentPayment",
+    "ParentPaymentStatus",
+    "ParentReceipt",
     "PaymentsNotConnected",
     "SelfApprovalForbidden",
     "account_summary",
@@ -375,6 +395,13 @@ __all__ = [
     "dues_for_student",
     "enabled",
     "export_records",
+    "parent_account_student",
+    "parent_dues",
+    "parent_pay",
+    "parent_payment",
+    "parent_receipt",
+    "parent_receipt_pdf",
+    "parent_upi_qr",
     "payment_link",
     "payments_connected",
     "purge_tenant_data",

@@ -3414,3 +3414,81 @@ def forget_destroyed_keys(tenant_id: uuid.UUID) -> None:
 
 if forget_destroyed_keys not in tenancy.KEYS_DESTROYED_HOOKS:
     tenancy.KEYS_DESTROYED_HOOKS.append(forget_destroyed_keys)
+
+
+# --- R2-3H parent pages (ADR-0046 decision 2; FR-PUB-009, FR-LANG-003) --------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class ParentChild:
+    """The most a parent dues page shows about the child: the first name and the class
+    (data minimisation, ADR-0046 decision 2 "Dues"; no surname, DOB, admission number)."""
+
+    first_name: str
+    class_name: str | None
+
+
+def first_name_of(full_name: str | None) -> str:
+    """A child's first given name for a parent page or message: the first word that is not an
+    initial (``K. VENKATA SAI`` gives ``Venkata``; ``Ravi Kumar`` gives ``Ravi``), in title case;
+    an empty string when the name is only initials."""
+    for word in (full_name or "").replace(".", ". ").split():
+        letters = word.strip(".,")
+        if len(letters) > 1 and any(ch.isalpha() for ch in letters):
+            return letters[:1].upper() + letters[1:].lower()
+    return ""
+
+
+def parent_page_child(session: Session, student_id: uuid.UUID) -> ParentChild | None:
+    """First name and current class of a student, for a parent link whose guardian the caller
+    has checked with :func:`guardian_student_ids` (system read, no scope)."""
+    rows = repo.summary_rows(session, [student_id])
+    if not rows:
+        return None
+    row = rows[0]
+    structure = _structure(session)
+    section = structure.sections.get(row.current_section_id) if row.current_section_id else None
+    klass = structure.classes.get(section.class_id) if section is not None else None
+    return ParentChild(
+        first_name=first_name_of(row.full_name),
+        class_name=klass.display_en if klass is not None else None,
+    )
+
+
+def set_guardian_language_from_parent_page(
+    session: Session, guardian_id: uuid.UUID, language: Language | None, *, handle_id: uuid.UUID
+) -> bool:
+    """The parent's own choice on the opt-in page ("Read messages in", ADR-0044 decision 4;
+    FR-LANG-003): ``en``, ``te`` or ``None`` for the school's choice. Audit ``guardian.updated``
+    (system actor, ``via: parent_link`` and the link's handle id). Returns ``False`` when the
+    guardian is gone or the value did not change."""
+    guardian = repo.get_guardian(session, guardian_id)
+    if guardian is None:
+        return False
+    if _language(guardian.preferred_language) == language:
+        return False
+    with _db_errors():
+        updated = repo.update_guardian(
+            session,
+            guardian_id,
+            expected_version=guardian.version,
+            values={"preferred_language": language},
+        )
+    if updated is None:
+        raise PreconditionFailed("The choice was changed just now. Reload and try again.")
+    request_id = get_context().get("request_id")
+    audit.record(
+        session,
+        action="guardian.updated",
+        resource_type="guardian",
+        resource_id=guardian_id,
+        summary={
+            "fields": ["preferred_language"],
+            "preferred_language": language,
+            "via": "parent_link",
+            "handle_id": handle_id,
+        },
+        actor_type="system",
+        request_id=request_id if isinstance(request_id, str) else None,
+    )
+    return True
