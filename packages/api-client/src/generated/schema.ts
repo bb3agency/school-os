@@ -980,6 +980,12 @@ export interface paths {
          * @description Change requests of students you can see, newest first (permission
          *     ``student.identity_change.request`` or ``student.identity_change.approve``). Values of
          *     sensitive (C3) fields are masked.
+         *
+         *     Inbox filters: ``waiting_for=me`` lists the requests you may decide now (pending and not
+         *     expired, on students in your approve scope, never your own: maker-checker), empty without
+         *     ``student.identity_change.approve``; ``requested_by=me`` lists the requests you submitted.
+         *     All filters combine, so ``waiting_for=me`` with another status or with ``requested_by=me``
+         *     gives an empty page.
          */
         get: operations["list_change_requests_api_v1_change_requests_get"];
         put?: never;
@@ -1732,6 +1738,30 @@ export interface paths {
          *     its board here, whether its format is verified, and its public sources (ADR-0041).
          */
         get: operations["list_profiles_api_v1_dq_profiles_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dq/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Readiness Overview
+         * @description Readiness of several boards and portals in one call: for each profile (at most 5, in
+         *     the order given) the same totals and per-section counts as ``GET
+         *     /dq/readiness/{profile_key}`` (permission ``dq.readiness.read``; class teachers see their
+         *     sections). Without ``profile_keys``, every readiness profile listed for the school. An
+         *     unknown profile, or one without a readiness check: 404.
+         */
+        get: operations["readiness_overview_api_v1_dq_readiness_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -16578,6 +16608,15 @@ export interface components {
             /** Waived */
             waived: boolean;
         };
+        /**
+         * ReadinessOverviewOut
+         * @description Readiness of several boards and portals in one call (one summary per profile, in the
+         *     order asked), each limited to your scope like ``GET /dq/readiness/{profile_key}``.
+         */
+        ReadinessOverviewOut: {
+            /** Summaries */
+            summaries: components["schemas"]["ReadinessSummaryOut"][];
+        };
         /** ReadinessProfileOut */
         ReadinessProfileOut: {
             /** Classes */
@@ -22347,8 +22386,10 @@ export interface operations {
                 cursor?: string | null;
                 /** @description Page size (max 200). */
                 limit?: number;
+                requested_by?: "me" | null;
                 status?: ("pending" | "approved" | "rejected" | "expired" | "cancelled") | null;
                 student_id?: string | null;
+                waiting_for?: "me" | null;
             };
             header?: never;
             path?: never;
@@ -24116,6 +24157,52 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProfileOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readiness_overview_api_v1_dq_readiness_get: {
+        parameters: {
+            query?: {
+                /** @description Readiness profiles (repeat the parameter); omitted: every readiness profile listed for this school. */
+                profile_keys?: string[] | null;
+                section_ids?: string[] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessOverviewOut"];
                 };
             };
             /** @description Validation Error */

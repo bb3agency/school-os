@@ -108,6 +108,47 @@ def test_US_504_summary_counts_sections_in_scope(world: Any, api: Any) -> None:
     assert api.call(office, "GET", "/api/v1/dq/readiness/udise-plus").status_code == 404
 
 
+def test_US_504_overview_has_one_summary_per_profile_in_scope(world: Any, api: Any) -> None:
+    """``GET /dq/readiness``: several boards and portals in one call (one column per portal)."""
+    ssc_student(world.a)
+    ssc_student(world.a, section_key="section_9c")
+    office = world.person("office_admin")
+    overview = "/api/v1/dq/readiness"
+    res = api.call(office, "GET", overview, params={"profile_keys": [SSC, "apaar"]})
+    assert res.status_code == 200, res.text
+    summaries = res.json()["summaries"]
+    assert [s["profile"]["key"] for s in summaries] == [SSC, "apaar"]
+    single = api.call(office, "GET", BASE).json()
+    assert summaries[0]["totals"] == single["totals"]
+    assert summaries[0]["sections"] == single["sections"]
+    # Omitted: every readiness profile listed for the school (FR-TEN-020).
+    profiles = api.call(office, "GET", "/api/v1/dq/profiles").json()
+    listed = {p["key"] for p in profiles if p["readiness"]}
+    default = api.call(office, "GET", overview).json()["summaries"]
+    assert {s["profile"]["key"] for s in default} == listed
+    # A class teacher sees only their own section in every column (SEC-015).
+    teacher = api.call(
+        world.person("class_teacher"), "GET", overview, params={"profile_keys": [SSC, "apaar"]}
+    )
+    assert teacher.status_code == 200, teacher.text
+    for one in teacher.json()["summaries"]:
+        assert {s["section_id"] for s in one["sections"]} <= {str(world.a.ids["section_9a"])}
+    # Permission, unknown profiles and bounds.
+    assert api.call(world.person("accountant"), "GET", overview).status_code == 403
+    for bad in ("no-such-board", "udise-plus"):
+        res = api.call(office, "GET", overview, params={"profile_keys": [SSC, bad]})
+        assert res.status_code == 404
+    bad_key = api.call(office, "GET", overview, params={"profile_keys": "Bad Key"})
+    assert bad_key.status_code == 422
+    too_many = api.call(office, "GET", overview, params={"profile_keys": [SSC] * 6})
+    assert too_many.status_code == 422
+    # Another school's sections never appear.
+    other = api.call(world.b.people["owner"], "GET", overview, params={"profile_keys": [SSC]})
+    assert other.status_code == 200
+    own_sections = {str(v) for k, v in world.a.ids.items() if k.startswith("section_")}
+    assert not {s["section_id"] for s in other.json()["summaries"][0]["sections"]} & own_sections
+
+
 def test_SEC_003_readiness_permissions(world: Any, api: Any) -> None:
     for role in ("accountant", "teacher"):
         assert api.call(world.person(role), "GET", BASE).status_code == 403

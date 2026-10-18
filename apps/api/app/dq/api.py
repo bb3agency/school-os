@@ -15,6 +15,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query, Request, Response
 from fastapi.responses import HTMLResponse
+from pydantic import StringConstraints
 
 from app.authz.context import UserContext
 from app.authz.dependencies import TenantDB, require
@@ -27,6 +28,7 @@ from app.dq.schemas import (
     FindingOut,
     FindingStatus,
     ProfileOut,
+    ReadinessOverviewOut,
     ReadinessRunIn,
     ReadinessStatus,
     ReadinessStudentDetailOut,
@@ -215,6 +217,32 @@ _SLIP_HEADERS = {
     "Content-Security-Policy": SLIP_CSP,
     "X-Content-Type-Options": "nosniff",
 }
+
+
+ProfileKeyValue = Annotated[str, StringConstraints(pattern=PROFILE_PATTERN, max_length=64)]
+
+
+@router.get("/readiness", response_model=ReadinessOverviewOut)
+def readiness_overview(
+    *,
+    ctx: ReadinessReader,
+    db: TenantDB,
+    profile_keys: Annotated[
+        list[ProfileKeyValue] | None,
+        Query(
+            max_length=readiness.MAX_OVERVIEW_PROFILES,
+            description="Readiness profiles (repeat the parameter); omitted: every readiness "
+            "profile listed for this school.",
+        ),
+    ] = None,
+    section_ids: Annotated[list[uuid.UUID] | None, Query(max_length=100)] = None,
+) -> ReadinessOverviewOut:
+    """Readiness of several boards and portals in one call: for each profile (at most 5, in
+    the order given) the same totals and per-section counts as ``GET
+    /dq/readiness/{profile_key}`` (permission ``dq.readiness.read``; class teachers see their
+    sections). Without ``profile_keys``, every readiness profile listed for the school. An
+    unknown profile, or one without a readiness check: 404."""
+    return readiness.overview(db, ctx, profile_keys, section_ids=section_ids)
 
 
 @router.get("/readiness/{profile_key}", response_model=ReadinessSummaryOut)
