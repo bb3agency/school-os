@@ -1,12 +1,12 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useState, type FormEvent, type ReactNode } from "react";
 import * as z from "@/lib/zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
-import { Badge } from "@/components/ui/Badge";
+import { Badge, Pill } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { LoadingState } from "@/components/ui/LoadingState";
@@ -16,9 +16,11 @@ import { SelectField } from "@/components/ui/Select";
 import { Value } from "@/components/ui/Value";
 import { useTeluguEnabled } from "@/i18n/LanguagesProvider";
 import { Link } from "@/i18n/navigation";
+import type { Locale } from "@/i18n/routing";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { STAFF_ME_KEY, useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
-import { formatDateTime } from "@/lib/format";
+import { formatCount, formatDateTime } from "@/lib/format";
+import { translateOr } from "@/lib/i18n-dynamic";
 import { containsAadhaarNumber } from "@/lib/aadhaar";
 import { formList, useApiForm } from "@/lib/forms";
 import { optionalEmail, text } from "@/lib/validation";
@@ -45,6 +47,7 @@ import {
   STATUS_ACTIONS,
   USER_LANGUAGES,
   USER_PERM,
+  type StaffRole,
   type StaffUser,
   type StatusChange,
   type UserLanguage,
@@ -92,6 +95,7 @@ function StatusActions({ user }: { user: StaffUser }) {
             description={
               user.status === "invited" && removing ? t("remove.invitedBody") : t(`${copy}.body`)
             }
+            consequence={t(`${copy}.consequence`)}
             confirmLabel={t(`${copy}.button`)}
             confirmVariant={removing ? "danger" : "primary"}
             stepUp
@@ -153,6 +157,59 @@ function ResendInvitation({ user }: { user: StaffUser & { email: string } }) {
         </>
       )}
     />
+  );
+}
+
+/**
+ * What the person's roles allow, from GET /roles (each role's permission keys): how many
+ * permissions in how many areas, and the areas with their counts. Read-only; the API decides
+ * every request. Shown only when the roles list could be read (`user.manage`).
+ */
+function PermissionSummary({
+  held,
+  roles,
+}: {
+  held: readonly string[];
+  roles: readonly StaffRole[] | undefined;
+}) {
+  const t = useTranslations("school.users.detail.permissions");
+  const locale = useLocale() as Locale;
+  if (!roles) return null;
+  const keys = new Set(
+    roles.filter((role) => held.includes(role.key)).flatMap((role) => role.permissions),
+  );
+  const areas = new Map<string, number>();
+  for (const key of keys) {
+    const area = key.split(".")[0] ?? key;
+    areas.set(area, (areas.get(area) ?? 0) + 1);
+  }
+  const count = (value: number) => formatCount(value, locale) ?? String(value);
+  const sorted = [...areas.entries()].sort(([a], [b]) => a.localeCompare(b));
+  return (
+    <section aria-labelledby="user-permissions-title" className="mt-5 border-t border-border pt-4">
+      <h3 id="user-permissions-title" className="font-semibold text-ink">
+        {t("title")}
+      </h3>
+      {keys.size === 0 ? (
+        <p className="mt-1 text-sm text-ink-muted">{t("none")}</p>
+      ) : (
+        <>
+          <p className="num mt-1 text-sm text-ink-muted">
+            {t("count", { permissions: keys.size, areas: areas.size })}
+          </p>
+          <ul aria-label={t("areasLabel")} className="mt-3 flex flex-wrap gap-1.5">
+            {sorted.map(([area, number]) => (
+              <li key={area}>
+                <Pill variant="tag">
+                  {translateOr(t, `area.${area}`, "area.other")}{" "}
+                  <span className="num font-semibold text-ink">{count(number)}</span>
+                </Pill>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
   );
 }
 
@@ -399,7 +456,7 @@ export function UserDetailScreen({ userId }: { userId: string }) {
     const missing = state.status === "error" && state.reason === "not_found";
     const forbidden = state.status === "error" && state.reason === "forbidden";
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader
           title={t("title")}
           breadcrumb={[{ label: tn("home"), href: "/" }, { label: t("title") }]}
@@ -425,7 +482,7 @@ export function UserDetailScreen({ userId }: { userId: string }) {
   const profileShared = user.profile_shared;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={user.display_name}
         breadcrumb={[
@@ -503,13 +560,23 @@ export function UserDetailScreen({ userId }: { userId: string }) {
             <UserStatusBadge status={user.status} />
           </Item>
           <Item label={td("invitedOn")}>
-            <Value>{formatDateTime(user.created_at)}</Value>
+            <span className="num">
+              <Value>{formatDateTime(user.created_at)}</Value>
+            </span>
           </Item>
           <Item label={t("colLastSignIn")}>
-            <Value>{formatDateTime(user.last_login_at)}</Value>
+            <span className="num">
+              <Value>{formatDateTime(user.last_login_at)}</Value>
+            </span>
           </Item>
           <Item label={td("accessEnds")}>
-            {user.expires_at ? <Value>{formatDateTime(user.expires_at)}</Value> : td("noEnd")}
+            {user.expires_at ? (
+              <span className="num">
+                <Value>{formatDateTime(user.expires_at)}</Value>
+              </span>
+            ) : (
+              td("noEnd")
+            )}
           </Item>
         </dl>
         {isSelf && canManage && !removed ? (
@@ -532,6 +599,7 @@ export function UserDetailScreen({ userId }: { userId: string }) {
         {!canAssign && !breakGlass && !removed ? (
           <p className="mt-2 text-sm text-ink-muted">{td("assignNeeded")}</p>
         ) : null}
+        <PermissionSummary held={user.roles} roles={roles.data} />
       </Card>
 
       <Card title={td("scopeTitle")} description={td("scopeDescription")}>

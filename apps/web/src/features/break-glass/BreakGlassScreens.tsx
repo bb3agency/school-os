@@ -2,16 +2,19 @@
 
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
+import { useRef } from "react";
 import * as z from "@/lib/zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
+import { DataTableV2, type ColumnV2 } from "@/components/console/DataTableV2";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import type { FilterChip } from "@/components/ui/FilterChips";
+import { Icon } from "@/components/ui/Icon";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
-import { DataTable, type Column } from "@/components/ui/Table";
 import { Timeline, type TimelineItem } from "@/components/ui/Timeline";
 import { Value } from "@/components/ui/Value";
 import { useSectionOptions } from "@/features/findings/data";
@@ -139,7 +142,7 @@ function NoAccess() {
   const t = useTranslations("breakGlass");
   const crumbs = useCrumbs();
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader title={t("title")} description={t("description")} breadcrumb={crumbs()} />
       <Alert tone="warning" title={t("noAccessTitle")}>
         {t("noAccessBody")}
@@ -149,6 +152,17 @@ function NoAccess() {
 }
 
 const PAGE_SIZE = 50;
+
+/**
+ * The status filter lives in the URL (GET form): removing its chip chooses "All" and submits
+ * the form again, the same GET of this page the Apply button makes.
+ */
+function submitAllStatuses(form: HTMLFormElement | null) {
+  if (!form) return;
+  const field = form.elements.namedItem("status");
+  if (field instanceof HTMLSelectElement) field.value = "";
+  form.requestSubmit();
+}
 
 /**
  * Support access (US-103, FR-OPS-004, SEC-021; docs/07 §6.4): every request SchoolOS support
@@ -163,6 +177,7 @@ export function BreakGlassScreen({ status }: { status: GrantStatus | null }) {
   const access = useCanApprove();
   const hours = useDuration();
   const crumbs = useCrumbs();
+  const filterForm = useRef<HTMLFormElement>(null);
   const list = useInfiniteQuery({
     queryKey: [...BREAKGLASS_KEYS.all, "list", status],
     queryFn: ({ pageParam }) =>
@@ -188,11 +203,16 @@ export function BreakGlassScreen({ status }: { status: GrantStatus | null }) {
 
   const rows = list.data?.pages.flatMap((one) => one.data) ?? [];
   const waiting = rows.filter((row) => row.status === "requested").length;
-  const columns: Column<Grant>[] = [
+  const open = rows.filter((row) => row.status === "active").length;
+  const columns: ColumnV2<Grant>[] = [
     {
       key: "requested",
       header: t("colRequested"),
-      cell: (row) => <Value>{formatDateTime(row.requested_at ?? row.created_at)}</Value>,
+      cell: (row) => (
+        <span className="num whitespace-nowrap">
+          <Value>{formatDateTime(row.requested_at ?? row.created_at)}</Value>
+        </span>
+      ),
     },
     {
       key: "who",
@@ -220,7 +240,11 @@ export function BreakGlassScreen({ status }: { status: GrantStatus | null }) {
     {
       key: "duration",
       header: t("colDuration"),
-      cell: (row) => <Value>{hours(row.duration_minutes)}</Value>,
+      cell: (row) => (
+        <span className="num whitespace-nowrap">
+          <Value>{hours(row.duration_minutes)}</Value>
+        </span>
+      ),
     },
     {
       key: "status",
@@ -229,7 +253,7 @@ export function BreakGlassScreen({ status }: { status: GrantStatus | null }) {
         <span className="flex flex-col items-start gap-1">
           <GrantStatusBadge status={row.status} />
           {row.status === "active" && row.expires_at ? (
-            <span className="text-xs text-ink-muted">
+            <span className="num text-xs whitespace-nowrap text-ink-muted">
               {t("endsAt", { time: formatDateTime(row.expires_at) ?? "" })}
             </span>
           ) : null}
@@ -251,57 +275,81 @@ export function BreakGlassScreen({ status }: { status: GrantStatus | null }) {
     },
   ];
 
+  const chips: FilterChip[] = status
+    ? [{ id: "status", label: t("filterStatus"), value: tstatus(status) }]
+    : [];
+
   return (
-    <div className="space-y-6">
-      <PageHeader title={t("title")} description={t("description")} breadcrumb={crumbs()} />
+    <div className="space-y-5">
+      <PageHeader
+        title={t("title")}
+        description={t("description")}
+        breadcrumb={crumbs()}
+        actions={
+          access.canReadAudit ? (
+            <ButtonLink href="/audit?action=breakglass.access" variant="secondary">
+              <Icon name="shieldCheck" className="size-4" />
+              {t("auditLink")}
+            </ButtonLink>
+          ) : undefined
+        }
+      />
+      {open > 0 ? <Alert tone="danger" title={t("openCount", { count: open })} /> : null}
       {waiting > 0 ? <Alert tone="warning" title={t("waitingCount", { count: waiting })} /> : null}
       <Alert tone="info" title={t("howTitle")}>
         {t("howBody")}
       </Alert>
-      <Card title={t("filtersTitle")} padding="sm">
-        <form method="get" className="flex flex-wrap items-end gap-3">
-          <SelectField
-            name="status"
-            label={t("filterStatus")}
-            defaultValue={status ?? ""}
-            options={[
-              { value: "", label: tc("all") },
-              ...GRANT_STATUSES.map((value) => ({ value, label: tstatus(value) })),
-            ]}
-          />
-          <Button type="submit" variant="secondary">
-            {tc("applyFilters")}
-          </Button>
-          {access.canReadAudit ? (
-            <Link
-              href="/audit?action=breakglass.access"
-              className="self-center text-sm text-primary underline"
-            >
-              {t("auditLink")}
-            </Link>
-          ) : null}
-        </form>
-      </Card>
-      <DataTable
+      <DataTableV2
+        id="break-glass"
         caption={t("title")}
         captionHidden
         columns={columns}
         state={toLoadable({ ...list, data: rows })}
         rowKey={(row) => row.id}
+        toolbar={
+          // GET form: the status filter lives in the URL.
+          <form
+            ref={filterForm}
+            method="get"
+            role="search"
+            aria-label={t("filtersTitle")}
+            className="flex flex-wrap items-end gap-3"
+          >
+            <SelectField
+              name="status"
+              label={t("filterStatus")}
+              defaultValue={status ?? ""}
+              options={[
+                { value: "", label: tc("all") },
+                ...GRANT_STATUSES.map((value) => ({ value, label: tstatus(value) })),
+              ]}
+            />
+            <Button type="submit" variant="secondary">
+              {tc("applyFilters")}
+            </Button>
+          </form>
+        }
+        chips={chips}
+        onRemoveChip={() => submitAllStatuses(filterForm.current)}
+        onClearFilters={() => submitAllStatuses(filterForm.current)}
+        onRetry={() => void list.refetch()}
         emptyTitle={t("emptyTitle")}
         emptyBody={t("emptyBody")}
+        footer={
+          list.hasNextPage ? (
+            <div className="flex justify-center">
+              <Button
+                variant="secondary"
+                onClick={() => void list.fetchNextPage()}
+                disabled={list.isFetchingNextPage}
+              >
+                {list.isFetchingNextPage ? tc("loading") : t("showMore")}
+              </Button>
+            </div>
+          ) : undefined
+        }
+        stacked
       />
-      {list.hasNextPage ? (
-        <div className="flex justify-center">
-          <Button
-            variant="secondary"
-            onClick={() => void list.fetchNextPage()}
-            disabled={list.isFetchingNextPage}
-          >
-            {list.isFetchingNextPage ? tc("loading") : t("showMore")}
-          </Button>
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -318,7 +366,11 @@ function GrantTimeline({ grant }: { grant: Grant }) {
   const td = useTranslations("breakGlass.detail");
   const ts = useTranslations("breakGlass.timeline");
   const open = grant.status === "active" || grant.status === "approved";
-  const at = (value: string | null | undefined) => <Value>{formatDateTime(value ?? null)}</Value>;
+  const at = (value: string | null | undefined) => (
+    <span className="num">
+      <Value>{formatDateTime(value ?? null)}</Value>
+    </span>
+  );
   const items: TimelineItem[] = [
     {
       id: "requested",
@@ -414,7 +466,7 @@ export function BreakGlassDetailScreen({ grantId }: { grantId: string }) {
   const canRevoke = data.status === "active" || data.status === "approved";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={td("title")}
         breadcrumb={crumbs(td("title"))}
@@ -434,6 +486,7 @@ export function BreakGlassDetailScreen({ grantId }: { grantId: string }) {
                   triggerVariant="primary"
                   title={td("approveTitle")}
                   description={td("approveBody", { duration: duration ?? "" })}
+                  consequence={td("approveConsequence")}
                   confirmLabel={td("approve")}
                   stepUp
                   schema={noInput}
@@ -452,6 +505,7 @@ export function BreakGlassDetailScreen({ grantId }: { grantId: string }) {
                   triggerVariant="secondary"
                   title={td("denyTitle")}
                   description={td("denyBody")}
+                  consequence={td("denyConsequence")}
                   confirmLabel={td("deny")}
                   confirmVariant="danger"
                   stepUp
@@ -474,6 +528,7 @@ export function BreakGlassDetailScreen({ grantId }: { grantId: string }) {
                 triggerVariant="danger"
                 title={td("revokeTitle")}
                 description={td("revokeBody")}
+                consequence={td("revokeConsequence")}
                 confirmLabel={td("revoke")}
                 confirmVariant="danger"
                 stepUp
@@ -494,7 +549,7 @@ export function BreakGlassDetailScreen({ grantId }: { grantId: string }) {
       />
 
       {data.status === "active" ? (
-        <Alert tone="warning" title={td("activeTitle")}>
+        <Alert tone="danger" title={td("activeTitle")}>
           {td("activeBody", { time: formatDateTime(data.expires_at) ?? "" })}
         </Alert>
       ) : null}
@@ -504,34 +559,36 @@ export function BreakGlassDetailScreen({ grantId }: { grantId: string }) {
         </Alert>
       ) : null}
 
-      <Card title={td("requestTitle")}>
-        <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-[max-content_1fr]">
-          <dt className="font-semibold">{t("colWho")}</dt>
-          <dd>
-            <Value>{data.operator_display_name}</Value>
-            <span className="block text-sm text-ink-muted">{td("whoNote")}</span>
-          </dd>
-          <dt className="font-semibold">{t("colWhy")}</dt>
-          <dd className="whitespace-pre-line">{data.reason}</dd>
-          <dt className="font-semibold">{td("scope")}</dt>
-          <dd>
-            <ScopeText scope={data.scope} />
-          </dd>
-          <dt className="font-semibold">{t("colDuration")}</dt>
-          <dd>
-            <Value>{duration}</Value>
-          </dd>
-          <dt className="font-semibold">{td("canSee")}</dt>
-          <dd>
-            {formatList([td("seeStudents"), td("seeFindings"), td("seeDocuments")], locale)}
-            <span className="block text-sm text-ink-muted">{td("readOnly")}</span>
-          </dd>
-        </dl>
-      </Card>
+      <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
+        <Card title={td("requestTitle")} className="min-w-0">
+          <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-[max-content_1fr]">
+            <dt className="font-semibold">{t("colWho")}</dt>
+            <dd>
+              <Value>{data.operator_display_name}</Value>
+              <span className="block text-sm text-ink-muted">{td("whoNote")}</span>
+            </dd>
+            <dt className="font-semibold">{t("colWhy")}</dt>
+            <dd className="whitespace-pre-line">{data.reason}</dd>
+            <dt className="font-semibold">{td("scope")}</dt>
+            <dd>
+              <ScopeText scope={data.scope} />
+            </dd>
+            <dt className="font-semibold">{t("colDuration")}</dt>
+            <dd className="num">
+              <Value>{duration}</Value>
+            </dd>
+            <dt className="font-semibold">{td("canSee")}</dt>
+            <dd>
+              {formatList([td("seeStudents"), td("seeFindings"), td("seeDocuments")], locale)}
+              <span className="block text-sm text-ink-muted">{td("readOnly")}</span>
+            </dd>
+          </dl>
+        </Card>
 
-      <Card title={td("timelineTitle")}>
-        <GrantTimeline grant={data} />
-      </Card>
+        <Card title={td("timelineTitle")} className="min-w-0 self-start">
+          <GrantTimeline grant={data} />
+        </Card>
+      </div>
 
       <p className="flex flex-wrap gap-x-4">
         {access.canReadAudit ? (

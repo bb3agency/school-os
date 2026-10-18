@@ -7,7 +7,7 @@ import { useState } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button } from "@/components/ui/Button";
-import { Pill } from "@/components/ui/Badge";
+import { Badge, Pill } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { LoadingState } from "@/components/ui/LoadingState";
@@ -63,7 +63,7 @@ export function AuditVerifyScreen() {
   if (me.isPending) return <LoadingState label={tc("loading")} />;
   if (!allowed) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader title={t("title")} />
         <Alert tone="warning" title={t("noAccessTitle")}>
           {t("noAccessBody")}
@@ -114,10 +114,17 @@ export function AuditVerifyScreen() {
   const intactUpTo = result ? Math.max(0, (result.first_bad_seq ?? 1) - 1) : 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={t("title")}
         description={t("description")}
+        badge={
+          state === "ok" ? (
+            <Badge tone="success">{t("badgeIntact")}</Badge>
+          ) : state === "broken" ? (
+            <Badge tone="danger">{t("badgeBroken")}</Badge>
+          ) : null
+        }
         breadcrumb={[
           { label: ta("home"), href: "/" },
           { label: ta("title"), href: "/audit" },
@@ -202,12 +209,12 @@ export function AuditVerifyScreen() {
               <div className="flex flex-wrap items-end justify-between gap-3 border-t border-border pt-4">
                 <dl>
                   <dt className="text-sm text-ink-muted">{t("eventsChecked")}</dt>
-                  <dd className="font-display text-4xl text-ink tabular-nums">
+                  <dd className="num text-4xl font-semibold text-ink tabular-nums">
                     {result ? count(result.checked) : null}
                   </dd>
                 </dl>
                 {verifiedAt ? (
-                  <p className="font-mono text-xs text-ink-subtle">
+                  <p className="num font-mono text-xs text-ink-subtle">
                     {t("lastVerifiedAt", { time: verifiedAt })}
                   </p>
                 ) : null}

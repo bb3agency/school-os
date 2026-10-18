@@ -101,17 +101,21 @@ export function RoleCheckboxes({
   selected,
   error,
   legend,
+  id,
 }: {
   roles: readonly StaffRole[];
   selected: readonly string[];
   error?: string | undefined;
   legend: string;
+  /** Prefix of the checkbox ids (`<id>-<role key>`), e.g. for an error summary's link. */
+  id?: string;
 }) {
   const grantable = (role: StaffRole) => role.grantable;
   const t = useTranslations("school.users.rolesForm");
   const label = useRoleLabel(roles);
   const errorId = useId();
-  const baseId = useId();
+  const generatedId = useId();
+  const baseId = id ?? generatedId;
   const listed = new Set(roles.map((role) => role.key));
   const unlisted = selected.filter((key) => !listed.has(key));
   const firstEnabled = roles.find((role) => grantable(role))?.key;
@@ -250,10 +254,13 @@ export function ScopeEditor({
   initial,
   initialMode,
   errors,
+  id,
 }: {
   initial: readonly StaffScope[];
   initialMode?: ScopeMode;
   errors: Record<string, string>;
+  /** Prefix of the choice ids (`<id>-mode-<mode>`), e.g. for an error summary's link. */
+  id?: string;
 }) {
   const t = useTranslations("school.users.scopeForm");
   const tc = useTranslations("common");
@@ -287,6 +294,7 @@ export function ScopeEditor({
         {SCOPE_MODES.map((value) => (
           <label key={value} className={box}>
             <input
+              {...(id ? { id: `${id}-mode-${value}` } : {})}
               type="radio"
               name="scope_mode"
               value={value}

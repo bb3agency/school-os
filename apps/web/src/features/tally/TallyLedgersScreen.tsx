@@ -5,26 +5,29 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import * as z from "@/lib/zod";
+import { DataTableV2, type ColumnV2 } from "@/components/console/DataTableV2";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
-import { EmptyState } from "@/components/ui/EmptyState";
+import type { FilterChip } from "@/components/ui/FilterChips";
 import { SearchInput } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { Table, TableScroll, TBody, Td, Th, THead, Tr } from "@/components/ui/Table";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
 import { formatDate } from "@/lib/format";
+import type { Loadable } from "@/lib/loadable";
 import {
   CONFIGURE,
+  isConnectorOff,
   KEYS,
   useParties,
   useParty,
   type LinkedStudent,
   type LinkFilter,
+  type Paged,
   type Party,
 } from "./data";
 import { Amount, TallyGate } from "./parts";
@@ -284,8 +287,114 @@ export function TallyLedgersScreen() {
     setSearch(draft.trim());
   }
 
+  function clearSearch() {
+    setCursors([null]);
+    setDraft("");
+    setSearch("");
+  }
+
+  const state: Loadable<Paged<Party>> = meLoaded ? parties : { status: "loading" };
+  const rows: Loadable<readonly Party[]> =
+    state.status === "ready" ? { status: "ready", data: state.data.data } : state;
+  const nextCursor = state.status === "ready" ? (state.data.next_cursor ?? null) : null;
+  // The name search is kept on this page only (never in the URL): shown as a chip.
+  const chips: FilterChip[] = search
+    ? [{ id: "search", label: t("searchLabel"), value: search }]
+    : [];
+
+  const columns: ColumnV2<Party>[] = [
+    {
+      key: "ledger",
+      header: t("columns.ledger"),
+      className: "break-words",
+      cell: (party) => (
+        <>
+          <span className="font-semibold">{party.ledger_name}</span>
+          <span className="num block text-xs text-ink-muted">
+            {t("asOf", { date: formatDate(party.as_of) ?? "" })}
+          </span>
+        </>
+      ),
+    },
+    { key: "group", header: t("columns.group"), cell: (party) => party.group_name },
+    {
+      key: "balance",
+      header: t("columns.balance"),
+      numeric: true,
+      cell: (party) =>
+        party.closing_balance === null ? (
+          <span className="text-ink-muted">—</span>
+        ) : (
+          <Amount value={party.closing_balance} withKind />
+        ),
+    },
+    {
+      key: "state",
+      header: t("state.title"),
+      cell: (party) =>
+        party.links.length > 0 ? (
+          <Badge tone="success">{t("state.linked", { count: party.links.length })}</Badge>
+        ) : (
+          <Badge tone="warning">{t("state.unlinked")}</Badge>
+        ),
+    },
+    {
+      key: "students",
+      header: t("columns.students"),
+      cell: (party) => <LinkedList party={party} />,
+    },
+    {
+      key: "actions",
+      header: <span className="sr-only">{t("columns.actions")}</span>,
+      name: t("columns.actions"),
+      hideable: false,
+      stack: "actions",
+      cell: (party) => (
+        <Button
+          size="sm"
+          variant="secondary"
+          aria-label={t("linkLedger", { ledger: party.ledger_name })}
+          onClick={() => setOpen(party.id)}
+        >
+          {t("link")}
+        </Button>
+      ),
+    },
+  ];
+
+  const toolbar = (
+    <div className="flex flex-wrap items-end gap-4">
+      <SegmentedControl
+        legend={t("filter")}
+        options={[
+          { value: "unlinked", label: t("filters.unlinked") },
+          { value: "linked", label: t("filters.linked") },
+          { value: "all", label: t("filters.all") },
+        ]}
+        value={filter}
+        onValueChange={(value) => {
+          setCursors([null]);
+          setFilter(value as LinkFilter);
+        }}
+      />
+      <form role="search" onSubmit={submitSearch} className="flex flex-wrap items-end gap-2">
+        <SearchInput
+          label={t("searchLabel")}
+          labelVisible
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          maxLength={100}
+          autoComplete="off"
+        />
+        <Button type="submit" variant="secondary">
+          {t("search")}
+        </Button>
+      </form>
+    </div>
+  );
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={t("title")}
         description={t("description")}
@@ -301,117 +410,50 @@ export function TallyLedgersScreen() {
         </Alert>
       ) : (
         <>
-          <div className="flex flex-wrap items-end gap-4">
-            <SegmentedControl
-              legend={t("filter")}
-              options={[
-                { value: "unlinked", label: t("filters.unlinked") },
-                { value: "linked", label: t("filters.linked") },
-                { value: "all", label: t("filters.all") },
-              ]}
-              value={filter}
-              onValueChange={(value) => {
-                setCursors([null]);
-                setFilter(value as LinkFilter);
-              }}
-            />
-            <form role="search" onSubmit={submitSearch} className="flex flex-wrap items-end gap-2">
-              <SearchInput
-                label={t("searchLabel")}
-                labelVisible
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                maxLength={100}
-                autoComplete="off"
-              />
-              <Button type="submit" variant="secondary">
-                {t("search")}
-              </Button>
-            </form>
-          </div>
           {open ? <LinkPanel partyId={open} onClose={() => setOpen(null)} /> : null}
-          <Card title={t("listTitle")}>
-            <TallyGate data={meLoaded ? parties : { status: "loading" }}>
-              {(page) =>
-                page.data.length === 0 ? (
-                  <EmptyState icon="inbox" title={t("emptyTitle")} body={t("emptyBody")} />
-                ) : (
-                  <>
-                    <TableScroll label={t("listTitle")}>
-                      <Table>
-                        <THead>
-                          <Tr>
-                            <Th>{t("columns.ledger")}</Th>
-                            <Th>{t("columns.group")}</Th>
-                            <Th className="text-right">{t("columns.balance")}</Th>
-                            <Th>{t("columns.students")}</Th>
-                            <Th>
-                              <span className="sr-only">{t("columns.actions")}</span>
-                            </Th>
-                          </Tr>
-                        </THead>
-                        <TBody>
-                          {page.data.map((party) => (
-                            <Tr key={party.id}>
-                              <Td className="break-words">
-                                <span className="font-semibold">{party.ledger_name}</span>
-                                <span className="block text-xs text-ink-muted">
-                                  {t("asOf", { date: formatDate(party.as_of) ?? "" })}
-                                </span>
-                              </Td>
-                              <Td>{party.group_name}</Td>
-                              <Td className="text-right">
-                                {party.closing_balance === null ? (
-                                  <span className="text-ink-muted">—</span>
-                                ) : (
-                                  <Amount value={party.closing_balance} withKind />
-                                )}
-                              </Td>
-                              <Td>
-                                <LinkedList party={party} />
-                              </Td>
-                              <Td>
-                                <Button
-                                  size="sm"
-                                  variant="secondary"
-                                  aria-label={t("linkLedger", { ledger: party.ledger_name })}
-                                  onClick={() => setOpen(party.id)}
-                                >
-                                  {t("link")}
-                                </Button>
-                              </Td>
-                            </Tr>
-                          ))}
-                        </TBody>
-                      </Table>
-                    </TableScroll>
-                    <div className="mt-4 flex flex-wrap gap-3">
-                      {cursors.length > 1 ? (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => setCursors((all) => all.slice(0, -1))}
-                        >
-                          {tt("previous")}
-                        </Button>
-                      ) : null}
-                      {page.next_cursor ? (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() =>
-                            setCursors((all) => [...all, page.next_cursor as string | null])
-                          }
-                        >
-                          {tt("next")}
-                        </Button>
-                      ) : null}
-                    </div>
-                  </>
-                )
+          {isConnectorOff(state) ? (
+            // The connector is switched off for this school (404): TallyGate says so.
+            <TallyGate data={state}>{() => null}</TallyGate>
+          ) : (
+            <DataTableV2
+              id="tally-ledgers"
+              caption={t("listTitle")}
+              columns={columns}
+              state={rows}
+              rowKey={(party) => party.id}
+              toolbar={toolbar}
+              chips={chips}
+              onRemoveChip={clearSearch}
+              onClearFilters={clearSearch}
+              emptyTitle={t("emptyTitle")}
+              emptyBody={t("emptyBody")}
+              footer={
+                cursors.length > 1 || nextCursor ? (
+                  <div className="flex flex-wrap gap-3">
+                    {cursors.length > 1 ? (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setCursors((all) => all.slice(0, -1))}
+                      >
+                        {tt("previous")}
+                      </Button>
+                    ) : null}
+                    {nextCursor ? (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setCursors((all) => [...all, nextCursor])}
+                      >
+                        {tt("next")}
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : undefined
               }
-            </TallyGate>
-          </Card>
+              stacked
+            />
+          )}
         </>
       )}
     </div>

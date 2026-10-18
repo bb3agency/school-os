@@ -47,6 +47,10 @@ describe("support access list (US-103, FR-OPS-004, SEC-021)", () => {
     expect(screen.getAllByText("Support Person")).toHaveLength(2);
     expect(screen.getAllByText("2 hours")).toHaveLength(2);
     expect(within(screen.getByRole("table")).getByText("Open now")).toBeInTheDocument();
+    // Open access is called out in the danger tone, in words.
+    expect(
+      screen.getByText("1 support access is open: SchoolOS support can see your records now."),
+    ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /^Decide/ })).toHaveAttribute(
       "href",
       `/break-glass/${ID}`,
@@ -92,6 +96,12 @@ describe("support access request (US-103 AC1/AC2)", () => {
     const dialog = screen.getByRole("dialog", { name: "Give SchoolOS support access" });
     expect(within(dialog).getByText(/ending by itself after 2 hours/)).toBeInTheDocument();
     expect(within(dialog).getByText(/you may be asked to sign in again/)).toBeInTheDocument();
+    // The consequence line says what approving changes.
+    expect(
+      within(dialog).getByText(
+        "SchoolOS support can read these records until the access ends or you end it.",
+      ),
+    ).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole("button", { name: "Approve" }));
     await waitFor(() =>
       expect(stub.callsTo(`POST /bff/api/v1/breakglass/requests/${ID}/approve`)).toHaveLength(1),

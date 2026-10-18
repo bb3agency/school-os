@@ -1,17 +1,19 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import { useId } from "react";
+import { useId, useState } from "react";
 import * as z from "@/lib/zod";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
-import { Button } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ErrorSummary, type SummaryError } from "@/components/ui/ErrorSummary";
 import { TextField } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SaveBar } from "@/components/ui/SaveBar";
 import { useTeluguEnabled } from "@/i18n/LanguagesProvider";
-import { Link, useRouter } from "@/i18n/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffMe, useStaffMeQuery } from "@/lib/bff/staff-me";
 import { formList, useApiForm } from "@/lib/forms";
@@ -56,6 +58,16 @@ export const inviteSchema = z
   })
   .superRefine(refineScopes);
 
+/** Ids of the invite form's fields (and id prefixes of its choice lists), for the summary. */
+const IDS = {
+  display_name: "invite-name",
+  email: "invite-email",
+  idp_subject: "invite-subject",
+  language: "invite-language",
+  roles: "invite-role",
+  scope: "invite-scope",
+} as const;
+
 /**
  * Invite a staff member (US-102 AC1, FR-IAM-010..012; POST /users with an Idempotency-Key,
  * `user.manage` and a fresh MFA sign-in). The person's sign-in account must already exist in
@@ -77,8 +89,11 @@ export function InviteUserScreen() {
   const roles = useRoles(allowed);
   const languageErrorId = useId();
   const telugu = useTeluguEnabled();
+  const [attempt, setAttempt] = useState(0);
+  const [dirty, setDirty] = useState(false);
 
   const form = useApiForm({
+    onInvalid: () => setAttempt((value) => value + 1),
     schema: inviteSchema,
     extra: (element) => ({
       roles: formList(element, "roles"),
@@ -113,7 +128,7 @@ export function InviteUserScreen() {
   if (meQuery.isPending) return <LoadingState label={tc("loading")} />;
   if (!allowed) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader title={t("title")} breadcrumb={breadcrumb} />
         <Alert tone="warning" title={tu("noAccessTitle")}>
           {tu("noAccessBody")}
@@ -127,17 +142,45 @@ export function InviteUserScreen() {
 
   const { errors } = form;
   const initialLanguage = locale === "te" ? "te" : "en";
+  const firstRole = roles.data?.find((role) => role.grantable)?.key;
+  const scopeError = errors.scope_mode ?? errors.class_refs ?? errors.section_refs;
+  const summary: SummaryError[] = [
+    ...(errors.display_name ? [{ fieldId: IDS.display_name, message: errors.display_name }] : []),
+    ...(errors.email ? [{ fieldId: IDS.email, message: errors.email }] : []),
+    ...(errors.idp_subject ? [{ fieldId: IDS.idp_subject, message: errors.idp_subject }] : []),
+    ...(errors.preferred_language && telugu
+      ? [{ fieldId: `${IDS.language}-${initialLanguage}`, message: errors.preferred_language }]
+      : []),
+    ...(errors.roles && firstRole
+      ? [{ fieldId: `${IDS.roles}-${firstRole}`, message: errors.roles }]
+      : []),
+    ...(scopeError
+      ? [
+          {
+            fieldId: `${IDS.scope}-mode-${errors.scope_mode ? "none" : "chosen"}`,
+            message: scopeError,
+          },
+        ]
+      : []),
+  ];
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-4xl space-y-5">
       <PageHeader title={t("title")} description={t("description")} breadcrumb={breadcrumb} />
       <Alert tone="info" title={t("stepUpTitle")}>
         {t("stepUpBody")}
       </Alert>
-      <form noValidate onSubmit={form.onSubmit} className="space-y-6">
+      <form
+        noValidate
+        onSubmit={form.onSubmit}
+        onChange={() => setDirty(true)}
+        className="space-y-5"
+      >
+        <ErrorSummary errors={summary} attempt={attempt} />
         <Card title={t("personTitle")}>
           <div className="grid gap-4 lg:grid-cols-2">
             <TextField
+              id={IDS.display_name}
               name="display_name"
               label={t("name")}
               hint={t("nameHint")}
@@ -146,6 +189,7 @@ export function InviteUserScreen() {
               autoComplete="off"
             />
             <TextField
+              id={IDS.email}
               name="email"
               type="email"
               label={t("email")}
@@ -154,6 +198,7 @@ export function InviteUserScreen() {
               autoComplete="off"
             />
             <TextField
+              id={IDS.idp_subject}
               name="idp_subject"
               label={t("subject")}
               hint={t("subjectHint")}
@@ -176,6 +221,7 @@ export function InviteUserScreen() {
                       className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-md border border-border-soft bg-surface px-3 text-sm has-checked:border-primary has-checked:bg-primary-soft"
                     >
                       <input
+                        id={`${IDS.language}-${value}`}
                         type="radio"
                         name="preferred_language"
                         value={value}
@@ -199,9 +245,9 @@ export function InviteUserScreen() {
         <Card title={t("rolesTitle")}>
           {roles.data ? (
             <RoleCheckboxes
+              id={IDS.roles}
               roles={roles.data}
               selected={[]}
-
               error={errors.roles}
               legend={t("rolesLegend")}
             />
@@ -211,26 +257,22 @@ export function InviteUserScreen() {
         </Card>
 
         <Card title={t("scopeTitle")}>
-          <ScopeEditor initial={[]} initialMode="none" errors={errors} />
+          <ScopeEditor id={IDS.scope} initial={[]} initialMode="none" errors={errors} />
         </Card>
 
         <ApiErrorAlert error={form.error} namespace="school.users" />
-        <div className="flex flex-wrap items-center justify-end gap-3 rounded-xl border border-border bg-surface px-5 py-4 shadow-card">
-          <Link
-            href="/settings/users"
-            className="text-sm text-primary underline underline-offset-4"
-          >
+        <SaveBar dirty={dirty}>
+          <ButtonLink href="/settings/users" variant="secondary">
             {tc("cancel")}
-          </Link>
+          </ButtonLink>
           <Button
             type="submit"
-            size="lg"
             disabled={form.pending || !roles.data}
             aria-disabled={form.pending || !roles.data || undefined}
           >
             {form.pending ? tc("working") : t("submit")}
           </Button>
-        </div>
+        </SaveBar>
       </form>
     </div>
   );
