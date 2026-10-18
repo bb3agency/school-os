@@ -115,7 +115,8 @@
     "steps": {
       "done": "Done",
       "current": "Current step",
-      "upcoming": "Not started"
+      "upcoming": "Not started",
+      "failed": "Stopped here"
     },
     "saveBar": {
       "unsaved": "Changes not saved",
@@ -263,7 +264,16 @@
         "warningsNote": "Worth checking, not blocking",
         "studentsAffected": "Students with blocking problems",
         "studentsAffectedNote": "From the latest checks",
-        "pendingNote": "Identity changes waiting for a second person"
+        "pendingNote": "Identity changes waiting for a second person",
+        "feesToday": "Fees collected today",
+        "feesTodayNote": "{count, plural, one {From # receipt, after cancellations and refunds} other {From # receipts, after cancellations and refunds}}",
+        "feesTodayEmpty": "Today's day book",
+        "cashToHandOver": "Cash to hand over",
+        "cashToHandOverNote": "Count the cash drawer against this before closing the day",
+        "feeApprovals": "Fee requests for you",
+        "feeApprovalsNote": "Concessions, cancellations and refunds you can decide",
+        "readiness": "Portal readiness",
+        "readinessNote": "{profile}: {ready} of {students} students ready"
       },
       "work": {
         "title": "Work waiting",
@@ -279,7 +289,17 @@
         "changesNote": "Someone other than the person who asked must approve each change.",
         "importsAction": "Open imports",
         "importsNone": "No imports yet. Start with your admission register spreadsheet.",
-        "rows": "{count, plural, one {# row} other {# rows}}"
+        "rows": "{count, plural, one {# row} other {# rows}}",
+        "lastRunLabel": "Checks last ran on",
+        "feeApprovalsTitle": "Fee requests waiting",
+        "feeApprovalsAction": "Open fee approvals",
+        "feeApprovalsNone": "No fee requests are waiting for you.",
+        "feeApprovalsBody": "{count, plural, one {1 fee request is waiting for your decision.} other {# fee requests are waiting for your decision.}}",
+        "dayCloseTitle": "Today's day book",
+        "dayCloseAction": "Open the day book",
+        "dayClosed": "Today is closed. New payments go to the next day.",
+        "dayOpen": "Today is not closed yet. Close it after counting the cash.",
+        "receiptsTotalLabel": "Receipts so far:"
       },
       "steps": {
         "label": "Steps to get started",
@@ -303,7 +323,21 @@
         }
       },
       "nothingTitle": "Nothing is waiting for you",
-      "nothingBody": "Use the menu to open students, documents or other screens."
+      "nothingBody": "Use the menu to open students, documents or other screens.",
+      "teacher": {
+        "title": "Your work today",
+        "scopeNote": "You see only the sections you teach.",
+        "attendanceTitle": "Take attendance",
+        "attendanceBody": "Mark today's attendance for your section.",
+        "marksTitle": "Enter marks",
+        "marksBody": "Enter exam marks for your sections and subjects.",
+        "askBody": "Ask a question about your school's records and documents."
+      },
+      "primary": {
+        "collectFees": "Collect fees",
+        "reviewApprovals": "Review approvals",
+        "addStudent": "Add a student"
+      }
     },
     "structure": {
       "title": "School structure",
@@ -2259,7 +2293,13 @@
       "apaarInvalid": "Enter the 12 digits of the APAAR ID, for example 1234 5678 9012.",
       "penLabel": "UDISE+ PEN",
       "penHint": "11 digits",
-      "penInvalid": "Enter the 11-digit PEN, for example 21345678901."
+      "penInvalid": "Enter the 11-digit PEN, for example 21345678901.",
+      "more": "More",
+      "chipSearch": "Search",
+      "chipSectionChosen": "Chosen section",
+      "moreFilters": "More filters: status, APAAR ID, PEN",
+      "blockedTitle": "Nothing was searched",
+      "blockedBody": "Correct the search above, then select Search again."
     },
     "create": {
       "title": "Add a student",
@@ -2346,7 +2386,9 @@
       "issueCertificateLink": "Issue a certificate",
       "certificatesLink": "Certificates of this student",
       "tabTimeline": "Timeline",
-      "apaarConsentLink": "APAAR consent"
+      "apaarConsentLink": "APAAR consent",
+      "metaClass": "Class",
+      "goTo": "Go to"
     },
     "record": {
       "open": "Record a value",
@@ -2606,7 +2648,8 @@
       "templatesTitle": "Saved column templates",
       "templatesDescription": "A file with the same column headings reuses its template automatically.",
       "templatesEmptyTitle": "No templates saved",
-      "templatesEmptyBody": "After you choose the columns of an import, save them as a template to reuse next time."
+      "templatesEmptyBody": "After you choose the columns of an import, save them as a template to reuse next time.",
+      "uploadAction": "Upload a spreadsheet"
     },
     "detail": {
       "loadingTitle": "Import",
@@ -2649,7 +2692,10 @@
       },
       "undoEyebrow": "24-hour undo",
       "hoursLeft": "{hours, plural, one {About # hour left to undo} other {About # hours left to undo}}",
-      "underAnHour": "Less than an hour left to undo"
+      "underAnHour": "Less than an hour left to undo",
+      "more": "More",
+      "uploadAgain": "Upload the file again",
+      "newImport": "Start another import"
     },
     "failure": {
       "generic": "Something went wrong with this file. Upload it again, or contact support with the time of the import.",
@@ -2985,7 +3031,8 @@
       "colStatus": "Status",
       "emptyTitle": "No register photos yet",
       "emptyBody": "Upload photos of your admission register pages to start.",
-      "pagesLabel": "Pages of uploads"
+      "pagesLabel": "Pages of uploads",
+      "uploadAction": "Upload photos"
     },
     "pages": {
       "title": "Pages",
@@ -3067,7 +3114,8 @@
         "pending": "Rows to check",
         "confirmed": "Rows saved",
         "low": "Rows with unclear values"
-      }
+      },
+      "reviewed": "{done} of {total} reviewed"
     },
     "image": {
       "caption": "Page {page}, row {row}",
@@ -3135,7 +3183,8 @@
       "corrected": "Corrected by hand",
       "correctedCount": "{count, plural, one {# value} other {# values}}",
       "openingNext": "Opening the next row",
-      "allChecked": "Every row has been checked. Going back to the photos…"
+      "allChecked": "Every row has been checked. Going back to the photos…",
+      "discard": "Reset to what was read"
     },
     "reject": {
       "open": "Discard this row",
@@ -3380,10 +3429,28 @@
       "openRun": "Open this check",
       "pageTitle": "Check progress",
       "pageDescription": "Progress and results of one check of student records.",
-      "seeFindings": "See the problems found"
+      "seeFindings": "See the problems found",
+      "statusLabel": "Status:",
+      "statusValue": {
+        "queued": "Waiting to start",
+        "running": "Checking",
+        "completed": "Finished",
+        "failed": "Could not finish"
+      },
+      "resultsLabel": "Results of this check",
+      "stat": {
+        "students": "Students checked",
+        "blockers": "Blockers",
+        "warnings": "Warnings",
+        "new": "New problems",
+        "reopened": "Came back",
+        "cleared": "Cleared"
+      }
     },
     "crumbHome": "Home",
-    "summaryBySeverityLabel": "By severity:"
+    "summaryBySeverityLabel": "By severity:",
+    "chipSection": "Chosen section",
+    "chipOneStudent": "One student"
   },
   "readiness": {
     "nav": "Board readiness",
@@ -3464,7 +3531,8 @@
     "showSensitiveSlips": "Show Aadhaar details on slips",
     "openSensitiveSlips": "Open slips with Aadhaar details",
     "sensitiveSlipsNote": "These slips show the names and dates as printed on Aadhaar. Opening them is recorded in the audit log. Keep the printouts safe.",
-    "newTab": "opens in a new tab"
+    "newTab": "opens in a new tab",
+    "shareLabel": "Students ready for {profile}"
   },
   "changeRequests": {
     "nav": "Correction requests",
@@ -3666,7 +3734,14 @@
       "createdTitle": "Request sent",
       "createdBody": "Someone with approval rights will check it. You'll be told in the bell when it is decided.",
       "openCreated": "Open the request",
-      "backToFinding": "Back to the problem"
+      "backToFinding": "Back to the problem",
+      "stagesLabel": "Steps of a correction request",
+      "stages": {
+        "student": "Choose student",
+        "change": "Field and new value",
+        "evidence": "Evidence",
+        "review": "Review and submit"
+      }
     },
     "detail": {
       "title": "Correction: {field}",
@@ -3717,9 +3792,14 @@
       "relatedLabel": "Related pages",
       "approveConsequence": "The student's record changes as soon as you approve. The old value stays in the history.",
       "rejectConsequence": "Nothing on the student's record changes.",
-      "cancelConsequence": "Nothing on the student's record changes."
+      "cancelConsequence": "Nothing on the student's record changes.",
+      "before": "Before",
+      "after": "After"
     },
-    "crumbHome": "Home"
+    "crumbHome": "Home",
+    "tabsLabel": "Requests by status",
+    "chipStudent": "Student",
+    "chipOneStudent": "One student"
   },
   "notifications": {
     "title": "Notifications",
@@ -4065,6 +4145,13 @@
       "expired": "The PDF was deleted. Make it again.",
       "again": "Make it again",
       "lost": "We could not check on the PDF."
+    },
+    "more": "More",
+    "steps": {
+      "label": "Steps of this export",
+      "pick": "Pick students and files",
+      "check": "SchoolOS checks and makes the files",
+      "download": "Download"
     }
   },
   "devSignIn": {
@@ -6477,7 +6564,11 @@
       "newTab": "opens in a new tab",
       "downloadPdf": "Download PDF",
       "pdfFailed": "The PDF could not be made.",
-      "pdfPreparing": "The PDF is being made and checked. It is usually ready within a minute."
+      "pdfPreparing": "The PDF is being made and checked. It is usually ready within a minute.",
+      "approveConsequence": "The certificate is issued with the next serial number and entered in the register.",
+      "approveConsequenceTc": "The certificate is issued with the next serial number, and the student is taken off the rolls from the date of leaving.",
+      "rejectConsequence": "Nothing is issued and the student record does not change. The person who prepared it sees your reason.",
+      "withdrawConsequence": "Nothing is issued and the student record does not change."
     },
     "issue": {
       "title": "Issue a certificate",
@@ -6535,6 +6626,12 @@
         "derived": "Worked out from the record",
         "identifier": "Printed only when verified",
         "restricted": "Restricted"
+      },
+      "steps": {
+        "label": "Steps to issue a certificate",
+        "type": "Choose the certificate",
+        "check": "Check what it prints",
+        "details": "Fill the details and issue"
       }
     },
     "registers": {
@@ -6563,7 +6660,12 @@
       "admission": {
         "title": "Admission and withdrawal register",
         "body": "Students enrolled in the year, in admission-number order, with their leaving details and TC number."
-      }
+      },
+      "pickerLegend": "Which register?",
+      "a4": "A4 landscape",
+      "sheetSchool": "School letterhead",
+      "sheetYear": "Academic year {label}",
+      "sheetNote": "The rows are filled in the print view."
     },
     "letterhead": {
       "title": "Certificate letterhead",
@@ -6631,7 +6733,9 @@
       "printThem": "Print religion and caste",
       "leaveBlank": "Leave them blank",
       "saved": "Saved."
-    }
+    },
+    "more": "More",
+    "chipOneStudent": "One student"
   },
   "circulars": {
     "nav": "Circulars",
@@ -7057,7 +7161,14 @@
       "name": "Name",
       "sampleName": "Synthetica Student",
       "summary": "Read {entries, plural, one {# entry} other {# entries}} for {students, plural, one {# student} other {# students}} over {days, plural, one {# day} other {# days}}."
-    }
+    },
+    "tally": {
+      "present": "{count, number} present",
+      "absent": "{count, number} absent",
+      "late": "{count, number} late",
+      "leave": "{count, number} on leave"
+    },
+    "undo": "Undo changes"
   },
   "marks": {
     "nav": "Marks",
@@ -7106,7 +7217,13 @@
         "maxInvalid": "Type the maximum marks as a number above 0 (at most 1000).",
         "marksInvalid": "Some marks are not numbers between 0 and the maximum. Fix them or type AB for absent.",
         "nothingEntered": "Type at least one student's marks."
-      }
+      },
+      "cellInvalid": "Type a number from 0 to {max}, or AB.",
+      "position": "Student {current, number} of {total, number}",
+      "previous": "Previous student",
+      "next": "Next student",
+      "keyboardHint": "Press Enter or the down arrow to go to the next student.",
+      "discard": "Clear typed marks"
     },
     "import": {
       "title": "Add marks from a sheet",
@@ -7256,7 +7373,8 @@
       "choose": "Choose one",
       "actedOn": "When",
       "note": "Note (optional)",
-      "noteHint": "Up to 1,000 characters. Kept encrypted and seen only by the class teacher and the principal."
+      "noteHint": "Up to 1,000 characters. Kept encrypted and seen only by the class teacher and the principal.",
+      "consequence": "The action is added to the flag's log. Nothing on the student's record changes."
     },
     "close": {
       "open": "Close the flag",
@@ -7271,7 +7389,8 @@
         "no_concern": "No concern after checking",
         "student_left": "The student left the school",
         "raised_in_error": "Raised in error"
-      }
+      },
+      "consequence": "The flag is closed and no longer due. Nothing on the student's record changes."
     },
     "assign": {
       "open": "Give to someone else",
@@ -7279,7 +7398,8 @@
       "description": "Only staff who can act for this student are listed. They are told in the app.",
       "save": "Give flag",
       "owner": "New owner",
-      "nobody": "Nobody else can act for this student."
+      "nobody": "Nobody else can act for this student.",
+      "consequence": "The new owner becomes the person who must act by the due date."
     },
     "erase": {
       "open": "Erase",
@@ -7290,7 +7410,8 @@
       "reason": {
         "parent_request": "The parent asked",
         "entered_in_error": "Entered in error"
-      }
+      },
+      "consequence": "This cannot be undone."
     },
     "raise": {
       "open": "Raise a flag",
