@@ -1,16 +1,47 @@
 /*
- * Parent pages (ADR-0046; docs/17 §5.8): mobile first (designed at 360 px), one column, 16 px
- * base text, 44 px touch targets, the system font stack (no web font except the self-hosted
- * Telugu font on Telugu pages). No Tailwind, no third-party CSS: the page must be small on slow
- * connections.
+ * Parent and verification pages (ADR-0045, ADR-0046; docs/17 §5.8): Direction B "Register
+ * paper" (docs/research/2026-10-ui/report.md §6.2). Mobile first (designed at 360 px), one
+ * column, 16 px base text, 44 px touch targets. No Tailwind, no third-party CSS, no client
+ * JavaScript: the pages must be small on 2G/3G and cheap phones.
+ *
+ * Fonts: the system stack for text; Instrument Serif (self-hosted, latin only, ~21 KB, OFL)
+ * for the page heading and the school's name; the self-hosted Telugu font on Telugu pages,
+ * where headings switch back to the sans (the serif has no Telugu glyphs).
+ *
+ * Colours are written as hex (the sRGB values of the report's OKLCH tokens), because old
+ * Android WebViews on cheap phones may not parse oklch(). Contrast (WCAG 2.2 AA):
+ * ink on paper 15.3:1, muted 6.9:1, ledger green 6.6:1 (white on green 7.1:1), the input
+ * boundary 3.7:1; banner inks 6.5-8.4:1 on their tints.
  */
+@font-face {
+  font-family: "SOS Register Serif";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../../../../../node_modules/@fontsource/instrument-serif/files/instrument-serif-latin-400-normal.woff2")
+    format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 :root {
-  --public-ink: #1b1f24;
-  --public-muted: #4a5360;
-  --public-line: #d8dde3;
-  --public-bg: #f6f7f9;
-  --public-card: #ffffff;
-  --public-accent: #0b5cad;
+  --paper: #f8f7f1; /* oklch(0.975 0.008 95) */
+  --sheet: #fefdfa; /* oklch(0.995 0.004 95) */
+  --rule: #dddbd2; /* oklch(0.89 0.012 95) ruled hairlines */
+  --ink: #211f1a; /* oklch(0.24 0.01 95) */
+  --muted: #57554e; /* oklch(0.45 0.012 95) */
+  --control: #828078; /* oklch(0.60 0.012 95) input boundary, 3.7:1 */
+  --ledger: #0e6549; /* oklch(0.45 0.09 165) ledger green */
+  --ledger-strong: #004f38; /* oklch(0.38 0.08 165) */
+  --ledger-soft: #daf6e9; /* oklch(0.95 0.035 165) */
+  --amber-ink: #7d460b;
+  --amber-soft: #ffeaca;
+  --red-ink: #972622;
+  --red-soft: #ffe7e4;
+  --serif: "SOS Register Serif", Georgia, "Times New Roman", serif;
+  --sans: system-ui, "Segoe UI", Roboto, Arial, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
   color-scheme: light;
 }
 
@@ -25,45 +56,96 @@ html {
 
 body {
   margin: 0;
-  background: var(--public-bg);
-  color: var(--public-ink);
-  font-family: system-ui, "Segoe UI", Roboto, Arial, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
   font-size: 16px;
   line-height: 1.5;
+  overflow-wrap: break-word;
 }
 
 :lang(te) {
-  font-family: "Noto Sans Telugu", system-ui, "Segoe UI", Roboto, Arial, sans-serif;
+  font-family: "Noto Sans Telugu", var(--sans);
   line-height: 1.7;
 }
 
+/* --- Page frame ---------------------------------------------------------------------------- */
+
 .public-page {
   max-width: 40rem;
+  min-height: 100vh;
   min-height: 100dvh;
   margin: 0 auto;
-  padding: 1rem;
+  padding: 1.25rem 1rem 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.25rem;
+}
+
+/* The masthead: the school's name (or the check's name) over a double rule, like the head of a
+   register page. */
+.public-masthead {
+  margin: 0;
+  padding-bottom: 0.75rem;
+  border-bottom: 3px double var(--rule);
 }
 
 .public-school {
   margin: 0;
-  font-weight: 600;
-  font-size: 1.125rem;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 1.625rem;
+  line-height: 1.2;
 }
 
+.public-kicker {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+/* The sheet: a ruled card with a ledger-green margin line at its start edge. */
 .public-card {
-  background: var(--public-card);
-  border: 1px solid var(--public-line);
-  border-radius: 0.75rem;
-  padding: 1rem;
+  position: relative;
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  border-radius: 0.375rem;
+  padding: 1.125rem 1rem 1.25rem 1.375rem;
+}
+
+.public-card::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0.5rem;
+  border-inline-start: 1px solid var(--ledger);
+  opacity: 0.35;
 }
 
 .public-card h1 {
   margin: 0 0 0.5rem;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 2rem;
+  line-height: 1.15;
+}
+
+.public-card h2 {
+  margin: 0 0 0.25rem;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 1.5rem;
+  line-height: 1.2;
+}
+
+/* Telugu keeps the sans and its taller line height (docs/17 §2 rule 2). */
+.public-school:lang(te),
+.public-card h1:lang(te),
+.public-card h2:lang(te) {
+  font-family: "Noto Sans Telugu", var(--sans);
+  font-weight: 600;
   font-size: 1.375rem;
-  line-height: 1.3;
+  line-height: 1.5;
 }
 
 .public-card p {
@@ -71,111 +153,171 @@ body {
 }
 
 .public-muted {
-  color: var(--public-muted);
+  color: var(--muted);
 }
 
 .public-footer {
   margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--rule);
   font-size: 0.875rem;
-  color: var(--public-muted);
+  color: var(--muted);
 }
 
 .public-footer p {
   margin: 0.25rem 0;
 }
 
-a {
-  color: var(--public-accent);
+/* The forwarding warning is the one line in the footer a parent must read. */
+.public-warning {
+  color: var(--ink);
+  font-weight: 600;
 }
 
-a:focus-visible {
-  outline: 3px solid var(--public-accent);
+a {
+  color: var(--ledger);
+  text-underline-offset: 0.2em;
+}
+
+a:hover {
+  color: var(--ledger-strong);
+}
+
+a:focus-visible,
+.public-input:focus-visible,
+.public-button:focus-visible {
+  outline: 3px solid var(--ledger);
   outline-offset: 2px;
 }
 
-/* --- R2-1A certificate verification (/v; ADR-0045; docs/17 §5.8) --------------------------- */
-
-.public-card h2 {
-  margin: 0 0 0.25rem;
-  font-size: 1.125rem;
+.public-icon {
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
 }
+
+/* --- Forms (/v) -------------------------------------------------------------------------- */
 
 .public-form {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  margin-top: 1rem;
+  margin-top: 1.25rem;
 }
 
 .public-form label {
   font-weight: 600;
 }
 
+.public-form .public-muted {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
 .public-input {
-  min-height: 44px;
+  width: 100%;
+  min-height: 52px;
   padding: 0.5rem 0.75rem;
-  border: 1px solid var(--public-muted);
-  border-radius: 0.5rem;
+  border: 1px solid var(--control);
+  border-radius: 0.375rem;
+  background: #fff;
+  color: var(--ink);
   font: inherit;
-  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
-  font-size: 1.125rem;
+  font-family: var(--mono);
+  font-size: 1.25rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .public-input[aria-invalid="true"] {
-  border-color: #a4262c;
-}
-
-.public-input:focus-visible,
-.public-button:focus-visible {
-  outline: 3px solid var(--public-accent);
-  outline-offset: 2px;
+  border-color: var(--red-ink);
+  border-width: 2px;
 }
 
 .public-button {
-  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 0.25rem;
   padding: 0.5rem 1.25rem;
   border: 0;
-  border-radius: 0.5rem;
-  background: var(--public-accent);
+  border-radius: 0.375rem;
+  background: var(--ledger);
   color: #fff;
   font: inherit;
   font-weight: 600;
   cursor: pointer;
-  align-self: flex-start;
+}
+
+.public-button:hover {
+  background: var(--ledger-strong);
+}
+
+@media (min-width: 30rem) {
+  .public-button {
+    width: auto;
+    align-self: flex-start;
+  }
 }
 
 .public-error {
-  color: #a4262c;
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  margin: 0;
+  color: var(--red-ink);
   font-weight: 600;
 }
 
-/* Colour is never the only signal: each banner says its status in words. */
+.public-error .public-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.125rem;
+}
+
+.public-note {
+  margin: 1.25rem 0 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+/* --- Verdict (/v/{code}) ------------------------------------------------------------------ */
+
+/* Colour is never the only signal: each verdict says its status in words and has its own icon. */
 .public-banner {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
   margin: 0;
-  padding: 0.75rem 1rem;
+  padding: 1rem;
   border: 1px solid;
-  border-radius: 0.75rem;
+  border-inline-start-width: 6px;
+  border-radius: 0.375rem;
+  font-size: 1.125rem;
   font-weight: 600;
+  line-height: 1.4;
 }
 
 .public-banner-green {
-  background: #e6f4ea;
-  border-color: #1e7e34;
-  color: #14532d;
+  background: var(--ledger-soft);
+  border-color: var(--ledger);
+  color: var(--ledger-strong);
 }
 
 .public-banner-amber {
-  background: #fff4e0;
-  border-color: #a15c00;
-  color: #6b3d00;
+  background: var(--amber-soft);
+  border-color: var(--amber-ink);
+  color: var(--amber-ink);
 }
 
 .public-banner-red {
-  background: #fdecea;
-  border-color: #a4262c;
-  color: #7a1c20;
+  background: var(--red-soft);
+  border-color: var(--red-ink);
+  color: var(--red-ink);
 }
 
 .public-facts,
@@ -183,15 +325,19 @@ a:focus-visible {
   margin: 0.75rem 0 0;
 }
 
-.public-facts {
+/* Facts and printed lines read like ruled register rows. */
+.public-facts div,
+.public-lines div {
   display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 0.25rem 1rem;
+  gap: 0.125rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--rule);
 }
 
 .public-facts dt,
 .public-lines dt {
-  color: var(--public-muted);
+  color: var(--muted);
+  font-size: 0.9375rem;
 }
 
 .public-facts dd,
@@ -200,11 +346,11 @@ a:focus-visible {
   overflow-wrap: anywhere;
 }
 
-.public-lines div {
-  display: grid;
-  gap: 0.125rem;
-  padding: 0.5rem 0;
-  border-top: 1px solid var(--public-line);
+@media (min-width: 30rem) {
+  .public-facts div {
+    grid-template-columns: 9rem 1fr;
+    gap: 1rem;
+  }
 }
 
 @media (min-width: 40rem) {
@@ -214,7 +360,39 @@ a:focus-visible {
   }
 }
 
+.public-blank {
+  color: var(--muted);
+  font-style: italic;
+}
+
 .public-code {
-  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-family: var(--mono);
   letter-spacing: 0.06em;
+}
+
+/* --- Forced colours and print -------------------------------------------------------------- */
+
+@media (forced-colors: active) {
+  .public-card::before {
+    display: none;
+  }
+  .public-banner,
+  .public-button {
+    border: 1px solid CanvasText;
+  }
+}
+
+@media print {
+  body {
+    background: #fff;
+  }
+  .public-page {
+    min-height: 0;
+  }
+  .public-card {
+    border-color: #999;
+  }
+  .public-card::before {
+    display: none;
+  }
 }

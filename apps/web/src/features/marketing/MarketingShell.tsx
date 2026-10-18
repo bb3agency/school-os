@@ -1,3 +1,6 @@
+// Instrument Serif italic, for the accent phrase of the home headline (latin only; the
+// font downloads only where italic serif text is shown).
+import "@fontsource/instrument-serif/latin-400-italic.css";
 import "./marketing.css";
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";

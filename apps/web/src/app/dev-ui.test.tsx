@@ -59,10 +59,14 @@ describe("dev UI reference (/[locale]/dev/ui)", () => {
       const { container } = renderWithIntl(DevUiPage(), locale);
       expect(intlErrors).toEqual([]);
       expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-      expect(screen.getAllByRole("heading", { level: 2 }).length).toBeGreaterThanOrEqual(14);
+      expect(screen.getAllByRole("heading", { level: 2 }).length).toBeGreaterThanOrEqual(18);
       expect(screen.getByRole("main")).toHaveAttribute("id", "main");
       expect(container.querySelectorAll("[style]")).toHaveLength(0);
-      expect(container.querySelectorAll("img, script, iframe, link")).toHaveLength(0);
+      expect(container.querySelectorAll("script, iframe, link")).toHaveLength(0);
+      // The only images are the line illustrations from 'self' (docs/17 §5.6).
+      for (const img of container.querySelectorAll("img")) {
+        expect(img.getAttribute("src") ?? "").toMatch(/^\/illustrations\/[a-z-]+\.svg$/);
+      }
       const ids = [...container.querySelectorAll("[id]")].map((element) => element.id);
       expect(new Set(ids).size).toBe(ids.length);
     });

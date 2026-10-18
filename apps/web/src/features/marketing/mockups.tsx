@@ -45,7 +45,7 @@ export function Mock({
 
 function Card({ children, className }: { children: ReactNode; className?: string | undefined }) {
   return (
-    <div className={cn("rounded-xl border border-border bg-surface p-4 sm:p-5", className)}>
+    <div className={cn("mk-app rounded-xl border border-border bg-surface p-4 sm:p-5", className)}>
       {children}
     </div>
   );
@@ -194,7 +194,7 @@ export function AskCard({
   return (
     <div
       className={cn(
-        "ai-gradient ai-chrome rounded-xl border border-transparent p-4 text-white sm:p-5",
+        "mk-app ai-gradient ai-chrome rounded-xl border border-transparent p-4 text-white sm:p-5",
         className,
       )}
     >
@@ -390,8 +390,8 @@ export function RegionDiagram({
       <svg viewBox="0 0 400 160" className="h-auto w-full" fill="none" aria-hidden="true">
         <defs>
           <linearGradient id="mk-route" x1="0" x2="1" y1="0" y2="0">
-            <stop offset="0" stopColor="#2563eb" />
-            <stop offset="1" stopColor="#0d9488" />
+            <stop offset="0" stopColor="#0e6549" />
+            <stop offset="1" stopColor="#8a5619" />
           </linearGradient>
         </defs>
         <path
@@ -401,13 +401,13 @@ export function RegionDiagram({
           strokeDasharray="6 7"
           strokeLinecap="round"
         />
-        <circle cx="70" cy="110" r="26" fill="#e8efff" />
-        <circle cx="70" cy="110" r="9" fill="#1d4ed8" />
-        <circle cx="330" cy="90" r="26" fill="#e6f7f5" />
-        <circle cx="330" cy="90" r="9" fill="#0f766e" />
+        <circle cx="70" cy="110" r="26" fill="#ddf5e9" />
+        <circle cx="70" cy="110" r="9" fill="#0e6549" />
+        <circle cx="330" cy="90" r="26" fill="#ffeaca" />
+        <circle cx="330" cy="90" r="9" fill="#8a5619" />
         <path
           d="M196 38 l8 5 -8 5"
-          stroke="#0f766e"
+          stroke="#0e6549"
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -438,7 +438,7 @@ export function HeroComposition() {
   return (
     <Mock caption={t("hero")} className="mx-auto w-full max-w-xl lg:max-w-none">
       <div className="relative pt-2 sm:pt-16 lg:ps-4">
-        <div className="mk-window mk-settle overflow-hidden rounded-2xl">
+        <div className="mk-app mk-window mk-settle overflow-hidden rounded-2xl">
           <div className="flex items-center gap-2 border-b border-border bg-surface-muted px-4 py-2.5">
             <span className="flex gap-1.5">
               <span className="size-2.5 rounded-full bg-border-soft" />

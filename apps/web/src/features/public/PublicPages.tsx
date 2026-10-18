@@ -4,11 +4,13 @@ import {
   PUBLIC_TELUGU_STYLESHEET_HREF,
   type ParentLanguage,
 } from "@/server/public/messages";
+import { PublicIcon } from "./PublicIcon";
 
 /**
- * Parent page shells (ADR-0046; docs/17 §5.8). Server components without client JavaScript:
- * the school's name at the top, "From <school>, sent through SchoolOS" and the forwarding
- * warning at the bottom, the text in the parent language. The page content per kind (notice,
+ * Parent page shells (ADR-0046; docs/17 §5.8). Server components without client JavaScript,
+ * in Direction B "Register paper" (public.css): the school's name as the masthead over a double
+ * rule, one ruled sheet, and at the bottom "From <school>, sent through SchoolOS" and the
+ * forwarding warning, the text in the parent language. The page content per kind (notice,
  * receipt, dues, opt-in) is added by wave R2-3H.
  */
 
@@ -32,7 +34,10 @@ export function LinkFrame({ envelope }: { envelope: LinkEnvelope }) {
     <main className="public-page" lang={language}>
       <TeluguFont language={language} />
       <title>{t("meta.title")}</title>
-      <p className="public-school">{envelope.school_name}</p>
+      <header className="public-masthead">
+        <p className="public-school">{envelope.school_name}</p>
+        <p className="public-kicker">{t("meta.title")}</p>
+      </header>
       <section className="public-card" aria-labelledby="public-heading">
         <h1 id="public-heading">{t(`kind.${envelope.kind}`)}</h1>
         <p className="public-muted">{t("view.detailsSoon")}</p>
@@ -40,7 +45,7 @@ export function LinkFrame({ envelope }: { envelope: LinkEnvelope }) {
       </section>
       <footer className="public-footer">
         <p>{t("footer.fromSchool", { school: envelope.school_name })}</p>
-        <p>{t("footer.doNotForward")}</p>
+        <p className="public-warning">{t("footer.doNotForward")}</p>
       </footer>
     </main>
   );
@@ -66,6 +71,9 @@ function Notice({ variant }: { variant: "expired" | "busy" }) {
     <main className="public-page" lang="en">
       <title>{t("meta.title")}</title>
       <section className="public-card" aria-labelledby="public-heading">
+        <p className="public-muted">
+          <PublicIcon name={variant === "expired" ? "unlinked" : "clock"} />
+        </p>
         <h1 id="public-heading">{t(`${variant}.title`)}</h1>
         <p>{t(`${variant}.body`)}</p>
       </section>

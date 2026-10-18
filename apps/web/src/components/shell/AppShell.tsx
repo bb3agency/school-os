@@ -44,10 +44,11 @@ const topbars: Record<
     search: "border-border-soft bg-surface text-ink-muted hover:bg-surface-muted hover:text-ink",
     crumb: "text-ink-muted",
   },
-  // Operator console: the dark neutral strip meets the dark sidebar, so an operator always
-  // knows they are in the control plane (C14; owner decision 2026-10-18).
+  // Operator console: the dark neutral strip meets the dark sidebar, with a 2px amber marker
+  // along its top edge, so an operator always knows they are in the control plane (C14;
+  // owner decision 2026-10-18, report §12.5).
   platform: {
-    bar: "platform-chrome border-b border-platform-hover bg-platform text-platform-ink",
+    bar: "platform-chrome border-t-2 border-b border-t-platform-accent border-b-platform-hover bg-platform text-platform-ink",
     menuButton: "border-platform-hover bg-platform text-platform-ink hover:bg-platform-hover",
     search: "border-platform-hover bg-platform-hover text-platform-muted hover:text-platform-ink",
     crumb: "text-platform-muted",
@@ -608,7 +609,13 @@ export function AppShell({
                         aria-current={current ? "page" : undefined}
                         className={cn(
                           "flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 text-xs",
-                          current ? "font-semibold text-accent" : "text-ink-muted",
+                          theme === "platform"
+                            ? current
+                              ? "font-semibold text-platform-accent"
+                              : "text-platform-muted"
+                            : current
+                              ? "font-semibold text-accent"
+                              : "text-ink-muted",
                         )}
                       >
                         {item.icon ? <Icon name={item.icon} className="size-5" /> : null}

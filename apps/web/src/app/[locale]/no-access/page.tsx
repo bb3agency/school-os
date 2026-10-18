@@ -2,6 +2,7 @@ import { useTranslations } from "next-intl";
 import { SessionControls } from "@/components/session/SessionControls";
 import { MinimalShell } from "@/components/shell/MinimalShell";
 import { Alert } from "@/components/ui/Alert";
+import { Illustration } from "@/components/ui/Illustration";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { CheckInvitationsButton } from "@/features/auth/CheckInvitationsButton";
 import { PendingInvitations } from "@/features/auth/PendingInvitations";
@@ -16,6 +17,7 @@ function NoAccessBody({ signedIn }: { signedIn: boolean }) {
   const t = useTranslations("noAccess");
   return (
     <div className="space-y-6">
+      <Illustration name="office-register" className="w-56 max-w-full" />
       <PageHeader title={t("title")} description={t("description")} />
       <Alert tone="info" title={t("expiredTitle")}>
         {t("expiredBody")}

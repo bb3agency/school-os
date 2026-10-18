@@ -2,12 +2,12 @@ import { TENANT_STATUSES, type TenantSummary } from "@schoolos/api-client";
 import { useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { SearchInput } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
-import { DataTable, type Column } from "@/components/ui/Table";
+import { DataTableV2 } from "@/components/console/DataTableV2";
+import type { Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { deploymentTone, known, subscriptionTone } from "@/features/status";
 import { Link } from "@/i18n/navigation";
@@ -133,74 +133,75 @@ export function SchoolsView({
         breadcrumb={[{ label: tn("dashboard"), href: "/platform" }, { label: t("title") }]}
         actions={provision}
       />
-      <Card padding="sm">
-        <form method="get" role="search" className="flex flex-wrap items-end gap-3">
-          <SearchInput
-            wrapperClassName="min-w-64 flex-1"
-            name="q"
-            label={t("searchLabel")}
-            labelVisible
-            placeholder={t("searchHint")}
-            defaultValue={filters.q ?? ""}
-            autoComplete="off"
-            maxLength={100}
-          />
-          <SelectField
-            name="status"
-            label={t("filterStatus")}
-            placeholder={tc("all")}
-            defaultValue={filters.status ?? ""}
-            options={TENANT_STATUSES.map((value) => ({ value, label: tstatus(value) }))}
-            className="w-44"
-          />
-          <SelectField
-            name="tier"
-            label={t("filterTier")}
-            placeholder={tc("all")}
-            defaultValue={filters.tier ?? ""}
-            options={(["shared", "dedicated"] as const).map((value) => ({
-              value,
-              label: tmode(value),
-            }))}
-            className="w-44"
-          />
-          <fieldset className="flex min-h-10 flex-wrap items-center gap-4">
-            <legend className="sr-only">{t("filterMore")}</legend>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                name="trial_ending"
-                value="true"
-                defaultChecked={filters.trialEnding ?? false}
-                className="size-4 accent-primary"
-              />
-              {t("filterTrialEnding")}
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                name="past_due"
-                value="true"
-                defaultChecked={filters.pastDue ?? false}
-                className="size-4 accent-primary"
-              />
-              {t("filterPastDue")}
-            </label>
-          </fieldset>
-          <div className="relative flex flex-wrap gap-2">
-            <Button type="submit" variant="secondary">
-              <Icon name="filter" className="size-4" />
-              {tc("search")}
-            </Button>
-            {filtered ? (
-              <ButtonLink href="/platform/schools" variant="ghost">
-                {t("clearFilters")}
-              </ButtonLink>
-            ) : null}
-          </div>
-        </form>
-      </Card>
-      <DataTable
+      <DataTableV2
+        id="platform.schools"
+        toolbar={
+          <form method="get" role="search" className="flex flex-wrap items-end gap-3">
+            <SearchInput
+              wrapperClassName="min-w-64 flex-1"
+              name="q"
+              label={t("searchLabel")}
+              labelVisible
+              placeholder={t("searchHint")}
+              defaultValue={filters.q ?? ""}
+              autoComplete="off"
+              maxLength={100}
+            />
+            <SelectField
+              name="status"
+              label={t("filterStatus")}
+              placeholder={tc("all")}
+              defaultValue={filters.status ?? ""}
+              options={TENANT_STATUSES.map((value) => ({ value, label: tstatus(value) }))}
+              className="w-44"
+            />
+            <SelectField
+              name="tier"
+              label={t("filterTier")}
+              placeholder={tc("all")}
+              defaultValue={filters.tier ?? ""}
+              options={(["shared", "dedicated"] as const).map((value) => ({
+                value,
+                label: tmode(value),
+              }))}
+              className="w-44"
+            />
+            <fieldset className="flex min-h-10 flex-wrap items-center gap-4">
+              <legend className="sr-only">{t("filterMore")}</legend>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  name="trial_ending"
+                  value="true"
+                  defaultChecked={filters.trialEnding ?? false}
+                  className="size-4 accent-primary"
+                />
+                {t("filterTrialEnding")}
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  name="past_due"
+                  value="true"
+                  defaultChecked={filters.pastDue ?? false}
+                  className="size-4 accent-primary"
+                />
+                {t("filterPastDue")}
+              </label>
+            </fieldset>
+            <div className="relative flex flex-wrap gap-2">
+              <Button type="submit" variant="secondary">
+                <Icon name="filter" className="size-4" />
+                {tc("search")}
+              </Button>
+              {filtered ? (
+                <ButtonLink href="/platform/schools" variant="ghost">
+                  {t("clearFilters")}
+                </ButtonLink>
+              ) : null}
+            </div>
+          </form>
+        }
         stacked
         caption={t("title")}
         captionHidden

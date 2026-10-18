@@ -9,7 +9,8 @@ import { Badge, Pill } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { TextField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { DataTable, type Column } from "@/components/ui/Table";
+import { DataTableV2 } from "@/components/console/DataTableV2";
+import type { Column } from "@/components/ui/Table";
 import { personTone } from "@/features/status";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { formList } from "@/lib/forms";
@@ -271,7 +272,8 @@ export function OperatorsScreen() {
           </ActionDialog>
         }
       />
-      <DataTable
+      <DataTableV2
+        id="platform.operators"
         caption={t("title")}
         captionHidden
         columns={columns}
@@ -281,7 +283,8 @@ export function OperatorsScreen() {
         emptyBody={t("emptyBody")}
       />
       <Card title={t("rolesTitle")} description={t("twoPersonNote")}>
-        <DataTable
+        <DataTableV2
+          id="platform.operator-roles"
           caption={t("rolesTitle")}
           captionHidden
           columns={roleColumns}

@@ -53,6 +53,12 @@ export {
 export { NarrowSwitch } from "./NarrowSwitch";
 export { Dialog } from "./Dialog";
 export { EmptyState } from "./EmptyState";
+export {
+  Illustration,
+  ILLUSTRATIONS,
+  illustrationSrc,
+  type IllustrationName,
+} from "./Illustration";
 export { Eyebrow, type EyebrowTone } from "./Eyebrow";
 export { Icon, ICON_NAMES, type IconName } from "./Icon";
 export {
