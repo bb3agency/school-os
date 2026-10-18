@@ -14,7 +14,7 @@ import { intlErrors, renderWithIntl } from "@/test/render";
 import { finding, me, SECTION, STUDENT, structureRoutes } from "@/test/school-fixtures";
 import { FindingDetailScreen } from "./FindingDetailScreen";
 import { FindingsScreen } from "./FindingsScreen";
-import { findingsQuery, parseFindingFilters } from "./filters";
+import { findingsHref, findingsQuery, parseFindingFilters } from "./filters";
 import { RulesScreen } from "./RulesScreen";
 import { RunChecksDialog, runPollDelay } from "./RunChecks";
 
@@ -189,6 +189,27 @@ describe("findings list (US-501 AC1/AC2, FR-DQ-006)", () => {
     const severity = screen.getByRole("group", { name: "Severity" });
     expect(within(severity).getByRole("radio", { name: "Blocker" })).toBeChecked();
     expect(within(severity).getByRole("radio", { name: "All" })).not.toBeChecked();
+    // The active filter shows as a chip (the default status filter does not).
+    expect(
+      screen.getByRole("button", { name: "Remove filter Severity: Blocker" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Remove filter Status/ })).toBeNull();
+  });
+
+  it("removing a filter chip opens the same list without that filter", () => {
+    const filters = parseFindingFilters({
+      status: ["open", "resolved"],
+      severity: ["blocker", "high"],
+      rule_id: "DQ-003",
+      student_id: STUDENT,
+    });
+    expect(findingsHref(filters, "severity")).toBe(
+      `/findings?status=open&status=resolved&rule_id=DQ-003&student_id=${STUDENT}`,
+    );
+    expect(findingsHref(filters, "status")).toBe(
+      `/findings?severity=blocker&severity=high&rule_id=DQ-003&student_id=${STUDENT}`,
+    );
+    expect(findingsHref(parseFindingFilters({}))).toBe("/findings");
   });
 
   it("says what to do when nothing is found", async () => {
@@ -259,6 +280,9 @@ describe("finding detail (US-502, FR-DQ-020)", () => {
       <FindingDetailScreen findingId="0192f3a4-0000-7000-8000-00000000f001" />,
     );
     expect(await screen.findByText("Problem DQ-003")).toBeInTheDocument();
+    // The values side by side: one column per source.
+    const sources = screen.getByRole("list", { name: "Values from each source" });
+    expect(within(sources).getAllByRole("listitem").length).toBeGreaterThan(0);
     expect(container.textContent ?? "").not.toMatch(/Telugu|[ఀ-౿]/);
     expect(container.querySelector("[lang='te']")).toBeNull();
   });

@@ -8,6 +8,9 @@ export interface Step {
   label: string;
   /** A finished step may link back to itself (imports, provisioning). */
   href?: string;
+  /** The job stopped at this step (an import that failed at upload): a danger marker with an
+      alert icon and "Stopped" read out, never colour alone. Steps after it stay upcoming. */
+  failed?: boolean;
 }
 
 /**
@@ -33,7 +36,13 @@ export function Steps({
   return (
     <ol aria-label={label} className={cn("flex flex-wrap items-center gap-x-2 gap-y-2", className)}>
       {steps.map((step, index) => {
-        const state = index < current ? "done" : index === current ? "current" : "upcoming";
+        const state = step.failed
+          ? "failed"
+          : index < current
+            ? "done"
+            : index === current
+              ? "current"
+              : "upcoming";
         const marker = (
           <span
             aria-hidden="true"
@@ -42,9 +51,16 @@ export function Steps({
               state === "done" && "bg-accent text-on-accent",
               state === "current" && "border-2 border-accent bg-surface text-accent",
               state === "upcoming" && "border border-border-control bg-surface text-ink-muted",
+              state === "failed" && "bg-danger text-white",
             )}
           >
-            {state === "done" ? <Icon name="check" className="size-3.5" /> : index + 1}
+            {state === "done" ? (
+              <Icon name="check" className="size-3.5" />
+            ) : state === "failed" ? (
+              <Icon name="alert" className="size-3.5" />
+            ) : (
+              index + 1
+            )}
           </span>
         );
         const text = (
@@ -53,20 +69,32 @@ export function Steps({
             <span
               className={cn(
                 "text-sm",
-                state === "current" ? "font-semibold text-ink" : "text-ink-muted",
+                state === "current"
+                  ? "font-semibold text-ink"
+                  : state === "failed"
+                    ? "font-semibold text-danger"
+                    : "text-ink-muted",
               )}
             >
               {step.label}
             </span>
             <span className="sr-only">
-              {state === "done" ? t("done") : state === "current" ? t("current") : t("upcoming")}
+              {state === "done"
+                ? t("done")
+                : state === "failed"
+                  ? t("failed")
+                  : state === "current"
+                    ? t("current")
+                    : t("upcoming")}
             </span>
           </>
         );
         return (
           <li
             key={step.id}
-            aria-current={state === "current" ? "step" : undefined}
+            aria-current={
+              state === "current" || (state === "failed" && index === current) ? "step" : undefined
+            }
             className="flex items-center gap-2"
           >
             {state === "done" && step.href ? (

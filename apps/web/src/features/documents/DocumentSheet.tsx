@@ -93,7 +93,7 @@ export function DocumentSheetScreen({ documentId }: { documentId: string }) {
 
   if (sheet.status !== "ready") {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader title={t("title")} breadcrumb={[...crumbs, { label: t("title") }]} />
         {sheet.status === "error" && sheet.reason === undefined ? (
           <Alert tone="warning" title={t("cannotOpenTitle")}>
@@ -201,7 +201,7 @@ export function DocumentSheetScreen({ documentId }: { documentId: string }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={t("title")}
         breadcrumb={[...crumbs, { label: t("title") }]}

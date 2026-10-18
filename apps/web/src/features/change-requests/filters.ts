@@ -34,6 +34,15 @@ export function parseChangeRequestFilters(params: SearchParams): ChangeRequestFi
   };
 }
 
+/** `/change-requests?…` for these filters (tab links and filter chips keep the others). */
+export function changeRequestsHref(filters: ChangeRequestFilters): string {
+  const params = new URLSearchParams();
+  if (filters.status) params.set("status", filters.status);
+  if (filters.studentId) params.set("student_id", filters.studentId);
+  const query = params.toString();
+  return query ? `/change-requests?${query}` : "/change-requests";
+}
+
 /** `/change-requests/new?student_id=&attribute_key=&finding_id=` (from a finding). */
 export interface NewRequestParams {
   studentId: string | null;

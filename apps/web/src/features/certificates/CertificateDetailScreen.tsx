@@ -5,10 +5,11 @@ import * as z from "@/lib/zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { Pill } from "@/components/ui/Badge";
-import { Button, ButtonLink } from "@/components/ui/Button";
+import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { TextAreaField } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
+import { Menu } from "@/components/ui/Menu";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Timeline, type TimelineItem } from "@/components/ui/Timeline";
 import { Value } from "@/components/ui/Value";
@@ -89,6 +90,11 @@ function Decisions({ certificate }: { certificate: Certificate }) {
             description={t("approveBody")}
             confirmLabel={t("approve")}
             stepUp
+            consequence={
+              certificate.certificate_type === "transfer"
+                ? t("approveConsequenceTc")
+                : t("approveConsequence")
+            }
             schema={approveSchema}
             invalidate={invalidate}
             errorNamespace="certificates"
@@ -121,6 +127,7 @@ function Decisions({ certificate }: { certificate: Certificate }) {
             confirmLabel={t("reject")}
             confirmVariant="danger"
             stepUp
+            consequence={t("rejectConsequence")}
             schema={reasonSchema}
             invalidate={invalidate}
             errorNamespace="certificates"
@@ -148,6 +155,7 @@ function Decisions({ certificate }: { certificate: Certificate }) {
           description={t("withdrawBody")}
           confirmLabel={t("withdraw")}
           confirmVariant="danger"
+          consequence={t("withdrawConsequence")}
           schema={z.object({})}
           invalidate={invalidate}
           errorNamespace="certificates"
@@ -294,7 +302,7 @@ export function CertificateDetailScreen({ certificateId }: { certificateId: stri
   if (query.status === "loading") return <LoadingState label={tc("loading")} />;
   if (query.status !== "ready") {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader breadcrumb={crumbs(t("nav"))} title={t("nav")} />
         <Alert tone="danger" title={tc("loadErrorTitle")}>
           {query.status === "error" && query.reason
@@ -355,9 +363,44 @@ export function CertificateDetailScreen({ certificateId }: { certificateId: stri
   }
 
   const inputs = Object.entries(data.inputs);
+  // The print view is the page's main action once there is something to print; a pending
+  // request's main action is the decision (the draft print view stays on the Print card).
+  const printable = data.status !== "rejected" && data.status !== "withdrawn";
+  const printInHeader = printable && data.status !== "pending";
+  const more = (
+    <Menu
+      label={t("more")}
+      variant="button"
+      align="end"
+      trigger={t("more")}
+      entries={[
+        {
+          kind: "link",
+          id: "student",
+          label: td("openStudent"),
+          href: `/students/${data.student_id}`,
+          icon: "users",
+        },
+        {
+          kind: "link",
+          id: "all-for-student",
+          label: td("allForStudent"),
+          href: `/certificates?student_id=${data.student_id}`,
+          icon: "file",
+        },
+        {
+          kind: "link",
+          id: "list",
+          label: td("backToList"),
+          href: "/certificates",
+          icon: "chevronLeft",
+        },
+      ]}
+    />
+  );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         breadcrumb={crumbs(name)}
         title={name}
@@ -374,7 +417,13 @@ export function CertificateDetailScreen({ certificateId }: { certificateId: stri
           </span>
         }
         badge={<CertificateStatusBadge status={data.status} size="md" />}
-        actions={data.status === "pending" ? <Decisions certificate={data} /> : null}
+        actions={
+          <>
+            {more}
+            {data.status === "pending" ? <Decisions certificate={data} /> : null}
+            {printInHeader ? <PrintViewLink certificateId={data.id} variant="primary" /> : null}
+          </>
+        }
       />
 
       {data.status === "pending" && data.can_approve ? (
@@ -406,8 +455,8 @@ export function CertificateDetailScreen({ certificateId }: { certificateId: stri
         </Alert>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[3fr_2fr]">
-        <div className="space-y-6">
+      <div className="grid items-start gap-4 xl:grid-cols-[3fr_2fr]">
+        <div className="min-w-0 space-y-4">
           {data.content ? (
             <Card title={td("printedTitle")} description={td("printedBody")}>
               <Lines lines={data.content.fields} locale={locale} />
@@ -440,15 +489,15 @@ export function CertificateDetailScreen({ certificateId }: { certificateId: stri
             </Card>
           )}
         </div>
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-4">
           <Card title={td("timelineTitle")}>
             <Timeline label={td("timelineLabel")} items={steps} />
           </Card>
-          {data.status !== "rejected" && data.status !== "withdrawn" ? (
+          {printable ? (
             <Card title={td("printTitle")} description={issued ? td("printBody") : td("draftBody")}>
               <div className="flex flex-wrap items-start gap-3">
-                <PrintViewLink certificateId={data.id} />
-                {issued ? <DownloadPdfButton certificate={data} /> : null}
+                {printInHeader ? null : <PrintViewLink certificateId={data.id} />}
+                {issued ? <DownloadPdfButton certificate={data} variant="secondary" /> : null}
               </div>
               {issued && data.pdf_status === "failed" ? (
                 <div className="mt-4">
@@ -473,22 +522,6 @@ export function CertificateDetailScreen({ certificateId }: { certificateId: stri
           ) : null}
         </div>
       </div>
-
-      <nav aria-label={td("relatedLabel")} className="flex flex-wrap gap-2" data-print="hide">
-        <ButtonLink href={`/students/${data.student_id}`} variant="secondary" size="sm">
-          {td("openStudent")}
-        </ButtonLink>
-        <ButtonLink
-          href={`/certificates?student_id=${data.student_id}`}
-          variant="secondary"
-          size="sm"
-        >
-          {td("allForStudent")}
-        </ButtonLink>
-        <ButtonLink href="/certificates" variant="ghost" size="sm">
-          {td("backToList")}
-        </ButtonLink>
-      </nav>
     </div>
   );
 }

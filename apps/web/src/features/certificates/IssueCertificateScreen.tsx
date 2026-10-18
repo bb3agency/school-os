@@ -9,11 +9,13 @@ import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Pill } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ErrorSummary } from "@/components/ui/ErrorSummary";
 import { TextField } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SelectField } from "@/components/ui/Select";
+import { Steps } from "@/components/ui/Steps";
 import { Table, TableScroll, TBody, Td, Th, THead, Tr } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { SourceChip } from "@/features/findings/parts";
@@ -246,14 +248,19 @@ function PreviewValue({ field }: { field: PrintedField }) {
   return <Value>{field.value}</Value>;
 }
 
+/** The input's id, so the error summary can link to it. */
+const inputId = (key: string) => `certificate-input-${key}`;
+
 function InputField({ input, error }: { input: CertificateInput; error: string | undefined }) {
   const t = useTranslations("certificates");
   const locale = useLocale();
   const label = useInputLabel()(input);
   const hint = input.required ? undefined : t("issue.optional");
+  const id = inputId(input.key);
   if (input.kind === "choice") {
     return (
       <SelectField
+        id={id}
         name={input.key}
         label={label}
         hint={hint}
@@ -267,11 +274,14 @@ function InputField({ input, error }: { input: CertificateInput; error: string |
     );
   }
   if (input.kind === "date") {
-    return <TextField name={input.key} type="date" label={label} hint={hint} error={error} />;
+    return (
+      <TextField id={id} name={input.key} type="date" label={label} hint={hint} error={error} />
+    );
   }
   if (input.kind === "number") {
     return (
       <TextField
+        id={id}
         name={input.key}
         label={label}
         hint={hint}
@@ -284,6 +294,7 @@ function InputField({ input, error }: { input: CertificateInput; error: string |
   }
   return (
     <TextField
+      id={id}
       name={input.key}
       label={label}
       hint={hint}
@@ -307,9 +318,13 @@ function IssueForm({
   const tf = useTranslations("certificates.format");
   const router = useRouter();
   const api = useBffClient("staff");
+  const inputLabel = useInputLabel();
+  // Each failed submit moves focus to the error summary again.
+  const [attempt, setAttempt] = useState(0);
   const form = useApiForm({
     schema: buildInputSchema(info),
     fieldMap: (serverField) => serverField.replace(/^inputs\./, ""),
+    onInvalid: () => setAttempt((count) => count + 1),
     invalidate: [CERT_KEYS.all],
     submit: (inputs, key) =>
       unwrap(
@@ -322,6 +337,13 @@ function IssueForm({
     onSuccess: (created) => router.push(`/certificates/${created.id}`),
   });
   const blocked = preview !== null && !preview.can_issue;
+  // Every input with a problem, in form order: "Date of leaving: Enter a date."
+  const summary = info.inputs.flatMap((input) => {
+    const message = form.errors[input.key];
+    return message
+      ? [{ fieldId: inputId(input.key), message: `${inputLabel(input)}: ${message}` }]
+      : [];
+  });
   return (
     <form noValidate onSubmit={form.onSubmit}>
       <Card
@@ -329,6 +351,7 @@ function IssueForm({
         description={info.requires_approval ? t("inputsBodyApproval") : t("inputsBody")}
       >
         <div className="space-y-4">
+          <ErrorSummary errors={summary} attempt={attempt} />
           {info.format_key && info.format_key !== "generic-v1" ? (
             <Alert
               tone={info.format_verified === false ? "warning" : "info"}
@@ -409,9 +432,12 @@ export function IssueCertificateScreen({
   const name =
     student.status === "ready" ? (student.data.canonical?.full_name?.value ?? null) : null;
   const info = types.status === "ready" ? types.data.find((item) => item.key === type) : undefined;
+  // Where the person is on this one page: choose the type, check what it will print (blocked
+  // until the problems are fixed), then fill the details and issue it.
+  const step = !preview.data ? 0 : preview.data.can_issue ? 2 : 1;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         breadcrumb={[
           { label: t("studentsCrumb"), href: "/students" },
@@ -420,6 +446,15 @@ export function IssueCertificateScreen({
         ]}
         title={ti("title")}
         description={name ?? undefined}
+      />
+      <Steps
+        label={ti("steps.label")}
+        current={step}
+        steps={[
+          { id: "type", label: ti("steps.type") },
+          { id: "check", label: ti("steps.check") },
+          { id: "details", label: ti("steps.details") },
+        ]}
       />
       {student.status === "error" ? (
         <Alert tone="danger" title={tc("loadErrorTitle")}>

@@ -3,14 +3,17 @@
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useRef, useState, type FormEvent } from "react";
 import * as z from "@/lib/zod";
+import { DataTableV2, type ColumnV2 } from "@/components/console";
 import { Alert } from "@/components/ui/Alert";
 import { Pill, type PillVariant } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
+import { Button, buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ErrorSummary, type SummaryError } from "@/components/ui/ErrorSummary";
+import { Icon } from "@/components/ui/Icon";
 import { Field } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
-import { DataTable, type Column } from "@/components/ui/Table";
+import { Steps } from "@/components/ui/Steps";
 import { Value } from "@/components/ui/Value";
 import { TENANT_KEY } from "@/features/settings/data";
 import { PERM, useStaffPermissions, type Permissions } from "@/features/students/me";
@@ -30,13 +33,15 @@ import {
   type ImportSummary,
   type ImportTemplate,
 } from "./types";
-import { FileDropZone, fileInputClasses, Stepper } from "./parts";
+import { FileDropZone, fileInputClasses } from "./parts";
 import { ERP_PRESET, TemplateLibrary } from "./presets";
 import { extensionOf, uploadDocument, type UploadProgress } from "./upload";
 
 export const IMPORTS_KEY = ["staff", "imports"] as const;
 /** FR-IMP-001: XLSX or CSV (a Google Sheets download), at most 10 MB. */
 export const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
+/** The upload card's id: the header's upload link jumps to it (the form's submit is the primary). */
+const UPLOAD_ANCHOR = "upload-spreadsheet";
 const ACCEPT =
   ".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv";
 
@@ -78,17 +83,20 @@ export function importStep(status: ImportBatch["status"]): number {
   }
 }
 
+const STEP_IDS = ["upload", "map", "check", "add"] as const;
+
+/** The import's stages as `Steps`; the step it failed at is marked failed ("Stopped"). */
 export function ImportSteps({ current, failed = false }: { current: number; failed?: boolean }) {
   const t = useTranslations("imports.steps");
   return (
-    <Stepper
+    <Steps
       label={t("label")}
-      steps={[t("upload"), t("map"), t("check"), t("add")]}
       current={current}
-      stepNumber={(number) => t("step", { number })}
-      doneLabel={t("done")}
-      failed={failed}
-      failedLabel={t("stopped")}
+      steps={STEP_IDS.map((id, index) => ({
+        id,
+        label: t(id),
+        ...(failed && index === current ? { failed: true } : {}),
+      }))}
     />
   );
 }
@@ -137,8 +145,11 @@ export function UploadSpreadsheet({
   const api = useBffClient("staff");
   const fileRef = useRef<HTMLInputElement>(null);
   const statusId = useId();
+  const fileId = `${statusId}-file`;
+  const sourceId = `${statusId}-source`;
   const [problem, setProblem] = useState<FileProblem | null>(null);
   const [sourceError, setSourceError] = useState<string | undefined>(undefined);
+  const [attempt, setAttempt] = useState(0);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [error, setError] = useState<unknown>(undefined);
   const busy = progress !== null;
@@ -173,11 +184,11 @@ export function UploadSpreadsheet({
     setProblem(found);
     setSourceError(parsed.success ? undefined : tv("chooseOption"));
     setError(undefined);
-    if (found || !file) {
-      fileRef.current?.focus();
+    if (found || !file || !parsed.success) {
+      // The error summary takes focus and links to each field (docs/17 §4.4).
+      setAttempt((value) => value + 1);
       return;
     }
-    if (!parsed.success) return;
     start(file, parsed.data.source)
       .then((batch) => {
         form.reset();
@@ -195,9 +206,16 @@ export function UploadSpreadsheet({
       ? t("stage.uploadingPercent", { percent: value.percent })
       : t(`stage.${value.stage}`);
 
+  const summary: SummaryError[] = [
+    ...(problem ? [{ fieldId: fileId, message: t(problem) }] : []),
+    ...(sourceError ? [{ fieldId: sourceId, message: sourceError }] : []),
+  ];
+
   return (
     <form noValidate onSubmit={onSubmit} className="space-y-4">
+      <ErrorSummary errors={summary} attempt={attempt} />
       <Field
+        id={fileId}
         label={t("file")}
         hint={t("fileHint", { size: formatBytes(MAX_IMPORT_BYTES, locale) ?? "10 MB" })}
         error={problem ? t(problem) : undefined}
@@ -220,6 +238,7 @@ export function UploadSpreadsheet({
         )}
       </Field>
       <SelectField
+        id={sourceId}
         name="source"
         label={t("source")}
         hint={t("sourceHint")}
@@ -320,16 +339,18 @@ export function ImportsView({
   const t = useTranslations("imports.list");
   const tn = useTranslations("school.nav");
   const locale = useLocale() as Locale;
+  const historyId = useId();
+  const templatesId = useId();
   const count = (value: number) => formatCount(value, locale) ?? String(value);
 
-  const columns: Column<ImportSummary>[] = [
+  const columns: ColumnV2<ImportSummary>[] = [
     {
       key: "started",
       header: t("colStarted"),
       cell: (row) => (
         <Link
           href={`/imports/${row.id}`}
-          className="font-semibold text-primary underline underline-offset-4"
+          className="num font-semibold text-primary underline underline-offset-4"
         >
           {formatDateTime(row.created_at) ?? t("open")}
           <span className="sr-only">{t("openHint")}</span>
@@ -341,7 +362,7 @@ export function ImportsView({
       key: "rows",
       header: t("colRows"),
       numeric: true,
-      cell: (row) => <span className="tabular-nums">{count(row.row_count)}</span>,
+      cell: (row) => count(row.row_count),
     },
     {
       key: "errors",
@@ -361,59 +382,88 @@ export function ImportsView({
     },
   ];
 
-  const templateColumns: Column<ImportTemplate>[] = [
+  const templateColumns: ColumnV2<ImportTemplate>[] = [
     { key: "name", header: t("templateName"), cell: (row) => row.name },
     { key: "source", header: t("colSource"), cell: (row) => <SourceName source={row.source} /> },
     {
       key: "columns",
       header: t("templateColumns"),
+      numeric: true,
       cell: (row) => count(Object.keys(row.mapping).length),
     },
     {
       key: "used",
       header: t("templateLastUsed"),
-      cell: (row) => <Value>{formatDateTime(row.last_used_at)}</Value>,
+      cell: (row) => (
+        <span className="num">
+          <Value>{formatDateTime(row.last_used_at)}</Value>
+        </span>
+      ),
     },
   ];
 
   const canUpload = permissions.has(PERM.importRun) && permissions.has(PERM.documentUpload);
+  // The one primary action jumps to the upload card on this page (nothing else changes).
+  const uploadLink = (
+    <a href={`#${UPLOAD_ANCHOR}`} className={buttonClasses("secondary")}>
+      <Icon name="upload" className="size-4" />
+      {t("uploadAction")}
+    </a>
+  );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={t("title")}
         description={t("description")}
         breadcrumb={[{ label: tn("home"), href: "/" }, { label: t("title") }]}
+        actions={canUpload ? uploadLink : undefined}
       />
       {canUpload && alongside ? (
         <ErpRefreshCard erpName={alongside.erpName} onStarted={onRefreshStarted ?? onStarted} />
       ) : null}
       {canUpload ? (
-        <Card title={t("uploadTitle")} description={t("uploadDescription")}>
-          <div className="space-y-6">
-            <ImportSteps current={0} />
-            <UploadSpreadsheet onStarted={onStarted} />
-          </div>
-        </Card>
+        <div id={UPLOAD_ANCHOR} tabIndex={-1} className="scroll-mt-20 focus:outline-none">
+          <Card title={t("uploadTitle")} description={t("uploadDescription")}>
+            <div className="space-y-5">
+              <ImportSteps current={0} />
+              <UploadSpreadsheet onStarted={onStarted} />
+            </div>
+          </Card>
+        </div>
       ) : null}
       {permissions.has(PERM.importRun) ? <TemplateLibrary /> : null}
-      <Card title={t("historyTitle")}>
-        <div className="space-y-3">
-          <DataTable
-            stacked
-            caption={t("historyTitle")}
-            captionHidden
-            columns={columns}
-            state={imports}
-            rowKey={(row) => row.id}
-            emptyTitle={t("emptyTitle")}
-            emptyBody={t("emptyBody")}
-          />
-          <Pager label={t("pagesLabel")} page={page} onPrevious={onPrevious} onNext={onNext} />
+      <section aria-labelledby={historyId} className="space-y-3">
+        <h2 id={historyId} className="text-lg font-semibold text-ink">
+          {t("historyTitle")}
+        </h2>
+        <DataTableV2
+          id="imports"
+          stacked
+          caption={t("historyTitle")}
+          captionHidden
+          columns={columns}
+          state={imports}
+          rowKey={(row) => row.id}
+          emptyTitle={t("emptyTitle")}
+          emptyBody={t("emptyBody")}
+          emptyAction={canUpload ? uploadLink : undefined}
+          footer={
+            onNext || onPrevious ? (
+              <Pager label={t("pagesLabel")} page={page} onPrevious={onPrevious} onNext={onNext} />
+            ) : undefined
+          }
+        />
+      </section>
+      <section aria-labelledby={templatesId} className="space-y-3">
+        <div className="space-y-1">
+          <h2 id={templatesId} className="text-lg font-semibold text-ink">
+            {t("templatesTitle")}
+          </h2>
+          <p className="text-sm text-ink-muted">{t("templatesDescription")}</p>
         </div>
-      </Card>
-      <Card title={t("templatesTitle")} description={t("templatesDescription")}>
-        <DataTable
+        <DataTableV2
+          id="import-templates"
           stacked
           caption={t("templatesTitle")}
           captionHidden
@@ -423,7 +473,7 @@ export function ImportsView({
           emptyTitle={t("templatesEmptyTitle")}
           emptyBody={t("templatesEmptyBody")}
         />
-      </Card>
+      </section>
     </div>
   );
 }

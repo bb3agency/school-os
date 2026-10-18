@@ -1,18 +1,86 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
+import type { ReactNode } from "react";
+import { Alert } from "@/components/ui/Alert";
+import { Badge, Pill } from "@/components/ui/Badge";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Icon } from "@/components/ui/Icon";
+import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { DataTable, type Column } from "@/components/ui/Table";
-import { Link } from "@/i18n/navigation";
-import { toLoadable } from "@/lib/bff/query";
 import { attributeLabel, useAttributes, useProfiles, useRules } from "./data";
 import { SeverityBadge, SourceChip } from "./parts";
 import { pick, type DqProfile, type DqRule } from "./types";
 
+/** Loading, error (with "Try again") and empty states of one settings-style list. */
+function ListState<T>({
+  query,
+  label,
+  children,
+}: {
+  query: {
+    isPending: boolean;
+    isError: boolean;
+    data: readonly T[] | undefined;
+    refetch: () => unknown;
+  };
+  label: string;
+  children: (items: readonly T[]) => ReactNode;
+}) {
+  const t = useTranslations("findings.rules");
+  const tc = useTranslations("common");
+  if (query.isPending) return <LoadingState label={tc("loading")} rows={3} />;
+  if (query.isError || !query.data) {
+    return (
+      <Alert tone="danger" title={tc("loadErrorTitle")}>
+        <p>{tc("loadErrorBody")}</p>
+        <Button variant="secondary" size="sm" className="mt-3" onClick={() => void query.refetch()}>
+          <Icon name="refresh" className="size-4" />
+          {tc("retry")}
+        </Button>
+      </Alert>
+    );
+  }
+  if (query.data.length === 0) return <EmptyState title={t("empty")} />;
+  return (
+    <ul aria-label={label} className="divide-y divide-border">
+      {children(query.data)}
+    </ul>
+  );
+}
+
+/** One row: what it is on the left (label, then the details), how it applies on the right. */
+function SettingRow({
+  id,
+  title,
+  details,
+  aside,
+}: {
+  id: string;
+  title: ReactNode;
+  details: ReactNode;
+  aside: ReactNode;
+}) {
+  return (
+    <li
+      key={id}
+      className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
+    >
+      <div className="min-w-0 flex-1 space-y-1.5">
+        {title}
+        <div className="space-y-1 text-sm text-ink-muted">{details}</div>
+      </div>
+      <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">{aside}</div>
+    </li>
+  );
+}
+
 /**
  * What SchoolOS checks (FR-DQ-001): the rule catalog and the export pre-check profiles, in
- * the reader's language, read-only.
+ * the reader's language, read-only (nothing on this page changes a setting, so it has no
+ * save button).
  */
 export function RulesScreen() {
   const t = useTranslations("findings.rules");
@@ -27,114 +95,113 @@ export function RulesScreen() {
       ? t("fieldsFromProfile")
       : keys.map((key) => attributeLabel(attributes.data, key, locale) ?? key).join(", ");
 
-  const ruleColumns: Column<DqRule>[] = [
-    { key: "id", header: t("colId"), cell: (row) => <span className="font-mono">{row.id}</span> },
-    {
-      key: "what",
-      header: t("colWhat"),
-      className: "min-w-64",
-      cell: (row) => <span lang={locale}>{pick(row.explanation, locale)}</span>,
-    },
-    { key: "fields", header: t("colFields"), cell: (row) => fields(row.attribute_keys) },
-    {
-      key: "sources",
-      header: t("colSources"),
-      cell: (row) => (
-        <span className="flex flex-wrap gap-1">
-          {row.sources.map((source) =>
-            source === "canonical" ? (
-              <span key={source} className="text-sm">
-                {t("canonical")}
-              </span>
-            ) : (
-              <SourceChip key={source} source={source} />
-            ),
+  const ruleRow = (row: DqRule) => (
+    <SettingRow
+      key={row.id}
+      id={row.id}
+      title={
+        <p className="flex flex-wrap items-baseline gap-x-2">
+          <span className="font-mono text-xs text-ink-muted">{row.id}</span>
+          <span className="font-semibold text-ink" lang={locale}>
+            {pick(row.explanation, locale)}
+          </span>
+        </p>
+      }
+      details={
+        <>
+          <p>
+            <span className="font-semibold">{t("colFields")}: </span>
+            <span>{fields(row.attribute_keys)}</span>
+          </p>
+          {row.sources.length > 0 ? (
+            <p className="flex flex-wrap items-center gap-1">
+              <span className="font-semibold">{t("colSources")}: </span>
+              {row.sources.map((source) =>
+                source === "canonical" ? (
+                  <span key={source}>{t("canonical")}</span>
+                ) : (
+                  <SourceChip key={source} source={source} />
+                ),
+              )}
+            </p>
+          ) : null}
+          {row.routes.length > 0 ? (
+            <div>
+              <p className="font-semibold">{t("colRoutes")}:</p>
+              <ol className="list-decimal space-y-0.5 ps-5" lang={locale}>
+                {row.routes.map((route) => (
+                  <li key={route.code}>{pick(route, locale)}</li>
+                ))}
+              </ol>
+            </div>
+          ) : null}
+        </>
+      }
+      aside={
+        <>
+          <span className="sr-only">{t("colSeverity")}: </span>
+          {row.severity.mode === "fixed" && row.severity.level ? (
+            <SeverityBadge severity={row.severity.level} />
+          ) : (
+            <Badge tone="neutral">{t("dependsOnNames")}</Badge>
           )}
-        </span>
-      ),
-    },
-    {
-      key: "severity",
-      header: t("colSeverity"),
-      cell: (row) =>
-        row.severity.mode === "fixed" && row.severity.level ? (
-          <SeverityBadge severity={row.severity.level} />
-        ) : (
-          <span className="text-sm">{t("dependsOnNames")}</span>
-        ),
-    },
-    {
-      key: "profile",
-      header: t("colProfile"),
-      cell: (row) => (row.requires_profile ? t("profileOnly") : t("always")),
-    },
-    {
-      key: "routes",
-      header: t("colRoutes"),
-      className: "min-w-56",
-      cell: (row) => (
-        <ol className="list-decimal space-y-1 pl-4" lang={locale}>
-          {row.routes.map((route) => (
-            <li key={route.code}>{pick(route, locale)}</li>
-          ))}
-        </ol>
-      ),
-    },
-  ];
+          <span className="sr-only">{t("colProfile")}: </span>
+          <Pill variant="tag" icon={null}>
+            {row.requires_profile ? t("profileOnly") : t("always")}
+          </Pill>
+        </>
+      }
+    />
+  );
 
-  const profileColumns: Column<DqProfile>[] = [
-    {
-      key: "name",
-      header: t("colProfileName"),
-      cell: (row) => (
-        <span>
-          <span className="block font-semibold">
+  const profileRow = (row: DqProfile) => (
+    <SettingRow
+      key={row.key}
+      id={row.key}
+      title={
+        <p className="flex flex-wrap items-baseline gap-x-2">
+          <span className="font-semibold text-ink">
             {locale === "te" && row.label_te ? row.label_te : row.label_en}
           </span>
-          <span className="block font-mono text-xs text-ink-muted">{row.key}</span>
-        </span>
-      ),
-    },
-    { key: "required", header: t("colRequired"), cell: (row) => fields(row.required_fields) },
-    {
-      key: "apaar",
-      header: t("colApaar"),
-      cell: (row) => (row.needs_apaar ? tc("yes") : tc("no")),
-    },
-  ];
+          <span className="font-mono text-xs text-ink-muted">{row.key}</span>
+        </p>
+      }
+      details={
+        <p>
+          <span className="font-semibold">{t("colRequired")}: </span>
+          <span>{fields(row.required_fields)}</span>
+        </p>
+      }
+      aside={
+        <Badge tone={row.needs_apaar ? "info" : "neutral"}>
+          {t("colApaar")}: {row.needs_apaar ? tc("yes") : tc("no")}
+        </Badge>
+      }
+    />
+  );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         breadcrumb={[{ label: tf("title"), href: "/findings" }, { label: t("title") }]}
         title={t("title")}
         description={t("description")}
+        actions={
+          <ButtonLink href="/findings" variant="secondary">
+            {tf("detail.backToList")}
+          </ButtonLink>
+        }
       />
       <Card title={t("rulesTitle")}>
-        <DataTable
-          caption={t("rulesTitle")}
-          captionHidden
-          columns={ruleColumns}
-          state={toLoadable(rules)}
-          rowKey={(row) => row.id}
-          emptyTitle={t("empty")}
-        />
+        <ListState query={rules} label={t("rulesTitle")}>
+          {(items) => items.map(ruleRow)}
+        </ListState>
       </Card>
       <Card title={t("profilesTitle")} description={t("profilesBody")}>
-        <DataTable
-          caption={t("profilesTitle")}
-          captionHidden
-          columns={profileColumns}
-          state={toLoadable(profiles)}
-          rowKey={(row) => row.key}
-          emptyTitle={t("empty")}
-        />
+        <ListState query={profiles} label={t("profilesTitle")}>
+          {(items) => items.map(profileRow)}
+        </ListState>
       </Card>
-      <p>
-        <Link href="/findings" className="text-primary underline">
-          {tf("detail.backToList")}
-        </Link>
-      </p>
     </div>
   );
 }

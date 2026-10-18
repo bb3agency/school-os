@@ -7,6 +7,7 @@ import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ErrorSummary } from "@/components/ui/ErrorSummary";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
@@ -20,12 +21,14 @@ import { EXPORT_KEYS, useExportAttributes, useExportProfiles } from "./data";
 import type { NewPrecheckParams } from "./filters";
 import {
   exportFieldMap,
+  ExportSteps,
   LanguageField,
   refineScope,
   ScopePicker,
   scopeBody,
   scopeFields,
   StepUpNotice,
+  summaryErrors,
 } from "./parts";
 import {
   EXPORT_LANGUAGES,
@@ -51,6 +54,17 @@ export const precheckSchema = z
     ...scopeFields,
   })
   .superRefine(refineScope);
+
+/** Input ids of the pre-check form, in reading order (the error summary links to them). */
+const FIELD_IDS = {
+  profile_key: "precheck-profile",
+  scope: "precheck-scope",
+  class_ids: "precheck-scope",
+  section_ids: "precheck-scope",
+  format: "precheck-format",
+  language: "precheck-language",
+  include_sensitive: "precheck-sensitive",
+} as const;
 
 /** Profiles this member may run: the API's `allowed` and their own permission from /me. */
 export function runnableProfiles(
@@ -87,6 +101,8 @@ export function NewPrecheckScreen({ params }: { params: NewPrecheckParams }) {
   const runnable = runnableProfiles(profiles.data, (permission) => can(permission));
   const [profileKey, setProfileKey] = useState<string>(params.profileKey ?? "");
   const formatErrorId = useId();
+  // Each failed submit moves focus to the error summary again.
+  const [attempt, setAttempt] = useState(0);
   const profile =
     runnable.find((item) => item.key === profileKey) ??
     (runnable.length === 1 ? runnable[0] : undefined);
@@ -108,6 +124,7 @@ export function NewPrecheckScreen({ params }: { params: NewPrecheckParams }) {
       section_ids: formList(element, "section_ids"),
     }),
     fieldMap: exportFieldMap,
+    onInvalid: () => setAttempt((count) => count + 1),
     invalidate: [EXPORT_KEYS.all],
     submit: (data, key): Promise<Export> =>
       unwrap(
@@ -128,7 +145,7 @@ export function NewPrecheckScreen({ params }: { params: NewPrecheckParams }) {
   if (me.isPending) return <LoadingState label={tc("loading")} />;
   if (!mayRun) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader
           title={tp("title")}
           breadcrumb={[
@@ -146,7 +163,7 @@ export function NewPrecheckScreen({ params }: { params: NewPrecheckParams }) {
   if (profiles.isPending) return <LoadingState label={tc("loading")} />;
   if (profiles.isError || runnable.length === 0) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader
           title={tp("title")}
           breadcrumb={[
@@ -176,7 +193,7 @@ export function NewPrecheckScreen({ params }: { params: NewPrecheckParams }) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={tp("title")}
         description={tp("description")}
@@ -186,11 +203,14 @@ export function NewPrecheckScreen({ params }: { params: NewPrecheckParams }) {
           { label: tp("title") },
         ]}
       />
+      <ExportSteps current={0} />
       <StepUpNotice />
-      <form noValidate onSubmit={form.onSubmit} className="space-y-6">
+      <form noValidate onSubmit={form.onSubmit} className="space-y-5">
+        <ErrorSummary errors={summaryErrors(errors, FIELD_IDS)} attempt={attempt} />
         <Card title={tp("profileTitle")}>
           <div className="space-y-4">
             <SelectField
+              id={FIELD_IDS.profile_key}
               name="profile_key"
               label={tp("profile")}
               hint={tp("profileHint")}
@@ -210,7 +230,7 @@ export function NewPrecheckScreen({ params }: { params: NewPrecheckParams }) {
         </Card>
 
         <Card title={t("studentsTitle")}>
-          <ScopePicker errors={errors} />
+          <ScopePicker errors={errors} firstId={FIELD_IDS.scope} />
         </Card>
 
         <Card title={t("fileTitle")}>
@@ -225,6 +245,7 @@ export function NewPrecheckScreen({ params }: { params: NewPrecheckParams }) {
                 {PRECHECK_FORMATS.map((format, index) => (
                   <label key={format} className="inline-flex min-h-8 items-center gap-2 text-sm">
                     <input
+                      id={index === 0 ? FIELD_IDS.format : undefined}
                       type="checkbox"
                       name="format"
                       value={format}
@@ -242,7 +263,7 @@ export function NewPrecheckScreen({ params }: { params: NewPrecheckParams }) {
                 </p>
               ) : null}
             </fieldset>
-            <LanguageField errors={errors} />
+            <LanguageField errors={errors} firstId={FIELD_IDS.language} />
           </div>
         </Card>
 
@@ -256,6 +277,7 @@ export function NewPrecheckScreen({ params }: { params: NewPrecheckParams }) {
               </p>
               <label className="flex min-h-8 items-start gap-2 text-sm">
                 <input
+                  id={FIELD_IDS.include_sensitive}
                   type="checkbox"
                   name="include_sensitive"
                   value="on"

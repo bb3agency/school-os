@@ -99,7 +99,14 @@ describe("FR-IMP-001: which files can be imported", () => {
     renderWithIntl(<UploadSpreadsheet onStarted={started} />);
 
     await user.click(screen.getByRole("button", { name: im.upload.submit }));
-    expect(screen.getByText(im.upload.fileMissing)).toBeInTheDocument();
+    // Under the field and, as a link to it, in the error summary that takes focus.
+    expect(screen.getAllByText(im.upload.fileMissing)).toHaveLength(2);
+    const summary = screen.getByRole("alert", { name: messages.en.ui.errorSummary.title });
+    expect(summary).toHaveFocus();
+    expect(within(summary).getByRole("link", { name: im.upload.fileMissing })).toHaveAttribute(
+      "href",
+      `#${screen.getByLabelText(im.upload.file).id}`,
+    );
 
     await user.upload(screen.getByLabelText(im.upload.file), file("class9.csv", 1024, "text/csv"));
     await user.selectOptions(screen.getByLabelText(im.upload.source), "udise_plus");
@@ -499,8 +506,49 @@ describe("NFR-A11Y-001: import steps and the 24-hour undo (US-401, FR-IMP-005)",
     expect(items).toHaveLength(4);
     expect(items[3]).toHaveAttribute("aria-current", "step");
     expect(items[3]).toHaveTextContent(im.steps.add);
-    expect(items[0]).toHaveTextContent(`${im.steps.done} ${im.steps.upload}`);
+    expect(items[0]).toHaveTextContent(im.steps.upload);
+    expect(items[0]).toHaveTextContent(messages.en.ui.steps.done);
+    expect(items[3]).not.toHaveTextContent(messages.en.ui.steps.done);
     expect(items.filter((item) => item.hasAttribute("aria-current"))).toHaveLength(1);
+  });
+
+  it("puts the step's next action in the header and the rest under More", async () => {
+    stub.routes[`GET /bff/api/v1/imports/${ID.import}/rows`] = () => page([]);
+    const user = userEvent.setup();
+    const view = renderWithIntl(
+      <ImportDetailView
+        batch={ready(importBatch({ status: "validated", stats: { valid: 3 }, can_commit: true }))}
+        attributes={ready(ATTRIBUTES)}
+        permissions={detailPerms}
+      />,
+    );
+    const header = screen.getByRole("banner");
+    expect(within(header).getByRole("button", { name: im.commit.open })).toBeInTheDocument();
+    await user.click(within(header).getByRole("button", { name: im.detail.more }));
+    expect(
+      within(screen.getByRole("menu")).getByRole("menuitem", {
+        name: messages.en.sheets.import.open,
+      }),
+    ).toHaveAttribute("href", `/imports/${ID.import}/sheet`);
+    view.unmount();
+    renderWithIntl(
+      <ImportDetailView
+        batch={ready(
+          importBatch({ status: "failed", error_code: "header_not_found", columns: [] }),
+        )}
+        attributes={ready(ATTRIBUTES)}
+        permissions={detailPerms}
+      />,
+    );
+    expect(screen.getByRole("link", { name: im.detail.uploadAgain })).toHaveAttribute(
+      "href",
+      "/imports",
+    );
+    const steps = within(screen.getByRole("list", { name: im.steps.label })).getAllByRole(
+      "listitem",
+    );
+    expect(steps[0]).toHaveTextContent(`${im.steps.upload}${messages.en.ui.steps.failed}`);
+    expect(steps[0]).toHaveAttribute("aria-current", "step");
   });
 
   it("shows how long is left to undo when the deadline is ahead", async () => {

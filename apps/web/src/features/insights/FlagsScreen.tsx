@@ -7,7 +7,9 @@ import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { DataTableV2, type ColumnV2 } from "@/components/console";
+import { Pill } from "@/components/ui/Badge";
+import { type FilterChip } from "@/components/ui/FilterChips";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SelectField } from "@/components/ui/Select";
@@ -19,6 +21,7 @@ import { unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
 import { formatDate } from "@/lib/format";
 import { translateOr } from "@/lib/i18n-dynamic";
+import type { Loadable } from "@/lib/loadable";
 import {
   INDICATORS,
   KEYS,
@@ -27,6 +30,7 @@ import {
   useFlags,
   useSettings,
   useSummary,
+  type Flag,
   type FlagFilters,
   type Settings,
   type Summary,
@@ -195,6 +199,13 @@ function RulesCard({ settings, canManage }: { settings: Settings; canManage: boo
   );
 }
 
+const DEFAULT_FILTERS: FlagFilters = {
+  view: "mine",
+  status: "active",
+  indicator: "any",
+  due: "any",
+};
+
 /**
  * Students to follow up (US-1705, US-1706, US-1708): "My flags" for the owner, every flag of the
  * caller's scope (class teachers: their sections; the principal: the school), the counts behind
@@ -204,14 +215,10 @@ export function FlagsScreen() {
   const t = useTranslations("insights");
   const tn = useTranslations("school.nav");
   const can = useStaffCan();
+  const queryClient = useQueryClient();
   const meLoaded = useStaffMe() !== undefined;
   const allowed = can(PERM.insightsRead);
-  const [filters, setFilterState] = useState<FlagFilters>({
-    view: "mine",
-    status: "active",
-    indicator: "any",
-    due: "any",
-  });
+  const [filters, setFilterState] = useState<FlagFilters>(DEFAULT_FILTERS);
   // Cursor paging (docs/09 §2): a page holds 100 flags; new filters start at the first page.
   const pages = useCursorStack();
   const setFilters = (next: FlagFilters) => {
@@ -221,9 +228,91 @@ export function FlagsScreen() {
   const list = useFlags(filters, allowed, pages.cursor);
   const summary = useSummary(allowed);
   const settings = useSettings(allowed);
+  const shown = meLoaded ? list : ({ status: "loading" } as const);
+  const rows: Loadable<readonly Flag[]> =
+    shown.status === "ready" ? { status: "ready", data: shown.data.data } : shown;
+  const nextCursor = shown.status === "ready" ? (shown.data.next_cursor ?? null) : null;
+
+  // Active filters (other than the defaults) as chips; removing one sets it back.
+  const chips: FilterChip[] = [
+    ...(filters.status !== DEFAULT_FILTERS.status
+      ? [{ id: "status", label: t("statusLabel"), value: t(`filter.${filters.status}`) }]
+      : []),
+    ...(filters.indicator !== "any"
+      ? [
+          {
+            id: "indicator",
+            label: t("indicatorLabel"),
+            value: t(`indicator.${filters.indicator}`),
+          },
+        ]
+      : []),
+    ...(filters.due !== "any" ? [{ id: "due", label: t("dueLabel"), value: t("overdue") }] : []),
+  ];
+  const removeChip = (id: string) => {
+    if (id === "status" || id === "indicator" || id === "due") {
+      setFilters({ ...filters, [id]: DEFAULT_FILTERS[id] });
+    }
+  };
+
+  const columns: ColumnV2<Flag>[] = [
+    {
+      key: "student",
+      header: t("columns.student"),
+      stack: "title",
+      cell: (flag) => (
+        <span className="flex flex-col gap-0.5">
+          <Link
+            href={`/flags/${flag.id}`}
+            className="font-semibold break-words text-primary underline-offset-4 hover:underline"
+          >
+            {flag.student.full_name ?? t("unnamed")}
+          </Link>
+          {flag.student.section_label ? (
+            <span className="text-sm text-ink-muted">{flag.student.section_label}</span>
+          ) : null}
+        </span>
+      ),
+    },
+    {
+      key: "why",
+      header: t("columns.why"),
+      stack: "wide",
+      cell: (flag) => (
+        <span className="flex flex-col items-start gap-1">
+          <Pill variant="tag" size="sm" icon={null}>
+            {t(`indicator.${flag.indicator}`)}
+          </Pill>
+          <span className="text-sm break-words text-ink-muted">
+            <FlagReason flag={flag} />
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: "due",
+      header: t("columns.due"),
+      cell: (flag) => (
+        <span className="flex flex-wrap items-center gap-1">
+          <span className="num">{formatDate(flag.due_on)}</span>
+          <OverduePill overdue={flag.overdue} />
+        </span>
+      ),
+    },
+    {
+      key: "owner",
+      header: t("columns.owner"),
+      cell: (flag) => flag.owner?.display_name ?? t("unassigned"),
+    },
+    {
+      key: "status",
+      header: t("columns.status"),
+      cell: (flag) => <FlagStatusPill status={flag.status} />,
+    },
+  ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={t("title")}
         description={t("description")}
@@ -237,125 +326,83 @@ export function FlagsScreen() {
         <>
           <PurposeNote />
           <LoadGate data={summary}>{(value) => <SummaryCards summary={value} />}</LoadGate>
-          <Card title={t("listTitle")}>
-            <div className="mb-4 flex flex-wrap items-end gap-4">
-              <SegmentedControl
-                legend={t("viewLabel")}
-                legendVisible
-                size="sm"
-                value={filters.view}
-                onValueChange={(view) =>
-                  setFilters({ ...filters, view: view as FlagFilters["view"] })
-                }
-                options={[
-                  { value: "mine", label: t("view.mine") },
-                  { value: "all", label: t("view.all") },
-                ]}
-              />
-              <SelectField
-                label={t("statusLabel")}
-                value={filters.status}
-                onChange={(event) =>
-                  setFilters({ ...filters, status: event.target.value as FlagFilters["status"] })
-                }
-                options={(["active", "open", "in_progress", "closed"] as const).map((value) => ({
-                  value,
-                  label: t(`filter.${value}`),
-                }))}
-              />
-              <SelectField
-                label={t("indicatorLabel")}
-                value={filters.indicator}
-                onChange={(event) =>
-                  setFilters({
-                    ...filters,
-                    indicator: event.target.value as FlagFilters["indicator"],
-                  })
-                }
-                options={[
-                  { value: "any", label: t("filter.any") },
-                  ...INDICATORS.map((value) => ({ value, label: t(`indicator.${value}`) })),
-                ]}
-              />
-              <SelectField
-                label={t("dueLabel")}
-                value={filters.due}
-                onChange={(event) =>
-                  setFilters({ ...filters, due: event.target.value as FlagFilters["due"] })
-                }
-                options={[
-                  { value: "any", label: t("filter.any") },
-                  { value: "overdue", label: t("overdue") },
-                ]}
-              />
-            </div>
-            <LoadGate data={meLoaded ? list : { status: "loading" }}>
-              {(page) => (
-                <div className="space-y-4">
-                  {page.data.length === 0 ? (
-                    <EmptyState icon="shieldCheck" title={t("emptyTitle")} body={t("emptyBody")} />
-                  ) : (
-                    <TableScroll label={t("listTitle")}>
-                      <Table>
-                        <THead>
-                          <Tr>
-                            <Th>{t("columns.student")}</Th>
-                            <Th>{t("columns.why")}</Th>
-                            <Th>{t("columns.due")}</Th>
-                            <Th>{t("columns.owner")}</Th>
-                            <Th>{t("columns.status")}</Th>
-                          </Tr>
-                        </THead>
-                        <TBody>
-                          {page.data.map((flag) => (
-                            <Tr key={flag.id}>
-                              <Td>
-                                <Link
-                                  href={`/flags/${flag.id}`}
-                                  className="font-semibold break-words text-primary underline underline-offset-4"
-                                >
-                                  {flag.student.full_name ?? t("unnamed")}
-                                </Link>
-                                <p className="text-sm text-ink-muted">
-                                  {flag.student.section_label ?? ""}
-                                </p>
-                              </Td>
-                              <Td>
-                                <p className="text-sm text-ink">
-                                  {t(`indicator.${flag.indicator}`)}
-                                </p>
-                                <p className="text-sm break-words text-ink-muted">
-                                  <FlagReason flag={flag} />
-                                </p>
-                              </Td>
-                              <Td>
-                                <span className="flex flex-wrap items-center gap-1">
-                                  <span className="font-mono">{formatDate(flag.due_on)}</span>
-                                  <OverduePill overdue={flag.overdue} />
-                                </span>
-                              </Td>
-                              <Td>{flag.owner?.display_name ?? t("unassigned")}</Td>
-                              <Td>
-                                <FlagStatusPill status={flag.status} />
-                              </Td>
-                            </Tr>
-                          ))}
-                        </TBody>
-                      </Table>
-                    </TableScroll>
-                  )}
-                  <Pager
-                    label={t("pagesLabel")}
-                    page={pages.page}
-                    onPrevious={pages.hasPrevious ? pages.previous : undefined}
-                    onNext={
-                      page.next_cursor ? () => pages.next(page.next_cursor as string) : undefined
-                    }
-                  />
-                </div>
-              )}
-            </LoadGate>
-          </Card>
+          <DataTableV2
+            id="flags"
+            caption={t("listTitle")}
+            columns={columns}
+            state={rows}
+            rowKey={(flag) => flag.id}
+            stacked
+            toolbar={
+              <div className="flex flex-wrap items-end gap-3">
+                <SegmentedControl
+                  legend={t("viewLabel")}
+                  legendVisible
+                  size="sm"
+                  value={filters.view}
+                  onValueChange={(view) =>
+                    setFilters({ ...filters, view: view as FlagFilters["view"] })
+                  }
+                  options={[
+                    { value: "mine", label: t("view.mine") },
+                    { value: "all", label: t("view.all") },
+                  ]}
+                />
+                <SelectField
+                  label={t("statusLabel")}
+                  value={filters.status}
+                  onChange={(event) =>
+                    setFilters({ ...filters, status: event.target.value as FlagFilters["status"] })
+                  }
+                  options={(["active", "open", "in_progress", "closed"] as const).map((value) => ({
+                    value,
+                    label: t(`filter.${value}`),
+                  }))}
+                />
+                <SelectField
+                  label={t("indicatorLabel")}
+                  value={filters.indicator}
+                  onChange={(event) =>
+                    setFilters({
+                      ...filters,
+                      indicator: event.target.value as FlagFilters["indicator"],
+                    })
+                  }
+                  options={[
+                    { value: "any", label: t("filter.any") },
+                    ...INDICATORS.map((value) => ({ value, label: t(`indicator.${value}`) })),
+                  ]}
+                />
+                <SelectField
+                  label={t("dueLabel")}
+                  value={filters.due}
+                  onChange={(event) =>
+                    setFilters({ ...filters, due: event.target.value as FlagFilters["due"] })
+                  }
+                  options={[
+                    { value: "any", label: t("filter.any") },
+                    { value: "overdue", label: t("overdue") },
+                  ]}
+                />
+              </div>
+            }
+            chips={chips}
+            onRemoveChip={removeChip}
+            onClearFilters={() => setFilters({ ...DEFAULT_FILTERS, view: filters.view })}
+            emptyTitle={t("emptyTitle")}
+            emptyBody={t("emptyBody")}
+            onRetry={() => void queryClient.invalidateQueries({ queryKey: KEYS.all })}
+            footer={
+              rows.status === "ready" ? (
+                <Pager
+                  label={t("pagesLabel")}
+                  page={pages.page}
+                  onPrevious={pages.hasPrevious ? pages.previous : undefined}
+                  onNext={nextCursor ? () => pages.next(nextCursor) : undefined}
+                />
+              ) : null
+            }
+          />
           <LoadGate data={settings}>
             {(value) => <RulesCard settings={value} canManage={can(PERM.insightsManage)} />}
           </LoadGate>

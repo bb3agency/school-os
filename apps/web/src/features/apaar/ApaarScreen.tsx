@@ -3,16 +3,18 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
+import { DataTableV2, type ColumnV2 } from "@/components/console";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
+import { Pill } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
+import { type FilterChip } from "@/components/ui/FilterChips";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SelectField } from "@/components/ui/Select";
 import { StatCard } from "@/components/ui/StatCard";
-import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { PdfJobButton } from "@/features/exports/PdfJobButton";
 import { useSchoolStructure, useSectionOptions } from "@/features/students/StudentList";
@@ -90,7 +92,7 @@ export function ApaarScreen() {
 
   if (!can([APAAR_READ, APAAR_RECORD])) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader title={t("title")} />
         <Alert tone="info" title={t("noPermissionTitle")}>
           {t("noPermissionBody")}
@@ -99,7 +101,19 @@ export function ApaarScreen() {
     );
   }
 
-  const columns: Column<ConsentRow>[] = [
+  const sectionLabel = sections.find((option) => option.value === sectionId)?.label;
+  const chips: FilterChip[] = [
+    ...(sectionId
+      ? [{ id: "section", label: t("section"), value: String(sectionLabel ?? sectionId) }]
+      : []),
+    ...(status ? [{ id: "status", label: t("filterStatus"), value: t(`status.${status}`) }] : []),
+  ];
+  const removeChip = (id: string) => {
+    if (id === "section") setSectionId("");
+    if (id === "status") setStatus("");
+  };
+
+  const columns: ColumnV2<ConsentRow>[] = [
     {
       key: "student",
       stack: "title",
@@ -132,22 +146,33 @@ export function ApaarScreen() {
       key: "decided",
       stack: "field",
       header: t("colDecidedOn"),
-      cell: (row) => <Value>{row.decided_on ? formatDate(row.decided_on) : null}</Value>,
+      cell: (row) => (
+        <span className="num">
+          <Value>{row.decided_on ? formatDate(row.decided_on) : null}</Value>
+        </span>
+      ),
     },
     {
       key: "form",
       header: t("colForm"),
-      cell: (row) => (row.has_form ? t("formOnFile") : t("noForm")),
+      cell: (row) => (
+        <ReadinessPill ready={row.has_form} label={row.has_form ? t("formOnFile") : t("noForm")} />
+      ),
     },
     {
       key: "apaar",
       header: t("colApaarId"),
-      cell: (row) => (row.has_apaar_id ? t("apaarRecorded") : t("apaarNone")),
+      cell: (row) => (
+        <ReadinessPill
+          ready={row.has_apaar_id}
+          label={row.has_apaar_id ? t("apaarRecorded") : t("apaarNone")}
+        />
+      ),
     },
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={t("title")}
         description={t("description")}
@@ -158,28 +183,31 @@ export function ApaarScreen() {
         <p className="mt-1 text-xs">{t("refusalSource")}</p>
       </Alert>
 
-      <Card title={t("filtersTitle")}>
-        <div className="grid gap-4 md:grid-cols-[minmax(0,18rem)_1fr] md:items-end">
-          <SelectField
-            label={t("section")}
-            placeholder={t("allSections")}
-            value={sectionId}
-            onChange={(event) => setSectionId(event.currentTarget.value)}
-            options={sections}
-          />
-          <SegmentedControl
-            legend={t("filterStatus")}
-            legendVisible
-            size="sm"
-            value={status}
-            onValueChange={(value) => setStatus(isConsentStatus(value) ? value : "")}
-            options={[
-              { value: "", label: tc("all") },
-              ...CONSENT_STATUSES.map((value) => ({ value, label: t(`status.${value}`) })),
-            ]}
-          />
-        </div>
-      </Card>
+      <section
+        aria-label={t("filtersTitle")}
+        className="grid gap-3 sm:flex sm:flex-wrap sm:items-end sm:gap-4"
+        data-print="hide"
+      >
+        <SelectField
+          label={t("section")}
+          placeholder={t("allSections")}
+          value={sectionId}
+          className="sm:w-72"
+          onChange={(event) => setSectionId(event.currentTarget.value)}
+          options={sections}
+        />
+        <SegmentedControl
+          legend={t("filterStatus")}
+          legendVisible
+          size="sm"
+          value={status}
+          onValueChange={(value) => setStatus(isConsentStatus(value) ? value : "")}
+          options={[
+            { value: "", label: tc("all") },
+            ...CONSENT_STATUSES.map((value) => ({ value, label: t(`status.${value}`) })),
+          ]}
+        />
+      </section>
 
       {can(APAAR_READ) ? (
         <section aria-labelledby="apaar-summary" className="space-y-3">
@@ -202,32 +230,51 @@ export function ApaarScreen() {
           <h2 id="apaar-students" className="text-lg font-semibold text-ink">
             {status === "pending" ? t("followUpTitle") : t("studentsTitle")}
           </h2>
-          <DataTable
+          <DataTableV2
+            id="apaar-students"
             stacked
             caption={t("studentsTitle")}
             captionHidden
             columns={columns}
             state={toLoadable({ ...list, data: rows })}
             rowKey={(row) => row.student_id}
+            chips={chips}
+            onRemoveChip={removeChip}
+            onClearFilters={() => {
+              setSectionId("");
+              setStatus("");
+            }}
             emptyTitle={t("emptyTitle")}
             emptyBody={t("emptyBody")}
+            onRetry={() => void list.refetch()}
+            footer={
+              list.hasNextPage ? (
+                <div className="flex justify-center p-3">
+                  <Button
+                    variant="secondary"
+                    onClick={() => void list.fetchNextPage()}
+                    disabled={list.isFetchingNextPage}
+                  >
+                    {list.isFetchingNextPage ? tc("loading") : t("showMore")}
+                  </Button>
+                </div>
+              ) : null
+            }
           />
-          {list.hasNextPage ? (
-            <div className="flex justify-center">
-              <Button
-                variant="secondary"
-                onClick={() => void list.fetchNextPage()}
-                disabled={list.isFetchingNextPage}
-              >
-                {list.isFetchingNextPage ? tc("loading") : t("showMore")}
-              </Button>
-            </div>
-          ) : null}
         </section>
       ) : null}
 
       <FormLanguageCard />
     </div>
+  );
+}
+
+/** Whether a record is in place, in words (colour only repeats the text). */
+function ReadinessPill({ ready, label }: { ready: boolean; label: string }) {
+  return (
+    <Pill variant={ready ? "done" : "tag"} size="sm" icon={ready ? "check" : null}>
+      {label}
+    </Pill>
   );
 }
 
@@ -262,13 +309,28 @@ function SectionTable({
 }) {
   const t = useTranslations("apaar");
   type Row = (typeof sections)[number];
-  const columns: Column<Row>[] = [
+  const columns: ColumnV2<Row>[] = [
     { key: "section", stack: "title", header: t("colClass"), cell: (row) => row.class_section },
-    { key: "total", header: t("totalStudents"), cell: (row) => row.counts.total },
-    { key: "given", header: t("status.given"), cell: (row) => row.counts.given },
-    { key: "refused", header: t("status.refused"), cell: (row) => row.counts.refused },
-    { key: "pending", header: t("status.pending"), cell: (row) => row.counts.pending },
-    { key: "withdrawn", header: t("status.withdrawn"), cell: (row) => row.counts.withdrawn },
+    { key: "total", header: t("totalStudents"), numeric: true, cell: (row) => row.counts.total },
+    { key: "given", header: t("status.given"), numeric: true, cell: (row) => row.counts.given },
+    {
+      key: "refused",
+      header: t("status.refused"),
+      numeric: true,
+      cell: (row) => row.counts.refused,
+    },
+    {
+      key: "pending",
+      header: t("status.pending"),
+      numeric: true,
+      cell: (row) => row.counts.pending,
+    },
+    {
+      key: "withdrawn",
+      header: t("status.withdrawn"),
+      numeric: true,
+      cell: (row) => row.counts.withdrawn,
+    },
     {
       key: "print",
       stack: "actions",
@@ -311,7 +373,8 @@ function SectionTable({
     },
   ];
   return (
-    <DataTable
+    <DataTableV2
+      id="apaar-sections"
       stacked
       caption={t("summaryTitle")}
       captionHidden

@@ -2,18 +2,18 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect } from "react";
+import { useEffect, useId, type ReactNode } from "react";
+import { DataTableV2, type ColumnV2 } from "@/components/console";
 import * as z from "@/lib/zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { Pill } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
+import { cardClasses } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { KpiCard } from "@/components/ui/StatCard";
-import { DataTable, type Column } from "@/components/ui/Table";
 import { TabNav } from "@/components/ui/TabNav";
 import { Value } from "@/components/ui/Value";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
@@ -34,9 +34,38 @@ import {
 } from "./data";
 import { OwnerBadge, ReadinessBadge, ReadyBar } from "./parts";
 import { SensitiveSlipLink } from "./SensitiveSlipLink";
-import { slipHref, type ReadinessSection, type ReadinessStudent } from "./types";
+import { readyShare, slipHref, type ReadinessSection, type ReadinessStudent } from "./types";
 
 const runSchema = z.object({});
+
+/** A titled block of the page (h2 names the region), with its actions on the right. */
+function Block({
+  title,
+  hint,
+  actions,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  actions?: ReactNode;
+  children: ReactNode;
+}) {
+  const headingId = useId();
+  return (
+    <section aria-labelledby={headingId} className="space-y-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <h2 id={headingId} className="text-lg font-semibold text-ink">
+            {title}
+          </h2>
+          {hint ? <p className="text-sm text-ink-muted">{hint}</p> : null}
+        </div>
+        {actions}
+      </div>
+      {children}
+    </section>
+  );
+}
 
 /** Reloads the readiness screen once a check it started has finished. */
 function RefreshWhenDone({ run, profile }: { run: DqRun; profile: string }) {
@@ -130,7 +159,7 @@ export function ReadinessScreen({
   const data = summary.data;
   const totals = data?.totals;
 
-  const sectionColumns: Column<ReadinessSection>[] = [
+  const sectionColumns: ColumnV2<ReadinessSection>[] = [
     {
       key: "section",
       stack: "title",
@@ -184,7 +213,7 @@ export function ReadinessScreen({
     },
   ];
 
-  const studentColumns: Column<ReadinessStudent>[] = [
+  const studentColumns: ColumnV2<ReadinessStudent>[] = [
     {
       key: "student",
       stack: "title",
@@ -224,6 +253,7 @@ export function ReadinessScreen({
     },
     {
       key: "fields",
+      numeric: true,
       header: t("colFields"),
       cell: (row) => count(row.open_items),
     },
@@ -261,9 +291,18 @@ export function ReadinessScreen({
     label: locale === "te" && profile.label_te ? profile.label_te : profile.label_en,
   }));
   const lastRun = formatDateTime(data?.last_run?.finished_at ?? null);
+  // The page's main figure: the share of students ready, rounded down (159 of 160 is 99%,
+  // never "100%" while someone still has to act).
+  const share =
+    totals && totals.students > 0
+      ? new Intl.NumberFormat(locale === "te" ? "te-IN" : "en-IN", {
+          style: "percent",
+          maximumFractionDigits: 0,
+        }).format(Math.floor(readyShare(totals) * 100) / 100)
+      : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={t("title")}
         description={t("description")}
@@ -317,34 +356,56 @@ export function ReadinessScreen({
           <h2 id="readiness-summary" className="sr-only">
             {t("summaryTitle", { profile: profileName(profileKey) })}
           </h2>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <KpiCard
-              label={t("kpiReady")}
-              value={t("readyOf", {
-                ready: count(totals?.ready),
-                students: count(totals?.students),
-              })}
-              unavailableLabel={tc("notAvailable")}
-              aside={<ReadinessBadge status="ready" />}
-            />
-            <KpiCard
-              label={t("status.needs_parent")}
-              value={count(totals?.needs_parent)}
-              unavailableLabel={tc("notAvailable")}
-              aside={<OwnerBadge owner="parent_aadhaar" />}
-            />
-            <KpiCard
-              label={t("status.needs_school")}
-              value={count(totals?.needs_school)}
-              unavailableLabel={tc("notAvailable")}
-              aside={<OwnerBadge owner="school_udise" />}
-            />
-            <KpiCard
-              label={t("status.blocked")}
-              value={count(totals?.blocked)}
-              unavailableLabel={tc("notAvailable")}
-              aside={<OwnerBadge owner="unknown" />}
-            />
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+            <div
+              role="group"
+              aria-labelledby="readiness-share"
+              className={cardClasses({ padding: "md" })}
+            >
+              <p id="readiness-share" className="text-sm text-ink-muted">
+                {t("shareLabel", { profile: profileName(profileKey) })}
+              </p>
+              <p className="num mt-1 text-5xl leading-none font-semibold text-ink">
+                {share ?? (
+                  <>
+                    <span aria-hidden="true">—</span>
+                    <span className="sr-only">{tc("notAvailable")}</span>
+                  </>
+                )}
+              </p>
+              {totals ? (
+                <div className="mt-3">
+                  <ReadyBar
+                    ready={totals.ready}
+                    students={totals.students}
+                    label={t("readyOf", {
+                      ready: count(totals.ready),
+                      students: count(totals.students),
+                    })}
+                  />
+                </div>
+              ) : null}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <KpiCard
+                label={t("status.needs_parent")}
+                value={count(totals?.needs_parent)}
+                unavailableLabel={tc("notAvailable")}
+                aside={<OwnerBadge owner="parent_aadhaar" />}
+              />
+              <KpiCard
+                label={t("status.needs_school")}
+                value={count(totals?.needs_school)}
+                unavailableLabel={tc("notAvailable")}
+                aside={<OwnerBadge owner="school_udise" />}
+              />
+              <KpiCard
+                label={t("status.blocked")}
+                value={count(totals?.blocked)}
+                unavailableLabel={tc("notAvailable")}
+                aside={<OwnerBadge owner="unknown" />}
+              />
+            </div>
           </div>
           <p className="inline-flex flex-wrap items-center gap-2 text-sm text-ink-muted">
             <span>{t("lastRun")}:</span>
@@ -358,8 +419,9 @@ export function ReadinessScreen({
               body={t("noSectionsBody")}
             />
           ) : (
-            <Card title={t("sectionsTitle")} description={t("sectionsHint")}>
-              <DataTable
+            <Block title={t("sectionsTitle")} hint={t("sectionsHint")}>
+              <DataTableV2
+                id="readiness-sections"
                 stacked
                 caption={t("sectionsTitle")}
                 captionHidden
@@ -368,15 +430,15 @@ export function ReadinessScreen({
                 rowKey={(row) => row.section_id}
                 emptyTitle={t("noSectionsTitle")}
               />
-            </Card>
+            </Block>
           )}
         </section>
       )}
 
       {sectionId ? (
-        <Card
+        <Block
           title={t("studentsTitle", { section: sectionLabel(sectionId) })}
-          description={t("studentsHint")}
+          hint={t("studentsHint")}
           actions={
             <span className="flex flex-wrap items-center gap-x-4 gap-y-2 print:hidden">
               <a
@@ -406,7 +468,8 @@ export function ReadinessScreen({
           {students.isError ? (
             <ApiErrorAlert error={students.error} />
           ) : (
-            <DataTable
+            <DataTableV2
+              id="readiness-students"
               stacked
               caption={t("studentsTitle", { section: sectionLabel(sectionId) })}
               captionHidden
@@ -418,9 +481,10 @@ export function ReadinessScreen({
               }
               rowKey={(row) => row.student.id}
               emptyTitle={t("noStudents")}
+              onRetry={() => void students.refetch()}
             />
           )}
-        </Card>
+        </Block>
       ) : null}
     </div>
   );

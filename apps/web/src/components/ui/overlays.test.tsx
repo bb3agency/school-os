@@ -250,6 +250,25 @@ describe("Steps", () => {
     expect(items[1]).toHaveAttribute("aria-current", "step");
     expect(items[2]).toHaveTextContent("ApplyNot started");
   });
+
+  it("a failed step says 'Stopped' with an icon, and later steps stay upcoming", () => {
+    renderWithIntl(
+      <Steps
+        label="Import steps"
+        current={0}
+        steps={[
+          { id: "upload", label: "Upload", failed: true },
+          { id: "check", label: "Check rows" },
+        ]}
+      />,
+    );
+    const items = within(screen.getByRole("list", { name: "Import steps" })).getAllByRole(
+      "listitem",
+    );
+    expect(items[0]).toHaveTextContent("UploadStopped here");
+    expect(items[0]).toHaveAttribute("aria-current", "step");
+    expect(items[1]).toHaveTextContent("Check rowsNot started");
+  });
 });
 
 describe("SaveBar and FilterChips", () => {

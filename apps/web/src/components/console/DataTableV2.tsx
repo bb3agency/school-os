@@ -358,7 +358,9 @@ export function DataTableV2<T>({
                   key={key}
                   aria-selected={selection ? isSelected : undefined}
                   className={cn(
-                    "hover:bg-surface-hover [&>*]:border-b [&>*]:border-border last:[&>*]:border-b-0",
+                    // relative: a row's main link may stretch over the row (`after:absolute
+                    // after:inset-0`); other controls in the row then need `relative z-[1]`.
+                    "relative hover:bg-surface-hover [&>*]:border-b [&>*]:border-border last:[&>*]:border-b-0",
                     isSelected && "bg-accent-soft hover:bg-accent-soft",
                   )}
                 >
@@ -366,7 +368,7 @@ export function DataTableV2<T>({
                     <td className="w-10 ps-4 pe-1 align-middle">
                       <input
                         type="checkbox"
-                        className="size-4 align-middle"
+                        className="relative z-[1] size-4 align-middle"
                         aria-label={selection.rowLabel(row)}
                         checked={isSelected}
                         onChange={() => {

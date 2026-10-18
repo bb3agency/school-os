@@ -4,9 +4,11 @@ import { useTranslations } from "next-intl";
 import { useRef, useState } from "react";
 import * as z from "@/lib/zod";
 import { Alert } from "@/components/ui/Alert";
-import { Button } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ErrorSummary } from "@/components/ui/ErrorSummary";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SaveBar } from "@/components/ui/SaveBar";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SelectField } from "@/components/ui/Select";
 import { Link, useRouter } from "@/i18n/navigation";
@@ -140,6 +142,8 @@ export function CreateStudentForm({ permissions, onCreated }: CreateStudentFormP
   const sent = useRef<string[]>([]);
   const [pen, setPen] = useState("");
   const [clash, setClash] = useState<string | null>(null);
+  const [dirty, setDirty] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   const form = useApiForm({
     schema: createStudentSchema,
@@ -164,7 +168,11 @@ export function CreateStudentForm({ permissions, onCreated }: CreateStudentFormP
       if (match) return sent.current[Number(match[1])];
       return field.split(".").pop();
     },
-    onSuccess: (student) => onCreated?.(student),
+    onInvalid: () => setAttempt((value) => value + 1),
+    onSuccess: (student) => {
+      setDirty(false);
+      onCreated?.(student);
+    },
   });
 
   if (permissions.loaded && !permissions.has(PERM.create)) {
@@ -183,77 +191,110 @@ export function CreateStudentForm({ permissions, onCreated }: CreateStudentFormP
     form.errors[field] && field === "dob"
       ? ts("dateInvalid", dates.hint("2012-03-14"))
       : form.errors[field];
+  const id = (name: string) => `create-student-${name}`;
+  const summary = Object.keys(form.errors)
+    .filter((name) => name in FIELD_ORDER && form.errors[name])
+    .sort((a, b) => (FIELD_ORDER[a] ?? 0) - (FIELD_ORDER[b] ?? 0))
+    .map((name) => ({
+      fieldId: id(name),
+      message: (CREATE_FIELDS as readonly string[]).includes(name)
+        ? (err(name as CreateField) ?? "")
+        : (form.errors[name] ?? ""),
+    }));
 
   return (
-    <div className="space-y-6">
-      <PageHeader title={t("title")} description={t("description")} />
+    <div className="space-y-5">
+      <PageHeader
+        title={t("title")}
+        description={t("description")}
+        breadcrumb={[
+          { label: ts("list.crumbHome"), href: "/" },
+          { label: ts("list.title"), href: "/students" },
+          { label: t("title") },
+        ]}
+      />
       <Alert tone="warning" title={ts("aadhaarWarningTitle")}>
         {ts("aadhaarWarningBody")}
       </Alert>
-      <Card>
-        <form noValidate onSubmit={form.onSubmit} className="space-y-6">
-          <SelectField
-            name="source"
-            label={t("source")}
-            hint={t("sourceHint")}
-            defaultValue="admission_register"
-            error={form.errors.source}
-            options={VALUE_SOURCES.map((value) => ({ value, label: ts(`sources.${value}`) }))}
-          />
-          <fieldset className="grid gap-4 md:grid-cols-2">
-            <legend className="mb-2 text-lg font-semibold">{t("detailsLegend")}</legend>
-            <GuardedTextField
-              name="admission_no"
-              label={t("admissionNo")}
-              hint={t("admissionNoHint")}
-              error={err("admission_no")}
-              maxLength={32}
-              autoComplete="off"
-              spellCheck={false}
-            />
-            <GuardedTextField
-              name="full_name"
-              label={t("fullName")}
-              hint={t("fullNameHint")}
-              error={err("full_name")}
-              maxLength={120}
-              autoComplete="off"
-              required
-              aria-required="true"
-            />
-            <GuardedTextField
-              name="dob"
-              label={t("dob")}
-              hint={dateHint}
-              error={err("dob")}
-              inputMode="numeric"
-              placeholder={dates.placeholder}
-              autoComplete="off"
-            />
+      <form
+        noValidate
+        onSubmit={form.onSubmit}
+        onChange={() => setDirty(true)}
+        className="space-y-4"
+      >
+        <ErrorSummary errors={summary} attempt={attempt} />
+        <Card title={t("detailsLegend")}>
+          <div className="space-y-4">
             <SelectField
-              name="gender"
-              label={t("gender")}
-              placeholder={tc("chooseOne")}
-              error={form.errors.gender}
-              options={GENDERS.map((value) => ({ value, label: ts(`enumValues.${value}`) }))}
+              id={id("source")}
+              name="source"
+              label={t("source")}
+              hint={t("sourceHint")}
+              defaultValue="admission_register"
+              error={form.errors.source}
+              options={VALUE_SOURCES.map((value) => ({ value, label: ts(`sources.${value}`) }))}
             />
-            <GuardedTextField
-              name="father_name"
-              label={t("fatherName")}
-              error={err("father_name")}
-              maxLength={120}
-              autoComplete="off"
-            />
-            <GuardedTextField
-              name="mother_name"
-              label={t("motherName")}
-              error={err("mother_name")}
-              maxLength={120}
-              autoComplete="off"
-            />
-          </fieldset>
-          <fieldset className="space-y-4">
-            <legend className="mb-2 text-lg font-semibold">{t("udiseLegend")}</legend>
+            <div className="grid gap-4 md:grid-cols-2">
+              <GuardedTextField
+                id={id("admission_no")}
+                name="admission_no"
+                label={t("admissionNo")}
+                hint={t("admissionNoHint")}
+                error={err("admission_no")}
+                maxLength={32}
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <GuardedTextField
+                id={id("full_name")}
+                name="full_name"
+                label={t("fullName")}
+                hint={t("fullNameHint")}
+                error={err("full_name")}
+                maxLength={120}
+                autoComplete="off"
+                required
+                aria-required="true"
+              />
+              <GuardedTextField
+                id={id("dob")}
+                name="dob"
+                label={t("dob")}
+                hint={dateHint}
+                error={err("dob")}
+                inputMode="numeric"
+                placeholder={dates.placeholder}
+                autoComplete="off"
+              />
+              <SelectField
+                id={id("gender")}
+                name="gender"
+                label={t("gender")}
+                placeholder={tc("chooseOne")}
+                error={form.errors.gender}
+                options={GENDERS.map((value) => ({ value, label: ts(`enumValues.${value}`) }))}
+              />
+              <GuardedTextField
+                id={id("father_name")}
+                name="father_name"
+                label={t("fatherName")}
+                error={err("father_name")}
+                maxLength={120}
+                autoComplete="off"
+              />
+              <GuardedTextField
+                id={id("mother_name")}
+                name="mother_name"
+                label={t("motherName")}
+                error={err("mother_name")}
+                maxLength={120}
+                autoComplete="off"
+              />
+            </div>
+          </div>
+        </Card>
+        <Card title={t("udiseLegend")}>
+          <div className="space-y-4">
             <SegmentedControl
               name="admission_kind"
               legend={t("admissionKind")}
@@ -268,6 +309,7 @@ export function CreateStudentForm({ permissions, onCreated }: CreateStudentFormP
             <p className="text-sm text-ink-muted">{t("transferHint")}</p>
             <div className="grid gap-4 md:grid-cols-2">
               <GuardedTextField
+                id={id("udise_pen")}
                 name="udise_pen"
                 label={t("pen")}
                 hint={t("penHint")}
@@ -280,6 +322,7 @@ export function CreateStudentForm({ permissions, onCreated }: CreateStudentFormP
                 spellCheck={false}
               />
               <SelectField
+                id={id("pen_source")}
                 name="pen_source"
                 label={t("penSource")}
                 defaultValue="tc_incoming"
@@ -296,10 +339,12 @@ export function CreateStudentForm({ permissions, onCreated }: CreateStudentFormP
                 </Link>
               </Alert>
             ) : null}
-          </fieldset>
-          <fieldset className="grid gap-4 md:grid-cols-2">
-            <legend className="mb-2 text-lg font-semibold">{t("classLegend")}</legend>
+          </div>
+        </Card>
+        <Card title={t("classLegend")}>
+          <div className="grid gap-4 md:grid-cols-2">
             <SelectField
+              id={id("section_id")}
               name="section_id"
               label={t("section")}
               hint={t("sectionHint")}
@@ -308,6 +353,7 @@ export function CreateStudentForm({ permissions, onCreated }: CreateStudentFormP
               options={sections}
             />
             <GuardedTextField
+              id={id("roll_no")}
               name="roll_no"
               label={t("rollNo")}
               error={form.errors.roll_no}
@@ -315,6 +361,7 @@ export function CreateStudentForm({ permissions, onCreated }: CreateStudentFormP
               autoComplete="off"
             />
             <SelectField
+              id={id("status")}
               name="status"
               label={t("status")}
               hint={t("statusHint")}
@@ -322,24 +369,28 @@ export function CreateStudentForm({ permissions, onCreated }: CreateStudentFormP
               error={form.errors.status}
               options={STUDENT_STATUSES.map((value) => ({ value, label: ts(`status.${value}`) }))}
             />
-          </fieldset>
-          <ProblemAlert error={form.error} namespace="students.errors" />
-          <div className="flex flex-wrap justify-end gap-2">
-            <Link
-              href="/students"
-              className="inline-flex min-h-10 items-center rounded-md px-4 py-2 text-sm font-semibold text-primary underline"
-            >
-              {tc("cancel")}
-            </Link>
-            <Button type="submit" disabled={form.pending}>
-              {form.pending ? tc("working") : t("submit")}
-            </Button>
           </div>
-        </form>
-      </Card>
+        </Card>
+        <ProblemAlert error={form.error} namespace="students.errors" />
+        <SaveBar dirty={dirty}>
+          <ButtonLink href="/students" variant="secondary">
+            {tc("cancel")}
+          </ButtonLink>
+          <Button type="submit" disabled={form.pending}>
+            {form.pending ? tc("working") : t("submit")}
+          </Button>
+        </SaveBar>
+      </form>
     </div>
   );
 }
+
+/** Form order of the fields, for the error summary (the same order as on the page). */
+const FIELD_ORDER: Record<string, number> = Object.fromEntries(
+  ["source", ...CREATE_FIELDS, "udise_pen", "pen_source", "section_id", "roll_no", "status"].map(
+    (name, index) => [name, index],
+  ),
+);
 
 export function CreateStudentScreen() {
   const permissions = useStaffPermissions();

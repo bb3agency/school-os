@@ -152,7 +152,7 @@ describe("US-302 / FR-STU-010: find students", () => {
     await user.click(screen.getByRole("button", { name: messages.en.common.search }));
     await screen.findByRole("link", { name: "Venkata Sai K." });
 
-    await user.click(screen.getByRole("button", { name: sm.list.next }));
+    await user.click(screen.getByRole("button", { name: messages.en.ui.pagination.next }));
     expect(await screen.findByRole("link", { name: "Lakshmi D." })).toBeInTheDocument();
     const bodies = stub
       .callsTo("POST /bff/api/v1/students/search")
@@ -377,11 +377,15 @@ describe("US-301 / US-303: add a student", () => {
     await user.type(screen.getByLabelText(sm.create.fullName), "Venkata Sai K.");
     await user.type(screen.getByLabelText(sm.create.dob), "31/02/2012");
     await user.click(screen.getByRole("button", { name: sm.create.submit }));
-    expect(
-      await screen.findByText(
-        sm.dateInvalid.replace("{format}", "DD/MM/YYYY").replace("{example}", "14/03/2012"),
-      ),
-    ).toBeInTheDocument();
+    // Under the field and, after the failed submit, in the error summary as a link to it.
+    const dobError = sm.dateInvalid
+      .replace("{format}", "DD/MM/YYYY")
+      .replace("{example}", "14/03/2012");
+    expect(await screen.findByRole("link", { name: dobError })).toHaveAttribute(
+      "href",
+      "#create-student-dob",
+    );
+    expect(screen.getAllByText(dobError)).toHaveLength(2);
 
     await user.clear(screen.getByLabelText(sm.create.dob));
     await user.type(screen.getByLabelText(sm.create.dob), "14/03/2012");
