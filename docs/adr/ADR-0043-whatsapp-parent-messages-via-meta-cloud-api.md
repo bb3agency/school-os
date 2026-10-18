@@ -62,6 +62,9 @@ Built as decided in `app/messaging/` and migration `0057_messaging_core` (docs/0
 ## Follow-up (2026-10-18, wave R2-3G built)
 
 Sending is built in `app/messaging/sends/` and migration `0061_messaging_sends` (docs/03 §3.22 "As built (wave R2-3G)"). Decisions taken while building: (1) quiet hours and the daily cap **defer** a message (`next_attempt_at`) rather than skip it, and a message that would arrive too late is skipped (`too_late`); (2) the 20:00 close for absence alerts and receipts is an earlier end of the day's window; (3) failures reported later by the status webhook are final (only send-time transient errors are retried); (4) a parent link is issued per send attempt and revoked when that attempt does not deliver; (5) a notice broadcast has no second approval: the notice's M4 approval is the check, the broadcast is audited with its counts; (6) nothing is sent or generated while a school is suspended (D31), enforced in the sweep, the held outbox tasks and the sender.
+## Owner decision (2026-10-18): no opt-out prompt (D32)
+
+Parent messages are utility messages only (notices, attendance alerts, fee reminders and receipts), never promotional. So parent pages and templates carry no "reply STOP" prompt and no opt-out button, and no web opt-out method is added. Inbound STOP handling (decision 7) stays as built, because Meta's WhatsApp Business policy requires a business to respect any request to stop messages, whatever the category; a parent who stopped messages sees "You asked the school to stop these messages" on the opt-in page. D31 (nothing processed or sent while a school is suspended) is unchanged.
 
 ## Related requirements
 

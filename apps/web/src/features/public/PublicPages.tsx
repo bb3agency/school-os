@@ -390,7 +390,6 @@ function OptinSheet({
         ))}
       </dl>
       {stopped ? <p className="public-muted">{t("optin.stoppedByYou")}</p> : null}
-      <p>{t("optin.howToStop")}</p>
       <p className="public-muted">{t("optin.howToJoin")}</p>
       <form className="public-form" method="post" action="/p/optin">
         <Csrf value={csrf} />
