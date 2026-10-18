@@ -5,6 +5,7 @@ import { useId, useState } from "react";
 import * as z from "@/lib/zod";
 import { Alert } from "@/components/ui/Alert";
 import { Pill, type PillVariant } from "@/components/ui/Badge";
+import { Steps } from "@/components/ui/Steps";
 import { useSectionOptions, type SectionOption } from "@/features/findings/data";
 import { useTeluguEnabled } from "@/i18n/LanguagesProvider";
 import { uuid } from "@/lib/validation";
@@ -50,6 +51,47 @@ export function RequesterName({ row }: { row: Pick<Export, "own" | "requested_by
   const t = useTranslations("exports");
   if (row.own) return <>{t("you")}</>;
   return <>{row.requested_by.display_name ?? t("formerStaff")}</>;
+}
+
+/**
+ * Where an export is: pick what to export (the new-export forms), SchoolOS checks the students
+ * and makes the files (the export page while it runs), then download (once it is ready).
+ */
+export function ExportSteps({ current }: { current: 0 | 1 | 2 | 3 }) {
+  const t = useTranslations("exports.steps");
+  return (
+    <Steps
+      label={t("label")}
+      current={current}
+      steps={[
+        { id: "pick", label: t("pick") },
+        { id: "check", label: t("check") },
+        { id: "download", label: t("download") },
+      ]}
+    />
+  );
+}
+
+/**
+ * Field errors in the order of `ids` (form field name → input id) for `ErrorSummary`; an error
+ * whose field is not listed links to the form's first field. One line per field id.
+ */
+export function summaryErrors(
+  errors: Record<string, string>,
+  ids: Record<string, string>,
+): { fieldId: string; message: string }[] {
+  const names = Object.keys(ids);
+  const fallback = ids[names[0] ?? ""] ?? "";
+  const seen = new Set<string>();
+  const out: { fieldId: string; message: string }[] = [];
+  for (const name of [...names, ...Object.keys(errors)]) {
+    const message = errors[name];
+    const fieldId = ids[name] ?? fallback;
+    if (!message || seen.has(fieldId)) continue;
+    seen.add(fieldId);
+    out.push({ fieldId, message });
+  }
+  return out;
 }
 
 /** Says before submitting that the server will ask the user to confirm it's them (ADR-0021). */
@@ -119,7 +161,14 @@ function classesOf(sections: readonly SectionOption[]): ClassOption[] {
  * Which students: everyone you can see, some classes or some sections of the current academic
  * year (the API offers no other year). Scoped staff only get their own sections from the API.
  */
-export function ScopePicker({ errors }: { errors: Record<string, string> }) {
+export function ScopePicker({
+  errors,
+  firstId,
+}: {
+  errors: Record<string, string>;
+  /** Id of the first choice, so an error summary can link to this group. */
+  firstId?: string;
+}) {
   const t = useTranslations("exports.scope");
   const tc = useTranslations("common");
   const { sections, loading } = useSectionOptions();
@@ -140,6 +189,7 @@ export function ScopePicker({ errors }: { errors: Record<string, string> }) {
         {SCOPE_MODES.map((value, index) => (
           <label key={value} className={box}>
             <input
+              id={index === 0 ? firstId : undefined}
               type="radio"
               name="scope"
               value={value}
@@ -246,7 +296,14 @@ export function ScopeSummary({ scope }: { scope: Export["scope"] }) {
 // --- language -------------------------------------------------------------------------------
 
 /** Language of the file's headings and labels (the data itself is as recorded). */
-export function LanguageField({ errors }: { errors: Record<string, string> }) {
+export function LanguageField({
+  errors,
+  firstId,
+}: {
+  errors: Record<string, string>;
+  /** Id of the first choice, so an error summary can link to this group. */
+  firstId?: string;
+}) {
   const t = useTranslations("exports.new");
   const tl = useTranslations("exports.language");
   const locale = useLocale();
@@ -260,9 +317,10 @@ export function LanguageField({ errors }: { errors: Record<string, string> }) {
       <legend className="text-sm font-semibold text-ink">{t("language")}</legend>
       <p className="text-sm text-ink-muted">{t("languageHint")}</p>
       <div className="flex flex-wrap gap-x-6">
-        {EXPORT_LANGUAGES.map((value) => (
+        {EXPORT_LANGUAGES.map((value, index) => (
           <label key={value} className="inline-flex min-h-8 items-center gap-2 text-sm">
             <input
+              id={index === 0 ? firstId : undefined}
               type="radio"
               name="language"
               value={value}

@@ -1,13 +1,14 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import { useId } from "react";
+import { useId, useState } from "react";
 import * as z from "@/lib/zod";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Badge } from "@/components/ui/Badge";
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ErrorSummary } from "@/components/ui/ErrorSummary";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import type { AttributeDef } from "@/features/findings/types";
@@ -18,12 +19,14 @@ import { formList, useApiForm } from "@/lib/forms";
 import { EXPORT_KEYS, useExportAttributes } from "./data";
 import {
   exportFieldMap,
+  ExportSteps,
   LanguageField,
   refineScope,
   ScopePicker,
   scopeBody,
   scopeFields,
   StepUpNotice,
+  summaryErrors,
 } from "./parts";
 import {
   EXPORT_LANGUAGES,
@@ -78,6 +81,16 @@ export function columnChoices(
   return [...STRUCTURE_COLUMNS.map((key) => ({ key, restricted: false })), ...catalogue];
 }
 
+/** Input ids of the student-list form, in reading order (the error summary links to them). */
+const FIELD_IDS = {
+  columns: "student-list-columns",
+  scope: "student-list-scope",
+  class_ids: "student-list-scope",
+  section_ids: "student-list-scope",
+  format: "student-list-format",
+  language: "student-list-language",
+} as const;
+
 /** Checked at first: where the student sits and their name (the least needed to be useful). */
 const DEFAULT_COLUMNS = new Set<string>([...STRUCTURE_COLUMNS, "admission_no", "full_name"]);
 
@@ -104,6 +117,8 @@ export function NewStudentListScreen() {
   const attributes = useExportAttributes(mayExport && can(EXPORT_PERM.readBasic));
   const columnsErrorId = useId();
   const formatErrorId = useId();
+  // Each failed submit moves focus to the error summary again.
+  const [attempt, setAttempt] = useState(0);
 
   const form = useApiForm({
     schema: studentListSchema,
@@ -113,6 +128,7 @@ export function NewStudentListScreen() {
       section_ids: formList(element, "section_ids"),
     }),
     fieldMap: exportFieldMap,
+    onInvalid: () => setAttempt((count) => count + 1),
     invalidate: [EXPORT_KEYS.all],
     submit: (data, key): Promise<Export> =>
       unwrap(
@@ -132,7 +148,7 @@ export function NewStudentListScreen() {
   if (me.isPending) return <LoadingState label={tc("loading")} />;
   if (!mayExport) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader
           title={tl("title")}
           breadcrumb={[
@@ -161,7 +177,7 @@ export function NewStudentListScreen() {
       : tcol(choice.key as (typeof STRUCTURE_COLUMNS)[number]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={tl("title")}
         description={tl("description")}
@@ -171,8 +187,10 @@ export function NewStudentListScreen() {
           { label: tl("title") },
         ]}
       />
+      <ExportSteps current={0} />
       <StepUpNotice />
-      <form noValidate onSubmit={form.onSubmit} className="space-y-6">
+      <form noValidate onSubmit={form.onSubmit} className="space-y-5">
+        <ErrorSummary errors={summaryErrors(errors, FIELD_IDS)} attempt={attempt} />
         <Card title={tl("columnsTitle")}>
           <fieldset
             className="space-y-2"
@@ -187,6 +205,7 @@ export function NewStudentListScreen() {
               {choices.map((choice, index) => (
                 <label key={choice.key} className="inline-flex min-h-8 items-center gap-2 text-sm">
                   <input
+                    id={index === 0 ? FIELD_IDS.columns : undefined}
                     type="checkbox"
                     name="columns"
                     value={choice.key}
@@ -212,7 +231,7 @@ export function NewStudentListScreen() {
         </Card>
 
         <Card title={t("studentsTitle")}>
-          <ScopePicker errors={errors} />
+          <ScopePicker errors={errors} firstId={FIELD_IDS.scope} />
         </Card>
 
         <Card title={t("fileTitle")}>
@@ -224,9 +243,10 @@ export function NewStudentListScreen() {
               <legend className="text-sm font-semibold text-ink">{tl("format")}</legend>
               <p className="text-sm text-ink-muted">{tl("formatHint")}</p>
               <div className="flex flex-wrap gap-x-6">
-                {LIST_FORMATS.map((format) => (
+                {LIST_FORMATS.map((format, index) => (
                   <label key={format} className="inline-flex min-h-8 items-center gap-2 text-sm">
                     <input
+                      id={index === 0 ? FIELD_IDS.format : undefined}
                       type="radio"
                       name="format"
                       value={format}
@@ -243,7 +263,7 @@ export function NewStudentListScreen() {
                 </p>
               ) : null}
             </fieldset>
-            <LanguageField errors={errors} />
+            <LanguageField errors={errors} firstId={FIELD_IDS.language} />
           </div>
         </Card>
 

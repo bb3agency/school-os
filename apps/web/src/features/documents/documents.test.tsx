@@ -27,13 +27,14 @@ import { purposeFor, versionBadge, versionReason } from "./types";
 import { checkFile, contentTypeFor, setDocumentStorageSendForTesting } from "./upload";
 
 const push = vi.hoisted(() => vi.fn());
+const replace = vi.hoisted(() => vi.fn());
 
 vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
     usePathname: () => "/documents",
-    useRouter: () => ({ push, replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
+    useRouter: () => ({ push, replace, refresh: vi.fn(), prefetch: vi.fn() }),
     useSearchParams: () => new URLSearchParams(),
     useParams: () => ({ locale: "en" }),
     notFound: () => {
@@ -125,6 +126,7 @@ function body(key: string, index = 0): Record<string, unknown> {
 
 beforeEach(() => {
   push.mockReset();
+  replace.mockReset();
   stub = installBffStub("staff");
   Object.assign(stub.routes, structureRoutes());
   setDocumentPollDelayForTesting(() => 10);
@@ -268,6 +270,22 @@ describe("documents list (US-701, FR-DOC-005..008)", () => {
     expect(
       screen.getByRole("link", { name: messages.en.documents.list.clearFilters }),
     ).toBeInTheDocument();
+  });
+
+  it("shows the active filters as chips; removing one drops only that URL parameter", async () => {
+    setMe([READ]);
+    stub.routes["GET /bff/api/v1/documents"] = () => page([]);
+    renderWithIntl(
+      <DocumentsScreen
+        filters={parseDocumentListFilters({ purpose: "circular", doc_type: "circular" })}
+      />,
+    );
+    // Nothing matches: the table says so and offers to clear the filters.
+    expect(await screen.findByText("No documents match these filters")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Remove filter Type: Circular" }));
+    expect(replace).toHaveBeenLastCalledWith("/documents?purpose=circular");
+    await userEvent.click(screen.getByRole("button", { name: "Clear all" }));
+    expect(replace).toHaveBeenLastCalledWith("/documents");
   });
 
   it("offers upload to uploaders and confirms a delete", async () => {
@@ -766,7 +784,12 @@ describe("upload a document (US-701 AC1..AC2, FR-DOC-001, FR-DOC-005)", () => {
     setMe([READ, UPLOAD]);
     renderWithIntl(<NewDocumentScreen />);
     await userEvent.click(await screen.findByRole("button", { name: "Upload a document" }));
-    expect(await screen.findByText("Choose a file to upload.")).toBeInTheDocument();
+    // The error summary links to the field; the message also stays under the field.
+    expect(await screen.findByRole("link", { name: "Choose a file to upload." })).toHaveAttribute(
+      "href",
+      "#document-file",
+    );
+    expect(screen.getAllByText("Choose a file to upload.")).toHaveLength(2);
     expect(screen.getByRole("textbox", { name: /Title/ })).toHaveAttribute("aria-invalid", "true");
     expect(stub.callsTo("POST /bff/api/v1/documents/uploads")).toHaveLength(0);
   });
@@ -847,7 +870,7 @@ describe("upload a document (US-701 AC1..AC2, FR-DOC-001, FR-DOC-005)", () => {
     await userEvent.type(screen.getByRole("textbox", { name: /Title/ }), "Fee policy");
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Type" }), "policy");
     await userEvent.click(screen.getByRole("button", { name: "Upload a document" }));
-    expect(await screen.findByText(/The file could not be uploaded/)).toBeInTheDocument();
+    expect((await screen.findAllByText(/The file could not be uploaded/))[0]).toBeInTheDocument();
     expect(stub.callsTo("POST /bff/api/v1/documents")).toHaveLength(0);
     await userEvent.click(screen.getByRole("button", { name: "Upload a document" }));
     await waitFor(() => expect(push).toHaveBeenCalledWith(`/documents/${DOC}`));
@@ -885,8 +908,9 @@ describe("upload a document (US-701 AC1..AC2, FR-DOC-001, FR-DOC-005)", () => {
     await userEvent.click(await screen.findByRole("checkbox", { name: "Principal" }));
     await userEvent.click(screen.getByRole("button", { name: "Upload a document" }));
     expect(
-      await screen.findByText(/Choose your own classes or sections under/),
-    ).toBeInTheDocument();
+      await screen.findByRole("link", { name: /Choose your own classes or sections under/ }),
+    ).toHaveAttribute("href", "#document-visibility");
+    expect(screen.getAllByText(/Choose your own classes or sections under/)).toHaveLength(2);
     expect(push).not.toHaveBeenCalled();
   });
 });

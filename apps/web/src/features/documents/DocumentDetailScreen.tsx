@@ -58,7 +58,7 @@ import { createUploadKeys, StorageUploadError, uploadVersion } from "./upload";
 
 function Item({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
-    <div className="space-y-0.5">
+    <div className="min-w-0 space-y-0.5 break-anywhere">
       <dt className="text-sm text-ink-muted">{label}</dt>
       <dd className="text-ink">{children}</dd>
     </div>
@@ -90,6 +90,25 @@ function showsSheet(doc: DocumentDetail): boolean {
 function SheetSection({ doc }: { doc: DocumentDetail }) {
   const mayOpen = useMayOpen(doc);
   return mayOpen && showsSheet(doc) ? <DocumentSheetPreview documentId={doc.id} /> : null;
+}
+
+/**
+ * The page's one primary action: download the newest version that passed the virus check
+ * (only for members who may open the file). "Open as a sheet" stays on the sheet preview, and
+ * the record-changing actions stay on the cards they change (each opens its own dialog).
+ */
+function HeaderActions({ doc }: { doc: DocumentDetail }) {
+  const t = useTranslations("documents.detail");
+  const mayOpen = useMayOpen(doc);
+  const ready = latestReady(doc.versions);
+  if (!mayOpen || !ready) return null;
+  return (
+    <DownloadButton
+      documentId={doc.id}
+      versionNo={ready.version_no}
+      label={t("download", { version: ready.version_no })}
+    />
+  );
 }
 
 /** The newest version that passed the virus check (what "Download" serves). */
@@ -127,16 +146,12 @@ function FileSection({ doc }: { doc: DocumentDetail }) {
       </div>
     );
   }
+  // The download itself is the page header's primary button.
   return (
     <div className="space-y-3">
       {notice}
       {ready ? (
         <>
-          <DownloadButton
-            documentId={doc.id}
-            versionNo={ready.version_no}
-            label={t("download", { version: ready.version_no })}
-          />
           {current && ready.version_no !== current.version_no ? (
             <p className="text-sm">{t("olderReady", { version: ready.version_no })}</p>
           ) : null}
@@ -476,7 +491,7 @@ export function DocumentDetailScreen({ documentId }: { documentId: string }) {
   }
   if (!allowed) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader title={t("title")} breadcrumb={[crumbs[0]!, { label: t("title") }]} />
         <Alert tone="warning" title={t("noAccessTitle")}>
           {t("noAccessBody")}
@@ -487,7 +502,7 @@ export function DocumentDetailScreen({ documentId }: { documentId: string }) {
   if (state.status !== "ready") {
     const missing = state.status === "error" && state.reason === "not_found";
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader title={td("title")} breadcrumb={[...crumbs, { label: td("title") }]} />
         <Alert
           tone={missing ? "warning" : "danger"}
@@ -520,85 +535,98 @@ export function DocumentDetailScreen({ documentId }: { documentId: string }) {
       : td("formerMember");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={doc.title}
         breadcrumb={[...crumbs, { label: doc.title }]}
         eyebrow={ttype(doc.doc_type)}
         badge={doc.current_version ? <VersionStatusBadge version={doc.current_version} /> : null}
+        actions={<HeaderActions doc={doc} />}
       />
       {/* Announces status changes while polling; the buttons stay outside the live region. */}
       <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {doc.current_version && busy ? td("stillChecking") : ""}
       </p>
-      <div className="grid gap-6 xl:grid-cols-[2fr_3fr]">
-        <Card
-          title={td("fileTitle")}
-          actions={
-            canUpload && uploadPurpose ? <NewVersion doc={doc} purpose={uploadPurpose} /> : null
-          }
-        >
-          <FileSection doc={doc} />
-        </Card>
-        <Card title={td("versionsTitle")} description={td("versionsHint")}>
-          <VersionsSection doc={doc} />
-        </Card>
-      </div>
-      <SheetSection doc={doc} />
       {archived ? (
         <Alert tone="info" title={td("archivedTitle")}>
           {td("archivedBody")}
         </Alert>
       ) : null}
-      <Card
-        title={td("aboutTitle")}
-        actions={
-          canEdit || canManage ? (
-            <span className="flex flex-wrap gap-2">
-              {canEdit ? <EditDetails doc={doc} /> : null}
-              {canManage ? <ArchiveToggle doc={doc} /> : null}
-            </span>
-          ) : null
-        }
-      >
-        <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <Item label={td("type")}>{ttype(doc.doc_type)}</Item>
-          <Item label={td("purpose")}>{tpurpose(doc.purpose)}</Item>
-          <Item label={td("sensitivity")}>{tsens(`${doc.sensitivity}.short`)}</Item>
-          {telugu ? (
-            <Item label={td("language")}>
-              {doc.language ? tlang(doc.language) : tc("notAvailable")}
-            </Item>
+      {/* The file and its versions on the left; its details beside them from lg (one column on
+          smaller screens, details after the file). */}
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
+        <div className="min-w-0 space-y-4">
+          <Card
+            title={td("fileTitle")}
+            actions={
+              canUpload && uploadPurpose ? <NewVersion doc={doc} purpose={uploadPurpose} /> : null
+            }
+          >
+            <FileSection doc={doc} />
+          </Card>
+          <SheetSection doc={doc} />
+          <Card title={td("versionsTitle")} description={td("versionsHint")}>
+            <VersionsSection doc={doc} />
+          </Card>
+        </div>
+        <aside aria-label={td("aboutTitle")} className="min-w-0 space-y-4">
+          <Card
+            title={td("aboutTitle")}
+            actions={
+              canEdit || canManage ? (
+                <span className="flex flex-wrap gap-2">
+                  {canEdit ? <EditDetails doc={doc} /> : null}
+                  {canManage ? <ArchiveToggle doc={doc} /> : null}
+                </span>
+              ) : null
+            }
+          >
+            <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+              <Item label={td("type")}>{ttype(doc.doc_type)}</Item>
+              <Item label={td("purpose")}>{tpurpose(doc.purpose)}</Item>
+              <Item label={td("sensitivity")}>{tsens(`${doc.sensitivity}.short`)}</Item>
+              {telugu ? (
+                <Item label={td("language")}>
+                  {doc.language ? tlang(doc.language) : tc("notAvailable")}
+                </Item>
+              ) : null}
+              <Item label={td("issuer")}>
+                <Value>{doc.issuer}</Value>
+              </Item>
+              <Item label={td("issuedOn")}>
+                <span className="num">
+                  <Value>{formatDate(doc.issued_on)}</Value>
+                </span>
+              </Item>
+              <Item label={td("status")}>{tstatus(doc.status)}</Item>
+              <Item label={td("uploadedBy")}>{uploader}</Item>
+              <Item label={td("created")}>
+                <span className="num">
+                  <Value>{formatDateTime(doc.created_at)}</Value>
+                </span>
+              </Item>
+              <Item label={td("updated")}>
+                <span className="num">
+                  <Value>{formatDateTime(doc.updated_at)}</Value>
+                </span>
+              </Item>
+            </dl>
+            <p className="mt-4 text-sm text-ink-muted">{tsens(`${doc.sensitivity}.hint`)}</p>
+          </Card>
+          <Card
+            title={td("aclTitle")}
+            description={td("aclHint")}
+            actions={canManage ? <EditAcl doc={doc} /> : null}
+          >
+            <AclSummary acl={doc.acl} />
+          </Card>
+          {canManage ? (
+            <Card title={td("deleteTitle")} description={td("deleteHint")} tone="outline">
+              <DeleteDocument doc={doc} />
+            </Card>
           ) : null}
-          <Item label={td("issuer")}>
-            <Value>{doc.issuer}</Value>
-          </Item>
-          <Item label={td("issuedOn")}>
-            <Value>{formatDate(doc.issued_on)}</Value>
-          </Item>
-          <Item label={td("status")}>{tstatus(doc.status)}</Item>
-          <Item label={td("uploadedBy")}>{uploader}</Item>
-          <Item label={td("created")}>
-            <Value>{formatDateTime(doc.created_at)}</Value>
-          </Item>
-          <Item label={td("updated")}>
-            <Value>{formatDateTime(doc.updated_at)}</Value>
-          </Item>
-        </dl>
-        <p className="mt-4 text-sm text-ink-muted">{tsens(`${doc.sensitivity}.hint`)}</p>
-      </Card>
-      <Card
-        title={td("aclTitle")}
-        description={td("aclHint")}
-        actions={canManage ? <EditAcl doc={doc} /> : null}
-      >
-        <AclSummary acl={doc.acl} />
-      </Card>
-      {canManage ? (
-        <Card title={td("deleteTitle")} description={td("deleteHint")}>
-          <DeleteDocument doc={doc} />
-        </Card>
-      ) : null}
+        </aside>
+      </div>
     </div>
   );
 }

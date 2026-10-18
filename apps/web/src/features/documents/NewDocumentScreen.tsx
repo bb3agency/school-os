@@ -1,11 +1,12 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ErrorSummary } from "@/components/ui/ErrorSummary";
 import { Field, TextField } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -18,7 +19,7 @@ import { useStaffCan, useStaffMeQuery } from "@/lib/bff/staff-me";
 import { useApiForm } from "@/lib/forms";
 import { DOCUMENT_KEYS } from "./data";
 import { chosenFile, newDocumentSchema, storageFailure } from "./forms";
-import { aclBody, aclExtra, AclFields, documentFieldMap } from "./parts";
+import { aclBody, aclExtra, AclFields, documentFieldMap, summaryErrors } from "./parts";
 import {
   acceptFor,
   DOC_LANGUAGES,
@@ -36,6 +37,19 @@ import { createUploadKeys, StorageUploadError, uploadDocument } from "./upload";
  * through a presigned form, then SchoolOS registers it with its details and who can see it.
  * It opens once the virus check has passed; the document screen shows the progress.
  */
+/** Input ids of the form's fields, in reading order (the error summary links to them). */
+const FIELD_IDS = {
+  file: "document-file",
+  title: "document-title",
+  doc_type: "document-type",
+  language: "document-language",
+  issuer: "document-issuer",
+  issued_on: "document-issued-on",
+  sensitivity: "document-sensitivity",
+  visibility: "document-visibility",
+  acl: "document-visibility",
+} as const;
+
 export function NewDocumentScreen() {
   const t = useTranslations("documents.new");
   const td = useTranslations("documents");
@@ -55,6 +69,8 @@ export function NewDocumentScreen() {
   const router = useRouter();
   const keys = useRef(createUploadKeys(newIdempotencyKey));
   const telugu = useTeluguEnabled();
+  // Each failed submit moves focus to the error summary again.
+  const [attempt, setAttempt] = useState(0);
 
   const form = useApiForm({
     schema: newDocumentSchema,
@@ -65,6 +81,7 @@ export function NewDocumentScreen() {
       ...(telugu ? {} : { language: "" }),
     }),
     fieldMap: documentFieldMap,
+    onInvalid: () => setAttempt((count) => count + 1),
     invalidate: [DOCUMENT_KEYS.all],
     submit: async (data, key) => {
       const purpose = purposeFor(data.doc_type);
@@ -95,7 +112,7 @@ export function NewDocumentScreen() {
   if (me.isPending) return <LoadingState label={tc("loading")} />;
   if (!can(DOCUMENT_PERM.upload)) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader title={t("title")} breadcrumb={crumbs} />
         <Alert tone="warning" title={t("noPermissionTitle")}>
           {t("noPermissionBody")}
@@ -109,11 +126,12 @@ export function NewDocumentScreen() {
 
   const errors = form.errors;
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader title={t("title")} description={t("description")} breadcrumb={crumbs} />
-      <form noValidate onSubmit={form.onSubmit} className="space-y-6">
+      <form noValidate onSubmit={form.onSubmit} className="space-y-5">
+        <ErrorSummary errors={summaryErrors(errors, FIELD_IDS)} attempt={attempt} />
         <Card title={t("fileTitle")}>
-          <Field label={t("file")} hint={t("fileHint")} error={errors.file}>
+          <Field id={FIELD_IDS.file} label={t("file")} hint={t("fileHint")} error={errors.file}>
             {({ id, describedBy, invalid }) => (
               <FileDropZone title={t("dropTitle")}>
                 <input
@@ -132,6 +150,7 @@ export function NewDocumentScreen() {
         <Card title={t("detailsTitle")}>
           <div className="grid gap-4 md:grid-cols-2">
             <TextField
+              id={FIELD_IDS.title}
               name="title"
               label={t("titleField")}
               hint={t("titleHint")}
@@ -142,6 +161,7 @@ export function NewDocumentScreen() {
               className="md:col-span-2"
             />
             <SelectField
+              id={FIELD_IDS.doc_type}
               name="doc_type"
               label={t("docType")}
               placeholder={tc("chooseOne")}
@@ -151,6 +171,7 @@ export function NewDocumentScreen() {
             />
             {telugu ? (
               <SelectField
+                id={FIELD_IDS.language}
                 name="language"
                 label={t("language")}
                 hint={t("languageHint")}
@@ -160,6 +181,7 @@ export function NewDocumentScreen() {
               />
             ) : null}
             <TextField
+              id={FIELD_IDS.issuer}
               name="issuer"
               label={t("issuer")}
               hint={t("issuerHint")}
@@ -168,6 +190,7 @@ export function NewDocumentScreen() {
               error={errors.issuer}
             />
             <TextField
+              id={FIELD_IDS.issued_on}
               name="issued_on"
               type="date"
               label={t("issuedOn")}
@@ -184,6 +207,7 @@ export function NewDocumentScreen() {
                 className="flex cursor-pointer items-start gap-3 rounded-lg border border-border-soft p-3 text-sm has-[:checked]:border-primary has-[:checked]:bg-primary-soft"
               >
                 <input
+                  id={value === "C1" ? FIELD_IDS.sensitivity : undefined}
                   type="radio"
                   name="sensitivity"
                   value={value}
@@ -203,7 +227,7 @@ export function NewDocumentScreen() {
           </fieldset>
         </Card>
         <Card title={t("aclTitle")}>
-          <AclFields errors={errors} />
+          <AclFields errors={errors} firstId={FIELD_IDS.visibility} />
         </Card>
         <ApiErrorAlert error={form.error} namespace="documents" />
         <div className="flex flex-wrap items-center justify-end gap-3">

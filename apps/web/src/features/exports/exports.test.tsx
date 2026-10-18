@@ -98,12 +98,9 @@ describe("exports list (FR-EXP-003, ADR-0021)", () => {
     expect(row && within(row).getByText("03/10/2026 10:31")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "New pre-check" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "New student list" })).not.toBeInTheDocument();
-    // One card per export type the member may make; the history sits in its own card.
-    expect(
-      screen.getByRole("heading", { level: 2, name: "Pre-check before you submit" }),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Student list" })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 2, name: "Earlier exports" })).toBeInTheDocument();
+    // The one primary action is the export the member may make; the list is named by its view.
+    expect(screen.queryByRole("button", { name: "More" })).not.toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "My exports" })).toBeInTheDocument();
   });
 
   it("offers the whole-school view to export.read_all holders and asks for requested_by=all", async () => {
@@ -141,6 +138,22 @@ describe("exports list (FR-EXP-003, ADR-0021)", () => {
     // No make-export permission: no buttons and no profile lookup (it would be refused).
     expect(screen.queryByRole("link", { name: "New pre-check" })).not.toBeInTheDocument();
     expect(stub.callsTo("GET /bff/api/v1/export-profiles")).toHaveLength(0);
+  });
+
+  it("makes the pre-check the one primary action and puts the student list under More", async () => {
+    setMe([BOARD, LIST, READ_BASIC, FINDINGS]);
+    stub.routes["GET /bff/api/v1/exports"] = () => page([]);
+    renderWithIntl(<ExportsScreen filters={parseExportListFilters({})} />);
+    expect(await screen.findByRole("link", { name: "New pre-check" })).toHaveAttribute(
+      "href",
+      "/exports/new/precheck",
+    );
+    expect(screen.queryByRole("link", { name: "New student list" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "More" }));
+    expect(await screen.findByRole("menuitem", { name: "New student list" })).toHaveAttribute(
+      "href",
+      "/exports/new/student-list",
+    );
   });
 
   it("says so when the member has no export permission (and asks the API nothing)", async () => {
@@ -269,8 +282,16 @@ describe("new pre-check (US-501 AC4, FR-EXP-001..004, SEC-005)", () => {
     await userEvent.click(screen.getByRole("checkbox", { name: "PDF" }));
     await userEvent.click(screen.getByRole("radio", { name: "Some sections" }));
     await userEvent.click(screen.getByRole("button", { name: "Make the pre-check" }));
-    expect(await screen.findByText("Choose at least one file type.")).toBeInTheDocument();
-    expect(screen.getByText(/Choose at least one section/)).toBeInTheDocument();
+    // The error summary links to each field; the messages also stay under the fields.
+    expect(
+      await screen.findByRole("link", { name: "Choose at least one file type." }),
+    ).toHaveAttribute("href", "#precheck-format");
+    expect(screen.getByRole("link", { name: /Choose at least one section/ })).toHaveAttribute(
+      "href",
+      "#precheck-scope",
+    );
+    expect(screen.getAllByText("Choose at least one file type.")).toHaveLength(2);
+    expect(screen.getAllByText(/Choose at least one section/)).toHaveLength(2);
     expect(stub.callsTo("POST /bff/api/v1/exports")).toHaveLength(0);
   });
 
@@ -330,8 +351,10 @@ describe("new pre-check (US-501 AC4, FR-EXP-001..004, SEC-005)", () => {
     renderWithIntl(<NewPrecheckScreen params={parseNewPrecheckParams({})} />);
     await userEvent.click(await screen.findByRole("button", { name: "Make the pre-check" }));
     expect(
-      await screen.findByText("No students match this choice. Choose other classes or sections."),
-    ).toBeInTheDocument();
+      await screen.findAllByText(
+        "No students match this choice. Choose other classes or sections.",
+      ),
+    ).toHaveLength(2);
   });
 
   it("428: the global step-up prompt confirms and the same request is sent again", async () => {
@@ -421,7 +444,10 @@ describe("new student list (US-901, FR-EXP-004)", () => {
       if ((box as HTMLInputElement).checked) await userEvent.click(box);
     }
     await userEvent.click(screen.getByRole("button", { name: "Make the student list" }));
-    expect(await screen.findByText("Choose at least one column.")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("link", { name: "Choose at least one column." }),
+    ).toHaveAttribute("href", "#student-list-columns");
+    expect(screen.getAllByText("Choose at least one column.")).toHaveLength(2);
     expect(stub.callsTo("POST /bff/api/v1/exports/student-list")).toHaveLength(0);
   });
 
