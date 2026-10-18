@@ -36,6 +36,7 @@ import {
   isUnavailable,
   manualSchema,
   settingsBody,
+  formatDayList,
   settingsSchema,
   useAccount,
   useMessagingSettings,
@@ -466,6 +467,7 @@ const SETTINGS_FIELDS = {
   quiet_end: "wa-quiet-end",
   daily_cap: "wa-daily-cap",
   office_phone: "wa-office-phone",
+  no_message_dates: "wa-no-message-dates",
 } as const;
 
 /**
@@ -600,6 +602,15 @@ function SettingsForm({
           error={form.errors.office_phone}
         />
       </div>
+      <TextField
+        id={SETTINGS_FIELDS.no_message_dates}
+        name="no_message_dates"
+        label={t("noMessageDates")}
+        hint={t("noMessageDatesHint")}
+        defaultValue={formatDayList(settings.no_message_dates)}
+        autoComplete="off"
+        error={form.errors.no_message_dates}
+      />
       <ApiErrorAlert error={form.error} namespace="messaging" />
       <SaveBar
         dirty={dirty}

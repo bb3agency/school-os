@@ -145,21 +145,30 @@ export function toLoadable<T>(query: {
   return ready(query.data as T);
 }
 
-export interface ApiQueryOptions {
+export interface ApiQueryOptions<T = unknown> {
   /** Skip the request (e.g. no permission, or a filter is incomplete). */
   enabled?: boolean;
+  /**
+   * Ask again every this many milliseconds while the screen is open (live counts, e.g. a
+   * WhatsApp broadcast that is still sending); `false` or omitted = no polling. A function
+   * decides from the last answer (stop once the broadcast is done).
+   */
+  refetchInterval?: number | false | ((data: T | undefined) => number | false);
 }
 
 /** Query through the BFF, exposed as a Loadable for the view components. */
 export function useApiQuery<T>(
   queryKey: QueryKey,
   load: () => Promise<T>,
-  options: ApiQueryOptions = {},
+  options: ApiQueryOptions<T> = {},
 ): Loadable<T> {
+  const interval = options.refetchInterval ?? false;
   const query = useQuery({
     queryKey,
     queryFn: load,
     enabled: options.enabled ?? true,
+    refetchInterval:
+      typeof interval === "function" ? (current) => interval(current.state.data) : interval,
     retry: (count, error) =>
       count < 1 &&
       !(error instanceof NotAvailableError) &&
