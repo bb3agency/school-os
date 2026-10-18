@@ -51,10 +51,19 @@ def test_FR_MSG_011_quiet_hours(now: dt.datetime, purpose: str, expected: object
 
 
 def test_FR_MSG_011_quiet_window_inside_one_day_and_none() -> None:
-    kw = {"purpose": "school_notice", "early_close": dt.time(20), "early_purposes": EARLY}
-    assert rules.next_open(_at(3), quiet_start=dt.time(1), quiet_end=dt.time(6), **kw) == _at(6)
-    assert rules.next_open(_at(7), quiet_start=dt.time(1), quiet_end=dt.time(6), **kw) is None
-    assert rules.next_open(_at(23), quiet_start=dt.time(7), quiet_end=dt.time(7), **kw) is None
+    def at(now: dt.datetime, start: int, end: int) -> dt.datetime | None:
+        return rules.next_open(
+            now,
+            purpose="school_notice",
+            quiet_start=dt.time(start),
+            quiet_end=dt.time(end),
+            early_close=dt.time(20),
+            early_purposes=EARLY,
+        )
+
+    assert at(_at(3), 1, 6) == _at(6)
+    assert at(_at(7), 1, 6) is None
+    assert at(_at(23), 7, 7) is None
 
 
 def test_FR_MSG_011_cap_and_staleness() -> None:

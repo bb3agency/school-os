@@ -21,6 +21,7 @@ from app.academics.schemas import AttendanceEntryIn, AttendanceWrite
 from app.core.db import tenant_session
 from app.fees import service as fees
 from app.fees.schemas import FeeSettingsIn
+from app.messaging import service as messaging
 from app.messaging.providers.fake import STATE
 from app.messaging.sends import service as sends
 from app.public import service as public
@@ -387,7 +388,7 @@ def test_US_2207_absence_alerts_after_the_evening_close_wait_for_tomorrow(
     # skipped the next day (too late: it was about yesterday).
     student, guardian, _ = S.opted_guardian(api, school, "attendance")
     with tenant_session(school.tenant_id) as db:
-        queued = sends.messaging.queue_message(
+        queued = messaging.queue_message(
             db,
             purpose="absence_alert",
             guardian_id=guardian,
@@ -458,7 +459,7 @@ def test_US_2206_receipt_message_from_the_outbox_event(
     account_id = F.account(school, student)
     receipt = F.issue(school, account_id, "500.00")
     with admin_engine.connect() as c:
-        events = c.execute(
+        events: int = c.execute(
             text(
                 "SELECT count(*) FROM ops.outbox WHERE tenant_id = :t "
                 "AND event_type = 'fee.receipt.message' AND payload->>'receipt_id' = :r"
