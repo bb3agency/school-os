@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import { PAYMENT_METHODS, type Invoice } from "@schoolos/api-client";
 import { useLocale, useTranslations } from "next-intl";
 import * as z from "@/lib/zod";
@@ -7,7 +9,8 @@ import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Pill, type PillVariant } from "@/components/ui/Badge";
 import { TextAreaField, TextField } from "@/components/ui/Input";
 import { SelectField } from "@/components/ui/Select";
-import { DataTable, type Column } from "@/components/ui/Table";
+import { DataTableV2 } from "@/components/console/DataTableV2";
+import type { Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { formatDate, formatInr } from "@/lib/format";
@@ -23,7 +26,7 @@ import {
 import { Link } from "@/i18n/navigation";
 import { PK, useCan } from "./data";
 import { InvoiceDownload } from "./InvoiceDownload";
-import { Mono } from "./pills";
+import { Figure } from "./pills";
 import { ReasonField } from "./SubscriptionActions";
 
 const INVALIDATE = [PK.invoices, PK.tenants, PK.dashboard] as const;
@@ -68,11 +71,14 @@ export function InvoiceTable({
   invoices,
   schoolName,
   caption,
+  toolbar,
 }: {
   invoices: Loadable<readonly Invoice[]>;
   /** Omit on a single school's page. */
   schoolName?: (tenantId: string) => string;
   caption: string;
+  /** Filters above the rows, inside the table card (docs/17 §4.3). */
+  toolbar?: ReactNode;
 }) {
   const t = useTranslations("platform.invoices");
   const tm = useTranslations("platform.invoices.methods");
@@ -81,9 +87,9 @@ export function InvoiceTable({
   const can = useCan();
   const manage = can("platform.invoices.manage");
   const money = (value: string) => (
-    <Mono>
+    <Figure>
       <Value>{formatInr(value, locale)}</Value>
-    </Mono>
+    </Figure>
   );
 
   function actions(row: Invoice) {
@@ -282,13 +288,13 @@ export function InvoiceTable({
     {
       key: "taxable",
       header: t("colSubtotal"),
-      className: "text-right tabular-nums",
+      numeric: true,
       cell: (row) => money(row.taxable_value_inr),
     },
     {
       key: "gst",
       header: t("colGst"),
-      className: "text-right tabular-nums",
+      numeric: true,
       cell: (row) => (
         <span className="flex flex-col items-end">
           {money((Number(row.cgst_inr) + Number(row.sgst_inr) + Number(row.igst_inr)).toFixed(2))}
@@ -310,13 +316,13 @@ export function InvoiceTable({
     {
       key: "total",
       header: t("colTotal"),
-      className: "text-right tabular-nums",
+      numeric: true,
       cell: (row) => money(row.total_inr),
     },
     {
       key: "balance",
       header: t("colBalance"),
-      className: "text-right tabular-nums",
+      numeric: true,
       cell: (row) => money(row.balance_due_inr),
     },
     {
@@ -328,7 +334,9 @@ export function InvoiceTable({
   ];
 
   return (
-    <DataTable
+    <DataTableV2
+      id="platform.invoices"
+      toolbar={toolbar}
       stacked
       caption={caption}
       captionHidden

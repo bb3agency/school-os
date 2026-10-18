@@ -137,7 +137,7 @@ export function PageHero({
           {children}
         </div>
         {illustration ? (
-          <Illustration name={illustration} priority className="hidden max-w-md lg:block" />
+          <Illustration name={illustration} priority className="hidden w-full max-w-md lg:block" />
         ) : null}
       </Container>
     </section>

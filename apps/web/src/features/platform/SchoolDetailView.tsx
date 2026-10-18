@@ -12,7 +12,8 @@ import { Icon } from "@/components/ui/Icon";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { TabNav } from "@/components/ui/TabNav";
-import { DataTable, type Column } from "@/components/ui/Table";
+import { DataTableV2 } from "@/components/console/DataTableV2";
+import type { Column } from "@/components/ui/Table";
 import { StatCard } from "@/components/ui/StatCard";
 import { Timeline } from "@/components/ui/Timeline";
 import { Value } from "@/components/ui/Value";
@@ -834,7 +835,8 @@ function FlagsTab({ school }: { school: TenantDetail }) {
       : []),
   ];
   return (
-    <DataTable
+    <DataTableV2
+      id="platform.school-flags"
       caption={t("title")}
       captionHidden
       columns={columns}

@@ -21,7 +21,8 @@ import { TextAreaField, TextField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
 import { Toggle } from "@/components/ui/Toggle";
-import { DataTable, type Column } from "@/components/ui/Table";
+import { DataTableV2 } from "@/components/console/DataTableV2";
+import type { Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { breakGlassTone, deploymentTone, known } from "@/features/status";
 import { Link } from "@/i18n/navigation";
@@ -44,7 +45,7 @@ import { DeploymentActions } from "./DeploymentActions";
 import { FilterCard } from "./FilterCard";
 import { FlagSwitch } from "./FlagSwitch";
 import { HeartbeatPill } from "./HeartbeatPill";
-import { Mono, MonoTime, TierTag } from "./pills";
+import { Figure, Mono, MonoTime, TierTag } from "./pills";
 import { ShowMore } from "./ShowMore";
 import { UsageTable } from "./UsageTable";
 
@@ -82,36 +83,45 @@ export function UsageScreen({ filters = {} }: { filters?: UsageFilters }) {
         description={t("description")}
         breadcrumb={[{ label: tn("dashboard"), href: "/platform" }, { label: t("title") }]}
       />
-      <FilterCard
-        clearHref={filters.from || filters.to || filters.tenantId ? "/platform/usage" : undefined}
-      >
-        <TextField
-          name="from"
-          type="date"
-          label={t("from")}
-          defaultValue={filters.from ?? ""}
-          className="w-44"
-        />
-        <TextField
-          name="to"
-          type="date"
-          label={t("to")}
-          defaultValue={filters.to ?? ""}
-          className="w-44"
-        />
-        <SelectField
-          name="school"
-          label={t("colSchool")}
-          placeholder={tc("all")}
-          defaultValue={filters.tenantId ?? ""}
-          options={schools.map((school) => ({
-            value: school.tenant_id,
-            label: `${school.school_name} (${school.code})`,
-          }))}
-          className="w-72"
-        />
-      </FilterCard>
-      <UsageTable usage={usage} caption={t("title")} schoolName={nameOf} />
+      <UsageTable
+        toolbar={
+          <FilterCard
+            bare
+            clearHref={
+              filters.from || filters.to || filters.tenantId ? "/platform/usage" : undefined
+            }
+          >
+            <TextField
+              name="from"
+              type="date"
+              label={t("from")}
+              defaultValue={filters.from ?? ""}
+              className="w-44"
+            />
+            <TextField
+              name="to"
+              type="date"
+              label={t("to")}
+              defaultValue={filters.to ?? ""}
+              className="w-44"
+            />
+            <SelectField
+              name="school"
+              label={t("colSchool")}
+              placeholder={tc("all")}
+              defaultValue={filters.tenantId ?? ""}
+              options={schools.map((school) => ({
+                value: school.tenant_id,
+                label: `${school.school_name} (${school.code})`,
+              }))}
+              className="w-72"
+            />
+          </FilterCard>
+        }
+        usage={usage}
+        caption={t("title")}
+        schoolName={nameOf}
+      />
     </div>
   );
 }
@@ -230,18 +240,18 @@ export function FlagsScreen() {
     {
       key: "rollout",
       header: t("colRollout"),
-      className: "text-right tabular-nums",
+      numeric: true,
       cell: (row) =>
         row.rollout_percent === null ? (
           <Value>{null}</Value>
         ) : (
-          <Mono>{t("rolloutValue", { percent: row.rollout_percent })}</Mono>
+          <Figure>{t("rolloutValue", { percent: row.rollout_percent })}</Figure>
         ),
     },
     {
       key: "overrides",
       header: t("colOverrides"),
-      className: "text-right tabular-nums",
+      numeric: true,
       cell: (row) => (
         <Value>
           {formatCount(
@@ -399,7 +409,8 @@ export function FlagsScreen() {
         }
       />
       <Card title={t("globalTitle")} description={manage ? t("switchHint") : undefined}>
-        <DataTable
+        <DataTableV2
+          id="platform.flags-global"
           caption={t("globalTitle")}
           captionHidden
           columns={columns}
@@ -410,7 +421,8 @@ export function FlagsScreen() {
         />
       </Card>
       <Card title={t("overridesTitle")}>
-        <DataTable
+        <DataTableV2
+          id="platform.flags-overrides"
           caption={t("overridesTitle")}
           captionHidden
           columns={overrideColumns}
@@ -537,11 +549,11 @@ export function FleetScreen({ status = "" }: { status?: string }) {
     {
       key: "count",
       header: t("colDeployments"),
-      className: "text-right tabular-nums",
+      numeric: true,
       cell: (row) => (
-        <Mono>
+        <Figure>
           <Value>{formatCount(row.deployments, locale)}</Value>
-        </Mono>
+        </Figure>
       ),
     },
   ];
@@ -565,7 +577,8 @@ export function FleetScreen({ status = "" }: { status?: string }) {
         />
       </FilterCard>
       <Card title={t("deploymentsTitle")}>
-        <DataTable
+        <DataTableV2
+          id="platform.fleet-deployments"
           caption={t("deploymentsTitle")}
           captionHidden
           columns={columns}
@@ -577,7 +590,8 @@ export function FleetScreen({ status = "" }: { status?: string }) {
         <ShowMore list={deploymentList} />
       </Card>
       <Card title={t("versionsTitle")}>
-        <DataTable
+        <DataTableV2
+          id="platform.fleet-versions"
           caption={t("versionsTitle")}
           captionHidden
           columns={versionColumns}
@@ -830,7 +844,8 @@ export function BreakGlassScreen() {
         }
       />
       <Alert tone="info">{t("m1Note")}</Alert>
-      <DataTable
+      <DataTableV2
+        id="platform.break-glass"
         caption={t("title")}
         captionHidden
         columns={columns}
@@ -1010,54 +1025,58 @@ export function PlatformAuditScreen({ filters = {} }: { filters?: PlatformAuditF
       ) : null}
       <ApiErrorAlert error={verify.error ?? undefined} />
       <ApiErrorAlert error={exportError} />
-      <FilterCard
-        clearHref={
-          filters.actor || filters.action || filters.tenantId || filters.from || filters.to
-            ? "/platform/audit"
-            : undefined
+      <DataTableV2
+        toolbar={
+          <FilterCard
+            bare
+            clearHref={
+              filters.actor || filters.action || filters.tenantId || filters.from || filters.to
+                ? "/platform/audit"
+                : undefined
+            }
+          >
+            <TextField
+              name="actor"
+              label={t("filterOperator")}
+              hint={t("filterOperatorHint")}
+              defaultValue={filters.actor ?? ""}
+              className="w-80"
+              spellCheck={false}
+            />
+            <TextField
+              name="action"
+              label={t("colAction")}
+              defaultValue={filters.action ?? ""}
+              className="w-56"
+            />
+            <SelectField
+              name="school"
+              label={t("colSchool")}
+              placeholder={tc("all")}
+              defaultValue={filters.tenantId ?? ""}
+              options={schools.map((school) => ({
+                value: school.tenant_id,
+                label: `${school.school_name} (${school.code})`,
+              }))}
+              className="w-64"
+            />
+            <TextField
+              name="from"
+              type="date"
+              label={t("from")}
+              defaultValue={filters.from ?? ""}
+              className="w-44"
+            />
+            <TextField
+              name="to"
+              type="date"
+              label={t("to")}
+              defaultValue={filters.to ?? ""}
+              className="w-44"
+            />
+          </FilterCard>
         }
-      >
-        <TextField
-          name="actor"
-          label={t("filterOperator")}
-          hint={t("filterOperatorHint")}
-          defaultValue={filters.actor ?? ""}
-          className="w-80"
-          spellCheck={false}
-        />
-        <TextField
-          name="action"
-          label={t("colAction")}
-          defaultValue={filters.action ?? ""}
-          className="w-56"
-        />
-        <SelectField
-          name="school"
-          label={t("colSchool")}
-          placeholder={tc("all")}
-          defaultValue={filters.tenantId ?? ""}
-          options={schools.map((school) => ({
-            value: school.tenant_id,
-            label: `${school.school_name} (${school.code})`,
-          }))}
-          className="w-64"
-        />
-        <TextField
-          name="from"
-          type="date"
-          label={t("from")}
-          defaultValue={filters.from ?? ""}
-          className="w-44"
-        />
-        <TextField
-          name="to"
-          type="date"
-          label={t("to")}
-          defaultValue={filters.to ?? ""}
-          className="w-44"
-        />
-      </FilterCard>
-      <DataTable
+        id="platform.audit"
         caption={t("title")}
         captionHidden
         columns={columns}

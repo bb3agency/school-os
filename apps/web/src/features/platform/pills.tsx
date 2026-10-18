@@ -32,11 +32,11 @@ export function TierTag({ tier }: { tier: "shared" | "dedicated" }) {
   );
 }
 
-/** Timestamp in mono (fleet, audit, heartbeats); "—" when there is none. */
+/** Timestamp in the figures face (fleet, audit, heartbeats); "—" when there is none. */
 export function MonoTime({ value }: { value: string | null | undefined }) {
   const text = formatDateTime(value);
   return text ? (
-    <time dateTime={value ?? undefined} className="font-mono text-xs whitespace-nowrap text-ink">
+    <time dateTime={value ?? undefined} className="num text-sm whitespace-nowrap text-ink">
       {text}
     </time>
   ) : (
@@ -44,7 +44,12 @@ export function MonoTime({ value }: { value: string | null | undefined }) {
   );
 }
 
-/** Money as the API sends it, in mono tabular figures (plans, invoices). */
+/** Identifiers in mono (plan version, audit sequence): docs/17 keeps mono for IDs only. */
 export function Mono({ children }: { children: ReactNode }) {
   return <span className="font-mono text-sm whitespace-nowrap tabular-nums">{children}</span>;
+}
+
+/** Money, counts and rates in SOS Figures (tabular digits and ₹; docs/17 §3.1). */
+export function Figure({ children }: { children: ReactNode }) {
+  return <span className="num text-sm whitespace-nowrap">{children}</span>;
 }

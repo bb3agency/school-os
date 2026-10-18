@@ -17,7 +17,8 @@ export const sidebarThemes: Record<
   },
   platform: {
     // .platform-chrome switches the focus ring to amber on the dark neutral chrome.
-    surface: "platform-chrome bg-platform text-platform-ink",
+    // A 2px amber marker along the top edge continues the top bar's (AppShell).
+    surface: "platform-chrome border-t-2 border-t-platform-accent bg-platform text-platform-ink",
     brand: "text-platform-ink hover:bg-platform-hover",
     control: "text-platform-muted hover:bg-platform-hover hover:text-platform-ink",
     divider: "border-platform-hover",

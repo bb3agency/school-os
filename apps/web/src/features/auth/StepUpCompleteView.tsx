@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { useEffect } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
+import { Icon } from "@/components/ui/Icon";
 import { STEP_UP_CHANNEL, STEP_UP_COMPLETE } from "@/lib/bff/step-up";
 
 /**
@@ -25,8 +26,11 @@ export function StepUpCompleteView() {
   }, []);
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">{t("completeTitle")}</h1>
+    <div className="mx-auto max-w-xl space-y-4">
+      <span className="flex size-12 items-center justify-center rounded-full bg-success-soft text-success-ink">
+        <Icon name="check" className="size-6" />
+      </span>
+      <h1 className="text-2xl font-semibold text-ink">{t("completeTitle")}</h1>
       <Alert tone="success">{t("completeBody")}</Alert>
       <Button variant="secondary" onClick={() => window.close()}>
         {t("closeWindow")}

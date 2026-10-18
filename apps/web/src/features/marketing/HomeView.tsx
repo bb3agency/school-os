@@ -136,7 +136,7 @@ export function HomeView({ settings }: { settings: MarketingSettings }) {
               eyebrow={t("home.how.eyebrow")}
               title={t("home.how.title")}
             />
-            <Illustration name="office-register" className="max-w-md" />
+            <Illustration name="office-register" className="w-full max-w-md" />
           </div>
           <Reveal as="ol" stagger className="mk-ruled border-y border-border lg:mt-2">
             {STEPS.map((step, index) => (

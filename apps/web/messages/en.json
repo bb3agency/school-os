@@ -6096,10 +6096,19 @@
       "dialog": "Dialog",
       "icons": "Icons",
       "telugu": "Telugu",
-      "chat": "Ask chat"
+      "chat": "Ask chat",
+      "paper": "Register paper (public pages)",
+      "figures": "Figures",
+      "console": "Console components",
+      "illustrations": "Illustrations"
     },
-    "sidebarNote": "The one sidebar of the school app (white) and the platform console (dark violet): brand, school or badge, grouped menu with the current page marked, signed-in account. From lg it sits beside the page and can be made compact; below lg it opens as the menu drawer. docs/17 §5.2 has the rules.",
-    "chatNote": "Ask the school as a chat (docs/17 §5.3): the question bubble, the answer with its Worked-for summary, markdown, citation chips (focus one to see its source), source cards, actions with the version switcher, follow-up chips, and the live status line of an answer still being prepared."
+    "sidebarNote": "The one sidebar of the school app (on the canvas) and the operator console (dark neutral with an amber marker): brand, school or badge, grouped menu with the current page marked, signed-in account. From lg it sits beside the page and can be made compact; below lg it opens as the menu drawer. docs/17 §5.2 has the rules.",
+    "chatNote": "Ask the school as a chat (docs/17 §5.3): the question bubble, the answer with its Worked-for summary, markdown, citation chips (focus one to see its source), source cards, actions with the version switcher, follow-up chips, and the live status line of an answer still being prepared.",
+    "paperNote": "Direction B for the marketing site and the parent and certificate check pages: paper, ruled hairlines, one ledger green and Instrument Serif headings. The staff app stays on the Quiet ledger tokens above.",
+    "consoleNote": "The record list with its toolbar, filter chips, row menu, selection and paging; a multi-step job with the error summary and the save bar; the menu, popover, drawer and toast. Try them with the keyboard.",
+    "illustrationsNote": "Line drawings of a school office, served as images from SchoolOS itself. Decorative: the words beside them say the same, and they are hidden in Windows high contrast mode.",
+    "emptyIllustrated": "No support tickets yet",
+    "emptyIllustratedBody": "An empty state with a drawing, for first use and for pages outside a school."
   },
   "admin": {
     "nav": {

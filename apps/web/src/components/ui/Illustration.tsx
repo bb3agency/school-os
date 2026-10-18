@@ -49,7 +49,7 @@ export function Illustration({
       height={height}
       loading={priority ? "eager" : "lazy"}
       decoding="async"
-      className={cn("sos-illustration block h-auto w-full", className)}
+      className={cn("sos-illustration block h-auto max-w-full", className ?? "w-full")}
     />
   );
 }
