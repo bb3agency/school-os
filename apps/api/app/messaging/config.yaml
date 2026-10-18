@@ -38,6 +38,9 @@ keywords:
   # The quick-reply button "Stop messages" on every business-initiated template sends this
   # payload (FR-MSG-010).
   stop_button_payload: SOS_STOP
+  # Labels of that quick reply on version 1 templates (sent before owner decision D32 removed
+  # the button): a tap on an old message still stops messages.
+  stop_button_labels: [Stop messages, సందేశాలు ఆపండి]
 
 # Automatic reply to any other inbound message: at most one per number per IST day, inside the
 # open service window; the inbound text is never stored (ADR-0043 decision 9, FR-MSG-018).

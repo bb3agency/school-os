@@ -1522,8 +1522,6 @@ def _prepare(
             body_values=values,
             url_suffix=url_suffix if "url" in buttons else None,
             url_button_index=buttons.index("url") if "url" in buttons else None,
-            stop_button_index=buttons.index("stop") if "stop" in buttons else None,
-            stop_payload=load_config().keywords.stop_button_payload,
         )
     return _Prepared(
         message_id=message.id,

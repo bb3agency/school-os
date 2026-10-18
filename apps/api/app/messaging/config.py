@@ -74,6 +74,7 @@ class KeywordConfig(_Model):
     stop: tuple[str, ...] = Field(min_length=1)
     join: tuple[str, ...] = Field(min_length=1)
     stop_button_payload: str = Field(pattern=r"^[A-Z_]{3,32}$")
+    stop_button_labels: tuple[str, ...] = ()
 
 
 class SendingConfig(_Model):

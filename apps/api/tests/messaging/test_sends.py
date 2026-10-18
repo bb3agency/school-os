@@ -104,7 +104,7 @@ def test_US_2204_preview_confirm_send_and_report(  # noqa: PLR0915 - one end-to-
     assert out.get("sent", 0) >= 1
     sent = _sent_to(mobile)
     assert len(sent) == 1
-    assert sent[0]["name"].startswith("sos_school_notice_v1_")
+    assert sent[0]["name"].startswith("sos_school_notice_v2_")
     assert sent[0]["url_suffix"]  # the parent token, in the URL button only
     assert sent[0]["url_suffix"] not in " ".join(sent[0]["values"])
     assert _sent_to(other_mobile) == []
@@ -369,7 +369,7 @@ def test_US_2207_absence_alerts_once_a_day_for_opted_in_guardians(
     sends.send_due(school.tenant_id, now=S.at(11, 45))
     sent = _sent_to(mobile)
     assert len(sent) == 1
-    assert sent[0]["name"].startswith("sos_absence_alert_v1_")
+    assert sent[0]["name"].startswith("sos_absence_alert_v2_")
     assert sent[0]["values"][1] == "Synthetica"  # the first name only
     assert sent[0]["values"][2] == S.today().strftime("%d/%m/%Y")
     auto = api.call(school.people["principal"], "GET", "/api/v1/messaging/automatic")
