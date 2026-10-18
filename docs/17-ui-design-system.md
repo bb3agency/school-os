@@ -2,8 +2,8 @@
 
 | Field            | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Version          | 1.0 · 2026-10-18 |
-| Changes          | 1.0: "Quiet ledger" (owner decisions 2026-10-18; docs/research/2026-10-ui/report.md §6.1, §12): OKLCH warm neutral tokens behind the same names, one ink-blue accent, fixed status colours, one flat canvas (no gradient), hairline cards with shadows only on overlays, SOS Figures (Inter digits and ₹, tabular) for numbers, sentence-case group labels, density toggle (§3.4), wordmark (§3.5); shell: 240/56px sidebar, 48px top bar with "Where you are", Ctrl/⌘+K command palette, preferences menu, Ctrl+\ compact sidebar, phone bottom bars for teachers and principals, dark neutral operator chrome with amber (§5.2, §5.9); plain PageHeader; new components Menu, Popover, Drawer, Toaster, Pagination, ErrorSummary, Steps, SaveBar, FilterChips, Kbd, DataTableV2, CommandPalette (§4); page recipe for the redesign wave (§5); contrast table recomputed from OKLCH (§7). 0.9: mobile and touch (§5.7): breakpoints, 44px touch targets on coarse pointers, stacked record lists and reflowing field tables below 640px, dialogs as bottom sheets, safe areas, keyboard-safe composer, tap to edit in the sheet grid, tap citations. 0.8: calmer app (design-research review, owner decisions): solid tinted status pills instead of gradients (§4, §7); a near-neutral canvas behind dense record screens, chosen once by the shell (§3.2); separate app and marketing radius scales (§3); "Ask on WhatsApp" beside "Talk to us" (`SOS_PUBLIC_WHATSAPP_NUMBER`) and the pricing page as a packaging explainer without prices (§5.6); consequence line in decision dialogs and numeric table columns (§4). 0.7: fixes from the review of the motion and marketing work: reveals use the Web Animations API with a root margin (never stuck hidden at high zoom, shown at once for keyboard focus), the phone menu closes when focus or a click leaves it, fading panels are `inert`, Motion features load after hydration, the marketing press feedback respects reduced motion and focus clears the sticky header; e2e for every public page. 0.6: §5.6 public marketing pages (layout, settings, reveal pattern, dedicated hosts); §5.5 motion (tokens shared with Motion, CSP-safe pattern, what moves and what never does, reduced motion), §3.1 type scale and weights for PP Mori, §2 rule 6, component states (Button loading, dialog exits). 0.5: §5.4 English first, Telugu hidden behind `SOS_TELUGU_ENABLED` (ADR-0036); §2 rules 2 and 8, §3 fonts. 0.4: §5.3 Ask chat patterns (anatomy, motion tokens, reduced motion, a11y), sidebar sub-lists (`sub`, `subActivePattern`). 0.3: §5.2 one sidebar (the icon rail and the separate list panel are gone): anatomy, compact mode, drawer, themes, a11y; §7 sidebar contrast pairs. 0.2: §5.1 responsive layout (spacing scale, menu drawer, TableScroll, dialogs, checks). 0.1: new document: tokens, fonts, primitives, shells, do/don't, contrast table (UI refresh foundation) |
+| Version          | 1.1 · 2026-10-18 |
+| Changes          | 1.1: page wave (operator console, public, marketing, session pages): Direction B "Register paper" on the marketing site and the parent and verification pages (§5.6, §5.8); line-interior illustrations in `public/illustrations` with `Illustration` and `EmptyState illustration` (§5.6); Lenis smooth wheel scrolling on the home page only, with its dependency check (§5.6); operator console lists on `DataTableV2` with filters in the toolbar, SOS Figures for money and times, a 2px amber marker on the operator chrome (§5.2); plain `MinimalShell`; `/dev/ui` shows the v1.0 components, figures, Register paper and every illustration. 1.0: "Quiet ledger" (owner decisions 2026-10-18; docs/research/2026-10-ui/report.md §6.1, §12): OKLCH warm neutral tokens behind the same names, one ink-blue accent, fixed status colours, one flat canvas (no gradient), hairline cards with shadows only on overlays, SOS Figures (Inter digits and ₹, tabular) for numbers, sentence-case group labels, density toggle (§3.4), wordmark (§3.5); shell: 240/56px sidebar, 48px top bar with "Where you are", Ctrl/⌘+K command palette, preferences menu, Ctrl+\ compact sidebar, phone bottom bars for teachers and principals, dark neutral operator chrome with amber (§5.2, §5.9); plain PageHeader; new components Menu, Popover, Drawer, Toaster, Pagination, ErrorSummary, Steps, SaveBar, FilterChips, Kbd, DataTableV2, CommandPalette (§4); page recipe for the redesign wave (§5); contrast table recomputed from OKLCH (§7). 0.9: mobile and touch (§5.7): breakpoints, 44px touch targets on coarse pointers, stacked record lists and reflowing field tables below 640px, dialogs as bottom sheets, safe areas, keyboard-safe composer, tap to edit in the sheet grid, tap citations. 0.8: calmer app (design-research review, owner decisions): solid tinted status pills instead of gradients (§4, §7); a near-neutral canvas behind dense record screens, chosen once by the shell (§3.2); separate app and marketing radius scales (§3); "Ask on WhatsApp" beside "Talk to us" (`SOS_PUBLIC_WHATSAPP_NUMBER`) and the pricing page as a packaging explainer without prices (§5.6); consequence line in decision dialogs and numeric table columns (§4). 0.7: fixes from the review of the motion and marketing work: reveals use the Web Animations API with a root margin (never stuck hidden at high zoom, shown at once for keyboard focus), the phone menu closes when focus or a click leaves it, fading panels are `inert`, Motion features load after hydration, the marketing press feedback respects reduced motion and focus clears the sticky header; e2e for every public page. 0.6: §5.6 public marketing pages (layout, settings, reveal pattern, dedicated hosts); §5.5 motion (tokens shared with Motion, CSP-safe pattern, what moves and what never does, reduced motion), §3.1 type scale and weights for PP Mori, §2 rule 6, component states (Button loading, dialog exits). 0.5: §5.4 English first, Telugu hidden behind `SOS_TELUGU_ENABLED` (ADR-0036); §2 rules 2 and 8, §3 fonts. 0.4: §5.3 Ask chat patterns (anatomy, motion tokens, reduced motion, a11y), sidebar sub-lists (`sub`, `subActivePattern`). 0.3: §5.2 one sidebar (the icon rail and the separate list panel are gone): anatomy, compact mode, drawer, themes, a11y; §7 sidebar contrast pairs. 0.2: §5.1 responsive layout (spacing scale, menu drawer, TableScroll, dialogs, checks). 0.1: new document: tokens, fonts, primitives, shells, do/don't, contrast table (UI refresh foundation) |
 | Requirements     | NFR-A11Y-001 (WCAG 2.2 AA), NFR-I18N-001 (English; Telugu hidden while `SOS_TELUGU_ENABLED` is off, ADR-0036), SEC-010 (CSP, self-hosted assets)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Related          | 02-PRD §8 (UX principles), 13 §5 (TypeScript/Next.js standards), CLAUDE.md §10                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Code             | `apps/web/src/app/globals.css` (tokens), `apps/web/src/components/ui/` (primitives, exported from `index.ts`), `apps/web/src/components/console/` (CommandPalette, DataTableV2), `apps/web/src/components/shell/` (shells)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
@@ -486,8 +486,12 @@ storage the sidebar simply starts expanded.
 
 **Themes.** School: the sidebar and top bar sit on the canvas tone (so they read quieter than
 the white content) with hairlines. Operator console: dark neutral sidebar and top bar
-(`platform-chrome`: amber focus ring), amber mark, badge and active bar (owner decision
-2026-10-18). Pairs in §7.
+(`platform-chrome`: amber focus ring), amber mark, badge and active bar, and (v1.1) a 2px amber
+marker along the top edge of the top bar and the sidebar; the phone bottom bar uses the
+platform colours (owner decision 2026-10-18). Operator lists are `DataTableV2` with their
+filter form in the toolbar (`FilterCard bare`), per-table preferences under `platform.*` ids;
+money, counts, rates and times use SOS Figures (`Figure`, `numeric` columns), mono only for
+IDs (plan version, audit sequence). Pairs in §7.
 
 **Telugu.** Every label is in `messages/*.json` (`shell` namespace plus the existing nav keys);
 the language switch in the top bar shows only while Telugu is switched on (§5.4).
@@ -820,12 +824,24 @@ under it. Content column `max-w-7xl` inside
 Every grid and flex child in `.mk` may shrink (`min-width: 0`), so a wide illustration never
 pushes the page past a 360px screen.
 
-**Type.** PP Mori extralight (200) for the page `h1` at 40px and up only (thin strokes need a
-large size; ink on the canvas stays 14:1), regular (400) for section `h2`, semibold for `h3`;
-tight tracking on display sizes (`.mk-display`, `.mk-title`; normal spacing under `:lang(te)`).
-Instrument Serif for the one accent phrase in the home headline and step numbers; JetBrains Mono
-for eyebrows. Dark bands (`.mk-night`, #0b1220) use white (18.9:1) and `--mk-night-muted`
-#c3cbd8 (10.9:1 on #111827) with a white focus ring.
+**Direction B, "Register paper" (v1.1; report §6.2, decision §12.1).** `.mk` redefines the
+semantic colour tokens for the marketing scope, so every utility draws the paper palette: canvas
+paper `oklch(0.975 0.008 95)` #f8f7f1, sheet surface `oklch(0.995 0.004 95)`, ruled hairlines
+`oklch(0.89 0.012 95)`, warm ink `oklch(0.24 0.01 95)` (15.3:1), ink-muted 6.9:1, ink-subtle
+5.1:1, and ONE accent, ledger green `oklch(0.45 0.09 165)` #0e6549 (6.6:1; `primary`, `accent`,
+`brand`, `focus`, `info` all point at it). The primary button stays near-black (warm ink).
+Product mockups add `.mk-app`, which restores the app's Quiet ledger tokens: they show the real
+UI. The hero has no glows or grid: `.mk-grid` draws ruled register lines with a faint
+ledger-green margin line that fade out downwards; "How it works" is a ruled register of the three
+steps (`.mk-ruled`) beside the office illustration; the dark band (`.mk-night`) is flat ledger
+ink `oklch(0.27 0.035 165)` (white 14.9:1, `--mk-night-muted` 9.8:1) with a white focus ring.
+`features/marketing/register-paper.test.ts` recomputes these pairs.
+
+**Type.** Headlines are Instrument Serif 400 (`.mk-display` h1, `.mk-title` h2; slight optical
+tracking, balanced wrapping); the home headline's accent phrase is the serif italic in ledger
+green (latin italic file loaded by `MarketingShell` only). Under `:lang(te)` headings switch to
+the sans, semibold, normal spacing and line height 1.5, and nothing is slanted. Body is PP Mori;
+eyebrows are the sentence-case `.eyebrow` over a hairline.
 
 **Calls to action (owner decisions).** "Talk to us" is a plain `mailto:` link, shown only when
 `SOS_PUBLIC_CONTACT_EMAIL` is set; there is no form and no lead data. "Sign in" goes to
@@ -858,13 +874,52 @@ browser bundle; unset or invalid means that part is not shown, no placeholder an
 `/security`, `/pricing` and `/about` answer 404 and `/welcome` is a branded sign-in card only: a
 dedicated host is one school's own address, not a sales site.
 
-**Illustrations.** HTML, CSS and inline SVG only (`mockups.tsx`): crisp at any DPI, no image
+**Line illustrations (v1.1).** Five drawings in the line-interior style (skills-review.md §5),
+drawn for SchoolOS: `office-register` (a clerk in a saree writes in the admission register),
+`fee-counter` (an accountant hands a receipt to a parent and her daughter), `certificate-check`
+(a principal holds a certificate; a clerk checks its code on her phone), `timetable-board` (a
+teacher at the class timetable with two students), `records-almirah` (a clerk files a folder in
+a locked steel almirah). Indian clothing, mixed genders and ages, four skin tones; no
+religious, festival, flag or caste-coded imagery. One 1.6px warm-ink line, paper, wood and steel
+fills, the ledger green and amber as small accents only; no gradients, filters, opacity or text.
+Files are static SVG in `apps/web/public/illustrations/` (480×360 viewBox, a `<title>`,
+presentation attributes only, 7-12 KB each), served as `<img>` from `'self'` by
+`components/ui/Illustration` (decorative `alt=""` by default; `alt` only when the picture adds
+meaning), lazy unless `priority`. Decorative art is hidden under `forced-colors: active`
+(`.sos-illustration[alt=""]`, globals.css) and always prints. `EmptyState` takes
+`illustration` for first-use and session pages (keep the icon for no-results and in-table
+states). Used on the home page ("How it works"), the hero of /features, /pricing, /about and
+/security (from lg), the not-found and no-access pages and `/dev/ui`. The Docker image copies
+`public/` into the standalone output. `components/ui/illustrations.test.ts` lints every file
+(registered in `ILLUSTRATIONS`, at most 30 KB, no script, style, class, handlers, `href`,
+`url()`, `<image>`/`<use>`/`<foreignObject>`, gradients or opacity; colours only from the
+illustration palette). The MengTo kit scripts were not run; their lint rules were ported.
+
+**Product mockups.** HTML, CSS and inline SVG only (`mockups.tsx`): crisp at any DPI, no image
 requests, no style attributes. Each carries a "Sample data" tag, uses made-up values ("Sample
 student A"), sits in a `<figure>` whose picture is `aria-hidden` and whose `figcaption` (sr-only)
 describes it, and keeps AA contrast like real UI. Mockups and the home tile vignettes are
 cropped on purpose (truncated lines, a fixed-height tile window): the responsive e2e skips
 its clipped-text check inside `aria-hidden` content only; page overflow and screen edges are
 still checked.
+
+**Lenis smooth scrolling (home page only, owner request 2026-10-18).** `SmoothScroll`
+(`features/marketing/SmoothScroll.tsx`, client) is mounted by `HomeView` only: never in the staff
+app, the operator console or the parent and verification pages. It imports `lenis` after
+hydration (its own chunk), smooths the wheel only (`smoothWheel`, touch native, `anchors` off),
+is never created under `prefers-reduced-motion: reduce` (and destroyed if that is switched on,
+and on unmount). Keyboard and focus scrolling stay native. A pointer click on an in-page link
+glides there with `scrollTo` (honouring `scroll-margin-top` and the root's `scroll-padding-top`),
+then moves focus to the target and updates the address bar; keyboard activation and the skip
+link keep the browser's instant jump. Lenis writes styles only through the CSSOM
+(`element.style.setProperty`) and classes on `<html>`; its dist has no `<style>` injection, so
+`style-src 'self'` holds; the rules we need from `lenis/dist/lenis.css` live in
+`marketing.css`. Dependency check (CLAUDE.md §11, 2026-10-18): **lenis 1.3.26**, MIT
+(darkroomengineering/lenis, actively released: 1.3.27 on 2026-10-15, 2.0 in pre-release), pinned
+exactly; 1.3.26 was published 2026-08-05 (1.3.27 is younger than two weeks, so not taken); no
+runtime dependencies, React/Vue/Nuxt peers optional; `npm audit`: no advisory for lenis (the
+five existing high findings are the dev-only eslint-config-next chain). Test:
+`features/marketing/smooth-scroll.test.tsx`.
 
 **Motion** (design-engineering skills in `.claude/skills/`; purpose first, transform and opacity
 only, strong ease-out `cubic-bezier(0.23, 1, 0.32, 1)`):
@@ -1041,11 +1096,27 @@ Mobile-first (designed at 360 px, scales up), no sidebar, no sign-in, the school
 - **Expired/unknown:** one calm page: "This link has expired or is not valid. Ask the school office, or reply to the school's WhatsApp message, for a new one." No school name.
 - Every page footer: "Anyone with this link can see this page. Do not forward it."
 
+**As built (v1.1, Direction B).** `app/(public)/public.css`: paper `#f8f7f1`, sheet `#fefdfa`,
+ruled hairlines, warm ink, ledger green `#0e6549` for links, focus and the one button (the OKLCH
+tokens written as hex, because old Android WebViews may not parse `oklch()`). The school's name
+is the masthead in Instrument Serif (latin file only, about 21 KB, `font-display: swap`) over a
+double rule; the page heading is serif; Telugu pages keep the sans (no serif glyphs) with the
+self-hosted Telugu font. Each page is one ruled sheet with a faint ledger-green margin line; the
+forwarding warning in the footer is semibold. Still server-rendered with no client JavaScript,
+no Lenis or motion library, 44-52px controls, designed at 360px. Contrast pairs are recomputed
+in `features/marketing/register-paper.test.ts`.
+
 #### Certificate verification (public origin; ADR-0045)
 
 On the separate verification host (`SOS_VERIFY_BASE_URL`, for example `verify.schoolos.in`; D29), `/v` shows a single code box (16 characters, auto-groups as typed, paste-friendly) and "Check"; `/v/{code}` shows a status banner (green "Valid", amber "Duplicate copy n", red "Cancelled on …") and, for valid ones, the printed values as a two-column definition list in the certificate's order, with "This page shows only what the certificate prints." Works without JavaScript (server-rendered form).
 
 **As built (R2-1A, 2026-10-17).** `/v` is a server-rendered form (one monospace code box, 44 px controls, `autocomplete="off"`, the hint "16 letters and numbers … Dashes and spaces do not matter", and the line that certificates are found only by code) posting to `/v/check`, which redirects (303) to `/v/{code}` or back with a field error; a code typed with dashes or in lower case is redirected to its canonical form. `/v/{code}` shows the status banner in words and colour (green "Valid: issued by <school> on <date>", amber "Duplicate copy n of serial …", red "Cancelled on …"), the school, serial, date of issue and code, then the printed lines as a definition list in the certificate's order ("Left blank on the certificate" for blank lines), "This page shows only what the certificate prints." and "Anyone with this code can see what the certificate shows."; unknown codes get one "We could not find a certificate with this code. Check the code or contact the school that issued it." page (404). English only (no school or language is known before the code is found). Not built: grouping the code while typing (needs client JavaScript). Staff side: the certificate detail has an **Online check** card (code in four groups, verification link, "Checked n times", last checked, how the code was made; principal: "Add verification code" for certificates from before R2, "Withdraw code" with a reason, both step-up); school settings has a **Transfer certificate format** card (current format, an "unconfirmed layout" warning while `verified` is false, switch buttons, and the religion-and-caste switch with its explanation); the issue screen shows "Format: Andhra Pradesh TC" with the same warning, each preview line's origin ("You type it", "Worked out from the record", "Printed only when verified", "Restricted") and "Typed below", "Not printed" or "Blank, filled by hand" in place of a value, and the format's inputs with the API's labels (working days as `inputmode="numeric"`).
+
+**Verdict (v1.1).** The status banner has a 6px start border, its own icon (check, copies,
+cross; `features/public/PublicIcon.tsx`, inline SVG, `aria-hidden`) and the words; the facts
+and printed lines are ruled register rows; blank lines read "Left blank on the certificate" in
+muted italics. The masthead is "SchoolOS" with "Certificate check for receiving schools,
+offices and employers".
 
 #### Ask usage (C25)
 
@@ -1194,6 +1265,14 @@ and the switch have no text inside when empty, so they use `border-control` (3:1
 
 ## 8. Open points
 
+- v1.1 page wave (operator console, public, marketing, session pages), left open: the
+  operator forms (provision, plans, announcements, subscriptions) keep their inline errors and
+  existing buttons; they do not yet use `ErrorSummary` + `SaveBar` + `Steps` (the provision
+  stepper still shows its own progress); the operator lists keep their URL filter forms, so no
+  `FilterChips` there yet; the dev-mode render of `notFound()` under the `(public)` root layout
+  is blank in `next dev` (production renders the uniform page; unchanged by this wave); the
+  illustrations were drawn and reviewed by an agent, an owner or illustrator review is still
+  worthwhile (figures are simple, faces minimal).
 - v1.0 foundation (2026-10-18), for the page-redesign wave: screens still use their own layouts
   on the new tokens; each list screen moves to `DataTableV2` + `Pagination` + `FilterChips`,
   each form to `ErrorSummary` + `SaveBar` (+ `Steps`), per §5. Not built yet: palette student
