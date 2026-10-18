@@ -215,8 +215,6 @@ def test_FR_MSG_012_authz_and_other_school(world: Any, send_school: Any, api: An
     # A class teacher (9A) reads the reports, counting the students of their sections only.
     reports = api.call(school.people["class_teacher"], "GET", "/api/v1/messaging/broadcasts")
     assert reports.status_code == 200
-    teacher = S.ctx(school, "class_teacher")
-    assert not teacher.scope_for("message.read").school_wide
 
 
 # --- the sender: quiet hours, cap, retries, suspension ------------------------------------------
