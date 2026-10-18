@@ -259,8 +259,8 @@ describe("opt-in page (ADR-0046 decision 2, ADR-0044 decision 4)", () => {
     expect(text).toContain("You get these");
     expect(text).toContain("Stopped");
     expect(text).toContain("Not joined");
-    expect(text).toContain("reply STOP");
-    expect(text).toContain("You stopped these by sending STOP.");
+    expect(text).not.toContain("STOP");
+    expect(text).toContain("You asked the school to stop these messages.");
     const form = container.querySelector('form[action="/p/optin"]');
     expect(form?.getAttribute("method")).toBe("post");
     const school = screen.getByRole("radio", { name: "The school's choice (English)" });

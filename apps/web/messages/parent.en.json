@@ -91,8 +91,7 @@
       "opted_out": "Stopped",
       "not_asked": "Not joined"
     },
-    "stoppedByYou": "You stopped these by sending STOP.",
-    "howToStop": "To stop all messages, reply STOP to the school's WhatsApp message.",
+    "stoppedByYou": "You asked the school to stop these messages.",
     "howToJoin": "To get messages you have not joined, ask the school office for a joining slip.",
     "languageTitle": "Read messages in",
     "languageEn": "English",
