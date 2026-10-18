@@ -341,6 +341,24 @@ describe("flags list (US-1705, US-1706, US-1708; FR-EW-009, FR-EW-015)", () => {
     );
   });
 
+  it("shows active filters as chips; removing one asks for the default again", async () => {
+    signedIn(TEACHER);
+    stub.routes["GET /bff/api/v1/insights/flags"] = () => page([]);
+    renderWithIntl(<FlagsScreen />);
+    expect(await screen.findByText(en.insights.emptyTitle)).toBeVisible();
+    await userEvent.selectOptions(screen.getByLabelText(en.insights.statusLabel), "closed");
+    const chip = await screen.findByRole("button", {
+      name: `Remove filter ${en.insights.statusLabel}: ${en.insights.filter.closed}`,
+    });
+    await userEvent.click(chip);
+    await waitFor(() =>
+      expect(
+        stub.callsTo("GET /bff/api/v1/insights/flags").at(-1)?.url.searchParams.get("status"),
+      ).toBeNull(),
+    );
+    expect(screen.getByLabelText(en.insights.statusLabel)).toHaveValue("active");
+  });
+
   it("says who can see flags when the user may not", async () => {
     signedIn(["student.read_basic"]);
     renderWithIntl(<FlagsScreen />);
@@ -518,6 +536,29 @@ describe("attendance (US-1701, US-1702; FR-ATT-001..004)", () => {
         .callsTo(`GET /bff/api/v1/sections/${SECTION}/attendance`)[0]
         ?.url.searchParams.get("date"),
     ).toBe(todayIst());
+  });
+
+  it("counts as you tap, marks everyone present again and keeps Save in the sticky bar", async () => {
+    signedIn(["attendance.read", "attendance.record"]);
+    stub.routes[`GET /bff/api/v1/sections/${SECTION}/attendance`] = () => Response.json(day());
+    renderWithIntl(<AttendanceScreen />);
+    const picker = await screen.findByLabelText(en.attendance.section);
+    await waitFor(() => expect(within(picker).getAllByRole("option").length).toBeGreaterThan(1));
+    await userEvent.selectOptions(picker, SECTION);
+    expect(await screen.findByText("2 present")).toBeVisible();
+    expect(screen.getByText("0 absent")).toBeVisible();
+    // A day not marked yet is not saved, even with everyone present.
+    expect(screen.getByText(en.ui.saveBar.unsaved)).toBeVisible();
+    const ravi = screen.getByRole("group", { name: "Attendance of Synthetica Ravi" });
+    await userEvent.click(within(ravi).getByRole("radio", { name: en.attendance.status.late }));
+    expect(screen.getByText("1 present")).toBeVisible();
+    expect(screen.getByText("1 late")).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: en.attendance.allPresent }));
+    expect(screen.getByText("2 present")).toBeVisible();
+    expect(within(ravi).getByRole("radio", { name: en.attendance.status.present })).toBeChecked();
+    const save = screen.getByRole("button", { name: en.attendance.save });
+    expect(save).toHaveAttribute("type", "submit");
+    expect(save.closest("[data-dirty]")).not.toBeNull();
   });
 
   it("imports a sheet: problems name the cell, a clean preview saves as an import", async () => {
@@ -721,9 +762,94 @@ describe("marks (US-1703; FR-MRK-001..003)", () => {
     await userEvent.type(screen.getByLabelText("Marks of Synthetica Ravi"), "142");
     await userEvent.click(screen.getByRole("button", { name: en.marks.entry.save }));
     expect(await screen.findByText(en.marks.entry.problem.marksInvalid)).toBeVisible();
+    // The box itself says what to fix.
+    expect(screen.getByLabelText("Marks of Synthetica Ravi")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    expect(screen.getByText("Type a number from 0 to 100, or AB.")).toBeVisible();
     expect(stub.callsTo(`POST /bff/api/v1/sections/${SECTION}/exams/${EXAM}/marks`)).toHaveLength(
       0,
     );
+  });
+
+  it("on a phone shows one student at a time and saves the same entries", async () => {
+    const EXAM = "0192f3a4-0000-7000-8000-00000000ea01";
+    const exam = {
+      id: EXAM,
+      academic_year_id: YEAR,
+      name: "Formative assessment 1",
+      held_on: "2026-08-10",
+      version: 1,
+    };
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes("40rem"),
+      media: query,
+      onchange: null,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      dispatchEvent: () => false,
+    })) as typeof window.matchMedia;
+    try {
+      signedIn(["marks.read", "marks.record"]);
+      stub.routes["GET /bff/api/v1/exams"] = () => Response.json([exam]);
+      stub.routes[`GET /bff/api/v1/sections/${SECTION}/exams/${EXAM}/marks`] = () =>
+        Response.json({
+          section: section(),
+          exam,
+          subjects: [],
+          students: day().students.map((row) => ({
+            student: row.student,
+            marks: [],
+            percent: null,
+          })),
+        });
+      stub.routes[`POST /bff/api/v1/sections/${SECTION}/exams/${EXAM}/marks`] = () =>
+        Response.json({ written: 2, unchanged: 0, dates: [] });
+      renderWithIntl(<MarksScreen />);
+      const picker = await screen.findByLabelText(en.marks.section);
+      await waitFor(() => expect(within(picker).getAllByRole("option").length).toBeGreaterThan(1));
+      await userEvent.selectOptions(picker, SECTION);
+      const exams = screen.getByLabelText(en.marks.exam);
+      await waitFor(() => expect(within(exams).getAllByRole("option").length).toBeGreaterThan(1));
+      await userEvent.selectOptions(exams, EXAM);
+      await userEvent.type(await screen.findByLabelText(en.marks.entry.subject), "Telugu");
+      expect(screen.getByText("Student 1 of 2")).toBeVisible();
+      expect(screen.getByRole("button", { name: en.marks.entry.previous })).toBeDisabled();
+      await userEvent.type(screen.getByLabelText("Marks of Synthetica Ravi"), "42.5");
+      expect(screen.queryByLabelText("Marks of Synthetica Anjali")).toBeNull();
+      await userEvent.click(screen.getByRole("button", { name: en.marks.entry.next }));
+      expect(screen.getByText("Student 2 of 2")).toBeVisible();
+      await userEvent.type(screen.getByLabelText("Marks of Synthetica Anjali"), "ab");
+      await userEvent.click(screen.getByRole("button", { name: en.marks.entry.save }));
+      await waitFor(() =>
+        expect(
+          stub.callsTo(`POST /bff/api/v1/sections/${SECTION}/exams/${EXAM}/marks`),
+        ).toHaveLength(1),
+      );
+      const call = stub.callsTo(`POST /bff/api/v1/sections/${SECTION}/exams/${EXAM}/marks`)[0];
+      expect(JSON.parse(call?.body ?? "{}").entries).toEqual([
+        {
+          student_id: STUDENT_ID,
+          subject: "Telugu",
+          max_marks: "100",
+          marks: "42.5",
+          absent: false,
+        },
+        {
+          student_id: OTHER_STUDENT,
+          subject: "Telugu",
+          max_marks: "100",
+          marks: null,
+          absent: true,
+        },
+      ]);
+    } finally {
+      window.matchMedia = original;
+    }
   });
 });
 

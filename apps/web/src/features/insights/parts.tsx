@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { Pill, type PillVariant } from "@/components/ui/Badge";
+import { Icon } from "@/components/ui/Icon";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { SelectField } from "@/components/ui/Select";
 import { Table, TableScroll, TBody, Td, Th, THead, Tr } from "@/components/ui/Table";
@@ -183,5 +184,10 @@ export function SheetIssues({ issues, total }: { issues: readonly SheetIssue[]; 
 /** The purpose limit, said where insights are shown (08 §4 PRV-003..005). */
 export function PurposeNote() {
   const t = useTranslations("insights");
-  return <p className="text-sm text-ink-muted">{t("purpose")}</p>;
+  return (
+    <p className="flex items-start gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink-muted">
+      <Icon name="shieldCheck" className="mt-0.5 size-4 shrink-0" />
+      <span>{t("purpose")}</span>
+    </p>
+  );
 }

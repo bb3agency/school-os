@@ -4,16 +4,17 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useRef, useState, type FormEvent } from "react";
 import * as z from "@/lib/zod";
+import { DataTableV2, type ColumnV2 } from "@/components/console";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ErrorSummary } from "@/components/ui/ErrorSummary";
 import { Field, TextAreaField, TextField } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SelectField } from "@/components/ui/Select";
-import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { PdfJobButton } from "@/features/exports/PdfJobButton";
 import { todayInIndia } from "@/features/change-requests/dates";
@@ -85,6 +86,11 @@ export function buildConsentSchema(today = todayInIndia()) {
     });
 }
 
+/** The id of a form field (error summary links). */
+function fieldId(field: string): string {
+  return `consent-${field}`;
+}
+
 /** Server field → form field. */
 function formField(field: string): string {
   const name = field.split(".").pop() ?? field;
@@ -127,7 +133,7 @@ export function StudentConsentScreen({ studentId }: { studentId: string }) {
   if (consent.isPending) return <LoadingState label={tc("loading")} />;
   if (!consent.data) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader breadcrumb={crumbs} title={t("title")} />
         <ApiErrorAlert error={consent.error} />
       </div>
@@ -140,53 +146,55 @@ export function StudentConsentScreen({ studentId }: { studentId: string }) {
     .join(" · ");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader breadcrumb={crumbs} title={t("title")} description={subtitle || undefined} />
-      <Card title={t("currentTitle")}>
-        <div className="flex flex-wrap items-center gap-3">
-          <ConsentStatusPill status={data.status} />
-          {data.current?.decided_on ? (
-            <span className="text-sm">
-              {t("decidedOn", { date: formatDate(data.current.decided_on) ?? "" })}
-            </span>
+      <div className="grid gap-4 md:grid-cols-2 md:items-start">
+        <Card title={t("currentTitle")}>
+          <div className="flex flex-wrap items-center gap-3">
+            <ConsentStatusPill status={data.status} />
+            {data.current?.decided_on ? (
+              <span className="text-sm">
+                {t("decidedOn", { date: formatDate(data.current.decided_on) ?? "" })}
+              </span>
+            ) : null}
+          </div>
+          {data.status === "refused" || data.status === "withdrawn" ? (
+            <p className="mt-3 text-sm">{t("refusedNote")}</p>
           ) : null}
-        </div>
-        {data.status === "refused" || data.status === "withdrawn" ? (
-          <p className="mt-3 text-sm">{t("refusedNote")}</p>
-        ) : null}
-        {can([APAAR_READ, APAAR_RECORD]) ? (
-          <p className="mt-4 flex flex-wrap gap-x-5 gap-y-2" data-print="hide">
-            <a
-              href={studentFormHref(studentId)}
-              target="_blank"
-              rel="noopener"
-              className="font-semibold text-primary underline-offset-4 hover:underline"
-            >
-              {t("printForm")}
-            </a>
-            {FORM_LANGUAGES.map((language) => (
+          {can([APAAR_READ, APAAR_RECORD]) ? (
+            <p className="mt-4 flex flex-wrap gap-x-5 gap-y-2" data-print="hide">
               <a
-                key={language}
-                href={studentFormHref(studentId, language)}
+                href={studentFormHref(studentId)}
                 target="_blank"
                 rel="noopener"
-                lang={language}
-                className="text-primary underline-offset-4 hover:underline"
+                className="font-semibold text-primary underline-offset-4 hover:underline"
               >
-                {t(`printIn.${language}`)}
+                {t("printForm")}
               </a>
-            ))}
-            <PdfJobButton
-              label={t("pdfForm")}
-              request={{ kind: "apaar_consent_forms", body: { student_id: studentId } }}
-            />
-          </p>
-        ) : null}
-      </Card>
+              {FORM_LANGUAGES.map((language) => (
+                <a
+                  key={language}
+                  href={studentFormHref(studentId, language)}
+                  target="_blank"
+                  rel="noopener"
+                  lang={language}
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  {t(`printIn.${language}`)}
+                </a>
+              ))}
+              <PdfJobButton
+                label={t("pdfForm")}
+                request={{ kind: "apaar_consent_forms", body: { student_id: studentId } }}
+              />
+            </p>
+          ) : null}
+        </Card>
 
-      {can(APAAR_RECORD) ? (
-        <RecordDecision studentId={studentId} current={data.status} version={data.version} />
-      ) : null}
+        {can(APAAR_RECORD) ? (
+          <RecordDecision studentId={studentId} current={data.status} version={data.version} />
+        ) : null}
+      </div>
 
       <History entries={data.history} />
     </div>
@@ -196,13 +204,13 @@ export function StudentConsentScreen({ studentId }: { studentId: string }) {
 function History({ entries }: { entries: readonly ConsentEntry[] }) {
   const t = useTranslations("apaar.student");
   const ta = useTranslations("apaar");
-  const columns: Column<ConsentEntry>[] = [
+  const columns: ColumnV2<ConsentEntry>[] = [
     {
       key: "recorded",
       stack: "field",
       header: t("colRecorded"),
       cell: (row) => (
-        <span className="font-mono text-xs whitespace-nowrap text-ink-muted">
+        <span className="num text-xs whitespace-nowrap text-ink-muted">
           {formatDateTime(row.recorded_at)}
         </span>
       ),
@@ -222,7 +230,11 @@ function History({ entries }: { entries: readonly ConsentEntry[] }) {
     {
       key: "date",
       header: t("colDate"),
-      cell: (row) => <Value>{row.decided_on ? formatDate(row.decided_on) : null}</Value>,
+      cell: (row) => (
+        <span className="num">
+          <Value>{row.decided_on ? formatDate(row.decided_on) : null}</Value>
+        </span>
+      ),
     },
     {
       key: "form",
@@ -246,7 +258,8 @@ function History({ entries }: { entries: readonly ConsentEntry[] }) {
       <h2 id="consent-history" className="text-lg font-semibold text-ink">
         {t("historyTitle")}
       </h2>
-      <DataTable
+      <DataTableV2
+        id="apaar-history"
         stacked
         caption={t("historyTitle")}
         captionHidden
@@ -284,6 +297,7 @@ function RecordDecision({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<unknown>(undefined);
   const [step, setStep] = useState<Step>("idle");
+  const [attempt, setAttempt] = useState(0);
   const [done, setDone] = useState(false);
   const keys = useRef({
     upload: newIdempotencyKey(),
@@ -329,9 +343,8 @@ function RecordDecision({
     setError(undefined);
     setDone(false);
     if (!parsed.success || Object.keys(next).length > 0) {
-      requestAnimationFrame(() =>
-        form.querySelector<HTMLElement>("[aria-invalid='true']")?.focus(),
-      );
+      // The error summary takes focus and links to each field (docs/17 §4.4).
+      setAttempt((value) => value + 1);
       return;
     }
     const data = parsed.data;
@@ -396,6 +409,7 @@ function RecordDecision({
         }
       }
       setErrors(mapped);
+      if (Object.keys(mapped).length > 0) setAttempt((value) => value + 1);
       if (failure instanceof ApiError && failure.status < 500) {
         keys.current = { ...keys.current, submit: newIdempotencyKey() };
       }
@@ -419,6 +433,13 @@ function RecordDecision({
         </Alert>
       ) : null}
       <form noValidate onSubmit={(event) => void onSubmit(event)} className="space-y-5">
+        <ErrorSummary
+          attempt={attempt}
+          errors={Object.entries(errors).map(([field, message]) => ({
+            fieldId: fieldId(field),
+            message,
+          }))}
+        />
         <SegmentedControl
           legend={t("decision")}
           legendVisible
@@ -430,9 +451,10 @@ function RecordDecision({
         />
         {status === "refused" ? <Alert tone="info">{t("refuseNote")}</Alert> : null}
         {status !== "pending" ? (
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 xl:grid-cols-2">
             {guardianOptions.length > 0 ? (
               <SelectField
+                id={fieldId("guardian_id")}
                 name="guardian_id"
                 label={t("guardian")}
                 hint={t("guardianHint")}
@@ -443,6 +465,7 @@ function RecordDecision({
               />
             ) : null}
             <SelectField
+              id={fieldId("relationship")}
               name="relationship"
               label={t("relationship")}
               error={errors.relationship}
@@ -454,6 +477,7 @@ function RecordDecision({
               }))}
             />
             <TextField
+              id={fieldId("decided_on")}
               name="decided_on"
               label={t("decidedOn")}
               hint={tc("dateHintFormat", dates.hint("2026-07-15"))}
@@ -463,6 +487,7 @@ function RecordDecision({
               autoComplete="off"
             />
             <SelectField
+              id={fieldId("form_language")}
               name="form_language"
               label={t("formLanguage")}
               defaultValue=""
@@ -476,6 +501,7 @@ function RecordDecision({
         ) : null}
         {status !== "pending" ? (
           <Field
+            id={fieldId("evidence")}
             label={status === "given" ? t("signedForm") : t("signedFormOptional")}
             hint={t("signedFormHint")}
             error={errors.evidence}
@@ -494,6 +520,7 @@ function RecordDecision({
           </Field>
         ) : null}
         <TextAreaField
+          id={fieldId("note")}
           name="note"
           label={t("note")}
           hint={t("noteHint")}

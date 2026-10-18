@@ -6,6 +6,7 @@ import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Icon } from "@/components/ui/Icon";
 import { Label } from "@/components/ui/Label";
 import {
   UploadError,
@@ -126,7 +127,13 @@ export function SheetImport<E, P extends SheetPreview<E>>({
               className="block w-full text-sm text-ink file:mr-3 file:min-h-10 file:rounded-md file:border-0 file:bg-surface-muted file:px-3 file:text-ink"
             />
           </div>
-          <Button type="submit" disabled={busy || !section} aria-disabled={busy || undefined}>
+          <Button
+            type="submit"
+            variant="secondary"
+            disabled={busy || !section}
+            aria-disabled={busy || undefined}
+          >
+            <Icon name="upload" className="size-4" />
             {t("read")}
           </Button>
           {progress ? (

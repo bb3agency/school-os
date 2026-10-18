@@ -2,21 +2,26 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type KeyboardEvent } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorSummary, type SummaryError } from "@/components/ui/ErrorSummary";
+import { Icon } from "@/components/ui/Icon";
 import { TextField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SaveBar } from "@/components/ui/SaveBar";
 import { SelectField } from "@/components/ui/Select";
 import { Table, TableScroll, TBody, Td, Th, THead, Tr } from "@/components/ui/Table";
 import { newIdempotencyKey, unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
+import { cn } from "@/lib/cn";
 import { formatDate } from "@/lib/format";
 import { zodErrorKeys } from "@/lib/forms";
 import { translateOr } from "@/lib/i18n-dynamic";
+import { NARROW_QUERY, useMediaQuery } from "@/lib/use-media-query";
 import {
   KEYS,
   PERM,
@@ -84,7 +89,12 @@ function NewExamCard({ onCreated }: { onCreated: (id: string) => void }) {
             error={fieldError("held_on")}
           />
         </div>
-        <Button type="submit" disabled={pending} aria-disabled={pending || undefined}>
+        <Button
+          type="submit"
+          variant="secondary"
+          disabled={pending}
+          aria-disabled={pending || undefined}
+        >
           {t("submit")}
         </Button>
         <ApiErrorAlert error={error} />
@@ -107,23 +117,25 @@ function MarksTable({ grid }: { grid: MarksGrid }) {
             <Th>{t("columns.roll")}</Th>
             <Th>{t("columns.student")}</Th>
             {grid.subjects.map((subject) => (
-              <Th key={subject}>{subject}</Th>
+              <Th key={subject} numeric>
+                {subject}
+              </Th>
             ))}
-            <Th>{t("columns.percent")}</Th>
+            <Th numeric>{t("columns.percent")}</Th>
           </Tr>
         </THead>
         <TBody>
           {grid.students.map((row) => (
             <Tr key={row.student.student_id}>
               <Td>
-                <span className="font-mono">{row.student.roll_no ?? "—"}</span>
+                <span className="num font-mono">{row.student.roll_no ?? "—"}</span>
               </Td>
               <Td>{row.student.full_name ?? t("unnamed")}</Td>
               {grid.subjects.map((subject) => {
                 const mark = row.marks.find((m) => m.subject === subject);
                 return (
-                  <Td key={subject}>
-                    <span className="font-mono">
+                  <Td key={subject} numeric>
+                    <span>
                       {mark
                         ? mark.absent
                           ? t("absentShort")
@@ -133,8 +145,8 @@ function MarksTable({ grid }: { grid: MarksGrid }) {
                   </Td>
                 );
               })}
-              <Td>
-                <span className="font-mono">
+              <Td numeric>
+                <span>
                   {row.percent === null || row.percent === undefined ? "—" : `${row.percent}%`}
                 </span>
               </Td>
@@ -146,33 +158,56 @@ function MarksTable({ grid }: { grid: MarksGrid }) {
   );
 }
 
-/** Enter one subject's marks for the whole section (marks.record; FR-MRK-002). */
+const SUBJECT_ID = "marks-subject";
+const MAX_ID = "marks-max";
+const cellId = (studentId: string) => `marks-${studentId}`;
+
+/**
+ * Enter one subject's marks for the whole section (marks.record; FR-MRK-002). One form for both
+ * layouts: a keyboard grid from 640px (Enter or the down arrow moves to the next student) and
+ * one student at a time with Previous and Next on phones. Values live in state, so switching
+ * layout or student never loses what was typed.
+ */
 function SubjectEntry({ grid, onSaved }: { grid: MarksGrid; onSaved: () => Promise<void> }) {
   const t = useTranslations("marks.entry");
   const api = useBffClient("staff");
+  const narrow = useMediaQuery(NARROW_QUERY);
   const [subject, setSubject] = useState("");
   const [max, setMax] = useState("100");
   const [values, setValues] = useState<Record<string, string>>({});
-  const [problem, setProblem] = useState<string | null>(null);
+  const [errors, setErrors] = useState<SummaryError[]>([]);
+  const [bad, setBad] = useState<ReadonlySet<string>>(new Set());
+  const [attempt, setAttempt] = useState(0);
+  const [index, setIndex] = useState(0);
   const [error, setError] = useState<unknown>(undefined);
   const [saved, setSaved] = useState<number | null>(null);
   const [pending, setPending] = useState(false);
+  const students = grid.students;
+  const ids = students.map((row) => row.student.student_id);
+  const current = Math.min(index, Math.max(students.length - 1, 0));
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setProblem(null);
+    setErrors([]);
+    setBad(new Set());
     setError(undefined);
     setSaved(null);
     const maximum = Number(max);
-    if (!subject.trim()) return setProblem("subjectRequired");
-    if (!(maximum > 0 && maximum <= 1000)) return setProblem("maxInvalid");
+    const problems: SummaryError[] = [];
+    if (!subject.trim()) {
+      problems.push({ fieldId: SUBJECT_ID, message: t("problem.subjectRequired") });
+    }
+    const maxValid = maximum > 0 && maximum <= 1000;
+    if (!maxValid) problems.push({ fieldId: MAX_ID, message: t("problem.maxInvalid") });
     const entries: MarkIn[] = [];
-    for (const row of grid.students) {
-      const raw = (values[row.student.student_id] ?? "").trim();
+    const invalid: string[] = [];
+    for (const row of students) {
+      const id = row.student.student_id;
+      const raw = (values[id] ?? "").trim();
       if (!raw) continue;
       if (/^ab$/i.test(raw)) {
         entries.push({
-          student_id: row.student.student_id,
+          student_id: id,
           subject: subject.trim(),
           max_marks: max,
           marks: null,
@@ -181,17 +216,32 @@ function SubjectEntry({ grid, onSaved }: { grid: MarksGrid; onSaved: () => Promi
         continue;
       }
       const value = Number(raw);
-      if (!Number.isFinite(value) || value < 0 || value > maximum)
-        return setProblem("marksInvalid");
+      if (!maxValid) continue;
+      if (!Number.isFinite(value) || value < 0 || value > maximum) {
+        invalid.push(id);
+        continue;
+      }
       entries.push({
-        student_id: row.student.student_id,
+        student_id: id,
         subject: subject.trim(),
         max_marks: max,
         marks: raw,
         absent: false,
       });
     }
-    if (entries.length === 0) return setProblem("nothingEntered");
+    const first = invalid[0];
+    if (first) problems.push({ fieldId: cellId(first), message: t("problem.marksInvalid") });
+    if (problems.length === 0 && entries.length === 0 && ids[0]) {
+      problems.push({ fieldId: cellId(ids[0]), message: t("problem.nothingEntered") });
+    }
+    if (problems.length > 0) {
+      setErrors(problems);
+      setBad(new Set(invalid));
+      setAttempt((value) => value + 1);
+      // On a phone, show the first student whose marks need fixing.
+      if (first) setIndex(Math.max(ids.indexOf(first), 0));
+      return;
+    }
     setPending(true);
     try {
       const out = await unwrap(
@@ -210,69 +260,159 @@ function SubjectEntry({ grid, onSaved }: { grid: MarksGrid; onSaved: () => Promi
     }
   }
 
+  function change(id: string, value: string) {
+    setValues({ ...values, [id]: value });
+    if (bad.has(id)) {
+      const next = new Set(bad);
+      next.delete(id);
+      setBad(next);
+    }
+  }
+
+  /** Enter or arrow down: the next student's box; arrow up: the one before (desktop grid). */
+  function moveFrom(position: number, event: KeyboardEvent<HTMLInputElement>) {
+    const step = event.key === "ArrowUp" ? -1 : event.key === "ArrowDown" ? 1 : 0;
+    const enter = event.key === "Enter";
+    if (!step && !enter) return;
+    const target = position + (step || 1);
+    if (narrow) {
+      if (enter && target < students.length) {
+        event.preventDefault();
+        setIndex(target);
+      }
+      return;
+    }
+    const next = ids[target];
+    if (next === undefined) return; // Enter on the last student submits the form.
+    event.preventDefault();
+    document.getElementById(cellId(next))?.focus();
+  }
+
+  const fieldError = (fieldId: string) => errors.find((e) => e.fieldId === fieldId)?.message;
+  const dirty = Object.values(values).some((value) => value.trim() !== "");
+
+  const markInput = (position: number, extraClass?: string) => {
+    const row = students[position];
+    if (!row) return null;
+    const id = row.student.student_id;
+    const name = row.student.full_name ?? t("unnamed");
+    const invalid = bad.has(id);
+    return (
+      <div className="space-y-1">
+        <input
+          id={cellId(id)}
+          aria-label={t("marksFor", { name })}
+          aria-invalid={invalid || undefined}
+          aria-describedby={invalid ? `${cellId(id)}-error` : undefined}
+          className={cn(
+            "num min-h-10 rounded-md border border-border-control bg-surface px-2 text-end text-base text-ink pointer-coarse:min-h-11",
+            "aria-invalid:border-2 aria-invalid:border-danger",
+            extraClass ?? "w-24",
+          )}
+          inputMode="decimal"
+          enterKeyHint={position < students.length - 1 ? "next" : "done"}
+          autoComplete="off"
+          value={values[id] ?? ""}
+          onChange={(event) => change(id, event.target.value)}
+          onKeyDown={(event) => moveFrom(position, event)}
+        />
+        {invalid ? (
+          <p id={`${cellId(id)}-error`} className="text-sm font-semibold text-danger">
+            {t("cellInvalid", { max })}
+          </p>
+        ) : null}
+      </div>
+    );
+  };
+
+  const one = students[current];
   return (
     <Card title={t("title")} description={t("description")}>
-      <form onSubmit={(event) => void save(event)} noValidate className="space-y-3">
-        <div className="grid gap-3 md:grid-cols-2">
+      <form onSubmit={(event) => void save(event)} noValidate className="space-y-4">
+        <ErrorSummary errors={errors} attempt={attempt} />
+        <div className="grid gap-3 sm:grid-cols-2">
           <TextField
+            id={SUBJECT_ID}
             label={t("subject")}
             value={subject}
             maxLength={60}
+            error={fieldError(SUBJECT_ID)}
             onChange={(event) => setSubject(event.target.value)}
           />
           <TextField
+            id={MAX_ID}
             label={t("max")}
             type="number"
             inputMode="decimal"
             min={1}
             max={1000}
             value={max}
+            error={fieldError(MAX_ID)}
             onChange={(event) => setMax(event.target.value)}
           />
         </div>
-        <TableScroll label={t("title")}>
-          <Table density="compact">
-            <THead>
-              <Tr>
-                <Th>{t("roll")}</Th>
-                <Th>{t("student")}</Th>
-                <Th>{t("marks")}</Th>
-              </Tr>
-            </THead>
-            <TBody>
-              {grid.students.map((row) => {
-                const id = row.student.student_id;
-                const name = row.student.full_name ?? t("unnamed");
-                return (
-                  <Tr key={id}>
+        {narrow ? (
+          one ? (
+            <div className="space-y-4 rounded-xl border border-border p-4">
+              <p className="num text-sm text-ink-muted" aria-live="polite">
+                {t("position", { current: current + 1, total: students.length })}
+              </p>
+              <div className="flex items-baseline gap-3">
+                <span className="num font-mono text-sm text-ink-muted">
+                  {one.student.roll_no ?? "—"}
+                </span>
+                <span className="text-lg font-semibold break-words text-ink">
+                  {one.student.full_name ?? t("unnamed")}
+                </span>
+              </div>
+              {markInput(current, "w-full")}
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="secondary"
+                  disabled={current === 0}
+                  onClick={() => setIndex(current - 1)}
+                >
+                  <Icon name="chevronLeft" className="size-4" />
+                  {t("previous")}
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={current >= students.length - 1}
+                  onClick={() => setIndex(current + 1)}
+                >
+                  {t("next")}
+                  <Icon name="chevronRight" className="size-4" />
+                </Button>
+              </div>
+            </div>
+          ) : null
+        ) : (
+          <TableScroll label={t("title")}>
+            <Table density="compact">
+              <THead>
+                <Tr>
+                  <Th>{t("roll")}</Th>
+                  <Th>{t("student")}</Th>
+                  <Th numeric>{t("marks")}</Th>
+                </Tr>
+              </THead>
+              <TBody>
+                {students.map((row, position) => (
+                  <Tr key={row.student.student_id}>
                     <Td>
-                      <span className="font-mono">{row.student.roll_no ?? "—"}</span>
+                      <span className="num font-mono">{row.student.roll_no ?? "—"}</span>
                     </Td>
-                    <Td>{name}</Td>
-                    <Td>
-                      <input
-                        aria-label={t("marksFor", { name })}
-                        className="min-h-10 w-24 rounded-md border border-border-control bg-surface px-2 font-mono text-ink"
-                        inputMode="decimal"
-                        value={values[id] ?? ""}
-                        onChange={(event) => setValues({ ...values, [id]: event.target.value })}
-                      />
-                    </Td>
+                    <Td>{row.student.full_name ?? t("unnamed")}</Td>
+                    <Td className="text-end">{markInput(position)}</Td>
                   </Tr>
-                );
-              })}
-            </TBody>
-          </Table>
-        </TableScroll>
-        <p className="text-xs text-ink-subtle">{t("hint")}</p>
-        <Button type="submit" disabled={pending} aria-disabled={pending || undefined}>
-          {t("save")}
-        </Button>
-        {problem ? (
-          <Alert tone="danger" live>
-            {translateOr(t, `problem.${problem}`, "problem.marksInvalid")}
-          </Alert>
-        ) : null}
+                ))}
+              </TBody>
+            </Table>
+          </TableScroll>
+        )}
+        <p className="text-xs text-ink-subtle">
+          {t("hint")} {narrow ? null : t("keyboardHint")}
+        </p>
         {saved !== null ? (
           <Alert tone="success" live>
             {t("saved", { count: saved })}
@@ -280,6 +420,21 @@ function SubjectEntry({ grid, onSaved }: { grid: MarksGrid; onSaved: () => Promi
         ) : null}
         <ApiErrorAlert error={error} />
         <ProblemList error={error} />
+        <SaveBar dirty={dirty}>
+          <Button
+            variant="secondary"
+            disabled={!dirty || pending}
+            onClick={() => {
+              setValues({});
+              setBad(new Set());
+            }}
+          >
+            {t("discard")}
+          </Button>
+          <Button type="submit" disabled={pending} aria-disabled={pending || undefined}>
+            {t("save")}
+          </Button>
+        </SaveBar>
       </form>
     </Card>
   );
@@ -307,7 +462,7 @@ export function MarksScreen() {
   const refresh = () => queryClient.invalidateQueries({ queryKey: KEYS.marks(section, exam) });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={t("title")}
         description={t("description")}
@@ -319,8 +474,8 @@ export function MarksScreen() {
         </Alert>
       ) : (
         <>
-          <Card>
-            <div className="flex flex-wrap items-end gap-4">
+          <Card padding="sm">
+            <div className="grid gap-3 sm:flex sm:flex-wrap sm:items-end sm:gap-4">
               <SectionPicker label={t("section")} value={section} onChange={setSection} />
               <SelectField
                 label={t("exam")}
