@@ -2053,6 +2053,8 @@ const ROUTES: Array<[RegExp, Handler]> = [
   [re("/exports"), () => page(EXPORTS)],
   // Certificates (US-1101..US-1105). Register print views are HTML and fall through.
   [re("/certificates/types"), () => CERTIFICATE_TYPE_INFO],
+  // TC formats (school settings, CertificateFormatCard): a list; none beyond the built-in.
+  [re("/certificates/formats"), () => []],
   [
     re("/certificates"),
     (_, q) => {
