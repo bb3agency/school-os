@@ -7856,7 +7856,9 @@
       "printedOnly": "This page shows only what the certificate prints.",
       "leftBlank": "Left blank on the certificate",
       "anyoneWithCode": "Anyone with this code can see what the certificate shows.",
-      "footer": "Certificate check by SchoolOS for the school that issued it."
+      "footer": "Certificate check by SchoolOS for the school that issued it.",
+      "masthead": "SchoolOS",
+      "kicker": "Certificate check for receiving schools, offices and employers"
     }
   },
   "messaging": {

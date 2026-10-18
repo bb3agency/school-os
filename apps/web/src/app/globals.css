@@ -1161,6 +1161,12 @@
   .sidebar-tip-bubble {
     border: 1px solid CanvasText;
   }
+
+  /* Decorative illustrations (components/ui/Illustration.tsx) have fixed colours that would
+     ignore the user's palette: hide them; the text beside them says the same. */
+  .sos-illustration[alt=""] {
+    display: none;
+  }
 }
 
 /* Print is a first-class output: A4, black on white, no navigation chrome. */

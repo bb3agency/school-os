@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { buttonClasses } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
+import { Illustration, type IllustrationName } from "@/components/ui/Illustration";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
 import { SIGN_IN_HREF, mailtoHref } from "./links";
@@ -95,33 +96,49 @@ export function SectionIntro({
   );
 }
 
-/** Top of an inner page: the page's one h1 on the hero backdrop, with room for extras. */
+/**
+ * Top of an inner page: the page's one h1 on the ruled paper, with room for extras and an
+ * optional decorative line illustration beside it from lg (hidden on phones, where it would
+ * push the content down).
+ */
 export function PageHero({
   id,
   eyebrow,
   title,
   intro,
+  illustration,
   children,
 }: {
   id: string;
   eyebrow: string;
   title: string;
   intro: string;
+  illustration?: IllustrationName;
   children?: ReactNode;
 }) {
   return (
     <section aria-labelledby={id} className="mk-hero-bg relative -mt-16 overflow-hidden pt-16">
       <div aria-hidden="true" className="mk-grid pointer-events-none absolute inset-0" />
-      <Container className="relative pt-12 pb-16 md:pt-20 md:pb-24">
-        <p className="eyebrow text-primary">{eyebrow}</p>
-        <h1
-          id={id}
-          className="mk-display mt-5 max-w-4xl text-[2.5rem] font-extralight text-ink sm:text-5xl lg:text-6xl"
-        >
-          {title}
-        </h1>
-        <p className="mk-lede mt-6 max-w-2xl text-lg text-ink-muted md:text-xl">{intro}</p>
-        {children}
+      <Container
+        className={cn(
+          "relative pt-12 pb-16 md:pt-20 md:pb-24",
+          illustration && "lg:grid lg:grid-cols-[1.4fr_1fr] lg:items-end lg:gap-12",
+        )}
+      >
+        <div>
+          <p className="eyebrow border-b border-border pb-3 text-ink-muted">{eyebrow}</p>
+          <h1
+            id={id}
+            className="mk-display mt-6 max-w-4xl text-[2.75rem] text-ink sm:text-[3.5rem] lg:text-[4rem]"
+          >
+            {title}
+          </h1>
+          <p className="mk-lede mt-6 max-w-2xl text-lg text-ink-muted md:text-xl">{intro}</p>
+          {children}
+        </div>
+        {illustration ? (
+          <Illustration name={illustration} priority className="hidden max-w-md lg:block" />
+        ) : null}
       </Container>
     </section>
   );

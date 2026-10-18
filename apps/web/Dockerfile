@@ -32,6 +32,8 @@ COPY packages/api-client packages/api-client
 RUN npm run build --workspace @schoolos/web \
  && mkdir -p apps/web/.next/standalone/apps/web/.next \
  && cp -R apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static \
+ # Static files (the illustrations, docs/17 §5.6): standalone output does not copy public/.
+ && cp -R apps/web/public apps/web/.next/standalone/apps/web/public \
  # Next.js writes its runtime cache here; point it at /tmp for a read-only root fs.
  && rm -rf apps/web/.next/standalone/apps/web/.next/cache \
  && ln -s /tmp/next-cache apps/web/.next/standalone/apps/web/.next/cache

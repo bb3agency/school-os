@@ -1,5 +1,6 @@
 import { useTranslations } from "next-intl";
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { Illustration } from "@/components/ui/Illustration";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
 import { FEATURE_SECTIONS, PAGE_HREF, PLANNED_FEATURES, type FeatureSection } from "./links";
@@ -16,6 +17,7 @@ import {
 import { PlanCards } from "./PlanCards";
 import { Reveal } from "./Reveal";
 import type { MarketingSettings } from "./settings";
+import { SmoothScroll } from "./SmoothScroll";
 import { ArrowLink, Container, CtaGroup, PlannedBadge, Section, SectionIntro } from "./ui";
 
 const SOURCES = ["register", "aadhaar", "udise", "board"] as const;
@@ -56,10 +58,13 @@ function Vignette({ feature }: { feature: FeatureSection }) {
 }
 
 /**
- * Public home page (/welcome; FR-IAM-001 entry point): hero with the product illustration,
- * the four sources, how it works, feature highlights, a dark security band, the plans teaser,
+ * Public home page (/welcome; FR-IAM-001 entry point), Direction B "Register paper": a ruled
+ * paper hero with the product itself (sample data in the real UI), the four sources, how it
+ * works as a ruled register of steps beside a line illustration of the office, feature
+ * highlights with slices of the real screens, a dark security band, the plans teaser,
  * questions and a closing call to action. Honest content only (docs/01, 07, 08, 14, 16): no
- * prices, logos, testimonials, ratings or counts; certificates are marked Planned.
+ * prices, logos, testimonials, ratings or counts; certificates are marked Planned. Lenis
+ * smooth wheel scrolling is mounted here only (SmoothScroll).
  */
 export function HomeView({ settings }: { settings: MarketingSettings }) {
   const t = useTranslations("marketing");
@@ -67,6 +72,7 @@ export function HomeView({ settings }: { settings: MarketingSettings }) {
 
   return (
     <MarketingShell current="home" settings={settings}>
+      <SmoothScroll />
       {/* Hero */}
       <section
         aria-labelledby="home-title"
@@ -75,18 +81,15 @@ export function HomeView({ settings }: { settings: MarketingSettings }) {
         <div aria-hidden="true" className="mk-grid pointer-events-none absolute inset-0" />
         <Container className="relative grid items-start gap-12 pt-10 pb-16 md:pt-16 lg:grid-cols-[1.05fr_1fr] lg:gap-12 lg:pt-14 lg:pb-24">
           <div className="lg:pt-10">
-            <p className="eyebrow inline-flex items-center gap-2 rounded-full border border-border bg-surface/80 px-3 py-1.5 text-ink">
-              <span aria-hidden="true" className="size-1.5 rounded-full bg-success" />
+            <p className="eyebrow border-b border-border pb-3 text-ink-muted">
               {t("home.eyebrow")}
             </p>
             <h1
               id="home-title"
-              className="mk-display mt-6 text-[2.5rem] font-extralight text-ink sm:text-5xl lg:text-[3.25rem] xl:text-[3.5rem] 2xl:text-[4rem]"
+              className="mk-display mt-6 text-[2.75rem] text-ink sm:text-[3.5rem] lg:text-[3.75rem] xl:text-[4.25rem] 2xl:text-[4.75rem]"
             >
               {t("home.headlineLead")}{" "}
-              <span className="font-display font-normal tracking-normal text-primary">
-                {t("home.headlineAccent")}
-              </span>
+              <span className="text-primary italic">{t("home.headlineAccent")}</span>
             </h1>
             <p className="mk-lede mt-6 max-w-xl text-lg text-ink-muted md:text-xl">
               {t("home.body")}
@@ -124,33 +127,40 @@ export function HomeView({ settings }: { settings: MarketingSettings }) {
         </Container>
       </section>
 
-      {/* How it works */}
+      {/* How it works: a ruled register of three steps beside the office it happens in. */}
       <Section id="how" labelledBy="how-title">
-        <Container>
-          <SectionIntro
-            id="how-title"
-            eyebrow={t("home.how.eyebrow")}
-            title={t("home.how.title")}
-          />
-          <Reveal as="ol" stagger className="grid gap-4 md:grid-cols-3 md:gap-5">
+        <Container className="grid gap-12 lg:grid-cols-[1fr_1.15fr] lg:gap-20">
+          <div>
+            <SectionIntro
+              id="how-title"
+              eyebrow={t("home.how.eyebrow")}
+              title={t("home.how.title")}
+            />
+            <Illustration name="office-register" className="max-w-md" />
+          </div>
+          <Reveal as="ol" stagger className="mk-ruled border-y border-border lg:mt-2">
             {STEPS.map((step, index) => (
               <li
                 key={step}
-                className="relative rounded-2xl border border-border bg-surface p-6 shadow-card md:p-8"
+                className="grid grid-cols-[3.5rem_1fr] gap-4 py-8 md:grid-cols-[5rem_1fr] md:py-10"
               >
                 <span
                   aria-hidden="true"
-                  className="block font-display text-6xl leading-none text-primary"
+                  className="font-display text-5xl leading-none text-primary md:text-6xl"
                 >
                   {String(index + 1).padStart(2, "0")}
                 </span>
-                <p className="eyebrow mt-6 text-ink-subtle">
-                  {t("home.how.step", { number: index + 1 })}
-                </p>
-                <h3 className="mt-1 text-xl font-semibold tracking-tight text-ink">
-                  {t(`home.how.${step}.title`)}
-                </h3>
-                <p className="mt-2 text-ink-muted">{t(`home.how.${step}.body`)}</p>
+                <div>
+                  <p className="eyebrow text-ink-subtle">
+                    {t("home.how.step", { number: index + 1 })}
+                  </p>
+                  <h3 className="mt-1 text-xl font-semibold text-ink md:text-2xl">
+                    {t(`home.how.${step}.title`)}
+                  </h3>
+                  <p className="mt-2 max-w-prose text-ink-muted md:text-lg">
+                    {t(`home.how.${step}.body`)}
+                  </p>
+                </div>
               </li>
             ))}
           </Reveal>

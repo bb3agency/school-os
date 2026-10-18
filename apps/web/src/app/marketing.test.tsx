@@ -133,9 +133,13 @@ describe("marketing pages render with structure and calls to action (FR-IAM-001)
       withContact();
       const { container } = render(name);
       expect(container.querySelectorAll("[style]")).toHaveLength(0);
-      expect(container.querySelectorAll("img, script, iframe, link, video, object")).toHaveLength(
-        0,
-      );
+      expect(container.querySelectorAll("script, iframe, link, video, object")).toHaveLength(0);
+      // The only images are the line illustrations from 'self' (docs/17 §5.6), decorative
+      // unless they carry an alt text.
+      for (const img of container.querySelectorAll("img")) {
+        expect(img.getAttribute("src") ?? "").toMatch(/^\/illustrations\/[a-z-]+\.svg$/);
+        expect(img.hasAttribute("alt")).toBe(true);
+      }
       for (const link of container.querySelectorAll("a")) {
         expect(link.getAttribute("href") ?? "").toMatch(/^(#|\/(?!\/)|mailto:)/);
       }

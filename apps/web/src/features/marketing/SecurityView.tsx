@@ -33,6 +33,7 @@ export function SecurityView({ settings }: { settings: MarketingSettings }) {
         eyebrow={t("security.eyebrow")}
         title={t("security.headline")}
         intro={t("security.intro")}
+        illustration="records-almirah"
       />
 
       {/* Where the data lives */}
