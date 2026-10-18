@@ -1428,6 +1428,7 @@ source_modules =
     app.messaging.config
     app.messaging.eligibility
     app.messaging.slips
+    app.messaging.sends
 forbidden_modules =
     httpx
     requests
@@ -1436,13 +1437,14 @@ allow_indirect_imports = True
 # The configuration, catalogue, eligibility rules and slip renderer stay pure (no database, web
 # or feature modules), so the catalogue and the rules are tested without a database.
 [importlinter:contract:messaging-pure-library]
-name = messaging config/catalogue/eligibility/slips stay pure (no DB, web or feature modules)
+name = messaging config/catalogue/eligibility/slips/send rules stay pure (no DB, web or features)
 type = forbidden
 source_modules =
     app.messaging.config
     app.messaging.catalogue
     app.messaging.eligibility
     app.messaging.slips
+    app.messaging.sends.rules
 forbidden_modules =
     sqlalchemy
     fastapi

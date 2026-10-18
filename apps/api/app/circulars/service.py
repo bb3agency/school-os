@@ -36,6 +36,7 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 from collections.abc import Iterable, Mapping, MutableMapping
+from dataclasses import dataclass
 from typing import Any, Final
 from zoneinfo import ZoneInfo
 
@@ -1746,6 +1747,34 @@ if on_version_indexed not in knowledge.INDEXED_HOOKS:
     knowledge.INDEXED_HOOKS.append(on_version_indexed)
 
 
+@dataclass(frozen=True, slots=True)
+class NoticeForSending:
+    """What the WhatsApp sender needs about a parent notice (R2-3G; FR-MSG-012): its status and
+    titles. Notices never carry student data (docs/08 §8)."""
+
+    notice_id: uuid.UUID
+    approved: bool
+    title_en: str
+    title_te: str
+    version: int
+
+
+def notice_for_sending(session: Session, notice_id: uuid.UUID) -> NoticeForSending | None:
+    """The notice of the current school for a broadcast, or ``None`` when there is no such notice
+    (system read: the caller holds ``message.send``; approved notices are written for parents and
+    visible to every drafter, so no circular scope applies to them)."""
+    notice = repo.get_notice(session, notice_id)
+    if notice is None:
+        return None
+    return NoticeForSending(
+        notice_id=notice.id,
+        approved=notice.status == "approved",
+        title_en=notice.title_en,
+        title_te=notice.title_te,
+        version=notice.version,
+    )
+
+
 def export_records(session: Session) -> list[RecordTable]:
     """Worker only: circular readings and suggestions, tasks and parent notices of the current
     school for its full data export (``app.admin``; the caller checked ``tenant.export_all``
@@ -1793,6 +1822,7 @@ __all__ = [
     "TASK_ALL",
     "TASK_MANAGE",
     "TASK_READ",
+    "NoticeForSending",
     "abandon_draft",
     "abandon_reading",
     "abandon_render",
@@ -1811,6 +1841,7 @@ __all__ = [
     "list_notices",
     "list_tasks",
     "mark_reviewed",
+    "notice_for_sending",
     "on_version_indexed",
     "purge_tenant_data",
     "render_notice",

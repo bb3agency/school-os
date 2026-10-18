@@ -57,6 +57,9 @@ log = get_logger(__name__)
 
 RENDER_EVENT: Final = "fee.receipt.issued"
 RENDER_TASK: Final = "fees.render_receipt"
+# R2-3G (FR-MSG-015): the receipt message to opted-in guardians. Its consumer is registered by
+# app.messaging (the receipt is told once per issue, in the issuing transaction).
+MESSAGE_EVENT: Final = "fee.receipt.message"
 DOCUMENT_PURPOSE: Final = "fee_receipt"
 _FILENAME_RE: Final = re.compile(r"[^A-Za-z0-9._-]+")
 LIVE_REFUNDS: Final = frozenset({"pending", "approved", "processing", "processed"})
@@ -387,6 +390,9 @@ def write_receipt(
         session,
         RENDER_EVENT,
         {"receipt_id": str(row.id), "user_id": str(actor_user_id), "account_id": str(account.id)},
+    )
+    ops.enqueue_event(
+        session, MESSAGE_EVENT, {"receipt_id": str(row.id), "account_id": str(account.id)}
     )
     log.info("fee.receipt.issued", resource_type="fee_receipt", resource_id=row.id)
     return row
@@ -751,6 +757,7 @@ def mark_pdf_failed(tenant_id: uuid.UUID, receipt_id: uuid.UUID, code: str) -> N
 
 
 __all__ = [
+    "MESSAGE_EVENT",
     "RENDER_EVENT",
     "RENDER_TASK",
     "AmountExceedsDue",

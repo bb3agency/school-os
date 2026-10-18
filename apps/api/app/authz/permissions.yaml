@@ -277,8 +277,8 @@ permissions:
     step_up: false
 
   # --- R2-1C WhatsApp messaging (ADR-0043, US-2201..US-2210, FR-MSG-*) ----------------------
-  # Migration 0057_messaging_core upserts these into core.permissions. message.send arrives with
-  # wave R2-3G (sending).
+  # Migration 0057_messaging_core upserts these into core.permissions; message.send arrives with
+  # wave R2-3G (0061_messaging_sends).
   messaging.configure:
     description: Connect or disconnect the school's WhatsApp number, sync templates, change messaging switches and times, and resume sending after a pause
     sensitivity: critical
@@ -289,6 +289,10 @@ permissions:
     step_up: false
   message.read:
     description: "See WhatsApp delivery reports, message history and opt-in states (class teachers: their sections)"
+    sensitivity: sensitive
+    step_up: false
+  message.send:
+    description: Send an approved notice to parents on WhatsApp, send it again with a reason, and revoke a parent link
     sensitivity: sensitive
     step_up: false
 

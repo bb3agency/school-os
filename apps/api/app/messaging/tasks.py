@@ -6,8 +6,8 @@ Outbox consumers (``app.ops``, relayed every 5 s):
   within 60 s of Meta's delivery, FR-MSG-010);
 - ``messaging.provision_templates``: create the catalogue's templates in the school's WABA and
   read their statuses back;
-The sending wave (R2-3G) adds its own consumer that calls ``service.deliver`` for queued
-messages.
+The sending wave (R2-3G, ``app.messaging.sends.tasks``) adds ``messaging.send_due`` and
+``messaging.receipt_message`` and its beat entries (imported here so the worker registers them).
 
 Beat: ``messaging.sweep_inbox`` every minute (events whose wake-up was lost),
 ``messaging.sync_accounts`` hourly (quality, limit, currency, template statuses; pauses on a red
@@ -29,6 +29,8 @@ from app.core.errors import DomainError
 from app.core.logging import get_logger
 from app.messaging import service
 from app.messaging.providers import ProviderError
+from app.messaging.sends import service as sends
+from app.messaging.sends import tasks as sends_tasks
 from app.ops.service import TenantTask
 
 log = get_logger(__name__)
@@ -105,9 +107,14 @@ def sync_accounts() -> dict[str, int]:
     return _each_school("sync", _sync)
 
 
+def _purge(tenant_id: uuid.UUID) -> None:
+    service.purge_expired(tenant_id)
+    sends.purge_expired(tenant_id)
+
+
 @shared_task(name="messaging.purge_expired", acks_late=True, ignore_result=True)
 def purge_expired() -> dict[str, int]:
-    return _each_school("purge", service.purge_expired)
+    return _each_school("purge", _purge)
 
 
 def beat_schedule() -> dict[str, dict[str, Any]]:
@@ -122,6 +129,7 @@ def beat_schedule() -> dict[str, dict[str, Any]]:
             "task": "messaging.purge_expired",
             "schedule": crontab(minute=20, hour=21),
         },
+        **sends_tasks.beat_schedule(),
     }
 
 

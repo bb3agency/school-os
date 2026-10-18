@@ -107,6 +107,10 @@ class MessagingSettings(Base):
     quiet_end: Mapped[dt.time] = mapped_column(Time)
     daily_cap: Mapped[int | None] = mapped_column(Integer)
     office_phone: Mapped[str | None] = mapped_column(Text)
+    # 0061_messaging_sends: IST dates without automatic messages (US-2205 AC2).
+    no_message_dates: Mapped[list[dt.date]] = mapped_column(
+        ARRAY(Date), server_default=text("'{}'")
+    )
     updated_by: Mapped[uuid.UUID | None]
     created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
@@ -199,6 +203,9 @@ class Message(Base):
     created_by: Mapped[uuid.UUID | None]
     created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
+    # 0061_messaging_sends: the notice broadcast it belongs to; when the sender may try again.
+    broadcast_id: Mapped[uuid.UUID | None]
+    next_attempt_at: Mapped[dt.datetime | None]
 
 
 class InboundEvent(Base):

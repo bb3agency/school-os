@@ -54,3 +54,17 @@ def fake_state() -> Iterator[object]:
     STATE.sent.clear()
     STATE.failing.clear()
     STATE.forced.clear()
+
+
+# --- R2-3G sending: a school of its own (counts stay exact) ----------------------------------
+
+F = _load("sos_test_fees_support", TESTS / "fees" / "support.py")
+S = _load("sos_test_messaging_sends_support", Path(__file__).with_name("sends_support.py"))
+
+
+@pytest.fixture(scope="session")
+def send_school(world: object, admin_engine: object) -> object:
+    """A separate synthetic school (structure of tests/api/world.py, fees on, WhatsApp connected
+    with every template approved, a synthetic public origin for URL buttons) so broadcasts,
+    caps and runs count only this suite's messages."""
+    return S.make_school(admin_engine)

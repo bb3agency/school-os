@@ -41,6 +41,7 @@ from app.messaging.schemas import (
     OptinIn,
     SectionOptinSummaryOut,
 )
+from app.messaging.sends import api as sends_api
 from app.messaging.slips import STYLE_CSP
 from app.messaging.webhook import parse_entries
 from app.public import service as public
@@ -338,6 +339,10 @@ def meta_webhook(delivery: MetaDelivery) -> Response:
             continue
         service.store_events(handle.tenant_id, handle.handle_id, waba_id, events)
     return Response(status_code=200)
+
+
+# R2-3G sending: broadcasts, reports, automatic messages, link revocation.
+router.include_router(sends_api.router)
 
 
 __all__ = ["router", "webhook_router"]

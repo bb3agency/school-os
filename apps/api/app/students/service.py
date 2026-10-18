@@ -2656,6 +2656,19 @@ def guardians_of_students(
     ]
 
 
+def first_names(session: Session, student_ids: Collection[uuid.UUID]) -> dict[uuid.UUID, str]:
+    """Each student's first name (the first word of the display name) for a parent message
+    (R2-3G: absence alerts, fee reminders and receipts carry only the child's first name,
+    PRV-026). System read; ``student_ids`` MUST come from a record the caller already reached
+    (an attendance mark, a fee account, a receipt). Students without a name are left out."""
+    out: dict[uuid.UUID, str] = {}
+    for row in repo.summary_rows(session, set(student_ids)):
+        name = (row.full_name or "").split()
+        if name:
+            out[row.id] = name[0]
+    return out
+
+
 def guardian_phone_index(
     session: Session, guardian_id: uuid.UUID, *, key_version: int | None = None
 ) -> GuardianPhoneIndex | None:
