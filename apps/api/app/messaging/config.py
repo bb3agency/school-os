@@ -74,6 +74,7 @@ class KeywordConfig(_Model):
     stop: tuple[str, ...] = Field(min_length=1)
     join: tuple[str, ...] = Field(min_length=1)
     stop_button_payload: str = Field(pattern=r"^[A-Z_]{3,32}$")
+    stop_button_labels: tuple[str, ...] = ()
 
 
 class SendingConfig(_Model):
@@ -83,6 +84,35 @@ class SendingConfig(_Model):
     permanent_error_codes: frozenset[int]
     transient_error_codes: frozenset[int]
     max_attempts: int = Field(ge=1, le=10)
+    retry_backoff_minutes: tuple[int, ...] = Field(min_length=1, max_length=9)
+    early_close: dt.time
+    early_close_purposes: frozenset[str]
+    max_queue_hours: int = Field(ge=1, le=240)
+    batch_per_run: int = Field(ge=1, le=10_000)
+    claim_seconds: int = Field(ge=30, le=3600)
+
+    @field_validator("retry_backoff_minutes")
+    @classmethod
+    def _within_an_hour(cls, value: tuple[int, ...]) -> tuple[int, ...]:
+        # FR-MSG-016: up to 3 attempts within 60 minutes.
+        if any(v < 1 for v in value) or sum(value) > 60:
+            raise ValueError("retry backoff minutes must be positive and add up to at most 60")
+        return value
+
+    def backoff(self, attempts: int) -> dt.timedelta:
+        """Wait after the ``attempts``-th failed try (1-based)."""
+        steps = self.retry_backoff_minutes
+        return dt.timedelta(minutes=steps[min(max(attempts, 1), len(steps)) - 1])
+
+
+class BroadcastConfig(_Model):
+    preview_minutes: int = Field(ge=1, le=240)
+    max_sections: int = Field(ge=1, le=300)
+    preview_retention_hours: int = Field(ge=1, le=720)
+
+
+class AutomaticConfig(_Model):
+    fee_reminder_time: dt.time
 
 
 class CostConfig(_Model):
@@ -115,6 +145,8 @@ class MessagingConfig(_Model):
     cost: CostConfig
     retention: RetentionConfig
     inbox: InboxConfig
+    broadcasts: BroadcastConfig
+    automatic: AutomaticConfig
 
     def limit_for(self, tier: str | None) -> int | None:
         """Unique users per 24 hours for a Meta messaging-limit tier (``None`` when unknown)."""

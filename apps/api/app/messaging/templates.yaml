@@ -13,7 +13,9 @@
 #   optin_category  the opt-in category a guardian needs for this purpose (none: sent as the
 #                   reply to the parent's own join message, inside the service window).
 #   buttons   url: a dynamic URL button whose suffix is the parent link token (ADR-0046),
-#             <SOS_PUBLIC_BASE_URL>/p/{{1}}; stop: the quick reply "Stop messages" (FR-MSG-010).
+#             <SOS_PUBLIC_BASE_URL>/p/{{1}}. No opt-out button and no "reply STOP" text (owner
+#             decision D32, 2026-10-18: utility messages only); an inbound STOP is still honoured
+#             (FR-MSG-010). Version 2 dropped the version 1 "Stop messages" quick reply.
 #   reviewed  false until a fluent reviewer signs the language off (ADR-0044 decision 6; owner
 #             decision D23). Meta's approval of a Telugu template does not count as review.
 # texts       Free-form replies sent only inside the 24-hour window the parent opened by writing
@@ -24,44 +26,40 @@ version: 1
 
 templates:
   optin_confirm:
-    version: 1
+    version: 2
     purpose: optin_confirm
     category: utility
     optin_category: null
     variables:
       - {name: school_name, max_length: 60}
-    buttons: [stop]
+    buttons: []
     en:
       reviewed: true
-      body: "You will now get WhatsApp messages from {{1}} about your child. Reply STOP at any time to stop them."
-      stop_label: Stop messages
+      body: "You will now get WhatsApp messages from {{1}} about your child."
     te:
       reviewed: false
-      body: "మీ పిల్లల గురించి {{1}} నుండి ఇకపై మీకు WhatsApp సందేశాలు వస్తాయి. ఎప్పుడైనా ఆపాలంటే ఆపు లేదా STOP అని పంపండి."
-      stop_label: సందేశాలు ఆపండి
+      body: "మీ పిల్లల గురించి {{1}} నుండి ఇకపై మీకు WhatsApp సందేశాలు వస్తాయి."
 
   school_notice:
-    version: 1
+    version: 2
     purpose: school_notice
     category: utility
     optin_category: notices
     variables:
       - {name: school_name, max_length: 60}
       - {name: notice_title, max_length: 120}
-    buttons: [url, stop]
+    buttons: [url]
     en:
       reviewed: true
       body: "New notice from {{1}}: {{2}}. Tap the button below to read the full notice."
       url_label: Read notice
-      stop_label: Stop messages
     te:
       reviewed: false
       body: "కొత్త నోటీసు ({{1}}): {{2}}. పూర్తి నోటీసు చదవడానికి కింద ఉన్న బటన్ నొక్కండి."
       url_label: నోటీసు చదవండి
-      stop_label: సందేశాలు ఆపండి
 
   absence_alert:
-    version: 1
+    version: 2
     purpose: absence_alert
     category: utility
     optin_category: attendance
@@ -69,18 +67,16 @@ templates:
       - {name: school_name, max_length: 60}
       - {name: child_first_name, max_length: 40}
       - {name: date, max_length: 20}
-    buttons: [stop]
+    buttons: []
     en:
       reviewed: true
       body: "Attendance update from {{1}}: {{2}} was marked absent on {{3}} at the time of this message. Please contact the school office if this is not right."
-      stop_label: Stop messages
     te:
       reviewed: false
       body: "హాజరు సమాచారం ({{1}}): ఈ సందేశం పంపిన సమయానికి {{2}} ను {{3}} తేదీన గైర్హాజరుగా నమోదు చేశారు. ఇది సరికాకపోతే దయచేసి పాఠశాల కార్యాలయాన్ని సంప్రదించండి."
-      stop_label: సందేశాలు ఆపండి
 
   fee_reminder:
-    version: 1
+    version: 2
     purpose: fee_reminder
     category: utility
     optin_category: fees
@@ -89,20 +85,18 @@ templates:
       - {name: amount, max_length: 16}
       - {name: child_first_name, max_length: 40}
       - {name: due_date, max_length: 20}
-    buttons: [url, stop]
+    buttons: [url]
     en:
       reviewed: true
       body: "Fee reminder from {{1}}: ₹{{2}} for {{3}} is due on {{4}}. Tap the button below to see the details."
       url_label: See details
-      stop_label: Stop messages
     te:
       reviewed: false
       body: "ఫీజు గుర్తు ({{1}}): {{3}} కోసం ₹{{2}} చెల్లించడానికి గడువు {{4}}. వివరాలు చూడటానికి కింద ఉన్న బటన్ నొక్కండి."
       url_label: వివరాలు చూడండి
-      stop_label: సందేశాలు ఆపండి
 
   fee_receipt:
-    version: 1
+    version: 2
     purpose: fee_receipt
     category: utility
     optin_category: fees
@@ -112,17 +106,15 @@ templates:
       - {name: child_first_name, max_length: 40}
       - {name: receipt_number, max_length: 30}
       - {name: date, max_length: 20}
-    buttons: [url, stop]
+    buttons: [url]
     en:
       reviewed: true
       body: "Payment received by {{1}}: ₹{{2}} for {{3}}, receipt {{4}} dated {{5}}. Tap the button below to see the receipt."
       url_label: See receipt
-      stop_label: Stop messages
     te:
       reviewed: false
       body: "చెల్లింపు అందింది ({{1}}): {{3}} కోసం ₹{{2}}, రసీదు {{4}}, తేదీ {{5}}. రసీదు చూడటానికి కింద ఉన్న బటన్ నొక్కండి."
       url_label: రసీదు చూడండి
-      stop_label: సందేశాలు ఆపండి
 
 texts:
   optin_stopped:
@@ -158,7 +150,6 @@ slip:
     category_fees: Fees (reminders and receipts)
     step_scan: Scan the code with your phone camera, or open this link
     step_send: "Send this message from your own WhatsApp number:"
-    stop_note: Send STOP at any time to stop the messages.
     voluntary: Joining is your choice. Your child's place at school does not depend on it.
     valid_until: Code valid until
     footer: The school sends these messages from its own WhatsApp number through SchoolOS.
@@ -172,7 +163,6 @@ slip:
     category_fees: ఫీజులు (గుర్తులు, రసీదులు)
     step_scan: మీ ఫోన్ కెమెరాతో కోడ్‌ను స్కాన్ చేయండి, లేదా ఈ లింక్ తెరవండి
     step_send: "మీ సొంత WhatsApp నంబర్ నుండి ఈ సందేశం పంపండి:"
-    stop_note: సందేశాలు ఆపాలంటే ఎప్పుడైనా ఆపు లేదా STOP అని పంపండి.
     voluntary: చేరడం మీ ఇష్టం. పాఠశాలలో మీ పిల్లల స్థానం దీనిపై ఆధారపడదు.
     valid_until: కోడ్ చెల్లుబాటు గడువు
     footer: పాఠశాల తన సొంత WhatsApp నంబర్ నుండి SchoolOS ద్వారా ఈ సందేశాలు పంపుతుంది.

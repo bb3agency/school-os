@@ -16,7 +16,7 @@ from app.core.config import DeploymentMode, Environment, MessagingProviderMode, 
 from app.messaging import catalogue as cat
 from app.messaging import eligibility as rules
 from app.messaging import slips
-from app.messaging.config import classify, load_config
+from app.messaging.config import LANGUAGES, classify, load_config
 from app.messaging.providers import get_provider
 from app.messaging.providers.fake import FakeMessagingProvider
 
@@ -73,10 +73,20 @@ def test_FR_MSG_006_deterministic_provider_names() -> None:
     assert cat.provider_name("school_notice", 1, "te") == "sos_school_notice_v1_te"
 
 
-def test_FR_MSG_010_every_business_template_offers_stop() -> None:
-    for key, item in cat.catalogue().templates.items():
-        if key != "optin_confirm":
-            assert "stop" in item.buttons
+def test_D32_no_template_offers_an_opt_out_button_or_stop_text() -> None:
+    """Owner decision D32 (2026-10-18): utility messages only, so no "Stop messages" button and
+    no "reply STOP" text in any template; inbound STOP is still honoured (FR-MSG-010)."""
+    for item in cat.catalogue().templates.values():
+        assert item.buttons in ((), ("url",))
+        for language in LANGUAGES:
+            body = item.text(language).body
+            assert "STOP" not in body
+            assert "ఆపు" not in body
+        components = cat.build_components(item.purpose, "en", "https://my.schoolos.example")
+        kinds = [b["type"] for c in components if c["type"] == "BUTTONS" for b in c["buttons"]]
+        assert "QUICK_REPLY" not in kinds
+    for language in LANGUAGES:
+        assert "stop_note" not in cat.catalogue().slip[language].model_dump()
 
 
 def test_FR_MSG_006_url_button_needs_the_public_origin() -> None:

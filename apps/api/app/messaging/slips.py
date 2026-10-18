@@ -98,7 +98,6 @@ def _slip(school: str, number: str, slip: Slip) -> str:
         f"<p>{e(text.get('for_parents_of'))}: <strong>{e(who)}</strong></p>"
         f"<p>{e(text.get('categories_intro'))}</p><ul>{items}</ul>"
         f'<p>{e(text.get("step_send"))}</p><p><span class="send">JOIN {e(slip.code)}</span></p>'
-        f'<p class="small">{e(text.get("stop_note"))}</p>'
         f'<p class="small">{e(text.get("voluntary"))}</p></div>'
         f'<div class="qr">{_qr(link)}<p class="small">{e(text.get("step_scan"))}</p>'
         f'<p class="link">{e(link)}</p>'

@@ -13,6 +13,7 @@ import { Card } from "@/components/ui/Card";
 import { TextAreaField, TextField } from "@/components/ui/Input";
 import { Skeleton } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SendNoticePanel } from "@/features/messaging/SendNoticePanel";
 import { useTeluguEnabled } from "@/i18n/LanguagesProvider";
 import { Link } from "@/i18n/navigation";
 import { unwrap, useBffClient } from "@/lib/bff/query";
@@ -516,6 +517,7 @@ export function NoticeDetailScreen({ noticeId }: { noticeId: string }) {
                 })}
               </p>
             ) : null}
+            {notice.status === "approved" ? <SendNoticePanel noticeId={notice.id} /> : null}
           </>
         )}
       </LoadGate>

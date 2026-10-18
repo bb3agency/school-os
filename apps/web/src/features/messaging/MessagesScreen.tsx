@@ -32,6 +32,7 @@ import {
   type MessagePurpose,
   type MessageStatus,
 } from "./data";
+import { AutomaticCard, BroadcastsCard } from "./BroadcastScreens";
 import { MessagingGate } from "./WhatsAppSettingsScreen";
 
 const STATUS_PILL: Record<MessageStatus, PillVariant> = {
@@ -187,58 +188,67 @@ export function MessagesScreen({
         // 404 module_unavailable: WhatsApp is not offered here; say so, not "could not load".
         <MessagingGate data={page}>{() => null}</MessagingGate>
       ) : (
-        <DataTableV2
-          id="messages"
-          caption={t("logTitle")}
-          captionHidden
-          columns={columns}
-          state={rows}
-          rowKey={(item) => item.id}
-          stacked
-          toolbar={
-            <div
-              role="search"
-              aria-labelledby={filtersId}
-              className="flex flex-wrap items-end gap-3"
-            >
-              <span id={filtersId} className="sr-only">
-                {tl("filtersLabel")}
-              </span>
-              <SelectField
-                label={tl("purpose")}
-                value={purpose}
-                onChange={(event) => choosePurpose(event.target.value as MessagePurpose | "")}
-                placeholder={tl("all")}
-                options={MESSAGE_PURPOSES.map((p) => ({ value: p, label: tl(`purposes.${p}`) }))}
-              />
-              <SelectField
-                label={tl("status")}
-                value={status}
-                onChange={(event) => chooseStatus(event.target.value as MessageStatus | "")}
-                placeholder={tl("all")}
-                options={MESSAGE_STATUSES.map((s) => ({ value: s, label: tl(`statuses.${s}`) }))}
-              />
-            </div>
-          }
-          chips={chips}
-          onRemoveChip={(id) => (id === "purpose" ? choosePurpose("") : chooseStatus(""))}
-          onClearFilters={() => {
-            setCursor(null);
-            setPurpose("");
-            setStatus("");
-          }}
-          emptyTitle={tl("emptyTitle")}
-          emptyBody={tl("emptyBody")}
-          noResultsTitle={tl("noResultsTitle")}
-          onRetry={() => void queryClient.invalidateQueries({ queryKey: KEYS.messages(filter) })}
-          footer={
-            nextCursor ? (
-              <Button variant="secondary" size="sm" onClick={() => setCursor(nextCursor)}>
-                {tl("more")}
-              </Button>
-            ) : undefined
-          }
-        />
+        <>
+          {!studentId && !guardianId ? (
+            <>
+              <BroadcastsCard />
+              <AutomaticCard />
+            </>
+          ) : null}
+          <h2 className="text-lg font-semibold text-ink">{t("historyTitle")}</h2>
+          <DataTableV2
+            id="messages"
+            caption={t("logTitle")}
+            captionHidden
+            columns={columns}
+            state={rows}
+            rowKey={(item) => item.id}
+            stacked
+            toolbar={
+              <div
+                role="search"
+                aria-labelledby={filtersId}
+                className="flex flex-wrap items-end gap-3"
+              >
+                <span id={filtersId} className="sr-only">
+                  {tl("filtersLabel")}
+                </span>
+                <SelectField
+                  label={tl("purpose")}
+                  value={purpose}
+                  onChange={(event) => choosePurpose(event.target.value as MessagePurpose | "")}
+                  placeholder={tl("all")}
+                  options={MESSAGE_PURPOSES.map((p) => ({ value: p, label: tl(`purposes.${p}`) }))}
+                />
+                <SelectField
+                  label={tl("status")}
+                  value={status}
+                  onChange={(event) => chooseStatus(event.target.value as MessageStatus | "")}
+                  placeholder={tl("all")}
+                  options={MESSAGE_STATUSES.map((s) => ({ value: s, label: tl(`statuses.${s}`) }))}
+                />
+              </div>
+            }
+            chips={chips}
+            onRemoveChip={(id) => (id === "purpose" ? choosePurpose("") : chooseStatus(""))}
+            onClearFilters={() => {
+              setCursor(null);
+              setPurpose("");
+              setStatus("");
+            }}
+            emptyTitle={tl("emptyTitle")}
+            emptyBody={tl("emptyBody")}
+            noResultsTitle={tl("noResultsTitle")}
+            onRetry={() => void queryClient.invalidateQueries({ queryKey: KEYS.messages(filter) })}
+            footer={
+              nextCursor ? (
+                <Button variant="secondary" size="sm" onClick={() => setCursor(nextCursor)}>
+                  {tl("more")}
+                </Button>
+              ) : undefined
+            }
+          />
+        </>
       )}
     </div>
   );

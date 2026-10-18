@@ -2458,6 +2458,64 @@
         "title": "AuditVerifyRequest",
         "type": "object"
       },
+      "AutomaticOut": {
+        "description": "The automatic messages: switches and times, and the recent runs (US-2205, US-2207).",
+        "properties": {
+          "absence_alert_time": {
+            "format": "time",
+            "title": "Absence Alert Time",
+            "type": "string"
+          },
+          "absence_alerts_enabled": {
+            "title": "Absence Alerts Enabled",
+            "type": "boolean"
+          },
+          "fee_receipts_enabled": {
+            "title": "Fee Receipts Enabled",
+            "type": "boolean"
+          },
+          "fee_reminder_time": {
+            "format": "time",
+            "title": "Fee Reminder Time",
+            "type": "string"
+          },
+          "fee_reminders_enabled": {
+            "title": "Fee Reminders Enabled",
+            "type": "boolean"
+          },
+          "no_message_dates": {
+            "items": {
+              "format": "date",
+              "type": "string"
+            },
+            "title": "No Message Dates",
+            "type": "array"
+          },
+          "queued_now": {
+            "title": "Queued Now",
+            "type": "integer"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/SendRunOut"
+            },
+            "title": "Runs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "absence_alerts_enabled",
+          "absence_alert_time",
+          "fee_reminders_enabled",
+          "fee_reminder_time",
+          "fee_receipts_enabled",
+          "no_message_dates",
+          "queued_now",
+          "runs"
+        ],
+        "title": "AutomaticOut",
+        "type": "object"
+      },
       "BatchCreate": {
         "additionalProperties": false,
         "description": "Start extraction for register-page photos already uploaded as ``register_scan``\ndocuments (JPG or PNG, one page each, malware scan passed).",
@@ -3338,6 +3396,373 @@
           "created_at"
         ],
         "title": "BreakGlassOut",
+        "type": "object"
+      },
+      "BroadcastConfirmIn": {
+        "additionalProperties": false,
+        "description": "Confirm a preview (``Idempotency-Key``). The sections must be the previewed ones; the\npreview token pins the counts shown (409 ``preview_stale`` when they changed).",
+        "properties": {
+          "preview_token": {
+            "maxLength": 80,
+            "minLength": 8,
+            "title": "Preview Token",
+            "type": "string"
+          },
+          "resend_reason": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "minLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resend Reason"
+          },
+          "section_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 300,
+            "minItems": 1,
+            "title": "Section Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "preview_token",
+          "section_ids"
+        ],
+        "title": "BroadcastConfirmIn",
+        "type": "object"
+      },
+      "BroadcastOut": {
+        "properties": {
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Messages by status now (queued, sent, delivered, read, failed, skipped).",
+            "title": "Counts",
+            "type": "object"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "estimated_cost_inr": {
+            "title": "Estimated Cost Inr",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "language_fallbacks": {
+            "title": "Language Fallbacks",
+            "type": "integer"
+          },
+          "languages": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Languages",
+            "type": "object"
+          },
+          "notice_id": {
+            "format": "uuid",
+            "title": "Notice Id",
+            "type": "string"
+          },
+          "notice_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notice Title"
+          },
+          "queued": {
+            "title": "Queued",
+            "type": "integer"
+          },
+          "recipients": {
+            "title": "Recipients",
+            "type": "integer"
+          },
+          "requested_by": {
+            "format": "uuid",
+            "title": "Requested By",
+            "type": "string"
+          },
+          "resend": {
+            "title": "Resend",
+            "type": "boolean"
+          },
+          "section_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Section Ids",
+            "type": "array"
+          },
+          "skipped": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Skipped",
+            "type": "object"
+          },
+          "status": {
+            "enum": [
+              "previewed",
+              "sending",
+              "done"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "notice_id",
+          "notice_title",
+          "status",
+          "section_ids",
+          "resend",
+          "recipients",
+          "skipped",
+          "languages",
+          "language_fallbacks",
+          "estimated_cost_inr",
+          "queued",
+          "counts",
+          "requested_by",
+          "confirmed_at",
+          "completed_at",
+          "created_at"
+        ],
+        "title": "BroadcastOut",
+        "type": "object"
+      },
+      "BroadcastPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BroadcastOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "BroadcastPage",
+        "type": "object"
+      },
+      "BroadcastPreviewIn": {
+        "additionalProperties": false,
+        "description": "Who would get the notice (FR-MSG-012): sections of the current academic year. ``resend``\nasks for a \"Send again\" (guardians who already got this notice are counted again; a reason\nis then required when confirming).",
+        "properties": {
+          "resend": {
+            "default": false,
+            "title": "Resend",
+            "type": "boolean"
+          },
+          "section_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 300,
+            "minItems": 1,
+            "title": "Section Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "section_ids"
+        ],
+        "title": "BroadcastPreviewIn",
+        "type": "object"
+      },
+      "BroadcastPreviewOut": {
+        "properties": {
+          "already_sent": {
+            "title": "Already Sent",
+            "type": "integer"
+          },
+          "blocked_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why nothing can be sent now (messaging_not_connected, messaging_paused, template_not_approved, template_paused, messaging_currency_not_inr, notices_off); null when it can.",
+            "title": "Blocked Reason"
+          },
+          "estimated_cost_inr": {
+            "description": "Rupees incl. GST, paid by the school to Meta.",
+            "title": "Estimated Cost Inr",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "gst_percent": {
+            "title": "Gst Percent",
+            "type": "string"
+          },
+          "guardians": {
+            "description": "Guardians of the students in the chosen sections.",
+            "title": "Guardians",
+            "type": "integer"
+          },
+          "language_fallbacks": {
+            "description": "Guardians who read Telugu but get English (Telugu text or template missing).",
+            "title": "Language Fallbacks",
+            "type": "integer"
+          },
+          "languages": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Messages per language (en, te).",
+            "title": "Languages",
+            "type": "object"
+          },
+          "notice_id": {
+            "format": "uuid",
+            "title": "Notice Id",
+            "type": "string"
+          },
+          "preview_token": {
+            "title": "Preview Token",
+            "type": "string"
+          },
+          "recipients": {
+            "description": "Messages that will be queued.",
+            "title": "Recipients",
+            "type": "integer"
+          },
+          "section_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Section Ids",
+            "type": "array"
+          },
+          "skipped": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Guardians left out by reason code (no_optin, opted_out, optin_for_other_number, no_mobile_number, already_sent).",
+            "title": "Skipped",
+            "type": "object"
+          },
+          "utility_rate_inr": {
+            "title": "Utility Rate Inr",
+            "type": "string"
+          }
+        },
+        "required": [
+          "preview_token",
+          "notice_id",
+          "section_ids",
+          "guardians",
+          "recipients",
+          "skipped",
+          "languages",
+          "language_fallbacks",
+          "already_sent",
+          "estimated_cost_inr",
+          "utility_rate_inr",
+          "gst_percent",
+          "blocked_reason",
+          "expires_at"
+        ],
+        "title": "BroadcastPreviewOut",
+        "type": "object"
+      },
+      "BroadcastReportOut": {
+        "properties": {
+          "broadcast": {
+            "$ref": "#/components/schemas/BroadcastOut"
+          },
+          "failure_reasons": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Failed and skipped messages by reason.",
+            "title": "Failure Reasons",
+            "type": "object"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/SectionCountsOut"
+            },
+            "title": "Sections",
+            "type": "array"
+          }
+        },
+        "required": [
+          "broadcast",
+          "sections",
+          "failure_reasons"
+        ],
+        "title": "BroadcastReportOut",
         "type": "object"
       },
       "CancellationOut": {
@@ -15754,6 +16179,18 @@
             "title": "Attempts",
             "type": "integer"
           },
+          "broadcast_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Broadcast Id"
+          },
           "delivered_at": {
             "anyOf": [
               {
@@ -15812,6 +16249,12 @@
             ],
             "title": "Guardian Id"
           },
+          "has_link": {
+            "default": false,
+            "description": "It carried a parent link.",
+            "title": "Has Link",
+            "type": "boolean"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -15836,6 +16279,19 @@
           "language_fallback": {
             "title": "Language Fallback",
             "type": "boolean"
+          },
+          "next_attempt_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When a queued message is tried next (quiet hours, retry).",
+            "title": "Next Attempt At"
           },
           "phone_last4": {
             "anyOf": [
@@ -16158,6 +16614,23 @@
             "title": "Fee Reminders Enabled",
             "type": "boolean"
           },
+          "no_message_dates": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "date",
+                  "type": "string"
+                },
+                "maxItems": 60,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "IST dates without automatic messages (absence alerts, fee reminders); omitted or null keeps the current list.",
+            "title": "No Message Dates"
+          },
           "notices_enabled": {
             "title": "Notices Enabled",
             "type": "boolean"
@@ -16244,6 +16717,14 @@
             "title": "Gst Percent",
             "type": "string"
           },
+          "no_message_dates": {
+            "items": {
+              "format": "date",
+              "type": "string"
+            },
+            "title": "No Message Dates",
+            "type": "array"
+          },
           "notices_enabled": {
             "title": "Notices Enabled",
             "type": "boolean"
@@ -16289,6 +16770,7 @@
           "daily_cap",
           "default_daily_cap",
           "office_phone",
+          "no_message_dates",
           "utility_rate_inr",
           "gst_percent",
           "version"
@@ -25272,6 +25754,25 @@
         "title": "ReviewIn",
         "type": "object"
       },
+      "RevokeLinkOut": {
+        "properties": {
+          "message_id": {
+            "format": "uuid",
+            "title": "Message Id",
+            "type": "string"
+          },
+          "revoked": {
+            "title": "Revoked",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "message_id",
+          "revoked"
+        ],
+        "title": "RevokeLinkOut",
+        "type": "object"
+      },
       "RoleOut": {
         "properties": {
           "grantable": {
@@ -26215,6 +26716,47 @@
         "title": "SearchResultOut",
         "type": "object"
       },
+      "SectionCountsOut": {
+        "properties": {
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "section_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Id"
+          }
+        },
+        "required": [
+          "section_id",
+          "label",
+          "counts"
+        ],
+        "title": "SectionCountsOut",
+        "type": "object"
+      },
       "SectionCreate": {
         "additionalProperties": false,
         "properties": {
@@ -26461,6 +27003,66 @@
           }
         },
         "title": "SectionUpdate",
+        "type": "object"
+      },
+      "SendRunOut": {
+        "properties": {
+          "considered": {
+            "title": "Considered",
+            "type": "integer"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "job": {
+            "enum": [
+              "absence_alerts",
+              "fee_reminders"
+            ],
+            "title": "Job",
+            "type": "string"
+          },
+          "queued": {
+            "title": "Queued",
+            "type": "integer"
+          },
+          "run_on": {
+            "format": "date",
+            "title": "Run On",
+            "type": "string"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job",
+          "run_on",
+          "started_at",
+          "finished_at",
+          "considered",
+          "queued",
+          "counts"
+        ],
+        "title": "SendRunOut",
         "type": "object"
       },
       "SessionSettingsOut": {
@@ -52025,6 +52627,77 @@
         ]
       }
     },
+    "/api/v1/messages/{message_id}/revoke-link": {
+      "post": {
+        "description": "Stop the parent link a message carried from working, at once (ADR-0046 decision 5,\nFR-PUB-007; ``message.send``). ``revoked`` false when it had already stopped. Audited.",
+        "operationId": "revoke_link_api_v1_messages__message_id__revoke_link_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "message_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Message Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokeLinkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Revoke Link",
+        "tags": [
+          "messaging"
+        ]
+      }
+    },
     "/api/v1/messaging/account": {
       "delete": {
         "description": "Disconnect WhatsApp: sending stops at once, the token is erased and open parent links\nsent through messages stop working (US-2201 AC4; ``messaging.configure``, MFA within 5\nminutes; optional ``If-Match``). Audited.",
@@ -52296,6 +52969,216 @@
           }
         },
         "summary": "Resume",
+        "tags": [
+          "messaging"
+        ]
+      }
+    },
+    "/api/v1/messaging/automatic": {
+      "get": {
+        "description": "Absence alerts, fee reminders and receipt messages: switches, times, no-message dates,\nmessages waiting and the last two weeks of runs (US-2205, US-2207; ``message.read``).",
+        "operationId": "automatic_api_v1_messaging_automatic_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomaticOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Automatic",
+        "tags": [
+          "messaging"
+        ]
+      }
+    },
+    "/api/v1/messaging/broadcasts": {
+      "get": {
+        "description": "Recent broadcasts, newest first, with live delivery counts (FR-MSG-017; ``message.read``).",
+        "operationId": "list_broadcasts_api_v1_messaging_broadcasts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BroadcastPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List Broadcasts",
+        "tags": [
+          "messaging"
+        ]
+      }
+    },
+    "/api/v1/messaging/broadcasts/{broadcast_id}": {
+      "get": {
+        "description": "A broadcast's delivery report: counts by status and by class, failure and skip reasons,\nlive (FR-MSG-017, US-2204 AC2; ``message.read``; class teachers: their sections). Counts\nonly.",
+        "operationId": "broadcast_report_api_v1_messaging_broadcasts__broadcast_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "broadcast_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Broadcast Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BroadcastReportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Broadcast Report",
         "tags": [
           "messaging"
         ]
@@ -52980,6 +53863,266 @@
         "summary": "Approve Notice",
         "tags": [
           "circulars"
+        ]
+      }
+    },
+    "/api/v1/notices/{notice_id}/broadcasts": {
+      "get": {
+        "description": "The notice's broadcasts with live counts (``message.read``).",
+        "operationId": "notice_broadcasts_api_v1_notices__notice_id__broadcasts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "notice_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Notice Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BroadcastPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Notice Broadcasts",
+        "tags": [
+          "messaging"
+        ]
+      },
+      "post": {
+        "description": "Send the previewed notice (US-2204 AC2, AC3; ``message.send``; ``Idempotency-Key``): one\nmessage per opted-in guardian, sent outside quiet hours (21:00-07:00 IST). Errors: 409\n``preview_invalid``, ``preview_expired``, ``preview_stale`` (preview again),\n``notice_not_approved``, ``messaging_not_connected``, ``messaging_paused``,\n``template_not_approved``, ``template_paused``, ``messaging_currency_not_inr``,\n``notices_off``; 422 ``resend_reason`` (``required`` for \"Send again\"). Audited.",
+        "operationId": "confirm_broadcast_api_v1_notices__notice_id__broadcasts_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "notice_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Notice Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BroadcastConfirmIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BroadcastOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Confirm Broadcast",
+        "tags": [
+          "messaging"
+        ]
+      }
+    },
+    "/api/v1/notices/{notice_id}/broadcasts/preview": {
+      "post": {
+        "description": "Before sending an approved notice on WhatsApp: recipients, guardians left out by reason,\nlanguages and the estimated Meta cost incl. GST, paid by the school to Meta (US-2204 AC1;\n``message.send``). Returns a preview token valid 30 minutes; nothing is sent. Errors: 404;\n409 ``notice_not_approved``; 422 ``section_ids`` (``not_found``, ``not_current_year``,\n``too_many``).",
+        "operationId": "preview_broadcast_api_v1_notices__notice_id__broadcasts_preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "notice_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Notice Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BroadcastPreviewIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BroadcastPreviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Preview Broadcast",
+        "tags": [
+          "messaging"
         ]
       }
     },

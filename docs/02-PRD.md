@@ -674,6 +674,8 @@ Stories of the 2026-27 plan, release R2 (docs/18 §3 R2; owner decisions D4-D9 o
 
 *Built in wave R2-1C (2026-10-17): US-2201, US-2202, US-2203, US-2209, US-2210 and the message history of US-2208; US-2204..US-2207 (sending) and the broadcast report are wave R2-3G (docs/14). A staff opt-in after a parent's STOP needs a signed form (US-2203 AC2); a new number needs a new opt-in.*
 
+*Built in wave R2-3G (2026-10-18): US-2204 ("Send on WhatsApp" on an approved notice: sections, recipients, skips by reason, languages and the estimated Meta cost incl. GST, confirm with the consequence line, live delivery counts; "Send again" needs a reason), US-2205 (fee reminders at 10:00 IST on the school's offsets, collectable amounts only, no-message dates in WhatsApp settings), US-2206 (receipt message right after a receipt is issued), US-2207 (absence alerts once a day at the school's time, `absent` only), US-2208 AC2 (temporary errors retried after 5 and 20 minutes) and the delivery report per broadcast. Messages that would go out in quiet hours or above the daily cap wait for the next opening instead of being dropped; nothing is sent while the school is suspended (D31). Not built: bulk "Send reminder" from the dues list and "Send on WhatsApp" at the counter (receipts are sent automatically when switched on).*
+
 #### C23 · Parent language per school (R2.3; ADR-0044)
 
 **US-2301** · As a principal, I want to choose English or Telugu for everything parents receive, while our staff screens stay English. [FR-LANG-001, FR-LANG-002, FR-LANG-005, FR-LANG-006]

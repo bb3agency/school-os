@@ -759,6 +759,13 @@ def attendance_history(
     return out
 
 
+def absent_students(session: Session, on_date: dt.date) -> list[uuid.UUID]:
+    """Students marked ``absent`` on ``on_date`` (not ``late`` or ``leave``), as marked now.
+    System read for the WhatsApp absence alerts (R2-3G, FR-MSG-013; ADR-0043 decision 11): IDs
+    only; the caller decides who is told."""
+    return repo.students_with_status(session, on_date, "absent")
+
+
 @dataclass(frozen=True, slots=True)
 class ExamResult:
     exam_id: uuid.UUID
@@ -838,6 +845,7 @@ __all__ = [
     "RECORDS_CHANGED_EVENT",
     "DayMark",
     "ExamResult",
+    "absent_students",
     "attendance_day",
     "attendance_history",
     "attendance_month",

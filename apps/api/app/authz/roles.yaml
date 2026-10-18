@@ -128,6 +128,8 @@ roles:
       messaging.configure: school_step_up
       messaging.optin.record: school
       message.read: school
+      # R2-3G sending (ADR-0043; docs/07 §6.2)
+      message.send: school
       # R2-1B fees (ADR-0042; docs/07 §6.2): school-wide only, never scoped (FR-FEE-024)
       fee.collect: school
       fee.manage: school
@@ -186,6 +188,8 @@ roles:
       # R2-1C messaging (ADR-0043)
       messaging.optin.record: school
       message.read: school
+      # R2-3G sending (ADR-0043; docs/07 §6.2)
+      message.send: school
       # R2-1B fees (ADR-0042; docs/07 §6.2): school-wide only, never scoped (FR-FEE-024)
       fee.collect: school
       fee.concession.request: school

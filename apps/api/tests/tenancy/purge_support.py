@@ -826,14 +826,33 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             k=task,
             u=u["user"],
         )
+        parent_notice = uuid.uuid4()
         _run(
             c,
             "INSERT INTO ops.parent_notices (id, tenant_id, source, document_id, created_by) "
             "VALUES (:i, :t, 'circular', :d, :u)",
-            i=uuid.uuid4(),
+            i=parent_notice,
             t=t,
             d=ids["doc"],
             u=u["user"],
+        )
+        # --- WhatsApp sending (R2-3G, 0061_messaging_sends): a preview and a run ------------
+        _run(
+            c,
+            "INSERT INTO msg.broadcasts (id, tenant_id, notice_id, section_ids, requested_by, "
+            "expires_at) VALUES (:i, :t, :n, ARRAY[:s]::uuid[], :u, now())",
+            i=uuid.uuid4(),
+            t=t,
+            n=parent_notice,
+            s=uuid.uuid4(),
+            u=u["user"],
+        )
+        _run(
+            c,
+            "INSERT INTO msg.send_runs (id, tenant_id, job, run_on) VALUES "
+            "(:i, :t, 'absence_alerts', current_date)",
+            i=uuid.uuid4(),
+            t=t,
         )
         # --- student timeline and early warning (M5, 0035_student_insights) ---------------
         exam, flag = uuid.uuid4(), uuid.uuid4()

@@ -161,6 +161,12 @@ class MessagingSettingsIn(_In):
     office_phone: OfficePhone | None = Field(
         default=None, description="The school office's phone, given in automatic replies."
     )
+    no_message_dates: list[dt.date] | None = Field(
+        default=None,
+        max_length=60,
+        description="IST dates without automatic messages (absence alerts, fee reminders); "
+        "omitted or null keeps the current list.",
+    )
 
 
 class MessagingSettingsOut(_Out):
@@ -174,6 +180,7 @@ class MessagingSettingsOut(_Out):
     daily_cap: int | None
     default_daily_cap: int | None
     office_phone: str | None
+    no_message_dates: list[dt.date]
     utility_rate_inr: str
     gst_percent: str
     version: int
@@ -296,6 +303,11 @@ class MessagingMessageOut(_Out):
     error_code: str | None
     error_reason: str | None
     attempts: int
+    broadcast_id: uuid.UUID | None = None
+    next_attempt_at: dt.datetime | None = Field(
+        default=None, description="When a queued message is tried next (quiet hours, retry)."
+    )
+    has_link: bool = Field(default=False, description="It carried a parent link.")
     queued_at: dt.datetime
     sent_at: dt.datetime | None
     delivered_at: dt.datetime | None

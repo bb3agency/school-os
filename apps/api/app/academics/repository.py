@@ -122,6 +122,16 @@ def student_marks(
 _EXAM_NAME_CONSTRAINTS = frozenset({"exams_name_per_year", "exams_name_per_year_ci"})
 
 
+def students_with_status(session: Session, on_date: dt.date, status: str) -> list[uuid.UUID]:
+    """Students marked ``status`` on ``on_date`` (one row per student and day)."""
+    stmt = (
+        select(AttendanceMark.student_id)
+        .where(AttendanceMark.on_date == on_date, AttendanceMark.status == status)
+        .order_by(AttendanceMark.student_id)
+    )
+    return list(session.scalars(stmt))
+
+
 def insert_exam(session: Session, values: Mapping[str, Any]) -> Exam | None:
     """The new exam, or ``None`` when a concurrent request created one with the same name
     (whatever its case) in the same year first (``exams_name_per_year`` /

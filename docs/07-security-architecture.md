@@ -232,6 +232,7 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | messaging.configure (R2-1C: connect or disconnect WhatsApp, sync templates, switches and times, resume after a pause; ADR-0043) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
 | messaging.optin.record (R2-1C: record opt-in/opt-out with evidence, print join slips) | — | ✓ | ✓ | ✓ | — | — | S | — | — |
 | message.read (R2-1C: delivery log, message history, opt-in states) | ✓ | ✓ | ✓ | ✓ | ✓ | — | S | — | ✓ |
+| message.send (R2-3G: send an approved notice on WhatsApp, send again with a reason, revoke a parent link) | — | ✓ | ✓ | — | — | — | — | — | — |
 | fee.collect (R2-1B: take payments at the counter, issue receipts, request receipt cancellations; fee permissions are school-wide only, FR-FEE-024) | — | ✓ | ✓ | ✓ | ✓ | — | — | — | — |
 | fee.manage (R2-1B: fee heads, plans, applying plans, adjustment requests, fee settings, day close) | — | ✓ | — | — | ✓ | — | — | — | — |
 | fee.concession.request (R2-1B) | — | ✓ | ✓ | — | ✓ | — | — | — | — |
@@ -329,9 +330,8 @@ Platform roles belong to SchoolOS staff (operators), not to schools (ADR-0013). 
 | fee.refund.approve (maker-checker; principal or accountant, D17) | — | ✓ᴿ | — | — | ✓ᴿ | — | — | — | — |
 | fee.reconcile (bank statement import, UPI confirmations, reconciliation items) | — | ✓ | — | — | ✓ | — | — | — | — |
 | fee.report (download the day book and dues lists: bulk personal financial data) | ✓ᴿ | ✓ᴿ | — | — | ✓ᴿ | — | — | — | ✓ᴿ |
-| message.send (send an approved notice, resend, revoke a parent link; wave R2-3G) | — | ✓ | ✓ | — | — | — | — | — | — |
 
-`messaging.configure`, `messaging.optin.record` and `message.read` moved to the §6.2 matrix when wave R2-1C built them (2026-10-17, migration `0057_messaging_core`).
+`messaging.configure`, `messaging.optin.record` and `message.read` moved to the §6.2 matrix when wave R2-1C built them (2026-10-17, migration `0057_messaging_core`). `message.send` moved there with wave R2-3G (2026-10-18, migration `0061_messaging_sends`; principal and office admin, school-wide, no step-up; run the system-role sync after migrating). The reports (`GET /messaging/broadcasts*`, `/notices/{id}/broadcasts`, `/messaging/automatic`) need `message.read`; a class teacher's section-scoped grant counts only the messages about the students of their sections (the automatic-run totals are whole-school counts without names or numbers).
 
 **R2-1B (2026-10-18):** the eight `fee.*` keys of the table above except `fee.reconcile` (R2-2E) are in the catalog, `roles.yaml` and the §6.2 matrix; every fee route requires them school-wide (a section-scoped custom role holding `fee.collect` gets 403). `finance.read` now also reads fee accounts, plans, dues and the daily report. The messaging keys moved with R2-1C.
 

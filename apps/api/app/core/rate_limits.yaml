@@ -207,6 +207,8 @@ routes:
   GET /api/v1/dq/readiness/{profile_key}: [readiness_reads, readiness_school]
   GET /api/v1/dq/readiness/{profile_key}/students: [readiness_reads, readiness_school]
   POST /api/v1/academic-years/{year_id}/promotions:preview: [heavy_jobs]
+  # R2-3G: a broadcast preview reads every guardian of the chosen sections
+  POST /api/v1/notices/{notice_id}/broadcasts/preview: [search]
   POST /api/v1/platform/invoice-runs: [platform_emergency]
   # audit-chain verification (R-19)
   POST /api/v1/platform/audit/verify: [platform_audit_verify]
