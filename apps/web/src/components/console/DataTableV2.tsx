@@ -64,6 +64,12 @@ export interface DataTableV2Props<T> {
   emptyAction?: ReactNode;
   /** Shown instead when filters are active and nothing matches. */
   noResultsTitle?: ReactNode;
+  /**
+   * With active chips and no rows, show the table's own "No matches" state (default). Off: the
+   * first-use state (`emptyTitle`, `emptyBody`, `emptyAction`) shows whatever the chips, for
+   * lists whose chips are views rather than filters, or whose page explains the empty result.
+   */
+  noResultsState?: boolean;
   /** Error state: a "Try again" button. */
   onRetry?: () => void;
   /**
@@ -113,6 +119,7 @@ export function DataTableV2<T>({
   emptyBody,
   emptyAction,
   noResultsTitle,
+  noResultsState = true,
   onRetry,
   selection,
   footer,
@@ -189,6 +196,12 @@ export function DataTableV2<T>({
   };
 
   const clearSelection = () => setSelected(new Set());
+  const toggleRow = (key: string) => {
+    const next = new Set(selected);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    setSelected(next);
+  };
   const selectedRows = rows ? rows.filter((row) => selected.has(rowKey(row))) : [];
 
   const columnChooser = (
@@ -280,7 +293,7 @@ export function DataTableV2<T>({
     );
   } else if (state.data.length === 0) {
     body =
-      chips.length > 0 ? (
+      chips.length > 0 && noResultsState ? (
         <EmptyState
           className="m-4"
           icon="search"
@@ -299,6 +312,26 @@ export function DataTableV2<T>({
       );
   } else {
     const data = state.data;
+    const selectColumn = (rowLabel: (row: T) => string): ColumnV2<T> => ({
+      key: "__select",
+      header: "",
+      stack: "actions",
+      cell: (row) => {
+        const key = rowKey(row);
+        return (
+          <label className="inline-flex min-h-8 items-center gap-2 text-sm font-semibold text-ink">
+            <input
+              type="checkbox"
+              className="size-4"
+              aria-label={rowLabel(row)}
+              checked={selected.has(key)}
+              onChange={() => toggleRow(key)}
+            />
+            <span aria-hidden="true">{t("select")}</span>
+          </label>
+        );
+      },
+    });
     const table = (
       <div
         role="region"
@@ -371,12 +404,7 @@ export function DataTableV2<T>({
                         className="relative z-[1] size-4 align-middle"
                         aria-label={selection.rowLabel(row)}
                         checked={isSelected}
-                        onChange={() => {
-                          const next = new Set(selected);
-                          if (next.has(key)) next.delete(key);
-                          else next.add(key);
-                          setSelected(next);
-                        }}
+                        onChange={() => toggleRow(key)}
                       />
                     </td>
                   ) : null}
@@ -407,7 +435,9 @@ export function DataTableV2<T>({
           <StackedRows
             caption={caption}
             captionHidden
-            columns={shown}
+            framed={false}
+            // Phones keep row selection: a labelled checkbox in each card's action row.
+            columns={selection ? [...shown, selectColumn(selection.rowLabel)] : shown}
             rows={data}
             rowKey={rowKey}
           />
@@ -440,7 +470,9 @@ export function DataTableV2<T>({
         <div
           role="region"
           aria-label={t("bulkActions")}
-          className="bar-in sticky bottom-0 z-[3] flex flex-wrap items-center gap-3 rounded-b-xl border-t border-border bg-surface px-4 py-2.5 shadow-popover"
+          data-dock=""
+          // On phones it stands on the bottom bar, clear of the home indicator (docs/17 §5.7).
+          className="bar-in sticky bottom-[var(--dock-offset)] z-[3] flex flex-wrap items-center gap-3 rounded-b-xl border-t border-border bg-surface px-4 py-2.5 pb-[max(0.625rem,var(--dock-safe))] shadow-popover"
           data-print="hide"
         >
           <p role="status" className="num text-sm font-semibold text-ink">

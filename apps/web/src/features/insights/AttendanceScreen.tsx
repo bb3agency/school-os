@@ -296,6 +296,7 @@ export function AttendanceScreen() {
         actions={
           view === "month" && section ? (
             <Button variant="secondary" onClick={() => window.print()} data-print="hide">
+              <Icon name="printer" className="size-4" />
               {t("print")}
             </Button>
           ) : null

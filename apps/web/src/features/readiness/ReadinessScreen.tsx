@@ -8,10 +8,12 @@ import * as z from "@/lib/zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { Pill } from "@/components/ui/Badge";
+import { Icon } from "@/components/ui/Icon";
 import { Button } from "@/components/ui/Button";
 import { cardClasses } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingState } from "@/components/ui/LoadingState";
+import { HeroFigure } from "@/components/ui/HeroFigure";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { KpiCard } from "@/components/ui/StatCard";
 import { TabNav } from "@/components/ui/TabNav";
@@ -317,6 +319,7 @@ export function ReadinessScreen({
               <RunReadinessDialog profile={profileKey} sectionId={sectionId} />
             ) : null}
             <Button variant="secondary" onClick={() => window.print()}>
+              <Icon name="printer" className="size-4" />
               {tf("print")}
             </Button>
           </>
@@ -362,17 +365,18 @@ export function ReadinessScreen({
               aria-labelledby="readiness-share"
               className={cardClasses({ padding: "md" })}
             >
-              <p id="readiness-share" className="text-sm text-ink-muted">
-                {t("shareLabel", { profile: profileName(profileKey) })}
-              </p>
-              <p className="num mt-1 text-5xl leading-none font-semibold text-ink">
-                {share ?? (
-                  <>
-                    <span aria-hidden="true">—</span>
-                    <span className="sr-only">{tc("notAvailable")}</span>
-                  </>
-                )}
-              </p>
+              <HeroFigure
+                labelId="readiness-share"
+                label={t("shareLabel", { profile: profileName(profileKey) })}
+                value={
+                  share ?? (
+                    <>
+                      <span aria-hidden="true">—</span>
+                      <span className="sr-only">{tc("notAvailable")}</span>
+                    </>
+                  )
+                }
+              />
               {totals ? (
                 <div className="mt-3">
                   <ReadyBar

@@ -7,6 +7,9 @@ const instances: Array<{
   options: Record<string, unknown>;
   scrollTo: ReturnType<typeof vi.fn>;
   destroy: ReturnType<typeof vi.fn>;
+  stop: ReturnType<typeof vi.fn>;
+  start: ReturnType<typeof vi.fn>;
+  isScrolling: boolean | "native" | "smooth";
 }> = [];
 
 vi.mock("lenis", () => ({
@@ -16,6 +19,9 @@ vi.mock("lenis", () => ({
       opts?.onComplete?.(),
     );
     destroy = vi.fn();
+    stop = vi.fn();
+    start = vi.fn();
+    isScrolling: boolean | "native" | "smooth" = false;
     constructor(options: Record<string, unknown>) {
       this.options = options;
       instances.push(this);
@@ -26,14 +32,16 @@ vi.mock("lenis", () => ({
 const { SmoothScroll } = await import("./SmoothScroll");
 
 let reduce = false;
+let coarse = false;
 const listeners = new Set<() => void>();
 beforeEach(() => {
   instances.length = 0;
   reduce = false;
+  coarse = false;
   listeners.clear();
   window.matchMedia = vi.fn().mockImplementation((query: string) => ({
     get matches() {
-      return query.includes("reduce") ? reduce : false;
+      return query.includes("reduce") ? reduce : query.includes("coarse") ? coarse : false;
     },
     media: query,
     addEventListener: (_: string, cb: () => void) => listeners.add(cb),
@@ -63,6 +71,29 @@ function page() {
 }
 
 describe("SmoothScroll (Lenis, home page only)", () => {
+  it("ends a running wheel glide when a scroll key is pressed, so the key's scroll wins", async () => {
+    const view = page();
+    await settle();
+    const lenis = instances[0]!;
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "PageDown" }));
+    expect(lenis.stop).not.toHaveBeenCalled();
+    lenis.isScrolling = "smooth";
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "a" }));
+    expect(lenis.stop).not.toHaveBeenCalled();
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "PageDown" }));
+    expect(lenis.stop).toHaveBeenCalledTimes(1);
+    expect(lenis.start).toHaveBeenCalledTimes(1);
+    view.unmount();
+  });
+
+  it("is never created on a touch screen (phones keep native scrolling)", async () => {
+    coarse = true;
+    const view = page();
+    await settle();
+    expect(instances).toHaveLength(0);
+    view.unmount();
+  });
+
   it("smooths the wheel only, and is destroyed on unmount", async () => {
     const view = page();
     await settle();

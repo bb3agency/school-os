@@ -121,6 +121,8 @@ export function TicketTable({
   return (
     <DataTableV2
       id="platform.tickets"
+      // Phones: one card per row (docs/17 §5.7).
+      stacked
       toolbar={toolbar}
       caption={caption}
       captionHidden

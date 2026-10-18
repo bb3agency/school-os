@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { useKeepInViewport } from "./keep-in-view";
 
 export interface PopoverProps {
   /** The trigger's content (text, or an icon with `label`). */
@@ -40,6 +41,8 @@ export function Popover({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
+  // On a narrow phone the panel is nudged back inside the screen (docs/17 §5.7).
+  useKeepInViewport(panelRef, open);
 
   useEffect(() => {
     if (!open) return;
@@ -79,7 +82,7 @@ export function Popover({
         aria-label={label}
         onClick={() => setOpen((value) => !value)}
         className={cn(
-          "pressable inline-flex min-h-10 items-center gap-2 rounded-md border border-border-soft bg-surface px-3 text-sm font-semibold text-ink hover:bg-surface-muted pointer-coarse:min-h-11",
+          "pressable inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-border-soft bg-surface px-3 text-sm font-semibold text-ink hover:bg-surface-muted pointer-coarse:min-h-11 pointer-coarse:min-w-11",
           triggerClassName,
         )}
       >

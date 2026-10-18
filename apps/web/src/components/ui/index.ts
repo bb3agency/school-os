@@ -98,5 +98,6 @@ export { Menu, type MenuEntry, type MenuProps } from "./Menu";
 export { Pagination, type PaginationProps } from "./Pagination";
 export { Popover, type PopoverProps } from "./Popover";
 export { SaveBar } from "./SaveBar";
+export { HeroFigure } from "./HeroFigure";
 export { Steps, type Step } from "./Steps";
 export { ToastProvider, useToast, type ToastInput, type ToastTone } from "./Toaster";

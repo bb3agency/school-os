@@ -19,6 +19,7 @@ import {
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
 import { Icon, type IconName } from "./Icon";
+import { useKeepInViewport } from "./keep-in-view";
 
 export type MenuEntry =
   | {
@@ -98,6 +99,8 @@ export function Menu({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
+  // On a narrow phone the panel is nudged back inside the screen (docs/17 §5.7).
+  useKeepInViewport(menuRef, open);
 
   const close = useCallback((returnFocus: boolean) => {
     setOpen(false);

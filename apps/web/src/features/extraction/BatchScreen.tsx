@@ -119,6 +119,8 @@ function PagesCard({ batch }: { batch: ExtractionBatchDetail }) {
       </div>
       <DataTableV2
         id="register-photo-pages"
+        // Phones: one card per row (docs/17 §5.7).
+        stacked
         caption={t("title")}
         captionHidden
         columns={columns}

@@ -125,8 +125,6 @@ const CONTRAST_PAIRS: ReadonlyArray<readonly [string, string, number, string]> =
   ["ink-subtle", "canvas-neutral", 4.5, "notes on the neutral canvas"],
   ["primary", "canvas-neutral", 4.5, "links and breadcrumbs on the neutral canvas"],
   ["focus", "canvas-neutral", 3, "focus ring on the neutral canvas"],
-  ["white", "ai-from", 4.5, "AI panel text (dark stop)"],
-  ["white", "ai-to", 4.5, "AI panel text (light stop)"],
   // Platform chrome
   ["platform-ink", "platform", 4.5, "platform sidebar and top bar text"],
   ["platform-ink", "platform-hover", 4.5, "platform sidebar hover and active row"],

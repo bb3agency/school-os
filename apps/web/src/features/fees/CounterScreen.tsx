@@ -16,6 +16,7 @@ import {
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button, buttonClasses } from "@/components/ui/Button";
+import { HeroFigure } from "@/components/ui/HeroFigure";
 import { Card } from "@/components/ui/Card";
 import { ErrorSummary, type SummaryError } from "@/components/ui/ErrorSummary";
 import { Icon } from "@/components/ui/Icon";
@@ -751,8 +752,7 @@ function SavedPanel({
   return (
     <Card title={t("savedTitle")} className="max-w-2xl">
       <div role="status" className="mt-2 space-y-2">
-        <p className="text-sm text-ink-muted">{t("receiptNumber")}</p>
-        <p className="num text-4xl font-semibold break-all text-ink">{saved.receipt_number}</p>
+        <HeroFigure size="md" label={t("receiptNumber")} value={saved.receipt_number} />
         <p className="flex flex-wrap items-baseline gap-x-2">
           <span>{saved.student_name}</span>
           <span aria-hidden="true">·</span>

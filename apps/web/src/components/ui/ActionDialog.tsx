@@ -10,6 +10,7 @@ import { useApiForm, type FieldErrors } from "@/lib/forms";
 import { Alert } from "./Alert";
 import { ApiErrorAlert, type ErrorNamespace } from "./ApiErrorAlert";
 import { Button, type ButtonSize, type ButtonVariant } from "./Button";
+import { useControlledOpen, useReturnFocus } from "./controlled-dialog";
 import { DialogCloseButton } from "./DialogCloseButton";
 
 /** Renders a one-time result (e.g. a secret) with a way to close the dialog. */
@@ -26,8 +27,18 @@ function ResultSlot<TResult>({
 }
 
 export interface ActionDialogProps<TSchema extends z.ZodType, TResult> {
-  /** Text of the button that opens the dialog. */
-  triggerLabel: ReactNode;
+  /**
+   * Text of the button that opens the dialog. Leave it out with `open` when something else
+   * opens the dialog (a "More" menu item): then no trigger is rendered.
+   */
+  triggerLabel?: ReactNode;
+  /**
+   * Controlled open (docs/17 §4): `true` opens the dialog, `false` closes it. The dialog
+   * reports every close (Escape, Cancel, success) through `onOpenChange(false)`. Omit for the
+   * usual trigger button.
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   triggerVariant?: ButtonVariant;
   triggerSize?: ButtonSize;
   triggerDisabled?: boolean;
@@ -74,6 +85,8 @@ export interface ActionDialogProps<TSchema extends z.ZodType, TResult> {
  */
 export function ActionDialog<TSchema extends z.ZodType, TResult>({
   triggerLabel,
+  open: openProp,
+  onOpenChange,
   triggerVariant = "secondary",
   triggerSize = "md",
   triggerDisabled = false,
@@ -105,6 +118,7 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
   const triggerHintId = useId();
   const consequenceId = useId();
   const [open, setOpen] = useState(false);
+  const focus = useReturnFocus();
 
   // Fades out before it closes (Escape too); instant under reduced motion.
   const close = useDialogClose(dialogRef, "modal");
@@ -122,28 +136,39 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
   });
 
   const show = useCallback(() => {
+    const dialog = dialogRef.current;
+    if (!dialog || dialog.open) return;
     form.reset();
+    focus.remember();
     setOpen(true);
-    dialogRef.current?.showModal();
-  }, [form]);
+    dialog.showModal();
+  }, [form, focus]);
+
+  useControlledOpen({ open: openProp, dialogRef, show, close });
+  const hasTrigger = triggerLabel !== undefined;
 
   const result = form.result;
 
   return (
     <>
-      <Button
-        ref={triggerRef}
-        variant={triggerVariant}
-        size={triggerSize}
-        onClick={show}
-        disabled={triggerDisabled}
-        hidden={triggerHidden}
-        aria-haspopup="dialog"
-        aria-describedby={triggerDescription && !triggerHidden ? triggerHintId : undefined}
-      >
-        {triggerLabel}
-      </Button>
-      {triggerDescription && !triggerHidden ? (
+      {hasTrigger ? (
+        <Button
+          ref={triggerRef}
+          variant={triggerVariant}
+          size={triggerSize}
+          onClick={() => {
+            show();
+            onOpenChange?.(true);
+          }}
+          disabled={triggerDisabled}
+          hidden={triggerHidden}
+          aria-haspopup="dialog"
+          aria-describedby={triggerDescription && !triggerHidden ? triggerHintId : undefined}
+        >
+          {triggerLabel}
+        </Button>
+      ) : null}
+      {hasTrigger && triggerDescription && !triggerHidden ? (
         <span id={triggerHintId} className="sr-only">
           {triggerDescription}
         </span>
@@ -154,7 +179,8 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
         aria-describedby={description ? descriptionId : undefined}
         onClose={() => {
           setOpen(false);
-          triggerRef.current?.focus();
+          onOpenChange?.(false);
+          focus.restore(triggerRef.current);
         }}
         className={cn(
           "dialog-motion m-auto w-[min(36rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-0 text-ink shadow-popover",

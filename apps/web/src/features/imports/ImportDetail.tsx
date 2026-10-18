@@ -473,6 +473,8 @@ function RowsCard({
       </div>
       <DataTableV2
         id="import-rows"
+        // Phones: one card per row (docs/17 §5.7).
+        stacked
         caption={t("title")}
         captionHidden
         columns={columns}

@@ -53,7 +53,7 @@ export function Pagination({
         ? t("range", { from: number(from), to: number(to) })
         : t("rangeOf", { from: number(from), to: number(to), total: number(total) });
   const button =
-    "pressable inline-flex min-h-9 items-center gap-1.5 rounded-md border border-border-soft bg-surface px-3 text-sm font-semibold text-ink hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:min-h-11";
+    "pressable inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border border-border-soft bg-surface px-3 text-sm font-semibold text-ink hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:min-h-11";
   return (
     <nav
       aria-label={t("label")}
@@ -63,7 +63,8 @@ export function Pagination({
       <p aria-live="polite" className="num text-ink-muted">
         {range}
       </p>
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Phones: Previous and Next share the width (thumb-sized, docs/17 §5.7). */}
+      <div className="flex flex-wrap items-center gap-2 max-sm:w-full">
         {pageSize && pageSizes && onPageSizeChange ? (
           <span className="inline-flex items-center gap-2">
             <label htmlFor={sizeId} className="text-ink-muted">
@@ -83,14 +84,16 @@ export function Pagination({
             </select>
           </span>
         ) : null}
-        <button type="button" className={button} disabled={!hasPrevious} onClick={onPrevious}>
-          <Icon name="chevronLeft" className="size-4" />
-          {t("previous")}
-        </button>
-        <button type="button" className={button} disabled={!hasNext} onClick={onNext}>
-          {t("next")}
-          <Icon name="chevronRight" className="size-4" />
-        </button>
+        <span className="flex gap-2 max-sm:w-full max-sm:[&>*]:flex-1">
+          <button type="button" className={button} disabled={!hasPrevious} onClick={onPrevious}>
+            <Icon name="chevronLeft" className="size-4" />
+            {t("previous")}
+          </button>
+          <button type="button" className={button} disabled={!hasNext} onClick={onNext}>
+            {t("next")}
+            <Icon name="chevronRight" className="size-4" />
+          </button>
+        </span>
       </div>
     </nav>
   );

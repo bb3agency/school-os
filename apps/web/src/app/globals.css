@@ -170,10 +170,6 @@
   --color-teal-soft: oklch(0.95 0.03 185);
   --color-teal: oklch(0.5 0.09 185);
 
-  /* AI panel (Ask): accent strong to accent; white text 6.1:1 at the lightest stop. */
-  --color-ai-from: oklch(0.4 0.11 258);
-  --color-ai-to: oklch(0.5 0.13 258);
-
   /* Chart series (graphics: 3:1 against white, WCAG 1.4.11) */
   --color-chart-1: oklch(0.5 0.13 258); /* accent, 6.1:1 */
   --color-chart-2: oklch(0.62 0.14 65); /* amber, 3.8:1 */
@@ -319,7 +315,12 @@
  *   --shell-gutter  the same inside the consoles (16px, 24px from md), where the sidebar
  *                   already uses width;
  *   --content-max   the widest the console content gets (1920px screens keep centred lines);
- *   --sticky-offset room kept above focused or scrolled-to elements (WCAG 2.4.11).
+ *   --sticky-offset room kept above focused or scrolled-to elements (WCAG 2.4.11);
+ *   --dock-offset   how far bottom-docked bars (SaveBar, bulk bar, the Ask composer) sit above
+ *                   the screen's bottom edge: the phone bottom bar's height while it shows,
+ *                   else 0 (docs/17 §5.7);
+ *   --dock-safe     the home-indicator inset those bars add themselves (0 while the bottom
+ *                   bar, which already adds it, is under them).
  * Safe-area insets (notches, rounded corners) are added on top via env(); they are 0 on
  * desktops, and env() is Baseline widely available.
  */
@@ -328,6 +329,18 @@
   --shell-gutter: 1rem;
   --content-max: 108rem;
   --sticky-offset: 1rem;
+  --dock-offset: 0px;
+  --dock-safe: env(safe-area-inset-bottom);
+}
+
+/* The phone bottom bar (AppShell, below md): 56px of links, a 1px top border and the home
+   indicator inset. Docked bars stand on it instead of hiding under it; while the on-screen
+   keyboard is up the bar is [hidden] and they drop back to the bottom edge. */
+@media (width < 48rem) {
+  :root:has(.bottom-bar:not([hidden])) {
+    --dock-offset: calc(3.5rem + 1px + env(safe-area-inset-bottom));
+    --dock-safe: 0px;
+  }
 }
 
 /*
@@ -412,6 +425,18 @@
     scroll-padding-block: var(--sticky-offset);
   }
 
+  /* The consoles: the sticky top bar (48px, taller when its tools wrap on a phone) and the
+     bottom bar or a docked SaveBar / Ask composer never cover the focused element
+     (WCAG 2.4.11 Focus not obscured). */
+  html:has(.shell-topbar) {
+    scroll-padding-top: calc(3.5rem + var(--sticky-offset));
+    scroll-padding-bottom: calc(var(--dock-offset) + var(--sticky-offset));
+  }
+
+  html:has(.shell-topbar):has([data-dock]) {
+    scroll-padding-bottom: calc(var(--dock-offset) + 5rem);
+  }
+
   /* The page behind the open menu drawer does not scroll (:has and :modal are Baseline
      widely available). */
   html:has(dialog.drawer:modal) {
@@ -461,11 +486,6 @@
     --color-focus: var(--color-platform-accent);
   }
 
-  /* Blue AI panel: a white ring (5.2:1 on the lightest stop) instead of the blue one. */
-  .ai-chrome {
-    --color-focus: #ffffff;
-  }
-
   dialog::backdrop {
     background-color: oklch(0.22 0.006 85 / 0.45);
   }
@@ -497,6 +517,17 @@
     color: var(--color-ink);
     box-shadow: var(--shadow-popover);
     overflow: hidden;
+  }
+
+  /* Phones: the palette stays at the top (not a bottom sheet), so the on-screen keyboard
+     never covers its search box or results; it fills the width less a small margin. */
+  @media (width < 40rem) {
+    dialog.palette {
+      margin: max(0.5rem, env(safe-area-inset-top)) auto auto;
+      width: calc(100vw - 1rem);
+      max-height: calc(100vh - 1rem);
+      max-height: calc(100dvh - 1rem);
+    }
   }
 
   /* Menus and popovers: a panel under their trigger (absolute inside a relative wrapper). */
@@ -581,15 +612,6 @@
       var(--color-surface-sunken) 80%
     );
     background-size: 200% 100%;
-  }
-
-  /* AI panel: dark stop at the top left with a soft light over it; the lightest point is
-     the brand stop (white text 5.2:1). */
-  .ai-gradient {
-    background-color: var(--color-ai-from);
-    background-image:
-      radial-gradient(circle at 0% 0%, rgb(96 165 250 / 0.25), transparent 45%),
-      linear-gradient(135deg, var(--color-ai-from) 0%, var(--color-ai-to) 100%);
   }
 
   /* Menu drawer (AppShell, below lg): the same Sidebar as on wide screens, in a native modal
@@ -1100,7 +1122,7 @@
  * lib/dialog-motion.ts.
  */
 @media (width < 40rem) {
-  dialog:modal:not(.drawer) {
+  dialog:modal:not(.drawer, .palette) {
     margin: auto 0 0;
     width: 100%;
     max-width: 100%;
@@ -1126,10 +1148,20 @@
   label:has(> input:is([type="checkbox"], [type="radio"])) {
     min-height: 2.75rem;
   }
+
+  /* A text field below 16px makes iOS zoom the page on focus: fields that a screen set
+     smaller (text-sm, text-xs) get 16px on touch screens. File pickers open no keyboard. */
+  :is(
+    input:not([type="checkbox"], [type="radio"], [type="file"], [type="range"]),
+    select,
+    textarea
+  ):is(.text-sm, .text-xs) {
+    font-size: 1rem;
+  }
 }
 
 @media (width < 40rem) and (prefers-reduced-motion: no-preference) {
-  dialog[open]:modal:not(.drawer) {
+  dialog[open]:modal:not(.drawer, .palette) {
     animation:
       fade-in var(--duration-quick) var(--ease-out),
       sheet-in var(--duration-drawer) var(--ease-drawer);
@@ -1154,10 +1186,6 @@
 
 /* Windows high contrast: gradients and shadows disappear, so borders carry the shapes. */
 @media (forced-colors: active) {
-  .ai-gradient {
-    border-color: CanvasText;
-  }
-
   .sidebar-tip-bubble {
     border: 1px solid CanvasText;
   }
@@ -1191,7 +1219,6 @@
     text-shadow: none !important;
   }
 
-  .ai-gradient,
   .quote-gradient {
     background: #ffffff !important;
     color: #000000 !important;

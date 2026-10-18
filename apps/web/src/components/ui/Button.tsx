@@ -7,7 +7,7 @@ import { cn } from "@/lib/cn";
  * - `brand`: blue fill for the one brand-coloured call to action on a page.
  * - `secondary`: white with a hairline border. `ghost`: text only (blue).
  * - `danger`: red fill for destructive actions ("End", "Revoke").
- * - `inverse`: white fill with dark text, for dark or blue surfaces (AI panel, dark cards).
+ * - `inverse`: white fill with dark text, for dark surfaces (dark cards, the operator chrome).
  *
  * `cn` joins classes without merging them, so `className` can add spacing or width but
  * cannot reliably override colours or padding: pick a variant or size instead.

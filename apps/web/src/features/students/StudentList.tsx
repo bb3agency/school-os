@@ -326,7 +326,7 @@ export function StudentListView({
             <div className="min-w-0">
               <Link
                 href={`/students/${row.id}`}
-                className="font-semibold break-anywhere text-primary underline-offset-4 after:absolute after:inset-0 hover:underline"
+                className="inline-block min-h-6 font-semibold break-anywhere text-primary underline-offset-4 after:absolute after:inset-0 hover:underline"
               >
                 {row.display_name ?? t("unnamed")}
               </Link>
@@ -377,7 +377,7 @@ export function StudentListView({
           },
         ]
       : []),
-    { id: "print", label: t("print"), icon: "file", onSelect: () => window.print() },
+    { id: "print", label: t("print"), icon: "printer", onSelect: () => window.print() },
   ];
 
   const toolbar = (

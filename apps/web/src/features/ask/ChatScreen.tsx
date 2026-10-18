@@ -505,10 +505,11 @@ export function ChatScreen({ conversationId }: { conversationId: string | null }
         {/* The composer stays mounted in the same place (focus and text survive the first
             question); it docks to the bottom once the chat has messages. */}
         <div
+          data-dock={empty ? undefined : ""}
           className={cn(
             empty
               ? "relative"
-              : "chat-dock sticky bottom-0 z-10 -mx-4 px-4 pt-6 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:-mx-6 sm:px-6",
+              : "chat-dock sticky bottom-[var(--dock-offset)] z-10 -mx-4 px-4 pt-6 pb-[max(0.75rem,var(--dock-safe))] sm:-mx-6 sm:px-6",
           )}
         >
           {!stick.pinned && !empty ? (

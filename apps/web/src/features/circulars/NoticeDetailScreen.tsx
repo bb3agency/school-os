@@ -7,6 +7,7 @@ import * as z from "@/lib/zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
+import { Icon } from "@/components/ui/Icon";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { TextAreaField, TextField } from "@/components/ui/Input";
@@ -388,6 +389,7 @@ function Approved({ notice, onChanged }: { notice: Notice; onChanged: () => Prom
       <div className="flex flex-wrap gap-3" data-print="hide">
         <Button onClick={() => void copy()}>{t("copy")}</Button>
         <Button variant="secondary" onClick={() => window.print()}>
+          <Icon name="printer" className="size-4" />
           {t("print")}
         </Button>
         {notice.files_available ? (

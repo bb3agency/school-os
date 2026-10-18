@@ -274,6 +274,8 @@ export function OperatorsScreen() {
       />
       <DataTableV2
         id="platform.operators"
+        // Phones: one card per row (docs/17 §5.7).
+        stacked
         caption={t("title")}
         captionHidden
         columns={columns}
