@@ -18,7 +18,7 @@ from sqlalchemy import Engine, text
 from app.core.db import tenant_session
 from app.identity.service_token import SERVICE_TOKEN_HEADER, issue_service_token
 from app.public import service
-from app.public.config import HandleKind
+from app.public.config import PARENT_TARGET_TYPES, HandleKind
 from app.public.guards import PUBLIC_TOKEN_HEADER
 
 TESTS = Path(__file__).resolve().parents[1]
@@ -36,6 +36,7 @@ def _load(name: str, path: Path) -> ModuleType:
 
 
 SW = _load("sos_test_student_world", TESTS / "students" / "student_world.py")
+_TARGETS: dict[str, str] = dict(PARENT_TARGET_TYPES.items())
 EXCHANGE = "/api/v1/public/links/exchange"
 CURRENT = "/api/v1/public/links/current"
 
@@ -59,20 +60,62 @@ def issue(
     guardian_id: uuid.UUID | None = None,
     target_id: uuid.UUID | None = None,
     key: str | None = None,
-    target_type: str = "notice",
+    target_type: str | None = None,
     by_owner: bool = True,
 ) -> service.IssuedHandle:
+    """A handle of ``school``. A ``parent_notice`` without ``target_id`` points at a fresh
+    approved synthetic notice (R2-3H: the page shows it); other kinds default to the target
+    type their page expects (``PARENT_TARGET_TYPES``) and a random target id."""
     owner = school.people["owner"]
     with tenant_session(school.tenant_id, owner.user_id if by_owner else None) as db:
+        if kind == "parent_notice" and target_id is None:
+            target_id = approved_notice(db, owner.user_id)
         return service.issue_handle(
             db,
             kind=kind,
-            target_type=target_type,
+            target_type=target_type or _TARGETS.get(kind, "notice"),
             target_id=target_id or uuid.uuid4(),
             guardian_id=guardian_id,
             key=key,
             created_by=owner.user_id if by_owner else None,
         )
+
+
+def approved_notice(
+    db: Any,
+    user_id: uuid.UUID,
+    *,
+    title: str = "Sports day",
+    body: str = "Sports day is on 14/11/2026 at 9:00. Children come in sports uniform.",
+    status: str = "approved",
+    pdf: bool = False,
+) -> uuid.UUID:
+    """An approved synthetic notice written in the current school's ``tenant_session`` (test
+    setup; the circulars tests cover drafting and approval). ``pdf``: its files are ready."""
+    notice_id = uuid.uuid4()
+    db.execute(
+        text(
+            "INSERT INTO ops.parent_notices (id, tenant_id, source, status, title_en, body_en, "
+            "title_te, body_te, created_by, approved_by, approved_at, render_status, pdf_key, "
+            "png_key, rendered_at) VALUES (:i, core.current_tenant(), 'blank', :s, :t, :b, :t, :b, "
+            ":u, :ab, :at, :rs, CASE WHEN :pk THEN 't/' || core.current_tenant() || '/exports/' || "
+            "CAST(:i AS text) || '/notice.pdf' END, CASE WHEN :pk THEN 't/' || "
+            "core.current_tenant() || '/exports/' || CAST(:i AS text) || '/notice.png' END, :ra)"
+        ),
+        {
+            "i": notice_id,
+            "s": status,
+            "t": title,
+            "b": body,
+            "u": user_id,
+            "ab": user_id if status == "approved" else None,
+            "at": dt.datetime.now(dt.UTC) if status == "approved" else None,
+            "rs": "ready" if pdf else None,
+            "pk": pdf,
+            "ra": dt.datetime.now(dt.UTC) if pdf else None,
+        },
+    )
+    return notice_id
 
 
 def key_hash(key: str) -> bytes:

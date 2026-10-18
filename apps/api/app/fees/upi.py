@@ -169,6 +169,20 @@ def payee(session: Session) -> tuple[str, str, str] | None:
     return row.payee_name, row.vpa, upi_uri(row.vpa, row.payee_name)
 
 
+def payee_qr(session: Session) -> tuple[str, str, str] | None:
+    """``(payee name, UPI ID, QR as SVG)`` for the parent dues page (R2-3H; US-2403), or
+    ``None`` when not set. No permission check: the caller holds a live dues link."""
+    row = repo.get_settings(session)
+    if row is None:
+        return None
+    svg = qr_svg(
+        upi_uri(row.vpa, row.payee_name),
+        label=f"UPI QR code for {row.payee_name}",
+        error=config().upi.qr_error,
+    )
+    return row.payee_name, row.vpa, svg
+
+
 # --- UTR at the counter (FR-FEE-014) ------------------------------------------------------------
 
 

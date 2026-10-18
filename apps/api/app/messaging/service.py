@@ -2184,10 +2184,55 @@ tenancy.register_data_owner(
 )
 
 
+# --- R2-3H parent opt-in page (ADR-0046 decision 2 "Opt-in"; ADR-0043 decision 7) ---------------
+
+
+@dataclass(frozen=True, slots=True)
+class ParentCategoryState:
+    category: str
+    status: str  # opted_in | opted_out | not_asked
+    stopped_by_parent: bool
+
+
+def parent_optin_state(
+    session: Session, guardian_id: uuid.UUID
+) -> tuple[ParentCategoryState, ...] | None:
+    """The guardian's current choice per category for the parent opt-in page, or ``None`` when
+    WhatsApp messages are not offered here (FR-MSG-024). Read only: the page never records an
+    opt-in (ADR-0043 decision 7 accepts only the join message, a signed form or in person) and
+    stopping stays the parent's ``STOP`` on WhatsApp (FR-MSG-010). "Opted in" counts only for
+    the guardian's current number. No permission check: the caller holds a live opt-in link."""
+    if not available():
+        return None
+    current = repo.current_optins(session, [guardian_id])
+    return tuple(
+        ParentCategoryState(
+            category=state.category,
+            status=(
+                "opted_in"
+                if state.status == "opted_in" and state.for_current_number
+                else ("opted_out" if state.status == "opted_out" else "not_asked")
+            ),
+            stopped_by_parent=state.stopped_by_parent,
+        )
+        for state in _category_states(session, guardian_id, current)
+    )
+
+
+def office_phone(session: Session) -> str | None:
+    """The school office phone set in the WhatsApp settings (the parent dues page shows it,
+    ADR-0046 decision 2 "Dues"); ``None`` when unset or messaging is not offered."""
+    if not available():
+        return None
+    row = repo.get_settings(session)
+    return row.office_phone if row is not None else None
+
+
 __all__ = [
     "CONFIGURE",
     "READ",
     "RECORD",
+    "ParentCategoryState",
     "QueuedMessage",
     "available",
     "connect_embedded_signup",
@@ -2202,6 +2247,8 @@ __all__ = [
     "join_slips",
     "list_templates",
     "live_tenant_ids",
+    "office_phone",
+    "parent_optin_state",
     "process_inbox",
     "provision_templates",
     "purge_expired",
