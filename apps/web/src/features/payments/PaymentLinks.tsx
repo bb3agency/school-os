@@ -169,6 +169,7 @@ function CancelLink({ intent }: { intent: Intent }) {
       description={t("cancelBody")}
       confirmLabel={t("cancel")}
       confirmVariant="danger"
+      consequence={t("cancelConsequence")}
       schema={z.object({})}
       invalidate={[KEYS.intents(intent.account_id)]}
       errorNamespace="payments"
@@ -209,15 +210,15 @@ export function PaymentLinks({ account }: { account: Account }) {
       <FeesGate data={intents}>
         {(rows) =>
           rows.length === 0 ? (
-            <p>{t("none")}</p>
+            <p className="text-ink-muted">{t("none")}</p>
           ) : (
             <TableScroll label={t("title")}>
-              <Table>
+              <Table density="compact">
                 <THead>
                   <Tr>
                     <Th>{t("columns.code")}</Th>
                     <Th>{t("columns.instalments")}</Th>
-                    <Th className="text-right">{t("columns.amount")}</Th>
+                    <Th numeric>{t("columns.amount")}</Th>
                     <Th>{t("columns.status")}</Th>
                     <Th>{t("columns.expires")}</Th>
                     <Th>{t("columns.receipt")}</Th>
@@ -227,15 +228,17 @@ export function PaymentLinks({ account }: { account: Account }) {
                 <TBody>
                   {rows.map((intent) => (
                     <Tr key={intent.id}>
-                      <Td>
+                      <Td className="whitespace-nowrap">
                         <code className="font-mono">{intent.intent_code}</code>
-                        <span className="block text-xs text-ink-muted">
+                        <span className="num block text-xs text-ink-muted">
                           {formatDateTime(intent.created_at)}
-                          {intent.created_by_name ? ` · ${intent.created_by_name}` : ""}
+                          {intent.created_by_name ? (
+                            <span className="font-sans">{` · ${intent.created_by_name}`}</span>
+                          ) : null}
                         </span>
                       </Td>
-                      <Td>{intent.instalments.join(", ")}</Td>
-                      <Td numeric>
+                      <Td className="num">{intent.instalments.join(", ")}</Td>
+                      <Td numeric className="font-semibold">
                         <Amount value={intent.amount} />
                       </Td>
                       <Td>
@@ -243,12 +246,12 @@ export function PaymentLinks({ account }: { account: Account }) {
                           {t(`statuses.${intent.status}`)}
                         </Pill>
                       </Td>
-                      <Td>{formatDate(intent.expires_at)}</Td>
-                      <Td>
+                      <Td className="num whitespace-nowrap">{formatDate(intent.expires_at)}</Td>
+                      <Td className="whitespace-nowrap">
                         {intent.receipt_id ? (
                           <Link
                             href={`/fees/receipts/${intent.receipt_id}`}
-                            className="text-primary underline underline-offset-4"
+                            className="num text-primary underline underline-offset-4"
                           >
                             {intent.receipt_number}
                           </Link>
