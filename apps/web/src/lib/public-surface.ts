@@ -11,13 +11,18 @@
  * Pure module (no `server-only`): the Next.js proxy imports it.
  */
 
-/** The public pages: `/p`, `/p/view`, `/p/expired`, `/p/<token>`, `/p/fonts/telugu/<file>`. */
+/**
+ * The public pages: `/p`, `/p/view`, `/p/expired`, `/p/<token>`, `/p/fonts/telugu/<file>`, and
+ * (R2-3H) `/p/document` (the PDF redirect), `/p/pay` and `/p/optin` (form posts), `/p/paid`
+ * (Razorpay's return page).
+ */
 export const PUBLIC_PREFIX = "/p";
 const PUBLIC_PATH = /^\/p(?:\/|$)/;
 /** Paths the `(public)` route group really serves; anything else under /p is the expired page. */
 const SERVED = [
   /^\/p\/view$/,
   /^\/p\/expired$/,
+  /^\/p\/(?:document|pay|paid|optin)$/,
   /^\/p\/[A-Za-z0-9_-]{1,128}$/,
   /^\/p\/fonts\/telugu\/[A-Za-z0-9._-]{1,80}$/,
 ];
@@ -27,6 +32,34 @@ export const PARENT_TOKEN = /^[A-Za-z0-9_-]{43}$/;
 export const PARENT_COOKIE = "sos_parent";
 export const PUBLIC_EXPIRED_PATH = "/p/expired";
 export const PUBLIC_VIEW_PATH = "/p/view";
+export const PUBLIC_PAID_PATH = "/p/paid";
+
+/**
+ * Where "Pay online" may send a parent (R2-3H; FR-PUB-010): Razorpay's hosted payment pages
+ * (the short link on rzp.io, the page on razorpay.com). The same list as `pay_redirect_hosts`
+ * in apps/api/app/public/config.yaml; `rzp.example.test` (the fake provider) only in
+ * development. They are the only third-party origins in the public CSP (`form-action`, because
+ * the pay form's answer is a 303 to them).
+ */
+export const PAY_HOSTS = ["rzp.io", "razorpay.com"] as const;
+const DEV_PAY_HOSTS = ["rzp.example.test"] as const;
+
+export function payHosts(isDev: boolean): readonly string[] {
+  return isDev ? [...PAY_HOSTS, ...DEV_PAY_HOSTS] : PAY_HOSTS;
+}
+
+/** An https URL on one of the pay hosts (or a subdomain of one). */
+export function isPayUrl(value: string, isDev: boolean): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:" || url.username || url.password || url.port) return false;
+  const host = url.hostname.toLowerCase();
+  return payHosts(isDev).some((h) => host === h || host.endsWith(`.${h}`));
+}
 
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
@@ -168,9 +201,22 @@ export function parentCookieName(secure: boolean): string {
 /**
  * The public pages' Content-Security-Policy: our own origin only, no third-party scripts,
  * fonts or analytics, no framing (docs/07 §11.2). Razorpay's hosted page is reached by a plain
- * navigation (wave R2-3H), never embedded or scripted.
+ * navigation (the pay form's 303, R2-3H), never embedded or scripted: its hosts are allowed in
+ * `form-action` only.
  */
-export function buildPublicCsp(options: { nonce: string; isDev: boolean; https: boolean }): string {
+export function buildPublicCsp(options: {
+  nonce: string;
+  isDev: boolean;
+  https: boolean;
+  /** Allow the pay hosts in form-action (the parent pages; not the verification pages). */
+  pay?: boolean;
+}): string {
+  const formAction =
+    (options.pay ?? true)
+      ? `form-action 'self' ${payHosts(options.isDev)
+          .flatMap((h) => [`https://${h}`, `https://*.${h}`])
+          .join(" ")}`
+      : "form-action 'self'";
   const directives = [
     "default-src 'self'",
     `script-src 'self' 'nonce-${options.nonce}' 'strict-dynamic'${options.isDev ? " 'unsafe-eval'" : ""}`,
@@ -181,7 +227,7 @@ export function buildPublicCsp(options: { nonce: string; isDev: boolean; https: 
     "object-src 'none'",
     "base-uri 'none'",
     "frame-ancestors 'none'",
-    "form-action 'self'",
+    formAction,
   ];
   if (options.https) directives.push("upgrade-insecure-requests");
   return directives.join("; ");

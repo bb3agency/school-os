@@ -28,6 +28,8 @@ export interface PublicApiCall {
   token?: string | undefined;
   /** JSON body (POST). */
   body?: unknown;
+  /** Query values (ids and codes only, never personal data or the token; R2-3H). */
+  query?: Record<string, string> | undefined;
   incomingHeaders: Headers;
   headersTimeoutMs?: number;
 }
@@ -56,6 +58,7 @@ export async function callPublicApi(
     body = JSON.stringify(call.body);
   }
   const url = new URL(call.path, runtime.config.apiInternalUrl);
+  if (call.query) url.search = new URLSearchParams(call.query).toString();
   const timeout = AbortSignal.timeout(call.headersTimeoutMs ?? 15_000);
   return runtime.apiFetch(url, {
     method: call.method,
