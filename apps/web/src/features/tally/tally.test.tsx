@@ -286,6 +286,7 @@ describe("connector screen (US-1801, US-1802, US-1803; FR-TALLY-001/002/004/009)
     await userEvent.click(await screen.findByRole("button", { name: en.devices.revoke }));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText(en.devices.revokeBody)).toBeInTheDocument();
+    expect(within(dialog).getByText(en.devices.revokeConsequence)).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole("button", { name: en.devices.revoke }));
     await waitFor(() =>
       expect(stub.callsTo(`POST /bff/api/v1/tally/devices/${DEVICE}/revoke`)).toHaveLength(1),
@@ -346,6 +347,8 @@ describe("ledger links (US-1803, FR-TALLY-006)", () => {
       "unlinked",
     );
     expect(screen.getByText(en.balance.due)).toBeInTheDocument();
+    // The mapping state is said in words, not by colour alone.
+    expect(screen.getByText(en.ledgers.state.unlinked)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: `Link ${LEDGER}` }));
     const panel = await screen.findByRole("region", { name: en.link.title });
     expect(within(panel).getByRole("heading", { name: en.link.title })).toHaveFocus();

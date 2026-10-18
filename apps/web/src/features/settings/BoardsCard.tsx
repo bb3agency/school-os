@@ -8,13 +8,16 @@ import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ErrorSummary } from "@/components/ui/ErrorSummary";
 import { TextField } from "@/components/ui/Input";
+import { SaveBar } from "@/components/ui/SaveBar";
 import { SelectField } from "@/components/ui/Select";
 import { Value } from "@/components/ui/Value";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { formList, formValues } from "@/lib/forms";
 import { useQueryClient } from "@tanstack/react-query";
 import { ifMatch, type SettingsPatch } from "./data";
+import { useFormDirty } from "./useFormDirty";
 
 /** FR-TEN-020 (ADR-0041): the boards SchoolOS has board profiles for. */
 export const BOARDS = ["BSEAP", "CBSE", "CISCE"] as const;
@@ -83,19 +86,8 @@ export function BoardsCard({
   onSaved?: (version: number) => void;
 }) {
   const t = useTranslations("schoolSettings.boards");
-  const tc = useTranslations("common");
-  const tv = useTranslations("validation");
-  const api = useBffClient("staff");
-  const queryClient = useQueryClient();
-  const formId = useId();
+  const [generation, setGeneration] = useState(0);
   const settings = tenant.settings;
-  const known = tenant.boards.filter(isBoard);
-  const [chosen, setChosen] = useState<Board[]>(known);
-  const [mode, setMode] = useState<(typeof MODES)[number]>(settings.operating_mode ?? "full");
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<unknown>(undefined);
-  const [nameError, setNameError] = useState<string | undefined>(undefined);
-  const [outcome, setOutcome] = useState<"saved" | "unchanged" | null>(saved ? "saved" : null);
   const classBoards = settings.class_boards ?? {};
   const boardName = (code: string) => (isBoard(code) ? t(`names.${code}`) : code);
 
@@ -128,6 +120,52 @@ export function BoardsCard({
     );
   }
 
+  // Discard: remount the form so it shows the loaded choice again.
+  return (
+    <BoardsForm
+      key={generation}
+      tenant={tenant}
+      tenantKey={tenantKey}
+      saved={saved && generation === 0}
+      onSaved={onSaved}
+      onDiscard={() => setGeneration((value) => value + 1)}
+    />
+  );
+}
+
+function BoardsForm({
+  tenant,
+  tenantKey,
+  saved,
+  onSaved,
+  onDiscard,
+}: {
+  tenant: TenantProfile;
+  tenantKey: readonly unknown[];
+  saved: boolean;
+  onSaved: ((version: number) => void) | undefined;
+  onDiscard: () => void;
+}) {
+  const t = useTranslations("schoolSettings.boards");
+  const ts = useTranslations("schoolSettings");
+  const tc = useTranslations("common");
+  const tv = useTranslations("validation");
+  const api = useBffClient("staff");
+  const queryClient = useQueryClient();
+  const formId = useId();
+  const erpId = `${formId}-erp`;
+  const settings = tenant.settings;
+  const known = tenant.boards.filter(isBoard);
+  const [chosen, setChosen] = useState<Board[]>(known);
+  const [mode, setMode] = useState<(typeof MODES)[number]>(settings.operating_mode ?? "full");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<unknown>(undefined);
+  const [nameError, setNameError] = useState<string | undefined>(undefined);
+  const [attempt, setAttempt] = useState(0);
+  const [outcome, setOutcome] = useState<"saved" | "unchanged" | null>(saved ? "saved" : null);
+  const classBoards = settings.class_boards ?? {};
+  const { ref: formRef, dirty, onChange: onFormChange } = useFormDirty();
+
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -141,6 +179,7 @@ export function BoardsCard({
     setError(undefined);
     if (!parsed.success) {
       setNameError(tv(parsed.error.issues[0]?.message === "tooLong" ? "tooLong" : "invalid"));
+      setAttempt((value) => value + 1);
       return;
     }
     setNameError(undefined);
@@ -182,9 +221,18 @@ export function BoardsCard({
     "inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-md border border-border-soft bg-surface px-3 text-sm has-checked:border-primary has-checked:bg-primary-soft";
 
   return (
-    <form noValidate onSubmit={onSubmit} aria-labelledby={`${formId}-title`}>
+    <form
+      ref={formRef}
+      noValidate
+      onSubmit={onSubmit}
+      onChange={onFormChange}
+      aria-labelledby={`${formId}-title`}
+    >
       <Card title={<span id={`${formId}-title`}>{t("title")}</span>} description={t("description")}>
         <div className="space-y-6">
+          {nameError ? (
+            <ErrorSummary errors={[{ fieldId: erpId, message: nameError }]} attempt={attempt} />
+          ) : null}
           <fieldset className="space-y-2" aria-describedby={`${formId}-boards-hint`}>
             <legend className="text-sm font-semibold text-ink">{t("boardsField")}</legend>
             <p id={`${formId}-boards-hint`} className="text-sm text-ink-muted">
@@ -267,6 +315,7 @@ export function BoardsCard({
 
           {mode === "alongside" ? (
             <TextField
+              id={erpId}
               name="current_erp_name"
               label={t("erpNameField")}
               hint={t("erpNameHint")}
@@ -291,12 +340,15 @@ export function BoardsCard({
               {t("unchanged")}
             </Alert>
           ) : null}
-          <div className="flex flex-wrap items-center gap-3">
-            <Button type="submit" disabled={pending}>
-              {pending ? tc("working") : t("save")}
-            </Button>
-          </div>
         </div>
+        <SaveBar dirty={dirty}>
+          <Button variant="secondary" disabled={!dirty || pending} onClick={onDiscard}>
+            {ts("discard")}
+          </Button>
+          <Button type="submit" disabled={pending}>
+            {pending ? tc("working") : t("save")}
+          </Button>
+        </SaveBar>
       </Card>
     </form>
   );

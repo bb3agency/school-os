@@ -1,13 +1,17 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useDeferredValue, useState } from "react";
 import * as z from "@/lib/zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { Pill, type PillVariant } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { Card, cardClasses } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { FilterChips, type FilterChip } from "@/components/ui/FilterChips";
+import { Icon } from "@/components/ui/Icon";
 import { SearchInput } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -116,7 +120,7 @@ function VerifiedCard({
             <Alert tone="warning">{t("needsReviewNote")}</Alert>
           ) : null}
           <p className="whitespace-pre-line">{displayText(answer.answer_text)}</p>
-          <p className="font-mono text-xs text-ink-subtle">
+          <p className="num text-xs text-ink-muted">
             {mine
               ? t("verifiedByYou")
               : name
@@ -156,6 +160,7 @@ export function VerifiedAnswersScreen() {
   const ta = useTranslations("ask");
   const tc = useTranslations("common");
   const tl = useTranslations("students.list");
+  const tt = useTranslations("ui.table");
   const meQuery = useStaffMeQuery();
   const me = useStaffMe();
   const can = useStaffCan();
@@ -165,6 +170,16 @@ export function VerifiedAnswersScreen() {
   const pages = useCursorStack();
   const allowed = can(ASK_PERM.ask);
   const list = useVerifiedAnswers(status, pages.cursor, allowed);
+  const queryClient = useQueryClient();
+  const retry = () => void queryClient.invalidateQueries({ queryKey: ASK_KEYS.verifiedAll });
+  const chooseStatus = (next: VerifiedStatus | null) => {
+    pages.reset();
+    setStatus(next);
+  };
+  const chips: FilterChip[] = [
+    ...(status ? [{ id: "status", label: t("statusFilter"), value: t(`status.${status}`) }] : []),
+    ...(filter.trim() ? [{ id: "text", label: t("filterLabel"), value: filter.trim() }] : []),
+  ];
 
   const shown =
     list.status === "ready" ? list.data.data.filter((a) => matchesFilter(a, deferredFilter)) : [];
@@ -172,7 +187,7 @@ export function VerifiedAnswersScreen() {
   if (meQuery.isPending) return <LoadingState label={tc("loading")} />;
   if (!allowed) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader title={ta("title")} />
         <AskTabs active="verified" />
         <Alert tone="warning" title={ta("noAccessTitle")}>
@@ -183,7 +198,7 @@ export function VerifiedAnswersScreen() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={ta("title")}
         description={t("description")}
@@ -211,33 +226,69 @@ export function VerifiedAnswersScreen() {
             value={status ?? ""}
             onChange={(event) => {
               const value = event.currentTarget.value;
-              pages.reset();
-              setStatus(STATUSES.find((s) => s === value) ?? null);
+              chooseStatus(STATUSES.find((s) => s === value) ?? null);
             }}
             options={STATUSES.map((value) => ({ value, label: t(`status.${value}`) }))}
           />
         </div>
+        <FilterChips
+          className="mt-3"
+          chips={chips}
+          onRemove={(id) => (id === "status" ? chooseStatus(null) : setFilter(""))}
+          onClear={() => {
+            chooseStatus(null);
+            setFilter("");
+          }}
+        />
       </div>
       {list.status === "loading" ? <LoadingState label={tc("loading")} /> : null}
       {list.status === "error" || list.status === "unavailable" ? (
         <Alert tone="danger" title={tc("loadErrorTitle")}>
-          {tc("loadErrorBody")}
+          <p>{tc("loadErrorBody")}</p>
+          {list.status === "error" ? (
+            <Button variant="secondary" size="sm" className="mt-3" onClick={retry}>
+              <Icon name="refresh" className="size-4" />
+              {tc("retry")}
+            </Button>
+          ) : null}
         </Alert>
       ) : null}
       {list.status === "ready" && list.data.data.length === 0 ? (
-        <EmptyState title={t("emptyTitle")} body={t("emptyBody")} />
+        status ? (
+          <EmptyState
+            title={t("filterEmptyTitle")}
+            body={t("filterEmptyBody")}
+            icon="search"
+            action={
+              <Button variant="secondary" size="sm" onClick={() => chooseStatus(null)}>
+                {tt("clearFilters")}
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState icon="checkCircle" title={t("emptyTitle")} body={t("emptyBody")} />
+        )
       ) : null}
       {list.status === "ready" && list.data.data.length > 0 ? (
         <section aria-label={t("title")} className="space-y-3">
-          <p role="status" className="text-sm text-ink-muted">
+          <p role="status" className="num text-sm text-ink-muted">
             {deferredFilter.trim()
               ? t("filterCount", { count: shown.length, total: list.data.data.length })
               : ""}
           </p>
           {shown.length === 0 ? (
-            <EmptyState title={t("filterEmptyTitle")} body={t("filterEmptyBody")} icon="search" />
+            <EmptyState
+              title={t("filterEmptyTitle")}
+              body={t("filterEmptyBody")}
+              icon="search"
+              action={
+                <Button variant="secondary" size="sm" onClick={() => setFilter("")}>
+                  {tt("clearFilters")}
+                </Button>
+              }
+            />
           ) : null}
-          <ul className="space-y-4">
+          <ul className="space-y-3">
             {shown.map((answer) => (
               <VerifiedCard
                 key={answer.id}

@@ -26,10 +26,13 @@ export function AuditScreen({ filters = {} }: { filters?: AuditFilters }) {
       }),
     ),
   );
+  // The pager sits in the table's footer, only when there is another page.
+  const paged = Boolean(pager.onPrevious || pager.onNext);
   return (
-    <div className="space-y-4">
-      <AuditView events={rows} filters={filters} />
-      <Pager label={t("pagesLabel")} {...pager} />
-    </div>
+    <AuditView
+      events={rows}
+      filters={filters}
+      footer={paged ? <Pager label={t("pagesLabel")} {...pager} /> : undefined}
+    />
   );
 }

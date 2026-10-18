@@ -3,11 +3,12 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
-import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
+import { ButtonLink } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Link } from "@/i18n/navigation";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { KEYS } from "./data";
 
@@ -49,27 +50,32 @@ export function OAuthCallbackScreen() {
   }, [api, queryClient]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader title={t("title")} />
-      {state.kind === "working" ? <LoadingState label={t("working")} /> : null}
-      {state.kind === "done" ? (
-        <Alert tone="success" title={t("doneTitle")}>
-          {t("doneBody")}
-        </Alert>
-      ) : null}
-      {state.kind === "missing" ? (
-        <Alert tone="warning" title={t("missingTitle")}>
-          {t("missingBody")}
-        </Alert>
-      ) : null}
-      {state.kind === "failed" ? <ApiErrorAlert error={state.error} namespace="payments" /> : null}
-      {state.kind !== "working" ? (
-        <p>
-          <Link href="/settings/payments" className="text-primary underline">
-            {t("back")}
-          </Link>
-        </p>
-      ) : null}
+      <Card className="mx-auto w-full max-w-xl">
+        {state.kind === "working" ? <LoadingState label={t("working")} /> : null}
+        <div role="status">
+          {state.kind === "done" ? (
+            <EmptyState icon="check" title={t("doneTitle")} body={t("doneBody")} />
+          ) : null}
+          {state.kind === "missing" ? (
+            <EmptyState icon="info" title={t("missingTitle")} body={t("missingBody")} />
+          ) : null}
+        </div>
+        {state.kind === "failed" ? (
+          <ApiErrorAlert error={state.error} namespace="payments" />
+        ) : null}
+        {state.kind !== "working" ? (
+          <p className="mt-4 flex justify-center">
+            <ButtonLink
+              href="/settings/payments"
+              variant={state.kind === "done" ? "primary" : "secondary"}
+            >
+              {t("back")}
+            </ButtonLink>
+          </p>
+        ) : null}
+      </Card>
     </div>
   );
 }

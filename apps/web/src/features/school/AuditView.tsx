@@ -1,12 +1,15 @@
+"use client";
+
 import type { AuditEvent } from "@schoolos/api-client";
 import { useTranslations } from "next-intl";
+import { useRef, type ReactNode } from "react";
+import { DataTableV2, type ColumnV2 } from "@/components/console/DataTableV2";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Pill } from "@/components/ui/Badge";
-import { cardClasses } from "@/components/ui/Card";
+import type { FilterChip } from "@/components/ui/FilterChips";
 import { Icon } from "@/components/ui/Icon";
 import { SearchInput, TextField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { Link } from "@/i18n/navigation";
 import { formatDateTime } from "@/lib/format";
@@ -16,6 +19,8 @@ import { AuditExportButton } from "./AuditExportButton";
 
 const KNOWN_ACTORS = ["user", "system", "operator"] as const;
 const MAX_SUMMARY = 240;
+const FILTER_KEYS = ["action", "actor", "from", "to"] as const;
+type FilterKey = (typeof FILTER_KEYS)[number];
 
 /**
  * Audit summaries hold IDs, field names, counts and codes only (the API rejects personal
@@ -37,18 +42,36 @@ export function formatSummary(summary: Readonly<Record<string, unknown>>): strin
 }
 
 /**
+ * The filters live in the URL (GET form), so removing a chip empties that field and submits
+ * the form again: the same GET of this page the Apply button makes, without that filter.
+ */
+function submitWithout(form: HTMLFormElement | null, keys: readonly FilterKey[]) {
+  if (!form) return;
+  for (const key of keys) {
+    const field = form.elements.namedItem(key);
+    if (field instanceof HTMLInputElement) field.value = "";
+  }
+  form.requestSubmit();
+}
+
+/**
  * US-1001 / FR-AUD-005: audit viewer with a filter bar (a GET form: the filters live in the
- * URL and are shown again after filtering), the integrity check and CSV export.
+ * URL, are shown again after filtering and as chips that remove one filter or all), the
+ * integrity check and CSV export. A compact log: dense rows, mono timestamps.
  */
 export function AuditView({
   events,
   filters = {},
+  footer,
 }: {
   events: Loadable<readonly AuditEvent[]>;
   filters?: AuditFilters;
+  /** Under the table: the pager, when there is more than one page. */
+  footer?: ReactNode;
 }) {
   const t = useTranslations("school.audit");
   const tc = useTranslations("common");
+  const formRef = useRef<HTMLFormElement>(null);
 
   const actor = (row: AuditEvent) => {
     const known = KNOWN_ACTORS.find((type) => type === row.actor_type);
@@ -64,22 +87,22 @@ export function AuditView({
       <Link
         href={{ pathname: "/audit", query }}
         aria-label={t("filterByUser", { who: text })}
-        className="underline underline-offset-2 hover:text-primary"
+        className="whitespace-nowrap underline underline-offset-2 hover:text-primary"
       >
         {text}
       </Link>
     );
   };
 
-  const columns: Column<AuditEvent>[] = [
+  const columns: ColumnV2<AuditEvent>[] = [
     {
       key: "when",
       header: t("colWhen"),
       className: "whitespace-nowrap",
       cell: (row) => (
-        <span className="font-mono text-xs text-ink-muted">
+        <time dateTime={row.occurred_at} className="num font-mono text-xs text-ink-muted">
           <Value>{formatDateTime(row.occurred_at)}</Value>
-        </span>
+        </time>
       ),
     },
     { key: "who", header: t("colWho"), cell: (row) => actor(row) },
@@ -105,6 +128,7 @@ export function AuditView({
     {
       key: "summary",
       header: t("colSummary"),
+      stack: "wide",
       cell: (row) => (
         <span className="text-sm break-words text-ink-muted">
           <Value>{formatSummary(row.summary)}</Value>
@@ -113,10 +137,20 @@ export function AuditView({
     },
   ];
 
-  const active = Boolean(filters.actor || filters.action || filters.from || filters.to);
+  const labels: Record<FilterKey, string> = {
+    action: t("filterAction"),
+    actor: t("filterUser"),
+    from: t("filterFrom"),
+    to: t("filterTo"),
+  };
+  const chips: FilterChip[] = FILTER_KEYS.flatMap((key) => {
+    const value = filters[key]?.trim();
+    return value ? [{ id: key, label: labels[key], value }] : [];
+  });
+  const active = chips.length > 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={t("title")}
         description={t("description")}
@@ -131,71 +165,86 @@ export function AuditView({
           </>
         }
       />
-      <div className={cardClasses({ padding: "sm" })}>
-        {/* GET form: filters live in the URL, work without JavaScript and can be bookmarked. */}
-        <form
-          method="get"
-          role="search"
-          aria-label={t("filtersTitle")}
-          className="grid items-end gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_9rem_9rem_auto]"
-        >
-          <SearchInput
-            name="action"
-            label={t("filterAction")}
-            labelVisible
-            placeholder={t("filterActionPlaceholder")}
-            defaultValue={filters.action ?? ""}
-            autoComplete="off"
-          />
-          <SearchInput
-            name="actor"
-            icon="users"
-            label={t("filterUser")}
-            labelVisible
-            placeholder={t("filterUserPlaceholder")}
-            defaultValue={filters.actor ?? ""}
-            autoComplete="off"
-          />
-          <TextField
-            name="from"
-            label={t("filterFrom")}
-            inputMode="numeric"
-            pattern="\d{2}/\d{2}/\d{4}"
-            placeholder="DD/MM/YYYY"
-            defaultValue={filters.from ?? ""}
-            autoComplete="off"
-          />
-          <TextField
-            name="to"
-            label={t("filterTo")}
-            inputMode="numeric"
-            pattern="\d{2}/\d{2}/\d{4}"
-            placeholder="DD/MM/YYYY"
-            defaultValue={filters.to ?? ""}
-            autoComplete="off"
-          />
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit">
-              <Icon name="filter" className="size-4" />
-              {tc("applyFilters")}
-            </Button>
-            {active ? (
-              <ButtonLink href="/audit" variant="ghost">
-                {t("clearFilters")}
-              </ButtonLink>
-            ) : null}
-          </div>
-        </form>
-        <p className="mt-2 text-xs text-ink-subtle">{tc("dateHint")}</p>
-      </div>
-      <DataTable
+      <DataTableV2
+        id="audit"
         caption={t("title")}
         captionHidden
         columns={columns}
         state={events}
         rowKey={(row) => row.id}
+        density="compact"
+        stacked
+        toolbar={
+          <div className="w-full min-w-0">
+            {/* GET form: filters live in the URL, work without JavaScript and can be bookmarked. */}
+            <form
+              ref={formRef}
+              method="get"
+              role="search"
+              aria-label={t("filtersTitle")}
+              className="grid items-end gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_9rem_9rem_auto]"
+            >
+              <SearchInput
+                name="action"
+                label={t("filterAction")}
+                labelVisible
+                placeholder={t("filterActionPlaceholder")}
+                defaultValue={filters.action ?? ""}
+                autoComplete="off"
+              />
+              <SearchInput
+                name="actor"
+                icon="users"
+                label={t("filterUser")}
+                labelVisible
+                placeholder={t("filterUserPlaceholder")}
+                defaultValue={filters.actor ?? ""}
+                autoComplete="off"
+              />
+              <TextField
+                name="from"
+                label={t("filterFrom")}
+                inputMode="numeric"
+                pattern="\d{2}/\d{2}/\d{4}"
+                placeholder="DD/MM/YYYY"
+                defaultValue={filters.from ?? ""}
+                autoComplete="off"
+              />
+              <TextField
+                name="to"
+                label={t("filterTo")}
+                inputMode="numeric"
+                pattern="\d{2}/\d{2}/\d{4}"
+                placeholder="DD/MM/YYYY"
+                defaultValue={filters.to ?? ""}
+                autoComplete="off"
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit">
+                  <Icon name="filter" className="size-4" />
+                  {tc("applyFilters")}
+                </Button>
+                {active ? (
+                  <ButtonLink href="/audit" variant="ghost">
+                    {t("clearFilters")}
+                  </ButtonLink>
+                ) : null}
+              </div>
+            </form>
+            <p className="mt-2 text-xs text-ink-subtle">{tc("dateHint")}</p>
+          </div>
+        }
+        chips={chips}
+        onRemoveChip={(id) =>
+          submitWithout(
+            formRef.current,
+            FILTER_KEYS.filter((key) => key === id),
+          )
+        }
+        onClearFilters={() => submitWithout(formRef.current, FILTER_KEYS)}
         emptyTitle={t("emptyTitle")}
         emptyBody={t("emptyBody")}
+        footer={footer}
       />
     </div>
   );

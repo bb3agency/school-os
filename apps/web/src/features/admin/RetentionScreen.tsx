@@ -8,9 +8,12 @@ import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Pill } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ErrorSummary, type SummaryError } from "@/components/ui/ErrorSummary";
 import { TextField } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SaveBar } from "@/components/ui/SaveBar";
+import { useFormDirty } from "@/features/settings/useFormDirty";
 import { ApiError, unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
 import { formatDateTime } from "@/lib/format";
@@ -66,19 +69,24 @@ function FixedRow({ category }: { category: RetentionCategory }) {
 function RetentionForm({
   settings,
   onReload,
+  onDiscard,
   outcome,
   setOutcome,
 }: {
   settings: RetentionSettings;
   onReload: () => Promise<void>;
+  onDiscard: () => void;
   outcome: Outcome;
   setOutcome: (outcome: Outcome) => void;
 }) {
   const t = useTranslations("admin.retention");
   const tc = useTranslations("common");
+  const ts = useTranslations("schoolSettings");
   const api = useBffClient("staff");
   const queryClient = useQueryClient();
-  const saveId = useId();
+  const fieldId = useId();
+  const [attempt, setAttempt] = useState(0);
+  const { ref: formRef, dirty, onChange: onFormChange } = useFormDirty();
   const [reloading, setReloading] = useState(false);
   const [resetError, setResetError] = useState<unknown>(undefined);
   const [resetting, setResetting] = useState(false);
@@ -90,6 +98,7 @@ function RetentionForm({
   const form = useApiForm({
     schema,
     invalidate: [ADMIN_KEYS.retention],
+    onInvalid: () => setAttempt((value) => value + 1),
     submit: async (data): Promise<RetentionSettings | null> => {
       setOutcome(null);
       const values = data as Record<string, number>;
@@ -128,15 +137,28 @@ function RetentionForm({
     (form.error instanceof ApiError && form.error.status === 412) ||
     (resetError instanceof ApiError && resetError.status === 412);
   const allDefault = categories.every((c) => c.is_default);
+  const inputId = (key: string) => `${fieldId}-${key}`;
+  const summary: SummaryError[] = editable.flatMap((category) => {
+    const message = form.errors[category.key];
+    return message ? [{ fieldId: inputId(category.key), message }] : [];
+  });
 
   return (
-    <form noValidate onSubmit={form.onSubmit} className="space-y-6">
+    <form
+      ref={formRef}
+      noValidate
+      onSubmit={form.onSubmit}
+      onChange={onFormChange}
+      className="space-y-5"
+    >
+      <ErrorSummary errors={summary} attempt={attempt} />
       <Card title={t("editableTitle")} description={t("editableDescription")}>
         <ul className="divide-y divide-border">
           {editable.map((category) => (
             <li key={category.key} className="space-y-2 py-4">
               {/* The label is the category (unique per field); the hint says what and how long. */}
               <TextField
+                id={inputId(category.key)}
                 name={category.key}
                 label={<CategoryName category={category} />}
                 hint={
@@ -171,27 +193,21 @@ function RetentionForm({
         <p className="mt-2 text-sm text-ink-muted">{t("recordsNote")}</p>
       </Card>
 
-      <section
-        aria-labelledby={`${saveId}-title`}
-        className="space-y-4 rounded-xl border border-border bg-surface p-5 shadow-card md:p-6 print:hidden"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="min-w-0 space-y-1">
-            <h2 id={`${saveId}-title`} className="font-semibold text-ink">
-              {t("saveTitle")}
-            </h2>
-            <p className="text-sm text-ink-muted">{t("saveBody")}</p>
-            <p className="text-sm text-ink-muted">{tc("stepUpNote")}</p>
-            {settings.updated_at ? (
-              <p className="text-sm text-ink-muted">
-                {t("lastChanged", {
-                  when: formatDateTime(settings.updated_at) ?? "",
-                  who: settings.updated_by?.display_name ?? t("formerStaff"),
-                })}
-              </p>
-            ) : null}
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
+      <div className="space-y-3 print:hidden">
+        <div className="space-y-1 text-sm text-ink-muted">
+          <p>{t("saveBody")}</p>
+          <p>{tc("stepUpNote")}</p>
+          {settings.updated_at ? (
+            <p>
+              {t("lastChanged", {
+                when: formatDateTime(settings.updated_at) ?? "",
+                who: settings.updated_by?.display_name ?? t("formerStaff"),
+              })}
+            </p>
+          ) : null}
+        </div>
+        {stale || !allDefault ? (
+          <div className="flex flex-wrap items-center gap-2">
             {stale ? (
               <Button
                 variant="secondary"
@@ -214,18 +230,23 @@ function RetentionForm({
                 {resetting ? tc("working") : t("restoreDefaults")}
               </Button>
             ) : null}
-            <Button type="submit" disabled={form.pending} aria-disabled={form.pending || undefined}>
-              {form.pending ? tc("working") : t("save")}
-            </Button>
           </div>
-        </div>
+        ) : null}
         <ApiErrorAlert error={form.error ?? resetError} namespace="admin" />
         {outcome ? (
           <Alert tone={outcome === "unchanged" ? "info" : "success"} live>
             {t(`outcome.${outcome}`)}
           </Alert>
         ) : null}
-      </section>
+      </div>
+      <SaveBar dirty={dirty}>
+        <Button variant="secondary" disabled={!dirty || form.pending} onClick={onDiscard}>
+          {ts("discard")}
+        </Button>
+        <Button type="submit" disabled={form.pending} aria-disabled={form.pending || undefined}>
+          {form.pending ? tc("working") : t("save")}
+        </Button>
+      </SaveBar>
     </form>
   );
 }
@@ -245,6 +266,10 @@ function RetentionEditor({ settings }: { settings: RetentionSettings }) {
       key={`${settings.version}:${generation}`}
       settings={settings}
       onReload={reload}
+      onDiscard={() => {
+        setOutcome(null);
+        setGeneration((value) => value + 1);
+      }}
       outcome={outcome}
       setOutcome={setOutcome}
     />
@@ -293,7 +318,7 @@ export function RetentionScreen() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={t("title")}
         description={t("description")}

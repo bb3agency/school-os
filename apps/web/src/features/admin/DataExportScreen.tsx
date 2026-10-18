@@ -6,11 +6,12 @@ import { useId, useState, type ReactNode } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Pill, type PillVariant } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
+import { Button, type ButtonVariant } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Table, TableScroll, TBody, Td, Th, THead, Tr } from "@/components/ui/Table";
+import { Steps } from "@/components/ui/Steps";
+import { DataTableV2, type ColumnV2 } from "@/components/console";
 import { Value } from "@/components/ui/Value";
 import type { Locale } from "@/i18n/routing";
 import { ApiError, newIdempotencyKey, unwrap, useBffClient } from "@/lib/bff/query";
@@ -56,7 +57,16 @@ function Requester({ row }: { row: TenantExport }) {
  * through the BFF when pressed and opened at once; it is never stored or logged. A 428 is
  * handled by the global step-up prompt, which retries the request.
  */
-function DownloadButton({ row, onError }: { row: TenantExport; onError: (e: unknown) => void }) {
+function DownloadButton({
+  row,
+  onError,
+  variant = "primary",
+}: {
+  row: TenantExport;
+  onError: (e: unknown) => void;
+  /** The latest export's download is the page's primary action; history rows are secondary. */
+  variant?: ButtonVariant;
+}) {
   const t = useTranslations("admin.dataExport");
   const tc = useTranslations("common");
   const locale = useLocale() as Locale;
@@ -87,7 +97,7 @@ function DownloadButton({ row, onError }: { row: TenantExport; onError: (e: unkn
 
   return (
     <Button
-      variant="primary"
+      variant={variant}
       onClick={() => void download()}
       disabled={pending}
       aria-disabled={pending || undefined}
@@ -169,13 +179,13 @@ function Fact({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
     <div className="min-w-0 space-y-1 rounded-lg border border-border bg-surface-muted px-4 py-3">
       <dt className="text-sm text-ink-muted">{label}</dt>
-      <dd className="font-semibold break-words text-ink">{children}</dd>
+      <dd className="num font-semibold break-words text-ink">{children}</dd>
     </div>
   );
 }
 
 /** "Make a full export": what it holds, the restricted-details choice and the request. */
-function RequestCard({ busy }: { busy: boolean }) {
+function RequestCard({ busy, ready }: { busy: boolean; ready: boolean }) {
   const t = useTranslations("admin.dataExport");
   const tc = useTranslations("common");
   const api = useBffClient("staff");
@@ -245,6 +255,7 @@ function RequestCard({ busy }: { busy: boolean }) {
         <p className="text-sm">{tc("stepUpNote")}</p>
         <div className="flex flex-wrap items-center gap-3">
           <Button
+            variant={ready ? "secondary" : "primary"}
             onClick={() => void request()}
             disabled={pending || busy}
             aria-disabled={pending || busy || undefined}
@@ -267,53 +278,98 @@ function RequestCard({ busy }: { busy: boolean }) {
 function History({ rows }: { rows: readonly TenantExport[] }) {
   const t = useTranslations("admin.dataExport");
   const locale = useLocale() as Locale;
+  const headingId = useId();
   const [error, setError] = useState<unknown>(undefined);
   if (rows.length === 0) return null;
+  const columns: ColumnV2<TenantExport>[] = [
+    {
+      key: "requested",
+      header: t("columns.requested"),
+      name: t("columns.requested"),
+      className: "whitespace-nowrap",
+      cell: (row) => (
+        <span className="num">
+          <Value>{formatDateTime(row.created_at)}</Value>
+        </span>
+      ),
+    },
+    {
+      key: "by",
+      header: t("columns.by"),
+      name: t("columns.by"),
+      cell: (row) => <Requester row={row} />,
+    },
+    {
+      key: "status",
+      header: t("columns.status"),
+      name: t("columns.status"),
+      cell: (row) => <StatusPill status={row.status} />,
+    },
+    {
+      key: "restricted",
+      header: t("columns.restricted"),
+      name: t("columns.restricted"),
+      cell: (row) => (row.include_sensitive ? t("restrictedYes") : t("restrictedNo")),
+    },
+    {
+      key: "size",
+      header: t("columns.size"),
+      name: t("columns.size"),
+      numeric: true,
+      cell: (row) => <Value>{formatBytes(row.size_bytes, locale)}</Value>,
+    },
+    {
+      key: "until",
+      header: t("columns.until"),
+      name: t("columns.until"),
+      className: "whitespace-nowrap",
+      cell: (row) => (
+        <span className="num">
+          <Value>{formatDateTime(row.expires_at)}</Value>
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      header: <span className="sr-only">{t("columns.actions")}</span>,
+      name: t("columns.actions"),
+      hideable: false,
+      stack: "actions",
+      cell: (row) =>
+        row.can_download ? (
+          <DownloadButton row={row} onError={setError} variant="secondary" />
+        ) : null,
+    },
+  ];
   return (
-    <Card title={t("historyTitle")} description={t("historyDescription")}>
-      <TableScroll label={t("historyTable")}>
-        <Table>
-          <THead>
-            <Tr>
-              <Th>{t("columns.requested")}</Th>
-              <Th>{t("columns.by")}</Th>
-              <Th>{t("columns.status")}</Th>
-              <Th>{t("columns.restricted")}</Th>
-              <Th>{t("columns.size")}</Th>
-              <Th>{t("columns.until")}</Th>
-              <Th>
-                <span className="sr-only">{t("columns.actions")}</span>
-              </Th>
-            </Tr>
-          </THead>
-          <TBody>
-            {rows.map((row) => (
-              <Tr key={row.id}>
-                <Td>
-                  <Value>{formatDateTime(row.created_at)}</Value>
-                </Td>
-                <Td>
-                  <Requester row={row} />
-                </Td>
-                <Td>
-                  <StatusPill status={row.status} />
-                </Td>
-                <Td>{row.include_sensitive ? t("restrictedYes") : t("restrictedNo")}</Td>
-                <Td>
-                  <Value>{formatBytes(row.size_bytes, locale)}</Value>
-                </Td>
-                <Td>
-                  <Value>{formatDateTime(row.expires_at)}</Value>
-                </Td>
-                <Td>{row.can_download ? <DownloadButton row={row} onError={setError} /> : null}</Td>
-              </Tr>
-            ))}
-          </TBody>
-        </Table>
-      </TableScroll>
-      <ApiErrorAlert error={error} namespace="admin" className="mt-4" />
-    </Card>
+    <section aria-labelledby={headingId} className="space-y-3">
+      <div className="space-y-1">
+        <h2 id={headingId} className="text-lg font-semibold text-ink">
+          {t("historyTitle")}
+        </h2>
+        <p className="text-sm text-ink-muted">{t("historyDescription")}</p>
+      </div>
+      <DataTableV2
+        id="tenant-exports"
+        caption={t("historyTable")}
+        captionHidden
+        columns={columns}
+        state={{ status: "ready", data: rows }}
+        rowKey={(row) => row.id}
+        emptyTitle={t("historyTitle")}
+        stacked
+      />
+      <ApiErrorAlert error={error} namespace="admin" />
+    </section>
   );
+}
+
+/** Where the export job is: choose what to export, prepare, download (from the latest). */
+function exportStep(latest: TenantExport | undefined): number {
+  if (!latest) return 0;
+  if (isExportBusy(latest.status)) return 1;
+  if (latest.status === "ready" && latest.can_download) return 2;
+  return 0;
 }
 
 /**
@@ -357,7 +413,20 @@ export function DataExportScreen() {
     const latest = rows[0];
     body = (
       <>
-        <RequestCard busy={latest !== undefined && isExportBusy(latest.status)} />
+        <Steps
+          label={t("steps.label")}
+          current={exportStep(latest)}
+          steps={[
+            { id: "choose", label: t("steps.choose") },
+            { id: "prepare", label: t("steps.prepare") },
+            { id: "download", label: t("steps.download") },
+          ]}
+        />
+        {/* While an archive is ready, its download is the one primary action. */}
+        <RequestCard
+          busy={latest !== undefined && isExportBusy(latest.status)}
+          ready={exportStep(latest) === 2}
+        />
         {latest ? <Latest row={latest} /> : null}
         <History rows={rows} />
       </>
@@ -365,7 +434,7 @@ export function DataExportScreen() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={t("title")}
         description={t("description")}

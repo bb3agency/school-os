@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -67,6 +67,8 @@ describe("audit chain check (US-1001 AC2, FR-AUD-003, FR-AUD-005)", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByText(/^Last verified on /)).toBeInTheDocument();
+    // The result also shows as a text badge next to the page title.
+    expect(screen.getByRole("heading", { level: 1 }).parentElement).toHaveTextContent("Intact");
     expect(stub.callsTo(VERIFY)).toHaveLength(1);
     expect(stub.callsTo(QUEUE)).toHaveLength(0);
   });
@@ -194,6 +196,38 @@ describe("audit chain check (US-1001 AC2, FR-AUD-003, FR-AUD-005)", () => {
     expect(screen.getByRole("link", { name: "Clear filters" })).toHaveAttribute("href", "/audit");
     // FR-AUD-005: the CSV download is available next to the filters.
     expect(screen.getByRole("button", { name: "Download CSV" })).toBeEnabled();
+    // The URL's filters also show as chips (one per filter) with "Clear all".
+    const chips = screen.getByRole("list", { name: "Active filters" });
+    expect(within(chips).getAllByRole("listitem")).toHaveLength(2);
+    expect(
+      screen.getByRole("button", { name: "Remove filter Action: student.update" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Remove filter From date: 01/06/2026" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Clear all" })).toBeInTheDocument();
+  });
+
+  it("removing a filter chip sends the GET form again without that filter", async () => {
+    const submit = vi
+      .spyOn(HTMLFormElement.prototype, "requestSubmit")
+      .mockImplementation(() => undefined);
+    try {
+      renderWithIntl(
+        <AuditView
+          events={{ status: "ready", data: [] }}
+          filters={{ action: "student.update", from: "01/06/2026" }}
+        />,
+      );
+      await userEvent.click(
+        screen.getByRole("button", { name: "Remove filter Action: student.update" }),
+      );
+      expect(submit).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole("searchbox", { name: "Action" })).toHaveValue("");
+      expect(screen.getByLabelText("From date")).toHaveValue("01/06/2026");
+    } finally {
+      submit.mockRestore();
+    }
   });
 
   for (const locale of ["en", "te"] as Locale[]) {

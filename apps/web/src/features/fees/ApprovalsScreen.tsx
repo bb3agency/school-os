@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import * as z from "@/lib/zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
+import { Badge, Pill } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { TextAreaField } from "@/components/ui/Input";
@@ -54,99 +55,109 @@ function Item({ item }: { item: ApprovalItem }) {
         },
       ),
     );
+  const who = `${tf(`approvalKinds.${item.kind}`)}, ${item.student_name ?? t("student")}`;
   return (
-    <li className="space-y-2 border-b border-border pb-4 last:border-0">
-      <p className="font-semibold">
-        {tf(`approvalKinds.${item.kind}`)} ·{" "}
-        <Link
-          href={`/fees/accounts/${item.account_id}`}
-          className="text-primary underline underline-offset-4"
-        >
-          {item.student_name ?? t("student")}
-        </Link>{" "}
-        <span className="font-normal text-ink-muted">{item.class_section}</span>
-        {item.amount ? (
-          <>
-            {" "}
-            · <Amount value={item.amount} />
-          </>
+    <li className="grid gap-3 py-4 first:pt-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-x-6">
+      <div className="min-w-0 space-y-1.5">
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <Pill variant="review" size="sm" icon={null}>
+            {tf(`approvalKinds.${item.kind}`)}
+          </Pill>
+          <Link
+            href={`/fees/accounts/${item.account_id}`}
+            className="font-semibold text-primary underline underline-offset-4"
+          >
+            {item.student_name ?? t("student")}
+          </Link>
+          {item.class_section ? (
+            <span className="text-sm text-ink-muted">{item.class_section}</span>
+          ) : null}
+        </p>
+        <p className="break-words">{item.reason}</p>
+        <p className="text-sm text-ink-muted">
+          {t("requestedBy", {
+            name: item.requested_by_name ?? "—",
+            when: formatDateTime(item.requested_at) ?? "",
+          })}
+        </p>
+        {item.mine ? <p className="text-sm">{t("mine")}</p> : null}
+      </div>
+      <div className="flex flex-col gap-3 sm:items-end">
+        {item.amount || (item.receipt_number && item.receipt_id) ? (
+          <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1 sm:justify-end">
+            {item.amount ? (
+              <Amount value={item.amount} className="num font-semibold whitespace-nowrap" />
+            ) : null}
+            {item.receipt_number && item.receipt_id ? (
+              <Link
+                href={`/fees/receipts/${item.receipt_id}`}
+                className="num font-mono text-sm whitespace-nowrap text-primary underline underline-offset-4"
+              >
+                {item.receipt_number}
+              </Link>
+            ) : null}
+          </p>
         ) : null}
-        {item.receipt_number && item.receipt_id ? (
-          <>
-            {" "}
-            ·{" "}
-            <Link
-              href={`/fees/receipts/${item.receipt_id}`}
-              className="text-primary underline underline-offset-4"
-            >
-              {item.receipt_number}
-            </Link>
-          </>
-        ) : null}
-      </p>
-      <p>{item.reason}</p>
-      <p className="text-sm text-ink-muted">
-        {t("requestedBy", {
-          name: item.requested_by_name ?? "—",
-          when: formatDateTime(item.requested_at) ?? "",
-        })}
-      </p>
-      <div className="flex flex-wrap gap-2">
-        {item.can_decide ? (
-          <>
-            <ActionDialog
-              triggerLabel={t("approve")}
-              triggerVariant="primary"
-              title={t("approveTitle")}
-              description={t("approveBody")}
-              confirmLabel={t("approve")}
-              consequence={t(`consequence.${item.kind}`)}
-              stepUp
-              schema={approveSchema}
-              invalidate={invalidate}
-              errorNamespace="fees"
-              submit={(input) => decide("approve", { note: input.note })}
-            >
-              {(errors) => (
-                <TextAreaField
-                  name="note"
-                  label={t("note")}
-                  error={errors.note}
-                  maxLength={REASON_MAX}
-                  rows={2}
-                />
-              )}
-            </ActionDialog>
-            <ActionDialog
-              triggerLabel={t("reject")}
-              triggerVariant="danger"
-              title={t("rejectTitle")}
-              confirmLabel={t("reject")}
-              confirmVariant="danger"
-              consequence={t("rejectConsequence")}
-              stepUp
-              schema={rejectSchema}
-              invalidate={invalidate}
-              errorNamespace="fees"
-              submit={(input) => decide("reject", input)}
-            >
-              {(errors) => (
-                <TextAreaField
-                  name="reason"
-                  label={t("rejectReason")}
-                  error={errors.reason}
-                  maxLength={REASON_MAX}
-                  rows={3}
-                />
-              )}
-            </ActionDialog>
-          </>
-        ) : null}
-        {item.mine ? (
-          <>
-            <p className="text-sm">{t("mine")}</p>
+        <div className="flex flex-wrap gap-2 sm:justify-end">
+          {item.can_decide ? (
+            <>
+              <ActionDialog
+                triggerLabel={t("approve")}
+                triggerVariant="primary"
+                triggerSize="sm"
+                triggerDescription={who}
+                title={t("approveTitle")}
+                description={t("approveBody")}
+                confirmLabel={t("approve")}
+                consequence={t(`consequence.${item.kind}`)}
+                stepUp
+                schema={approveSchema}
+                invalidate={invalidate}
+                errorNamespace="fees"
+                submit={(input) => decide("approve", { note: input.note })}
+              >
+                {(errors) => (
+                  <TextAreaField
+                    name="note"
+                    label={t("note")}
+                    error={errors.note}
+                    maxLength={REASON_MAX}
+                    rows={2}
+                  />
+                )}
+              </ActionDialog>
+              <ActionDialog
+                triggerLabel={t("reject")}
+                triggerVariant="secondary"
+                triggerSize="sm"
+                triggerDescription={who}
+                title={t("rejectTitle")}
+                confirmLabel={t("reject")}
+                confirmVariant="danger"
+                consequence={t("rejectConsequence")}
+                stepUp
+                schema={rejectSchema}
+                invalidate={invalidate}
+                errorNamespace="fees"
+                submit={(input) => decide("reject", input)}
+              >
+                {(errors) => (
+                  <TextAreaField
+                    name="reason"
+                    label={t("rejectReason")}
+                    error={errors.reason}
+                    maxLength={REASON_MAX}
+                    rows={3}
+                  />
+                )}
+              </ActionDialog>
+            </>
+          ) : null}
+          {item.mine ? (
             <ActionDialog
               triggerLabel={t("withdraw")}
+              triggerSize="sm"
+              triggerDescription={who}
               title={t("withdrawTitle")}
               confirmLabel={t("withdraw")}
               consequence={t("withdrawConsequence")}
@@ -155,10 +166,39 @@ function Item({ item }: { item: ApprovalItem }) {
               errorNamespace="fees"
               submit={() => decide("withdraw", undefined)}
             />
-          </>
-        ) : null}
+          ) : null}
+        </div>
       </div>
     </li>
+  );
+}
+
+function Inbox({
+  title,
+  description,
+  items,
+}: {
+  title: string;
+  description?: string;
+  items: readonly ApprovalItem[];
+}) {
+  const t = useTranslations("fees.approvals");
+  return (
+    <Card
+      title={title}
+      {...(description ? { description } : {})}
+      actions={
+        <Badge tone="neutral">
+          <span className="num">{t("count", { count: items.length })}</span>
+        </Badge>
+      }
+    >
+      <ul className="divide-y divide-border">
+        {items.map((item) => (
+          <Item key={`${item.kind}-${item.id}`} item={item} />
+        ))}
+      </ul>
+    </Card>
   );
 }
 
@@ -186,29 +226,37 @@ export function ApprovalsScreen() {
   );
   if (me !== undefined && !allowed) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         {header}
         <NoAccess />
       </div>
     );
   }
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {header}
       <FeesGate data={list}>
-        {(items) => (
-          <Card title={t("listTitle")}>
-            {items.length === 0 ? (
-              <EmptyState icon="inbox" title={t("emptyTitle")} body={t("emptyBody")} />
-            ) : (
-              <ul className="space-y-4">
-                {items.map((item) => (
-                  <Item key={`${item.kind}-${item.id}`} item={item} />
-                ))}
-              </ul>
-            )}
-          </Card>
-        )}
+        {(items) => {
+          if (items.length === 0) {
+            return (
+              <Card title={t("listTitle")}>
+                <EmptyState icon="inbox" title={t("emptyTitle")} body={t("emptyBody")} />
+              </Card>
+            );
+          }
+          const waiting = items.filter((item) => !item.mine);
+          const mine = items.filter((item) => item.mine);
+          return (
+            <>
+              {waiting.length > 0 ? (
+                <Inbox title={t("listTitle")} description={t("listBody")} items={waiting} />
+              ) : null}
+              {mine.length > 0 ? (
+                <Inbox title={t("mineTitle")} description={t("mineBody")} items={mine} />
+              ) : null}
+            </>
+          );
+        }}
       </FeesGate>
     </div>
   );

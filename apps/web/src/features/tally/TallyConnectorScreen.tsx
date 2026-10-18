@@ -8,14 +8,14 @@ import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Pill } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { TextField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SaveBar } from "@/components/ui/SaveBar";
 import { Table, TableScroll, TBody, Td, Th, THead, Tr } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
-import { Link } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
@@ -107,19 +107,31 @@ function StatusCard({ status }: { status: ConnectorStatus }) {
         </Alert>
       ) : null}
       <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Fact label={t("agents")}>{formatCount(status.devices_active, locale)}</Fact>
-        <Fact label={t("lastSync")}>{formatDateTime(status.last_sync_at) ?? none}</Fact>
-        <Fact label={t("asOf")}>{formatDate(status.as_of) ?? none}</Fact>
+        <Fact label={t("agents")}>
+          <span className="num">{formatCount(status.devices_active, locale)}</span>
+        </Fact>
+        <Fact label={t("lastSync")}>
+          <span className="num">{formatDateTime(status.last_sync_at) ?? none}</span>
+        </Fact>
+        <Fact label={t("asOf")}>
+          <span className="num">{formatDate(status.as_of) ?? none}</span>
+        </Fact>
         <Fact label={t("company")}>{status.company ?? none}</Fact>
-        <Fact label={t("groups")}>{formatCount(status.groups_selected, locale)}</Fact>
+        <Fact label={t("groups")}>
+          <span className="num">{formatCount(status.groups_selected, locale)}</span>
+        </Fact>
         <Fact label={t("ledgers")}>
-          {t("ledgersValue", {
-            linked: formatCount(status.parties_linked, locale) ?? "0",
-            total: formatCount(status.parties, locale) ?? "0",
-          })}
+          <span className="num">
+            {t("ledgersValue", {
+              linked: formatCount(status.parties_linked, locale) ?? "0",
+              total: formatCount(status.parties, locale) ?? "0",
+            })}
+          </span>
         </Fact>
         {status.total_due !== null && status.total_due !== undefined ? (
-          <Fact label={t("totalDue")}>{formatInr(status.total_due, locale)}</Fact>
+          <Fact label={t("totalDue")}>
+            <span className="num whitespace-nowrap">{formatInr(status.total_due, locale)}</span>
+          </Fact>
         ) : null}
       </dl>
     </Card>
@@ -212,13 +224,13 @@ function DevicesCard({ tenantId }: { tenantId: string }) {
                       <Td>
                         <DeviceStatus device={device} />
                       </Td>
-                      <Td>
+                      <Td className="num whitespace-nowrap">
                         <Value>{formatDateTime(device.last_seen_at)}</Value>
                       </Td>
-                      <Td>
+                      <Td className="num whitespace-nowrap">
                         <Value>{formatDateTime(device.last_sync_at)}</Value>
                       </Td>
-                      <Td>
+                      <Td className="num whitespace-nowrap">
                         <Value>{device.agent_version}</Value>
                       </Td>
                       <Td>
@@ -233,6 +245,7 @@ function DevicesCard({ tenantId }: { tenantId: string }) {
                             triggerDescription={device.name}
                             title={t("revokeTitle")}
                             description={t("revokeBody")}
+                            consequence={t("revokeConsequence")}
                             confirmLabel={t("revoke")}
                             confirmVariant="danger"
                             stepUp
@@ -249,7 +262,9 @@ function DevicesCard({ tenantId }: { tenantId: string }) {
                             }
                           />
                         ) : (
-                          <Value>{formatDate(device.revoked_at)}</Value>
+                          <span className="num whitespace-nowrap">
+                            <Value>{formatDate(device.revoked_at)}</Value>
+                          </span>
                         )}
                       </Td>
                     </Tr>
@@ -269,9 +284,12 @@ function GroupsForm({ groups, company }: { groups: Group[]; company: string }) {
   const api = useBffClient("staff");
   const queryClient = useQueryClient();
   const present = groups.filter((g) => g.company === company && g.present);
-  const [chosen, setChosen] = useState<Set<string>>(
+  // The selection last saved (or loaded): the bar says "Changes not saved" while it differs.
+  const [savedIds, setSavedIds] = useState<ReadonlySet<string>>(
     () => new Set(present.filter((g) => g.selected).map((g) => g.id)),
   );
+  const [chosen, setChosen] = useState<Set<string>>(() => new Set(savedIds));
+  const dirty = chosen.size !== savedIds.size || [...chosen].some((id) => !savedIds.has(id));
   const [pending, setPending] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<unknown>(undefined);
@@ -288,6 +306,7 @@ function GroupsForm({ groups, company }: { groups: Group[]; company: string }) {
         }),
       );
       await queryClient.invalidateQueries({ queryKey: KEYS.all });
+      setSavedIds(new Set(chosen));
       setSaved(true);
     } catch (failure) {
       setError(failure);
@@ -337,7 +356,25 @@ function GroupsForm({ groups, company }: { groups: Group[]; company: string }) {
           ))}
         </ul>
       </fieldset>
-      <div className="flex flex-wrap items-center gap-3">
+      <ApiErrorAlert error={error} namespace="tally" />
+      <SaveBar
+        dirty={dirty}
+        savedLabel={
+          saved ? (
+            <span className="num text-positive-ink">{t("saved", { count: chosen.size })}</span>
+          ) : undefined
+        }
+      >
+        <Button
+          variant="secondary"
+          disabled={!dirty || pending}
+          onClick={() => {
+            setSaved(false);
+            setChosen(new Set(savedIds));
+          }}
+        >
+          {t("discard")}
+        </Button>
         <Button
           type="submit"
           variant="primary"
@@ -346,13 +383,7 @@ function GroupsForm({ groups, company }: { groups: Group[]; company: string }) {
         >
           {t("save")}
         </Button>
-        {saved ? (
-          <p role="status" className="text-sm text-positive-ink">
-            {t("saved", { count: chosen.size })}
-          </p>
-        ) : null}
-      </div>
-      <ApiErrorAlert error={error} namespace="tally" />
+      </SaveBar>
     </form>
   );
 }
@@ -392,11 +423,28 @@ export function TallyConnectorScreen() {
   const status = useConnectorStatus(meLoaded && allowed);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={t("connector.title")}
         description={t("connector.description")}
         breadcrumb={[{ label: tn("home"), href: "/" }, { label: t("connector.title") }]}
+        actions={
+          // Only once the connector answered (not while it is switched off).
+          meLoaded && status.status === "ready" && (can(CONFIGURE) || can(FINANCE_READ)) ? (
+            <nav aria-label={t("connector.linksLabel")} className="flex flex-wrap gap-2">
+              {can(CONFIGURE) ? (
+                <ButtonLink href="/settings/tally/ledgers" variant="secondary">
+                  {t("connector.toLedgers")}
+                </ButtonLink>
+              ) : null}
+              {can(FINANCE_READ) ? (
+                <ButtonLink href="/fees" variant="secondary">
+                  {t("connector.toDues")}
+                </ButtonLink>
+              ) : null}
+            </nav>
+          ) : undefined
+        }
       />
       {meLoaded && !allowed ? (
         <Alert tone="info" title={t("connector.noAccessTitle")}>
@@ -407,24 +455,6 @@ export function TallyConnectorScreen() {
           {(current) => (
             <>
               <StatusCard status={current} />
-              <nav aria-label={t("connector.linksLabel")} className="flex flex-wrap gap-3">
-                {can(CONFIGURE) ? (
-                  <Link
-                    href="/settings/tally/ledgers"
-                    className="font-semibold text-primary underline underline-offset-4"
-                  >
-                    {t("connector.toLedgers")}
-                  </Link>
-                ) : null}
-                {can(FINANCE_READ) ? (
-                  <Link
-                    href="/fees"
-                    className="font-semibold text-primary underline underline-offset-4"
-                  >
-                    {t("connector.toDues")}
-                  </Link>
-                ) : null}
-              </nav>
               {can(DEVICE_MANAGE) && me ? <DevicesCard tenantId={me.tenant_id} /> : null}
               {can(CONFIGURE) ? <GroupsCard company={current.company} /> : null}
             </>

@@ -131,11 +131,13 @@ describe("add a task (US-1603, FR-TASK-001)", () => {
       expect(screen.getByLabelText(n.dueOn)).toHaveAttribute("placeholder", "DD/MM/YYYY"),
     );
     await fill("31/02/2026");
-    expect(
-      await screen.findByText(
-        /^Enter a real date as DD\/MM\/YYYY, for example \d{2}\/\d{2}\/\d{4}\.$/,
-      ),
-    ).toBeVisible();
+    const message = /^Enter a real date as DD\/MM\/YYYY, for example \d{2}\/\d{2}\/\d{4}\.$/;
+    // Under the field, and in the error summary as a link to it (docs/17 §4.4).
+    expect(await screen.findAllByText(message)).toHaveLength(2);
+    expect(screen.getByLabelText(n.dueOn)).toHaveAccessibleDescription(
+      expect.stringMatching(/Enter a real date as DD\/MM\/YYYY/),
+    );
+    expect(screen.getByRole("link", { name: message })).toHaveAttribute("href", "#new-task-due");
     expect(stub.callsTo(POST)).toHaveLength(0);
   });
 
@@ -149,7 +151,7 @@ describe("add a task (US-1603, FR-TASK-001)", () => {
     await user.type(screen.getByLabelText(n.taskTitle), "Send the fee report");
     await user.selectOptions(await screen.findByLabelText(n.owner), OWNER);
     await user.click(screen.getByRole("button", { name: n.submit }));
-    expect(await screen.findByText(/^Enter a real date as DD\/MM\/YYYY/)).toBeVisible();
+    expect(await screen.findAllByText(/^Enter a real date as DD\/MM\/YYYY/)).toHaveLength(2);
     expect(stub.callsTo(POST)).toHaveLength(0);
   });
 });

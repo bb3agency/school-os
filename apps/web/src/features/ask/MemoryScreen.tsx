@@ -126,7 +126,7 @@ function MemoryRow({ item, off }: { item: MemoryItem; off: boolean }) {
       <div className="min-w-0 flex-1 space-y-1">
         <p className="text-ink break-anywhere">{item.text}</p>
         <p className="flex flex-wrap items-center gap-2 text-xs text-ink-subtle">
-          {created ? <span>{created}</span> : null}
+          {created ? <span className="num">{created}</span> : null}
           {item.source === "suggested" ? <span>{t("fromChat")}</span> : null}
           {item.status === "pending" ? <Pill variant="review">{t("pending")}</Pill> : null}
         </p>
@@ -134,6 +134,7 @@ function MemoryRow({ item, off }: { item: MemoryItem; off: boolean }) {
           <div className="flex flex-wrap gap-2 pt-1">
             <Button
               size="sm"
+              variant="secondary"
               disabled={off || confirm.isPending}
               aria-label={t("confirmFor", { text: item.text })}
               onClick={() => confirm.mutate(item.id)}
@@ -142,7 +143,7 @@ function MemoryRow({ item, off }: { item: MemoryItem; off: boolean }) {
             </Button>
             <Button
               size="sm"
-              variant="secondary"
+              variant="ghost"
               disabled={remove.isPending}
               aria-label={t("dismissFor", { text: item.text })}
               onClick={() => remove.mutate(item.id)}
@@ -222,7 +223,7 @@ export function MemoryScreen() {
 
   if (!allowed) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         {header}
         <Alert tone="warning" title={ta("noAccessTitle")}>
           {ta("noAccessBody")}
@@ -239,7 +240,7 @@ export function MemoryScreen() {
   const full = list.length >= MEMORY_LIMIT;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {header}
       <AskTabs active="ask" />
       <p role="status" className="sr-only">
@@ -301,7 +302,7 @@ export function MemoryScreen() {
           </div>
         ) : (
           <>
-            <p className="px-4 pt-1 text-sm text-ink-subtle">
+            <p className="num px-4 pt-1 text-sm text-ink-muted">
               {t("count", { count: list.length })}
             </p>
             <ul className="divide-y divide-border">

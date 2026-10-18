@@ -263,9 +263,38 @@ describe("school settings (FR-TEN-012)", () => {
     await userEvent.click(screen.getByRole("checkbox", { name: "English" }));
     await userEvent.click(screen.getByRole("checkbox", { name: "తెలుగు" }));
     await userEvent.click(screen.getByRole("button", { name: en.form.save }));
-    expect(await screen.findByText(messages.en.validation.invalidNumber)).toBeInTheDocument();
-    expect(screen.getByText(messages.en.validation.chooseOption)).toBeInTheDocument();
+    // The message shows under the field and, linked to it, in the error summary on top.
+    const summary = await screen.findByRole("alert", { name: messages.en.ui.errorSummary.title });
+    expect(
+      within(summary).getByRole("link", { name: messages.en.validation.invalidNumber }),
+    ).toHaveAttribute("href", `#${idle.id}`);
+    expect(screen.getAllByText(messages.en.validation.invalidNumber)).toHaveLength(2);
+    expect(screen.getAllByText(messages.en.validation.chooseOption)).toHaveLength(2);
     expect(idle).toHaveAttribute("aria-invalid", "true");
+    expect(stub.callsTo("PATCH /bff/api/v1/tenant")).toHaveLength(0);
+  });
+
+  it("the save bar says when changes are not saved, and Discard puts back the loaded values", async () => {
+    school([MANAGE]);
+    renderWithIntl(<SchoolSettingsScreen />);
+    const idle = await screen.findByLabelText(en.form.idleField);
+    const bar = messages.en.ui.saveBar;
+    const form = within(idle.closest("form") as HTMLElement);
+    expect(form.getByText(bar.noChanges)).toBeInTheDocument();
+    const discard = form.getByRole("button", { name: en.discard });
+    expect(discard).toBeDisabled();
+    await userEvent.clear(idle);
+    await userEvent.type(idle, "20");
+    expect(await form.findByText(bar.unsaved)).toBeInTheDocument();
+    await userEvent.click(form.getByRole("button", { name: en.discard }));
+    await waitFor(() => expect(screen.getByLabelText(en.form.idleField)).toHaveValue("15"));
+    // The form was put back (remounted with the loaded values).
+    const reset = within(screen.getByLabelText(en.form.idleField).closest("form") as HTMLElement);
+    expect(reset.getByText(bar.noChanges)).toBeInTheDocument();
+    // A switch counts as a change too.
+    const ai = screen.getByRole("region", { name: en.groups.ai.title });
+    await userEvent.click(within(ai).getByRole("switch", { name: en.form.aiToggle }));
+    expect(await reset.findByText(bar.unsaved)).toBeInTheDocument();
     expect(stub.callsTo("PATCH /bff/api/v1/tenant")).toHaveLength(0);
   });
 

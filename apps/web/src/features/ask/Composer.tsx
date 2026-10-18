@@ -176,99 +176,106 @@ export function Composer({
       className="space-y-1.5"
       data-print="hide"
     >
-      <div
-        className={cn(
-          "rounded-2xl border border-border-control bg-surface shadow-raised",
-          "focus-within:outline-3 focus-within:outline-offset-2 focus-within:outline-focus",
-          error && "border-danger",
-        )}
-      >
-        <label htmlFor={`${hintId}-box`} className="sr-only">
-          {t("label")}
-        </label>
-        <textarea
-          ref={box}
-          id={`${hintId}-box`}
-          name="question"
-          rows={1}
-          value={text}
-          maxLength={MAX_QUESTION}
-          placeholder={placeholder}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={describedBy}
-          aria-keyshortcuts="/"
-          onChange={(event) => {
-            setTextState(event.target.value);
-            onTextChange?.();
-          }}
-          onCompositionStart={() => {
-            composing.current = true;
-          }}
-          onCompositionEnd={() => {
-            composing.current = false;
-          }}
-          onKeyDown={(event) => {
-            if (shouldSend(event, composing.current, touch)) {
-              event.preventDefault();
-              send();
-            }
-          }}
+      {/* The Ask surface: an accent tint around the white question box (docs/17 §5.3). */}
+      <div className="rounded-[1.25rem] border border-info-border bg-accent-soft p-1.5">
+        <div
           className={cn(
-            "block max-h-[40vh] w-full resize-none overflow-y-auto bg-transparent px-4 pt-3.5 pb-1 text-base leading-relaxed text-ink placeholder:text-ink-subtle",
-            "focus-visible:outline-none",
-            large ? "min-h-20" : "min-h-12",
+            "rounded-2xl border border-border-control bg-surface",
+            "focus-within:outline-3 focus-within:outline-offset-2 focus-within:outline-focus",
+            error && "border-danger",
           )}
-        />
-        <div className="flex items-center gap-2 px-2 pb-2">
-          <div className="flex min-w-0 flex-1 items-center gap-2">{tools}</div>
-          {text.length >= COUNTER_FROM ? (
-            <span
-              id={counterId}
-              className={cn(
-                "shrink-0 text-xs tabular-nums",
-                remaining <= 50 ? "font-semibold text-danger" : "text-ink-subtle",
-              )}
-            >
-              {t("remaining", { count: remaining })}
-            </span>
-          ) : null}
-          <button
-            type={busy ? "button" : "submit"}
-            aria-label={busy ? t("stop") : t("send")}
-            aria-disabled={!busy && !online ? true : undefined}
-            onClick={(event) => {
-              if (!busy) return;
-              // The second click of a double click on "Ask" must not stop the new answer.
-              if (event.detail > 0 && performance.now() - sentAt.current < STOP_GUARD_MS) return;
-              onStop();
-              box.current?.focus();
+        >
+          <label htmlFor={`${hintId}-box`} className="sr-only">
+            {t("label")}
+          </label>
+          <textarea
+            ref={box}
+            id={`${hintId}-box`}
+            name="question"
+            rows={1}
+            value={text}
+            maxLength={MAX_QUESTION}
+            placeholder={placeholder}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={describedBy}
+            aria-keyshortcuts="/"
+            onChange={(event) => {
+              setTextState(event.target.value);
+              onTextChange?.();
+            }}
+            onCompositionStart={() => {
+              composing.current = true;
+            }}
+            onCompositionEnd={() => {
+              composing.current = false;
+            }}
+            onKeyDown={(event) => {
+              if (shouldSend(event, composing.current, touch)) {
+                event.preventDefault();
+                send();
+              }
             }}
             className={cn(
-              "relative inline-flex size-10 shrink-0 items-center justify-center rounded-full border",
-              "border-action bg-action text-on-action shadow-raised hover:bg-action-hover",
-              "aria-disabled:cursor-not-allowed aria-disabled:opacity-60",
+              "block max-h-[40vh] w-full resize-none overflow-y-auto bg-transparent px-4 pt-3.5 pb-1 text-base leading-relaxed text-ink placeholder:text-ink-subtle",
+              "focus-visible:outline-none",
+              large ? "min-h-20" : "min-h-12",
             )}
-          >
-            <span
-              aria-hidden="true"
+          />
+          <div className="flex items-center gap-2 px-2 pb-2">
+            <div className="flex min-w-0 flex-1 items-center gap-2">{tools}</div>
+            {text.length >= COUNTER_FROM ? (
+              <span
+                id={counterId}
+                className={cn(
+                  "num shrink-0 text-xs",
+                  remaining <= 50 ? "font-semibold text-danger" : "text-ink-subtle",
+                )}
+              >
+                {t("remaining", { count: remaining })}
+              </span>
+            ) : null}
+            <button
+              type={busy ? "button" : "submit"}
+              aria-label={busy ? t("stop") : t("send")}
+              aria-disabled={!busy && !online ? true : undefined}
+              onClick={(event) => {
+                if (!busy) return;
+                // The second click of a double click on "Ask" must not stop the new answer.
+                if (event.detail > 0 && performance.now() - sentAt.current < STOP_GUARD_MS) return;
+                onStop();
+                box.current?.focus();
+              }}
               className={cn(
-                "chat-morph-icon absolute inset-0 flex items-center justify-center",
-                busy ? "scale-50 opacity-0" : "scale-100 opacity-100",
+                "relative inline-flex size-10 shrink-0 items-center justify-center rounded-full border",
+                "border-action bg-action text-on-action hover:bg-action-hover",
+                "aria-disabled:cursor-not-allowed aria-disabled:opacity-60",
               )}
             >
-              <Icon name="arrowUp" className="size-5" />
-            </span>
-            <span
-              aria-hidden="true"
-              className={cn(
-                "chat-morph-icon absolute inset-0 flex items-center justify-center",
-                busy ? "scale-100 opacity-100" : "scale-50 opacity-0",
-              )}
-            >
-              <Icon name="stop" className="size-4 fill-current" />
-            </span>
-          </button>
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "chat-morph-icon absolute inset-0 flex items-center justify-center",
+                  busy ? "scale-50 opacity-0" : "scale-100 opacity-100",
+                )}
+              >
+                <Icon name="arrowUp" className="size-5" />
+              </span>
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "chat-morph-icon absolute inset-0 flex items-center justify-center",
+                  busy ? "scale-100 opacity-100" : "scale-50 opacity-0",
+                )}
+              >
+                <Icon name="stop" className="size-4 fill-current" />
+              </span>
+            </button>
+          </div>
         </div>
+        <p id={hintId} className="px-2.5 pt-1.5 pb-0.5 text-xs text-ink-muted">
+          {touch ? t("hintTouch") : t("hint")}
+          <span id={shortcutId} className="max-sm:hidden">{` ${t("shortcuts")}`}</span>
+        </p>
       </div>
       {error ? (
         <p id={errorId} role="alert" className="px-2 text-sm font-semibold text-danger">
@@ -280,10 +287,6 @@ export function Composer({
           {t("offline")}
         </p>
       ) : null}
-      <p id={hintId} className="px-2 text-xs text-ink-subtle">
-        {touch ? t("hintTouch") : t("hint")}
-        <span id={shortcutId} className="max-sm:hidden">{` ${t("shortcuts")}`}</span>
-      </p>
     </form>
   );
 }

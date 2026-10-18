@@ -243,11 +243,15 @@ describe("invite user (US-102 AC1, FR-IAM-010..012)", () => {
     setMe([MANAGE, READ_BASIC]);
     renderWithIntl(<InviteUserScreen />);
     await userEvent.click(await screen.findByRole("button", { name: "Send invitation" }));
-    expect(await screen.findAllByText("Fill in this field.")).toHaveLength(2);
-    expect(screen.getByText("Choose at least one role.")).toBeInTheDocument();
+    // Each problem shows under its field and again in the error summary at the top.
+    const summary = await screen.findByRole("alert", { name: "There is a problem" });
+    expect(within(summary).getAllByText("Fill in this field.")).toHaveLength(2);
+    expect(within(summary).getByText("Choose at least one role.")).toBeInTheDocument();
+    expect(screen.getAllByText("Fill in this field.")).toHaveLength(4);
+    expect(screen.getAllByText("Choose at least one role.")).toHaveLength(2);
     await userEvent.type(screen.getByLabelText("Sign-in ID"), "has space");
     await userEvent.click(screen.getByRole("button", { name: "Send invitation" }));
-    expect(await screen.findByText("Remove the spaces.")).toBeInTheDocument();
+    expect(await screen.findAllByText("Remove the spaces.")).toHaveLength(2);
     expect(stub.callsTo("POST /bff/api/v1/users")).toHaveLength(0);
   });
 
@@ -359,6 +363,12 @@ describe("user detail (US-102 AC2, FR-IAM-012..014)", () => {
     // user.manage still allows suspending and removing.
     expect(screen.getByRole("button", { name: "Suspend" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Remove" })).toBeInTheDocument();
+    // Permissions summary from GET /roles: what the held roles allow, by area.
+    expect(await screen.findByText("1 permission in 1 area.")).toBeInTheDocument();
+    const areas = screen.getByRole("list", {
+      name: messages.en.school.users.detail.permissions.areasLabel,
+    });
+    expect(within(areas).getByRole("listitem")).toHaveTextContent("Students 1");
   });
 
   it("without user.manage there are no status actions", async () => {
@@ -448,6 +458,10 @@ describe("user detail (US-102 AC2, FR-IAM-012..014)", () => {
     renderWithIntl(<UserDetailScreen userId={USER} />);
     await userEvent.click(await screen.findByRole("button", { name: "Suspend" }));
     const dialog = screen.getByRole("dialog", { name: "Suspend Lakshmi Sample?" });
+    // The consequence line says what suspending changes.
+    expect(
+      within(dialog).getByText(messages.en.school.users.detail.status.suspend.consequence),
+    ).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole("button", { name: "Suspend" }));
     expect(await within(dialog).findByText("At least one owner must remain")).toBeInTheDocument();
     const call = stub.callsTo(`PATCH /bff/api/v1/users/${USER}`)[0];
