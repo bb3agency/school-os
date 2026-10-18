@@ -2281,6 +2281,86 @@ SPECS.update(
 )
 
 
+# --- R2-3G WhatsApp sending (ADR-0043): an approved notice and a broadcast of school A ----------
+
+_SENDS: dict[str, uuid.UUID] = {}
+
+
+def _send_notice(w: Any) -> uuid.UUID:
+    if "notice" not in _SENDS:
+        _SENDS["notice"] = CI.complete_notice(w.a, approved=True)[0]
+    return _SENDS["notice"]
+
+
+def _send_broadcast(w: Any, a: Engine) -> uuid.UUID:
+    if "broadcast" not in _SENDS:
+        broadcast = uuid.uuid4()
+        with a.begin() as c:
+            c.execute(
+                text(
+                    "INSERT INTO msg.broadcasts (id, tenant_id, notice_id, section_ids, status, "
+                    "requested_by, confirmed_by, confirmed_at, expires_at) VALUES (:b, :t, :n, "
+                    "ARRAY[:s]::uuid[], 'sending', :u, :u, now(), now())"
+                ),
+                {
+                    "b": broadcast,
+                    "t": w.a.tenant_id,
+                    "n": _send_notice(w),
+                    "s": w.a.ids["section_9a"],
+                    "u": w.a.people["owner"].user_id,
+                },
+            )
+        _SENDS["broadcast"] = broadcast
+    return _SENDS["broadcast"]
+
+
+def _send_section(w: Any) -> list[str]:
+    return [str(w.a.ids["section_9a"])]
+
+
+SPECS.update(
+    {
+        ("POST", "/api/v1/notices/{notice_id}/broadcasts/preview"): lambda w, r, a: (
+            f"/api/v1/notices/{_send_notice(w)}/broadcasts/preview",
+            {"section_ids": _send_section(w)},
+            {},
+        ),
+        # A preview token that is not the caller's: the guard passed, the service says 409.
+        ("POST", "/api/v1/notices/{notice_id}/broadcasts"): lambda w, r, a: (
+            f"/api/v1/notices/{_send_notice(w)}/broadcasts",
+            {"preview_token": "bp_" + uuid.uuid4().hex, "section_ids": _send_section(w)},
+            {"Idempotency-Key": str(uuid.uuid4())},
+        ),
+        ("GET", "/api/v1/notices/{notice_id}/broadcasts"): lambda w, r, a: (
+            f"/api/v1/notices/{_send_notice(w)}/broadcasts",
+            None,
+            {},
+        ),
+        ("GET", "/api/v1/messaging/broadcasts"): lambda w, r, a: (
+            "/api/v1/messaging/broadcasts",
+            None,
+            {},
+        ),
+        ("GET", "/api/v1/messaging/broadcasts/{broadcast_id}"): lambda w, r, a: (
+            f"/api/v1/messaging/broadcasts/{_send_broadcast(w, a)}",
+            None,
+            {},
+        ),
+        ("GET", "/api/v1/messaging/automatic"): lambda w, r, a: (
+            "/api/v1/messaging/automatic",
+            None,
+            {},
+        ),
+        # A message without a parent link: the guard passed, the service says 404.
+        ("POST", "/api/v1/messages/{message_id}/revoke-link"): lambda w, r, a: (
+            f"/api/v1/messages/{uuid.uuid4()}/revoke-link",
+            None,
+            {},
+        ),
+    }
+)
+
+
 # --- R2-1B fees (ADR-0042): fees on for school A around each call -------------------------------
 
 
@@ -2383,6 +2463,10 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911 - one answer per r
         return 201
     if (method, path) in _fees().ONLINE_REFUSED:
         return 409  # guard passed; no Razorpay partner application in tests (R2-2D)
+    if (method, path) == ("POST", "/api/v1/notices/{notice_id}/broadcasts"):
+        return 409  # guard passed; the preview token is not the caller's (R2-3G)
+    if (method, path) == ("POST", "/api/v1/messages/{message_id}/revoke-link"):
+        return 404  # guard passed; no such message with a link (R2-3G)
     if (method, path) == ("POST", "/api/v1/users/{user_id}/invitation-email"):
         return 409  # guard passed; the service refuses (email off in tests)
     if method == "POST" and path.startswith("/api/v1/me/invitations/"):

@@ -445,6 +445,14 @@ def _broadcast_out(
     )
 
 
+def _reach(session: Session, ctx: UserContext) -> set[uuid.UUID] | None:
+    """``None`` for a school-wide ``message.read`` holder; otherwise the students a scoped reader
+    (class teacher) reaches, whose messages alone are counted for them (FR-MSG-017)."""
+    if ctx.scope_for(READ).school_wide:
+        return None
+    return set(students.list_students_in_scope(session, ctx, permissions=(READ,)))
+
+
 def list_broadcasts(
     session: Session,
     ctx: UserContext,
@@ -454,9 +462,11 @@ def list_broadcasts(
     cursor: str | None,
 ) -> BroadcastPage:
     """Confirmed broadcasts, newest first, with live counts by status (FR-MSG-017;
-    ``message.read`` school-wide)."""
-    del ctx
+    ``message.read``; a class teacher's counts cover the students of their sections only)."""
     messaging.ensure_available()
+    if notice_id is not None and circulars.notice_for_sending(session, notice_id) is None:
+        raise NotFound("Notice not found")
+    reach = _reach(session, ctx)
     after = None
     decoded = decode_cursor(cursor)
     if decoded is not None:
@@ -467,7 +477,7 @@ def list_broadcasts(
     rows = repo.list_broadcasts(session, notice_id=notice_id, after=after, limit=limit + 1)
     more = len(rows) > limit
     rows = rows[:limit]
-    counts = repo.status_counts(session, [r.id for r in rows])
+    counts = repo.status_counts(session, [r.id for r in rows], student_ids=reach)
     titles: dict[uuid.UUID, str] = {}
     for notice in {r.notice_id for r in rows}:
         found = circulars.notice_for_sending(session, notice)
@@ -497,14 +507,18 @@ def broadcast_report(
     session: Session, ctx: UserContext, broadcast_id: uuid.UUID
 ) -> BroadcastReportOut:
     """One broadcast's delivery report: counts by status, by class and section, and failure
-    and skip reasons, live (FR-MSG-017, US-2204 AC2; ``message.read`` school-wide). Counts
-    only, no phone numbers or names."""
-    del ctx
+    and skip reasons, live (FR-MSG-017, US-2204 AC2; ``message.read``; a class teacher sees the
+    students of their sections only). Counts only, no phone numbers or names."""
     messaging.ensure_available()
     row = repo.get_broadcast(session, broadcast_id)
     if row is None or row.status == "previewed":
         raise NotFound("Broadcast not found")
-    messages = repo.broadcast_messages(session, row.id)
+    reach = _reach(session, ctx)
+    messages = [
+        m
+        for m in repo.broadcast_messages(session, row.id)
+        if reach is None or m.student_id in reach
+    ]
     placements = students.current_placements(
         session, [m.student_id for m in messages if m.student_id is not None]
     )
@@ -550,9 +564,9 @@ def revoke_link(session: Session, ctx: UserContext, message_id: uuid.UUID) -> Re
 
 
 def automatic(session: Session, ctx: UserContext) -> AutomaticOut:
-    """The automatic messages and their recent runs (US-2205, US-2207; ``message.read``
-    school-wide): switches, times, no-message dates, how many messages wait, and per run the
-    messages it queued by status now."""
+    """The automatic messages and their recent runs (US-2205, US-2207; ``message.read``):
+    switches, times, no-message dates, how many messages wait, and per run the messages it
+    queued by status now. Counts of the whole school only (no names or numbers)."""
     del ctx
     messaging.ensure_available()
     row = _settings(session)

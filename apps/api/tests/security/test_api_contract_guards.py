@@ -350,6 +350,9 @@ RESPONSE_FIELD_ALLOWLIST = {
     # R2-1C (ADR-0043): catalogue template codes of WhatsApp messages, not secrets.
     "app.messaging.schemas.MessagingTemplateOut.template_key": "message catalogue code",
     "app.messaging.schemas.MessagingMessageOut.template_key": "message catalogue code",
+    # R2-3G: the preview's id (bp_<uuid>) that pins the counts the sender confirms; it grants
+    # nothing (the confirmation re-checks the caller and recomputes the audience).
+    "app.messaging.sends.schemas.BroadcastPreviewOut.preview_token": "broadcast preview id",
     "app.identity.schemas.PermissionOut.key": "permission key",
     "app.identity.schemas.RoleOut.key": "role key",
     "app.platform.schemas.FlagOut.key": "feature flag key",
@@ -430,6 +433,10 @@ IDEMPOTENCY_EXEMPT = {
     ("POST", "/api/v1/webhooks/meta"): "machine route; signed, replayed bodies and event keys "
     "are deduplicated",
     ("POST", "/api/v1/messaging/account/resume"): "a state transition (409 when not paused)",
+    ("POST", "/api/v1/notices/{notice_id}/broadcasts/preview"): "computes counts (R2-3G); the "
+    "stored preview sends nothing and expires in 30 minutes",
+    ("POST", "/api/v1/messages/{message_id}/revoke-link"): "a state transition (revoked false on "
+    "repeat)",
     ("POST", "/api/v1/messaging/templates/sync"): "re-reads Meta; creating is idempotent per "
     "template name",
     ("POST", "/api/v1/messaging/join-slips"): "a print view; each print makes new single-use "

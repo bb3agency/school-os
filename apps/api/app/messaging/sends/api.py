@@ -1,8 +1,8 @@
 """WhatsApp sending routes (docs/09 §4 "Messaging"; R2-3G; US-2204..US-2208; FR-MSG-012,
 FR-MSG-017; FR-PUB-007). Included in ``app.messaging.api.router`` (prefix ``/api/v1``).
 
-Every route declares ``message.send`` or ``message.read`` school-wide (principal and office admin
-send; class teachers' scoped ``message.read`` does not open whole-school reports). On a
+Sending declares ``message.send`` school-wide (principal and office admin); the reports declare
+``message.read`` (a class teacher's scoped grant counts the students of their sections only). On a
 dedicated host or with messaging off every route answers ``404 module_unavailable``.
 """
 
@@ -31,7 +31,7 @@ from app.messaging.sends.schemas import (
 router = APIRouter()
 
 Sender = Annotated[UserContext, Depends(require(service.SEND, scope="school"))]
-SchoolReader = Annotated[UserContext, Depends(require(service.READ, scope="school"))]
+Reader = Annotated[UserContext, Depends(require(service.READ))]
 
 _UNAVAILABLE: dict[int | str, dict[str, Any]] = {
     404: {"description": "``module_unavailable`` on a dedicated host or with messaging off."}
@@ -86,25 +86,24 @@ def confirm_broadcast(
 
 @router.get("/notices/{notice_id}/broadcasts", response_model=BroadcastPage, responses=_UNAVAILABLE)
 def notice_broadcasts(
-    ctx: SchoolReader,
+    ctx: Reader,
     db: TenantDB,
     notice_id: uuid.UUID,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     cursor: Annotated[str | None, Query(max_length=512)] = None,
 ) -> BroadcastPage:
-    """The notice's broadcasts with live counts (``message.read``, school-wide)."""
+    """The notice's broadcasts with live counts (``message.read``)."""
     return service.list_broadcasts(db, ctx, notice_id=notice_id, limit=limit, cursor=cursor)
 
 
 @router.get("/messaging/broadcasts", response_model=BroadcastPage, responses=_UNAVAILABLE)
 def list_broadcasts(
-    ctx: SchoolReader,
+    ctx: Reader,
     db: TenantDB,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     cursor: Annotated[str | None, Query(max_length=512)] = None,
 ) -> BroadcastPage:
-    """Recent broadcasts, newest first, with live delivery counts (FR-MSG-017; ``message.read``,
-    school-wide)."""
+    """Recent broadcasts, newest first, with live delivery counts (FR-MSG-017; ``message.read``)."""
     return service.list_broadcasts(db, ctx, notice_id=None, limit=limit, cursor=cursor)
 
 
@@ -113,19 +112,17 @@ def list_broadcasts(
     response_model=BroadcastReportOut,
     responses=_UNAVAILABLE,
 )
-def broadcast_report(
-    ctx: SchoolReader, db: TenantDB, broadcast_id: uuid.UUID
-) -> BroadcastReportOut:
+def broadcast_report(ctx: Reader, db: TenantDB, broadcast_id: uuid.UUID) -> BroadcastReportOut:
     """A broadcast's delivery report: counts by status and by class, failure and skip reasons,
-    live (FR-MSG-017, US-2204 AC2; ``message.read``, school-wide). Counts only."""
+    live (FR-MSG-017, US-2204 AC2; ``message.read``; class teachers: their sections). Counts
+    only."""
     return service.broadcast_report(db, ctx, broadcast_id)
 
 
 @router.get("/messaging/automatic", response_model=AutomaticOut, responses=_UNAVAILABLE)
-def automatic(ctx: SchoolReader, db: TenantDB) -> AutomaticOut:
+def automatic(ctx: Reader, db: TenantDB) -> AutomaticOut:
     """Absence alerts, fee reminders and receipt messages: switches, times, no-message dates,
-    messages waiting and the last two weeks of runs (US-2205, US-2207; ``message.read``,
-    school-wide)."""
+    messages waiting and the last two weeks of runs (US-2205, US-2207; ``message.read``)."""
     return service.automatic(db, ctx)
 
 

@@ -199,6 +199,9 @@ EXPECTED_TABLES = {
     "messaging_settings",
     "messaging_optins",
     "messaging_messages",
+    # R2-3G sending (0061_messaging_sends): broadcast counts and automatic-run history.
+    "messaging_broadcasts",
+    "messaging_send_runs",
     "retention_settings",
     # R2-1B fees (0058_fees_core, FR-FEE-027): every fin table, empty ones too.
     "fees_fee_settings",

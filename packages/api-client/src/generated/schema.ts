@@ -4964,8 +4964,7 @@ export interface paths {
         /**
          * Automatic
          * @description Absence alerts, fee reminders and receipt messages: switches, times, no-message dates,
-         *     messages waiting and the last two weeks of runs (US-2205, US-2207; ``message.read``,
-         *     school-wide).
+         *     messages waiting and the last two weeks of runs (US-2205, US-2207; ``message.read``).
          */
         get: operations["automatic_api_v1_messaging_automatic_get"];
         put?: never;
@@ -4985,8 +4984,7 @@ export interface paths {
         };
         /**
          * List Broadcasts
-         * @description Recent broadcasts, newest first, with live delivery counts (FR-MSG-017; ``message.read``,
-         *     school-wide).
+         * @description Recent broadcasts, newest first, with live delivery counts (FR-MSG-017; ``message.read``).
          */
         get: operations["list_broadcasts_api_v1_messaging_broadcasts_get"];
         put?: never;
@@ -5007,7 +5005,8 @@ export interface paths {
         /**
          * Broadcast Report
          * @description A broadcast's delivery report: counts by status and by class, failure and skip reasons,
-         *     live (FR-MSG-017, US-2204 AC2; ``message.read``, school-wide). Counts only.
+         *     live (FR-MSG-017, US-2204 AC2; ``message.read``; class teachers: their sections). Counts
+         *     only.
          */
         get: operations["broadcast_report_api_v1_messaging_broadcasts__broadcast_id__get"];
         put?: never;
@@ -5203,7 +5202,7 @@ export interface paths {
         };
         /**
          * Notice Broadcasts
-         * @description The notice's broadcasts with live counts (``message.read``, school-wide).
+         * @description The notice's broadcasts with live counts (``message.read``).
          */
         get: operations["notice_broadcasts_api_v1_notices__notice_id__broadcasts_get"];
         put?: never;

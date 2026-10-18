@@ -72,16 +72,21 @@ def broadcasts_sending(session: Session) -> list[Broadcast]:
 
 
 def status_counts(
-    session: Session, broadcast_ids: Collection[uuid.UUID]
+    session: Session,
+    broadcast_ids: Collection[uuid.UUID],
+    *,
+    student_ids: Collection[uuid.UUID] | None = None,
 ) -> dict[uuid.UUID, dict[str, int]]:
-    """Messages per broadcast and status."""
-    if not broadcast_ids:
+    """Messages per broadcast and status (``student_ids``: only messages about these students,
+    for a section-scoped reader)."""
+    if not broadcast_ids or (student_ids is not None and not student_ids):
         return {}
-    stmt = (
-        select(Message.broadcast_id, Message.status, func.count())
-        .where(Message.broadcast_id.in_(list(broadcast_ids)))
-        .group_by(Message.broadcast_id, Message.status)
+    stmt = select(Message.broadcast_id, Message.status, func.count()).where(
+        Message.broadcast_id.in_(list(broadcast_ids))
     )
+    if student_ids is not None:
+        stmt = stmt.where(Message.student_id.in_(list(student_ids)))
+    stmt = stmt.group_by(Message.broadcast_id, Message.status)
     out: dict[uuid.UUID, dict[str, int]] = {}
     for bid, status, count in session.execute(stmt):
         if bid is not None:

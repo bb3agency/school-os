@@ -276,7 +276,7 @@ describe("broadcasts and automatic messages on /messages (FR-MSG-017)", () => {
     expect(screen.getByText(en.automatic.waiting.replace("{count}", "3"))).toBeInTheDocument();
   });
 
-  it("hides the school-wide cards for a scoped reader (403)", async () => {
+  it("hides the broadcast and automatic cards when the API refuses them (403)", async () => {
     signedIn([READ]);
     stub.routes["POST /bff/api/v1/messages/search"] = () =>
       Response.json({ items: [], next_cursor: null });
