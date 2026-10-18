@@ -103,6 +103,146 @@ describe("school home (dashboard)", () => {
     expect(intlErrors).toEqual([]);
   });
 
+  it("office home: 'Add a student' is the one primary action", async () => {
+    stub.routes["GET /bff/api/v1/me"] = () =>
+      Response.json(me(["student.create", "dq.findings.read", "kb.ask"]));
+    stub.routes["GET /bff/api/v1/dq/summary"] = () =>
+      Response.json({
+        blockers: 0,
+        warnings: 0,
+        students_with_blockers: 0,
+        by_rule: [],
+        by_severity: {},
+        last_run: null,
+        profile_key: null,
+      });
+    renderWithIntl(<HomeScreen />);
+    expect(await screen.findByRole("link", { name: sm.home.primary.addStudent })).toHaveAttribute(
+      "href",
+      "/students/new",
+    );
+    expect(screen.getByRole("link", { name: sm.home.askAction })).toHaveAttribute("href", "/ask");
+    // Office staff never load money or readiness on their home.
+    expect(stub.callsTo("GET /bff/api/v1/fees/status")).toHaveLength(0);
+    expect(stub.callsTo("GET /bff/api/v1/dq/profiles")).toHaveLength(0);
+  });
+
+  it("teacher home: attendance and marks as large links, no setup steps, no fee calls", async () => {
+    stub.routes["GET /bff/api/v1/me"] = () =>
+      Response.json({
+        ...me(["attendance.record", "marks.record", "kb.ask", "finance.read"]),
+        roles: ["class_teacher"],
+      });
+    renderWithIntl(<HomeScreen />);
+    const tasks = await screen.findByRole("region", { name: sm.home.teacher.title });
+    expect(within(tasks).getByRole("link", { name: /Take attendance/ })).toHaveAttribute(
+      "href",
+      "/attendance",
+    );
+    expect(within(tasks).getByRole("link", { name: /Enter marks/ })).toHaveAttribute(
+      "href",
+      "/marks",
+    );
+    expect(screen.queryByRole("list", { name: sm.home.steps.label })).toBeNull();
+    expect(stub.callsTo("GET /bff/api/v1/fees/status")).toHaveLength(0);
+    expect(intlErrors).toEqual([]);
+  });
+
+  it("accountant home: today's fee totals from the day book, fee requests to decide", async () => {
+    stub.routes["GET /bff/api/v1/me"] = () =>
+      Response.json({
+        ...me(["finance.read", "fee.collect", "fee.concession.approve"]),
+        roles: ["accountant"],
+      });
+    stub.routes["GET /bff/api/v1/fees/status"] = () =>
+      Response.json({
+        enabled: true,
+        today: "2026-10-18",
+        day_closed: false,
+        financial_year: "2026-27",
+        paper_size: "A5",
+      });
+    stub.routes["GET /bff/api/v1/fees/reports/daily"] = () =>
+      Response.json({
+        date: "2026-10-18",
+        by_collector: [],
+        by_mode: [],
+        cancellations: [],
+        cancelled_total: "0.00",
+        cash_to_hand_over: "1500.00",
+        cheque_to_hand_over: "0.00",
+        closed: null,
+        net_total: "2500.00",
+        receipts: [{}, {}],
+        receipts_total: "2500.00",
+        refunded_total: "0.00",
+      });
+    stub.routes["GET /bff/api/v1/fees/approvals"] = () =>
+      Response.json([{ can_decide: true }, { can_decide: false }]);
+    renderWithIntl(<HomeScreen />);
+    expect(await screen.findByRole("link", { name: sm.home.primary.collectFees })).toHaveAttribute(
+      "href",
+      "/fees/collect",
+    );
+    const kpis = await screen.findByRole("region", { name: sm.home.kpi.label });
+    await waitFor(() =>
+      expect(within(kpis).getByRole("group", { name: sm.home.kpi.feesToday })).toHaveTextContent(
+        "2,500",
+      ),
+    );
+    expect(within(kpis).getByRole("group", { name: sm.home.kpi.feeApprovals })).toHaveTextContent(
+      "1",
+    );
+    expect(
+      stub.callsTo("GET /bff/api/v1/fees/reports/daily")[0]?.url.searchParams.get("date"),
+    ).toBe("2026-10-18");
+    expect(await screen.findByText(sm.home.work.dayOpen)).toBeVisible();
+  });
+
+  it("principal home: portal readiness first, approvals as the primary action", async () => {
+    stub.routes["GET /bff/api/v1/me"] = () =>
+      Response.json({
+        ...me(["dq.findings.read", "student.identity_change.approve"]),
+        roles: ["principal"],
+      });
+    stub.routes["GET /bff/api/v1/dq/summary"] = () =>
+      Response.json({
+        blockers: 4,
+        warnings: 1,
+        students_with_blockers: 3,
+        by_rule: [],
+        by_severity: {},
+        last_run: null,
+        profile_key: null,
+      });
+    stub.routes["GET /bff/api/v1/change-requests"] = () =>
+      Response.json({ data: [{}], next_cursor: null });
+    stub.routes["GET /bff/api/v1/dq/profiles"] = () =>
+      Response.json([
+        { key: "udise", readiness: false, label_en: "UDISE+", label_te: "UDISE+" },
+        { key: "ap_ssc_2027", readiness: true, label_en: "AP SSC 2027", label_te: "AP SSC 2027" },
+      ]);
+    stub.routes["GET /bff/api/v1/dq/readiness/ap_ssc_2027"] = () =>
+      Response.json({
+        last_run: null,
+        profile: { key: "ap_ssc_2027" },
+        sections: [],
+        totals: { ready: 30, students: 40, blocked: 5, needs_parent: 3, needs_school: 2 },
+      });
+    renderWithIntl(<HomeScreen />);
+    expect(
+      await screen.findByRole("link", { name: sm.home.primary.reviewApprovals }),
+    ).toHaveAttribute("href", "/change-requests");
+    const kpis = await screen.findByRole("region", { name: sm.home.kpi.label });
+    await waitFor(() =>
+      expect(within(kpis).getByRole("group", { name: sm.home.kpi.readiness })).toHaveTextContent(
+        "75%",
+      ),
+    );
+    // Readiness is the first card.
+    expect(within(kpis).getAllByRole("group")[0]).toHaveAccessibleName(sm.home.kpi.readiness);
+  });
+
   it("more pending requests than one page reads as '200+', and a failed load shows '—'", async () => {
     stub.routes["GET /bff/api/v1/me"] = () =>
       Response.json(me(["dq.findings.read", "student.identity_change.request"]));
