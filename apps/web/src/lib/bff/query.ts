@@ -162,13 +162,20 @@ export function useApiQuery<T>(
   load: () => Promise<T>,
   options: ApiQueryOptions<T> = {},
 ): Loadable<T> {
-  const interval = options.refetchInterval ?? false;
+  const interval = options.refetchInterval;
   const query = useQuery({
     queryKey,
     queryFn: load,
     enabled: options.enabled ?? true,
-    refetchInterval:
-      typeof interval === "function" ? (current) => interval(current.state.data) : interval,
+    // Only callers that ask for polling set it (other observers of the same key keep theirs).
+    ...(interval === undefined
+      ? {}
+      : {
+          refetchInterval:
+            typeof interval === "function"
+              ? (current: { state: { data: T | undefined } }) => interval(current.state.data)
+              : interval,
+        }),
     retry: (count, error) =>
       count < 1 &&
       !(error instanceof NotAvailableError) &&
