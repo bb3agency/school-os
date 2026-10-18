@@ -42,6 +42,7 @@ from app.public import tokens
 from app.public.config import (
     HANDLE_KINDS,
     PARENT_KINDS,
+    PARENT_TARGET_TYPES,
     HandleKind,
     ParentKind,
     is_parent_kind,
@@ -209,6 +210,33 @@ def issue_handle(
         system=created_by is None,
     )
     return IssuedHandle(handle_id=row.id, kind=kind, key=returned, expires_at=expires_at)
+
+
+def issue_parent_link(
+    session: Session,
+    *,
+    kind: ParentKind,
+    target_id: uuid.UUID,
+    guardian_id: uuid.UUID,
+    message_id: uuid.UUID | None = None,
+    created_by: uuid.UUID | None = None,
+) -> IssuedHandle:
+    """A parent link with the target type its page expects (``PARENT_TARGET_TYPES``; R2-3H
+    pages, R2-3G sends): a notice, receipt, fee account or (opt-in) the guardian itself, always
+    for one guardian (FR-PUB-005). The link is ``f"{SOS_PUBLIC_BASE_URL}/p/{issued.key}"``."""
+    if kind not in PARENT_KINDS:
+        raise ValueError(f"{kind!r} is not a parent link kind")
+    if kind == "parent_optin" and target_id != guardian_id:
+        raise ValueError("an opt-in link points at its own guardian")
+    return issue_handle(
+        session,
+        kind=kind,
+        target_type=PARENT_TARGET_TYPES[kind],
+        target_id=target_id,
+        guardian_id=guardian_id,
+        created_by=created_by,
+        message_id=message_id,
+    )
 
 
 # --- resolve (cross-school, definer function) -------------------------------------------------
@@ -391,6 +419,7 @@ __all__ = [
     "IssuedHandle",
     "ResolvedHandle",
     "issue_handle",
+    "issue_parent_link",
     "load_handle",
     "purge_expired_handles",
     "purge_tenant_data",

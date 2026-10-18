@@ -172,6 +172,22 @@ describe("/p/view loader (FR-PUB-008, FR-PUB-010)", () => {
     expires_at: EXPIRES,
     language: "te",
     school_name: "Synthetic Model School",
+    notice: null,
+    dues: null,
+    optin: null,
+    receipt: {
+      receipt_number: "RCT/2026-27/000412",
+      receipt_date: "2026-10-17",
+      student_name: "Synthetica Student",
+      class_section: "IX-A",
+      admission_no: "2019/0457/A",
+      lines: [],
+      amount: "1500.00",
+      amount_in_words: "One thousand five hundred rupees only",
+      mode: "cash",
+      cancelled_on: null,
+      has_pdf: false,
+    },
   };
 
   it("re-resolves the cookie's token on every request and reads only the parent cookie", async () => {
@@ -180,7 +196,10 @@ describe("/p/view loader (FR-PUB-008, FR-PUB-010)", () => {
       runtime(),
       new Headers({ cookie: `__Host-sos_session=staff; __Host-sos_parent=${TOKEN}` }),
     );
-    expect(view).toEqual({ state: "ok", envelope });
+    expect(view).toMatchObject({ state: "ok", envelope });
+    // The forms' CSRF token is bound to the cookie's token (never the token itself).
+    expect(view.state === "ok" && view.csrf).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(view.state === "ok" && view.csrf).not.toBe(TOKEN);
     const [sent] = calls;
     expect(sent?.headers.get(PUBLIC_TOKEN_HEADER)).toBe(TOKEN);
     expect(sent?.headers.get("cookie")).toBeNull();
@@ -198,6 +217,9 @@ describe("/p/view loader (FR-PUB-008, FR-PUB-010)", () => {
     answer = () => json({ code: "rate_limited" }, 429);
     expect(await loadLinkView(runtime(), cookie)).toEqual({ state: "busy" });
     answer = () => json({ ...envelope, kind: "staff_page" });
+    expect(await loadLinkView(runtime(), cookie)).toEqual({ state: "expired" });
+    // A page without its content block (an older API, a malformed answer) is never shown.
+    answer = () => json({ ...envelope, receipt: null });
     expect(await loadLinkView(runtime(), cookie)).toEqual({ state: "expired" });
   });
 });

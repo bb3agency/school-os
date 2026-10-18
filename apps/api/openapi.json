@@ -14934,8 +14934,18 @@
       },
       "LinkEnvelopeOut": {
         "additionalProperties": false,
-        "description": "The parent page's frame for the cookie's link (``/p/view``): which page it is, until when\nit works, its language (the guardian's choice, else the school's parent language, else\nEnglish: ADR-0044) and the school's name for the page heading. The page content per kind is\nadded by wave R2-3H (``app/public/pages.py``).",
+        "description": "The parent page for the cookie's link (``/p/view``): which page it is, until when it\nworks, its language (the guardian's choice, else the school's parent language, else English:\nADR-0044), the school's name, and exactly one content block for its kind (R2-3H).",
         "properties": {
+          "dues": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParentDuesOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "expires_at": {
             "format": "date-time",
             "title": "Expires At",
@@ -14958,6 +14968,36 @@
             ],
             "title": "Language",
             "type": "string"
+          },
+          "notice": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParentNoticeOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "optin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParentOptinOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "receipt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParentReceiptOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "school_name": {
             "title": "School Name",
@@ -19658,6 +19698,493 @@
         "title": "Page[VerifiedAnswerOut]",
         "type": "object"
       },
+      "ParentDocumentLinkOut": {
+        "additionalProperties": false,
+        "description": "A presigned GET of the notice or receipt PDF, valid at most 5 minutes; the BFF redirects\nthe parent to it (303) and never shows the address.",
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "expires_at"
+        ],
+        "title": "ParentDocumentLinkOut",
+        "type": "object"
+      },
+      "ParentDueInstalmentOut": {
+        "additionalProperties": false,
+        "properties": {
+          "due": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Due",
+            "type": "string"
+          },
+          "due_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due On"
+          },
+          "instalment_no": {
+            "title": "Instalment No",
+            "type": "integer"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "late_fee": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Late Fee",
+            "type": "string"
+          },
+          "overdue": {
+            "title": "Overdue",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "instalment_no",
+          "label",
+          "due_on",
+          "due",
+          "late_fee",
+          "overdue"
+        ],
+        "title": "ParentDueInstalmentOut",
+        "type": "object"
+      },
+      "ParentDuesOut": {
+        "additionalProperties": false,
+        "description": "ADR-0046 decision 2 \"Dues\": the child's first name and class only, what is due now per\ninstalment (late fee shown separately), \"Pay online\" when the school takes online payments,\nthe UPI QR when set and the office phone.",
+        "properties": {
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "child_first_name": {
+            "title": "Child First Name",
+            "type": "string"
+          },
+          "class_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Name"
+          },
+          "instalments": {
+            "items": {
+              "$ref": "#/components/schemas/ParentDueInstalmentOut"
+            },
+            "title": "Instalments",
+            "type": "array"
+          },
+          "late_fee_total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Late Fee Total",
+            "type": "string"
+          },
+          "office_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Office Phone"
+          },
+          "pay_online": {
+            "title": "Pay Online",
+            "type": "boolean"
+          },
+          "total_due": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Total Due",
+            "type": "string"
+          },
+          "upi": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParentUpiOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "child_first_name",
+          "class_name",
+          "as_of",
+          "instalments",
+          "total_due",
+          "late_fee_total",
+          "pay_online",
+          "upi",
+          "office_phone"
+        ],
+        "title": "ParentDuesOut",
+        "type": "object"
+      },
+      "ParentNoticeOut": {
+        "additionalProperties": false,
+        "description": "ADR-0046 decision 2 \"Notice\": the approved notice's title, body and date, and whether its\nPDF can be opened now (``GET /public/links/current/document``).",
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "has_pdf": {
+            "title": "Has Pdf",
+            "type": "boolean"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "body",
+          "date",
+          "has_pdf"
+        ],
+        "title": "ParentNoticeOut",
+        "type": "object"
+      },
+      "ParentOptinCategoryOut": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "enum": [
+              "notices",
+              "attendance",
+              "fees"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "opted_in",
+              "opted_out",
+              "not_asked"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "stopped_by_parent": {
+            "title": "Stopped By Parent",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "category",
+          "status",
+          "stopped_by_parent"
+        ],
+        "title": "ParentOptinCategoryOut",
+        "type": "object"
+      },
+      "ParentOptinIn": {
+        "additionalProperties": false,
+        "description": "The parent's message language from the opt-in page (ADR-0044 decision 4).",
+        "properties": {
+          "language": {
+            "enum": [
+              "en",
+              "te",
+              "school"
+            ],
+            "title": "Language",
+            "type": "string"
+          }
+        },
+        "required": [
+          "language"
+        ],
+        "title": "ParentOptinIn",
+        "type": "object"
+      },
+      "ParentOptinOut": {
+        "additionalProperties": false,
+        "description": "ADR-0046 decision 2 \"Opt-in\": the categories with the choice made and the guardian's\nmessage language (``school`` = the school's choice).",
+        "properties": {
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/ParentOptinCategoryOut"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "language_choice": {
+            "enum": [
+              "en",
+              "te",
+              "school"
+            ],
+            "title": "Language Choice",
+            "type": "string"
+          },
+          "school_language": {
+            "enum": [
+              "en",
+              "te"
+            ],
+            "title": "School Language",
+            "type": "string"
+          }
+        },
+        "required": [
+          "categories",
+          "language_choice",
+          "school_language"
+        ],
+        "title": "ParentOptinOut",
+        "type": "object"
+      },
+      "ParentPayIn": {
+        "additionalProperties": false,
+        "description": "The instalments the parent ticked on the dues page.",
+        "properties": {
+          "instalments": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 24,
+            "minItems": 1,
+            "title": "Instalments",
+            "type": "array"
+          }
+        },
+        "required": [
+          "instalments"
+        ],
+        "title": "ParentPayIn",
+        "type": "object"
+      },
+      "ParentPayOut": {
+        "additionalProperties": false,
+        "description": "Where to send the parent: the school's own Razorpay payment page (FR-PUB-010).",
+        "properties": {
+          "amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Amount",
+            "type": "string"
+          },
+          "redirect_url": {
+            "title": "Redirect Url",
+            "type": "string"
+          },
+          "reused": {
+            "title": "Reused",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "redirect_url",
+          "amount",
+          "reused"
+        ],
+        "title": "ParentPayOut",
+        "type": "object"
+      },
+      "ParentPaymentStatusOut": {
+        "additionalProperties": false,
+        "description": "The return page's status of one payment link (``created`` = not paid yet).",
+        "properties": {
+          "amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Amount",
+            "type": "string"
+          },
+          "receipt_issued": {
+            "title": "Receipt Issued",
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "created",
+              "paid",
+              "expired",
+              "cancelled",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "amount",
+          "receipt_issued"
+        ],
+        "title": "ParentPaymentStatusOut",
+        "type": "object"
+      },
+      "ParentReceiptLineOut": {
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Amount",
+            "type": "string"
+          },
+          "head_name": {
+            "title": "Head Name",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "head_name",
+          "amount"
+        ],
+        "title": "ParentReceiptLineOut",
+        "type": "object"
+      },
+      "ParentReceiptOut": {
+        "additionalProperties": false,
+        "description": "ADR-0046 decision 2 \"Receipt\" (owner decision D22): the receipt card as printed.",
+        "properties": {
+          "admission_no": {
+            "title": "Admission No",
+            "type": "string"
+          },
+          "amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Amount",
+            "type": "string"
+          },
+          "amount_in_words": {
+            "title": "Amount In Words",
+            "type": "string"
+          },
+          "cancelled_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled On"
+          },
+          "class_section": {
+            "title": "Class Section",
+            "type": "string"
+          },
+          "has_pdf": {
+            "title": "Has Pdf",
+            "type": "boolean"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ParentReceiptLineOut"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "receipt_date": {
+            "format": "date",
+            "title": "Receipt Date",
+            "type": "string"
+          },
+          "receipt_number": {
+            "title": "Receipt Number",
+            "type": "string"
+          },
+          "student_name": {
+            "title": "Student Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "receipt_number",
+          "receipt_date",
+          "student_name",
+          "class_section",
+          "admission_no",
+          "lines",
+          "amount",
+          "amount_in_words",
+          "mode",
+          "cancelled_on",
+          "has_pdf"
+        ],
+        "title": "ParentReceiptOut",
+        "type": "object"
+      },
+      "ParentUpiOut": {
+        "additionalProperties": false,
+        "description": "The school's static UPI QR (SVG, no amount) and payee, when set (R2-2E).",
+        "properties": {
+          "payee_name": {
+            "title": "Payee Name",
+            "type": "string"
+          },
+          "qr_svg": {
+            "title": "Qr Svg",
+            "type": "string"
+          },
+          "upi_id": {
+            "title": "Upi Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "payee_name",
+          "upi_id",
+          "qr_svg"
+        ],
+        "title": "ParentUpiOut",
+        "type": "object"
+      },
       "PartyDetail": {
         "properties": {
           "as_of": {
@@ -23044,6 +23571,23 @@
           "finding_status"
         ],
         "title": "ReadinessItemOut",
+        "type": "object"
+      },
+      "ReadinessOverviewOut": {
+        "description": "Readiness of several boards and portals in one call (one summary per profile, in the\norder asked), each limited to your scope like ``GET /dq/readiness/{profile_key}``.",
+        "properties": {
+          "summaries": {
+            "items": {
+              "$ref": "#/components/schemas/ReadinessSummaryOut"
+            },
+            "title": "Summaries",
+            "type": "array"
+          }
+        },
+        "required": [
+          "summaries"
+        ],
+        "title": "ReadinessOverviewOut",
         "type": "object"
       },
       "ReadinessProfileOut": {
@@ -36994,7 +37538,7 @@
     },
     "/api/v1/change-requests": {
       "get": {
-        "description": "Change requests of students you can see, newest first (permission\n``student.identity_change.request`` or ``student.identity_change.approve``). Values of\nsensitive (C3) fields are masked.",
+        "description": "Change requests of students you can see, newest first (permission\n``student.identity_change.request`` or ``student.identity_change.approve``). Values of\nsensitive (C3) fields are masked.\n\nInbox filters: ``waiting_for=me`` lists the requests you may decide now (pending and not\nexpired, on students in your approve scope, never your own: maker-checker), empty without\n``student.identity_change.approve``; ``requested_by=me`` lists the requests you submitted.\nAll filters combine, so ``waiting_for=me`` with another status or with ``requested_by=me``\ngives an empty page.",
         "operationId": "list_change_requests_api_v1_change_requests_get",
         "parameters": [
           {
@@ -37035,6 +37579,40 @@
                 }
               ],
               "title": "Student Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "waiting_for",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "const": "me",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Waiting For"
+            }
+          },
+          {
+            "in": "query",
+            "name": "requested_by",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "const": "me",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Requested By"
             }
           },
           {
@@ -40207,6 +40785,109 @@
           }
         },
         "summary": "List Profiles",
+        "tags": [
+          "data-quality"
+        ]
+      }
+    },
+    "/api/v1/dq/readiness": {
+      "get": {
+        "description": "Readiness of several boards and portals in one call: for each profile (at most 5, in\nthe order given) the same totals and per-section counts as ``GET\n/dq/readiness/{profile_key}`` (permission ``dq.readiness.read``; class teachers see their\nsections). Without ``profile_keys``, every readiness profile listed for the school. An\nunknown profile, or one without a readiness check: 404.",
+        "operationId": "readiness_overview_api_v1_dq_readiness_get",
+        "parameters": [
+          {
+            "description": "Readiness profiles (repeat the parameter); omitted: every readiness profile listed for this school.",
+            "in": "query",
+            "name": "profile_keys",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "maxLength": 64,
+                    "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+                    "type": "string"
+                  },
+                  "maxItems": 5,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Readiness profiles (repeat the parameter); omitted: every readiness profile listed for this school.",
+              "title": "Profile Keys"
+            }
+          },
+          {
+            "in": "query",
+            "name": "section_ids",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "maxItems": 100,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Section Ids"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessOverviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Readiness Overview",
         "tags": [
           "data-quality"
         ]
@@ -61145,7 +61826,7 @@
     },
     "/api/v1/public/links/current": {
       "get": {
-        "description": "The parent page frame for the cookie's link (the BFF sends the cookie's token in\n``X-SOS-Public-Token``): kind, expiry, language (guardian, else school, else English;\nFR-PUB-008) and the school's name. Counts a view (FR-PUB-012).",
+        "description": "The parent page for the cookie's link (the BFF sends the cookie's token in\n``X-SOS-Public-Token``): kind, expiry, language (guardian, else school, else English;\nFR-PUB-008), the school's name and the content of its kind (ADR-0046 decision 2;\nFR-PUB-009). Counts a view (FR-PUB-012).",
         "operationId": "current_link_api_v1_public_links_current_get",
         "responses": {
           "200": {
@@ -61166,6 +61847,193 @@
           }
         },
         "summary": "Current Link",
+        "tags": [
+          "public"
+        ]
+      }
+    },
+    "/api/v1/public/links/current/document": {
+      "get": {
+        "description": "The PDF of a notice or receipt link, presigned for at most 5 minutes (FR-PUB-009); 404\nwhile there is none (a cancelled receipt, a notice whose files were removed). Audited by\nthe owning module. Not a view.",
+        "operationId": "current_document_api_v1_public_links_current_document_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParentDocumentLinkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Unknown, expired or revoked link (always the same body)."
+          },
+          "429": {
+            "description": "Too many requests or failed lookups from this address."
+          }
+        },
+        "summary": "Current Document",
+        "tags": [
+          "public"
+        ]
+      }
+    },
+    "/api/v1/public/links/current/optin": {
+      "post": {
+        "description": "The parent's message language on an opt-in link (\"Read messages in\": English, Telugu or\nthe school's choice; ADR-0044 decision 4, FR-LANG-003). Audited ``guardian.updated``. The\npage never records an opt-in or opt-out (ADR-0043 decision 7: STOP on WhatsApp).",
+        "operationId": "current_optin_api_v1_public_links_current_optin_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParentOptinIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParentOptinOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Unknown, expired or revoked link (always the same body)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests or failed lookups from this address."
+          }
+        },
+        "summary": "Current Optin",
+        "tags": [
+          "public"
+        ]
+      }
+    },
+    "/api/v1/public/links/current/pay": {
+      "post": {
+        "description": "Pay online from a dues link (ADR-0046 decision 9; FR-PAY-005): creates, or reuses while\nit is valid, one payment link for the ticked instalments on the school's own Razorpay\naccount (``created_via parent_page``), and answers where to send the parent. Idempotent per\nlink and instalments: the same choice gets the same link back (``reused``) without spending\nthe budget; new links are limited to 5 per dues link per day (``public_pay``, 429). The BFF\nchecks the CSRF token and the Origin before calling.",
+        "operationId": "current_pay_api_v1_public_links_current_pay_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParentPayIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParentPayOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Unknown, expired or revoked link (always the same body)."
+          },
+          "409": {
+            "description": "Not connected, nothing due or too many open links."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests or failed lookups from this address."
+          },
+          "502": {
+            "description": "Razorpay did not make the link; try again."
+          }
+        },
+        "summary": "Current Pay",
+        "tags": [
+          "public"
+        ]
+      }
+    },
+    "/api/v1/public/links/current/payment": {
+      "get": {
+        "description": "The status of the payment link Razorpay returned from (``intent`` = the link's reference,\n32 hex characters) or of the newest one this dues link made; 404 for anything else. The\nreturn page polls it; it never counts as a view.",
+        "operationId": "current_payment_api_v1_public_links_current_payment_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "intent",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[0-9a-f]{32}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Intent"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParentPaymentStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Unknown, expired or revoked link (always the same body)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests or failed lookups from this address."
+          }
+        },
+        "summary": "Current Payment",
         "tags": [
           "public"
         ]

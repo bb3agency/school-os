@@ -31,7 +31,7 @@ import { ProblemAlert, problemCode } from "@/features/students/ProblemAlert";
 import { useSchoolStructure, useSectionOptions } from "@/features/students/StudentList";
 import { STUDENT_STATUSES, type Attribute } from "@/features/students/types";
 import { Link, useRouter } from "@/i18n/navigation";
-import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
+import { listAll, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { cn } from "@/lib/cn";
 import { useDateInput } from "@/lib/date-format";
 import { formatDateTime } from "@/lib/format";
@@ -640,6 +640,8 @@ export interface ItemReviewViewProps {
   after?: AfterAction | undefined;
   onDone: (action: AfterAction) => void;
   onImageBroken: () => void;
+  /** Previous / next row of the batch, once its list has loaded. */
+  neighbours?: RowNeighbours | null;
 }
 
 /**
@@ -656,6 +658,7 @@ export function ItemReviewView({
   after,
   onDone,
   onImageBroken,
+  neighbours = null,
 }: ItemReviewViewProps) {
   const t = useTranslations("extraction.review");
   const tb = useTranslations("extraction.batch");
@@ -711,6 +714,7 @@ export function ItemReviewView({
         }
         description={t("description")}
       />
+      {neighbours && neighbours.total > 1 ? <RowNav neighbours={neighbours} /> : null}
       {after ? (
         <Alert tone="success" live>
           {t(`after.${after}`)}
@@ -783,6 +787,87 @@ export function ItemReviewView({
   );
 }
 
+/** Where a row sits in its batch's list (page order, the API's order). */
+export interface RowNeighbours {
+  position: number;
+  total: number;
+  previous: string | null;
+  next: string | null;
+}
+
+export function rowNeighbours(ids: readonly string[], itemId: string): RowNeighbours | null {
+  const index = ids.indexOf(itemId);
+  if (index < 0) return null;
+  return {
+    position: index + 1,
+    total: ids.length,
+    previous: index > 0 ? (ids[index - 1] ?? null) : null,
+    next: index < ids.length - 1 ? (ids[index + 1] ?? null) : null,
+  };
+}
+
+/**
+ * Previous / next row of the batch (every status, page order), as links with P and N as
+ * keyboard shortcuts while focus is not in a field, so typing a value never moves on.
+ */
+export function RowNav({ neighbours }: { neighbours: RowNeighbours }) {
+  const t = useTranslations("extraction.review");
+  const router = useRouter();
+  const hintId = useId();
+  const { previous, next } = neighbours;
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return;
+      const target = event.target;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target instanceof HTMLElement && target.isContentEditable) ||
+        document.querySelector("dialog[open]")
+      )
+        return;
+      const key = event.key.toLowerCase();
+      const to = key === "p" ? previous : key === "n" ? next : null;
+      if (!to) return;
+      event.preventDefault();
+      router.push(`/register-photos/items/${to}`);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [previous, next, router]);
+  const linkClass =
+    "inline-flex min-h-6 items-center gap-1 font-semibold text-primary underline-offset-4 hover:underline";
+  return (
+    <nav aria-label={t("rowNavLabel")} aria-describedby={hintId} className="space-y-1 text-sm">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        {previous ? (
+          <Link
+            href={`/register-photos/items/${previous}`}
+            aria-keyshortcuts="P"
+            className={linkClass}
+          >
+            <Icon name="chevronLeft" className="size-4" />
+            {t("previousRow")}
+          </Link>
+        ) : null}
+        <span className="num text-ink-muted">
+          {t("rowPosition", { position: neighbours.position, total: neighbours.total })}
+        </span>
+        {next ? (
+          <Link href={`/register-photos/items/${next}`} aria-keyshortcuts="N" className={linkClass}>
+            {t("nextRow")}
+            <Icon name="chevronRight" className="size-4" />
+          </Link>
+        ) : null}
+      </div>
+      <p id={hintId} className="text-xs text-ink-muted">
+        {t("rowKeysHint")}
+      </p>
+    </nav>
+  );
+}
+
 /** GET /extraction-items/{id} (fresh image link before it expires) and its batch's pages. */
 export function ItemReviewScreen({ itemId, after }: { itemId: string; after?: AfterAction }) {
   const api = useBffClient("staff");
@@ -818,8 +903,31 @@ export function ItemReviewScreen({ itemId, after }: { itemId: string; after?: Af
       ),
     { enabled: batchId !== null },
   );
+  // The batch's rows in page order (every status), for previous / next.
+  const order = useApiQuery(
+    [...itemsKey(batchId ?? "none"), "order"],
+    () =>
+      listAll((cursor) =>
+        unwrap(
+          api.GET("/api/v1/extraction-items", {
+            params: {
+              query: { batch_id: batchId ?? "", limit: 200, ...(cursor ? { cursor } : {}) },
+            },
+          }),
+        ),
+      ),
+    { enabled: batchId !== null },
+  );
+  const neighbours =
+    order.status === "ready"
+      ? rowNeighbours(
+          order.data.map((row) => row.id),
+          itemId,
+        )
+      : null;
   return (
     <ItemReviewView
+      neighbours={neighbours}
       item={item}
       batch={batch}
       attributes={attributes}

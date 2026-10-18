@@ -57,6 +57,7 @@ from app.dq.schemas import (
     ReadinessCounts,
     ReadinessFieldOut,
     ReadinessItemOut,
+    ReadinessOverviewOut,
     ReadinessProfileOut,
     ReadinessRunIn,
     ReadinessSectionOut,
@@ -367,6 +368,34 @@ def summary(
         totals=ReadinessCounts(**_counts(all_statuses)),
         sections=rows,
         last_run=dq._run_out(last) if visible and last is not None else None,
+    )
+
+
+MAX_OVERVIEW_PROFILES: Final = 5
+
+
+def overview(
+    session: Session,
+    ctx: UserContext,
+    profile_keys: Sequence[str] | None = None,
+    *,
+    section_ids: Collection[uuid.UUID] | None = None,
+) -> ReadinessOverviewOut:
+    """:func:`summary` for several profiles at once (one column per portal on the readiness
+    page). ``None`` or empty: every readiness profile listed for this school (FR-TEN-020).
+    Unknown keys, or keys without a readiness check: 404, like the single summary."""
+    if profile_keys:
+        keys = list(dict.fromkeys(profile_keys))
+        for key in keys:
+            readiness_profile(key)  # 404 before any student is assessed
+    else:
+        keys = [p.key for p in dq.school_profiles(session) if p.readiness]
+    if len(keys) > MAX_OVERVIEW_PROFILES:
+        raise ValidationFailed(
+            [{"field": "profile_keys", "code": "too_many", "message_key": "errors.too_many"}]
+        )
+    return ReadinessOverviewOut(
+        summaries=[summary(session, ctx, key, section_ids=section_ids) for key in keys]
     )
 
 

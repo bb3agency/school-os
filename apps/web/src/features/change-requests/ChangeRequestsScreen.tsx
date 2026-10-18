@@ -14,7 +14,7 @@ import { Link, useRouter } from "@/i18n/navigation";
 import { toLoadable, unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
 import { formatDateTime } from "@/lib/format";
-import { changeRequestsHref, type ChangeRequestFilters } from "./filters";
+import { changeRequestsHref, changeRequestsQuery, type ChangeRequestFilters } from "./filters";
 import { ChangeRequestStatusBadge, ExpiryText, fieldLabel, ValueChange } from "./parts";
 import { CHANGE_REQUEST_STATUSES, CR_APPROVE, CR_REQUEST, type ChangeRequest } from "./types";
 
@@ -28,8 +28,10 @@ const PAGE_SIZE = 50;
 /**
  * Change requests (US-601, FR-CR-001..004): the maker-checker queue, newest first. Approvers
  * see which requests wait for them; nobody is ever offered their own request to approve.
- * The inbox tabs are the API's status filter (links, so the tab is in the URL); the API has
- * no "waiting for me" or "mine" filter, so those show as row labels instead of tabs.
+ * The tabs are links (the tab is in the URL): "Waiting for me" (`waiting_for=me`, approvers
+ * only), "Asked by me" (`requested_by=me`, makers only) and the status filter. Choosing an
+ * inbox tab clears the status and the other way round. No counts: the list is cursor-paged
+ * and carries no totals.
  */
 export function ChangeRequestsScreen({ filters }: { filters: ChangeRequestFilters }) {
   const t = useTranslations("changeRequests");
@@ -40,10 +42,7 @@ export function ChangeRequestsScreen({ filters }: { filters: ChangeRequestFilter
   const me = useStaffMe();
   const can = useStaffCan();
   const router = useRouter();
-  const query = {
-    ...(filters.status ? { status: filters.status } : {}),
-    ...(filters.studentId ? { student_id: filters.studentId } : {}),
-  };
+  const query = changeRequestsQuery(filters);
   const list = useInfiniteQuery({
     queryKey: [...CR_KEYS.all, "list", query],
     queryFn: ({ pageParam }) =>
@@ -120,13 +119,47 @@ export function ChangeRequestsScreen({ filters }: { filters: ChangeRequestFilter
   ];
 
   const tabs = [
-    { id: "all", href: changeRequestsHref({ ...filters, status: null }), label: tc("all") },
+    {
+      id: "all",
+      href: changeRequestsHref({ ...filters, status: null, inbox: null }),
+      label: tc("all"),
+    },
+    ...(can(CR_APPROVE)
+      ? [
+          {
+            id: "waiting",
+            href: changeRequestsHref({ ...filters, status: null, inbox: "waiting" }),
+            label: t("tabWaitingForMe"),
+          },
+        ]
+      : []),
+    ...(can(CR_REQUEST)
+      ? [
+          {
+            id: "mine",
+            href: changeRequestsHref({ ...filters, status: null, inbox: "mine" }),
+            label: t("tabMine"),
+          },
+        ]
+      : []),
     ...CHANGE_REQUEST_STATUSES.map((status) => ({
       id: status,
-      href: changeRequestsHref({ ...filters, status }),
+      href: changeRequestsHref({ ...filters, status, inbox: null }),
       label: tstatus(status),
     })),
   ];
+  const emptyTitle =
+    filters.inbox === "waiting"
+      ? t("emptyWaitingTitle")
+      : filters.inbox === "mine"
+        ? t("emptyMineTitle")
+        : t("emptyTitle");
+  const emptyBody =
+    filters.inbox === "waiting"
+      ? t("emptyWaitingBody")
+      : can(CR_REQUEST)
+        ? t("emptyBodyRequester")
+        : t("emptyBody");
   const chips = filters.studentId
     ? [{ id: "student_id", label: t("chipStudent"), value: t("chipOneStudent") }]
     : [];
@@ -153,7 +186,11 @@ export function ChangeRequestsScreen({ filters }: { filters: ChangeRequestFilter
         }
       />
       {can(CR_APPROVE) ? <Alert tone="info">{t("approverHint")}</Alert> : null}
-      <TabNav label={t("tabsLabel")} items={tabs} activeId={filters.status ?? "all"} />
+      <TabNav
+        label={t("tabsLabel")}
+        items={tabs}
+        activeId={filters.inbox ?? filters.status ?? "all"}
+      />
       <DataTableV2
         id="change-requests"
         stacked
@@ -165,9 +202,9 @@ export function ChangeRequestsScreen({ filters }: { filters: ChangeRequestFilter
         chips={chips}
         onRemoveChip={() => router.push(changeRequestsHref({ ...filters, studentId: null }))}
         onRetry={() => void list.refetch()}
-        emptyTitle={t("emptyTitle")}
-        emptyBody={can(CR_REQUEST) ? t("emptyBodyRequester") : t("emptyBody")}
-        noResultsTitle={t("emptyTitle")}
+        emptyTitle={emptyTitle}
+        emptyBody={emptyBody}
+        noResultsTitle={emptyTitle}
         footer={
           list.hasNextPage ? (
             <div className="flex justify-center">

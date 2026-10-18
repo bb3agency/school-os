@@ -707,6 +707,8 @@ Stories of the 2026-27 plan, release R2 (docs/18 §3 R2; owner decisions D4-D9 o
 **US-2405** · As a principal, I want to know parent pages cannot be used to find other children or schools. [FR-PUB-011]
 - AC1: Links cannot be guessed; repeated wrong links from one address are slowed and then refused; no page shows another child, a phone number, an address or a date of birth.
 
+*As built (R2-3H, 2026-10-18):* US-2401 AC1 (the notice page: title, date, text, "Open the PDF" while the rendered PDF is kept) and AC2 (uniform expired page); US-2402 AC1 (the receipt card, "Save as PDF" once the PDF is stored, a red "Cancelled on …" banner); US-2403 AC1 and AC2 (first name and class, instalments with due dates, late fees and "Overdue", the school's UPI QR and payee, "Pay online" when Razorpay is connected, Razorpay's page for the school's account, the return page "Thank you … the school will send your receipt"; nothing else can be changed and no card or bank details are asked); US-2405 AC1 (another child's, guardian's or school's target is the uniform 404). US-2404's staff "Revoke link" is R2-3G's (message history). The opt-in page shows the categories and lets the parent choose the message language (US-2302 AC1); stopping stays STOP on WhatsApp.
+
 #### C25 · Ask the school: finish-up (R2.4)
 
 The conversation screens, source chips, follow-ups, feedback, verified answers, history and memory are **built** (docs/17 §5.3, `apps/web/src/features/ask/`; docs/14 M2 status). docs/18 §2 listed them as "not built"; that was stale. R2 adds what is missing.

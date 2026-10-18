@@ -71,6 +71,8 @@ export function NewDocumentScreen() {
   const telugu = useTeluguEnabled();
   // Each failed submit moves focus to the error summary again.
   const [attempt, setAttempt] = useState(0);
+  // Share of the file sent to storage (null before the file starts to go).
+  const [progress, setProgress] = useState<number | null>(null);
 
   const form = useApiForm({
     schema: newDocumentSchema,
@@ -85,6 +87,7 @@ export function NewDocumentScreen() {
     invalidate: [DOCUMENT_KEYS.all],
     submit: async (data, key) => {
       const purpose = purposeFor(data.doc_type);
+      setProgress(null);
       try {
         return await uploadDocument(
           api,
@@ -100,6 +103,7 @@ export function NewDocumentScreen() {
             acl: aclBody(data),
           },
           keys.current.for(key),
+          setProgress,
         );
       } catch (failure) {
         if (failure instanceof StorageUploadError) keys.current.storageFailed();
@@ -230,6 +234,26 @@ export function NewDocumentScreen() {
           <AclFields errors={errors} firstId={FIELD_IDS.visibility} />
         </Card>
         <ApiErrorAlert error={form.error} namespace="documents" />
+        <div role="status" aria-live="polite" className="space-y-1">
+          {form.pending && progress !== null ? (
+            <>
+              <p className="num text-sm">
+                {t("uploadProgress", {
+                  percent: new Intl.NumberFormat("en-IN", {
+                    style: "percent",
+                    maximumFractionDigits: 0,
+                  }).format(Math.floor(progress * 100) / 100),
+                })}
+              </p>
+              <progress
+                max={1}
+                value={progress}
+                aria-label={t("uploading")}
+                className="h-2 w-full accent-primary"
+              />
+            </>
+          ) : null}
+        </div>
         <div className="flex flex-wrap items-center justify-end gap-3">
           <p className="mr-auto max-w-prose text-sm text-ink-muted">{t("scanNote")}</p>
           <Link href="/documents" className={buttonClasses("ghost", "md")}>

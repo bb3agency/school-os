@@ -26,6 +26,8 @@ Source = Literal[
     "manual_entry",
 ]
 Status = Literal["pending", "approved", "rejected", "expired", "cancelled"]
+# Inbox filters of ``GET /change-requests`` (the only value is the caller: ``me``).
+Me = Literal["me"]
 
 
 def _nfc(value: Any) -> Any:

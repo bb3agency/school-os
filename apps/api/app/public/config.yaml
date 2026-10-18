@@ -32,3 +32,10 @@ webhook_providers:
   razorpay: {max_body_bytes: 262144}
   meta: {max_body_bytes: 3145728}
 replay_window_hours: 72
+
+# Where "Pay online" may send a parent (R2-3H; FR-PUB-010: Razorpay's hosted page is the only
+# third-party navigation target). The payment link's https URL must be on one of these hosts or
+# a subdomain; anything else is refused (502 payment_link_failed). rzp.example.test is the fake
+# provider's host (local and CI; .test never resolves on the internet). The web CSP form-action
+# lists the same hosts (apps/web/src/lib/public-surface.ts).
+pay_redirect_hosts: [rzp.io, razorpay.com, rzp.example.test]

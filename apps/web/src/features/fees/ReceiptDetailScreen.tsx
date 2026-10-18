@@ -39,6 +39,7 @@ import {
   NoAccess,
   ReceiptStatusPill,
   RequestStatusPill,
+  type DialogControl,
   type MoreItem,
 } from "./parts";
 
@@ -93,14 +94,14 @@ function useDownloadPdf(receipt: Receipt | null) {
   return { ready, pending, error, download };
 }
 
-function CancelDialog({ receipt }: { receipt: Receipt }) {
+function CancelDialog({ receipt, control }: { receipt: Receipt; control: DialogControl }) {
   const t = useTranslations("fees.receipt");
   const tf = useTranslations("fees");
   const api = useBffClient("staff");
   return (
     <ActionDialog
-      triggerLabel={t("requestCancel")}
-      triggerHidden
+      open={control.open}
+      onOpenChange={control.onOpenChange}
       title={t("cancelTitle")}
       description={t("cancelBody")}
       confirmLabel={t("requestCancel")}
@@ -149,14 +150,14 @@ function CancelDialog({ receipt }: { receipt: Receipt }) {
   );
 }
 
-function RefundDialog({ receipt }: { receipt: Receipt }) {
+function RefundDialog({ receipt, control }: { receipt: Receipt; control: DialogControl }) {
   const t = useTranslations("fees.receipt");
   const tf = useTranslations("fees");
   const api = useBffClient("staff");
   return (
     <ActionDialog
-      triggerLabel={t("requestRefund")}
-      triggerHidden
+      open={control.open}
+      onOpenChange={control.onOpenChange}
       title={t("refundTitle")}
       description={receipt.mode === "razorpay" ? t("refundOnlineBody") : t("refundBody")}
       confirmLabel={t("requestRefund")}
@@ -366,7 +367,7 @@ export function ReceiptDetailScreen({ receiptId }: { receiptId: string }) {
         items.push({
           id: "refund",
           label: t("requestRefund"),
-          dialog: <RefundDialog receipt={r} />,
+          dialog: (control) => <RefundDialog receipt={r} control={control} />,
         });
       }
       if (r.status === "issued" && !r.cancellation && can([COLLECT, MANAGE])) {
@@ -374,7 +375,7 @@ export function ReceiptDetailScreen({ receiptId }: { receiptId: string }) {
           id: "cancel",
           label: t("requestCancel"),
           danger: true,
-          dialog: <CancelDialog receipt={r} />,
+          dialog: (control) => <CancelDialog receipt={r} control={control} />,
         });
       }
     }

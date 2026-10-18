@@ -78,7 +78,7 @@ export function FeaturesView({ settings }: { settings: MarketingSettings }) {
           id={feature}
           aria-labelledby={`${feature}-title`}
           className={cn(
-            "scroll-mt-20 py-16 md:py-24 print:py-6",
+            "py-16 md:py-24 print:py-6",
             index % 2 === 0 ? "border-t border-border bg-surface" : "border-t border-border",
           )}
         >

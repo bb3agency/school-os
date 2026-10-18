@@ -145,6 +145,7 @@ def test_SEC_046_readiness_reads_have_per_person_and_per_school_budgets(
     per-person budget shared by both routes, plus a per-school one charged after authorization."""
     config = rl.load_config()
     for route in (
+        "GET /api/v1/dq/readiness",
         "GET /api/v1/dq/readiness/{profile_key}",
         "GET /api/v1/dq/readiness/{profile_key}/students",
     ):

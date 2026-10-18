@@ -277,6 +277,13 @@ class ReadinessSummaryOut(_Out):
     last_run: RunOut | None
 
 
+class ReadinessOverviewOut(_Out):
+    """Readiness of several boards and portals in one call (one summary per profile, in the
+    order asked), each limited to your scope like ``GET /dq/readiness/{profile_key}``."""
+
+    summaries: list[ReadinessSummaryOut]
+
+
 class ReadinessStudentOut(_Out):
     """One student of a section: status and who must act (no values)."""
 

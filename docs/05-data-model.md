@@ -1537,6 +1537,9 @@ CREATE TABLE core.public_handles (
 
 `core.resolve_public_handle(p_kind text, p_key_hash bytea) RETURNS TABLE (tenant_id uuid, handle_id uuid)`: owned by `sos_definer`, `EXECUTE` to `sos_app` only, active handles of `active` schools (receipt and certificate kinds also `suspended`), no other columns. `rls_allowlist.yaml`: `definer_access_tables` += `core.public_handles`; `definer_functions` += `core.resolve_public_handle`. Purge: expired parent handles 30 days after `expires_at` (daily `public.purge_handles`).
 
+
+**Parent link targets (R2-3H, 2026-10-18).** `target_type` per parent kind is pinned in `app/public/config.py` `PARENT_TARGET_TYPES`: `parent_notice` → `parent_notice` (`ops.parent_notices.id`), `parent_receipt` → `fee_receipt` (`fin.receipts.id`), `parent_dues` → `fee_account` (`fin.student_fee_accounts.id`), `parent_optin` → `guardian` (the guardian id, equal to `guardian_id`). Payment intents made from a dues page record the handle (`fin.payment_intents.public_handle_id`).
+
 ### 15.6 Classification, export and offboarding
 
 - Fee accounts, ledger, receipts, concessions, refunds, intents, provider payments, statement lines and reconciliation items are **C2 personal financial data** (they identify a child and a family's payments): fee permissions only (07 §6.7), audit on export, masked in logs; concession reasons and evidence follow the document's classification (hardship evidence is C3).

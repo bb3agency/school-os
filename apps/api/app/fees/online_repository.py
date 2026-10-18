@@ -178,6 +178,16 @@ def intents_of_account(session: Session, account_id: uuid.UUID, limit: int) -> l
     )
 
 
+def latest_intent_of_handle(session: Session, handle_id: uuid.UUID) -> PaymentIntent | None:
+    """The newest intent a parent dues link made (R2-3H return page)."""
+    return session.scalars(
+        select(PaymentIntent)
+        .where(PaymentIntent.public_handle_id == handle_id)
+        .order_by(PaymentIntent.created_at.desc(), PaymentIntent.id.desc())
+        .limit(1)
+    ).first()
+
+
 def open_intents(
     session: Session, account_id: uuid.UUID, *, lock: bool = False
 ) -> list[PaymentIntent]:

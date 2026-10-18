@@ -13,6 +13,8 @@ sources:
   dq.readiness_slip: {reviewed: false}
   # R2-0 public page shell (apps/web messages te.json "public" namespace).
   public.shell: {reviewed: false}
+  # R2-3H parent pages (apps/web messages/parent.te.json: notice, receipt, dues, payment, opt-in).
+  public.pages: {reviewed: false}
   # --- R2-1C messaging (ADR-0043): the Telugu WhatsApp templates, free-form replies and the
   # printed join slip (app/messaging/templates.yaml; tests/messaging pins these keys to its te
   # `reviewed` flags).
