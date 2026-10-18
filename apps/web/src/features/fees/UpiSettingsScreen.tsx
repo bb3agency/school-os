@@ -1,13 +1,16 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorSummary, type SummaryError } from "@/components/ui/ErrorSummary";
 import { TextField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SaveBar } from "@/components/ui/SaveBar";
 import { unwrap, useApiMutation, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
 import { ifMatch, MANAGE } from "./data";
@@ -46,7 +49,18 @@ function SettingsForm({ settings }: { settings: UpiSettings }) {
   const [vpa, setVpa] = useState(settings.vpa ?? "");
   const [days, setDays] = useState(String(settings.confirm_within_days));
   const [errors, setErrors] = useState<Errors>({});
+  const [attempt, setAttempt] = useState(0);
   const [saved, setSaved] = useState(false);
+  const formId = useId();
+  const ids = { payee: `${formId}-payee`, vpa: `${formId}-vpa`, days: `${formId}-days` };
+  const dirty =
+    payee !== (settings.payee_name ?? "") ||
+    vpa !== (settings.vpa ?? "") ||
+    days !== String(settings.confirm_within_days);
+  const summary: SummaryError[] = (["payee", "vpa", "days"] as const).flatMap((key) => {
+    const message = errors[key];
+    return message ? [{ fieldId: ids[key], message }] : [];
+  });
   const save = useApiMutation(
     (body: { payee_name: string; vpa: string; confirm_within_days: number }) =>
       unwrap(
@@ -69,13 +83,18 @@ function SettingsForm({ settings }: { settings: UpiSettings }) {
     if (!VPA.test(id)) next.vpa = t("errors.vpa");
     if (!Number.isInteger(window) || window < 1 || window > 30) next.days = t("errors.days");
     setErrors(next);
-    if (Object.keys(next).length > 0) return;
+    if (Object.keys(next).length > 0) {
+      setAttempt((n) => n + 1);
+      return;
+    }
     save.mutate({ payee_name: name, vpa: id, confirm_within_days: window });
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate className="space-y-4">
+    <form onSubmit={onSubmit} noValidate aria-label={t("formTitle")} className="space-y-4">
+      {summary.length > 0 ? <ErrorSummary errors={summary} attempt={attempt} /> : null}
       <TextField
+        id={ids.payee}
         name="payee_name"
         label={t("payee")}
         hint={t("payeeHint")}
@@ -86,7 +105,9 @@ function SettingsForm({ settings }: { settings: UpiSettings }) {
         onChange={(event) => setPayee(event.target.value)}
       />
       <TextField
+        id={ids.vpa}
         name="vpa"
+        className="max-w-md"
         label={t("vpa")}
         hint={t("vpaHint")}
         error={errors.vpa}
@@ -97,8 +118,10 @@ function SettingsForm({ settings }: { settings: UpiSettings }) {
         onChange={(event) => setVpa(event.target.value)}
       />
       <TextField
+        id={ids.days}
         name="confirm_within_days"
         type="number"
+        className="max-w-40"
         label={t("days")}
         hint={t("daysHint")}
         error={errors.days}
@@ -108,15 +131,29 @@ function SettingsForm({ settings }: { settings: UpiSettings }) {
         value={days}
         onChange={(event) => setDays(event.target.value)}
       />
-      <Button type="submit" disabled={save.isPending}>
-        {save.isPending ? tc("working") : t("save")}
-      </Button>
       {saved ? (
         <Alert tone="success" live>
           {t("saved")}
         </Alert>
       ) : null}
       <ApiErrorAlert error={save.error ?? undefined} namespace="fees" />
+      <SaveBar dirty={dirty}>
+        <Button type="submit" disabled={save.isPending}>
+          {save.isPending ? tc("working") : t("save")}
+        </Button>
+        <Button
+          variant="secondary"
+          disabled={!dirty || save.isPending}
+          onClick={() => {
+            setPayee(settings.payee_name ?? "");
+            setVpa(settings.vpa ?? "");
+            setDays(String(settings.confirm_within_days));
+            setErrors({});
+          }}
+        >
+          {t("discard")}
+        </Button>
+      </SaveBar>
     </form>
   );
 }
@@ -143,22 +180,22 @@ export function UpiSettingsScreen() {
   );
   if (me !== undefined && !allowed) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         {header}
         <NoAccess />
       </div>
     );
   }
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {header}
       <Alert tone="info" title={t("moneyTitle")}>
         {t("moneyBody")}
       </Alert>
       <FeesGate data={settings}>
         {(s) => (
-          <div className="grid gap-4 lg:grid-cols-3">
-            <Card title={t("formTitle")} className="lg:col-span-2">
+          <div className="grid items-start gap-4 lg:grid-cols-3">
+            <Card title={t("formTitle")} className="min-w-0 lg:col-span-2">
               {can(MANAGE) ? (
                 <SettingsForm settings={s} />
               ) : (
@@ -173,13 +210,19 @@ export function UpiSettingsScreen() {
                   </div>
                   <div>
                     <dt className="text-sm text-ink-muted">{t("days")}</dt>
-                    <dd>{t("daysValue", { days: s.confirm_within_days })}</dd>
+                    <dd className="num">{t("daysValue", { days: s.confirm_within_days })}</dd>
                   </div>
                 </dl>
               )}
             </Card>
-            <Card title={t("previewTitle")} description={t("previewBody")}>
-              {s.configured ? <UpiQr settings={s} /> : <p>{t("notSet")}</p>}
+            <Card title={t("previewTitle")} description={t("previewBody")} className="min-w-0">
+              {s.configured ? (
+                <div className="flex justify-center">
+                  <UpiQr settings={s} />
+                </div>
+              ) : (
+                <EmptyState icon="camera" title={t("notSet")} />
+              )}
             </Card>
           </div>
         )}

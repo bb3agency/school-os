@@ -172,7 +172,12 @@ describe("UPI settings (US-2109 AC1, FR-FEE-015)", () => {
     await user.clear(vpa);
     await user.type(vpa, "not a upi id");
     await user.click(screen.getByRole("button", { name: en.upi.save }));
-    expect(await screen.findByText(en.upi.errors.vpa)).toBeInTheDocument();
+    // The message shows under the field and, linked to it, in the error summary at the top.
+    expect(await screen.findAllByText(en.upi.errors.vpa)).toHaveLength(2);
+    expect(screen.getByRole("link", { name: en.upi.errors.vpa })).toHaveAttribute(
+      "href",
+      `#${vpa.id}`,
+    );
     expect(stub.callsTo("PUT /bff/api/v1/fees/upi-settings")).toHaveLength(0);
     await user.clear(vpa);
     await user.type(vpa, "school.fees@hdfcbank");

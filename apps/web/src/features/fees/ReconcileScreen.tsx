@@ -1,16 +1,18 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useQueryClient } from "@tanstack/react-query";
+import { useLocale, useTranslations } from "next-intl";
 import { useId, useMemo, useRef, useState, type FormEvent } from "react";
 import * as z from "@/lib/zod";
+import { DataTableV2, type ColumnV2 } from "@/components/console";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Pill, type PillVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { Label } from "@/components/ui/Label";
+import { Menu } from "@/components/ui/Menu";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
 import { StatCard } from "@/components/ui/StatCard";
@@ -23,11 +25,12 @@ import {
   type UploadProgress,
 } from "@/features/imports/upload";
 import { Link } from "@/i18n/navigation";
+import type { Locale } from "@/i18n/routing";
 import { unwrap, useApiMutation, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatCount, formatDate, formatDateTime, formatInr } from "@/lib/format";
 import { translateOr } from "@/lib/i18n-dynamic";
-import { toPaise } from "./data";
+import { isFeesOff, toPaise } from "./data";
 import { Amount, FeesGate, NoAccess } from "./parts";
 import {
   confirmable,
@@ -38,6 +41,7 @@ import {
   UPI_KEYS,
   type StatementImport,
   type StatementLine,
+  type UpiExceptions,
 } from "./upi";
 
 const STATUS_PILL: Record<string, PillVariant> = {
@@ -173,7 +177,7 @@ function LinesTable({
               </Th>
             ) : null}
             <Th>{t("valueDate")}</Th>
-            <Th className="text-right">{t("amount")}</Th>
+            <Th numeric>{t("amountInr")}</Th>
             <Th>{t("reference")}</Th>
             <Th>{t("narration")}</Th>
             <Th>{t("statusColumn")}</Th>
@@ -200,11 +204,13 @@ function LinesTable({
                     ) : null}
                   </Td>
                 ) : null}
-                <Td>{formatDate(line.value_date)}</Td>
+                <Td>
+                  <span className="num whitespace-nowrap">{formatDate(line.value_date)}</span>
+                </Td>
                 <Td numeric>
                   <Amount value={line.amount} />
                 </Td>
-                <Td className="font-mono">
+                <Td className="num font-mono whitespace-nowrap">
                   {line.utr_or_ref ?? "—"}
                   {line.ref_kind === "utr" ? <span className="sr-only"> ({t("utr")})</span> : null}
                 </Td>
@@ -266,14 +272,14 @@ function ReceiptRef({
     <span className="block text-sm">
       <Link
         href={`/fees/receipts/${receipt.id}`}
-        className="font-semibold text-primary underline underline-offset-4"
+        className="num font-mono font-semibold whitespace-nowrap text-primary underline underline-offset-4"
       >
         {receipt.receipt_number}
       </Link>
       <span className="block">
         {receipt.student_name} · {receipt.class_section}
       </span>
-      <span className="block text-ink-muted">
+      <span className="num block whitespace-nowrap text-ink-muted">
         <Amount value={receipt.amount} /> · {formatDate(receipt.receipt_date)}
       </span>
       {conflict ? <span className="block text-warning-ink">{t("notCorrected")}</span> : null}
@@ -479,67 +485,93 @@ function StatementUpload({ onImported }: { onImported: (id: string) => void }) {
 
 function BankTab() {
   const t = useTranslations("fees.reconcile");
+  const locale = useLocale() as Locale;
   const api = useBffClient("staff");
+  const queryClient = useQueryClient();
   const list = useApiQuery(UPI_KEYS.statements, () =>
     unwrap(api.GET("/api/v1/fees/bank-statements", { params: { query: { limit: 25 } } })),
   );
   const [open, setOpen] = useState<string | null>(null);
+  const columns: ColumnV2<StatementImport>[] = [
+    {
+      key: "importedAt",
+      name: t("importedAt"),
+      header: t("importedAt"),
+      hideable: false,
+      cell: (s) => <span className="num whitespace-nowrap">{formatDateTime(s.imported_at)}</span>,
+    },
+    {
+      key: "period",
+      name: t("period"),
+      header: t("period"),
+      cell: (s) => (
+        <span className="num whitespace-nowrap">
+          {formatDate(s.period_from) ?? "—"} – {formatDate(s.period_to) ?? "—"}
+        </span>
+      ),
+    },
+    {
+      key: "credits",
+      name: t("credits"),
+      header: t("credits"),
+      numeric: true,
+      cell: (s) => formatCount(s.credit_count, locale),
+    },
+    {
+      key: "proposed",
+      name: t("proposed"),
+      header: t("proposed"),
+      numeric: true,
+      cell: (s) => formatCount(s.proposed_count, locale),
+    },
+    {
+      key: "importedBy",
+      name: t("importedBy"),
+      header: t("importedBy"),
+      cell: (s) => s.imported_by_name ?? "—",
+    },
+    {
+      key: "actions",
+      name: t("actions"),
+      header: <span className="sr-only">{t("actions")}</span>,
+      hideable: false,
+      stack: "actions",
+      cell: (s) => (
+        <Button
+          size="sm"
+          variant={open === s.id ? "primary" : "secondary"}
+          aria-pressed={open === s.id}
+          onClick={() => setOpen(s.id)}
+        >
+          {t("review")}
+        </Button>
+      ),
+    },
+  ];
   return (
     <div className="space-y-4">
       <StatementUpload onImported={setOpen} />
-      <Card title={t("statementsTitle")}>
-        <FeesGate data={list}>
-          {(rows) =>
-            rows.length === 0 ? (
-              <EmptyState title={t("noStatements")} />
-            ) : (
-              <TableScroll label={t("statementsTitle")}>
-                <Table>
-                  <THead>
-                    <Tr>
-                      <Th>{t("importedAt")}</Th>
-                      <Th>{t("period")}</Th>
-                      <Th className="text-right">{t("credits")}</Th>
-                      <Th className="text-right">{t("proposed")}</Th>
-                      <Th>{t("importedBy")}</Th>
-                      <Th>
-                        <span className="sr-only">{t("actions")}</span>
-                      </Th>
-                    </Tr>
-                  </THead>
-                  <TBody>
-                    {rows.map((s) => (
-                      <Tr key={s.id}>
-                        <Td>{formatDateTime(s.imported_at)}</Td>
-                        <Td>
-                          {formatDate(s.period_from) ?? "—"} – {formatDate(s.period_to) ?? "—"}
-                        </Td>
-                        <Td numeric>{s.credit_count}</Td>
-                        <Td numeric>{s.proposed_count}</Td>
-                        <Td>{s.imported_by_name ?? "—"}</Td>
-                        <Td>
-                          <Button
-                            size="sm"
-                            variant={open === s.id ? "primary" : "secondary"}
-                            aria-pressed={open === s.id}
-                            onClick={() => setOpen(s.id)}
-                          >
-                            {t("review")}
-                          </Button>
-                        </Td>
-                      </Tr>
-                    ))}
-                  </TBody>
-                </Table>
-              </TableScroll>
-            )
-          }
-        </FeesGate>
-      </Card>
+      {isFeesOff(list) ? (
+        <FeesGate data={list}>{() => null}</FeesGate>
+      ) : (
+        <DataTableV2
+          id="fees-bank-statements"
+          caption={t("statementsTitle")}
+          columns={columns}
+          state={list}
+          rowKey={(s) => s.id}
+          emptyTitle={t("noStatements")}
+          emptyBody={t("noStatementsBody")}
+          onRetry={() => void queryClient.invalidateQueries({ queryKey: UPI_KEYS.statements })}
+          stacked
+        />
+      )}
       {open ? <StatementReview id={open} /> : null}
     </div>
   );
 }
+
+type UnconfirmedReceipt = UpiExceptions["unconfirmed_receipts"][number];
 
 function ExceptionsTab() {
   const t = useTranslations("fees.reconcile");
@@ -552,24 +584,80 @@ function ExceptionsTab() {
   const rematch = useApiMutation(() => unwrap(api.POST("/api/v1/fees/bank-statements/rematch")), {
     invalidate: [["staff", "fees", "upi"]],
   });
+  const locale = useLocale() as Locale;
+  const unconfirmedId = useId();
+  const unconfirmedColumns: ColumnV2<UnconfirmedReceipt>[] = [
+    {
+      key: "receipt",
+      name: t("receipt"),
+      header: t("receipt"),
+      hideable: false,
+      cell: (r) => (
+        <Link
+          href={`/fees/receipts/${r.id}`}
+          className="num font-mono font-semibold whitespace-nowrap text-primary underline underline-offset-4"
+        >
+          {r.receipt_number}
+        </Link>
+      ),
+    },
+    {
+      key: "receiptDate",
+      name: t("receiptDate"),
+      header: t("receiptDate"),
+      cell: (r) => <span className="num whitespace-nowrap">{formatDate(r.receipt_date)}</span>,
+    },
+    {
+      key: "amount",
+      name: t("amount"),
+      header: t("amountInr"),
+      numeric: true,
+      cell: (r) => <Amount value={r.amount} />,
+    },
+    {
+      key: "utr",
+      name: t("utr"),
+      header: t("utr"),
+      cell: (r) => <span className="num font-mono whitespace-nowrap">{r.utr ?? "—"}</span>,
+    },
+    {
+      key: "student",
+      name: t("student"),
+      header: t("student"),
+      cell: (r) => (
+        <>
+          {r.student_name} · {r.class_section}
+        </>
+      ),
+    },
+    {
+      key: "daysWaiting",
+      name: t("daysWaiting"),
+      header: t("daysWaiting"),
+      numeric: true,
+      cell: (r) => formatCount(r.days_waiting, locale),
+    },
+  ];
   return (
     <div className="space-y-4">
       <FeesGate data={report}>
         {(r) => (
-          <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
               label={t("reportConfirmed")}
-              value={String(r.confirmed_count)}
+              value={formatCount(r.confirmed_count, locale)}
               unavailableLabel={tc("notAvailable")}
+              hint={<span className="num">{formatInr(r.confirmed_total, locale)}</span>}
             />
             <StatCard
               label={t("reportUnconfirmed")}
-              value={String(r.unconfirmed_count)}
+              value={formatCount(r.unconfirmed_count, locale)}
               unavailableLabel={tc("notAvailable")}
+              hint={<span className="num">{formatInr(r.unconfirmed_total, locale)}</span>}
             />
             <StatCard
               label={t("reportOverdue")}
-              value={String(r.overdue_count)}
+              value={formatCount(r.overdue_count, locale)}
               unavailableLabel={tc("notAvailable")}
             />
             <StatCard
@@ -583,57 +671,35 @@ function ExceptionsTab() {
       <FeesGate data={exceptions}>
         {(e) => (
           <>
-            <Card
-              title={t("unconfirmedTitle", { days: e.confirm_within_days })}
-              description={t("unconfirmedBody")}
-            >
-              {e.unconfirmed_receipts.length === 0 ? (
-                <p>{t("noUnconfirmed")}</p>
-              ) : (
-                <TableScroll label={t("unconfirmedTitle", { days: e.confirm_within_days })}>
-                  <Table>
-                    <THead>
-                      <Tr>
-                        <Th>{t("receipt")}</Th>
-                        <Th>{t("receiptDate")}</Th>
-                        <Th className="text-right">{t("amount")}</Th>
-                        <Th>{t("utr")}</Th>
-                        <Th>{t("student")}</Th>
-                        <Th className="text-right">{t("daysWaiting")}</Th>
-                      </Tr>
-                    </THead>
-                    <TBody>
-                      {e.unconfirmed_receipts.map((r) => (
-                        <Tr key={r.id}>
-                          <Td>
-                            <Link
-                              href={`/fees/receipts/${r.id}`}
-                              className="font-semibold text-primary underline underline-offset-4"
-                            >
-                              {r.receipt_number}
-                            </Link>
-                          </Td>
-                          <Td>{formatDate(r.receipt_date)}</Td>
-                          <Td numeric>
-                            <Amount value={r.amount} />
-                          </Td>
-                          <Td className="font-mono">{r.utr ?? "—"}</Td>
-                          <Td>
-                            {r.student_name} · {r.class_section}
-                          </Td>
-                          <Td numeric>{r.days_waiting}</Td>
-                        </Tr>
-                      ))}
-                    </TBody>
-                  </Table>
-                </TableScroll>
-              )}
-              {e.unconfirmed_count > e.unconfirmed_receipts.length ? (
-                <p className="mt-2 text-sm text-ink-muted">
-                  {t("more", { count: e.unconfirmed_count - e.unconfirmed_receipts.length })}
-                </p>
-              ) : null}
-            </Card>
+            <section aria-labelledby={unconfirmedId} className="space-y-3">
+              <div className="space-y-1">
+                <h2 id={unconfirmedId} className="text-lg font-semibold text-ink">
+                  {t("unconfirmedTitle", { days: e.confirm_within_days })}
+                </h2>
+                <p className="text-sm text-ink-muted">{t("unconfirmedBody")}</p>
+              </div>
+              <DataTableV2
+                id="fees-upi-unconfirmed"
+                caption={t("unconfirmedTitle", { days: e.confirm_within_days })}
+                captionHidden
+                columns={unconfirmedColumns}
+                state={{ status: "ready", data: e.unconfirmed_receipts }}
+                rowKey={(r) => r.id}
+                emptyTitle={t("noUnconfirmed")}
+                stacked
+                {...(e.unconfirmed_count > e.unconfirmed_receipts.length
+                  ? {
+                      footer: (
+                        <p className="num text-sm text-ink-muted">
+                          {t("more", {
+                            count: e.unconfirmed_count - e.unconfirmed_receipts.length,
+                          })}
+                        </p>
+                      ),
+                    }
+                  : {})}
+              />
+            </section>
             <Card
               title={t("creditsTitle")}
               description={t("creditsBody")}
@@ -680,6 +746,7 @@ function ExceptionsTab() {
 export function ReconcileScreen() {
   const t = useTranslations("fees.reconcile");
   const tn = useTranslations("school.nav");
+  const tu = useTranslations("ui");
   const can = useStaffCan();
   const me = useStaffMe();
   const allowed = can(RECONCILE);
@@ -688,28 +755,40 @@ export function ReconcileScreen() {
       title={t("title")}
       description={t("description")}
       breadcrumb={[{ label: tn("home"), href: "/" }, { label: t("title") }]}
+      actions={
+        me !== undefined && allowed ? (
+          <Menu
+            label={tu("moreActions")}
+            variant="button"
+            trigger={tu("more")}
+            align="end"
+            entries={[
+              {
+                kind: "link",
+                id: "online",
+                label: t("onlineMenu"),
+                href: "/fees/reconcile/online",
+                icon: "globe",
+              },
+              { kind: "link", id: "upi", label: t("upiSettingsLink"), href: "/settings/upi" },
+            ]}
+          />
+        ) : null
+      }
     />
   );
   if (me === undefined) return header;
   if (!allowed) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         {header}
         <NoAccess />
       </div>
     );
   }
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {header}
-      <p>
-        <Link
-          href="/fees/reconcile/online"
-          className="font-semibold text-primary underline underline-offset-4"
-        >
-          {t("onlineLink")}
-        </Link>
-      </p>
       <Tabs
         label={t("tabs")}
         items={[

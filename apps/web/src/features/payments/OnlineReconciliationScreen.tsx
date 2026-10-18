@@ -1,21 +1,25 @@
 "use client";
 
-import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useLocale, useTranslations } from "next-intl";
+import { useMemo, useState } from "react";
+import { DataTableV2, type ColumnV2 } from "@/components/console";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { Pill, type PillVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
-import { EmptyState } from "@/components/ui/EmptyState";
+import type { FilterChip } from "@/components/ui/FilterChips";
 import { TextAreaField } from "@/components/ui/Input";
+import { Menu } from "@/components/ui/Menu";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
-import { Table, TableScroll, TBody, Td, Th, THead, Tr } from "@/components/ui/Table";
+import { StatCard } from "@/components/ui/StatCard";
 import { Link } from "@/i18n/navigation";
+import type { Locale } from "@/i18n/routing";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatCount, formatDate, formatDateTime } from "@/lib/format";
+import { isFeesOff } from "@/features/fees/data";
 import { Amount, FeesGate, NoAccess } from "@/features/fees/parts";
 import {
   FINANCE_READ,
@@ -80,43 +84,43 @@ function ExplainButton({ item }: { item: ReconItem }) {
 
 function Summary() {
   const t = useTranslations("payments.recon");
+  const tc = useTranslations("common");
+  const locale = useLocale() as Locale;
   const summary = useReconSummary();
   if (summary.status !== "ready") return null;
   const s = summary.data;
   const last = s.runs[0];
   return (
-    <Card title={t("summaryTitle")}>
+    <section aria-label={t("summaryTitle")} className="space-y-3">
       {!s.connected ? (
         <Alert tone="info" title={t("notConnectedTitle")}>
           {t("notConnectedBody")}
         </Alert>
       ) : null}
-      <dl className="grid gap-4 sm:grid-cols-4">
-        <div>
-          <dt className="text-sm text-ink-muted">{t("open")}</dt>
-          <dd className="text-2xl font-semibold tabular-nums">{s.open_count}</dd>
-        </div>
-        <div>
-          <dt className="text-sm text-ink-muted">{t("waiting")}</dt>
-          <dd className="text-2xl font-semibold tabular-nums">{s.pending_events}</dd>
-        </div>
-        <div>
-          <dt className="text-sm text-ink-muted">{t("failedEvents")}</dt>
-          <dd className="text-2xl font-semibold tabular-nums">{s.failed_events}</dd>
-        </div>
-        <div>
-          <dt className="text-sm text-ink-muted">{t("lastRun")}</dt>
-          <dd>
-            {last
-              ? t("lastRunValue", {
-                  date: formatDate(last.run_date) ?? "",
-                  status: t(`runStatuses.${last.status}`),
-                })
-              : t("noRun")}
-          </dd>
-        </div>
+      <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label={t("open")}
+          value={formatCount(s.open_count, locale)}
+          unavailableLabel={tc("notAvailable")}
+        />
+        <StatCard
+          label={t("waiting")}
+          value={formatCount(s.pending_events, locale)}
+          unavailableLabel={tc("notAvailable")}
+        />
+        <StatCard
+          label={t("failedEvents")}
+          value={formatCount(s.failed_events, locale)}
+          unavailableLabel={tc("notAvailable")}
+        />
+        <StatCard
+          label={t("lastRun")}
+          value={last ? (formatDate(last.run_date) ?? null) : t("noRun")}
+          unavailableLabel={tc("notAvailable")}
+          hint={last ? t(`runStatuses.${last.status}`) : undefined}
+        />
       </dl>
-    </Card>
+    </section>
   );
 }
 
@@ -131,175 +135,245 @@ export function OnlineReconciliationScreen() {
   const t = useTranslations("payments.recon");
   const tf = useTranslations("fees");
   const tn = useTranslations("school.nav");
+  const tu = useTranslations("ui");
   const can = useStaffCan();
   const me = useStaffMe();
   const allowed = can([RECONCILE, FINANCE_READ]);
   const canExplain = can(RECONCILE);
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState<ItemStatus | "">("open");
   const [kind, setKind] = useState<ItemKind | "">("");
   const [cursors, setCursors] = useState<(string | null)[]>([null]);
   const cursor = cursors[cursors.length - 1] ?? null;
   const list = useReconciliation(status, kind, cursor);
+  const columns = useMemo<ColumnV2<ReconItem>[]>(
+    () => [
+      {
+        key: "found",
+        name: t("columns.found"),
+        header: t("columns.found"),
+        hideable: false,
+        cell: (item) => (
+          <span className="num whitespace-nowrap">{formatDateTime(item.created_at)}</span>
+        ),
+      },
+      {
+        key: "kind",
+        name: t("columns.kind"),
+        header: t("columns.kind"),
+        stack: "wide",
+        cell: (item) => (
+          <>
+            <span className="font-semibold">{t(`kinds.${item.kind}`)}</span>
+            <span className="block text-xs text-ink-muted">
+              {t(`reasons.${item.reason_code}` as "reasons.no_receipt")}
+            </span>
+          </>
+        ),
+      },
+      {
+        key: "payment",
+        name: t("columns.payment"),
+        header: t("columns.payment"),
+        cell: (item) => (
+          <>
+            <code className="font-mono text-xs whitespace-nowrap">
+              {item.provider_payment_id ?? "—"}
+            </code>
+            {item.intent_code ? (
+              <span className="block text-xs whitespace-nowrap text-ink-muted">
+                {t("link", { code: item.intent_code })}
+              </span>
+            ) : null}
+          </>
+        ),
+      },
+      {
+        key: "receipt",
+        name: t("columns.receipt"),
+        header: t("columns.receipt"),
+        cell: (item) =>
+          item.receipt_id ? (
+            <Link
+              href={`/fees/receipts/${item.receipt_id}`}
+              className="num font-mono whitespace-nowrap text-primary underline underline-offset-4"
+            >
+              {item.receipt_number ?? t("receipt")}
+            </Link>
+          ) : item.account_id ? (
+            <Link
+              href={`/fees/accounts/${item.account_id}`}
+              className="text-primary underline underline-offset-4"
+            >
+              {t("account")}
+            </Link>
+          ) : (
+            "—"
+          ),
+      },
+      {
+        key: "amount",
+        name: t("columns.amount"),
+        header: t("columns.amountInr"),
+        numeric: true,
+        cell: (item) => (
+          <>
+            <Amount value={item.amount} />
+            {item.expected_amount && item.expected_amount !== item.amount ? (
+              <span className="block text-xs text-ink-muted">
+                {t("expected")} <Amount value={item.expected_amount} />
+              </span>
+            ) : null}
+          </>
+        ),
+      },
+      {
+        key: "status",
+        name: t("columns.status"),
+        header: t("columns.status"),
+        stack: "wide",
+        cell: (item) => (
+          <>
+            <Pill variant={STATUS_PILL[item.status] ?? "tag"}>{t(`statuses.${item.status}`)}</Pill>
+            {item.note ? (
+              <span className="block max-w-xs text-xs break-words">
+                {item.note}
+                {item.explained_by_name ? ` — ${item.explained_by_name}` : ""}
+              </span>
+            ) : null}
+          </>
+        ),
+      },
+      {
+        key: "action",
+        name: t("columns.action"),
+        header: t("columns.action"),
+        hideable: false,
+        stack: "actions",
+        cell: (item) =>
+          item.status === "open" && canExplain ? <ExplainButton item={item} /> : null,
+      },
+    ],
+    [t, canExplain],
+  );
   const header = (
     <PageHeader
       title={t("title")}
       description={t("description")}
       breadcrumb={[{ label: tn("home"), href: "/" }, { label: t("title") }]}
+      actions={
+        me !== undefined && canExplain ? (
+          <Menu
+            label={tu("moreActions")}
+            variant="button"
+            trigger={tu("more")}
+            align="end"
+            entries={[
+              {
+                kind: "link",
+                id: "bank",
+                label: t("bankLink"),
+                href: "/fees/reconcile",
+                icon: "building",
+              },
+            ]}
+          />
+        ) : null
+      }
     />
   );
   if (me !== undefined && !allowed) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         {header}
         <NoAccess />
       </div>
     );
   }
+  const resetTo = (next: { status?: ItemStatus | ""; kind?: ItemKind | "" }) => {
+    if (next.status !== undefined) setStatus(next.status);
+    if (next.kind !== undefined) setKind(next.kind);
+    setCursors([null]);
+  };
+  const chips: FilterChip[] = [
+    ...(status ? [{ id: "status", label: t("filterStatus"), value: t(`statuses.${status}`) }] : []),
+    ...(kind ? [{ id: "kind", label: t("filterKind"), value: t(`kinds.${kind}`) }] : []),
+  ];
+  const page = list.status === "ready" ? list.data : null;
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {header}
       <Summary />
-      <form
-        role="search"
-        className="grid gap-4 md:grid-cols-2"
-        onSubmit={(e) => e.preventDefault()}
-      >
-        <SelectField
-          name="status"
-          label={t("filterStatus")}
-          placeholder={t("any")}
-          value={status}
-          onChange={(e) => {
-            setStatus(e.target.value as ItemStatus | "");
-            setCursors([null]);
-          }}
-          options={ITEM_STATUSES.map((s) => ({ value: s, label: t(`statuses.${s}`) }))}
+      {isFeesOff(list) ? (
+        <FeesGate data={list}>{() => null}</FeesGate>
+      ) : (
+        <DataTableV2
+          id="payments-online-recon"
+          caption={t("listTitle")}
+          columns={columns}
+          state={list.status === "ready" ? { status: "ready", data: list.data.items } : list}
+          rowKey={(item) => item.id}
+          toolbar={
+            <form
+              role="search"
+              aria-label={t("filterLabel")}
+              className="flex flex-wrap items-end gap-3"
+              onSubmit={(e) => e.preventDefault()}
+            >
+              <SelectField
+                name="status"
+                label={t("filterStatus")}
+                placeholder={t("any")}
+                value={status}
+                onChange={(e) => resetTo({ status: e.target.value as ItemStatus | "" })}
+                options={ITEM_STATUSES.map((s) => ({ value: s, label: t(`statuses.${s}`) }))}
+              />
+              <SelectField
+                name="kind"
+                label={t("filterKind")}
+                placeholder={t("any")}
+                value={kind}
+                onChange={(e) => resetTo({ kind: e.target.value as ItemKind | "" })}
+                options={ITEM_KINDS.map((k) => ({ value: k, label: t(`kinds.${k}`) }))}
+              />
+            </form>
+          }
+          chips={chips}
+          onRemoveChip={(id) => resetTo(id === "status" ? { status: "" } : { kind: "" })}
+          onClearFilters={() => resetTo({ status: "", kind: "" })}
+          emptyTitle={t("emptyTitle")}
+          emptyBody={t("emptyBody")}
+          noResultsTitle={t("noResultsTitle")}
+          onRetry={() => void queryClient.invalidateQueries({ queryKey: KEYS.all })}
+          stacked
+          {...(page && (cursors.length > 1 || page.next_cursor)
+            ? {
+                footer: (
+                  <div className="flex flex-wrap justify-end gap-3">
+                    {cursors.length > 1 ? (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setCursors((c) => c.slice(0, -1))}
+                      >
+                        {tf("previous")}
+                      </Button>
+                    ) : null}
+                    {page.next_cursor ? (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setCursors((c) => [...c, page.next_cursor ?? null])}
+                      >
+                        {tf("next")}
+                      </Button>
+                    ) : null}
+                  </div>
+                ),
+              }
+            : {})}
         />
-        <SelectField
-          name="kind"
-          label={t("filterKind")}
-          placeholder={t("any")}
-          value={kind}
-          onChange={(e) => {
-            setKind(e.target.value as ItemKind | "");
-            setCursors([null]);
-          }}
-          options={ITEM_KINDS.map((k) => ({ value: k, label: t(`kinds.${k}`) }))}
-        />
-      </form>
-      <FeesGate data={list}>
-        {(page) => (
-          <Card title={t("listTitle")}>
-            {page.items.length === 0 ? (
-              <EmptyState icon="check" title={t("emptyTitle")} body={t("emptyBody")} />
-            ) : (
-              <>
-                <TableScroll label={t("listTitle")}>
-                  <Table>
-                    <THead>
-                      <Tr>
-                        <Th>{t("columns.found")}</Th>
-                        <Th>{t("columns.kind")}</Th>
-                        <Th>{t("columns.payment")}</Th>
-                        <Th>{t("columns.receipt")}</Th>
-                        <Th className="text-right">{t("columns.amount")}</Th>
-                        <Th>{t("columns.status")}</Th>
-                        <Th>{t("columns.action")}</Th>
-                      </Tr>
-                    </THead>
-                    <TBody>
-                      {page.items.map((item) => (
-                        <Tr key={item.id}>
-                          <Td>{formatDateTime(item.created_at)}</Td>
-                          <Td>
-                            <span className="font-semibold">{t(`kinds.${item.kind}`)}</span>
-                            <span className="block text-xs text-ink-muted">
-                              {t(`reasons.${item.reason_code}` as "reasons.no_receipt")}
-                            </span>
-                          </Td>
-                          <Td>
-                            <code className="font-mono text-xs">
-                              {item.provider_payment_id ?? "—"}
-                            </code>
-                            {item.intent_code ? (
-                              <span className="block text-xs text-ink-muted">
-                                {t("link", { code: item.intent_code })}
-                              </span>
-                            ) : null}
-                          </Td>
-                          <Td>
-                            {item.receipt_id ? (
-                              <Link
-                                href={`/fees/receipts/${item.receipt_id}`}
-                                className="text-primary underline underline-offset-4"
-                              >
-                                {item.receipt_number ?? t("receipt")}
-                              </Link>
-                            ) : item.account_id ? (
-                              <Link
-                                href={`/fees/accounts/${item.account_id}`}
-                                className="text-primary underline underline-offset-4"
-                              >
-                                {t("account")}
-                              </Link>
-                            ) : (
-                              "—"
-                            )}
-                          </Td>
-                          <Td numeric>
-                            <Amount value={item.amount} />
-                            {item.expected_amount && item.expected_amount !== item.amount ? (
-                              <span className="block text-xs text-ink-muted">
-                                {t("expected")} <Amount value={item.expected_amount} />
-                              </span>
-                            ) : null}
-                          </Td>
-                          <Td>
-                            <Pill variant={STATUS_PILL[item.status] ?? "tag"}>
-                              {t(`statuses.${item.status}`)}
-                            </Pill>
-                            {item.note ? (
-                              <span className="block max-w-xs text-xs">
-                                {item.note}
-                                {item.explained_by_name ? ` — ${item.explained_by_name}` : ""}
-                              </span>
-                            ) : null}
-                          </Td>
-                          <Td>
-                            {item.status === "open" && canExplain ? (
-                              <ExplainButton item={item} />
-                            ) : null}
-                          </Td>
-                        </Tr>
-                      ))}
-                    </TBody>
-                  </Table>
-                </TableScroll>
-                <div className="mt-4 flex gap-3">
-                  {cursors.length > 1 ? (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setCursors((c) => c.slice(0, -1))}
-                    >
-                      {tf("previous")}
-                    </Button>
-                  ) : null}
-                  {page.next_cursor ? (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setCursors((c) => [...c, page.next_cursor ?? null])}
-                    >
-                      {tf("next")}
-                    </Button>
-                  ) : null}
-                </div>
-              </>
-            )}
-          </Card>
-        )}
-      </FeesGate>
+      )}
     </div>
   );
 }

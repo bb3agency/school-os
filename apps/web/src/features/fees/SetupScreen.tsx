@@ -2,16 +2,20 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import * as z from "@/lib/zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
-import { Pill } from "@/components/ui/Badge";
+import { Badge, Pill } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Icon } from "@/components/ui/Icon";
+import { ErrorSummary, type SummaryError } from "@/components/ui/ErrorSummary";
 import { Input, TextField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SaveBar } from "@/components/ui/SaveBar";
 import { SelectField } from "@/components/ui/Select";
 import { Table, TableScroll, TBody, Td, Th, THead, Tr } from "@/components/ui/Table";
 import type { Locale } from "@/i18n/routing";
@@ -59,11 +63,13 @@ function PlanEditor({
   years,
   classes,
   onSaved,
+  onCancel,
 }: {
   heads: Head[];
   years: { id: string; label: string; starts_on: string; ends_on: string; is_current: boolean }[];
   classes: { id: string; display_en: string }[];
   onSaved: () => void;
+  onCancel: () => void;
 }) {
   const t = useTranslations("fees.setup");
   const locale = useLocale() as Locale;
@@ -83,30 +89,63 @@ function PlanEditor({
   const [lateGrace, setLateGrace] = useState("0");
   const [lateCap, setLateCap] = useState("");
   const [error, setError] = useState<unknown>(undefined);
-  const [problem, setProblem] = useState<string | null>(null);
+  const [problems, setProblems] = useState<SummaryError[]>([]);
+  const [attempt, setAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
+  const formId = useId();
+  const fieldId = (part: string) => `${formId}-${part}`;
+  const invalid = (part: string) => problems.some((p) => p.fieldId === fieldId(part));
+  const dirty =
+    name.trim() !== "" ||
+    category.trim() !== "" ||
+    Object.values(cells).some((v) => v !== "") ||
+    columns.length > 1 ||
+    lateKind !== "none";
   const cell = (headId: string, col: number) => cells[`${headId}:${col}`] ?? "";
   const rowTotal = (headId: string) =>
     columns.reduce((sum, _, i) => sum + (toPaise(cell(headId, i) || "0") ?? 0), 0);
   const colTotal = (col: number) =>
     active.reduce((sum, h) => sum + (toPaise(cell(h.id, col) || "0") ?? 0), 0);
 
+  /** What is missing, each linked to the field to fix (ErrorSummary, docs/17 §4.4). */
+  function check(lineCount: number): SummaryError[] {
+    const found: SummaryError[] = [];
+    if (!name.trim()) found.push({ fieldId: fieldId("name"), message: t("check.name") });
+    const badCell = Object.entries(cells).find(
+      ([, v]) => v !== "" && (toPaise(v) === null || (toPaise(v) ?? 0) < 0),
+    );
+    if (badCell) {
+      const [headId, col] = badCell[0].split(":");
+      found.push({ fieldId: fieldId(`cell-${headId}-${col}`), message: t("check.badAmount") });
+    } else if (lineCount === 0 && active[0]) {
+      found.push({ fieldId: fieldId(`cell-${active[0].id}-0`), message: t("check.amounts") });
+    }
+    columns.forEach((c, i) => {
+      if (!c.label.trim()) {
+        found.push({
+          fieldId: fieldId(`label-${i}`),
+          message: t("check.instalmentName", { no: i + 1 }),
+        });
+      }
+      if (!c.due_on) {
+        found.push({
+          fieldId: fieldId(`due-${i}`),
+          message: t("check.instalmentDue", { no: i + 1 }),
+        });
+      }
+    });
+    return found;
+  }
+
   async function save() {
-    setProblem(null);
     setError(undefined);
     const lines = active
       .filter((h) => rowTotal(h.id) > 0)
       .map((h) => ({ head_id: h.id, annual_amount: fromPaise(rowTotal(h.id)) }));
-    const bad = Object.values(cells).some(
-      (v) => v !== "" && (toPaise(v) === null || (toPaise(v) ?? 0) < 0),
-    );
-    if (
-      !name.trim() ||
-      lines.length === 0 ||
-      bad ||
-      columns.some((c) => !c.due_on || !c.label.trim())
-    ) {
-      setProblem(t("editorIncomplete"));
+    const found = check(lines.length);
+    setProblems(found);
+    if (found.length > 0) {
+      setAttempt((n) => n + 1);
       return;
     }
     setSaving(true);
@@ -152,174 +191,207 @@ function PlanEditor({
 
   return (
     <Card title={t("editorTitle")} description={t("editorBody")}>
-      <div className="grid gap-4 md:grid-cols-4">
-        <SelectField
-          name="year"
-          label={t("year")}
-          value={yearId}
-          onChange={(e) => setYearId(e.target.value)}
-          options={years.map((y) => ({ value: y.id, label: y.label }))}
-        />
-        <SelectField
-          name="class"
-          label={t("class")}
-          value={classId}
-          onChange={(e) => setClassId(e.target.value)}
-          options={classes.map((c) => ({ value: c.id, label: c.display_en }))}
-        />
-        <TextField
-          name="name"
-          label={t("planName")}
-          value={name}
-          maxLength={80}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <TextField
-          name="category"
-          label={t("category")}
-          hint={t("categoryHint")}
-          value={category}
-          maxLength={32}
-          onChange={(e) => setCategory(e.target.value.toLowerCase())}
-        />
-      </div>
-      <TableScroll label={t("gridLabel")} className="mt-4">
-        <Table>
-          <THead>
-            <Tr>
-              <Th>{t("head")}</Th>
-              {columns.map((c, i) => (
-                <Th key={i}>
-                  <Input
-                    aria-label={t("instalmentLabel", { no: i + 1 })}
-                    value={c.label}
-                    maxLength={40}
-                    onChange={(e) =>
-                      setColumns((all) =>
-                        all.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)),
-                      )
-                    }
-                  />
-                  <Input
-                    type="date"
-                    aria-label={t("instalmentDue", { no: i + 1 })}
-                    value={c.due_on}
-                    onChange={(e) =>
-                      setColumns((all) =>
-                        all.map((x, j) => (j === i ? { ...x, due_on: e.target.value } : x)),
-                      )
-                    }
-                  />
-                </Th>
-              ))}
-              <Th className="text-right">{t("annual")}</Th>
-            </Tr>
-          </THead>
-          <TBody>
-            {active.map((h) => (
-              <Tr key={h.id}>
-                <Td>
-                  {h.name} <span className="text-xs text-ink-muted">{h.code}</span>
-                  {!h.gst_exempt ? <span className="block text-xs">{t("taxable")}</span> : null}
-                </Td>
-                {columns.map((_, i) => (
-                  <Td key={i}>
-                    <Input
-                      inputMode="decimal"
-                      aria-label={t("cellLabel", { head: h.name, no: i + 1 })}
-                      value={cell(h.id, i)}
-                      onChange={(e) =>
-                        setCells((all) => ({ ...all, [`${h.id}:${i}`]: e.target.value }))
-                      }
-                    />
-                  </Td>
-                ))}
-                <Td numeric>{formatInr(fromPaise(rowTotal(h.id)), locale)}</Td>
-              </Tr>
-            ))}
-            <Tr>
-              <Td className="font-semibold">{t("instalmentTotal")}</Td>
-              {columns.map((_, i) => (
-                <Td key={i} numeric className="font-semibold">
-                  {formatInr(fromPaise(colTotal(i)), locale)}
-                </Td>
-              ))}
-              <Td numeric className="font-semibold">
-                {formatInr(fromPaise(columns.reduce((s, _, i) => s + colTotal(i), 0)), locale)}
-              </Td>
-            </Tr>
-          </TBody>
-        </Table>
-      </TableScroll>
-      <div className="mt-2 flex gap-2">
-        <Button
-          variant="secondary"
-          size="sm"
-          disabled={columns.length >= 24}
-          onClick={() =>
-            setColumns((all) => [...all, { label: t("term", { no: all.length + 1 }), due_on: "" }])
-          }
-        >
-          {t("addInstalment")}
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={columns.length <= 1}
-          onClick={() => setColumns((all) => all.slice(0, -1))}
-        >
-          {t("removeInstalment")}
-        </Button>
-      </div>
-      <div className="mt-4 grid gap-4 md:grid-cols-4">
-        <SelectField
-          name="late_kind"
-          label={t("lateRule")}
-          value={lateKind}
-          onChange={(e) => setLateKind(e.target.value)}
-          options={[
-            { value: "none", label: t("lateNone") },
-            { value: "flat_per_instalment", label: t("lateFlat") },
-            { value: "per_day", label: t("latePerDay") },
-          ]}
-        />
-        {lateKind !== "none" ? (
-          <>
-            <TextField
-              name="late_amount"
-              label={t("lateAmount")}
-              inputMode="decimal"
-              value={lateAmount}
-              onChange={(e) => setLateAmount(e.target.value)}
-            />
-            <TextField
-              name="late_grace"
-              label={t("lateGrace")}
-              inputMode="numeric"
-              value={lateGrace}
-              onChange={(e) => setLateGrace(e.target.value)}
-            />
-          </>
-        ) : null}
-        {lateKind === "per_day" ? (
-          <TextField
-            name="late_cap"
-            label={t("lateCap")}
-            inputMode="decimal"
-            value={lateCap}
-            onChange={(e) => setLateCap(e.target.value)}
+      <form
+        noValidate
+        aria-label={t("editorTitle")}
+        onSubmit={(e) => {
+          e.preventDefault();
+          void save();
+        }}
+      >
+        {problems.length > 0 ? (
+          <ErrorSummary
+            errors={problems}
+            title={t("editorIncomplete")}
+            attempt={attempt}
+            className="mb-4"
           />
         ) : null}
-      </div>
-      {problem ? (
-        <Alert tone="danger" live title={problem} className="mt-4">
-          {t("editorIncompleteBody")}
-        </Alert>
-      ) : null}
-      <ApiErrorAlert error={error} namespace="fees" className="mt-4" />
-      <Button className="mt-4" onClick={() => void save()} loading={saving}>
-        {t("saveDraft")}
-      </Button>
+        <div className="grid gap-4 md:grid-cols-4">
+          <SelectField
+            name="year"
+            label={t("year")}
+            value={yearId}
+            onChange={(e) => setYearId(e.target.value)}
+            options={years.map((y) => ({ value: y.id, label: y.label }))}
+          />
+          <SelectField
+            name="class"
+            label={t("class")}
+            value={classId}
+            onChange={(e) => setClassId(e.target.value)}
+            options={classes.map((c) => ({ value: c.id, label: c.display_en }))}
+          />
+          <TextField
+            id={fieldId("name")}
+            name="name"
+            label={t("planName")}
+            error={invalid("name") ? t("check.name") : undefined}
+            value={name}
+            maxLength={80}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <TextField
+            name="category"
+            label={t("category")}
+            hint={t("categoryHint")}
+            value={category}
+            maxLength={32}
+            onChange={(e) => setCategory(e.target.value.toLowerCase())}
+          />
+        </div>
+        <TableScroll label={t("gridLabel")} className="mt-4">
+          <Table density="compact">
+            <THead>
+              <Tr>
+                <Th>{t("head")}</Th>
+                {columns.map((c, i) => (
+                  <Th key={i}>
+                    <Input
+                      id={fieldId(`label-${i}`)}
+                      aria-label={t("instalmentLabel", { no: i + 1 })}
+                      aria-invalid={invalid(`label-${i}`) || undefined}
+                      value={c.label}
+                      maxLength={40}
+                      onChange={(e) =>
+                        setColumns((all) =>
+                          all.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)),
+                        )
+                      }
+                    />
+                    <Input
+                      id={fieldId(`due-${i}`)}
+                      type="date"
+                      className="num mt-1"
+                      aria-label={t("instalmentDue", { no: i + 1 })}
+                      aria-invalid={invalid(`due-${i}`) || undefined}
+                      value={c.due_on}
+                      onChange={(e) =>
+                        setColumns((all) =>
+                          all.map((x, j) => (j === i ? { ...x, due_on: e.target.value } : x)),
+                        )
+                      }
+                    />
+                  </Th>
+                ))}
+                <Th numeric>{t("annual")}</Th>
+              </Tr>
+            </THead>
+            <TBody>
+              {active.map((h) => (
+                <Tr key={h.id}>
+                  <Td>
+                    {h.name} <span className="font-mono text-xs text-ink-muted">{h.code}</span>
+                    {!h.gst_exempt ? <span className="block text-xs">{t("taxable")}</span> : null}
+                  </Td>
+                  {columns.map((_, i) => (
+                    <Td key={i}>
+                      <Input
+                        id={fieldId(`cell-${h.id}-${i}`)}
+                        inputMode="decimal"
+                        className="num min-w-24 text-end"
+                        aria-label={t("cellLabel", { head: h.name, no: i + 1 })}
+                        aria-invalid={invalid(`cell-${h.id}-${i}`) || undefined}
+                        value={cell(h.id, i)}
+                        onChange={(e) =>
+                          setCells((all) => ({ ...all, [`${h.id}:${i}`]: e.target.value }))
+                        }
+                      />
+                    </Td>
+                  ))}
+                  <Td numeric className="num">
+                    {formatInr(fromPaise(rowTotal(h.id)), locale)}
+                  </Td>
+                </Tr>
+              ))}
+              <Tr>
+                <Td className="font-semibold">{t("instalmentTotal")}</Td>
+                {columns.map((_, i) => (
+                  <Td key={i} numeric className="font-semibold">
+                    {formatInr(fromPaise(colTotal(i)), locale)}
+                  </Td>
+                ))}
+                <Td numeric className="font-semibold">
+                  {formatInr(fromPaise(columns.reduce((s, _, i) => s + colTotal(i), 0)), locale)}
+                </Td>
+              </Tr>
+            </TBody>
+          </Table>
+        </TableScroll>
+        <div className="mt-2 flex gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={columns.length >= 24}
+            onClick={() =>
+              setColumns((all) => [
+                ...all,
+                { label: t("term", { no: all.length + 1 }), due_on: "" },
+              ])
+            }
+          >
+            {t("addInstalment")}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={columns.length <= 1}
+            onClick={() => setColumns((all) => all.slice(0, -1))}
+          >
+            {t("removeInstalment")}
+          </Button>
+        </div>
+        <div className="mt-4 grid gap-4 md:grid-cols-4">
+          <SelectField
+            name="late_kind"
+            label={t("lateRule")}
+            value={lateKind}
+            onChange={(e) => setLateKind(e.target.value)}
+            options={[
+              { value: "none", label: t("lateNone") },
+              { value: "flat_per_instalment", label: t("lateFlat") },
+              { value: "per_day", label: t("latePerDay") },
+            ]}
+          />
+          {lateKind !== "none" ? (
+            <>
+              <TextField
+                name="late_amount"
+                label={t("lateAmount")}
+                inputMode="decimal"
+                value={lateAmount}
+                onChange={(e) => setLateAmount(e.target.value)}
+              />
+              <TextField
+                name="late_grace"
+                label={t("lateGrace")}
+                inputMode="numeric"
+                value={lateGrace}
+                onChange={(e) => setLateGrace(e.target.value)}
+              />
+            </>
+          ) : null}
+          {lateKind === "per_day" ? (
+            <TextField
+              name="late_cap"
+              label={t("lateCap")}
+              inputMode="decimal"
+              value={lateCap}
+              onChange={(e) => setLateCap(e.target.value)}
+            />
+          ) : null}
+        </div>
+        <p className="mt-4 text-sm text-ink-muted">{t("editorIncompleteBody")}</p>
+        <ApiErrorAlert error={error} namespace="fees" className="mt-4" />
+        <SaveBar dirty={dirty}>
+          <Button type="submit" loading={saving}>
+            {t("saveDraft")}
+          </Button>
+          <Button variant="secondary" onClick={onCancel} disabled={saving}>
+            {t("discard")}
+          </Button>
+        </SaveBar>
+      </form>
     </Card>
   );
 }
@@ -350,31 +422,52 @@ function PlanRow({ plan, classes }: { plan: Plan; classes: Map<string, string> }
     }
   }
   return (
-    <li className="space-y-2 border-b border-border pb-4 last:border-0">
-      <p className="font-semibold">
-        {plan.name} · {classes.get(plan.class_id) ?? ""}
-        {plan.category_code ? ` · ${plan.category_code}` : ""} ·{" "}
-        {t("version", { no: plan.plan_version })}{" "}
+    <li className="min-w-0 space-y-3 py-4 first:pt-0 last:pb-0">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <h3 className="font-semibold">{plan.name}</h3>
+        <span className="text-sm text-ink-muted">
+          {classes.get(plan.class_id) ?? ""}
+          {plan.category_code ? ` · ${plan.category_code}` : ""} ·{" "}
+          <span className="num">{t("version", { no: plan.plan_version })}</span>
+        </span>
         <Pill
+          size="sm"
           variant={plan.status === "active" ? "done" : plan.status === "draft" ? "progress" : "tag"}
         >
           {t(`status.${plan.status}`)}
         </Pill>
-      </p>
-      <p className="text-sm">
+      </div>
+      <p className="num text-sm">
         {t("planSummary", {
           total: formatInr(plan.annual_total, locale) ?? "",
           count: plan.instalments.length,
           accounts: plan.accounts,
         })}
       </p>
-      <ul className="text-sm text-ink-muted">
-        {plan.instalments.map((i) => (
-          <li key={i.instalment_no}>
-            {i.label} · {formatDate(i.due_on)} · {formatInr(i.total, locale)}
-          </li>
-        ))}
-      </ul>
+      <TableScroll label={t("instalmentsOf", { name: plan.name })}>
+        <Table density="compact">
+          <THead>
+            <Tr>
+              <Th>{t("instalment")}</Th>
+              <Th>{t("dueOn")}</Th>
+              <Th numeric>{t("amountInr")}</Th>
+            </Tr>
+          </THead>
+          <TBody>
+            {plan.instalments.map((i) => (
+              <Tr key={i.instalment_no}>
+                <Td>{i.label}</Td>
+                <Td>
+                  <span className="num whitespace-nowrap">{formatDate(i.due_on)}</span>
+                </Td>
+                <Td numeric className="num">
+                  {formatInr(i.total, locale)}
+                </Td>
+              </Tr>
+            ))}
+          </TBody>
+        </Table>
+      </TableScroll>
       {manage ? (
         <div className="flex flex-wrap gap-2">
           {plan.status === "draft" ? (
@@ -513,23 +606,32 @@ export function SetupScreen() {
     [classes],
   );
   const [editing, setEditing] = useState(false);
+  const canNewPlan = can(MANAGE) && !editing && heads.status === "ready" && heads.data.length > 0;
   const header = (
     <PageHeader
       title={t("title")}
       description={t("description")}
       breadcrumb={[{ label: tn("home"), href: "/" }, { label: t("title") }]}
+      actions={
+        canNewPlan ? (
+          <Button onClick={() => setEditing(true)}>
+            <Icon name="plus" className="size-4" />
+            {t("newPlan")}
+          </Button>
+        ) : null
+      }
     />
   );
   if (me !== undefined && !allowed) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         {header}
         <NoAccess />
       </div>
     );
   }
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {header}
       <FeesGate data={heads}>
         {(rows) => (
@@ -541,6 +643,7 @@ export function SetupScreen() {
                 can(MANAGE) ? (
                   <ActionDialog
                     triggerLabel={t("addHead")}
+                    triggerSize="sm"
                     title={t("addHeadTitle")}
                     confirmLabel={t("addHead")}
                     schema={headSchema}
@@ -598,37 +701,53 @@ export function SetupScreen() {
               }
             >
               {rows.length === 0 ? (
-                <p>{t("noHeads")}</p>
+                <EmptyState icon="receipt" title={t("noHeadsTitle")} body={t("noHeads")} />
               ) : (
-                <ul className="flex flex-wrap gap-2">
-                  {rows.map((h) => (
-                    <li key={h.id}>
-                      <Pill variant={h.active ? "tag" : "sample"}>
-                        {h.code} · {h.name}
-                        {!h.gst_exempt ? ` · ${t("taxable")}` : ""}
-                        {!h.active ? ` · ${t("inactive")}` : ""}
-                      </Pill>
-                    </li>
-                  ))}
-                </ul>
+                <TableScroll label={t("headsTitle")}>
+                  <Table density="compact">
+                    <THead>
+                      <Tr>
+                        <Th>{t("headCode")}</Th>
+                        <Th>{t("headName")}</Th>
+                        <Th>{t("headKind")}</Th>
+                        <Th>{t("headTax")}</Th>
+                        <Th>{t("headInUse")}</Th>
+                      </Tr>
+                    </THead>
+                    <TBody>
+                      {rows.map((h) => (
+                        <Tr key={h.id}>
+                          <Td>
+                            <span className="font-mono whitespace-nowrap">{h.code}</span>
+                          </Td>
+                          <Td>{h.name}</Td>
+                          <Td>{tf(`headKinds.${h.kind}`)}</Td>
+                          <Td>{h.gst_exempt ? t("exempt") : t("taxable")}</Td>
+                          <Td>
+                            {h.active ? (
+                              <Badge tone="success">{t("inUse")}</Badge>
+                            ) : (
+                              <Badge tone="neutral">{t("inactive")}</Badge>
+                            )}
+                          </Td>
+                        </Tr>
+                      ))}
+                    </TBody>
+                  </Table>
+                </TableScroll>
               )}
             </Card>
-            <Card
-              title={t("plansTitle")}
-              actions={
-                can(MANAGE) && !editing ? (
-                  <Button onClick={() => setEditing(true)} disabled={rows.length === 0}>
-                    {t("newPlan")}
-                  </Button>
-                ) : null
-              }
-            >
+            <Card title={t("plansTitle")}>
               <FeesGate data={plans}>
                 {(list) =>
                   list.length === 0 ? (
-                    <p>{t("noPlans")}</p>
+                    <EmptyState
+                      icon="layers"
+                      title={t("noPlans")}
+                      body={rows.length === 0 ? t("noHeads") : t("noPlansBody")}
+                    />
                   ) : (
-                    <ul className="space-y-4">
+                    <ul className="divide-y divide-border">
                       {list.map((p) => (
                         <PlanRow key={p.id} plan={p} classes={classNames} />
                       ))}
@@ -646,6 +765,7 @@ export function SetupScreen() {
                   setEditing(false);
                   void queryClient.invalidateQueries({ queryKey: KEYS.plans });
                 }}
+                onCancel={() => setEditing(false)}
               />
             ) : null}
           </>

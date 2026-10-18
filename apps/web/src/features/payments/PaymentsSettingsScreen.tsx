@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useState, type ReactNode } from "react";
 import * as z from "@/lib/zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
@@ -14,9 +14,12 @@ import { TextField } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SecretOnce } from "@/components/ui/SecretOnce";
+import { Steps } from "@/components/ui/Steps";
+import type { Locale } from "@/i18n/routing";
+import { cn } from "@/lib/cn";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
-import { formatDateTime } from "@/lib/format";
+import { formatCount, formatDateTime } from "@/lib/format";
 import type { Loadable } from "@/lib/loadable";
 import {
   CONFIGURE,
@@ -65,12 +68,41 @@ export function PaymentsGate<T>({
   return <>{children(data.data)}</>;
 }
 
-function Fact({ label, children }: { label: ReactNode; children: ReactNode }) {
+function Fact({
+  label,
+  children,
+  numeric = false,
+}: {
+  label: ReactNode;
+  children: ReactNode;
+  /** Dates, times and counts: SOS Figures, never truncated. */
+  numeric?: boolean;
+}) {
   return (
     <div className="min-w-0">
       <dt className="text-sm text-ink-muted">{label}</dt>
-      <dd className="mt-0.5 break-words text-ink">{children}</dd>
+      <dd className={cn("mt-0.5 break-words text-ink", numeric && "num")}>{children}</dd>
     </div>
+  );
+}
+
+/**
+ * Where the school is in connecting (docs/17 §4.4 Steps), derived from the connection only:
+ * not connected = choose how to connect; the one-time webhook panel = add the webhook;
+ * connected = ready. The flow itself is unchanged.
+ */
+function ConnectSteps({ current }: { current: 0 | 1 | 2 }) {
+  const t = useTranslations("payments.steps");
+  return (
+    <Steps
+      label={t("label")}
+      current={current}
+      steps={[
+        { id: "choose", label: t("choose") },
+        { id: "webhook", label: t("webhook") },
+        { id: "ready", label: t("ready") },
+      ]}
+    />
   );
 }
 
@@ -96,10 +128,20 @@ function MerchantNotice() {
 }
 
 /** The webhook the school adds in its dashboard (manual keys), shown once with its secret. */
-function WebhookInstructions({ setup, onDone }: { setup: WebhookSetup; onDone: () => void }) {
+function WebhookInstructions({
+  setup,
+  onDone,
+  showSteps = false,
+}: {
+  setup: WebhookSetup;
+  onDone: () => void;
+  /** First connection: show where this is in the connect steps. */
+  showSteps?: boolean;
+}) {
   const t = useTranslations("payments.webhook");
   return (
     <div className="space-y-4">
+      {showSteps ? <ConnectSteps current={1} /> : null}
       <p className="text-sm">{t("steps")}</p>
       <div className="space-y-1">
         <p className="text-sm text-ink-muted">{t("url")}</p>
@@ -116,7 +158,7 @@ function WebhookInstructions({ setup, onDone }: { setup: WebhookSetup; onDone: (
         </ul>
       </div>
       {setup.previous_valid_until ? (
-        <p className="text-sm text-ink-muted">
+        <p className="num text-sm text-ink-muted">
           {t("previousUntil", { when: formatDateTime(setup.previous_valid_until) ?? "" })}
         </p>
       ) : null}
@@ -179,10 +221,14 @@ function ConnectCard({
         {!canConfigure ? (
           <p className="text-sm text-ink-muted">{t("askOwner")}</p>
         ) : (
-          <>
-            {connection.oauth_available ? <OAuthButton /> : null}
+          <div className="grid gap-4 md:grid-cols-2">
+            {connection.oauth_available ? (
+              <div className="min-w-0 rounded-lg border border-border p-4">
+                <OAuthButton />
+              </div>
+            ) : null}
             {connection.manual_keys_allowed ? (
-              <div className="space-y-2">
+              <div className="min-w-0 space-y-2 rounded-lg border border-border p-4">
                 <p className="text-sm text-ink-muted">{t("manualHint")}</p>
                 <ActionDialog
                   triggerLabel={t("manual")}
@@ -202,6 +248,7 @@ function ConnectCard({
                   }
                   renderResult={(result: ManualConnect, close) => (
                     <WebhookInstructions
+                      showSteps
                       setup={result.webhook}
                       onDone={() => {
                         close();
@@ -237,7 +284,7 @@ function ConnectCard({
             {!connection.oauth_available && !connection.manual_keys_allowed ? (
               <p className="text-sm text-ink-muted">{t("notConfigured")}</p>
             ) : null}
-          </>
+          </div>
         )}
       </div>
     </Card>
@@ -293,6 +340,7 @@ function AccountCard({
   const t = useTranslations("payments.account");
   const api = useBffClient("staff");
   const queryClient = useQueryClient();
+  const locale = useLocale() as Locale;
   const none = t("none");
   const status = connection.status ?? "active";
   return (
@@ -308,6 +356,7 @@ function AccountCard({
               title={t("rotateTitle")}
               description={t("rotateBody")}
               confirmLabel={t("rotate")}
+              consequence={t("rotateConsequence")}
               stepUp
               schema={z.object({})}
               errorNamespace="payments"
@@ -321,19 +370,6 @@ function AccountCard({
                   }}
                 />
               )}
-            />
-            <ActionDialog
-              triggerLabel={t("disconnect")}
-              triggerVariant="danger"
-              title={t("disconnectTitle")}
-              description={t("disconnectBody")}
-              confirmLabel={t("disconnect")}
-              confirmVariant="danger"
-              stepUp
-              schema={z.object({})}
-              invalidate={[KEYS.all]}
-              errorNamespace="payments"
-              submit={() => unwrap(api.DELETE("/api/v1/payments/connection"))}
             />
           </span>
         ) : null
@@ -353,17 +389,25 @@ function AccountCard({
           {connection.environment ? t(`environments.${connection.environment}`) : none}
         </Fact>
         <Fact label={t("accountId")}>
-          {connection.provider_account_id ?? connection.key_id_hint ?? none}
+          <span className="font-mono">
+            {connection.provider_account_id ?? connection.key_id_hint ?? none}
+          </span>
         </Fact>
-        <Fact label={t("connectedAt")}>
+        <Fact label={t("connectedAt")} numeric>
           {formatDateTime(connection.connected_at) ?? none}
           {connection.connected_by_name ? ` · ${connection.connected_by_name}` : ""}
         </Fact>
-        <Fact label={t("checkedAt")}>{formatDateTime(connection.last_checked_at) ?? none}</Fact>
-        <Fact label={t("openLinks")}>{String(connection.open_links)}</Fact>
-        <Fact label={t("pendingEvents")}>{String(connection.pending_events)}</Fact>
+        <Fact label={t("checkedAt")} numeric>
+          {formatDateTime(connection.last_checked_at) ?? none}
+        </Fact>
+        <Fact label={t("openLinks")} numeric>
+          {formatCount(connection.open_links, locale)}
+        </Fact>
+        <Fact label={t("pendingEvents")} numeric>
+          {formatCount(connection.pending_events, locale)}
+        </Fact>
         {connection.mode === "oauth" ? (
-          <Fact label={t("accessUntil")}>
+          <Fact label={t("accessUntil")} numeric>
             {formatDateTime(connection.refresh_expires_at) ?? none}
           </Fact>
         ) : null}
@@ -374,12 +418,40 @@ function AccountCard({
           {connection.webhook_url ?? none}
         </code>
         {connection.previous_valid_until ? (
-          <p className="text-sm text-ink-muted">
+          <p className="num text-sm text-ink-muted">
             {t("previousUntil", { when: formatDateTime(connection.previous_valid_until) ?? "" })}
           </p>
         ) : null}
       </div>
     </Card>
+  );
+}
+
+/** Disconnect (danger, step-up) on its own, with what it changes in one sentence. */
+function DisconnectCard({ connection }: { connection: Connection }) {
+  const t = useTranslations("payments.account");
+  const api = useBffClient("staff");
+  return (
+    <Card
+      title={t("disconnectTitle")}
+      description={t("disconnectBody")}
+      actions={
+        <ActionDialog
+          triggerLabel={t("disconnect")}
+          triggerVariant="danger"
+          title={t("disconnectTitle")}
+          description={t("disconnectBody")}
+          confirmLabel={t("disconnect")}
+          confirmVariant="danger"
+          consequence={t("disconnectConsequence", { count: connection.open_links })}
+          stepUp
+          schema={z.object({})}
+          invalidate={[KEYS.all]}
+          errorNamespace="payments"
+          submit={() => unwrap(api.DELETE("/api/v1/payments/connection"))}
+        />
+      }
+    />
   );
 }
 
@@ -400,7 +472,7 @@ export function PaymentsSettingsScreen() {
   const canConfigure = can(CONFIGURE);
   const connection = useConnection(meLoaded && allowed);
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={t("settingsTitle")}
         description={t("settingsDescription")}
@@ -412,13 +484,19 @@ export function PaymentsSettingsScreen() {
         </Alert>
       ) : (
         <PaymentsGate data={meLoaded ? connection : { status: "loading" }}>
-          {(current) =>
-            current.connected ? (
-              <AccountCard connection={current} canConfigure={canConfigure} />
-            ) : (
-              <ConnectCard connection={current} canConfigure={canConfigure} />
-            )
-          }
+          {(current) => (
+            <>
+              <ConnectSteps current={current.connected ? 2 : 0} />
+              {current.connected ? (
+                <>
+                  <AccountCard connection={current} canConfigure={canConfigure} />
+                  {canConfigure ? <DisconnectCard connection={current} /> : null}
+                </>
+              ) : (
+                <ConnectCard connection={current} canConfigure={canConfigure} />
+              )}
+            </>
+          )}
         </PaymentsGate>
       )}
     </div>
