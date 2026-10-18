@@ -853,6 +853,35 @@ describe("upload a document (US-701 AC1..AC2, FR-DOC-001, FR-DOC-005)", () => {
     expect(body("POST /bff/api/v1/documents")).toMatchObject({ language: null });
   });
 
+  it("shows how much of the file has been sent while it uploads", async () => {
+    setMe([READ, UPLOAD]);
+    presign();
+    let finish: () => void = () => undefined;
+    setDocumentStorageSendForTesting(
+      (_url, _init, onProgress) =>
+        new Promise((resolve) => {
+          onProgress?.(0.456);
+          finish = () => resolve(new Response(null, { status: 204 }));
+        }),
+    );
+    stub.routes["POST /bff/api/v1/documents"] = () => Response.json(row(), { status: 202 });
+    renderWithIntl(<NewDocumentScreen />);
+    await userEvent.upload(
+      await screen.findByLabelText("File to upload"),
+      new File(["%PDF"], "policy.pdf", { type: "application/pdf" }),
+    );
+    await userEvent.type(screen.getByRole("textbox", { name: /Title/ }), "Fee policy");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Type" }), "policy");
+    await userEvent.click(screen.getByRole("button", { name: "Upload a document" }));
+    expect(await screen.findByText("Sending the file: 45% done")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Uploading…" })).toHaveAttribute(
+      "value",
+      "0.456",
+    );
+    finish();
+    await waitFor(() => expect(stub.callsTo("POST /bff/api/v1/documents")).toHaveLength(1));
+  });
+
   it("asks to upload again when storage refused the file, with a fresh upload form", async () => {
     setMe([READ, UPLOAD]);
     presign();

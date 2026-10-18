@@ -1,7 +1,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import { useRef, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { Pill, type PillVariant } from "@/components/ui/Badge";
 import { buttonClasses } from "@/components/ui/Button";
@@ -108,6 +108,12 @@ export function PrintLink({ path, label }: { path: string; label: string }) {
   );
 }
 
+/** Controlled open for a dialog a "More" menu item opens (ActionDialog/FormDialog `open`). */
+export interface DialogControl {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
 /** One item of a page's "More" menu: an action, a link, or a confirm dialog it opens. */
 export type MoreItem =
   | {
@@ -122,34 +128,20 @@ export type MoreItem =
       id: string;
       label: string;
       danger?: boolean;
-      /** An `ActionDialog` with `triggerHidden`; the menu item opens it. */
-      dialog: ReactNode;
+      /** Renders an `ActionDialog` or `FormDialog` with `open`/`onOpenChange` from `control`. */
+      dialog: (control: DialogControl) => ReactNode;
     };
 
 /**
  * The secondary actions of a page header under one "More" button (docs/17 §5). Confirm
- * dialogs stay `ActionDialog`s (consequence line, step-up, idempotency key): each is mounted
- * with its trigger hidden, the menu item presses that trigger, and when the dialog closes focus
- * returns to the "More" button. Renders nothing without items.
+ * dialogs stay `ActionDialog`s (consequence line, step-up, idempotency key), opened through
+ * their controlled `open` prop: the menu closes (focus back on "More"), then the dialog opens
+ * and, when it closes, returns focus to the "More" button. Renders nothing without items.
  */
 export function MoreActions({ label, items }: { label: string; items: readonly MoreItem[] }) {
   const tu = useTranslations("ui");
-  const root = useRef<HTMLDivElement>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
   if (items.length === 0) return null;
-  function launch(id: string) {
-    const host = root.current?.querySelector(`[data-more-dialog="${id}"]`);
-    const trigger = host?.querySelector<HTMLButtonElement>('button[aria-haspopup="dialog"]');
-    host?.querySelector("dialog")?.addEventListener(
-      "close",
-      () => {
-        window.setTimeout(() => {
-          root.current?.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]')?.focus();
-        }, 0);
-      },
-      { once: true },
-    );
-    trigger?.click();
-  }
   const entries: MenuEntry[] = items.map((item): MenuEntry => {
     if ("href" in item) return { kind: "link", id: item.id, label: item.label, href: item.href };
     if ("dialog" in item) {
@@ -157,7 +149,7 @@ export function MoreActions({ label, items }: { label: string; items: readonly M
         id: item.id,
         label: item.label,
         danger: item.danger === true,
-        onSelect: () => launch(item.id),
+        onSelect: () => setOpenId(item.id),
       };
     }
     return {
@@ -169,7 +161,7 @@ export function MoreActions({ label, items }: { label: string; items: readonly M
     };
   });
   return (
-    <div ref={root} className="contents">
+    <>
       <Menu
         label={label}
         variant="button"
@@ -183,12 +175,15 @@ export function MoreActions({ label, items }: { label: string; items: readonly M
       />
       {items.map((item) =>
         "dialog" in item ? (
-          <div key={item.id} data-more-dialog={item.id} className="contents">
-            {item.dialog}
-          </div>
+          <Fragment key={item.id}>
+            {item.dialog({
+              open: openId === item.id,
+              onOpenChange: (open) => setOpenId(open ? item.id : null),
+            })}
+          </Fragment>
         ) : null,
       )}
-    </div>
+    </>
   );
 }
 

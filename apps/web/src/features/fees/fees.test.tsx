@@ -380,6 +380,25 @@ describe("receipt page", () => {
     const call = stub.callsTo(`POST /bff/api/v1/fees/receipts/${RECEIPT}/cancellation`)[0];
     expect(call?.headers.get("Idempotency-Key")).toBeTruthy();
   });
+
+  it("opens a More dialog without a hidden trigger, returns focus to More and opens it again", async () => {
+    signedIn([COLLECT]);
+    stub.routes[`GET /bff/api/v1/fees/receipts/${RECEIPT}`] = () => Response.json(receipt());
+    const user = userEvent.setup();
+    renderWithIntl(<ReceiptDetailScreen receiptId={RECEIPT} />);
+    const more = await screen.findByRole("button", { name: messages.en.ui.more });
+    // Controlled open: no hidden trigger buttons sit in the page any more.
+    expect(document.querySelector("button[hidden]")).toBeNull();
+    for (let round = 0; round < 2; round += 1) {
+      await user.click(more);
+      await user.click(screen.getByRole("menuitem", { name: en.receipt.requestCancel }));
+      const dialog = await screen.findByRole("dialog");
+      expect(within(dialog).getByText(en.receipt.cancelConsequence)).toBeInTheDocument();
+      await user.keyboard("{Escape}");
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      await waitFor(() => expect(more).toHaveFocus());
+    }
+  });
 });
 
 describe("approvals inbox (D17: never one's own request)", () => {

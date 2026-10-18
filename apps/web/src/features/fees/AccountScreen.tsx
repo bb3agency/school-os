@@ -32,7 +32,15 @@ import {
   type DueLine,
 } from "./data";
 import { PaymentLinks } from "@/features/payments/PaymentLinks";
-import { Amount, FeesGate, MoreActions, NoAccess, RequestStatusPill, type MoreItem } from "./parts";
+import {
+  Amount,
+  FeesGate,
+  MoreActions,
+  NoAccess,
+  RequestStatusPill,
+  type DialogControl,
+  type MoreItem,
+} from "./parts";
 
 const reason = z
   .string()
@@ -232,7 +240,7 @@ function Dues({ account }: { account: Account }) {
   );
 }
 
-function ConcessionDialog({ account }: { account: Account }) {
+function ConcessionDialog({ account, control }: { account: Account; control: DialogControl }) {
   const t = useTranslations("fees.account");
   const tf = useTranslations("fees");
   const api = useBffClient("staff");
@@ -245,8 +253,8 @@ function ConcessionDialog({ account }: { account: Account }) {
     }));
   return (
     <ActionDialog
-      triggerLabel={t("requestConcession")}
-      triggerHidden
+      open={control.open}
+      onOpenChange={control.onOpenChange}
       title={t("concessionTitle")}
       description={t("concessionBody")}
       confirmLabel={t("requestConcession")}
@@ -309,7 +317,7 @@ function ConcessionDialog({ account }: { account: Account }) {
   );
 }
 
-function AdjustmentDialog({ account }: { account: Account }) {
+function AdjustmentDialog({ account, control }: { account: Account; control: DialogControl }) {
   const t = useTranslations("fees.account");
   const tf = useTranslations("fees");
   const api = useBffClient("staff");
@@ -320,8 +328,8 @@ function AdjustmentDialog({ account }: { account: Account }) {
   }));
   return (
     <ActionDialog
-      triggerLabel={t("requestAdjustment")}
-      triggerHidden
+      open={control.open}
+      onOpenChange={control.onOpenChange}
       title={t("adjustmentTitle")}
       description={t("adjustmentBody")}
       confirmLabel={t("requestAdjustment")}
@@ -491,14 +499,14 @@ export function AccountScreen({ accountId }: { accountId: string }) {
       items.push({
         id: "concession",
         label: t("requestConcession"),
-        dialog: <ConcessionDialog account={a} />,
+        dialog: (control) => <ConcessionDialog account={a} control={control} />,
       });
     }
     if (a && can(MANAGE)) {
       items.push({
         id: "adjustment",
         label: t("requestAdjustment"),
-        dialog: <AdjustmentDialog account={a} />,
+        dialog: (control) => <AdjustmentDialog account={a} control={control} />,
       });
     }
     return (
