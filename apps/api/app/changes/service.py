@@ -592,21 +592,39 @@ def list_requests(
     *,
     status: str | None = None,
     student_id: uuid.UUID | None = None,
+    waiting_for_me: bool = False,
+    requested_by_me: bool = False,
     limit: int = 50,
     cursor: str | None = None,
 ) -> Page[ChangeRequestOut]:
-    """Requests of students the caller reaches (request or approve permission), newest first."""
-    reach = _reach(session, ctx, [REQUEST, APPROVE])
+    """Requests of students the caller reaches (request or approve permission), newest first.
+
+    ``waiting_for_me`` keeps the requests the caller may decide now: open (pending, not expired),
+    on a student they reach through the approve permission and not submitted by them (maker !=
+    checker, SEC-014); empty without the approve permission. ``requested_by_me`` keeps the
+    caller's own requests. Filters combine (AND), so contradictory ones give an empty page.
+    """
+    if waiting_for_me:
+        if requested_by_me or status not in (None, "pending") or not ctx.has(APPROVE):
+            return Page[ChangeRequestOut](data=[], next_cursor=None)
+        reach = _reach(session, ctx, [APPROVE])
+    else:
+        reach = _reach(session, ctx, [REQUEST, APPROVE])
+    after = _after(cursor)
+    now = _now(session)
     rows = repo.list_requests(
         session,
         student_ids=reach,
         status=status,
         student_id=student_id,
-        after=_after(cursor),
+        after=after,
         limit=limit + 1,
+        requested_by=ctx.membership_id if requested_by_me else None,
+        not_requested_by=ctx.membership_id if waiting_for_me else None,
+        open_at=now if waiting_for_me else None,
     )
     page, more = rows[:limit], len(rows) > limit
-    labels, now = _labels(session), _now(session)
+    labels = _labels(session)
     items = [_out(session, ctx, r, labels, now) for r in page]
     next_cursor = (
         encode_cursor({"t": page[-1].requested_at.isoformat(), "i": str(page[-1].id)})

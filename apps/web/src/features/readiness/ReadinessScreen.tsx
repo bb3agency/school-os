@@ -35,6 +35,7 @@ import {
   useSectionReadiness,
 } from "./data";
 import { OwnerBadge, ReadinessBadge, ReadyBar } from "./parts";
+import { ReadinessOverview } from "./ReadinessOverview";
 import { SensitiveSlipLink } from "./SensitiveSlipLink";
 import { readyShare, slipHref, type ReadinessSection, type ReadinessStudent } from "./types";
 
@@ -74,8 +75,9 @@ function RefreshWhenDone({ run, profile }: { run: DqRun; profile: string }) {
   const queryClient = useQueryClient();
   const finished = isRunFinished(run.status);
   useEffect(() => {
-    if (finished)
-      void queryClient.invalidateQueries({ queryKey: [...READINESS_KEYS.all, profile] });
+    if (!finished) return;
+    void queryClient.invalidateQueries({ queryKey: [...READINESS_KEYS.all, profile] });
+    void queryClient.invalidateQueries({ queryKey: READINESS_KEYS.overview });
   }, [finished, profile, queryClient]);
   return null;
 }
@@ -324,6 +326,12 @@ export function ReadinessScreen({
             </Button>
           </>
         }
+      />
+
+      <ReadinessOverview
+        enabled={(profiles.data?.length ?? 0) > 1}
+        sections={sections}
+        profileName={profileName}
       />
 
       {tabs.length > 0 ? (

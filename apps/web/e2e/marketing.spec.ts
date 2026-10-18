@@ -174,6 +174,29 @@ test.describe("public marketing pages (docs/17 §5.6)", () => {
     await expectEverythingRevealedAfterScrolling(page, "/features#certificates");
   });
 
+  test("home: an anchor lands its section just below the sticky header (one offset, not two)", async ({
+    page,
+  }) => {
+    await page.goto("/#how");
+    await settleAnimations(page);
+    const header = await page
+      .getByRole("banner")
+      .evaluate((el) => el.getBoundingClientRect().bottom);
+    const top = await page.locator("section#how").evaluate((el) => el.getBoundingClientRect().top);
+    // The root's scroll-padding (header + 1rem) is the only offset: no scroll-margin on top.
+    expect(top).toBeGreaterThanOrEqual(header);
+    expect(top - header).toBeLessThanOrEqual(24);
+    // The same from a header link clicked with the pointer (the smooth-scroll glide).
+    await page.goto("/");
+    await page.locator("a[href='#how'], a[href='/#how']").first().click();
+    await expect(page).toHaveURL(/#how$/);
+    await expect
+      .poll(async () =>
+        page.locator("section#how").evaluate((el) => Math.round(el.getBoundingClientRect().top)),
+      )
+      .toBeLessThanOrEqual(Math.round(header) + 24);
+  });
+
   test("keyboard only on every page: visible focus on each stop", async ({ page }) => {
     for (const { path } of PAGES.slice(1)) {
       await page.goto(path);

@@ -82,9 +82,17 @@ describe("change request list (US-601, FR-CR-002)", () => {
   });
 
   it("filters by a student ID from the URL (API filter), ignoring anything that is not a UUID", async () => {
-    expect(parseChangeRequestFilters({ student_id: "not-a-uuid", status: "bogus" })).toEqual({
+    expect(
+      parseChangeRequestFilters({
+        student_id: "not-a-uuid",
+        status: "bogus",
+        waiting_for: "someone",
+        requested_by: "x",
+      }),
+    ).toEqual({
       status: null,
       studentId: null,
+      inbox: null,
     });
     stub.routes["GET /bff/api/v1/me"] = () => Response.json(me([REQUEST]));
     stub.routes["GET /bff/api/v1/change-requests"] = () => page([changeRequest()]);
@@ -104,6 +112,49 @@ describe("change request list (US-601, FR-CR-002)", () => {
     );
     const call = stub.callsTo("GET /bff/api/v1/change-requests")[0];
     expect(call?.url.searchParams.get("student_id")).toBe(STUDENT);
+  });
+
+  it("has Waiting for me and Asked by me tabs on the API's inbox filters", async () => {
+    stub.routes["GET /bff/api/v1/me"] = () => Response.json(me([REQUEST, APPROVE]));
+    stub.routes["GET /bff/api/v1/change-requests"] = () => page([]);
+    renderWithIntl(
+      <ChangeRequestsScreen
+        filters={parseChangeRequestFilters({ waiting_for: "me", status: "approved" })}
+      />,
+    );
+    const tabs = await screen.findByRole("navigation", { name: "Requests by status" });
+    const waiting = await within(tabs).findByRole("link", { name: "Waiting for me" });
+    expect(waiting).toHaveAttribute("aria-current", "page");
+    expect(waiting).toHaveAttribute("href", "/change-requests?waiting_for=me");
+    expect(within(tabs).getByRole("link", { name: "Asked by me" })).toHaveAttribute(
+      "href",
+      "/change-requests?requested_by=me",
+    );
+    // A status tab leaves the inbox view.
+    expect(within(tabs).getByRole("link", { name: "Waiting for approval" })).toHaveAttribute(
+      "href",
+      "/change-requests?status=pending",
+    );
+    expect(await screen.findByText("Nothing is waiting for you")).toBeInTheDocument();
+    const call = stub.callsTo("GET /bff/api/v1/change-requests")[0];
+    expect(call?.url.searchParams.get("waiting_for")).toBe("me");
+    expect(call?.url.searchParams.get("requested_by")).toBeNull();
+  });
+
+  it("shows only the inbox tabs the caller's permissions allow", async () => {
+    stub.routes["GET /bff/api/v1/me"] = () => Response.json(me([REQUEST]));
+    stub.routes["GET /bff/api/v1/change-requests"] = () => page([]);
+    renderWithIntl(
+      <ChangeRequestsScreen filters={parseChangeRequestFilters({ requested_by: "me" })} />,
+    );
+    const tabs = await screen.findByRole("navigation", { name: "Requests by status" });
+    expect(await within(tabs).findByRole("link", { name: "Asked by me" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(within(tabs).queryByRole("link", { name: "Waiting for me" })).toBeNull();
+    const call = stub.callsTo("GET /bff/api/v1/change-requests")[0];
+    expect(call?.url.searchParams.get("requested_by")).toBe("me");
   });
 
   it("keeps masked values masked", async () => {

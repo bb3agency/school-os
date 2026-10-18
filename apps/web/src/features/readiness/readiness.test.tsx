@@ -226,6 +226,65 @@ describe("board readiness screen (US-504, US-506)", () => {
     expect(screen.queryByRole("button", { name: "Check now" })).toBeNull();
   });
 
+  it("shows one column per board or portal when the school has two checks (GET /dq/readiness)", async () => {
+    common(READ);
+    const apaar = {
+      ...PROFILE,
+      key: "apaar",
+      label_en: "APAAR ID",
+      label_te: "APAAR ID",
+      classes: ["I"],
+    };
+    stub.routes["GET /bff/api/v1/dq/profiles"] = () =>
+      Response.json(
+        [PROFILE, apaar].map((p) => ({
+          key: p.key,
+          version: 1,
+          label_en: p.label_en,
+          label_te: p.label_te,
+          required_fields: ["full_name"],
+          needs_apaar: false,
+          source: p.source,
+          verified: false,
+          readiness: true,
+        })),
+      );
+    stub.routes["GET /bff/api/v1/dq/readiness"] = () =>
+      Response.json({
+        summaries: [
+          summary(),
+          {
+            profile: apaar,
+            totals: { students: 0, ready: 0, needs_parent: 0, needs_school: 0, blocked: 0 },
+            sections: [],
+            last_run: null,
+          },
+        ],
+      });
+    renderWithIntl(<ReadinessScreen profileKey={SSC} sectionId={null} />);
+    const table = await screen.findByRole("table", { name: "Every board and portal" });
+    const headers = within(table)
+      .getAllByRole("columnheader")
+      .map((cell) => cell.textContent);
+    expect(headers).toEqual(expect.arrayContaining(["AP SSC 2027 (BSEAP)", "APAAR ID"]));
+    const rows = within(table).getAllByRole("row");
+    expect(within(rows[1]!).getByText("All sections")).toBeInTheDocument();
+    // The section's figure opens that check for that section.
+    expect(
+      within(table).getByRole("link", { name: /142 of 160 ready.*AP SSC 2027 \(BSEAP\), Class/ }),
+    ).toHaveAttribute("href", `/findings/readiness?profile=${SSC}&section=${SECTION}`);
+    // A section the check does not cover says so instead of "0 of 0".
+    expect(within(table).getByText("Not covered")).toBeInTheDocument();
+  });
+
+  it("has no overview with a single check", async () => {
+    common(READ);
+    renderWithIntl(<ReadinessScreen profileKey={SSC} sectionId={null} />);
+    await screen.findByRole("table", { name: "Sections" });
+    expect(screen.queryByRole("table", { name: "Every board and portal" })).toBeNull();
+    expect(stub.callsTo("GET /bff/api/v1/dq/readiness")).toHaveLength(0);
+  });
+
   it("lists a section's students with who must act and slip links", async () => {
     common([...READ, "dq.readiness.manage"]);
     stub.routes[`GET /bff/api/v1/dq/readiness/${SSC}/students`] = () =>

@@ -1568,6 +1568,11 @@ SPECS: dict[tuple[str, str], Builder] = {
         {},
     ),
     # Board and portal readiness (ADR-0040): the class teacher reaches 9A only.
+    ("GET", "/api/v1/dq/readiness"): lambda w, r, a: (
+        "/api/v1/dq/readiness?profile_keys=bseap-ssc-2027",
+        None,
+        {},
+    ),
     ("GET", "/api/v1/dq/readiness/{profile_key}"): lambda w, r, a: (
         "/api/v1/dq/readiness/bseap-ssc-2027",
         None,

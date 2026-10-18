@@ -58,7 +58,33 @@ export class StorageUploadError extends Error {
   }
 }
 
-type StorageSend = (url: string, init: RequestInit) => Promise<Response>;
+/** Upload progress, 0..1 (from the browser's upload events). */
+export type OnProgress = (fraction: number) => void;
+
+type StorageSend = (
+  url: string,
+  init: { method: "POST"; body: FormData; credentials: "omit" },
+  onProgress?: OnProgress,
+) => Promise<Pick<Response, "ok" | "status">>;
+
+/**
+ * The presigned POST through XMLHttpRequest, which (unlike fetch) reports upload progress, so
+ * a 10 MB scan on a slow office line never looks stuck. No cookies are sent (`credentials:
+ * "omit"` is XHR's default for another origin). Network failures reject like fetch does.
+ */
+const xhrSend: StorageSend = (url, init, onProgress) =>
+  new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(init.method, url);
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) onProgress?.(event.loaded / event.total);
+    };
+    xhr.onload = () => resolve({ ok: xhr.status >= 200 && xhr.status < 300, status: xhr.status });
+    xhr.onerror = () => reject(new TypeError("network"));
+    xhr.onabort = () => reject(new TypeError("network"));
+    xhr.send(init.body);
+  });
+
 let storageSendOverride: StorageSend | undefined;
 /** Tests only: jsdom's FormData cannot be sent through the test fetch double. */
 export function setDocumentStorageSendForTesting(send: StorageSend | undefined): void {
@@ -79,6 +105,7 @@ async function sendFile(
   purpose: UploadPurpose,
   key: string,
   documentId?: string,
+  onProgress?: OnProgress,
 ): Promise<string> {
   const presigned = await unwrap(
     api.POST("/api/v1/documents/uploads", {
@@ -96,13 +123,13 @@ async function sendFile(
   for (const [name, value] of Object.entries(presigned.fields)) form.append(name, value);
   // The file must be the last field of an S3 POST policy form.
   form.append("file", file);
-  let stored: Response;
+  let stored: Pick<Response, "ok" | "status">;
   try {
-    stored = await (storageSendOverride ?? fetch)(presigned.url, {
-      method: "POST",
-      body: form,
-      credentials: "omit",
-    });
+    stored = await (storageSendOverride ?? xhrSend)(
+      presigned.url,
+      { method: "POST", body: form, credentials: "omit" },
+      onProgress,
+    );
   } catch {
     throw new StorageUploadError(0);
   }
@@ -119,8 +146,9 @@ export async function uploadDocument(
   purpose: UploadPurpose,
   metadata: NewDocument,
   keys: UploadKeys,
+  onProgress?: OnProgress,
 ): Promise<DocumentOut> {
-  const uploadId = await sendFile(api, file, purpose, keys.upload);
+  const uploadId = await sendFile(api, file, purpose, keys.upload, undefined, onProgress);
   return unwrap(
     api.POST("/api/v1/documents", {
       headers: { "Idempotency-Key": keys.register },
