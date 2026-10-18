@@ -37,7 +37,7 @@ import uuid
 from collections import Counter, defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Final
+from typing import Any, Final, Literal
 
 from sqlalchemy.orm import Session
 
@@ -84,12 +84,13 @@ TOKEN_PREFIX: Final = "bp_"  # noqa: S105 - a preview id prefix, not a secret
 SENDING_PURPOSES: Final = frozenset(
     {"school_notice", "absence_alert", "fee_reminder", "fee_receipt"}
 )
-# Parent link per purpose (ADR-0046; the R2-3H contract app.public.config.PARENT_TARGET_TYPES):
-# kind, and the message's source_type is the handle's target_type.
-LINKS: Final[dict[str, tuple[str, str]]] = {
-    "school_notice": ("parent_notice", "parent_notice"),
-    "fee_reminder": ("parent_dues", "fee_account"),
-    "fee_receipt": ("parent_receipt", "fee_receipt"),
+# Parent link kind per purpose (ADR-0046). The target type is the R2-3H pages' contract
+# (app.public.config.PARENT_TARGET_TYPES, applied by public.service.issue_parent_link); the
+# message's source is the link's target (notice, fee account, receipt).
+LINKS: Final[dict[str, Literal["parent_notice", "parent_dues", "parent_receipt"]]] = {
+    "school_notice": "parent_notice",
+    "fee_reminder": "parent_dues",
+    "fee_receipt": "parent_receipt",
 }
 _SWITCH: Final = {
     "school_notice": "notices_enabled",
@@ -831,16 +832,14 @@ def _claim(session: Session, message_id: uuid.UUID, now: dt.datetime) -> _Claim 
     values: dict[str, Any] = {"next_attempt_at": now + dt.timedelta(seconds=cfg.claim_seconds)}
     key: str | None = None
     handle_id: uuid.UUID | None = None
-    link = LINKS.get(message.purpose)
-    if link is not None and message.guardian_id is not None:
+    kind = LINKS.get(message.purpose)
+    if kind is not None and message.guardian_id is not None:
         # One token per guardian per message (FR-PUB-005); the earlier try's token was never
         # delivered, so it is revoked and a new one issued.
         _revoke(session, message.public_handle_id, "send_retry")
-        kind, target_type = link
-        issued = public.issue_handle(
+        issued = public.issue_parent_link(
             session,
-            kind=kind,  # type: ignore[arg-type]
-            target_type=target_type,
+            kind=kind,
             target_id=message.source_id,
             guardian_id=message.guardian_id,
             message_id=message.id,
