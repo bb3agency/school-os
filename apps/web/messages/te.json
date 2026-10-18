@@ -8050,8 +8050,7 @@
       "parent_optin": "వాట్సాప్‌లో పాఠశాల సందేశాలు"
     },
     "view": {
-      "validUntil": "ఈ లింక్ {date} వరకు పనిచేస్తుంది.",
-      "detailsSoon": "ఈ పేజీ వివరాలు త్వరలో ఇక్కడ కనిపిస్తాయి."
+      "validUntil": "ఈ లింక్ {date} వరకు పనిచేస్తుంది."
     },
     "footer": {
       "fromSchool": "{school} నుండి, SchoolOS ద్వారా పంపబడింది",

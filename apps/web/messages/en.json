@@ -8050,8 +8050,7 @@
       "parent_optin": "School messages on WhatsApp"
     },
     "view": {
-      "validUntil": "This link works until {date}.",
-      "detailsSoon": "The details of this page will appear here soon."
+      "validUntil": "This link works until {date}."
     },
     "footer": {
       "fromSchool": "From {school}, sent through SchoolOS",
