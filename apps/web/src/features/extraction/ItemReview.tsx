@@ -2,15 +2,17 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import * as z from "@/lib/zod";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ErrorSummary, type SummaryError } from "@/components/ui/ErrorSummary";
 import { Icon } from "@/components/ui/Icon";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SaveBar } from "@/components/ui/SaveBar";
 import { SelectField, type SelectOption } from "@/components/ui/Select";
 import { Value } from "@/components/ui/Value";
 import { POLL_MS, usePolledQuery } from "@/features/imports/poll";
@@ -36,7 +38,7 @@ import { formatDateTime } from "@/lib/format";
 import { useApiForm } from "@/lib/forms";
 import type { Loadable } from "@/lib/loadable";
 import type { AfterAction } from "./after";
-import { batchKey, itemsKey, ItemStatusBadge, pageNumber } from "./BatchScreen";
+import { batchKey, itemsKey, ItemStatusBadge, pageNumber, ReviewProgress } from "./BatchScreen";
 import { EXTRACTION_KEY } from "./RegisterPhotosScreen";
 import {
   DATE_FIELDS,
@@ -269,7 +271,12 @@ function ConfirmForm({
   const tc = useTranslations("common");
   const locale = useLocale();
   const api = useBffClient("staff");
+  const formId = useId();
   const [target, setTarget] = useState("");
+  /** Something was changed since the row was opened (explicit save, docs/17 §4.4). */
+  const [dirty, setDirty] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const idOf = (name: string) => `${formId}-${name}`;
   // Every register field is offered (the machine may have missed one); masked ones are shown
   // read-only and never sent back (the API refuses masked values).
   const keys = REGISTER_FIELDS;
@@ -309,8 +316,44 @@ function ConfirmForm({
       ? ts("dateInvalid", dates.hint("2012-03-14"))
       : form.errors[key];
 
+  // Every field with an id that can show an error, in the form's order.
+  const summaryFields: readonly string[] = [
+    ...editable,
+    ...(target === "" ? ["section_id", "roll_no", "student_status"] : []),
+  ];
+  const labelOf = (name: string) =>
+    name === "section_id"
+      ? t("section")
+      : name === "roll_no"
+        ? t("rollNo")
+        : name === "student_status"
+          ? t("status")
+          : label(name);
+  const summary: SummaryError[] = summaryFields.flatMap((name) => {
+    const message = (REGISTER_FIELDS as readonly string[]).includes(name)
+      ? fieldError(name)
+      : form.errors[name];
+    return message ? [{ fieldId: idOf(name), message: `${labelOf(name)}: ${message}` }] : [];
+  });
+
   return (
-    <form noValidate onSubmit={form.onSubmit} className="space-y-5">
+    <form
+      noValidate
+      onSubmit={(event) => {
+        setAttempt((value) => value + 1);
+        form.onSubmit(event);
+      }}
+      onChange={() => setDirty(true)}
+      onReset={() => {
+        // Back to the values as read from the photo (uncontrolled inputs reset themselves).
+        setDirty(false);
+        setTarget("");
+        form.reset();
+        onFocusField(null);
+      }}
+      className="space-y-5"
+    >
+      <ErrorSummary errors={summary} attempt={attempt} />
       <fieldset className="space-y-4">
         <legend className="mb-1 text-lg font-semibold text-ink">{t("valuesLegend")}</legend>
         <p className="text-sm text-ink-muted">{t("valuesHint")}</p>
@@ -358,6 +401,7 @@ function ConfirmForm({
               <div key={key} className={wrapper}>
                 <SelectField
                   className="min-w-0 flex-1"
+                  id={idOf("gender")}
                   name="gender"
                   label={fieldLabel}
                   hint={
@@ -378,6 +422,7 @@ function ConfirmForm({
             <div key={key} className={wrapper}>
               <div className="min-w-0 flex-1">
                 <GuardedTextField
+                  id={idOf(key)}
                   name={key}
                   label={fieldLabel}
                   hint={hint || undefined}
@@ -435,6 +480,7 @@ function ConfirmForm({
         {target === "" ? (
           <div className="grid gap-4 md:grid-cols-3">
             <SelectField
+              id={idOf("section_id")}
               name="section_id"
               label={t("section")}
               hint={t("sectionHint")}
@@ -443,6 +489,7 @@ function ConfirmForm({
               error={form.errors.section_id}
             />
             <GuardedTextField
+              id={idOf("roll_no")}
               name="roll_no"
               label={t("rollNo")}
               maxLength={16}
@@ -450,6 +497,7 @@ function ConfirmForm({
               error={form.errors.roll_no}
             />
             <SelectField
+              id={idOf("student_status")}
               name="student_status"
               label={t("status")}
               defaultValue="active"
@@ -483,11 +531,14 @@ function ConfirmForm({
           ) : undefined
         }
       />
-      <div className="flex flex-wrap justify-end gap-2">
+      <SaveBar dirty={dirty}>
+        <Button type="reset" variant="secondary" disabled={!dirty || form.pending}>
+          {t("discard")}
+        </Button>
         <Button type="submit" disabled={form.pending || withheld}>
           {form.pending ? tc("working") : t("confirm")}
         </Button>
-      </div>
+      </SaveBar>
     </form>
   );
 }
@@ -620,7 +671,7 @@ export function ItemReviewView({
 
   if (item.status !== "ready") {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader
           title={t("loadingTitle")}
           breadcrumb={[...crumbs, { label: t("loadingTitle") }]}
@@ -644,7 +695,7 @@ export function ItemReviewView({
       : t("backToBatch");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={title}
         breadcrumb={[
@@ -652,7 +703,12 @@ export function ItemReviewView({
           { label: batchLabel, href: `/register-photos/${data.batch_id}` },
           { label: title },
         ]}
-        badge={<ItemStatusBadge status={data.status} />}
+        badge={
+          <>
+            <ItemStatusBadge status={data.status} />
+            {batch.status === "ready" ? <ReviewProgress batch={batch.data} /> : null}
+          </>
+        }
         description={t("description")}
       />
       {after ? (
@@ -671,8 +727,9 @@ export function ItemReviewView({
           {t("withheldBody")}
         </Alert>
       ) : null}
-      <div className="grid gap-6 xl:grid-cols-2">
-        <div className="xl:sticky xl:top-4 xl:self-start">
+      {/* Split review: the photo on the left, the values on the right from lg up; stacked on phones. */}
+      <div className="grid gap-5 lg:grid-cols-2">
+        <div className="lg:sticky lg:top-4 lg:self-start">
           <PageImage
             item={data}
             seq={seq}
@@ -799,7 +856,7 @@ export function NextItemScreen({ batchId, after }: { batchId: string; after?: Af
     if (target) router.replace(target);
   }, [router, target]);
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader title={t("openingNext")} />
       {next.status === "ready" && !next.data.data[0] ? (
         <p role="status">{t("allChecked")}</p>
