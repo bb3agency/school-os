@@ -31,6 +31,7 @@ export function AboutView({ settings }: { settings: MarketingSettings }) {
         eyebrow={t("about.eyebrow")}
         title={t("about.headline")}
         intro={t("about.intro")}
+        illustration="timetable-board"
       />
 
       <Section id="who" labelledBy="who-title" tone="white" className="md:py-24">

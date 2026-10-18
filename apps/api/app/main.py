@@ -24,7 +24,11 @@ from app.documents.api import router as documents_router
 from app.dq.api import router as dq_router
 from app.exports.api import router as exports_router
 from app.extraction.api import router as extraction_router
+from app.fees import webhook as payments_webhook
 from app.fees.api import router as fees_router
+from app.fees.api_online import router as payments_router
+from app.fees.api_online import webhook_router as payments_webhook_router
+from app.fees.api_upi import router as fees_upi_router
 from app.identity.api import router as identity_router
 from app.imports.api import router as imports_router
 from app.insights.api import router as insights_router
@@ -94,6 +98,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(insights_router)
     # R2-1B fees (ADR-0042): every route answers 404 module_hidden while fees are off.
     app.include_router(fees_router)
+    # R2-2E UPI and bank statements (ADR-0042 decision 9).
+    app.include_router(fees_upi_router)
+    # R2-2D online payments (ADR-0042): the school's Razorpay account, payment links, the
+    # Razorpay webhook (require_webhook_signature("razorpay")) and online reconciliation.
+    app.include_router(payments_router)
+    app.include_router(payments_webhook_router)
+    payments_webhook.install()
     # M6 Tally connector (ADR-0032 Proposed): behind the per-school flag
     # tally.connector.enabled (default off, 404). The agent routes are device-signed.
     app.include_router(tally_router)

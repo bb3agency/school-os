@@ -209,6 +209,9 @@ describe("board readiness screen (US-504, US-506)", () => {
     const table = await screen.findByRole("table", { name: "Sections" });
     const bar = within(table).getByRole("progressbar", { name: "142 of 160 ready" });
     expect(bar).toHaveAttribute("value", "142");
+    // The share ready is the page's main figure, rounded down.
+    const share = screen.getByRole("group", { name: /^Students ready for/ });
+    expect(within(share).getByText(/^\d+%$/)).toHaveClass("num");
     expect(within(table).getByRole("link", { name: /Open section/ })).toHaveAttribute(
       "href",
       `/findings/readiness?profile=${SSC}&section=${SECTION}`,

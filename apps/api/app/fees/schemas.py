@@ -33,7 +33,7 @@ AdjustmentReason = Literal[
 CancelReason = Literal[
     "wrong_student", "wrong_amount", "cheque_dishonoured", "duplicate_entry", "other"
 ]
-RefundMode = Literal["cash", "cheque", "bank_transfer"]
+RefundMode = Literal["original_method", "cash", "cheque", "bank_transfer"]
 RefundStatus = Literal[
     "pending", "approved", "processing", "processed", "failed", "rejected", "withdrawn"
 ]
@@ -501,6 +501,9 @@ class ReceiptOut(_Out):
     refunded: Money
     refunds: list[RefundOut]
     version: int
+    # R2-2E (FR-FEE-016): when a person confirmed this UPI receipt from the bank statement;
+    # null: "Not yet seen in bank statement" (UPI receipts) or not applicable (other modes).
+    bank_confirmed_at: dt.datetime | None = None
 
 
 class ReceiptListItem(_Out):

@@ -2472,6 +2472,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/fees/accounts/{account_id}/payment-intents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Payment Intents
+         * @description The account's payment links with their status (``fee.collect`` or ``finance.read``).
+         */
+        get: operations["list_payment_intents_api_v1_fees_accounts__account_id__payment_intents_get"];
+        put?: never;
+        /**
+         * Create Payment Intent
+         * @description A payment link for chosen instalments (``fee.collect``; send ``Idempotency-Key``): the
+         *     amount is what is due on them now; an open link for the same instalments is reused
+         *     (``reused: true``). Errors (409): ``payments_not_connected``, ``nothing_due``,
+         *     ``account_closed``, ``too_many_links``; (502) ``payment_link_failed``.
+         */
+        post: operations["create_payment_intent_api_v1_fees_accounts__account_id__payment_intents_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/fees/accounts/{account_id}/statement": {
         parameters: {
             query?: never;
@@ -2578,6 +2605,159 @@ export interface paths {
         get: operations["fee_approvals_api_v1_fees_approvals_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/bank-statement-lines/{line_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Bank Statement Line
+         * @description Match one credit with a UPI receipt a person chose and confirm it (``fee.reconcile``).
+         *     409 ``amount_mismatch`` / ``utr_differs`` when they disagree (never corrected),
+         *     ``receipt_already_confirmed``, ``line_decided``.
+         */
+        post: operations["confirm_bank_statement_line_api_v1_fees_bank_statement_lines__line_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/bank-statement-lines/{line_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dismiss Bank Statement Line
+         * @description Mark a credit as not a fee payment with a reason code (``fee.reconcile``). 409
+         *     ``line_decided`` for a confirmed credit.
+         */
+        post: operations["dismiss_bank_statement_line_api_v1_fees_bank_statement_lines__line_id__dismiss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/bank-statement-presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bank Statement Presets
+         * @description The bank statement formats SchoolOS reads (``fee.reconcile``).
+         */
+        get: operations["bank_statement_presets_api_v1_fees_bank_statement_presets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/bank-statements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Bank Statements
+         * @description Imported statements, newest first (``fee.reconcile``).
+         */
+        get: operations["list_bank_statements_api_v1_fees_bank_statements_get"];
+        put?: never;
+        /**
+         * Import Bank Statement
+         * @description Read an uploaded bank statement (CSV or XLSX, at most 2 MB and 5,000 transactions;
+         *     ``fee.reconcile``). The file is deleted as soon as it is read; credits are stored and the
+         *     matching rules propose UPI receipts (nothing is confirmed). 422 with row numbers when the
+         *     file cannot be read; 409 ``statement_already_imported``, ``document_not_ready``.
+         */
+        post: operations["import_bank_statement_api_v1_fees_bank_statements_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/bank-statements/{statement_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Bank Statement
+         * @description A statement's credits with their proposals and exceptions (``fee.reconcile``).
+         */
+        get: operations["get_bank_statement_api_v1_fees_bank_statements__statement_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/bank-statements/{statement_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Bank Statement
+         * @description Confirm proposed matches in one step (``fee.reconcile``): each becomes a UPI
+         *     confirmation; receipts are never changed. Lines whose proposal no longer holds are listed in
+         *     ``skipped``; confirming again is harmless.
+         */
+        post: operations["confirm_bank_statement_api_v1_fees_bank_statements__statement_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/bank-statements/rematch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rematch Bank Statements
+         * @description Look again for UPI receipts for recent unmatched credits (receipts issued after the
+         *     statement was imported); proposals only (``fee.reconcile``).
+         */
+        post: operations["rematch_bank_statements_api_v1_fees_bank_statements_rematch_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2796,6 +2976,44 @@ export interface paths {
          *     ``If-Match``).
          */
         patch: operations["update_fee_head_api_v1_fees_heads__head_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/fees/payment-intents/{intent_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Payment Intent */
+        get: operations["get_payment_intent_api_v1_fees_payment_intents__intent_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/payment-intents/{intent_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Payment Intent
+         * @description Cancel an unpaid link at Razorpay (``fee.collect``). 409 ``intent_closed``,
+         *     ``intent_paid``.
+         */
+        post: operations["cancel_payment_intent_api_v1_fees_payment_intents__intent_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/fees/plans": {
@@ -3091,6 +3309,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/fees/reconciliation/online": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Online Reconciliation
+         * @description Online payment exceptions, newest first (``fee.reconcile`` or ``finance.read``).
+         */
+        get: operations["list_online_reconciliation_api_v1_fees_reconciliation_online_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/reconciliation/online/items/{recon_item_id}/explain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Explain Online Item
+         * @description Mark an exception explained with a note of 10-500 characters (``fee.reconcile``; audited
+         *     without the note). 409 ``item_closed``.
+         */
+        post: operations["explain_online_item_api_v1_fees_reconciliation_online_items__recon_item_id__explain_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/reconciliation/online/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Online Reconciliation Summary
+         * @description Open exceptions, webhook events waiting or failed, and the last 14 daily runs.
+         */
+        get: operations["online_reconciliation_summary_api_v1_fees_reconciliation_online_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/fees/refunds/{refund_id}/approve": {
         parameters: {
             query?: never;
@@ -3227,6 +3506,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/fees/reports/upi": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Upi Report
+         * @description UPI receipts per day: confirmed from the bank vs not yet (``fee.reconcile`` or
+         *     ``finance.read``). Default the last 30 days; at most a year.
+         */
+        get: operations["upi_report_api_v1_fees_reports_upi_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/fees/settings": {
         parameters: {
             query?: never;
@@ -3267,6 +3567,96 @@ export interface paths {
         get: operations["fee_status_api_v1_fees_status_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/upi-exceptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Upi Exceptions
+         * @description UPI receipts not seen in a bank statement within the school's window, credits nobody
+         *     matched and confirmed credits whose receipt was cancelled (``fee.reconcile``).
+         */
+        get: operations["upi_exceptions_api_v1_fees_upi_exceptions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/upi-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Upi Settings
+         * @description The school's payee name, UPI ID and confirmation window (``fee.collect``, ``fee.manage``,
+         *     ``finance.read`` or ``fee.reconcile``). ``configured`` is false until set.
+         */
+        get: operations["get_upi_settings_api_v1_fees_upi_settings_get"];
+        /**
+         * Put Upi Settings
+         * @description Set the payee name and UPI ID (shape checked only, never with a bank) and the days
+         *     within which a UPI receipt should be seen in a bank statement (``fee.manage``; ``If-Match``
+         *     once set).
+         */
+        put: operations["put_upi_settings_api_v1_fees_upi_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/upi-settings/qr.svg": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Upi Qr
+         * @description The school's static UPI QR (its UPI ID and payee name, no amount) as SVG for the counter
+         *     and the settings preview. 404 ``upi_not_set`` until the settings exist.
+         */
+        get: operations["upi_qr_api_v1_fees_upi_settings_qr_svg_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/upi/utr-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Utr
+         * @description Check a UTR before issuing a UPI receipt (``fee.collect``): 12 digits, not on another
+         *     issued receipt, and whether the bank already reported it.
+         */
+        post: operations["check_utr_api_v1_fees_upi_utr_check_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4829,6 +5219,138 @@ export interface paths {
         get: operations["unread_count_api_v1_notifications_unread_count_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Payment Connection
+         * @description The school's Razorpay connection: mode, environment, status, account id, webhook URL,
+         *     expiry dates and counts; never a secret (``payments.configure`` or ``finance.read``).
+         */
+        get: operations["get_payment_connection_api_v1_payments_connection_get"];
+        put?: never;
+        post?: never;
+        /**
+         * Disconnect Payments
+         * @description Disconnect: open links cancelled, webhook route revoked, secrets erased, history kept
+         *     (FR-PAY-013).
+         */
+        delete: operations["disconnect_payments_api_v1_payments_connection_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/connection/manual": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Connect Payments Manual
+         * @description Connect with the school's own key id and secret (pilots, D13; ``payments.configure``,
+         *     step-up). The answer carries the webhook URL and secret **once** (``Cache-Control:
+         *     no-store``; no idempotency replay, which would store the secret). Errors: 403
+         *     ``manual_keys_not_allowed``; 409 ``payments_already_connected``; 422 ``keys_rejected``.
+         */
+        post: operations["connect_payments_manual_api_v1_payments_connection_manual_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/connection/oauth/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Finish Payments Oauth
+         * @description Finish the sign-in: the BFF's callback page posts Razorpay's ``code`` and ``state`` here
+         *     (body, never a URL the API logs). 403 ``oauth_state_invalid``.
+         */
+        post: operations["finish_payments_oauth_api_v1_payments_connection_oauth_callback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/connection/oauth/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Payments Oauth
+         * @description The Razorpay sign-in URL with a single-use ``state`` (10 minutes) bound to the member
+         *     (``payments.configure``, step-up). 409 ``oauth_not_available`` before partner approval.
+         */
+        post: operations["start_payments_oauth_api_v1_payments_connection_oauth_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/connection/rotate-webhook-secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate Payment Webhook Secret
+         * @description A new webhook secret, shown once; the previous one verifies retries for 7 more days
+         *     (FR-PAY-014).
+         */
+        post: operations["rotate_payment_webhook_secret_api_v1_payments_connection_rotate_webhook_secret_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/connection/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Payment Connection
+         * @description Check the connection with a read call; a refusal marks it revoked (FR-PAY-012).
+         */
+        post: operations["test_payment_connection_api_v1_payments_connection_test_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7746,6 +8268,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/webhooks/razorpay/{route}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Razorpay Webhook
+         * @description One school's Razorpay events. The signature (the school's secret over the raw body) was
+         *     checked by the guard; the minimised event is stored encrypted, deduplicated by Razorpay's
+         *     event id, and the worker re-fetches the payment before any receipt. A replayed event is
+         *     acknowledged without effect.
+         */
+        post: operations["razorpay_webhook_api_v1_webhooks_razorpay__route__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -10190,6 +10735,30 @@ export interface components {
             /** Reference */
             reference: string;
         };
+        /** ConfirmIn */
+        ConfirmIn: {
+            /** Line Ids */
+            line_ids: string[];
+        };
+        /** ConfirmOut */
+        ConfirmOut: {
+            /** Already Confirmed */
+            already_confirmed: number;
+            /** Confirmed */
+            confirmed: number;
+            /** Skipped */
+            skipped: components["schemas"]["ConfirmSkipped"][];
+        };
+        /** ConfirmSkipped */
+        ConfirmSkipped: {
+            /** Code */
+            code: string;
+            /**
+             * Line Id
+             * Format: uuid
+             */
+            line_id: string;
+        };
         /**
          * ConfirmTeardownIn
          * @description Dedicated tier: the host's KMS key is scheduled for deletion and the host destroyed
@@ -10200,6 +10769,18 @@ export interface components {
             host_teardown_reference: string;
             /** Kms Deletion Reference */
             kms_deletion_reference: string;
+        };
+        /** ConnectionTestOut */
+        ConnectionTestOut: {
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
+            /** Error Code */
+            error_code?: string | null;
+            /** Ok */
+            ok: boolean;
         };
         /**
          * ConnectorStatus
@@ -11391,6 +11972,11 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** ExplainIn */
+        ExplainIn: {
+            /** Note */
+            note: string;
+        };
         /** ExportDownloadOut */
         ExportDownloadOut: {
             /** Content Type */
@@ -12202,6 +12788,14 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** IgnoreIn */
+        IgnoreIn: {
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "not_a_fee" | "recorded_elsewhere" | "duplicate_credit" | "other";
         };
         /**
          * ImportCreate
@@ -13268,6 +13862,11 @@ export interface components {
             /** Waba Id */
             waba_id: string;
         };
+        /** ManualConnectOut */
+        ManualConnectOut: {
+            connection: components["schemas"]["PaymentConnectionOut"];
+            webhook: components["schemas"]["WebhookSetupOut"];
+        };
         /** ManualFlagIn */
         ManualFlagIn: {
             /**
@@ -13277,6 +13876,20 @@ export interface components {
             indicator: "attendance" | "behaviour" | "course";
             /** Note */
             note?: string | null;
+        };
+        /**
+         * ManualKeysIn
+         * @description The key id and key secret from the school's own Razorpay dashboard (pilots, D13). The
+         *     secret is checked with a read call, stored wrapped and never returned.
+         */
+        ManualKeysIn: {
+            /** Key Id */
+            key_id: string;
+            /**
+             * Key Secret
+             * Format: password
+             */
+            key_secret: string;
         };
         /**
          * MappingIn
@@ -13383,6 +13996,14 @@ export interface components {
              * @enum {string}
              */
             source: "mark" | "import";
+        };
+        /** MatchIn */
+        MatchIn: {
+            /**
+             * Receipt Id
+             * Format: uuid
+             */
+            receipt_id: string;
         };
         /** MemoryIn */
         MemoryIn: {
@@ -14109,6 +14730,18 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** OAuthCallbackIn */
+        OAuthCallbackIn: {
+            /** Code */
+            code: string;
+            /** State */
+            state: string;
+        };
+        /** OAuthStartOut */
+        OAuthStartOut: {
+            /** Authorize Url */
+            authorize_url: string;
+        };
         /**
          * OffboardingOut
          * @description Progress of a school's offboarding (docs/16 §5.5). Codes, counts and IDs only.
@@ -14777,6 +15410,74 @@ export interface components {
             /** Query */
             query: string;
         };
+        /**
+         * PaymentConnectionOut
+         * @description The school's connection, never its secrets (FR-PAY-002/003).
+         */
+        PaymentConnectionOut: {
+            /** Access Expires At */
+            access_expires_at?: string | null;
+            /** Connected */
+            connected: boolean;
+            /** Connected At */
+            connected_at?: string | null;
+            /** Connected By Name */
+            connected_by_name?: string | null;
+            /** Environment */
+            environment?: ("test" | "live") | null;
+            /**
+             * Failed Events
+             * @default 0
+             */
+            failed_events: number;
+            /** Id */
+            id?: string | null;
+            /** Key Id Hint */
+            key_id_hint?: string | null;
+            /** Last Checked At */
+            last_checked_at?: string | null;
+            /** Last Error Code */
+            last_error_code?: string | null;
+            /** Manual Keys Allowed */
+            manual_keys_allowed: boolean;
+            /** Mode */
+            mode?: ("oauth" | "manual_keys") | null;
+            /** Oauth Available */
+            oauth_available: boolean;
+            /**
+             * Open Links
+             * @default 0
+             */
+            open_links: number;
+            /**
+             * Pending Events
+             * @default 0
+             */
+            pending_events: number;
+            /** Previous Valid Until */
+            previous_valid_until?: string | null;
+            /**
+             * Provider
+             * @default razorpay
+             */
+            provider: string;
+            /** Provider Account Id */
+            provider_account_id?: string | null;
+            /** Refresh Expires At */
+            refresh_expires_at?: string | null;
+            /** Revoked At */
+            revoked_at?: string | null;
+            /** Secret Rotated At */
+            secret_rotated_at?: string | null;
+            /** Status */
+            status?: ("active" | "revoked" | "disconnected") | null;
+            /** Version */
+            version?: number | null;
+            /** Webhook Events */
+            webhook_events?: string[];
+            /** Webhook Url */
+            webhook_url?: string | null;
+        };
         /** PaymentIn */
         PaymentIn: {
             /** Amount Inr */
@@ -14800,6 +15501,77 @@ export interface components {
              * @default 0
              */
             tds_inr: number | string;
+        };
+        /**
+         * PaymentIntentCreate
+         * @description A payment link for chosen instalments of one account (FR-PAY-005): the amount is what is
+         *     still due on them now, never typed.
+         */
+        PaymentIntentCreate: {
+            /** Expires In Days */
+            expires_in_days?: number | null;
+            /** Instalments */
+            instalments: number[];
+        };
+        /** PaymentIntentOut */
+        PaymentIntentOut: {
+            /**
+             * Account Id
+             * Format: uuid
+             */
+            account_id: string;
+            /** Amount */
+            amount: string;
+            /** Cancelled At */
+            cancelled_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: string | null;
+            /** Created By Name */
+            created_by_name: string | null;
+            /**
+             * Created Via
+             * @enum {string}
+             */
+            created_via: "staff" | "parent_page" | "reminder";
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Instalments */
+            instalments: number[];
+            /** Intent Code */
+            intent_code: string;
+            /** Paid At */
+            paid_at: string | null;
+            /** Receipt Id */
+            receipt_id: string | null;
+            /** Receipt Number */
+            receipt_number: string | null;
+            /**
+             * Reused
+             * @default false
+             */
+            reused: boolean;
+            /** Short Url */
+            short_url: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "created" | "paid" | "expired" | "cancelled" | "failed";
+            /** Version */
+            version: number;
         };
         /**
          * PaymentOut
@@ -16149,6 +16921,8 @@ export interface components {
             amount: string;
             /** Amount In Words */
             amount_in_words: string;
+            /** Bank Confirmed At */
+            bank_confirmed_at?: string | null;
             cancellation: components["schemas"]["CancellationOut"] | null;
             /** Cancelled On */
             cancelled_on: string | null;
@@ -16216,6 +16990,136 @@ export interface components {
             /** Version */
             version: number;
         };
+        /**
+         * ReceiptRef
+         * @description The receipt a line is proposed for or confirms (or conflicts with).
+         */
+        ReceiptRef: {
+            /** Amount */
+            amount: string;
+            /** Class Section */
+            class_section: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Receipt Date
+             * Format: date
+             */
+            receipt_date: string;
+            /** Receipt Number */
+            receipt_number: string;
+            /** Status */
+            status: string;
+            /** Student Name */
+            student_name: string;
+            /** Utr */
+            utr: string | null;
+        };
+        /** ReconciliationItemOut */
+        ReconciliationItemOut: {
+            /** Account Id */
+            account_id: string | null;
+            /** Amount */
+            amount: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Expected Amount */
+            expected_amount: string | null;
+            /** Explained At */
+            explained_at: string | null;
+            /** Explained By */
+            explained_by: string | null;
+            /** Explained By Name */
+            explained_by_name: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Intent Code */
+            intent_code: string | null;
+            /** Intent Id */
+            intent_id: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "paid_not_receipted" | "receipted_not_captured" | "amount_mismatch" | "refunded" | "refund_failed" | "settlement_missing" | "unknown_intent";
+            /** Note */
+            note: string | null;
+            /** Provider Payment Id */
+            provider_payment_id: string | null;
+            /** Provider Refund Id */
+            provider_refund_id: string | null;
+            /** Reason Code */
+            reason_code: string;
+            /** Receipt Id */
+            receipt_id: string | null;
+            /** Receipt Number */
+            receipt_number: string | null;
+            /** Refund Id */
+            refund_id: string | null;
+            /** Resolved At */
+            resolved_at: string | null;
+            /** Run Date */
+            run_date: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "explained" | "resolved";
+            /** Version */
+            version: number;
+        };
+        /** ReconciliationPage */
+        ReconciliationPage: {
+            /** Items */
+            items: components["schemas"]["ReconciliationItemOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+            /** Open Count */
+            open_count: number;
+        };
+        /** ReconciliationRunOut */
+        ReconciliationRunOut: {
+            /** Error Code */
+            error_code: string | null;
+            /** Exceptions Opened */
+            exceptions_opened: number;
+            /** Finished At */
+            finished_at: string | null;
+            /** Payments Seen */
+            payments_seen: number;
+            /**
+             * Run Date
+             * Format: date
+             */
+            run_date: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "running" | "done" | "failed";
+        };
+        /** ReconciliationSummaryOut */
+        ReconciliationSummaryOut: {
+            /** Connected */
+            connected: boolean;
+            /** Failed Events */
+            failed_events: number;
+            /** Open Count */
+            open_count: number;
+            /** Pending Events */
+            pending_events: number;
+            /** Runs */
+            runs: components["schemas"]["ReconciliationRunOut"][];
+        };
         /** RecordSectionOut */
         RecordSectionOut: {
             /**
@@ -16251,7 +17155,7 @@ export interface components {
              * Mode
              * @enum {string}
              */
-            mode: "cash" | "cheque" | "bank_transfer";
+            mode: "original_method" | "cash" | "cheque" | "bank_transfer";
             mode_details?: components["schemas"]["ModeDetailsIn"];
             /** Reason */
             reason: string;
@@ -16320,6 +17224,13 @@ export interface components {
         RejectIn: {
             /** Reason */
             reason: string;
+        };
+        /** RematchOut */
+        RematchOut: {
+            /** Looked At */
+            looked_at: number;
+            /** Proposed */
+            proposed: number;
         };
         /**
          * ResolveIn
@@ -17133,6 +18044,12 @@ export interface components {
              */
             membership_id: string;
         };
+        /** StatementDetailOut */
+        StatementDetailOut: {
+            /** Lines */
+            lines: components["schemas"]["StatementLineOut"][];
+            statement: components["schemas"]["StatementImportOut"];
+        };
         /** StatementEntry */
         StatementEntry: {
             /** Amount */
@@ -17165,6 +18082,122 @@ export interface components {
             /** Source Id */
             source_id: string | null;
         };
+        /** StatementImportIn */
+        StatementImportIn: {
+            /**
+             * Document Id
+             * Format: uuid
+             * @description An import_file the caller uploaded (CSV or XLSX)
+             */
+            document_id: string;
+            /**
+             * Preset
+             * @description A preset key from GET /fees/bank-statement-presets; none: detect
+             */
+            preset?: string | null;
+        };
+        /** StatementImportOut */
+        StatementImportOut: {
+            /** Credit Count */
+            credit_count: number;
+            /** Duplicate Count */
+            duplicate_count: number;
+            /**
+             * File Deleted At
+             * Format: date-time
+             */
+            file_deleted_at: string;
+            /** File Kind */
+            file_kind: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Imported At
+             * Format: date-time
+             */
+            imported_at: string;
+            /**
+             * Imported By
+             * Format: uuid
+             */
+            imported_by: string;
+            /** Imported By Name */
+            imported_by_name: string | null;
+            /** Line Count */
+            line_count: number;
+            /** Period From */
+            period_from: string | null;
+            /** Period To */
+            period_to: string | null;
+            /** Preset */
+            preset: string;
+            /** Preset Version */
+            preset_version: number;
+            /** Proposed Count */
+            proposed_count: number;
+        };
+        /** StatementLineOut */
+        StatementLineOut: {
+            /** Amount */
+            amount: string;
+            /** @description The receipt with this line's UTR when it does not match (never corrected) */
+            conflict_receipt: components["schemas"]["ReceiptRef"] | null;
+            /** Decided At */
+            decided_at: string | null;
+            /** Decided By Name */
+            decided_by_name: string | null;
+            /**
+             * Exception
+             * @description Why an unmatched (or confirmed) line needs a person; computed when read
+             */
+            exception: ("no_receipt" | "amount_mismatch" | "receipt_cancelled" | "receipt_already_confirmed" | "confirmed_receipt_cancelled") | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Ignore Reason */
+            ignore_reason: ("not_a_fee" | "recorded_elsewhere" | "duplicate_credit" | "other") | null;
+            /**
+             * Import Id
+             * Format: uuid
+             */
+            import_id: string;
+            /** Line No */
+            line_no: number;
+            /** Match Kind */
+            match_kind: ("utr_exact" | "amount_date" | "manual") | null;
+            /**
+             * Match Status
+             * @enum {string}
+             */
+            match_status: "unmatched" | "proposed" | "confirmed" | "ignored";
+            /**
+             * Narration
+             * @description Masked; null once erased (90 days)
+             */
+            narration: string | null;
+            /** Narration Erased */
+            narration_erased: boolean;
+            receipt: components["schemas"]["ReceiptRef"] | null;
+            /**
+             * Ref Kind
+             * @enum {string}
+             */
+            ref_kind: "utr" | "reference" | "none";
+            /** Utr Or Ref */
+            utr_or_ref: string | null;
+            /**
+             * Value Date
+             * Format: date
+             */
+            value_date: string;
+            /** Version */
+            version: number;
+        };
         /** StatementOut */
         StatementOut: {
             /**
@@ -17176,6 +18209,17 @@ export interface components {
             balance: string;
             /** Entries */
             entries: components["schemas"]["StatementEntry"][];
+        };
+        /** StatementPresetOut */
+        StatementPresetOut: {
+            /** Name */
+            name: string;
+            /** Preset */
+            preset: string;
+            /** Verified */
+            verified: boolean;
+            /** Version */
+            version: number;
         };
         /** StatusCounts */
         StatusCounts: {
@@ -18398,10 +19442,134 @@ export interface components {
             items: components["schemas"]["TimelineItem"][];
             student: components["schemas"]["InsightStudentRef"];
         };
+        /** UnconfirmedReceipt */
+        UnconfirmedReceipt: {
+            /** Amount */
+            amount: string;
+            /** Class Section */
+            class_section: string;
+            /** Days Waiting */
+            days_waiting: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Proposed Line Id */
+            proposed_line_id: string | null;
+            /**
+             * Receipt Date
+             * Format: date
+             */
+            receipt_date: string;
+            /** Receipt Number */
+            receipt_number: string;
+            /** Student Name */
+            student_name: string;
+            /** Utr */
+            utr: string | null;
+        };
         /** UnreadCountOut */
         UnreadCountOut: {
             /** Count */
             count: number;
+        };
+        /** UpiExceptionsOut */
+        UpiExceptionsOut: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Confirm Within Days */
+            confirm_within_days: number;
+            /**
+             * Lines
+             * @description Unmatched credits and lines whose receipt was cancelled after confirmation
+             */
+            lines: components["schemas"]["StatementLineOut"][];
+            /** Lines Count */
+            lines_count: number;
+            /** Proposed Count */
+            proposed_count: number;
+            /** Unconfirmed Count */
+            unconfirmed_count: number;
+            /** Unconfirmed Receipts */
+            unconfirmed_receipts: components["schemas"]["UnconfirmedReceipt"][];
+        };
+        /** UpiReportOut */
+        UpiReportOut: {
+            /** Confirmed Count */
+            confirmed_count: number;
+            /** Confirmed Total */
+            confirmed_total: string;
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+            /** Overdue Count */
+            overdue_count: number;
+            /** Rows */
+            rows: components["schemas"]["UpiReportRow"][];
+            /** Unconfirmed Count */
+            unconfirmed_count: number;
+            /** Unconfirmed Total */
+            unconfirmed_total: string;
+        };
+        /** UpiReportRow */
+        UpiReportRow: {
+            /** Confirmed Count */
+            confirmed_count: number;
+            /** Confirmed Total */
+            confirmed_total: string;
+            /**
+             * Receipt Date
+             * Format: date
+             */
+            receipt_date: string;
+            /** Unconfirmed Count */
+            unconfirmed_count: number;
+            /** Unconfirmed Total */
+            unconfirmed_total: string;
+        };
+        /** UpiSettingsIn */
+        UpiSettingsIn: {
+            /**
+             * Confirm Within Days
+             * @default 7
+             */
+            confirm_within_days: number;
+            /** Payee Name */
+            payee_name: string;
+            /** Vpa */
+            vpa: string;
+        };
+        /**
+         * UpiSettingsOut
+         * @description The school's UPI details. ``configured`` false: nothing set yet (no QR at the counter).
+         */
+        UpiSettingsOut: {
+            /** Configured */
+            configured: boolean;
+            /** Confirm Within Days */
+            confirm_within_days: number;
+            /** Payee Name */
+            payee_name: string | null;
+            /**
+             * Upi Uri
+             * @description upi://pay?pa=..&pn=..&cu=INR (no amount): what the static QR encodes
+             */
+            upi_uri: string | null;
+            /** Version */
+            version: number;
+            /** Vpa */
+            vpa: string | null;
         };
         /**
          * UploadCreate
@@ -18632,6 +19800,33 @@ export interface components {
             preferred_language?: ("en" | "te") | null;
             /** Status */
             status?: ("active" | "suspended" | "removed") | null;
+        };
+        /** UtrCheckIn */
+        UtrCheckIn: {
+            /** Utr */
+            utr: string;
+        };
+        /**
+         * UtrCheckOut
+         * @description The counter's UTR check (FR-FEE-014): ``invalid`` (not 12 digits), ``in_use`` (on another
+         *     issued receipt: its id and number), ``free``. ``seen_in_bank``: a bank credit with this UTR is
+         *     already imported (the amount is not shown at the counter).
+         */
+        UtrCheckOut: {
+            /** Receipt Id */
+            receipt_id?: string | null;
+            /** Receipt Number */
+            receipt_number?: string | null;
+            /**
+             * Seen In Bank
+             * @default false
+             */
+            seen_in_bank: boolean;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "free" | "in_use" | "invalid";
         };
         /** ValidationError */
         ValidationError: {
@@ -18930,6 +20125,21 @@ export interface components {
         WaiveIn: {
             /** Reason */
             reason: string;
+        };
+        /**
+         * WebhookSetupOut
+         * @description Shown once after connecting with manual keys or rotating the secret: the school adds this
+         *     webhook (URL, secret, events) in its own Razorpay dashboard.
+         */
+        WebhookSetupOut: {
+            /** Events */
+            events: string[];
+            /** Previous Valid Until */
+            previous_valid_until?: string | null;
+            /** Secret */
+            secret: string;
+            /** Url */
+            url: string;
         };
         /** WriteResultOut */
         WriteResultOut: {
@@ -24565,6 +25775,98 @@ export interface operations {
             };
         };
     };
+    list_payment_intents_api_v1_fees_accounts__account_id__payment_intents_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentIntentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_payment_intent_api_v1_fees_accounts__account_id__payment_intents_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaymentIntentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentIntentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     get_fee_statement_api_v1_fees_accounts__account_id__statement_get: {
         parameters: {
             query?: never;
@@ -24811,6 +26113,352 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApprovalItem"][];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    confirm_bank_statement_line_api_v1_fees_bank_statement_lines__line_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                line_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatementLineOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    dismiss_bank_statement_line_api_v1_fees_bank_statement_lines__line_id__dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                line_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IgnoreIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatementLineOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    bank_statement_presets_api_v1_fees_bank_statement_presets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatementPresetOut"][];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_bank_statements_api_v1_fees_bank_statements_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatementImportOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    import_bank_statement_api_v1_fees_bank_statements_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatementImportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatementImportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_bank_statement_api_v1_fees_bank_statements__statement_id__get: {
+        parameters: {
+            query?: {
+                status?: ("unmatched" | "proposed" | "confirmed" | "ignored") | null;
+            };
+            header?: never;
+            path: {
+                statement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatementDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    confirm_bank_statement_api_v1_fees_bank_statements__statement_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                statement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfirmOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    rematch_bank_statements_api_v1_fees_bank_statements_rematch_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RematchOut"];
                 };
             };
             /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
@@ -25345,6 +26993,94 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HeadOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_payment_intent_api_v1_fees_payment_intents__intent_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                intent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentIntentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    cancel_payment_intent_api_v1_fees_payment_intents__intent_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                intent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentIntentOut"];
                 };
             };
             /** @description Validation Error */
@@ -26152,6 +27888,136 @@ export interface operations {
             };
         };
     };
+    list_online_reconciliation_api_v1_fees_reconciliation_online_get: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                kind?: ("paid_not_receipted" | "receipted_not_captured" | "amount_mismatch" | "refunded" | "refund_failed" | "settlement_missing" | "unknown_intent") | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+                status?: ("open" | "explained" | "resolved") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    explain_online_item_api_v1_fees_reconciliation_online_items__recon_item_id__explain_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                recon_item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExplainIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationItemOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    online_reconciliation_summary_api_v1_fees_reconciliation_online_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationSummaryOut"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     approve_fee_refund_api_v1_fees_refunds__refund_id__approve_post: {
         parameters: {
             query?: never;
@@ -26468,6 +28334,51 @@ export interface operations {
             };
         };
     };
+    upi_report_api_v1_fees_reports_upi_get: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpiReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     get_fee_settings_api_v1_fees_settings_get: {
         parameters: {
             query?: never;
@@ -26563,6 +28474,197 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FeeStatusOut"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    upi_exceptions_api_v1_fees_upi_exceptions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpiExceptionsOut"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_upi_settings_api_v1_fees_upi_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpiSettingsOut"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    put_upi_settings_api_v1_fees_upi_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpiSettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpiSettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    upi_qr_api_v1_fees_upi_settings_qr_svg_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The school's static UPI QR (SVG) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/svg+xml": unknown;
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    check_utr_api_v1_fees_upi_utr_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UtrCheckIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UtrCheckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
             /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
@@ -30169,6 +32271,263 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UnreadCountOut"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_payment_connection_api_v1_payments_connection_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentConnectionOut"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    disconnect_payments_api_v1_payments_connection_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentConnectionOut"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    connect_payments_manual_api_v1_payments_connection_manual_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualKeysIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualConnectOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    finish_payments_oauth_api_v1_payments_connection_oauth_callback_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OAuthCallbackIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentConnectionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    start_payments_oauth_api_v1_payments_connection_oauth_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OAuthStartOut"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    rotate_payment_webhook_secret_api_v1_payments_connection_rotate_webhook_secret_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookSetupOut"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    test_payment_connection_api_v1_payments_connection_test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionTestOut"];
                 };
             };
             /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
@@ -37997,6 +40356,71 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    razorpay_webhook_api_v1_webhooks_razorpay__route__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                route: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Bad or missing X-Razorpay-Signature (no detail). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown or disconnected route. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Larger than 256 KB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
             /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
             429: {

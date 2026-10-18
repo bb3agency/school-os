@@ -1,11 +1,13 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { DataTableV2, type ColumnV2 } from "@/components/console/DataTableV2";
 import { Alert } from "@/components/ui/Alert";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge, Pill } from "@/components/ui/Badge";
 import { ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Icon } from "@/components/ui/Icon";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
@@ -39,7 +41,7 @@ export function UsersScreen() {
 
   if (me.data && !allowed) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader title={t("title")} />
         <Alert tone="warning" title={t("noAccessTitle")}>
           {t("noAccessBody")}
@@ -52,7 +54,7 @@ export function UsersScreen() {
     list.status === "ready" ? { status: "ready", data: list.data.data } : list;
   const next = list.status === "ready" ? list.data.next_cursor : null;
 
-  const columns: Column<StaffUser>[] = [
+  const columns: ColumnV2<StaffUser>[] = [
     {
       key: "name",
       header: t("colName"),
@@ -95,7 +97,11 @@ export function UsersScreen() {
     {
       key: "last",
       header: t("colLastSignIn"),
-      cell: (row) => <Value>{formatDateTime(row.last_login_at)}</Value>,
+      cell: (row) => (
+        <span className="num whitespace-nowrap">
+          <Value>{formatDateTime(row.last_login_at)}</Value>
+        </span>
+      ),
     },
   ];
 
@@ -127,19 +133,26 @@ export function UsersScreen() {
       ? { status: "error" }
       : { status: "loading" };
 
+  const canInvite = can(USER_PERM.manage);
+  const paged = pages.hasPrevious || Boolean(next);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={t("title")}
         description={t("description")}
         breadcrumb={[{ label: tn("home"), href: "/" }, { label: t("title") }]}
         actions={
-          can(USER_PERM.manage) ? (
-            <ButtonLink href="/settings/users/new">{t("invite")}</ButtonLink>
+          canInvite ? (
+            <ButtonLink href="/settings/users/new">
+              <Icon name="plus" className="size-4" />
+              {t("invite")}
+            </ButtonLink>
           ) : null
         }
       />
-      <DataTable
+      <DataTableV2
+        id="users"
         stacked
         caption={t("title")}
         captionHidden
@@ -148,12 +161,23 @@ export function UsersScreen() {
         rowKey={(row) => row.id}
         emptyTitle={t("emptyTitle")}
         emptyBody={t("emptyBody")}
-      />
-      <Pager
-        label={t("pagesLabel")}
-        page={pages.page}
-        onPrevious={pages.hasPrevious ? pages.previous : undefined}
-        onNext={next ? () => pages.next(next) : undefined}
+        emptyAction={
+          canInvite ? (
+            <ButtonLink href="/settings/users/new" variant="secondary">
+              {t("invite")}
+            </ButtonLink>
+          ) : undefined
+        }
+        footer={
+          paged ? (
+            <Pager
+              label={t("pagesLabel")}
+              page={pages.page}
+              onPrevious={pages.hasPrevious ? pages.previous : undefined}
+              onNext={next ? () => pages.next(next) : undefined}
+            />
+          ) : undefined
+        }
       />
       {roles.fetchStatus !== "idle" || roles.data ? (
         <Card title={t("rolesTitle")} description={t("rolesDescription")}>

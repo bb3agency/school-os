@@ -216,6 +216,24 @@ def _messaging_on() -> Iterator[None]:
     runtime.patch_for_tests(None)
 
 
+PAYMENTS_TEST_SETTINGS = {
+    "razorpay_manual_keys_allowed": True,
+    "webhook_base_url": "https://app.example.test",
+}
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _payments_pilot_mode() -> Iterator[None]:
+    """R2-2D online payments (ADR-0042): the fake provider (local/CI default), the pilot
+    manual-keys connection and a synthetic webhook origin, patched for payments only
+    (``app.fees.payments_runtime``); tests of the switches patch them themselves."""
+    from app.fees import payments_runtime
+
+    payments_runtime.patch_for_tests(PAYMENTS_TEST_SETTINGS)
+    yield
+    payments_runtime.patch_for_tests(None)
+
+
 @pytest.fixture(autouse=True)
 def _full_rate_limit_budgets() -> None:
     """Every test starts with full rate-limit budgets, like a fresh minute. Limiting itself stays

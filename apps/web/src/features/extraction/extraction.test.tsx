@@ -189,7 +189,9 @@ describe("US-402 AC1: upload register photos", () => {
 
     await user.upload(screen.getByLabelText(xm.upload.photos), [photo("p1.pdf")]);
     await user.click(screen.getByRole("button", { name: xm.upload.submit }));
-    expect(screen.getByText(xm.upload.photoPdf)).toBeInTheDocument();
+    // Under the field and, as a link to it, in the error summary that takes focus.
+    expect(screen.getAllByText(xm.upload.photoPdf)).toHaveLength(2);
+    expect(screen.getByRole("alert", { name: messages.en.ui.errorSummary.title })).toHaveFocus();
 
     await user.upload(screen.getByLabelText(xm.upload.photos), [photo("p1.jpg"), photo("p2.png")]);
     await user.click(screen.getByRole("button", { name: xm.upload.submit }));
@@ -310,6 +312,37 @@ describe("US-402 AC1/AC2: check one row beside its page photo", () => {
     expect(body.fields).not.toHaveProperty("father_name");
     expect(body).toMatchObject({ section_id: ID.section, student_status: "active" });
     expect(body).not.toHaveProperty("student_id");
+  });
+
+  it("shows review progress in the header and saves explicitly (SaveBar, error summary)", async () => {
+    const user = userEvent.setup();
+    view(extractionItem(), perms, extractionBatch({ items_total: 40, items_pending: 28 }));
+    expect(
+      within(screen.getByRole("banner")).getByText(
+        xm.batch.reviewed.replace("{done}", "12").replace("{total}", "40"),
+      ),
+    ).toBeInTheDocument();
+    const reset = screen.getByRole("button", { name: xm.review.discard });
+    expect(reset).toBeDisabled();
+    expect(screen.getByText(messages.en.ui.saveBar.noChanges)).toBeInTheDocument();
+
+    const dob = screen.getByLabelText(/Date of birth/);
+    const before = (dob as HTMLInputElement).value;
+    await user.clear(dob);
+    await user.type(dob, "31/02/20");
+    expect(screen.getByText(messages.en.ui.saveBar.unsaved)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: xm.review.confirm }));
+    const errors = await screen.findByRole("alert", { name: messages.en.ui.errorSummary.title });
+    expect(within(errors).getByRole("link", { name: /Date of birth/ })).toHaveAttribute(
+      "href",
+      `#${dob.id}`,
+    );
+    expect(stub.callsTo(`POST /bff/api/v1/extraction-items/${ID.item}/confirm`)).toHaveLength(0);
+
+    await user.click(reset);
+    expect(dob).toHaveValue(before);
+    expect(screen.getByText(messages.en.ui.saveBar.noChanges)).toBeInTheDocument();
+    expect(screen.queryByRole("alert", { name: messages.en.ui.errorSummary.title })).toBeNull();
   });
 
   it("refuses a typed full Aadhaar number before sending", async () => {

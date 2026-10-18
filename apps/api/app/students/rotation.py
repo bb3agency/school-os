@@ -111,6 +111,12 @@ CIPHERTEXT_COLUMNS: Final[tuple[tuple[str, str], ...]] = (
     # registers their re-encryption, and refreshes opt-in phone indexes in the same pass).
     ("msg.messages", "vars_ciphertext"),
     ("msg.provider_events", "payload_ciphertext"),
+    # R2-2E (0060_fees_upi): bank statement narrations (app.fees registers their re-encryption;
+    # erased after 90 days).
+    ("fin.bank_statement_lines", "narration_ciphertext"),
+    # R2-2D (0059_payments_online): the Razorpay webhook inbox (app.fees.online registers its
+    # re-encryption).
+    ("fin.provider_events", "payload_ciphertext"),
 )
 
 # Ciphertext-looking columns that are NOT under a tenant DEK, with the reason.
@@ -125,6 +131,28 @@ NOT_TENANT_DEK: Final[Mapping[tuple[str, str], str]] = {
     # wrapped with wrap_bound (KMS context bound to the account row), not a tenant DEK.
     ("msg.accounts", "token_ciphertext"): "KMS key wrapper bound to the account row (ADR-0043)",
     ("msg.accounts", "pin_ciphertext"): "KMS key wrapper bound to the account row (ADR-0043)",
+    # R2-2D (ADR-0042 decision 6, SEC-035): the school's Razorpay keys, OAuth tokens, webhook
+    # secrets and route value are wrapped with wrap_bound (bound to the connection row).
+    (
+        "fin.payment_connections",
+        "key_secret_ciphertext",
+    ): "KMS key wrapper bound to the row (ADR-0042)",
+    (
+        "fin.payment_connections",
+        "access_token_ciphertext",
+    ): "KMS key wrapper bound to the row (ADR-0042)",
+    (
+        "fin.payment_connections",
+        "refresh_token_ciphertext",
+    ): "KMS key wrapper bound to the row (ADR-0042)",
+    (
+        "fin.payment_connections",
+        "webhook_secret_ciphertext",
+    ): "KMS key wrapper bound to the row (ADR-0042)",
+    ("fin.payment_connections", "previous_webhook_secret_ciphertext"): (
+        "KMS key wrapper bound to the row (ADR-0042)"
+    ),
+    ("fin.payment_connections", "route_ciphertext"): "KMS key wrapper bound to the row (ADR-0042)",
 }
 
 

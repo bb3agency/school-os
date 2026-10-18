@@ -91,14 +91,21 @@ export function useCertificateTitle() {
 }
 
 /** The print view is an API page with its own strict CSP, served through the BFF. */
-export function PrintViewLink({ certificateId }: { certificateId: string }) {
+export function PrintViewLink({
+  certificateId,
+  variant = "secondary",
+}: {
+  certificateId: string;
+  /** `primary` where printing is the page's main action (an issued certificate). */
+  variant?: "primary" | "secondary";
+}) {
   const t = useTranslations("certificates.detail");
   return (
     <a
       href={`/bff/api/v1/certificates/${certificateId}/print`}
       target="_blank"
       rel="noopener noreferrer"
-      className={buttonClasses("secondary", "md")}
+      className={buttonClasses(variant, "md")}
     >
       <Icon name="file" className="size-4" />
       {t("openPrint")}
@@ -112,7 +119,14 @@ export function PrintViewLink({ certificateId }: { certificateId: string }) {
  * demand and opened at once; it is never stored. Until the PDF is stored and checked, the
  * button explains why it is not ready.
  */
-export function DownloadPdfButton({ certificate }: { certificate: Certificate }) {
+export function DownloadPdfButton({
+  certificate,
+  variant = "primary",
+}: {
+  certificate: Certificate;
+  /** `secondary` beside a primary print button. */
+  variant?: "primary" | "secondary";
+}) {
   const t = useTranslations("certificates.detail");
   const tc = useTranslations("common");
   const api = useBffClient("staff");
@@ -137,7 +151,7 @@ export function DownloadPdfButton({ certificate }: { certificate: Certificate })
   }
   return (
     <div className="space-y-2">
-      <Button onClick={() => void download()} disabled={!ready || pending}>
+      <Button variant={variant} onClick={() => void download()} disabled={!ready || pending}>
         <Icon name="arrowDown" className="size-4" />
         {pending ? tc("working") : t("downloadPdf")}
       </Button>

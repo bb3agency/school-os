@@ -5,9 +5,8 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Eyebrow } from "@/components/ui/Eyebrow";
+import { Icon } from "@/components/ui/Icon";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
@@ -66,7 +65,7 @@ export function NotificationsScreen() {
   const today = formatDate(new Date().toISOString());
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={t("title")}
         description={t("description")}
@@ -80,66 +79,80 @@ export function NotificationsScreen() {
           </Button>
         }
       />
-      <SegmentedControl
-        legend={t("filterLegend")}
-        options={[
-          { value: "all", label: t("filterAll") },
-          { value: "unread", label: t("filterUnread") },
-        ]}
-        value={unreadOnly ? "unread" : "all"}
-        onValueChange={(value) => setUnreadOnly(value === "unread")}
-        size="sm"
-      />
       <ApiErrorAlert error={markRead.error ?? markAll.error} />
-      <Card>
-        {list.isPending ? (
-          <LoadingState label={tc("loading")} />
-        ) : list.isError ? (
-          <ApiErrorAlert error={list.error} namespace="notifications" />
-        ) : rows.length === 0 ? (
-          <EmptyState
-            title={unreadOnly ? t("emptyUnread") : t("empty")}
-            body={unreadOnly ? t("emptyUnreadBody") : t("emptyBody")}
-            icon="bell"
+      <div className="min-w-0 rounded-xl border border-border bg-surface">
+        {/* Read/unread filter: the API filters (`unread=true`), so paging stays right. */}
+        <div
+          className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2.5 sm:px-4"
+          data-print="hide"
+        >
+          <SegmentedControl
+            legend={t("filterLegend")}
+            options={[
+              { value: "all", label: t("filterAll") },
+              { value: "unread", label: t("filterUnread") },
+            ]}
+            value={unreadOnly ? "unread" : "all"}
+            onValueChange={(value) => setUnreadOnly(value === "unread")}
+            size="sm"
           />
-        ) : (
-          <div className="space-y-6">
-            {groupByDay(rows).map((group, index) => {
-              const headingId = `notifications-day-${index}`;
-              return (
-                <section key={group.day || index} aria-labelledby={headingId}>
-                  <Eyebrow as="h2" id={headingId} className="mb-1">
-                    {group.day === today ? t("today", { date: group.day }) : group.day}
-                  </Eyebrow>
-                  <ul className="divide-y divide-border">
-                    {group.items.map((item) => (
-                      <li key={item.id} className="py-3">
-                        <NotificationItem
-                          item={item}
-                          onOpen={(one) => {
-                            if (one.read_at === null) markRead.mutate(one.id);
-                          }}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              );
-            })}
-          </div>
-        )}
-      </Card>
-      {list.hasNextPage ? (
-        <div className="flex justify-center">
-          <Button
-            variant="secondary"
-            onClick={() => void list.fetchNextPage()}
-            disabled={list.isFetchingNextPage}
-          >
-            {list.isFetchingNextPage ? tc("loading") : t("showMore")}
-          </Button>
         </div>
-      ) : null}
+        <div className="p-4 sm:p-5">
+          {list.isPending ? (
+            <LoadingState label={tc("loading")} />
+          ) : list.isError ? (
+            <div className="space-y-3">
+              <ApiErrorAlert error={list.error} namespace="notifications" />
+              <Button variant="secondary" size="sm" onClick={() => void list.refetch()}>
+                <Icon name="refresh" className="size-4" />
+                {tc("retry")}
+              </Button>
+            </div>
+          ) : rows.length === 0 ? (
+            <EmptyState
+              title={unreadOnly ? t("emptyUnread") : t("empty")}
+              body={unreadOnly ? t("emptyUnreadBody") : t("emptyBody")}
+              icon="bell"
+            />
+          ) : (
+            <div className="space-y-6">
+              {groupByDay(rows).map((group, index) => {
+                const headingId = `notifications-day-${index}`;
+                return (
+                  <section key={group.day || index} aria-labelledby={headingId}>
+                    <h2 id={headingId} className="num mb-1 text-xs font-semibold text-ink-muted">
+                      {group.day === today ? t("today", { date: group.day }) : group.day}
+                    </h2>
+                    <ul className="divide-y divide-border">
+                      {group.items.map((item) => (
+                        <li key={item.id} className="py-3">
+                          <NotificationItem
+                            item={item}
+                            onOpen={(one) => {
+                              if (one.read_at === null) markRead.mutate(one.id);
+                            }}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        {list.hasNextPage ? (
+          <div className="flex justify-center border-t border-border px-3 py-2.5 sm:px-4">
+            <Button
+              variant="secondary"
+              onClick={() => void list.fetchNextPage()}
+              disabled={list.isFetchingNextPage}
+            >
+              {list.isFetchingNextPage ? tc("loading") : t("showMore")}
+            </Button>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

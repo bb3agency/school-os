@@ -2,16 +2,16 @@
 
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
+import { DataTableV2, type ColumnV2 } from "@/components/console";
 import { Pill } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
+import type { FilterChip } from "@/components/ui/FilterChips";
 import { Icon } from "@/components/ui/Icon";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SelectField } from "@/components/ui/Select";
-import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
-import { Link } from "@/i18n/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
 import { toLoadable, unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan } from "@/lib/bff/staff-me";
 import { formatDateTime } from "@/lib/format";
@@ -40,6 +40,7 @@ export function CertificatesScreen({ filters }: { filters: CertificateFilters })
   const api = useBffClient("staff");
   const can = useStaffCan();
   const title = useCertificateTitle();
+  const router = useRouter();
   const query = {
     ...(filters.status ? { status: filters.status } : {}),
     ...(filters.certificateType ? { certificate_type: filters.certificateType } : {}),
@@ -61,13 +62,13 @@ export function CertificatesScreen({ filters }: { filters: CertificateFilters })
   });
   const rows = list.data?.pages.flatMap((one) => one.data) ?? [];
 
-  const columns: Column<Certificate>[] = [
+  const columns: ColumnV2<Certificate>[] = [
     {
       key: "requested",
       stack: "field",
       header: t("colRequested"),
       cell: (row) => (
-        <span className="font-mono text-xs whitespace-nowrap text-ink-muted">
+        <span className="num text-xs whitespace-nowrap text-ink-muted">
           <Value>{formatDateTime(row.issued_at ?? row.requested_at)}</Value>
         </span>
       ),
@@ -123,45 +124,86 @@ export function CertificatesScreen({ filters }: { filters: CertificateFilters })
     },
   ];
 
+  // The active filters as chips. Removing one opens the list without that URL parameter (the
+  // same as choosing "All" in the filter form, or "Show all students").
+  const chips: FilterChip[] = [
+    ...(filters.certificateType
+      ? [
+          {
+            id: "certificate_type",
+            label: t("filterType"),
+            value: t(`types.${filters.certificateType}`),
+          },
+        ]
+      : []),
+    ...(filters.status
+      ? [{ id: "status", label: t("filterStatus"), value: tstatus(filters.status) }]
+      : []),
+    ...(filters.studentId
+      ? [{ id: "student_id", label: t("colStudent"), value: t("chipOneStudent") }]
+      : []),
+  ];
+  const hrefWithout = (drop: string | null): string => {
+    const params = new URLSearchParams();
+    if (filters.certificateType && drop !== "certificate_type") {
+      params.set("certificate_type", filters.certificateType);
+    }
+    if (filters.status && drop !== "status") params.set("status", filters.status);
+    if (filters.studentId && drop !== "student_id") params.set("student_id", filters.studentId);
+    const search = params.toString();
+    return search ? `/certificates?${search}` : "/certificates";
+  };
+  const issueHere = filters.studentId !== null && can(CERT_ISSUE);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={t("title")}
         description={t("description")}
         breadcrumb={[{ label: t("crumbHome"), href: "/" }, { label: t("title") }]}
         actions={
-          can(REGISTER_READ) ? (
-            <ButtonLink href="/registers" variant="secondary">
-              <Icon name="clipboard" className="size-4" />
-              {t("registers.nav")}
-            </ButtonLink>
-          ) : null
+          <>
+            {can(REGISTER_READ) ? (
+              <ButtonLink href="/registers" variant="secondary">
+                <Icon name="clipboard" className="size-4" />
+                {t("registers.nav")}
+              </ButtonLink>
+            ) : null}
+            {/* One student's list: issuing for that student is the page's primary action. */}
+            {issueHere ? (
+              <ButtonLink href={`/students/${filters.studentId}/certificates/new`}>
+                <Icon name="plus" className="size-4" />
+                {t("issueForStudent")}
+              </ButtonLink>
+            ) : null}
+          </>
         }
       />
-      <Card title={t("filtersTitle")}>
-        <form method="get" className="space-y-4">
-          {filters.studentId ? (
-            <div className="flex flex-wrap items-center gap-3">
+      {filters.studentId ? (
+        <p className="text-sm text-ink-muted">
+          {t("oneStudentOnly")}{" "}
+          <Link href="/certificates" className="text-primary underline underline-offset-4">
+            {t("allStudents")}
+          </Link>
+        </p>
+      ) : null}
+      <DataTableV2
+        id="certificates"
+        stacked
+        caption={t("title")}
+        captionHidden
+        columns={columns}
+        state={toLoadable({ ...list, data: rows })}
+        rowKey={(row) => row.id}
+        toolbar={
+          <form
+            method="get"
+            aria-label={t("filtersTitle")}
+            className="flex w-full flex-wrap items-end gap-3"
+          >
+            {filters.studentId ? (
               <input type="hidden" name="student_id" value={filters.studentId} />
-              <Pill variant="date" size="md">
-                {t("oneStudentOnly")}
-              </Pill>
-              <Link href="/certificates" className="text-sm text-primary underline">
-                {t("allStudents")}
-              </Link>
-              {can(CERT_ISSUE) ? (
-                <ButtonLink
-                  href={`/students/${filters.studentId}/certificates/new`}
-                  variant="secondary"
-                  size="sm"
-                >
-                  <Icon name="plus" className="size-4" />
-                  {t("issueForStudent")}
-                </ButtonLink>
-              ) : null}
-            </div>
-          ) : null}
-          <div className="grid gap-4 md:grid-cols-[minmax(0,16rem)_1fr_auto] md:items-end">
+            ) : null}
             <SelectField
               name="certificate_type"
               label={t("filterType")}
@@ -171,6 +213,7 @@ export function CertificatesScreen({ filters }: { filters: CertificateFilters })
                 value: type,
                 label: t(`types.${type}`),
               }))}
+              className="min-w-44 flex-1 sm:flex-none"
             />
             <SegmentedControl
               name="status"
@@ -186,34 +229,33 @@ export function CertificatesScreen({ filters }: { filters: CertificateFilters })
                 })),
               ]}
             />
-            <Button type="submit">
+            <Button type="submit" variant="secondary">
               <Icon name="filter" className="size-4" />
               {tc("applyFilters")}
             </Button>
-          </div>
-        </form>
-      </Card>
-      <DataTable
-        stacked
-        caption={t("title")}
-        captionHidden
-        columns={columns}
-        state={toLoadable({ ...list, data: rows })}
-        rowKey={(row) => row.id}
+          </form>
+        }
+        chips={chips}
+        onRemoveChip={(id) => router.replace(hrefWithout(id))}
+        onClearFilters={() => router.replace("/certificates")}
         emptyTitle={t("emptyTitle")}
         emptyBody={can(CERT_ISSUE) ? t("emptyBodyIssuer") : t("emptyBody")}
+        noResultsTitle={t("emptyTitle")}
+        onRetry={() => void list.refetch()}
+        footer={
+          list.hasNextPage ? (
+            <div className="flex justify-center">
+              <Button
+                variant="secondary"
+                onClick={() => void list.fetchNextPage()}
+                disabled={list.isFetchingNextPage}
+              >
+                {list.isFetchingNextPage ? tc("loading") : t("showMore")}
+              </Button>
+            </div>
+          ) : undefined
+        }
       />
-      {list.hasNextPage ? (
-        <div className="flex justify-center">
-          <Button
-            variant="secondary"
-            onClick={() => void list.fetchNextPage()}
-            disabled={list.isFetchingNextPage}
-          >
-            {list.isFetchingNextPage ? tc("loading") : t("showMore")}
-          </Button>
-        </div>
-      ) : null}
     </div>
   );
 }

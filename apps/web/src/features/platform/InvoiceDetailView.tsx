@@ -15,7 +15,8 @@ import { Pill, type PillVariant } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { DataTable, type Column } from "@/components/ui/Table";
+import { DataTableV2 } from "@/components/console/DataTableV2";
+import type { Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { ApiError, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { formatDate, formatInr } from "@/lib/format";
@@ -24,7 +25,7 @@ import { reason } from "@/lib/validation";
 import { PK, useCan, useSchoolDirectory } from "./data";
 import { InvoiceDownload } from "./InvoiceDownload";
 import { InvoiceStatusPill } from "./InvoiceTable";
-import { Mono, MonoTime } from "./pills";
+import { Figure, MonoTime } from "./pills";
 import { ReasonField } from "./SubscriptionActions";
 
 /** Everything a reversal can change: this invoice, its payments, lists, the school, KPIs. */
@@ -127,7 +128,7 @@ export function InvoicePayments({
       numeric: true,
       cell: (row) => (
         <span className="flex flex-col items-start sm:items-end">
-          <Mono>{inr(row.amount_inr)}</Mono>
+          <Figure>{inr(row.amount_inr)}</Figure>
           {Number(row.tds_inr) > 0 ? (
             <span className="text-xs whitespace-nowrap text-ink-muted">
               {t("tdsValue", { tds: inr(row.tds_inr) })}
@@ -198,7 +199,8 @@ export function InvoicePayments({
       {invoice.status === "issued" || invoice.status === "paid" ? null : (
         <p className="text-sm text-ink-muted">{t("onlyIssued")}</p>
       )}
-      <DataTable
+      <DataTableV2
+        id="platform.invoice-payments"
         caption={t("title")}
         captionHidden
         columns={columns}
@@ -278,19 +280,19 @@ export function InvoiceDetailScreen({ invoiceId }: { invoiceId: string }) {
           </dd>
           <dt className="text-ink-muted">{t("colTotal")}</dt>
           <dd>
-            <Mono>{inr(data.total_inr)}</Mono>
+            <Figure>{inr(data.total_inr)}</Figure>
           </dd>
           <dt className="text-ink-muted">{t("amountPaid")}</dt>
           <dd>
-            <Mono>{inr(data.amount_paid_inr)}</Mono>
+            <Figure>{inr(data.amount_paid_inr)}</Figure>
           </dd>
           <dt className="text-ink-muted">{t("tdsReceived")}</dt>
           <dd>
-            <Mono>{inr(data.tds_inr)}</Mono>
+            <Figure>{inr(data.tds_inr)}</Figure>
           </dd>
           <dt className="text-ink-muted">{t("colBalance")}</dt>
           <dd>
-            <Mono>{inr(data.balance_due_inr)}</Mono>
+            <Figure>{inr(data.balance_due_inr)}</Figure>
           </dd>
         </dl>
       </Card>

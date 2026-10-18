@@ -191,6 +191,42 @@ test.describe("app shell on a phone: the one sidebar as a keyboard-only drawer (
   });
 });
 
+test.describe("phone bottom bar, keyboard and docked bars (docs/17 §5.7, WCAG 2.4.11)", () => {
+  test.skip(!standIn, "set E2E_STAND_IN=1 (needs Valkey at REDIS_URL)");
+  // A touch phone: coarse pointer, so a focused text field means an on-screen keyboard.
+  test.use({ viewport: { width: 360, height: 640 }, hasTouch: true, isMobile: true });
+
+  test("the bar steps aside while typing, and the SaveBar stands on it", async ({ page }) => {
+    await installFixtures(page);
+    // The stand-in member is a principal: Home, Approvals, Ask, Messages (those it may open).
+    await signInAs(page, "/support", "clerk");
+    await page.goto("/settings/school");
+    await settle(page);
+    const bar = page.getByRole("navigation", { name: "Quick links" });
+    await expect(bar).toBeVisible();
+
+    // The SaveBar docks on top of the bottom bar, never under it.
+    // Scrolled to: it sticks above the bar (and scroll-padding keeps it clear, WCAG 2.4.11).
+    const save = page.locator("[data-dock][data-placement]").first();
+    await save.scrollIntoViewIfNeeded();
+    await expect(save).toBeVisible();
+    const barBox = await bar.boundingBox();
+    const saveBox = await save.boundingBox();
+    expect(barBox && saveBox).toBeTruthy();
+    expect(Math.round(saveBox!.y + saveBox!.height)).toBeLessThanOrEqual(Math.round(barBox!.y));
+
+    // Typing: the bar is hidden; leaving the field brings it back.
+    const field = page.locator("main input[type=text], main input:not([type])").first();
+    await field.focus();
+    await expect(bar).toBeHidden();
+    await page.locator("main h1").first().click();
+    await expect(bar).toBeVisible();
+
+    // Nothing scrolls sideways at 360px.
+    expect(problems(await measure(page))).toEqual([]);
+  });
+});
+
 test.describe("app shell on the office PC: one sidebar, compact mode (NFR-A11Y-001)", () => {
   test.skip(!standIn, "set E2E_STAND_IN=1 (needs Valkey at REDIS_URL)");
   test.use({ viewport: { width: 1366, height: 768 } });
@@ -231,7 +267,7 @@ test.describe("app shell on the office PC: one sidebar, compact mode (NFR-A11Y-0
       await toggle.focus();
       await page.keyboard.press("Enter");
       await expect(sidebar.getByRole("button", { name: expandName })).toBeFocused();
-      expect((await sidebar.boundingBox())?.width).toBe(72);
+      expect((await sidebar.boundingBox())?.width).toBe(56);
       const current = nav.locator("a[aria-current='page']");
       await expect(current).toHaveAccessibleName(locale === "en" ? "Students" : /.+/);
       // Its label shows beside it on focus (visual only), and Escape dismisses it.
@@ -240,7 +276,7 @@ test.describe("app shell on the office PC: one sidebar, compact mode (NFR-A11Y-0
       await expect(tip).toBeVisible();
       expect(await tip.getAttribute("aria-hidden")).toBe("true");
       const tipBox = await tip.locator(".sidebar-tip-bubble").boundingBox();
-      expect(tipBox?.x ?? 0).toBeGreaterThanOrEqual(72);
+      expect(tipBox?.x ?? 0).toBeGreaterThanOrEqual(56);
       await page.keyboard.press("Escape");
       await expect(tip).toBeHidden();
       expect(problems(await measure(page))).toEqual([]);
@@ -251,10 +287,10 @@ test.describe("app shell on the office PC: one sidebar, compact mode (NFR-A11Y-0
       expect(await page.evaluate(() => document.documentElement.getAttribute("data-sidebar"))).toBe(
         "collapsed",
       );
-      expect((await sidebar.boundingBox())?.width).toBe(72);
+      expect((await sidebar.boundingBox())?.width).toBe(56);
       await settle(page);
       await sidebar.getByRole("button", { name: expandName }).click();
-      expect((await sidebar.boundingBox())?.width).toBe(272);
+      expect((await sidebar.boundingBox())?.width).toBe(240);
     });
   }
 });

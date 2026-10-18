@@ -69,3 +69,37 @@ export function findingsQuery(filters: FindingFilters) {
     ...(filters.studentId ? { student_id: filters.studentId } : {}),
   };
 }
+
+/** A filter that a chip can remove (the URL parameter it stands for). */
+export type FindingFilterKey =
+  "status" | "severity" | "rule_id" | "profile_key" | "section_id" | "student_id";
+
+/** The status filter differs from the default (unresolved findings). */
+export function hasCustomStatus(filters: FindingFilters): boolean {
+  return (
+    filters.status.length !== UNRESOLVED.length ||
+    filters.status.some((status) => !UNRESOLVED.includes(status))
+  );
+}
+
+/**
+ * `/findings?…` for these filters without the one named (the URL the GET form builds), so
+ * removing a filter chip lands on the list the form gives without that filter.
+ */
+export function findingsHref(filters: FindingFilters, without?: FindingFilterKey): string {
+  const params = new URLSearchParams();
+  if (without !== "status" && hasCustomStatus(filters)) {
+    for (const status of filters.status) params.append("status", status);
+  }
+  if (without !== "severity") {
+    for (const severity of filters.severity) params.append("severity", severity);
+  }
+  if (without !== "rule_id" && filters.ruleId) params.set("rule_id", filters.ruleId);
+  if (without !== "profile_key" && filters.profileKey) {
+    params.set("profile_key", filters.profileKey);
+  }
+  if (without !== "section_id" && filters.sectionId) params.set("section_id", filters.sectionId);
+  if (without !== "student_id" && filters.studentId) params.set("student_id", filters.studentId);
+  const query = params.toString();
+  return query ? `/findings?${query}` : "/findings";
+}

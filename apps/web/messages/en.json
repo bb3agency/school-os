@@ -58,6 +58,93 @@
     "currentSchool": "Current school",
     "account": "Your account"
   },
+  "ui": {
+    "more": "More",
+    "moreActions": "More actions",
+    "palette": {
+      "label": "Search or jump to",
+      "placeholder": "Type a page or an action…",
+      "empty": "Nothing matches. Try another word.",
+      "results": "{count, plural, =0 {No results} one {# result} other {# results}}",
+      "hintMove": "to move",
+      "hintOpen": "to open",
+      "hintClose": "to close",
+      "trigger": "Search or jump to…",
+      "groupPages": "Go to",
+      "groupActions": "Actions",
+      "groupPreferences": "Preferences",
+      "densityCompact": "Use compact rows",
+      "densityComfortable": "Use comfortable rows",
+      "toggleSidebar": "Collapse or expand the menu",
+      "addStudent": "Add a student",
+      "newChangeRequest": "New change request",
+      "uploadDocument": "Upload a document",
+      "collectFee": "Collect fees",
+      "takeAttendance": "Take attendance",
+      "enterMarks": "Enter marks",
+      "askSchool": "Ask the school",
+      "inviteUser": "Invite a staff member",
+      "studentList": "Download a student list",
+      "provisionSchool": "Set up a new school"
+    },
+    "shell": {
+      "breadcrumb": "Where you are",
+      "search": "Search",
+      "preferences": "Your preferences",
+      "density": "Row density",
+      "comfortable": "Comfortable",
+      "compact": "Compact",
+      "shortcutPalette": "Search or jump to (Ctrl+K)",
+      "quickLinks": "Quick links",
+      "signedInAs": "Signed in as {name}"
+    },
+    "toast": {
+      "region": "Notifications from SchoolOS",
+      "dismiss": "Dismiss"
+    },
+    "pagination": {
+      "label": "Pages",
+      "none": "No rows",
+      "range": "{from}–{to}",
+      "rangeOf": "{from}–{to} of {total}",
+      "rowsPerPage": "Rows per page",
+      "previous": "Previous",
+      "next": "Next"
+    },
+    "errorSummary": {
+      "title": "There is a problem"
+    },
+    "steps": {
+      "done": "Done",
+      "current": "Current step",
+      "upcoming": "Not started",
+      "failed": "Stopped here"
+    },
+    "saveBar": {
+      "unsaved": "Changes not saved",
+      "noChanges": "No changes"
+    },
+    "filters": {
+      "active": "Active filters",
+      "remove": "Remove filter {label}: {value}",
+      "clearAll": "Clear all"
+    },
+    "table": {
+      "columns": "Columns",
+      "showColumns": "Show columns",
+      "density": "Rows",
+      "comfortable": "Comfortable",
+      "compact": "Compact",
+      "noResults": "No rows match these filters",
+      "noResultsBody": "Remove a filter or clear them all to see more.",
+      "clearFilters": "Clear filters",
+      "select": "Select",
+      "selectAll": "Select all rows on this page",
+      "selected": "{count, plural, one {# selected} other {# selected}}",
+      "bulkActions": "Actions for the selected rows",
+      "clearSelection": "Clear selection"
+    }
+  },
   "language": {
     "label": "Language",
     "en": "English",
@@ -180,7 +267,16 @@
         "warningsNote": "Worth checking, not blocking",
         "studentsAffected": "Students with blocking problems",
         "studentsAffectedNote": "From the latest checks",
-        "pendingNote": "Identity changes waiting for a second person"
+        "pendingNote": "Identity changes waiting for a second person",
+        "feesToday": "Fees collected today",
+        "feesTodayNote": "{count, plural, one {From # receipt, after cancellations and refunds} other {From # receipts, after cancellations and refunds}}",
+        "feesTodayEmpty": "Today's day book",
+        "cashToHandOver": "Cash to hand over",
+        "cashToHandOverNote": "Count the cash drawer against this before closing the day",
+        "feeApprovals": "Fee requests for you",
+        "feeApprovalsNote": "Concessions, cancellations and refunds you can decide",
+        "readiness": "Portal readiness",
+        "readinessNote": "{profile}: {ready} of {students} students ready"
       },
       "work": {
         "title": "Work waiting",
@@ -196,7 +292,17 @@
         "changesNote": "Someone other than the person who asked must approve each change.",
         "importsAction": "Open imports",
         "importsNone": "No imports yet. Start with your admission register spreadsheet.",
-        "rows": "{count, plural, one {# row} other {# rows}}"
+        "rows": "{count, plural, one {# row} other {# rows}}",
+        "lastRunLabel": "Checks last ran on",
+        "feeApprovalsTitle": "Fee requests waiting",
+        "feeApprovalsAction": "Open fee approvals",
+        "feeApprovalsNone": "No fee requests are waiting for you.",
+        "feeApprovalsBody": "{count, plural, one {1 fee request is waiting for your decision.} other {# fee requests are waiting for your decision.}}",
+        "dayCloseTitle": "Today's day book",
+        "dayCloseAction": "Open the day book",
+        "dayClosed": "Today is closed. New payments go to the next day.",
+        "dayOpen": "Today is not closed yet. Close it after counting the cash.",
+        "receiptsTotalLabel": "Receipts so far:"
       },
       "steps": {
         "label": "Steps to get started",
@@ -220,7 +326,21 @@
         }
       },
       "nothingTitle": "Nothing is waiting for you",
-      "nothingBody": "Use the menu to open students, documents or other screens."
+      "nothingBody": "Use the menu to open students, documents or other screens.",
+      "teacher": {
+        "title": "Your work today",
+        "scopeNote": "You see only the sections you teach.",
+        "attendanceTitle": "Take attendance",
+        "attendanceBody": "Mark today's attendance for your section.",
+        "marksTitle": "Enter marks",
+        "marksBody": "Enter exam marks for your sections and subjects.",
+        "askBody": "Ask a question about your school's records and documents."
+      },
+      "primary": {
+        "collectFees": "Collect fees",
+        "reviewApprovals": "Review approvals",
+        "addStudent": "Add a student"
+      }
     },
     "structure": {
       "title": "School structure",
@@ -350,21 +470,61 @@
           "activate": {
             "button": "Give access back",
             "title": "Give {name} access again?",
-            "body": "They can sign in to this school again with the same roles and classes."
+            "body": "They can sign in to this school again with the same roles and classes.",
+            "consequence": "They can sign in again straight away."
           },
           "suspend": {
             "button": "Suspend",
             "title": "Suspend {name}?",
-            "body": "They can't sign in to this school until someone gives access back. Their roles and classes are kept."
+            "body": "They can't sign in to this school until someone gives access back. Their roles and classes are kept.",
+            "consequence": "Signing in stops until access is given back; nothing else changes."
           },
           "remove": {
             "button": "Remove",
             "title": "Remove {name}?",
             "body": "They lose access to this school for good. This can't be undone; to add them again you must send a new invitation.",
-            "invitedBody": "The invitation is cancelled and can't be used. To add them later, send a new invitation."
+            "invitedBody": "The invitation is cancelled and can't be used. To add them later, send a new invitation.",
+            "consequence": "This can't be undone."
           }
         },
         "selfNoStatus": "This is your own account, so you can't suspend or remove it here. Ask another person who manages users if that is needed.",
+        "permissions": {
+          "title": "What these roles allow",
+          "count": "{permissions, plural, one {# permission} other {# permissions}} in {areas, plural, one {# area} other {# areas}}.",
+          "none": "These roles give no permissions.",
+          "areasLabel": "Areas and the number of permissions in each",
+          "area": {
+            "apaar": "APAAR consent",
+            "attendance": "Attendance",
+            "audit": "Audit log",
+            "breakglass": "Support access",
+            "certificate": "Certificates",
+            "circular": "Circulars",
+            "document": "Documents",
+            "dq": "Data checks",
+            "exam": "Exams",
+            "export": "Exports",
+            "fee": "Fees",
+            "finance": "Finance",
+            "import": "Imports",
+            "insights": "Student insights",
+            "kb": "Ask the school",
+            "marks": "Marks",
+            "message": "Messages",
+            "messaging": "WhatsApp messages",
+            "notice": "Notices",
+            "payments": "Online payments",
+            "register": "Registers",
+            "role": "Roles",
+            "student": "Students",
+            "support": "Support tickets",
+            "tally": "Tally",
+            "task": "Tasks",
+            "tenant": "School settings",
+            "user": "Users",
+            "other": "Other"
+          }
+        },
         "edit": {
           "trigger": "Edit details",
           "title": "Edit name, email and language",
@@ -584,7 +744,9 @@
         "okIncremental": "Verified up to event {last}: {count, plural, =0 {no new events since the last check} one {# new event was checked} other {# new events were checked}} and none was changed.",
         "lastVerifiedAt": "Last verified on {time}.",
         "coolDownTitle": "The log was checked a moment ago",
-        "coolDownBody": "You can ask for another check in {minutes, plural, one {# minute} other {# minutes}}. SchoolOS also checks the whole log every night."
+        "coolDownBody": "You can ask for another check in {minutes, plural, one {# minute} other {# minutes}}. SchoolOS also checks the whole log every night.",
+        "badgeIntact": "Intact",
+        "badgeBroken": "Broken"
       },
       "home": "Home",
       "filterActionPlaceholder": "Such as student.update",
@@ -2024,7 +2186,8 @@
     "emergencyReason": "Emergency access is only for a security incident or a legal obligation. Choose one of those, or untick Emergency.",
     "penInvalid": "Enter the 11-digit PEN, for example 21345678901.",
     "penRequiredForTransfer": "A child from another school needs the PEN from the transfer certificate.",
-    "invalidHeadCode": "Use up to 20 letters, digits, - or _, starting with a letter or digit, for example TUI."
+    "invalidHeadCode": "Use up to 20 letters, digits, - or _, starting with a letter or digit, for example TUI.",
+    "invalidKeyId": "Enter the key id as Razorpay shows it: rzp_live_ or rzp_test_ and letters or digits."
   },
   "support": {
     "piiWarningTitle": "Do not include student personal data",
@@ -2175,7 +2338,13 @@
       "apaarInvalid": "Enter the 12 digits of the APAAR ID, for example 1234 5678 9012.",
       "penLabel": "UDISE+ PEN",
       "penHint": "11 digits",
-      "penInvalid": "Enter the 11-digit PEN, for example 21345678901."
+      "penInvalid": "Enter the 11-digit PEN, for example 21345678901.",
+      "more": "More",
+      "chipSearch": "Search",
+      "chipSectionChosen": "Chosen section",
+      "moreFilters": "More filters: status, APAAR ID, PEN",
+      "blockedTitle": "Nothing was searched",
+      "blockedBody": "Correct the search above, then select Search again."
     },
     "create": {
       "title": "Add a student",
@@ -2262,7 +2431,9 @@
       "issueCertificateLink": "Issue a certificate",
       "certificatesLink": "Certificates of this student",
       "tabTimeline": "Timeline",
-      "apaarConsentLink": "APAAR consent"
+      "apaarConsentLink": "APAAR consent",
+      "metaClass": "Class",
+      "goTo": "Go to"
     },
     "record": {
       "open": "Record a value",
@@ -2522,7 +2693,8 @@
       "templatesTitle": "Saved column templates",
       "templatesDescription": "A file with the same column headings reuses its template automatically.",
       "templatesEmptyTitle": "No templates saved",
-      "templatesEmptyBody": "After you choose the columns of an import, save them as a template to reuse next time."
+      "templatesEmptyBody": "After you choose the columns of an import, save them as a template to reuse next time.",
+      "uploadAction": "Upload a spreadsheet"
     },
     "detail": {
       "loadingTitle": "Import",
@@ -2565,7 +2737,10 @@
       },
       "undoEyebrow": "24-hour undo",
       "hoursLeft": "{hours, plural, one {About # hour left to undo} other {About # hours left to undo}}",
-      "underAnHour": "Less than an hour left to undo"
+      "underAnHour": "Less than an hour left to undo",
+      "more": "More",
+      "uploadAgain": "Upload the file again",
+      "newImport": "Start another import"
     },
     "failure": {
       "generic": "Something went wrong with this file. Upload it again, or contact support with the time of the import.",
@@ -2901,7 +3076,8 @@
       "colStatus": "Status",
       "emptyTitle": "No register photos yet",
       "emptyBody": "Upload photos of your admission register pages to start.",
-      "pagesLabel": "Pages of uploads"
+      "pagesLabel": "Pages of uploads",
+      "uploadAction": "Upload photos"
     },
     "pages": {
       "title": "Pages",
@@ -2983,7 +3159,8 @@
         "pending": "Rows to check",
         "confirmed": "Rows saved",
         "low": "Rows with unclear values"
-      }
+      },
+      "reviewed": "{done} of {total} reviewed"
     },
     "image": {
       "caption": "Page {page}, row {row}",
@@ -3051,7 +3228,8 @@
       "corrected": "Corrected by hand",
       "correctedCount": "{count, plural, one {# value} other {# values}}",
       "openingNext": "Opening the next row",
-      "allChecked": "Every row has been checked. Going back to the photos…"
+      "allChecked": "Every row has been checked. Going back to the photos…",
+      "discard": "Reset to what was read"
     },
     "reject": {
       "open": "Discard this row",
@@ -3296,10 +3474,28 @@
       "openRun": "Open this check",
       "pageTitle": "Check progress",
       "pageDescription": "Progress and results of one check of student records.",
-      "seeFindings": "See the problems found"
+      "seeFindings": "See the problems found",
+      "statusLabel": "Status:",
+      "statusValue": {
+        "queued": "Waiting to start",
+        "running": "Checking",
+        "completed": "Finished",
+        "failed": "Could not finish"
+      },
+      "resultsLabel": "Results of this check",
+      "stat": {
+        "students": "Students checked",
+        "blockers": "Blockers",
+        "warnings": "Warnings",
+        "new": "New problems",
+        "reopened": "Came back",
+        "cleared": "Cleared"
+      }
     },
     "crumbHome": "Home",
-    "summaryBySeverityLabel": "By severity:"
+    "summaryBySeverityLabel": "By severity:",
+    "chipSection": "Chosen section",
+    "chipOneStudent": "One student"
   },
   "readiness": {
     "nav": "Board readiness",
@@ -3380,7 +3576,8 @@
     "showSensitiveSlips": "Show Aadhaar details on slips",
     "openSensitiveSlips": "Open slips with Aadhaar details",
     "sensitiveSlipsNote": "These slips show the names and dates as printed on Aadhaar. Opening them is recorded in the audit log. Keep the printouts safe.",
-    "newTab": "opens in a new tab"
+    "newTab": "opens in a new tab",
+    "shareLabel": "Students ready for {profile}"
   },
   "changeRequests": {
     "nav": "Correction requests",
@@ -3582,7 +3779,14 @@
       "createdTitle": "Request sent",
       "createdBody": "Someone with approval rights will check it. You'll be told in the bell when it is decided.",
       "openCreated": "Open the request",
-      "backToFinding": "Back to the problem"
+      "backToFinding": "Back to the problem",
+      "stagesLabel": "Steps of a correction request",
+      "stages": {
+        "student": "Choose student",
+        "change": "Field and new value",
+        "evidence": "Evidence",
+        "review": "Review and submit"
+      }
     },
     "detail": {
       "title": "Correction: {field}",
@@ -3633,9 +3837,14 @@
       "relatedLabel": "Related pages",
       "approveConsequence": "The student's record changes as soon as you approve. The old value stays in the history.",
       "rejectConsequence": "Nothing on the student's record changes.",
-      "cancelConsequence": "Nothing on the student's record changes."
+      "cancelConsequence": "Nothing on the student's record changes.",
+      "before": "Before",
+      "after": "After"
     },
-    "crumbHome": "Home"
+    "crumbHome": "Home",
+    "tabsLabel": "Requests by status",
+    "chipStudent": "Student",
+    "chipOneStudent": "One student"
   },
   "notifications": {
     "title": "Notifications",
@@ -3666,6 +3875,7 @@
     "howTitle": "How support access works",
     "howBody": "SchoolOS staff never see your school's records on their own. When they need to help, they ask here with a reason, what they want to see and for how long (at most 8 hours). Access is read-only, ends by itself, and every screen they open is written to your audit log. You can end it at any time.",
     "waitingCount": "{count, plural, one {# request is waiting for your decision.} other {# requests are waiting for your decision.}}",
+    "openCount": "{count, plural, one {# support access is open: SchoolOS support can see your records now.} other {# support accesses are open: SchoolOS support can see your records now.}}",
     "noAccessTitle": "Only the owner and the principal can see this",
     "noAccessBody": "Support access is approved by the school's owner or principal. Ask them if SchoolOS support needs to look at something.",
     "filtersTitle": "Filters",
@@ -3756,6 +3966,9 @@
       "revoke": "End access now",
       "revokeTitle": "End support access now",
       "revokeBody": "Support loses access immediately. You will be asked to confirm it's you.",
+      "approveConsequence": "SchoolOS support can read these records until the access ends or you end it.",
+      "denyConsequence": "The request closes for good. SchoolOS support must send a new request to ask again.",
+      "revokeConsequence": "The access ends for good. It cannot be opened again; support must send a new request.",
       "backToList": "Back to support access"
     },
     "timeline": {
@@ -3981,6 +4194,13 @@
       "expired": "The PDF was deleted. Make it again.",
       "again": "Make it again",
       "lost": "We could not check on the PDF."
+    },
+    "more": "More",
+    "steps": {
+      "label": "Steps of this export",
+      "pick": "Pick students and files",
+      "check": "SchoolOS checks and makes the files",
+      "download": "Download"
     }
   },
   "devSignIn": {
@@ -4037,6 +4257,7 @@
       "makeCurrentDescribe": "Make {label} the current year",
       "makeCurrentTitle": "Make {label} the current year?",
       "makeCurrentBody": "Only one year can be current. The year that is current now will stop being current, and {label} will be shown as the current year everywhere.",
+      "makeCurrentConsequence": "{label} becomes the current year for everyone in the school.",
       "promote": "Promote students",
       "promoteFor": "(academic year {label})"
     },
@@ -4163,6 +4384,7 @@
       "archive": "Archive",
       "unarchive": "Unarchive",
       "unarchiveBody": "It shows in lists again and can be used for new records.",
+      "consequence": "Nothing is deleted. You can unarchive it later.",
       "year": {
         "title": "Archive academic year {name}?",
         "body": "The year is hidden from lists but kept for old records. The current year, or a year that still has students enrolled, can't be archived.",
@@ -4205,6 +4427,7 @@
       "undo": "Undo promotion",
       "undoTitle": "Undo this promotion?",
       "undoBody": "Students go back to their classes and sections in {from}. Their new enrolments are removed and graduates get their earlier status back. This is recorded in the audit log.",
+      "undoConsequence": "The new enrolments from this promotion are removed.",
       "undoConfirm": "Undo promotion",
       "historyTitle": "Promotions of this year",
       "colStatus": "Status",
@@ -4281,6 +4504,7 @@
       "commit": "Promote students",
       "commitTitle": "{count, plural, one {Promote # student now?} other {Promote # students now?}}",
       "commitBody": "{from} to {to}: {promoted} promoted, {held} held back, {graduated} graduated. You can undo this within 24 hours.",
+      "commitConsequence": "{count, plural, one {# student gets a new enrolment} other {# students get new enrolments}} in {to}.",
       "commitConfirm": "Promote students",
       "commitHint": "You can undo a promotion within 24 hours.",
       "commitNeedsPreview": "Preview again to promote with the plan as it is now.",
@@ -4304,6 +4528,7 @@
     "title": "School settings",
     "description": "Your school's details and the settings that apply to everyone in the school.",
     "readOnlyNote": "You can see these settings. Only the owner or principal can change them.",
+    "discard": "Discard changes",
     "minutes": "{count, plural, one {# minute} other {# minutes}}",
     "aiOn": "On",
     "aiOff": "Off",
@@ -6012,10 +6237,19 @@
       "dialog": "Dialog",
       "icons": "Icons",
       "telugu": "Telugu",
-      "chat": "Ask chat"
+      "chat": "Ask chat",
+      "paper": "Register paper (public pages)",
+      "figures": "Figures",
+      "console": "Console components",
+      "illustrations": "Illustrations"
     },
-    "sidebarNote": "The one sidebar of the school app (white) and the platform console (dark violet): brand, school or badge, grouped menu with the current page marked, signed-in account. From lg it sits beside the page and can be made compact; below lg it opens as the menu drawer. docs/17 §5.2 has the rules.",
-    "chatNote": "Ask the school as a chat (docs/17 §5.3): the question bubble, the answer with its Worked-for summary, markdown, citation chips (focus one to see its source), source cards, actions with the version switcher, follow-up chips, and the live status line of an answer still being prepared."
+    "sidebarNote": "The one sidebar of the school app (on the canvas) and the operator console (dark neutral with an amber marker): brand, school or badge, grouped menu with the current page marked, signed-in account. From lg it sits beside the page and can be made compact; below lg it opens as the menu drawer. docs/17 §5.2 has the rules.",
+    "chatNote": "Ask the school as a chat (docs/17 §5.3): the question bubble, the answer with its Worked-for summary, markdown, citation chips (focus one to see its source), source cards, actions with the version switcher, follow-up chips, and the live status line of an answer still being prepared.",
+    "paperNote": "Direction B for the marketing site and the parent and certificate check pages: paper, ruled hairlines, one ledger green and Instrument Serif headings. The staff app stays on the Quiet ledger tokens above.",
+    "consoleNote": "The record list with its toolbar, filter chips, row menu, selection and paging; a multi-step job with the error summary and the save bar; the menu, popover, drawer and toast. Try them with the keyboard.",
+    "illustrationsNote": "Line drawings of a school office, served as images from SchoolOS itself. Decorative: the words beside them say the same, and they are hidden in Windows high contrast mode.",
+    "emptyIllustrated": "No support tickets yet",
+    "emptyIllustratedBody": "An empty state with a drawing, for first use and for pages outside a school."
   },
   "admin": {
     "nav": {
@@ -6030,6 +6264,12 @@
       "description": "Download all of your school's records, documents and audit log in one file. Only the owner can do this.",
       "ownerOnlyTitle": "Only the owner can export all data",
       "ownerOnlyBody": "Exporting everything the school holds is kept for the school's owner. Ask the owner if you need a copy of the school's data.",
+      "steps": {
+        "label": "Export steps",
+        "choose": "Choose what to export",
+        "prepare": "Prepare",
+        "download": "Download"
+      },
       "requestTitle": "Make a full export",
       "requestDescription": "SchoolOS prepares one ZIP file in the background. You will get a notification when it is ready.",
       "includes": {
@@ -6393,7 +6633,11 @@
       "newTab": "opens in a new tab",
       "downloadPdf": "Download PDF",
       "pdfFailed": "The PDF could not be made.",
-      "pdfPreparing": "The PDF is being made and checked. It is usually ready within a minute."
+      "pdfPreparing": "The PDF is being made and checked. It is usually ready within a minute.",
+      "approveConsequence": "The certificate is issued with the next serial number and entered in the register.",
+      "approveConsequenceTc": "The certificate is issued with the next serial number, and the student is taken off the rolls from the date of leaving.",
+      "rejectConsequence": "Nothing is issued and the student record does not change. The person who prepared it sees your reason.",
+      "withdrawConsequence": "Nothing is issued and the student record does not change."
     },
     "issue": {
       "title": "Issue a certificate",
@@ -6451,6 +6695,12 @@
         "derived": "Worked out from the record",
         "identifier": "Printed only when verified",
         "restricted": "Restricted"
+      },
+      "steps": {
+        "label": "Steps to issue a certificate",
+        "type": "Choose the certificate",
+        "check": "Check what it prints",
+        "details": "Fill the details and issue"
       }
     },
     "registers": {
@@ -6479,7 +6729,12 @@
       "admission": {
         "title": "Admission and withdrawal register",
         "body": "Students enrolled in the year, in admission-number order, with their leaving details and TC number."
-      }
+      },
+      "pickerLegend": "Which register?",
+      "a4": "A4 landscape",
+      "sheetSchool": "School letterhead",
+      "sheetYear": "Academic year {label}",
+      "sheetNote": "The rows are filled in the print view."
     },
     "letterhead": {
       "title": "Certificate letterhead",
@@ -6547,7 +6802,9 @@
       "printThem": "Print religion and caste",
       "leaveBlank": "Leave them blank",
       "saved": "Saved."
-    }
+    },
+    "more": "More",
+    "chipOneStudent": "One student"
   },
   "circulars": {
     "nav": "Circulars",
@@ -6640,6 +6897,9 @@
     "reviewPending": "{count, plural, one {Decide # more suggestion first.} other {Decide # more suggestions first.}}",
     "reviewReady": "Every suggestion is decided. Mark the circular reviewed.",
     "markReviewed": "Mark reviewed",
+    "markReviewedTitle": "Mark this circular reviewed?",
+    "markReviewedBody": "Do this when every suggested deadline is confirmed or dismissed.",
+    "markReviewedConsequence": "The circular leaves the To review list. Tasks already confirmed stay as they are.",
     "reviewedBy": "Reviewed by {name} on {when}.",
     "notReviewed": "Not reviewed yet.",
     "formerStaff": "a former staff member",
@@ -6710,6 +6970,19 @@
     "emptyTitle": "No tasks here",
     "emptyBody": "Tasks appear when someone confirms a circular's deadline or adds a task for you.",
     "pagesLabel": "Pages of tasks",
+    "addTask": "Add a task",
+    "filtersLabel": "Filter tasks",
+    "noResultsTitle": "No tasks match these filters",
+    "noResultsBody": "Change the filters or clear them to see more tasks.",
+    "groupCount": "{count, plural, one {# task} other {# tasks}}",
+    "groups": {
+      "overdue": "Overdue",
+      "today": "Due today",
+      "week": "This week",
+      "later": "Later",
+      "earlier": "Earlier",
+      "noDate": "No due date"
+    },
     "columns": {
       "task": "Task",
       "due": "Due date",
@@ -6850,7 +7123,12 @@
       "save": "Save draft",
       "approve": "Approve notice",
       "approverNeeded": "The principal or owner approves notices.",
-      "incomplete": "Fill in both titles and both notices before approving."
+      "incomplete": "Fill in both titles and both notices before approving.",
+      "unsaved": "Changes not saved",
+      "lastSaved": "Last saved {when}",
+      "approveTitle": "Approve this notice?",
+      "approveBody": "Check every date and word first. Changes not saved yet are saved before approving.",
+      "approveConsequence": "An approved notice can't be changed. Staff can then copy, print or download it for the parents' groups."
     },
     "approved": {
       "preview": "Notice for parents",
@@ -6973,7 +7251,14 @@
       "name": "Name",
       "sampleName": "Synthetica Student",
       "summary": "Read {entries, plural, one {# entry} other {# entries}} for {students, plural, one {# student} other {# students}} over {days, plural, one {# day} other {# days}}."
-    }
+    },
+    "tally": {
+      "present": "{count, number} present",
+      "absent": "{count, number} absent",
+      "late": "{count, number} late",
+      "leave": "{count, number} on leave"
+    },
+    "undo": "Undo changes"
   },
   "marks": {
     "nav": "Marks",
@@ -7022,7 +7307,13 @@
         "maxInvalid": "Type the maximum marks as a number above 0 (at most 1000).",
         "marksInvalid": "Some marks are not numbers between 0 and the maximum. Fix them or type AB for absent.",
         "nothingEntered": "Type at least one student's marks."
-      }
+      },
+      "cellInvalid": "Type a number from 0 to {max}, or AB.",
+      "position": "Student {current, number} of {total, number}",
+      "previous": "Previous student",
+      "next": "Next student",
+      "keyboardHint": "Press Enter or the down arrow to go to the next student.",
+      "discard": "Clear typed marks"
     },
     "import": {
       "title": "Add marks from a sheet",
@@ -7172,7 +7463,8 @@
       "choose": "Choose one",
       "actedOn": "When",
       "note": "Note (optional)",
-      "noteHint": "Up to 1,000 characters. Kept encrypted and seen only by the class teacher and the principal."
+      "noteHint": "Up to 1,000 characters. Kept encrypted and seen only by the class teacher and the principal.",
+      "consequence": "The action is added to the flag's log. Nothing on the student's record changes."
     },
     "close": {
       "open": "Close the flag",
@@ -7187,7 +7479,8 @@
         "no_concern": "No concern after checking",
         "student_left": "The student left the school",
         "raised_in_error": "Raised in error"
-      }
+      },
+      "consequence": "The flag is closed and no longer due. Nothing on the student's record changes."
     },
     "assign": {
       "open": "Give to someone else",
@@ -7195,7 +7488,8 @@
       "description": "Only staff who can act for this student are listed. They are told in the app.",
       "save": "Give flag",
       "owner": "New owner",
-      "nobody": "Nobody else can act for this student."
+      "nobody": "Nobody else can act for this student.",
+      "consequence": "The new owner becomes the person who must act by the due date."
     },
     "erase": {
       "open": "Erase",
@@ -7206,7 +7500,8 @@
       "reason": {
         "parent_request": "The parent asked",
         "entered_in_error": "Entered in error"
-      }
+      },
+      "consequence": "This cannot be undone."
     },
     "raise": {
       "open": "Raise a flag",
@@ -7420,9 +7715,11 @@
         "admissionNo": "Admission no.",
         "class": "Class",
         "due": "Due",
+        "dueInr": "Due (₹)",
         "ledgers": "Ledgers",
         "asOf": "As of"
-      }
+      },
+      "kpiLabel": "Summary of Tally dues"
     },
     "connector": {
       "title": "Tally connector",
@@ -7457,6 +7754,7 @@
       "revoke": "Revoke",
       "revokeTitle": "Revoke this agent?",
       "revokeBody": "The agent stops working at once. Figures already synced stay. To sync again, add a new agent.",
+      "revokeConsequence": "This can't be undone: the agent's key stops working for good.",
       "columns": {
         "name": "Name",
         "status": "Status",
@@ -7496,7 +7794,8 @@
       "legend": "Groups in {company}",
       "under": "Under {parent}",
       "save": "Save groups",
-      "saved": "{count, plural, =0 {Saved. No groups are selected.} one {Saved. 1 group is selected.} other {Saved. # groups are selected.}}"
+      "saved": "{count, plural, =0 {Saved. No groups are selected.} one {Saved. 1 group is selected.} other {Saved. # groups are selected.}}",
+      "discard": "Discard changes"
     },
     "ledgers": {
       "title": "Link ledgers to students",
@@ -7521,6 +7820,11 @@
       "unlinkBody": "{ledger} will no longer count for {student}. Tally is not changed.",
       "link": "Link",
       "linkLedger": "Link {ledger}",
+      "state": {
+        "title": "Mapping",
+        "linked": "{count, plural, one {Linked to # student} other {Linked to # students}}",
+        "unlinked": "Needs a student"
+      },
       "columns": {
         "ledger": "Ledger",
         "group": "Group",
@@ -7772,7 +8076,9 @@
       "printedOnly": "This page shows only what the certificate prints.",
       "leftBlank": "Left blank on the certificate",
       "anyoneWithCode": "Anyone with this code can see what the certificate shows.",
-      "footer": "Certificate check by SchoolOS for the school that issued it."
+      "footer": "Certificate check by SchoolOS for the school that issued it.",
+      "masthead": "SchoolOS",
+      "kicker": "Certificate check for receiving schools, offices and employers"
     }
   },
   "messaging": {
@@ -7782,6 +8088,12 @@
     },
     "settingsTitle": "WhatsApp messages",
     "settingsDescription": "Send school messages to parents from the school's own WhatsApp number. The school pays Meta directly for them.",
+    "steps": {
+      "label": "Steps to set up WhatsApp",
+      "check": "Check before you connect",
+      "connect": "Connect",
+      "templates": "Templates and settings"
+    },
     "logTitle": "Messages",
     "logDescription": "What was sent to parents on WhatsApp and whether it arrived.",
     "noAccessTitle": "You can't see WhatsApp messages",
@@ -7868,7 +8180,9 @@
       "resumeBody": "SchoolOS checks the number with Meta first. Messages start going out again.",
       "disconnect": "Disconnect",
       "disconnectTitle": "Disconnect WhatsApp?",
-      "disconnectBody": "Sending stops at once, and links already sent to parents stop working. You can connect again later."
+      "disconnectBody": "Sending stops at once, and links already sent to parents stop working. You can connect again later.",
+      "resumeConsequence": "Messages to parents who agreed start going out again from the school's number.",
+      "disconnectConsequence": "Parents get no WhatsApp messages from the school until someone connects the number again."
     },
     "templates": {
       "title": "Message templates",
@@ -7876,6 +8190,7 @@
       "sync": "Check with Meta",
       "syncTitle": "Check templates with Meta?",
       "syncBody": "SchoolOS submits any template not sent yet and reads every status back. This takes a minute.",
+      "syncConsequence": "Nothing is sent to parents. Only the template statuses on this page change.",
       "pausedBySchoolOs": "Paused by SchoolOS",
       "reviewed": "Checked",
       "notReviewed": "Not checked by a fluent reader",
@@ -7933,7 +8248,8 @@
       "officePhone": "Office phone for replies",
       "officePhoneHint": "Parents who write to the WhatsApp number are told to call this number.",
       "save": "Save settings",
-      "saved": "Saved."
+      "saved": "Saved.",
+      "discard": "Discard changes"
     },
     "optins": {
       "title": "WhatsApp messages",
@@ -7994,6 +8310,8 @@
       "emptyTitle": "No messages yet",
       "emptyBody": "Messages to parents appear here once the school sends them.",
       "more": "Show more",
+      "filtersLabel": "Filter messages",
+      "noResultsTitle": "No messages match these filters",
       "fallback": "Sent in English: the message in the parent's language is not approved",
       "phoneEnding": "ending {last4}",
       "columns": {
@@ -8121,14 +8439,17 @@
       "approvals": "Fee approvals",
       "daily": "Daily collection",
       "dues": "Fee dues",
-      "setup": "Fee setup"
+      "setup": "Fee setup",
+      "reconcile": "Reconcile UPI",
+      "upiSettings": "UPI QR"
     },
     "modes": {
       "cash": "Cash",
       "cheque": "Cheque",
       "bank_transfer": "Bank transfer",
       "upi_qr": "UPI (school QR)",
-      "razorpay": "Online (Razorpay)"
+      "razorpay": "Online (Razorpay)",
+      "original_method": "Back to the payer (Razorpay)"
     },
     "modeDetails": {
       "cheque_number": "Cheque number",
@@ -8224,6 +8545,9 @@
       "nothingDue": "Nothing is due on this account now.",
       "nothingDueTitle": "Nothing to collect",
       "totalDue": "Total due now:",
+      "totalDueNow": "Total due now",
+      "paymentTitle": "Take the payment",
+      "shortcutsLabel": "Keyboard shortcuts",
       "openAccount": "Open the fee account",
       "amount": "Amount (₹)",
       "amountHint": "Filled with the total due; type a smaller amount for a part payment. Advances are not taken.",
@@ -8259,6 +8583,13 @@
         "allocation": "Enter each amount in rupees, or leave it empty.",
         "allocationSum": "The amounts must add up to the receipt amount.",
         "utrInUse": "This UTR is already on another receipt. Open that receipt."
+      },
+      "upi": {
+        "showQr": "Show the school's UPI QR",
+        "hideQr": "Hide the QR",
+        "noQr": "The school's UPI QR is not set yet. The accountant adds it in Settings > UPI QR.",
+        "inUse": "This UTR is already on receipt",
+        "seenInBank": "The bank statement already shows a credit with this UTR."
       }
     },
     "receipts": {
@@ -8281,7 +8612,8 @@
         "amount": "Amount"
       },
       "cancelledOn": "Cancelled on {date}",
-      "cancellationPending": "Cancellation waiting for approval"
+      "cancellationPending": "Cancellation waiting for approval",
+      "firstUseBody": "Receipts appear here once a payment is recorded at the counter."
     },
     "receipt": {
       "title": "Receipt {number}",
@@ -8322,7 +8654,11 @@
       "requestedBy": "Requested by {name} on {when}",
       "toApprovals": "Go to fee approvals",
       "refundsTitle": "Refunds",
-      "printVoucher": "Print voucher"
+      "printVoucher": "Print voucher",
+      "refundOnlineBody": "Razorpay returns the money to the payer's card, bank or UPI after a second person approves. The refund voucher is written when Razorpay confirms the refund.",
+      "bankSeen": "Seen in the bank statement on {date}",
+      "bankNotSeen": "Not yet seen in a bank statement",
+      "previewLabel": "Receipt preview"
     },
     "account": {
       "title": "Fee account",
@@ -8346,6 +8682,7 @@
         "balance": "Running balance"
       },
       "instalmentShort": "Inst. {no}",
+      "closingBalance": "Balance now",
       "lateFee": "late fee",
       "requestConcession": "Request concession",
       "concessionTitle": "Request a concession",
@@ -8373,6 +8710,10 @@
       "title": "Fee approvals",
       "description": "Concessions, adjustments, receipt cancellations and refunds waiting for a second person. You never decide your own request.",
       "listTitle": "Waiting for a decision",
+      "listBody": "Requests made by someone else. Check the reason before you decide.",
+      "mineTitle": "Your requests",
+      "mineBody": "Someone else decides these. You can withdraw a request until it is decided.",
+      "count": "{count, plural, one {# request} other {# requests}}",
       "emptyTitle": "Nothing is waiting",
       "emptyBody": "When someone asks for a concession, adjustment, cancellation or refund, it appears here.",
       "student": "Student",
@@ -8425,8 +8766,14 @@
         "student": "Student",
         "mode": "Paid by",
         "status": "Status",
-        "amount": "Amount"
+        "amount": "Amount",
+        "amountInr": "Amount (₹)",
+        "count": "Receipts",
+        "collector": "Collected by",
+        "reversal": "Cancellation or refund"
       },
+      "filterLabel": "Choose the day",
+      "totalsLabel": "Totals of the day",
       "reversalsTitle": "Cancellations and refunds of the day",
       "cancelled": "Receipt {number} cancelled",
       "refunded": "Voucher {voucher} for receipt {number}"
@@ -8448,8 +8795,12 @@
         "class": "Class",
         "oldest": "Oldest due date",
         "lastPayment": "Last payment",
-        "overdue": "Overdue"
-      }
+        "overdue": "Overdue",
+        "overdueInr": "Overdue (₹)"
+      },
+      "filterLabel": "Filter dues",
+      "totalsLabel": "Totals of overdue fees",
+      "noResultsTitle": "No student in this class has an overdue fee"
     },
     "setup": {
       "title": "Fee setup",
@@ -8520,7 +8871,25 @@
       "lateCap": "Cap per instalment (₹)",
       "saveDraft": "Save draft",
       "editorIncomplete": "The plan is not complete",
-      "editorIncompleteBody": "Give the plan a name, at least one amount, and a name and due date for every instalment. Amounts are rupees with at most two decimals."
+      "editorIncompleteBody": "Give the plan a name, at least one amount, and a name and due date for every instalment. Amounts are rupees with at most two decimals.",
+      "check": {
+        "name": "Enter a name for the plan",
+        "amounts": "Enter at least one amount in the grid",
+        "badAmount": "Enter amounts in rupees with at most two decimals, for example 1250 or 1250.50",
+        "instalmentName": "Enter a name for instalment {no}",
+        "instalmentDue": "Enter the due date of instalment {no}"
+      },
+      "discard": "Discard plan",
+      "instalmentsOf": "Instalments of {name}",
+      "instalment": "Instalment",
+      "dueOn": "Due date",
+      "amountInr": "Amount (₹)",
+      "noHeadsTitle": "No fee heads yet",
+      "noPlansBody": "Make a plan for a class with its instalments and due dates, then activate it.",
+      "headTax": "GST",
+      "headInUse": "Status",
+      "exempt": "exempt",
+      "inUse": "In use"
     },
     "errors": {
       "module_hidden": {
@@ -8598,6 +8967,458 @@
       "cancellation_exists": {
         "title": "Cancellation already asked",
         "body": "A cancellation of this receipt is already waiting or approved."
+      },
+      "statement_already_imported": {
+        "title": "Statement already imported",
+        "body": "This file was imported before. Download a newer statement from the bank."
+      },
+      "amount_mismatch": {
+        "title": "Amounts differ",
+        "body": "The bank credit and the receipt have different amounts, so they are not matched. Check the receipt; a wrong receipt is cancelled and issued again."
+      },
+      "utr_differs": {
+        "title": "UPI references differ",
+        "body": "The bank shows a different UTR than the receipt, so they are not matched. Check the receipt; a wrong receipt is cancelled and issued again."
+      },
+      "receipt_already_confirmed": {
+        "title": "Already confirmed",
+        "body": "This receipt is already confirmed from another bank credit."
+      },
+      "line_decided": {
+        "title": "Already decided",
+        "body": "Someone already decided this bank credit. Reload the page."
+      },
+      "line_taken": {
+        "title": "Credit already used",
+        "body": "This bank credit already confirms another receipt."
+      },
+      "receipt_taken": {
+        "title": "Receipt already matched",
+        "body": "This receipt is already matched with another bank credit."
+      },
+      "receipt_not_confirmable": {
+        "title": "Not a UPI receipt",
+        "body": "Only an issued UPI receipt can be confirmed from the bank statement."
+      },
+      "upi_not_set": {
+        "title": "UPI not set",
+        "body": "The school's UPI ID is not set yet. The accountant adds it in Settings > UPI QR."
+      }
+    },
+    "upi": {
+      "title": "UPI QR",
+      "description": "The school's UPI ID and payee name, shown as a QR at the counter. Parents pay the school's bank account directly.",
+      "moneyTitle": "SchoolOS never holds money",
+      "moneyBody": "The QR is your bank's UPI ID with no amount in it. Money goes straight to the school's bank account. Each UPI receipt is issued at the counter with the parent's UTR and confirmed later from the bank statement.",
+      "formTitle": "UPI details",
+      "payee": "Payee name",
+      "payeeHint": "As the bank shows it, for example the school's account name. 2 to 60 characters.",
+      "vpa": "UPI ID",
+      "vpaHint": "For example schoolname@sbi. SchoolOS checks only how it is written, not with the bank.",
+      "days": "Confirm within (days)",
+      "daysHint": "A UPI receipt not seen in a bank statement after this many days is listed as an exception. 1 to 30.",
+      "daysValue": "{days, plural, one {# day} other {# days}}",
+      "save": "Save UPI details",
+      "saved": "UPI details saved.",
+      "discard": "Discard changes",
+      "previewTitle": "As parents will see it",
+      "previewBody": "Print it or show it on the counter screen. Check the name before using it.",
+      "notSet": "Not set yet.",
+      "qrAlt": "UPI QR code for {payee}",
+      "errors": {
+        "payee": "Enter the payee name (2 to 60 characters).",
+        "vpa": "Enter a UPI ID like schoolname@bank.",
+        "days": "Enter a whole number of days from 1 to 30."
+      }
+    },
+    "reconcile": {
+      "title": "Reconcile UPI",
+      "description": "Import the bank statement, confirm the UPI receipts it shows and look into anything not seen in the bank.",
+      "tabs": "Reconciliation",
+      "bankTab": "Bank statement",
+      "exceptionsTab": "UPI exceptions",
+      "uploadTitle": "Import a bank statement",
+      "uploadBody": "Download the statement from your bank as Excel (XLSX) or CSV, at most 2 MB and 5,000 transactions, and upload it unchanged.",
+      "deletedNote": "The file is read and deleted at once. Only the credits are kept: date, amount, UPI reference and the bank's description (erased after 90 days). Account numbers are never kept.",
+      "bank": "Bank format",
+      "bankHint": "Leave on automatic unless the statement is not recognised.",
+      "detect": "Find automatically",
+      "file": "Statement file",
+      "read": "Read statement",
+      "reading": "Reading the statement…",
+      "statementsTitle": "Imported statements",
+      "noStatements": "No bank statement imported yet.",
+      "importedAt": "Imported",
+      "period": "Period",
+      "credits": "Credits",
+      "proposed": "Proposed",
+      "importedBy": "Imported by",
+      "actions": "Actions",
+      "review": "Review",
+      "reviewTitle": "Statement {from} to {to}",
+      "reviewBody": "{credits, plural, one {# credit} other {# credits}} read; {duplicates, plural, =0 {none already imported} one {# already imported} other {# already imported}}.",
+      "confirmN": "{count, plural, =0 {Confirm matches} one {Confirm # match} other {Confirm # matches}}",
+      "confirmTitle": "{count, plural, one {Confirm # match} other {Confirm # matches}}",
+      "confirmBody": "Each ticked UPI receipt is marked as seen in the bank. Receipts themselves are never changed.",
+      "confirmConsequence": "A match that no longer holds is skipped and shown as an exception.",
+      "confirmed": "{count, plural, =0 {Nothing confirmed} one {# receipt confirmed} other {# receipts confirmed}}{skipped, plural, =0 {.} other {; # skipped (see the exceptions).}}",
+      "noCredits": "This statement has no credits.",
+      "linesCaption": "Credits of the statement",
+      "select": "Select",
+      "selectLine": "Confirm the match of row {row}",
+      "valueDate": "Value date",
+      "amount": "Amount",
+      "reference": "UTR or reference",
+      "utr": "UPI reference",
+      "narration": "Bank description",
+      "narrationErased": "Erased after 90 days",
+      "statusColumn": "Status",
+      "receipt": "Receipt",
+      "notCorrected": "Not matched: the receipt is never corrected. Cancel and issue it again if it is wrong.",
+      "status": {
+        "unmatched": "Needs a person",
+        "proposed": "Proposed",
+        "confirmed": "Confirmed",
+        "ignored": "Not a fee"
+      },
+      "kinds": {
+        "utr_exact": "Same UTR and amount",
+        "amount_date": "Same amount, near date: check it",
+        "manual": "Matched by a person"
+      },
+      "exceptions": {
+        "no_receipt": "No receipt has this payment yet",
+        "amount_mismatch": "The receipt with this UTR has a different amount",
+        "receipt_cancelled": "The receipt with this UTR was cancelled",
+        "receipt_already_confirmed": "The receipt with this UTR is already confirmed by another credit",
+        "confirmed_receipt_cancelled": "Its receipt was cancelled after confirming: match the new receipt"
+      },
+      "ignoreReasons": {
+        "not_a_fee": "Not a fee payment",
+        "recorded_elsewhere": "Recorded elsewhere",
+        "duplicate_credit": "Duplicate credit",
+        "other": "Other"
+      },
+      "match": "Match receipt",
+      "matchTitle": "Match this credit with a receipt",
+      "matchBody": "Choose the UPI receipt this credit paid. Only issued UPI receipts of the same amount are listed.",
+      "matchConsequence": "The receipt is marked as seen in the bank; it is not changed.",
+      "matchConfirm": "Match and confirm",
+      "chooseReceipt": "Choose a receipt",
+      "loadingReceipts": "Loading receipts…",
+      "noCandidates": "No issued UPI receipt has this amount. Issue the receipt at the counter first if the payment was missed.",
+      "lineLabel": "Row {row} of the statement",
+      "dismiss": "Not a fee",
+      "dismissTitle": "Mark this credit as not a fee payment",
+      "dismissBody": "For interest, grants or payments recorded elsewhere.",
+      "dismissConsequence": "The credit leaves the exceptions list. This cannot be undone.",
+      "dismissReason": "Reason",
+      "unconfirmedTitle": "UPI receipts not seen in the bank after {days, plural, one {# day} other {# days}}",
+      "unconfirmedBody": "Import a newer statement first. A receipt still missing may need checking with the parent.",
+      "noUnconfirmed": "Every older UPI receipt was seen in the bank.",
+      "receiptDate": "Receipt date",
+      "student": "Student",
+      "daysWaiting": "Days waiting",
+      "more": "{count, plural, one {# more not shown} other {# more not shown}}",
+      "creditsTitle": "Bank credits that need a person",
+      "creditsBody": "Credits no rule could match, and confirmed credits whose receipt was cancelled. A missed counter payment is issued at the counter, then matched here.",
+      "rematch": "Find matches again",
+      "rematched": "{count, plural, =0 {No new match found.} one {# new match proposed.} other {# new matches proposed.}}",
+      "proposedWaiting": "{count, plural, one {# proposed match is} other {# proposed matches are}} waiting in the Bank statement tab.",
+      "noCreditExceptions": "Nothing to look into.",
+      "reportConfirmed": "Confirmed from the bank (30 days)",
+      "reportUnconfirmed": "Not yet seen in the bank",
+      "reportOverdue": "Past the confirmation window",
+      "reportPeriod": "Period",
+      "onlineLink": "Online payments (Razorpay) are reconciled on their own page",
+      "onlineMenu": "Online reconciliation (Razorpay)",
+      "upiSettingsLink": "UPI QR settings",
+      "amountInr": "Amount (₹)",
+      "noStatementsBody": "Download the account statement from the bank's website as Excel or CSV and read it above. Matches are proposed for you to confirm."
+    }
+  },
+  "payments": {
+    "nav": {
+      "settings": "Online payments",
+      "reconcile": "Online reconciliation"
+    },
+    "settingsTitle": "Online payments",
+    "settingsDescription": "Connect the school's own Razorpay account so parents can pay fees online. The money goes straight to the school's Razorpay account and bank.",
+    "noAccessTitle": "You cannot see online payments",
+    "noAccessBody": "The owner connects online payments. Accountants and the principal can see the connection.",
+    "steps": {
+      "label": "Steps to connect online payments",
+      "choose": "Choose how to connect",
+      "webhook": "Add the webhook",
+      "ready": "Ready for online payments"
+    },
+    "off": {
+      "title": "Fees are not switched on for this school",
+      "body": "Online payments work with SchoolOS fees. The owner or principal turns fees on in school settings."
+    },
+    "connect": {
+      "title": "Connect Razorpay",
+      "description": "Use the school's own Razorpay account. SchoolOS makes payment links in it and reads its payments to issue receipts.",
+      "noticeTitle": "Before you connect",
+      "ownAccount": "The school is Razorpay's customer: payments go to the school's Razorpay account and from there to the school's bank.",
+      "neverHeld": "SchoolOS never holds or moves the school's money and takes no commission.",
+      "razorpayFees": "Razorpay charges the school its own fees on online payments (about 2% + GST unless the school agreed otherwise).",
+      "cashStays": "Cash, cheque and the school's own UPI QR keep working as before.",
+      "askOwner": "Only the owner can connect online payments.",
+      "oauth": "Connect with Razorpay sign-in",
+      "oauthPending": "Opening Razorpay…",
+      "oauthHint": "Razorpay asks you to sign in to the school's account and allow SchoolOS. You come back here afterwards.",
+      "manual": "Connect with API keys",
+      "manualHint": "Until SchoolOS is an approved Razorpay partner, pilot schools paste a key id and key secret from their own Razorpay dashboard.",
+      "manualTitle": "Connect with the school's API keys",
+      "manualDescription": "In the Razorpay dashboard open Account & Settings > API keys and create a key. Paste the key id and key secret here. The secret is stored encrypted and never shown again.",
+      "keyId": "Key id",
+      "keyIdHint": "Starts with rzp_live_ (real payments) or rzp_test_ (test mode).",
+      "keySecret": "Key secret",
+      "keySecretHint": "Shown by Razorpay only when the key is made. SchoolOS never shows it again.",
+      "connect": "Connect",
+      "notConfigured": "Online payments are not offered on this deployment yet. Ask SchoolOS support.",
+      "revokedTitle": "Razorpay stopped accepting SchoolOS",
+      "revokedBody": "The school's keys or its permission for SchoolOS no longer work, so no new payment links can be made. Connect again to continue."
+    },
+    "webhook": {
+      "steps": "Add this webhook in the Razorpay dashboard (Account & Settings > Webhooks > Add new webhook): paste the URL and the secret, and tick the events below. Receipts appear by themselves only after this is done.",
+      "url": "Webhook URL",
+      "events": "Events to tick",
+      "secret": "Webhook secret",
+      "previousUntil": "The old secret keeps working until {when}, so Razorpay's retries still arrive. Change it in the dashboard before then.",
+      "done": "I have added it"
+    },
+    "account": {
+      "title": "Razorpay account",
+      "description": "The school's own account. Payment links are made in it and its payments become receipts.",
+      "none": "Not available",
+      "status": "Status",
+      "statuses": {
+        "active": "Connected",
+        "revoked": "Stopped",
+        "disconnected": "Disconnected"
+      },
+      "mode": "Connected with",
+      "modes": {
+        "oauth": "Razorpay sign-in",
+        "manual_keys": "API keys"
+      },
+      "environment": "Mode",
+      "environments": {
+        "live": "Live payments",
+        "test": "Test mode"
+      },
+      "accountId": "Account",
+      "connectedAt": "Connected on",
+      "checkedAt": "Last checked",
+      "openLinks": "Open payment links",
+      "pendingEvents": "Razorpay messages waiting",
+      "accessUntil": "Access ends",
+      "webhookUrl": "Webhook URL",
+      "previousUntil": "The old webhook secret keeps working until {when}.",
+      "test": "Test connection",
+      "testOk": "Razorpay accepted the connection.",
+      "testFailed": "Razorpay refused the connection. Connect again.",
+      "rotate": "New webhook secret",
+      "rotateTitle": "Make a new webhook secret",
+      "rotateBody": "The new secret is shown once. The old one keeps working for 7 days so no payment is missed; paste the new one in the Razorpay dashboard before then.",
+      "rotateConsequence": "After 7 days Razorpay messages signed with the old secret are refused.",
+      "disconnectConsequence": "{count, plural, =0 {No payment link is open.} one {# open payment link is cancelled.} other {# open payment links are cancelled.}} Parents cannot pay online until the owner connects again.",
+      "disconnect": "Disconnect",
+      "disconnectTitle": "Disconnect Razorpay",
+      "disconnectBody": "Open payment links are cancelled and no new links can be made. Receipts and history stay. Payments already made stay in the school's Razorpay account.",
+      "failedEventsTitle": "Some Razorpay messages could not be applied",
+      "failedEventsBody": "{count, plural, one {# message} other {# messages}} could not be applied. Open Online reconciliation to check the payments."
+    },
+    "callback": {
+      "title": "Connecting Razorpay",
+      "working": "Finishing the connection…",
+      "doneTitle": "Razorpay is connected",
+      "doneBody": "Payment links can now be made from a student's fee account.",
+      "missingTitle": "Nothing to finish",
+      "missingBody": "This page is opened by Razorpay after you allow SchoolOS. Start again from Online payments.",
+      "back": "Back to Online payments"
+    },
+    "links": {
+      "tab": "Payment links",
+      "title": "Payment links",
+      "none": "No payment links yet.",
+      "create": "Make payment link",
+      "createTitle": "Make a payment link",
+      "createBody": "Choose the instalments to pay. The amount is what is still due on them now. Razorpay gets no name, phone number or email.",
+      "createConsequence": "An open link for the same instalments is reused; other open links for them are cancelled.",
+      "instalments": "Instalments",
+      "nothingDue": "Nothing is due that can be paid online.",
+      "createdTitle": "Payment link ready",
+      "reusedTitle": "This link is still open",
+      "createdBody": "Share it with the parent. It works until {date}. The receipt is issued by itself when the parent pays.",
+      "url": "Payment link",
+      "copy": "Copy link",
+      "copied": "Copied.",
+      "copyFailed": "Could not copy. Select the link and copy it.",
+      "done": "Done",
+      "cancel": "Cancel link",
+      "cancelFor": "Cancel payment link {code}",
+      "cancelTitle": "Cancel this payment link",
+      "cancelBody": "The parent can no longer pay with it. A link the parent has already paid cannot be cancelled.",
+      "cancelConsequence": "The link stops working at once. Nothing on the fee account changes.",
+      "notConnectedTitle": "Online payments are not connected",
+      "notConnectedBody": "The owner connects the school's Razorpay account in Settings > Online payments.",
+      "statuses": {
+        "created": "Open",
+        "paid": "Paid",
+        "expired": "Expired",
+        "cancelled": "Cancelled",
+        "failed": "Failed"
+      },
+      "columns": {
+        "code": "Link",
+        "instalments": "Instalments",
+        "amount": "Amount",
+        "status": "Status",
+        "expires": "Works until",
+        "receipt": "Receipt",
+        "action": "Action"
+      }
+    },
+    "recon": {
+      "title": "Online reconciliation",
+      "description": "Online payments that need a person: each morning SchoolOS compares yesterday's Razorpay payments, refunds and settlements with the receipt book. Nothing is changed automatically.",
+      "summaryTitle": "Today",
+      "notConnectedTitle": "Online payments are not connected",
+      "notConnectedBody": "The daily check runs only while the school's Razorpay account is connected.",
+      "open": "Open items",
+      "waiting": "Razorpay messages waiting",
+      "failedEvents": "Messages not applied",
+      "lastRun": "Last daily check",
+      "lastRunValue": "{date}: {status}",
+      "bankLink": "Reconcile UPI and bank statements",
+      "filterLabel": "Filter items",
+      "noResultsTitle": "No item matches these filters",
+      "noRun": "Not run yet",
+      "runStatuses": {
+        "running": "running",
+        "done": "done",
+        "failed": "could not finish"
+      },
+      "filterStatus": "Status",
+      "filterKind": "Kind",
+      "any": "Any",
+      "listTitle": "Items",
+      "emptyTitle": "Nothing to check",
+      "emptyBody": "Every online payment matches a receipt.",
+      "explain": "Explain",
+      "explainFor": "Explain: {kind}",
+      "explainTitle": "Explain this item",
+      "explainBody": "Say what happened and what was done (for example, refunded in the Razorpay dashboard). The note is kept with the item.",
+      "explainConsequence": "The item is closed. Nothing in receipts or the ledger changes.",
+      "note": "Note",
+      "noteHint": "10 to 500 characters. Do not type Aadhaar numbers or card details.",
+      "link": "Link {code}",
+      "receipt": "Receipt",
+      "account": "Fee account",
+      "expected": "Expected",
+      "statuses": {
+        "open": "Open",
+        "explained": "Explained",
+        "resolved": "Resolved"
+      },
+      "kinds": {
+        "paid_not_receipted": "Paid, no receipt",
+        "receipted_not_captured": "Receipt, payment not captured",
+        "amount_mismatch": "Amount differs",
+        "refunded": "Refunded at Razorpay",
+        "refund_failed": "Refund failed",
+        "settlement_missing": "Not settled to the bank",
+        "unknown_intent": "Payment for an unknown link"
+      },
+      "reasons": {
+        "no_receipt": "Razorpay shows the payment but no receipt was issued.",
+        "dues_already_paid": "The dues were paid another way first. Refund the parent or record what happened.",
+        "intent_already_paid": "The link was already paid by another payment.",
+        "account_closed": "The student's fee account is closed.",
+        "student_not_found": "The student's record could not be read.",
+        "amount": "Razorpay's amount differs from the link's.",
+        "currency": "The payment is not in rupees.",
+        "receipt_amount": "Razorpay's amount differs from the receipt's.",
+        "refunded_before_receipt": "The payment was refunded before a receipt was issued.",
+        "refund_without_voucher": "Razorpay shows a refund that has no SchoolOS voucher.",
+        "refund_outside_schoolos": "The payment was refunded outside SchoolOS.",
+        "refund_amount_differs": "Razorpay's refund amount differs from the approved refund.",
+        "provider_failed": "Razorpay could not refund the payment.",
+        "not_settled": "Razorpay has not settled this payment to the bank after 3 working days.",
+        "not_captured": "Razorpay says this payment was not captured.",
+        "payment_not_found": "Razorpay does not know this payment.",
+        "intent_not_found": "The payment names a link this school does not have."
+      },
+      "columns": {
+        "found": "Found",
+        "kind": "What",
+        "payment": "Razorpay payment",
+        "receipt": "Receipt",
+        "amount": "Amount",
+        "amountInr": "Amount (₹)",
+        "status": "Status",
+        "action": "Action"
+      }
+    },
+    "errors": {
+      "payments_not_connected": {
+        "title": "Online payments are not connected",
+        "body": "The owner connects the school's Razorpay account in Settings > Online payments."
+      },
+      "payments_already_connected": {
+        "title": "Already connected",
+        "body": "Disconnect the current Razorpay account first."
+      },
+      "manual_keys_not_allowed": {
+        "title": "Keys cannot be used here",
+        "body": "Connecting with API keys is not offered on this deployment. Use Razorpay sign-in."
+      },
+      "oauth_not_available": {
+        "title": "Razorpay sign-in is not available yet",
+        "body": "Ask SchoolOS support about connecting with the school's API keys."
+      },
+      "oauth_state_invalid": {
+        "title": "This connection attempt expired",
+        "body": "Start again from Online payments. The same person must finish within 10 minutes."
+      },
+      "payments_auth_failed": {
+        "title": "Razorpay refused the school's credentials",
+        "body": "Check the connection in Settings > Online payments and connect again."
+      },
+      "payments_provider_error": {
+        "title": "Razorpay did not accept the request",
+        "body": "Try again in a few minutes."
+      },
+      "payment_link_failed": {
+        "title": "The payment link was not made",
+        "body": "Razorpay did not accept the request. Try again in a few minutes."
+      },
+      "nothing_due": {
+        "title": "Nothing is due",
+        "body": "Nothing is due on the chosen instalments, so no payment link is needed."
+      },
+      "too_many_links": {
+        "title": "Too many open links",
+        "body": "This student has too many open payment links. Cancel one first."
+      },
+      "intent_closed": {
+        "title": "This link is closed",
+        "body": "It was already paid, expired or cancelled. Reload to see it."
+      },
+      "intent_paid": {
+        "title": "The parent has paid",
+        "body": "This link was paid, so it cannot be cancelled. The receipt appears shortly."
+      },
+      "item_closed": {
+        "title": "Already explained",
+        "body": "Someone else explained or resolved this item. Reload to see it."
+      },
+      "account_closed": {
+        "title": "The fee account is closed",
+        "body": "Payment links are made only for open fee accounts."
       }
     }
   }

@@ -70,6 +70,14 @@ class MessagingProviderMode(StrEnum):
     LIVE = "live"
 
 
+class PaymentsProviderMode(StrEnum):
+    """Payment provider (ADR-0042 decision 3; FR-PAY-001): ``fake`` = deterministic offline
+    provider for local and CI (refused in staging/prod); ``live`` = Razorpay."""
+
+    FAKE = "fake"
+    LIVE = "live"
+
+
 class LlmCredentialsSource(StrEnum):
     """How the gateway authenticates to Vertex AI (ADR-0033; invariant 10: a service identity,
     never a person's account). ``workload-identity``: an AWS -> Google workload identity
@@ -396,6 +404,23 @@ class Settings(BaseSettings):
     meta_graph_api_version: str | None = Field(default=None, pattern=r"^v[0-9]{1,3}\.[0-9]$")
     messaging_manual_token_allowed: bool = False
 
+    # --- R2-2D online payments (ADR-0042 decisions 3, 6; docs/10 §11; FR-PAY-001..004) ----------
+    # Provider mode: unset = "fake" in local/ci, "live" (Razorpay) in staging/prod; "fake" is
+    # refused in staging/prod. The partner client id and secret are SchoolOS's Razorpay
+    # Technology Partner application (Secrets Manager); unset, the OAuth connection is not
+    # offered. Each school's own keys, tokens and webhook secrets are never settings: they are
+    # wrapped in fin.payment_connections (SEC-035). The manual-keys connection is for pilots
+    # until partner approval (ADR-0042 P1, D13). SOS_WEBHOOK_BASE_URL is the origin Razorpay
+    # posts to (the ALB routes /api/v1/webhooks/* to the API); unset, the settings page shows
+    # the path only.
+    payments_provider_mode: PaymentsProviderMode | None = None
+    razorpay_partner_client_id: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_]{1,64}$")
+    razorpay_partner_client_secret: SecretStr | None = None
+    razorpay_oauth_redirect_uri: str | None = None
+    razorpay_oauth_mode: Literal["live", "test"] = "live"
+    razorpay_manual_keys_allowed: bool = False
+    webhook_base_url: str | None = None
+
     # Control plane / fleet (docs/16 §10, §12; ADR-0015). Supplier identity for GST invoices.
     billing_supplier_legal_name: str = DEV_SUPPLIER_NAME
     billing_supplier_gstin: str = DEV_SUPPLIER_GSTIN
@@ -615,6 +640,49 @@ class Settings(BaseSettings):
             if "dev-only" in secret.get_secret_value() or len(secret.get_secret_value()) < 16:
                 raise ValueError(f"SOS_META_APP_SECRET must be the real app secret in {self.env}")
 
+    @property
+    def effective_payments_provider_mode(self) -> PaymentsProviderMode:
+        """``SOS_PAYMENTS_PROVIDER_MODE``, else ``fake`` locally and in CI, ``live`` elsewhere."""
+        if self.payments_provider_mode is not None:
+            return self.payments_provider_mode
+        return PaymentsProviderMode.LIVE if self.is_production_like else PaymentsProviderMode.FAKE
+
+    def _guard_payments(self) -> None:
+        """Online payments (ADR-0042; FR-PAY-001): staging/prod never use the fake provider; the
+        partner secret is a real one; the OAuth redirect and the webhook origin are public https
+        URLs there (the webhook origin without a path)."""
+        if self.webhook_base_url is not None:
+            parts = urlsplit(self.webhook_base_url)
+            if (
+                parts.scheme not in ("http", "https")
+                or not parts.hostname
+                or parts.path not in ("", "/")
+                or parts.query
+                or parts.fragment
+                or parts.username
+                or parts.password
+            ):
+                raise ValueError(
+                    "SOS_WEBHOOK_BASE_URL must be an origin (scheme and host, no path)"
+                )
+        if not self.is_production_like:
+            return
+        if self.effective_payments_provider_mode is PaymentsProviderMode.FAKE:
+            raise ValueError(f"SOS_PAYMENTS_PROVIDER_MODE=fake is not allowed in {self.env}")
+        secret = self.razorpay_partner_client_secret
+        if secret is not None and (
+            "dev-only" in secret.get_secret_value() or len(secret.get_secret_value()) < 16
+        ):
+            raise ValueError(
+                f"SOS_RAZORPAY_PARTNER_CLIENT_SECRET must be the real secret in {self.env}"
+            )
+        for name, value in (
+            ("SOS_RAZORPAY_OAUTH_REDIRECT_URI", self.razorpay_oauth_redirect_uri),
+            ("SOS_WEBHOOK_BASE_URL", self.webhook_base_url),
+        ):
+            if value is not None and not _is_public_https(value):
+                raise ValueError(f"{name} must be a public https URL in {self.env}")
+
     def _guard_postgres_tls(self) -> None:
         """Shared tier, staging/prod: the database is RDS across the VPC, so TLS must check the
         server's certificate and host name (audit 2026-10-05; Terraform writes
@@ -638,6 +706,7 @@ class Settings(BaseSettings):
         self._guard_llm_credentials()
         self._guard_public_origins()
         self._guard_messaging()
+        self._guard_payments()
         if self.is_production_like:
             # Anti-automation is a production control (OWASP API4:2023, ASVS 2.2.1).
             if not self.rate_limit_enabled:

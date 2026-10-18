@@ -159,6 +159,9 @@ describe("FR-STU-018 transfer-in by PEN", () => {
       "href",
       expect.stringContaining(`/students/${ID.student}`),
     );
-    expect(await screen.findByText(messages.en.errors.field.udise_pen_in_use)).toBeInTheDocument();
+    expect(
+      await screen.findByRole("link", { name: messages.en.errors.field.udise_pen_in_use }),
+    ).toHaveAttribute("href", "#create-student-udise_pen");
+    expect(screen.getAllByText(messages.en.errors.field.udise_pen_in_use)).toHaveLength(2);
   });
 });

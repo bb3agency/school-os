@@ -36,4 +36,8 @@ routes:
     guard: webhook_signature
     provider: meta
   # --- R2-2D online payments: POST /api/v1/webhooks/razorpay/{route} -------------------------
+  POST /api/v1/webhooks/razorpay/{route}:
+    guard: webhook_signature
+    provider: razorpay
+  # --- end R2-2D ------------------------------------------------------------------------------
   # --- R2-3H parent pages: the other /api/v1/public/links/current/* routes ------------------

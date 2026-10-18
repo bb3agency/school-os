@@ -87,6 +87,7 @@ AnyFee = Annotated[
             R.REFUND_REQUEST,
             R.REFUND_APPROVE,
             R.REPORT,
+            R.RECONCILE,
         )
     ),
 ]

@@ -69,6 +69,7 @@ export function PricingView({ settings }: { settings: MarketingSettings }) {
         eyebrow={t("pricing.eyebrow")}
         title={t("pricing.headline")}
         intro={t("pricing.intro")}
+        illustration="fee-counter"
       />
 
       <section aria-label={t("pricing.plansLabel")} className="-mt-6 pb-20 md:-mt-10 md:pb-28">

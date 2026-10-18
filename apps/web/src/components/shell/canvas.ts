@@ -1,44 +1,20 @@
 import type { SidebarTheme } from "@/components/ui/SidebarNav";
 
 /**
- * The canvas behind the console's cards (docs/17 §3.2).
- *
- * - `gradient`: the soft sky-blue to aqua body gradient. Kept for the two dashboards (school
- *   home, platform home) and the public marketing pages.
- * - `neutral`: a near-neutral flat canvas (`--color-canvas-neutral`) for dense record
- *   screens, so the only colour on the page is the colour that means something (a status
- *   pill, an error).
- *
- * The rule lives here, once, instead of in each screen. A page that needs the other canvas
- * passes `canvas` to the shell.
+ * The canvas behind the console (docs/17 §3.2). Since v1.0 ("Quiet ledger", owner decision
+ * 2026-10-18) there is ONE flat warm canvas everywhere, dashboards included; the gradient
+ * is gone. The type and the `canvas` prop stay so older callers keep compiling; "gradient"
+ * now paints the same flat canvas.
  */
 export type ShellCanvas = "gradient" | "neutral";
 
-/** Locale-free path prefixes of the dense record screens (each includes its sub-pages). */
+/** Kept for older imports: every console page is on the flat canvas now. */
 export const NEUTRAL_CANVAS_PATHS = {
-  school: [
-    "/students",
-    "/findings",
-    "/change-requests",
-    "/imports",
-    "/register-photos",
-    "/exports",
-    "/documents",
-    "/audit",
-    "/settings",
-  ],
+  school: ["/"],
 } as const satisfies Record<"school", readonly string[]>;
 
-function under(pathname: string, prefix: string): boolean {
-  return pathname === prefix || pathname.startsWith(`${prefix}/`);
-}
-
-/** Which canvas a console page gets, from its theme and its locale-free path. */
-export function canvasFor(theme: SidebarTheme, pathname: string): ShellCanvas {
-  const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
-  if (theme === "platform") {
-    // Every platform page but the dashboard is a table of records.
-    return path === "/platform" || path === "" || path === "/" ? "gradient" : "neutral";
-  }
-  return NEUTRAL_CANVAS_PATHS.school.some((prefix) => under(path, prefix)) ? "neutral" : "gradient";
+/** Which canvas a console page gets: always the flat one. */
+export function canvasFor(...where: [theme: SidebarTheme, pathname: string]): ShellCanvas {
+  void where;
+  return "neutral";
 }

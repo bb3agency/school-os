@@ -27,6 +27,7 @@ import { Tabs } from "@/components/ui/Tabs";
 import { Timeline } from "@/components/ui/Timeline";
 import { Toggle } from "@/components/ui/Toggle";
 import { ChatPreview } from "@/features/ask/ChatPreview";
+import { ConsoleReference, FiguresReference, IllustrationsReference } from "./ConsoleReference";
 
 /*
  * Synthetic fixture content for the component gallery (invariant 11: no real data).
@@ -58,6 +59,18 @@ const SWATCHES = [
   ["chart-4", "bg-chart-4"],
   ["platform", "bg-platform"],
   ["platform-accent", "bg-platform-accent"],
+] as const;
+
+/** Direction B "Register paper" (marketing, parent and verification pages; docs/17 §5.6). */
+const PAPER_SWATCHES = [
+  ["paper #f8f7f1", "bg-[#f8f7f1]"],
+  ["sheet #fefdfa", "bg-[#fefdfa]"],
+  ["rule #dddbd2", "bg-[#dddbd2]"],
+  ["ink #211f1a", "bg-[#211f1a]"],
+  ["muted #57554e", "bg-[#57554e]"],
+  ["ledger green #0e6549", "bg-[#0e6549]"],
+  ["ledger soft #daf6e9", "bg-[#daf6e9]"],
+  ["night band #152c22", "bg-[#152c22]"],
 ] as const;
 
 /** Sample menu for the sidebar previews (synthetic labels; nothing is current on this page). */
@@ -160,6 +173,39 @@ export function UiReference({ telugu = false }: { telugu?: boolean }) {
           </ul>
         </Section>
 
+        <Section id="paper" title={t("sections.paper")}>
+          <p className="text-sm text-ink-muted">{t("paperNote")}</p>
+          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {PAPER_SWATCHES.map(([name, className]) => (
+              <li key={name} className="space-y-1.5">
+                <span
+                  aria-hidden="true"
+                  className={`block h-12 rounded-lg border border-border ${className}`}
+                />
+                <code className="block font-mono text-xs text-ink-muted">{name}</code>
+              </li>
+            ))}
+          </ul>
+          <p className="font-display text-4xl text-[#211f1a]">
+            Enter student details once.{" "}
+            <span className="text-[#0e6549] italic">Catch mismatches early.</span>
+          </p>
+        </Section>
+
+        <Section id="figures" title={t("sections.figures")}>
+          <FiguresReference />
+        </Section>
+
+        <Section id="console" title={t("sections.console")}>
+          <p className="text-sm text-ink-muted">{t("consoleNote")}</p>
+          <ConsoleReference />
+        </Section>
+
+        <Section id="illustrations" title={t("sections.illustrations")}>
+          <p className="text-sm text-ink-muted">{t("illustrationsNote")}</p>
+          <IllustrationsReference />
+        </Section>
+
         <Section id="type" title={t("sections.type")}>
           <Eyebrow>Sentiment dynamics · line 8 / 34</Eyebrow>
           <p className="font-display text-6xl leading-none text-ink">1,245</p>
@@ -202,8 +248,8 @@ export function UiReference({ telugu = false }: { telugu?: boolean }) {
               <Icon name="close" className="size-4" />
             </IconButton>
           </Row>
-          <div className="ai-gradient ai-chrome rounded-xl p-5">
-            <Button variant="inverse">Inverse on blue</Button>
+          <div className="rounded-xl bg-action p-5">
+            <Button variant="inverse">Inverse on dark</Button>
           </div>
         </Section>
 

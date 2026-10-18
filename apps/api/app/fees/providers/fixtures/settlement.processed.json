@@ -1,0 +1,23 @@
+{
+  "entity": "event",
+  "account_id": "acc_SYNTHETIC0001",
+  "event": "settlement.processed",
+  "contains": [
+    "settlement"
+  ],
+  "payload": {
+    "settlement": {
+      "entity": {
+        "id": "setl_SYNTHETIC0001",
+        "entity": "settlement",
+        "amount": 341932,
+        "status": "processed",
+        "fees": 7000,
+        "tax": 1068,
+        "utr": "SYNTHETICUTR0001",
+        "created_at": 1790090000
+      }
+    }
+  },
+  "created_at": 1790000100
+}

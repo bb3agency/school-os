@@ -1,0 +1,85 @@
+"use client";
+
+import Link from "next/link";
+
+import { useCalls } from "@/lib/api/hooks";
+import { useClientRealm } from "@/lib/api/session";
+import { BAR_STATUS } from "@/components/console/statusPill";
+
+/** The wire value of a call that is happening now (`calls.status`). */
+export const LIVE_STATUS = "in_progress";
+
+/**
+ * How many in-progress calls the chrome asks for. The count is shown as "N+" when the
+ * page comes back full, because `/v1/calls` returns a list without a total and a full
+ * page means "at least this many", not "exactly this many".
+ */
+const LIVE_PAGE = 20;
+
+/**
+ * The "this is happening now" mark. A solid dot with a soft ping around it; under reduced
+ * motion the ping is not drawn and the solid dot carries the meaning. Decorative to a
+ * screen reader — every place that draws it also says "Live" or "In progress" in text.
+ */
+export function LiveDot({ className = "" }: { className?: string }) {
+  return (
+    <span aria-hidden className={`relative inline-flex h-2 w-2 shrink-0 ${className}`}>
+      <span className="absolute inset-0 rounded-full bg-brand-bright opacity-60 motion-safe:animate-ping" />
+      <span className="relative inline-flex h-2 w-2 rounded-full bg-brand" />
+    </span>
+  );
+}
+
+/**
+ * "Live: 2 calls" in the client header — how many calls are in progress across the
+ * account, opening the call when there is one and the filtered call log when there are more.
+ *
+ * Read from the existing `/v1/calls?status=in_progress` through `useCalls`, so it polls on
+ * the same 20-second cadence as every other call list and adds no endpoint. Nothing while
+ * the first read is out and nothing on zero; a failed read says it could not check,
+ * because its silence would read as "no calls live".
+ */
+export function LiveCallsPill({ slug }: { slug: string }) {
+  const { session, href } = useClientRealm();
+  const live = useCalls(session, { status: LIVE_STATUS, limit: LIVE_PAGE });
+  if (live.isPending) return null;
+  // A failed read is not "no calls live": it says in words that it could not check.
+  if (live.isError) {
+    return (
+      <Link
+        href={href(`/c/${slug}/calls`)}
+        aria-label="Live calls: couldn't check. Open the call log to try again."
+        title="We couldn't check for calls in progress. Open the call log to try again."
+        className={`${BAR_STATUS} text-ink-muted`}
+      >
+        <span aria-hidden className="h-2 w-2 rounded-full bg-ink-faint" />
+        <span>
+          <span className="text-ink-muted">Live calls:</span> {"couldn't check"}
+        </span>
+      </Link>
+    );
+  }
+  if (live.data.length === 0) return null;
+  const count = live.data.length;
+  const label = count >= LIVE_PAGE ? `${LIVE_PAGE}+` : String(count);
+  const noun = count === 1 ? "call" : "calls";
+  // One call opens that call, where the live panel shows how long it has run; several open the
+  // call log filtered to the ones in progress.
+  const only = count === 1 ? live.data[0] : undefined;
+  const target = only
+    ? `/c/${slug}/calls/${only.id}`
+    : `/c/${slug}/calls?status=${LIVE_STATUS}`;
+  return (
+    <Link
+      href={href(target)}
+      aria-label={`${label} ${noun} in progress now`}
+      className={`${BAR_STATUS} text-ink`}
+    >
+      <LiveDot />
+      <span>
+        <span className="text-ink-muted">Live:</span>{" "}
+        <span className="tabular-nums">{label}</span> {noun}
+      </span>
+    </Link>
+  );
+}

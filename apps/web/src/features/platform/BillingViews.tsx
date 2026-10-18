@@ -19,7 +19,8 @@ import { Button } from "@/components/ui/Button";
 import { TextAreaField, TextField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
-import { DataTable, type Column } from "@/components/ui/Table";
+import { DataTableV2 } from "@/components/console/DataTableV2";
+import type { Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { planTone, subscriptionTone } from "@/features/status";
 import { Pager, usePagedList } from "@/features/students/paging";
@@ -47,7 +48,7 @@ import {
 } from "./data";
 import { InvoiceTable } from "./InvoiceTable";
 import { FilterCard } from "./FilterCard";
-import { Mono, TierTag } from "./pills";
+import { Figure, Mono, TierTag } from "./pills";
 import { SubscriptionActions } from "./SubscriptionActions";
 
 /* ------------------------------------------------------------------ plans */
@@ -485,10 +486,10 @@ export function PlansScreen({ status = "" }: { status?: string }) {
     {
       key: "price",
       header: t("colPrice"),
-      className: "text-right tabular-nums",
+      numeric: true,
       cell: (row) => (
         <span className="whitespace-nowrap">
-          <Mono>{formatInr(row.base_price_inr, locale)}</Mono>
+          <Figure>{formatInr(row.base_price_inr, locale)}</Figure>
           <span className="text-ink-muted">
             {" "}
             / {row.billing_period === "annual" ? t("perYear") : t("perMonth")}
@@ -499,13 +500,13 @@ export function PlansScreen({ status = "" }: { status?: string }) {
     {
       key: "fee",
       header: t("colOneTimeFee"),
-      className: "text-right tabular-nums",
+      numeric: true,
       cell: (row) => (
-        <Mono>
+        <Figure>
           <Value>
             {Number(row.one_time_fee_inr) > 0 ? formatInr(row.one_time_fee_inr, locale) : null}
           </Value>
-        </Mono>
+        </Figure>
       ),
     },
     {
@@ -514,7 +515,7 @@ export function PlansScreen({ status = "" }: { status?: string }) {
       className: "tabular-nums",
       cell: (row) => (
         <span className="flex flex-col">
-          <Mono>{`${Number(row.gst_rate)}%`}</Mono>
+          <Figure>{`${Number(row.gst_rate)}%`}</Figure>
           <span className="text-xs whitespace-nowrap text-ink-muted">
             {t("sacCode")}: <span className="font-mono">{row.sac_code}</span>
           </span>
@@ -524,13 +525,13 @@ export function PlansScreen({ status = "" }: { status?: string }) {
     {
       key: "students",
       header: t("colStudents"),
-      className: "text-right tabular-nums",
+      numeric: true,
       cell: (row) => {
         const value = row.limits.students;
         return (
-          <Mono>
+          <Figure>
             <Value>{typeof value === "number" ? formatCount(value, locale) : null}</Value>
-          </Mono>
+          </Figure>
         );
       },
     },
@@ -639,20 +640,23 @@ export function PlansScreen({ status = "" }: { status?: string }) {
         breadcrumb={[{ label: tn("dashboard"), href: "/platform" }, { label: t("title") }]}
         actions={manage ? createDialog() : undefined}
       />
-      <FilterCard clearHref={status ? "/platform/plans" : undefined}>
-        <SelectField
-          name="status"
-          label={t("colStatus")}
-          placeholder={tc("all")}
-          defaultValue={status}
-          options={(["draft", "published", "retired"] as const).map((value) => ({
-            value,
-            label: tstatus(value),
-          }))}
-          className="w-52"
-        />
-      </FilterCard>
-      <DataTable
+      <DataTableV2
+        toolbar={
+          <FilterCard bare clearHref={status ? "/platform/plans" : undefined}>
+            <SelectField
+              name="status"
+              label={t("colStatus")}
+              placeholder={tc("all")}
+              defaultValue={status}
+              options={(["draft", "published", "retired"] as const).map((value) => ({
+                value,
+                label: tstatus(value),
+              }))}
+              className="w-52"
+            />
+          </FilterCard>
+        }
+        id="platform.plans"
         caption={t("title")}
         captionHidden
         columns={columns}
@@ -677,20 +681,20 @@ function AiBundlesTable() {
     {
       key: "answers",
       header: t("colIncluded"),
-      className: "text-right tabular-nums",
-      cell: (row) => <Mono>{formatCount(row.included_answers, locale)}</Mono>,
+      numeric: true,
+      cell: (row) => <Figure>{formatCount(row.included_answers, locale)}</Figure>,
     },
     {
       key: "price",
       header: t("colBundlePrice"),
-      className: "text-right tabular-nums",
-      cell: (row) => <Mono>{formatInr(row.price_inr, locale)}</Mono>,
+      numeric: true,
+      cell: (row) => <Figure>{formatInr(row.price_inr, locale)}</Figure>,
     },
     {
       key: "extra",
       header: t("colExtra"),
-      className: "text-right tabular-nums",
-      cell: (row) => <Mono>{formatInr(row.overage_rate_inr, locale)}</Mono>,
+      numeric: true,
+      cell: (row) => <Figure>{formatInr(row.overage_rate_inr, locale)}</Figure>,
     },
     {
       key: "status",
@@ -704,7 +708,8 @@ function AiBundlesTable() {
         {t("bundlesTitle")}
       </h2>
       <p className="max-w-3xl text-sm text-ink-muted">{t("bundlesBody")}</p>
-      <DataTable
+      <DataTableV2
+        id="platform.ai-bundles"
         caption={t("bundlesTitle")}
         captionHidden
         columns={columns}
@@ -822,18 +827,18 @@ export function SubscriptionsScreen({ status = "" }: { status?: string }) {
       key: "period",
       header: t("colPeriodEnd"),
       cell: (row) => (
-        <Mono>
+        <Figure>
           <Value>{formatDate(row.current_period_end)}</Value>
-        </Mono>
+        </Figure>
       ),
     },
     {
       key: "trial",
       header: t("colTrialEnds"),
       cell: (row) => (
-        <Mono>
+        <Figure>
           <Value>{formatDate(row.trial_ends_at)}</Value>
-        </Mono>
+        </Figure>
       ),
     },
     {
@@ -849,17 +854,20 @@ export function SubscriptionsScreen({ status = "" }: { status?: string }) {
         description={t("description")}
         breadcrumb={[{ label: tn("dashboard"), href: "/platform" }, { label: t("title") }]}
       />
-      <FilterCard clearHref={status ? "/platform/subscriptions" : undefined}>
-        <SelectField
-          name="status"
-          label={t("filterStatus")}
-          placeholder={t("allStatuses")}
-          defaultValue={status}
-          options={SUBSCRIPTION_STATUSES.map((value) => ({ value, label: tstatus(value) }))}
-          className="w-64"
-        />
-      </FilterCard>
-      <DataTable
+      <DataTableV2
+        toolbar={
+          <FilterCard bare clearHref={status ? "/platform/subscriptions" : undefined}>
+            <SelectField
+              name="status"
+              label={t("filterStatus")}
+              placeholder={t("allStatuses")}
+              defaultValue={status}
+              options={SUBSCRIPTION_STATUSES.map((value) => ({ value, label: tstatus(value) }))}
+              className="w-64"
+            />
+          </FilterCard>
+        }
+        id="platform.subscriptions"
         stacked
         caption={t("title")}
         captionHidden
@@ -962,42 +970,49 @@ export function InvoicesScreen({ filters = {} }: { filters?: InvoiceFilters }) {
         <p>{t("gstNote")}</p>
         <p>{t("manualPaymentNote")}</p>
       </Alert>
-      <FilterCard
-        clearHref={
-          filters.status || filters.financialYear || filters.tenantId
-            ? "/platform/invoices"
-            : undefined
+      <InvoiceTable
+        toolbar={
+          <FilterCard
+            bare
+            clearHref={
+              filters.status || filters.financialYear || filters.tenantId
+                ? "/platform/invoices"
+                : undefined
+            }
+          >
+            <SelectField
+              name="status"
+              label={t("colStatus")}
+              placeholder={tc("all")}
+              defaultValue={filters.status ?? ""}
+              options={INVOICE_STATUSES.map((value) => ({ value, label: tstatus(value) }))}
+              className="w-44"
+            />
+            <TextField
+              name="fy"
+              label={t("financialYear")}
+              hint={t("financialYearHint")}
+              defaultValue={filters.financialYear ?? ""}
+              pattern="[0-9]{4}-[0-9]{2}"
+              className="w-44"
+            />
+            <SelectField
+              name="school"
+              label={t("colSchool")}
+              placeholder={tc("all")}
+              defaultValue={filters.tenantId ?? ""}
+              options={schools.map((school) => ({
+                value: school.tenant_id,
+                label: `${school.school_name} (${school.code})`,
+              }))}
+              className="w-72"
+            />
+          </FilterCard>
         }
-      >
-        <SelectField
-          name="status"
-          label={t("colStatus")}
-          placeholder={tc("all")}
-          defaultValue={filters.status ?? ""}
-          options={INVOICE_STATUSES.map((value) => ({ value, label: tstatus(value) }))}
-          className="w-44"
-        />
-        <TextField
-          name="fy"
-          label={t("financialYear")}
-          hint={t("financialYearHint")}
-          defaultValue={filters.financialYear ?? ""}
-          pattern="[0-9]{4}-[0-9]{2}"
-          className="w-44"
-        />
-        <SelectField
-          name="school"
-          label={t("colSchool")}
-          placeholder={tc("all")}
-          defaultValue={filters.tenantId ?? ""}
-          options={schools.map((school) => ({
-            value: school.tenant_id,
-            label: `${school.school_name} (${school.code})`,
-          }))}
-          className="w-72"
-        />
-      </FilterCard>
-      <InvoiceTable invoices={invoices} caption={t("title")} schoolName={nameOf} />
+        invoices={invoices}
+        caption={t("title")}
+        schoolName={nameOf}
+      />
       <Pager label={t("pagesLabel")} {...pager} />
     </div>
   );

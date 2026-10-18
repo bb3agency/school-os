@@ -78,7 +78,7 @@ function AssistantMark() {
   return (
     <span
       aria-hidden="true"
-      className="ai-gradient mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full text-white"
+      className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full border border-info-border bg-accent-soft text-accent"
     >
       <Icon name="sparkles" className="size-4" />
     </span>
@@ -233,7 +233,9 @@ function Sources({ state, prefix }: { state: AskState; prefix: string }) {
         <h3 id={headingId} className="text-sm font-semibold text-ink">
           {searchOnly ? t("searchOnly.passages") : t("answer.sources")}
         </h3>
-        <Pill variant="tag">{t("answer.sourcesCount", { count: state.citations.length })}</Pill>
+        <Pill variant="tag" className="num">
+          {t("answer.sourcesCount", { count: state.citations.length })}
+        </Pill>
       </div>
       <ol className="grid gap-2 sm:grid-cols-2">
         {state.citations.map((c) => (

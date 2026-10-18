@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
+import { Pill } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { TextAreaField, TextField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -62,13 +63,16 @@ export function ActionLog({ actions, label }: { actions: readonly FlagAction[]; 
 function FlagFacts({ flag }: { flag: FlagDetail }) {
   const t = useTranslations("insights");
   const rows: [string, ReactNode][] = [
-    [t("detail.indicator"), t(`indicator.${flag.indicator}`)],
-    [t("detail.why"), <FlagReason key="why" flag={flag} />],
-    [t("detail.raisedOn"), formatDate(flag.raised_on)],
+    [
+      t("detail.raisedOn"),
+      <span key="raised" className="num">
+        {formatDate(flag.raised_on)}
+      </span>,
+    ],
     [
       t("detail.dueOn"),
       <span key="due" className="inline-flex flex-wrap items-center gap-1">
-        <span className="font-mono">{formatDate(flag.due_on)}</span>
+        <span className="num">{formatDate(flag.due_on)}</span>
         <OverduePill overdue={flag.overdue} />
       </span>,
     ],
@@ -85,14 +89,28 @@ function FlagFacts({ flag }: { flag: FlagDetail }) {
       : []),
   ];
   return (
-    <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-[max-content_1fr]">
-      {rows.map(([label, value]) => (
-        <div key={label} className="contents">
-          <dt className="text-sm text-ink-muted">{label}</dt>
-          <dd className="text-sm break-words text-ink">{value}</dd>
-        </div>
-      ))}
-    </dl>
+    <div className="space-y-4">
+      {/* The evidence first: the area and, in words, what the rule saw (FR-EW-001). */}
+      <div className="space-y-2 rounded-lg border border-border bg-surface-muted p-4">
+        <p className="flex flex-wrap items-center gap-2 text-sm text-ink-muted">
+          <span>{t("detail.why")}</span>
+          <Pill variant="tag" size="sm" icon={null}>
+            {t(`indicator.${flag.indicator}`)}
+          </Pill>
+        </p>
+        <p className="text-base font-semibold break-words text-ink">
+          <FlagReason flag={flag} />
+        </p>
+      </div>
+      <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-[max-content_1fr]">
+        {rows.map(([label, value]) => (
+          <div key={label} className="contents">
+            <dt className="text-sm text-ink-muted">{label}</dt>
+            <dd className="text-sm break-words text-ink">{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
   );
 }
 
@@ -119,6 +137,7 @@ function FlagActions({ flag }: { flag: FlagDetail }) {
             title={t("action.title")}
             description={t("action.description")}
             confirmLabel={t("action.save")}
+            consequence={t("action.consequence")}
             schema={actionSchema}
             invalidate={invalidate}
             errorNamespace="insights"
@@ -170,6 +189,7 @@ function FlagActions({ flag }: { flag: FlagDetail }) {
             title={t("close.title")}
             description={t("close.description")}
             confirmLabel={t("close.save")}
+            consequence={t("close.consequence")}
             schema={closeSchema}
             invalidate={invalidate}
             errorNamespace="insights"
@@ -214,6 +234,7 @@ function FlagActions({ flag }: { flag: FlagDetail }) {
           title={t("assign.title")}
           description={t("assign.description")}
           confirmLabel={t("assign.save")}
+          consequence={t("assign.consequence")}
           stepUp
           schema={assignSchema}
           invalidate={invalidate}
@@ -254,6 +275,7 @@ function FlagActions({ flag }: { flag: FlagDetail }) {
           title={t("erase.title")}
           description={t("erase.description")}
           confirmLabel={t("erase.save")}
+          consequence={t("erase.consequence")}
           confirmVariant="danger"
           stepUp
           schema={eraseSchema}
@@ -287,17 +309,23 @@ function FlagActions({ flag }: { flag: FlagDetail }) {
  */
 export function FlagDetailScreen({ flagId }: { flagId: string }) {
   const t = useTranslations("insights");
+  const tn = useTranslations("school.nav");
   const can = useStaffCan();
   const meLoaded = useStaffMe() !== undefined;
   const allowed = can(PERM.insightsRead);
   const flag = useFlag(flagId, allowed);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={t("detail.title")}
         description={t("detail.description")}
-        breadcrumb={[{ label: t("title"), href: "/flags" }, { label: t("detail.title") }]}
+        badge={flag.status === "ready" ? <FlagStatusPill status={flag.data.status} /> : undefined}
+        breadcrumb={[
+          { label: tn("home"), href: "/" },
+          { label: t("title"), href: "/flags" },
+          { label: t("detail.title") },
+        ]}
       />
       {meLoaded && !allowed ? (
         <Alert tone="info" title={t("noAccessTitle")}>
@@ -307,35 +335,34 @@ export function FlagDetailScreen({ flagId }: { flagId: string }) {
         <LoadGate data={meLoaded ? flag : { status: "loading" }}>
           {(value) => (
             <>
-              <Card
-                title={
-                  <span className="inline-flex flex-wrap items-center gap-2">
-                    <span className="break-words">{value.student.full_name ?? t("unnamed")}</span>
-                    <FlagStatusPill status={value.status} />
-                  </span>
-                }
-                description={[value.student.section_label, value.student.admission_no]
-                  .filter(Boolean)
-                  .join(" · ")}
-                actions={
-                  <Link
-                    href={`/students/${value.student.id}`}
-                    className="text-sm text-primary underline underline-offset-4"
-                    data-print="hide"
-                  >
-                    {t("detail.profile")}
-                  </Link>
-                }
-              >
-                <div className="space-y-4">
-                  <FlagFacts flag={value} />
-                  <FlagActions flag={value} />
-                </div>
-              </Card>
-              <Card title={t("detail.logTitle")} description={t("detail.logDescription")}>
-                <ActionLog actions={value.actions} label={t("detail.logTitle")} />
-              </Card>
               <PurposeNote />
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
+                <Card
+                  title={
+                    <span className="break-words">{value.student.full_name ?? t("unnamed")}</span>
+                  }
+                  description={[value.student.section_label, value.student.admission_no]
+                    .filter(Boolean)
+                    .join(" · ")}
+                  actions={
+                    <Link
+                      href={`/students/${value.student.id}`}
+                      className="text-sm text-primary underline underline-offset-4"
+                      data-print="hide"
+                    >
+                      {t("detail.profile")}
+                    </Link>
+                  }
+                >
+                  <div className="space-y-5">
+                    <FlagFacts flag={value} />
+                    <FlagActions flag={value} />
+                  </div>
+                </Card>
+                <Card title={t("detail.logTitle")} description={t("detail.logDescription")}>
+                  <ActionLog actions={value.actions} label={t("detail.logTitle")} />
+                </Card>
+              </div>
             </>
           )}
         </LoadGate>

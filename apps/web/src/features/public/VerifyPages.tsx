@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import type { PublicCertificate } from "@/server/public/verify";
 import { groupCode } from "@/lib/verification-code";
 import { parentDate, publicTranslator } from "@/server/public/messages";
+import { PublicIcon } from "./PublicIcon";
 
 /**
  * Certificate verification pages (ADR-0045 decisions 5-7; docs/17 §5.8; FR-CERT-021,
@@ -9,6 +10,8 @@ import { parentDate, publicTranslator } from "@/server/public/messages";
  * `/v/check`, which redirects to `/v/{code}`. English: nothing says which school or language
  * the code belongs to before it is found, and verifiers are receiving schools and offices.
  * The result shows exactly what the certificate prints (its frozen content) and nothing else.
+ * Direction B "Register paper" (public.css): a masthead over a double rule, ruled sheets, and a
+ * verdict that says its status in words, colour and its own icon.
  */
 
 const t = () => publicTranslator("en");
@@ -18,6 +21,10 @@ function Shell({ children }: { children: ReactNode }) {
   return (
     <main className="public-page" lang="en">
       <title>{tr("verify.meta")}</title>
+      <header className="public-masthead">
+        <p className="public-school">{tr("verify.masthead")}</p>
+        <p className="public-kicker">{tr("verify.kicker")}</p>
+      </header>
       {children}
       <footer className="public-footer">
         <p>{tr("verify.footer")}</p>
@@ -55,14 +62,15 @@ export function VerifyForm({ invalid = false }: { invalid?: boolean }) {
           />
           {invalid ? (
             <p id="verify-code-error" className="public-error" role="alert">
-              {tr("verify.invalid")}
+              <PublicIcon name="alert" />
+              <span>{tr("verify.invalid")}</span>
             </p>
           ) : null}
           <button type="submit" className="public-button">
             {tr("verify.check")}
           </button>
         </form>
-        <p className="public-muted">{tr("verify.noSearch")}</p>
+        <p className="public-note">{tr("verify.noSearch")}</p>
       </section>
     </Shell>
   );
@@ -74,6 +82,9 @@ export function VerifyNotFound() {
   return (
     <Shell>
       <section className="public-card" aria-labelledby="verify-heading">
+        <p className="public-muted">
+          <PublicIcon name="alert" />
+        </p>
         <h1 id="verify-heading">{tr("verify.notFoundTitle")}</h1>
         <p>{tr("verify.notFoundBody")}</p>
         <p>
@@ -91,6 +102,9 @@ export function VerifyBusy() {
   return (
     <Shell>
       <section className="public-card" aria-labelledby="verify-heading">
+        <p className="public-muted">
+          <PublicIcon name="clock" />
+        </p>
         <h1 id="verify-heading">{tr("busy.title")}</h1>
         <p>{tr("verify.busyBody")}</p>
       </section>
@@ -133,22 +147,31 @@ export function VerifyResult({
         className={`public-banner ${cancelled ? "public-banner-red" : c.duplicate ? "public-banner-amber" : "public-banner-green"}`}
         role="status"
       >
-        {banner}
+        <PublicIcon name={cancelled ? "cancelled" : c.duplicate ? "duplicate" : "valid"} />
+        <span>{banner}</span>
       </p>
       <section className="public-card" aria-labelledby="verify-heading">
         <h1 id="verify-heading">{c.title_en}</h1>
         <dl className="public-facts">
-          <dt>{tr("verify.school")}</dt>
-          <dd>
-            {c.school_name}
-            {c.school_place ? `, ${c.school_place}` : ""}
-          </dd>
-          <dt>{tr("verify.serial")}</dt>
-          <dd>{c.serial}</dd>
-          <dt>{tr("verify.issuedOn")}</dt>
-          <dd>{date(c.issued_on)}</dd>
-          <dt>{tr("verify.code")}</dt>
-          <dd className="public-code">{groupCode(code)}</dd>
+          <div>
+            <dt>{tr("verify.school")}</dt>
+            <dd>
+              {c.school_name}
+              {c.school_place ? `, ${c.school_place}` : ""}
+            </dd>
+          </div>
+          <div>
+            <dt>{tr("verify.serial")}</dt>
+            <dd className="public-code">{c.serial}</dd>
+          </div>
+          <div>
+            <dt>{tr("verify.issuedOn")}</dt>
+            <dd>{date(c.issued_on)}</dd>
+          </div>
+          <div>
+            <dt>{tr("verify.code")}</dt>
+            <dd className="public-code">{groupCode(code)}</dd>
+          </div>
         </dl>
       </section>
       {lines.length > 0 ? (
@@ -159,7 +182,11 @@ export function VerifyResult({
             {lines.map((line) => (
               <div key={line.key}>
                 <dt>{line.label_en}</dt>
-                <dd>{line.value ?? tr("verify.leftBlank")}</dd>
+                {line.value === null || line.value === undefined ? (
+                  <dd className="public-blank">{tr("verify.leftBlank")}</dd>
+                ) : (
+                  <dd>{line.value}</dd>
+                )}
               </div>
             ))}
           </dl>

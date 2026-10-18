@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Icon } from "@/components/ui/Icon";
 import { SearchInput } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
+import { Menu } from "@/components/ui/Menu";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Link } from "@/i18n/navigation";
 import { useStaffCan, useStaffMeQuery } from "@/lib/bff/staff-me";
@@ -58,7 +59,7 @@ function Row({
           {conversation.pinned ? <span className="sr-only">{`${tc("pinnedMark")}: `}</span> : null}
           {title}
         </Link>
-        <p className="text-xs text-ink-subtle">
+        <p className="num text-xs text-ink-subtle">
           {updated ? t("updated", { date: updated }) : null}
           {updated ? " · " : null}
           {t("messages", { count: conversation.message_count })}
@@ -88,6 +89,8 @@ export function HistoryScreen() {
   const t = useTranslations("ask.history");
   const ta = useTranslations("ask");
   const tc = useTranslations("common");
+  const tu = useTranslations("ui");
+  const ttable = useTranslations("ui.table");
   const me = useStaffMeQuery();
   const can = useStaffCan();
   const allowed = can(ASK_PERM.ask);
@@ -133,10 +136,27 @@ export function HistoryScreen() {
       ]}
       actions={
         allowed ? (
-          <ButtonLink href="/ask">
-            <Icon name="newChat" className="size-4" />
-            {ta("chat.newChat")}
-          </ButtonLink>
+          <>
+            <ButtonLink href="/ask">
+              <Icon name="newChat" className="size-4" />
+              {ta("chat.newChat")}
+            </ButtonLink>
+            <Menu
+              label={tu("moreActions")}
+              variant="button"
+              trigger={tu("more")}
+              align="end"
+              entries={[
+                {
+                  kind: "link",
+                  id: "memory",
+                  label: ta("memory.manage"),
+                  href: "/ask/memory",
+                  icon: "memory",
+                },
+              ]}
+            />
+          </>
         ) : null
       }
     />
@@ -174,14 +194,20 @@ export function HistoryScreen() {
     ) : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {header}
       <AskTabs active="ask" />
       {actions.dialogs}
       {list.isPending ? (
         <LoadingState label={tc("loading")} rows={5} />
       ) : list.isError ? (
-        <ApiErrorAlert error={list.error} namespace="ask" />
+        <div className="space-y-3">
+          <ApiErrorAlert error={list.error} namespace="ask" />
+          <Button variant="secondary" size="sm" onClick={list.refetch}>
+            <Icon name="refresh" className="size-4" />
+            {tc("retry")}
+          </Button>
+        </div>
       ) : list.items.length === 0 ? (
         <EmptyState
           icon="message"
@@ -201,13 +227,22 @@ export function HistoryScreen() {
               autoComplete="off"
             />
             {filter.trim() ? (
-              <p role="status" className="text-sm text-ink-muted">
+              <p role="status" className="num text-sm text-ink-muted">
                 {t("filterCount", { count: matching.length, total: list.items.length })}
               </p>
             ) : null}
           </div>
           {matching.length === 0 ? (
-            <EmptyState icon="search" title={t("filterEmptyTitle")} body={t("filterEmptyBody")} />
+            <EmptyState
+              icon="search"
+              title={t("filterEmptyTitle")}
+              body={t("filterEmptyBody")}
+              action={
+                <Button variant="secondary" size="sm" onClick={() => setFilter("")}>
+                  {ttable("clearFilters")}
+                </Button>
+              }
+            />
           ) : (
             <div className="space-y-6">
               {section(pinnedId, t("pinned"), pinned)}

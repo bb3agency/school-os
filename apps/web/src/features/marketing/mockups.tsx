@@ -45,7 +45,7 @@ export function Mock({
 
 function Card({ children, className }: { children: ReactNode; className?: string | undefined }) {
   return (
-    <div className={cn("rounded-xl border border-border bg-surface p-4 sm:p-5", className)}>
+    <div className={cn("mk-app rounded-xl border border-border bg-surface p-4 sm:p-5", className)}>
       {children}
     </div>
   );
@@ -194,28 +194,29 @@ export function AskCard({
   return (
     <div
       className={cn(
-        "ai-gradient ai-chrome rounded-xl border border-transparent p-4 text-white sm:p-5",
+        // The product's Ask panel: the accent tint (docs/17 §5.3), not a blue gradient.
+        "mk-app rounded-xl border border-info-border bg-accent-soft p-4 text-ink sm:p-5",
         className,
       )}
     >
-      <p className="eyebrow flex items-center gap-1.5 text-white">
-        <Icon name="sparkles" className="size-4" />
+      <p className="eyebrow flex items-center gap-1.5 text-ink">
+        <Icon name="sparkles" className="size-4 text-accent" />
         {t("label")}
       </p>
-      <p className="mt-3 ms-auto w-fit max-w-[90%] rounded-lg rounded-br-sm bg-surface px-3 py-2 text-sm text-ink">
+      <p className="mt-3 ms-auto w-fit max-w-[90%] rounded-lg rounded-br-sm border border-border bg-surface px-3 py-2 text-sm text-ink">
         {t("question")}
       </p>
-      <p className="mt-3 text-sm leading-relaxed text-white">
+      <p className="mt-3 text-sm leading-relaxed text-ink">
         {t("answer")}
         <sup className="ms-0.5 font-mono text-[0.6875rem]">[1]</sup>
         <sup className="font-mono text-[0.6875rem]">[2]</sup>
       </p>
-      <p className="eyebrow mt-3 text-white">{t("sources")}</p>
+      <p className="eyebrow mt-3 text-ink-muted">{t("sources")}</p>
       <ul className="mt-1.5 flex flex-wrap gap-1.5">
         {[t("sourceRegister"), t("sourceRecord")].map((source, index) => (
           <li
             key={source}
-            className="inline-flex items-center gap-1 rounded-full bg-surface px-2.5 py-0.5 text-xs font-semibold text-ink"
+            className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-0.5 text-xs font-semibold text-ink"
           >
             <span className="font-mono text-primary">[{index + 1}]</span>
             {source}
@@ -223,7 +224,7 @@ export function AskCard({
         ))}
       </ul>
       {notFound ? (
-        <p className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-white/40 px-2.5 py-0.5 text-xs text-white">
+        <p className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-0.5 text-xs text-ink-muted">
           <Icon name="search" className="size-3" />
           {t("notFound")}
         </p>
@@ -390,8 +391,8 @@ export function RegionDiagram({
       <svg viewBox="0 0 400 160" className="h-auto w-full" fill="none" aria-hidden="true">
         <defs>
           <linearGradient id="mk-route" x1="0" x2="1" y1="0" y2="0">
-            <stop offset="0" stopColor="#2563eb" />
-            <stop offset="1" stopColor="#0d9488" />
+            <stop offset="0" stopColor="#0e6549" />
+            <stop offset="1" stopColor="#8a5619" />
           </linearGradient>
         </defs>
         <path
@@ -401,13 +402,13 @@ export function RegionDiagram({
           strokeDasharray="6 7"
           strokeLinecap="round"
         />
-        <circle cx="70" cy="110" r="26" fill="#e8efff" />
-        <circle cx="70" cy="110" r="9" fill="#1d4ed8" />
-        <circle cx="330" cy="90" r="26" fill="#e6f7f5" />
-        <circle cx="330" cy="90" r="9" fill="#0f766e" />
+        <circle cx="70" cy="110" r="26" fill="#ddf5e9" />
+        <circle cx="70" cy="110" r="9" fill="#0e6549" />
+        <circle cx="330" cy="90" r="26" fill="#ffeaca" />
+        <circle cx="330" cy="90" r="9" fill="#8a5619" />
         <path
           d="M196 38 l8 5 -8 5"
-          stroke="#0f766e"
+          stroke="#0e6549"
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -438,7 +439,7 @@ export function HeroComposition() {
   return (
     <Mock caption={t("hero")} className="mx-auto w-full max-w-xl lg:max-w-none">
       <div className="relative pt-2 sm:pt-16 lg:ps-4">
-        <div className="mk-window mk-settle overflow-hidden rounded-2xl">
+        <div className="mk-app mk-window mk-settle overflow-hidden rounded-2xl">
           <div className="flex items-center gap-2 border-b border-border bg-surface-muted px-4 py-2.5">
             <span className="flex gap-1.5">
               <span className="size-2.5 rounded-full bg-border-soft" />

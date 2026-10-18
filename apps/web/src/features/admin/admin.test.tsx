@@ -119,6 +119,11 @@ describe("data export screen (US-1201 AC1, FR-ADM-001)", () => {
     expect(call?.headers.get("Idempotency-Key")).toMatch(/^[0-9a-f-]{36}$/);
     expect(await screen.findByText(en.dataExport.requested)).toBeInTheDocument();
     expect(await screen.findByText(en.dataExport.queuedTitle)).toBeInTheDocument();
+    const steps = screen.getByRole("list", { name: en.dataExport.steps.label });
+    expect(within(steps).getByText(en.dataExport.steps.prepare).closest("li")).toHaveAttribute(
+      "aria-current",
+      "step",
+    );
     // One export at a time: the button waits for it.
     expect(screen.getByRole("button", { name: en.dataExport.requestButton })).toBeDisabled();
   });
@@ -162,6 +167,12 @@ describe("data export screen (US-1201 AC1, FR-ADM-001)", () => {
       });
     renderWithIntl(<DataExportScreen />);
     const latest = await screen.findByRole("region", { name: en.dataExport.latestTitle });
+    // The job's steps follow the latest export: ready means the download step is current.
+    const steps = screen.getByRole("list", { name: en.dataExport.steps.label });
+    expect(within(steps).getByText(en.dataExport.steps.download).closest("li")).toHaveAttribute(
+      "aria-current",
+      "step",
+    );
     expect(within(latest).getByText(en.dataExport.readyTitle)).toBeInTheDocument();
     expect(within(latest).getByText("412")).toBeInTheDocument();
     const history = screen.getByRole("region", { name: en.dataExport.historyTable });
@@ -315,8 +326,33 @@ describe("retention settings (FR-ADM-002)", () => {
     await userEvent.clear(read);
     await userEvent.type(read, "120");
     await userEvent.click(screen.getByRole("button", { name: en.retention.save }));
-    expect(await screen.findByText(messages.en.validation.invalidNumber)).toBeInTheDocument();
+    // Under the field and, linked to it, in the error summary at the top of the form.
+    const summary = await screen.findByRole("alert", { name: messages.en.ui.errorSummary.title });
+    expect(
+      within(summary).getByRole("link", { name: messages.en.validation.invalidNumber }),
+    ).toHaveAttribute("href", `#${read.id}`);
+    expect(screen.getAllByText(messages.en.validation.invalidNumber)).toHaveLength(2);
     expect(read).toHaveAttribute("aria-invalid", "true");
+    expect(stub.callsTo("PUT /bff/api/v1/admin/retention")).toHaveLength(0);
+  });
+
+  it("the save bar shows unsaved changes and Discard puts back the loaded periods", async () => {
+    signedIn([MANAGE]);
+    stub.routes["GET /bff/api/v1/admin/retention"] = () => Response.json(retention());
+    renderWithIntl(<RetentionScreen />);
+    const read = await screen.findByLabelText(en.retention.categories.notifications_read.name);
+    const before = (read as HTMLInputElement).value;
+    expect(screen.getByText(messages.en.ui.saveBar.noChanges)).toBeInTheDocument();
+    await userEvent.clear(read);
+    await userEvent.type(read, "45");
+    expect(await screen.findByText(messages.en.ui.saveBar.unsaved)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: messages.en.schoolSettings.discard }));
+    await waitFor(() =>
+      expect(screen.getByLabelText(en.retention.categories.notifications_read.name)).toHaveValue(
+        before,
+      ),
+    );
+    expect(screen.getByText(messages.en.ui.saveBar.noChanges)).toBeInTheDocument();
     expect(stub.callsTo("PUT /bff/api/v1/admin/retention")).toHaveLength(0);
   });
 

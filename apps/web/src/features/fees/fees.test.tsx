@@ -21,6 +21,7 @@ import {
   type FeeStatus,
   type Receipt,
 } from "./data";
+import { ReceiptDetailScreen } from "./ReceiptDetailScreen";
 import { ReceiptsScreen } from "./ReceiptsScreen";
 
 /**
@@ -285,8 +286,22 @@ describe("fee counter (US-2102; docs/17 §5.8)", () => {
     await user.click(screen.getByRole("radio", { name: re(en.modes.upi_qr) }));
     await user.type(screen.getByLabelText(re(en.counter.utr)), "123");
     await user.click(screen.getByRole("button", { name: re(en.counter.save) }));
-    expect(await screen.findByText(en.counter.errors.amountAboveDue)).toBeInTheDocument();
-    expect(screen.getByText(en.counter.errors.utr)).toBeInTheDocument();
+    // The error summary takes focus and links each problem to its field; each field still
+    // carries its own message.
+    const summary = await screen.findByRole("alert", {
+      name: messages.en.ui.errorSummary.title,
+    });
+    await waitFor(() => expect(summary).toHaveFocus());
+    expect(
+      within(summary).getByRole("link", { name: en.counter.errors.amountAboveDue }),
+    ).toHaveAttribute("href", `#${amount.id}`);
+    expect(within(summary).getByRole("link", { name: en.counter.errors.utr })).toBeInTheDocument();
+    expect(amount).toHaveAccessibleDescription(
+      expect.stringContaining(en.counter.errors.amountAboveDue),
+    );
+    expect(screen.getByLabelText(re(en.counter.utr))).toHaveAccessibleDescription(
+      expect.stringContaining(en.counter.errors.utr),
+    );
     expect(stub.callsTo("POST /bff/api/v1/fees/receipts")).toHaveLength(0);
   });
 
@@ -330,6 +345,40 @@ describe("receipts list", () => {
     const link = await screen.findByRole("link", { name: "RCT/2026-27/000123" });
     expect(link.className).toContain("line-through");
     expect(screen.getByText("Cancelled on 18/10/2026")).toBeInTheDocument();
+  });
+});
+
+describe("receipt page", () => {
+  it("prints first and asks for a cancellation from More, with its consequence", async () => {
+    signedIn([COLLECT]);
+    stub.routes[`GET /bff/api/v1/fees/receipts/${RECEIPT}`] = () => Response.json(receipt());
+    stub.routes[`POST /bff/api/v1/fees/receipts/${RECEIPT}/cancellation`] = () =>
+      Response.json({}, { status: 201 });
+    const user = userEvent.setup();
+    renderWithIntl(<ReceiptDetailScreen receiptId={RECEIPT} />);
+    expect(await screen.findByRole("link", { name: re(en.receipt.print) })).toHaveAttribute(
+      "href",
+      `/bff/api/v1/fees/receipts/${RECEIPT}/print`,
+    );
+    // No refund permission: no refund item; the PDF is not ready yet.
+    await user.click(screen.getByRole("button", { name: messages.en.ui.more }));
+    expect(screen.queryByRole("menuitem", { name: en.receipt.requestRefund })).toBeNull();
+    expect(screen.getByRole("menuitem", { name: en.receipt.downloadPdf })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    await user.click(screen.getByRole("menuitem", { name: en.receipt.requestCancel }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(en.receipt.cancelConsequence)).toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText(re(en.receipt.reason)), "Typed the wrong amount");
+    await user.click(within(dialog).getByRole("button", { name: en.receipt.requestCancel }));
+    await waitFor(() =>
+      expect(stub.callsTo(`POST /bff/api/v1/fees/receipts/${RECEIPT}/cancellation`)).toHaveLength(
+        1,
+      ),
+    );
+    const call = stub.callsTo(`POST /bff/api/v1/fees/receipts/${RECEIPT}/cancellation`)[0];
+    expect(call?.headers.get("Idempotency-Key")).toBeTruthy();
   });
 });
 

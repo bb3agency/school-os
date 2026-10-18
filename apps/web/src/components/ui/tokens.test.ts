@@ -15,9 +15,45 @@ const css = readFileSync(
 
 // Only the @theme block defines tokens (scoped overrides such as .platform-chrome come later).
 const theme = css.slice(css.indexOf("@theme {"), css.indexOf("@layer base"));
+
+/**
+ * OKLCH → sRGB hex (CSS Color 4: OKLab → linear sRGB, gamma-encoded, clamped to the sRGB
+ * gamut, which is what an sRGB office screen shows). The palette is written in oklch()
+ * (docs/17 §3); the contrast maths below works on sRGB.
+ */
+function oklchToHex(lightness: number, chroma: number, hue: number): string {
+  const h = (hue * Math.PI) / 180;
+  const a = chroma * Math.cos(h);
+  const b = chroma * Math.sin(h);
+  const l = (lightness + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (lightness - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (lightness - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  const linear = [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+  ];
+  return `#${linear
+    .map((value) => {
+      const clamped = Math.min(1, Math.max(0, value));
+      const encoded = clamped <= 0.0031308 ? 12.92 * clamped : 1.055 * clamped ** (1 / 2.4) - 0.055;
+      return Math.round(encoded * 255)
+        .toString(16)
+        .padStart(2, "0");
+    })
+    .join("")}`;
+}
+
 const tokens = new Map<string, string>();
-for (const match of theme.matchAll(/--color-([a-z0-9-]+):\s*(#[0-9a-f]{6})\b/gi)) {
-  tokens.set(match[1] as string, (match[2] as string).toLowerCase());
+for (const match of theme.matchAll(
+  /--color-([a-z0-9-]+):\s*(?:(#[0-9a-f]{6})\b|oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\))/gi,
+)) {
+  tokens.set(
+    match[1] as string,
+    match[2]
+      ? match[2].toLowerCase()
+      : oklchToHex(Number(match[3]), Number(match[4]), Number(match[5])),
+  );
 }
 
 function hex(name: string): string {
@@ -89,8 +125,6 @@ const CONTRAST_PAIRS: ReadonlyArray<readonly [string, string, number, string]> =
   ["ink-subtle", "canvas-neutral", 4.5, "notes on the neutral canvas"],
   ["primary", "canvas-neutral", 4.5, "links and breadcrumbs on the neutral canvas"],
   ["focus", "canvas-neutral", 3, "focus ring on the neutral canvas"],
-  ["white", "ai-from", 4.5, "AI panel text (dark stop)"],
-  ["white", "ai-to", 4.5, "AI panel text (light stop)"],
   // Platform chrome
   ["platform-ink", "platform", 4.5, "platform sidebar and top bar text"],
   ["platform-ink", "platform-hover", 4.5, "platform sidebar hover and active row"],
@@ -115,12 +149,64 @@ const CONTRAST_PAIRS: ReadonlyArray<readonly [string, string, number, string]> =
   ["chart-2", "surface", 3, "chart series 2 (amber)"],
   ["chart-3", "surface", 3, "chart series 3 (teal)"],
   ["chart-4", "surface", 3, "chart series 4 (violet)"],
+  // Quiet ledger (docs/17 v1.0): the one accent, the flat canvas and the fixed status colours
+  ["ink", "canvas", 4.5, "text on the flat canvas"],
+  ["ink-muted", "canvas", 4.5, "secondary text on the flat canvas"],
+  ["ink-subtle", "canvas", 4.5, "notes and group labels on the canvas"],
+  ["ink-subtle", "surface-sunken", 4.5, "notes on the sunken track"],
+  ["accent", "surface", 4.5, "links, breadcrumb links on white"],
+  ["accent", "canvas", 4.5, "links and the top bar breadcrumb on the canvas"],
+  ["accent", "accent-soft", 4.5, "current nav item, selected row text"],
+  ["accent-strong", "accent-soft", 4.5, "selected chip text"],
+  ["on-accent", "accent", 4.5, "selection count badge, accent fill"],
+  ["on-accent", "accent-strong", 4.5, "accent fill hover"],
+  ["accent", "accent-soft", 3, "current nav item marker on its tint"],
+  ["focus", "canvas", 3, "focus ring on the flat canvas"],
+  ["focus", "surface-muted", 3, "focus ring on table headers and filled inputs"],
+  ["success-ink", "success-soft", 4.5, "success pill and toast"],
+  ["warning-ink", "warning-soft", 4.5, "warning pill and toast"],
+  ["danger", "danger-soft", 4.5, "danger pill, error summary"],
+  ["info-ink", "info-soft", 4.5, "info pill and toast"],
+  ["ink", "surface-hover", 4.5, "row text on hover"],
+  ["ink-muted", "surface-hover", 4.5, "secondary row text on hover"],
+  ["border-control", "canvas", 3, "checkbox boundary on the canvas"],
+  ["platform-muted", "platform-hover", 4.5, "operator sidebar muted text on hover"],
+  ["platform-ink", "platform", 4.5, "operator top bar breadcrumb"],
+  ["ink", "accent-soft", 4.5, "current sidebar item, palette option text"],
+  ["ink-muted", "accent-soft", 4.5, "filter chip label"],
+  ["accent-strong", "accent-soft", 4.5, "active palette option, filter chip value"],
+  ["warning-ink", "surface", 4.5, "'Changes not saved' on the save bar"],
+  ["ink-subtle", "surface-muted", 4.5, "palette group headings, footer hints"],
+  ["ink-muted", "surface-sunken", 4.5, "sidebar item on hover"],
+  ["platform-accent", "platform-hover", 3, "operator focus ring on the active row"],
 ];
 
 describe("design tokens meet WCAG 2.2 AA (NFR-A11Y-001)", () => {
   it("parses the palette from globals.css", () => {
     expect(tokens.size).toBeGreaterThan(40);
-    expect(hex("ink")).toBe("#111827");
+    // Quiet ledger: warm near-black ink, ink-blue accent, flat warm canvas.
+    expect(hex("ink")).toBe("#1c1a17");
+    expect(hex("accent")).toBe("#2f62ac");
+    expect(hex("canvas")).toBe("#fbfaf9");
+  });
+
+  it("the canvas is flat: the old gradient stops equal the canvas", () => {
+    for (const name of ["canvas-from", "canvas-via", "canvas-to", "canvas-neutral"]) {
+      expect(hex(name), name).toBe(hex("canvas"));
+    }
+    expect(css).not.toMatch(/body\s*\{[^}]*linear-gradient/);
+  });
+
+  it("there is one accent: primary, brand, focus and info point at it", () => {
+    for (const name of ["primary", "brand", "focus", "chart-1", "info-soft"]) {
+      expect(hex(name), name).toBe(name === "info-soft" ? hex("accent-soft") : hex("accent"));
+    }
+  });
+
+  it("converts oklch like the browser (known sRGB values)", () => {
+    expect(oklchToHex(1, 0, 0)).toBe("#ffffff");
+    expect(oklchToHex(0, 0, 0)).toBe("#000000");
+    expect(oklchToHex(0.627955, 0.257683, 29.234)).toBe("#ff0000");
   });
 
   it.each(CONTRAST_PAIRS)("%s on %s ≥ %s:1 (%s)", (foreground, background, minimum) => {

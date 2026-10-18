@@ -341,7 +341,10 @@ describe("promotions screen (FR-TEN-011, US-202 AC2)", () => {
     expect(commit).toBeEnabled();
     await userEvent.click(commit);
     const dialog = screen.getByRole("dialog", { name: "Promote 3 students now?" });
-    await userEvent.click(within(dialog).getByRole("button", { name: "Promote students" }));
+    // The confirm says in one line what changes (the consequence describes the button).
+    const confirm = within(dialog).getByRole("button", { name: "Promote students" });
+    expect(confirm).toHaveAccessibleDescription(/3 students get new enrolments in/);
+    await userEvent.click(confirm);
     await waitFor(() => expect(stub.callsTo(`POST ${PROMOTIONS}:commit`)).toHaveLength(1));
     const call = stub.callsTo(`POST ${PROMOTIONS}:commit`)[0];
     expect(call?.headers.get("Idempotency-Key")).toMatch(/^[0-9a-f-]{36}$/);
@@ -452,9 +455,12 @@ describe("promotions screen (FR-TEN-011, US-202 AC2)", () => {
       "aria-current",
       "step",
     );
-    expect(within(steps).getAllByText("Done:", { exact: false })).toHaveLength(3);
+    expect(within(steps).getAllByText(messages.en.ui.steps.done)).toHaveLength(3);
     await userEvent.click(screen.getByRole("button", { name: "Undo promotion" }));
     const dialog = screen.getByRole("dialog", { name: "Undo this promotion?" });
+    expect(
+      within(dialog).getByText(messages.en.academicStructure.promotions.undoConsequence),
+    ).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole("button", { name: "Undo promotion" }));
     await waitFor(() => expect(stub.callsTo(`POST ${PROMOTIONS}:undo`)).toHaveLength(1));
   });

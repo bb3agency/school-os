@@ -54,6 +54,7 @@ export function FeaturesView({ settings }: { settings: MarketingSettings }) {
         eyebrow={t("features.eyebrow")}
         title={t("features.headline")}
         intro={t("features.intro")}
+        illustration="certificate-check"
       >
         <nav aria-label={t("features.jumpLabel")} className="mt-10" data-print="hide">
           <ul className="flex flex-wrap gap-2">

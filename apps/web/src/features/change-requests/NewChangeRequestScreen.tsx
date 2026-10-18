@@ -8,10 +8,12 @@ import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ErrorSummary } from "@/components/ui/ErrorSummary";
 import { Field, Input, TextAreaField } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
+import { Steps } from "@/components/ui/Steps";
 import { DQ_KEYS, useAttributes } from "@/features/findings/data";
 import { isSourceKey, SOURCES, type AttributeDef, type SourceKey } from "@/features/findings/types";
 import { Link } from "@/i18n/navigation";
@@ -135,12 +137,27 @@ export function NewChangeRequestScreen({ params }: { params: NewRequestParams })
   const me = useStaffMeQuery();
   const attributes = useAttributes();
   const searchId = useId();
+  const formId = useId();
+  /** Stable control ids, so the error summary can link to each field. */
+  const fieldIds: Record<string, string> = {
+    student_id: searchId,
+    attribute_key: `${formId}-attribute_key`,
+    target_source: `${formId}-target_source`,
+    new_value: `${formId}-new_value`,
+    reason: `${formId}-reason`,
+    evidence: `${formId}-evidence`,
+    evidence_document_id: `${formId}-evidence_document_id`,
+  };
   const [studentId, setStudentId] = useState<string | null>(params.studentId);
   const [search, setSearch] = useState("");
   const [searchTerm, setSearchTerm] = useState<string | null>(null);
   const [attributeKey, setAttributeKey] = useState<string>(params.attributeKey ?? "");
   const [evidenceMode, setEvidenceMode] = useState<EvidenceMode>("upload");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // Each failed submit moves focus to the error summary again (docs/17 §4.4).
+  const [attempt, setAttempt] = useState(0);
+  // Whether an evidence file or document is chosen: only for the steps shown above the form.
+  const [evidencePicked, setEvidencePicked] = useState(false);
   const [error, setError] = useState<unknown>(undefined);
   const [step, setStep] = useState<Step>("idle");
   const [created, setCreated] = useState<ChangeRequest | null>(null);
@@ -276,9 +293,7 @@ export function NewChangeRequestScreen({ params }: { params: NewRequestParams })
     setErrors(next);
     setError(undefined);
     if (!parsed.success || Object.keys(next).length > 0) {
-      requestAnimationFrame(() =>
-        form.querySelector<HTMLElement>("[aria-invalid='true']")?.focus(),
-      );
+      setAttempt((value) => value + 1);
       return;
     }
     const data = parsed.data;
@@ -320,6 +335,7 @@ export function NewChangeRequestScreen({ params }: { params: NewRequestParams })
       uploaded.current = null;
       setCreated(result);
       form.reset();
+      setEvidencePicked(false);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: CR_KEYS.all }),
         queryClient.invalidateQueries({ queryKey: DQ_KEYS.findings }),
@@ -329,6 +345,7 @@ export function NewChangeRequestScreen({ params }: { params: NewRequestParams })
         // A fresh presigned form next time (the old one may have expired).
         resetKeys("document");
         setErrors({ evidence: clientMessage("uploadFailed") });
+        setAttempt((value) => value + 1);
         return;
       }
       const fields = apiFieldErrors(failure);
@@ -344,6 +361,7 @@ export function NewChangeRequestScreen({ params }: { params: NewRequestParams })
         }
       }
       setErrors(mapped);
+      if (Object.keys(mapped).length > 0) setAttempt((value) => value + 1);
       if (failure instanceof ApiError && failure.status < 500) {
         resetKeys("submit");
         if (mapped.evidence) {
@@ -358,10 +376,21 @@ export function NewChangeRequestScreen({ params }: { params: NewRequestParams })
   }
 
   const busy = step !== "idle";
+  const stages = [
+    { id: "student", label: t("stages.student") },
+    { id: "change", label: t("stages.change") },
+    { id: "evidence", label: t("stages.evidence") },
+    { id: "review", label: t("stages.review") },
+  ];
+  const stage = !studentId ? 0 : !attributeKey ? 1 : !evidencePicked ? 2 : 3;
+  const summary = Object.entries(errors)
+    .filter(([field]) => field in fieldIds)
+    .map(([field, message]) => ({ fieldId: fieldIds[field] as string, message }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader breadcrumb={crumbs} title={t("title")} description={t("description")} />
+      <Steps steps={stages} current={stage} label={t("stagesLabel")} />
       {created ? (
         <Alert tone="success" live title={t("createdTitle")}>
           <p>{t("createdBody")}</p>
@@ -378,7 +407,8 @@ export function NewChangeRequestScreen({ params }: { params: NewRequestParams })
         </Alert>
       ) : null}
       <Alert tone="info">{t("makerChecker")}</Alert>
-      <form noValidate onSubmit={(event) => void onSubmit(event)} className="space-y-6">
+      <form noValidate onSubmit={(event) => void onSubmit(event)} className="space-y-5">
+        <ErrorSummary errors={summary} attempt={attempt} />
         <Card title={t("studentTitle")}>
           {studentId ? (
             <div className="space-y-3">
@@ -467,6 +497,7 @@ export function NewChangeRequestScreen({ params }: { params: NewRequestParams })
         <Card title={t("changeTitle")}>
           <div className="grid gap-4 md:grid-cols-2">
             <SelectField
+              id={fieldIds.attribute_key}
               name="attribute_key"
               label={t("field")}
               hint={t("fieldHint")}
@@ -478,6 +509,7 @@ export function NewChangeRequestScreen({ params }: { params: NewRequestParams })
             />
             <SelectField
               key={attributeKey}
+              id={fieldIds.target_source}
               name="target_source"
               label={t("source")}
               hint={t("sourceHint")}
@@ -501,6 +533,7 @@ export function NewChangeRequestScreen({ params }: { params: NewRequestParams })
             {attribute?.data_type === "enum" ? (
               <SelectField
                 key={`value-${attributeKey}`}
+                id={fieldIds.new_value}
                 name="new_value"
                 label={t("newValue")}
                 error={errors.new_value}
@@ -514,6 +547,7 @@ export function NewChangeRequestScreen({ params }: { params: NewRequestParams })
             ) : (
               <Field
                 key={`value-${attributeKey}`}
+                id={fieldIds.new_value}
                 label={t("newValue")}
                 hint={
                   attribute?.data_type === "date"
@@ -539,6 +573,7 @@ export function NewChangeRequestScreen({ params }: { params: NewRequestParams })
           </div>
           <TextAreaField
             className="mt-4"
+            id={fieldIds.reason}
             name="reason"
             label={t("reason")}
             hint={t("reasonHint")}
@@ -561,7 +596,10 @@ export function NewChangeRequestScreen({ params }: { params: NewRequestParams })
                         name="evidence_mode"
                         value={mode}
                         checked={evidenceMode === mode}
-                        onChange={() => setEvidenceMode(mode)}
+                        onChange={() => {
+                          setEvidenceMode(mode);
+                          setEvidencePicked(false);
+                        }}
                         className="size-4"
                       />
                       {mode === "upload" ? t("evidenceUpload") : t("evidenceExisting")}
@@ -571,12 +609,20 @@ export function NewChangeRequestScreen({ params }: { params: NewRequestParams })
               </fieldset>
             ) : null}
             {evidenceMode === "upload" ? (
-              <Field label={t("evidenceFile")} hint={t("evidenceHint")} error={errors.evidence}>
+              <Field
+                id={fieldIds.evidence}
+                label={t("evidenceFile")}
+                hint={t("evidenceHint")}
+                error={errors.evidence}
+              >
                 {({ id, describedBy, invalid }) => (
                   <input
                     id={id}
                     name="evidence"
                     type="file"
+                    onChange={(event) =>
+                      setEvidencePicked((event.currentTarget.files?.length ?? 0) > 0)
+                    }
                     accept={EVIDENCE_ACCEPT}
                     aria-describedby={describedBy}
                     aria-invalid={invalid || undefined}
@@ -586,7 +632,9 @@ export function NewChangeRequestScreen({ params }: { params: NewRequestParams })
               </Field>
             ) : (
               <SelectField
+                id={fieldIds.evidence_document_id}
                 name="evidence_document_id"
+                onChange={(event) => setEvidencePicked(event.currentTarget.value !== "")}
                 label={t("evidenceDocument")}
                 hint={
                   documents.data && documents.data.length === 0

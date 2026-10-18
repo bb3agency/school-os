@@ -17,12 +17,13 @@ import { registerQuery, RegistersScreen } from "./RegistersScreen";
 type Schemas = components["schemas"];
 
 const push = vi.hoisted(() => vi.fn());
+const replace = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
     usePathname: () => "/certificates",
-    useRouter: () => ({ push, replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
+    useRouter: () => ({ push, replace, refresh: vi.fn(), prefetch: vi.fn() }),
     useSearchParams: () => new URLSearchParams(),
     useParams: () => ({ locale: "en" }),
   };
@@ -359,6 +360,24 @@ describe("certificate list (US-1101..US-1105)", () => {
       stub.callsTo("GET /bff/api/v1/certificates")[0]?.url.searchParams.get("student_id"),
     ).toBe(STUDENT);
   });
+
+  it("shows the filters as chips; removing one drops only that URL parameter", async () => {
+    stub.routes["GET /bff/api/v1/me"] = () => Response.json(me([READ]));
+    stub.routes["GET /bff/api/v1/certificates"] = () => page([]);
+    renderWithIntl(
+      <CertificatesScreen
+        filters={parseCertificateFilters({ status: "pending", student_id: STUDENT })}
+      />,
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Remove filter Status: Waiting for approval" }),
+    );
+    expect(replace).toHaveBeenLastCalledWith(`/certificates?student_id=${STUDENT}`);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Remove filter Student: One student" }),
+    );
+    expect(replace).toHaveBeenLastCalledWith("/certificates?status=pending");
+  });
 });
 
 describe("certificate detail (US-1102..US-1107)", () => {
@@ -375,6 +394,10 @@ describe("certificate detail (US-1102..US-1107)", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Approve and issue" }));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText(/takes the student off the rolls/)).toBeInTheDocument();
+    // What confirming changes, read as the confirm button's description.
+    expect(
+      within(dialog).getByRole("button", { name: "Approve and issue" }),
+    ).toHaveAccessibleDescription(/the student is taken off the rolls from the date of leaving/);
     await userEvent.type(
       within(dialog).getByLabelText("Note (optional)"),
       "Checked with the register",
@@ -452,6 +475,14 @@ describe("certificate detail (US-1102..US-1107)", () => {
         name: "Bonafide certificate BC/2026-27/0007",
       }),
     ).toBeInTheDocument();
+    // An issued certificate: printing is the header's one primary action, links under More.
+    expect(screen.getAllByRole("link", { name: /Open print view/ })).toHaveLength(1);
+    await userEvent.click(screen.getByRole("button", { name: "More" }));
+    expect(await screen.findByRole("menuitem", { name: "Open the student" })).toHaveAttribute(
+      "href",
+      `/students/${STUDENT}`,
+    );
+    await userEvent.keyboard("{Escape}");
     expect(screen.getByText("What the certificate prints")).toBeInTheDocument();
     expect(screen.getByText("14/03/2012")).toBeInTheDocument();
     expect(screen.queryByText("purpose_te")).not.toBeInTheDocument();
@@ -517,6 +548,12 @@ describe("issue a certificate (US-1101, US-1102, FR-CERT-002)", () => {
     expect(within(table).getByText("Not verified")).toBeInTheDocument();
     const call = stub.callsTo(`GET /bff/api/v1/students/${STUDENT}/certificates/preview`)[0];
     expect(call?.url.searchParams.get("certificate_type")).toBe("bonafide");
+    // The stepper follows the page: the preview can be issued, so the details step is current.
+    const steps = screen.getByRole("list", { name: "Steps to issue a certificate" });
+    const current = within(steps)
+      .getAllByRole("listitem")
+      .find((item) => item.getAttribute("aria-current") === "step");
+    expect(current).toHaveTextContent(/Fill the details and issue/);
   });
 
   it("lists blockers with links to the finding and a correction request, and cannot issue", async () => {
@@ -631,6 +668,14 @@ describe("registers (US-1106, FR-REG-004)", () => {
     expect(calls[0]?.url.searchParams.get("academic_year_id")).toBe(YEAR);
     expect(calls[0]?.url.searchParams.get("check")).toBe("true");
     expect(link.getAttribute("href")).not.toContain("check");
+    // The picker switches the A4 sheet beside it to another register (nothing is asked yet).
+    await userEvent.click(
+      screen.getByRole("radio", { name: /^Admission and withdrawal register/ }),
+    );
+    expect(
+      await screen.findByRole("region", { name: "Admission and withdrawal register" }),
+    ).toBeInTheDocument();
+    expect(stub.callsTo("GET /bff/api/v1/registers/admission-withdrawal")).toHaveLength(0);
   });
 });
 

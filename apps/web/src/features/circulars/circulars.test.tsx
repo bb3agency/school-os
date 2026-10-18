@@ -24,7 +24,7 @@ import {
 } from "./data";
 import { NoticeDetailScreen } from "./NoticeDetailScreen";
 import { NoticesScreen } from "./NoticesScreen";
-import { TasksScreen } from "./TasksScreen";
+import { groupTasks, taskGroup, TasksScreen } from "./TasksScreen";
 
 const push = vi.fn();
 vi.mock("next/navigation", async (importOriginal) => {
@@ -352,7 +352,8 @@ describe("tasks (US-1603, US-1604)", () => {
       signedIn(["task.read"]);
       stub.routes["GET /bff/api/v1/tasks"] = () => page([task()]);
       renderWithIntl(<TasksScreen />);
-      const list = await screen.findByRole("list", { name: en.tasks.listTitle });
+      // The inbox is grouped by due date: an overdue task is in the "Overdue" group.
+      const list = await screen.findByRole("list", { name: en.tasks.groups.overdue });
       const card = within(list).getByRole("listitem");
       expect(within(card).getByText(task().title)).toBeVisible();
       expect(within(card).getByText(en.tasks.due.overdue)).toBeVisible();
@@ -444,6 +445,42 @@ describe("tasks (US-1603, US-1604)", () => {
     expect(dueState({ due_on: "2026-10-20", status: "open" }, today)).toBe("later");
     expect(dueState({ due_on: "2026-10-01", status: "done" }, today)).toBe("closed");
     expect(todayIst(new Date("2026-10-09T19:00:00Z"))).toBe("2026-10-10");
+  });
+
+  it("groups the inbox by due date and keeps the API's order inside a group", () => {
+    const today = "2026-10-10";
+    expect(taskGroup({ due_on: "2026-10-09", status: "open" }, today)).toBe("overdue");
+    expect(taskGroup({ due_on: "2026-10-09", status: "done" }, today)).toBe("earlier");
+    expect(taskGroup({ due_on: "2026-10-10", status: "open" }, today)).toBe("today");
+    expect(taskGroup({ due_on: "2026-10-17", status: "open" }, today)).toBe("week");
+    expect(taskGroup({ due_on: "2026-10-18", status: "open" }, today)).toBe("later");
+    const rows = [
+      task({ id: "a", due_on: "2026-10-01" }),
+      task({ id: "b", due_on: "2026-10-12" }),
+      task({ id: "c", due_on: "2026-10-05" }),
+    ];
+    expect(groupTasks(rows, today).map((g) => [g.group, g.tasks.map((x) => x.id)])).toEqual([
+      ["overdue", ["a", "c"]],
+      ["week", ["b"]],
+    ]);
+  });
+
+  it("shows each due-date group with its count", async () => {
+    signedIn(["task.read"]);
+    stub.routes["GET /bff/api/v1/tasks"] = () =>
+      page([
+        task(),
+        task({
+          id: "0192f3a4-0000-7000-8000-00000000f0f2",
+          title: "Far away",
+          due_on: "2099-01-01",
+        }),
+      ]);
+    renderWithIntl(<TasksScreen />);
+    expect(
+      await screen.findByRole("heading", { level: 2, name: /^Overdue\s*1 task$/ }),
+    ).toBeVisible();
+    expect(screen.getByRole("heading", { level: 2, name: /^Later\s*1 task$/ })).toBeVisible();
   });
 });
 
@@ -584,7 +621,13 @@ describe("parent notices (US-1605, US-1606)", () => {
     const title = screen.getAllByLabelText(en.notices.editor.title)[0] as HTMLInputElement;
     await userEvent.clear(title);
     await userEvent.type(title, "Sports day 2026");
+    expect(screen.getByText(en.notices.editor.unsaved)).toBeVisible();
     await userEvent.click(screen.getByRole("button", { name: en.notices.editor.approve }));
+    // Approving is confirmed in a dialog that says what it changes.
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(en.notices.editor.approveConsequence)).toBeVisible();
+    expect(stub.callsTo(`POST /bff/api/v1/notices/${NOTICE}/approve`)).toHaveLength(0);
+    await userEvent.click(within(dialog).getByRole("button", { name: en.notices.editor.approve }));
     await waitFor(() =>
       expect(stub.callsTo(`POST /bff/api/v1/notices/${NOTICE}/approve`)).toHaveLength(1),
     );
@@ -669,6 +712,8 @@ describe("circulars and notices with Telugu switched off (ADR-0036, the default)
     await userEvent.clear(title);
     await userEvent.type(title, "Sports day 2026");
     await userEvent.click(screen.getByRole("button", { name: en.notices.editor.approve }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: en.notices.editor.approve }));
     await waitFor(() =>
       expect(stub.callsTo(`POST /bff/api/v1/notices/${NOTICE}/approve`)).toHaveLength(1),
     );

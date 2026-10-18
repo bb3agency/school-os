@@ -10,7 +10,14 @@ import type { NavSection } from "@/components/ui/SidebarNav";
 import { messages, renderWithIntl } from "@/test/render";
 import { AppShell, type AppShellProps } from "./AppShell";
 import { NEUTRAL_CANVAS_PATHS, canvasFor } from "./canvas";
-import { SIDEBAR_ATTRIBUTE, SIDEBAR_STATE_SCRIPT, SIDEBAR_STORAGE_KEY } from "./sidebar-script";
+import {
+  DENSITY_ATTRIBUTE,
+  DENSITY_STORAGE_KEY,
+  SHELL_STATE_SCRIPT,
+  SIDEBAR_ATTRIBUTE,
+  SIDEBAR_STATE_SCRIPT,
+  SIDEBAR_STORAGE_KEY,
+} from "./sidebar-script";
 
 /**
  * The one sidebar (docs/17 §5.2; NFR-A11Y-001, NFR-I18N-001). jsdom applies no CSS, so the
@@ -20,9 +27,15 @@ import { SIDEBAR_ATTRIBUTE, SIDEBAR_STATE_SCRIPT, SIDEBAR_STORAGE_KEY } from "./
  */
 
 const path = vi.hoisted(() => ({ current: "/students" }));
+const router = vi.hoisted(() => ({
+  push: vi.fn(),
+  replace: vi.fn(),
+  refresh: vi.fn(),
+  prefetch: vi.fn(),
+}));
 vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
-  return { ...actual, usePathname: () => path.current };
+  return { ...actual, usePathname: () => path.current, useRouter: () => router };
 });
 
 const SECTIONS: NavSection[] = [
@@ -69,6 +82,7 @@ function inlineSidebar(): HTMLElement {
 beforeEach(() => {
   path.current = "/students";
   document.documentElement.removeAttribute(SIDEBAR_ATTRIBUTE);
+  document.documentElement.removeAttribute(DENSITY_ATTRIBUTE);
   window.localStorage.clear();
 });
 
@@ -86,8 +100,10 @@ describe("AppShell: one sidebar, no rail and no second list panel", () => {
     // The skip link is the first focusable element of the page.
     expect(document.querySelector("a[href], button")).toBe(skip);
     expect(screen.getByRole("main")).toHaveAttribute("id", "main");
-    expect(screen.getAllByRole("navigation")).toHaveLength(1);
-    expect(screen.getByRole("navigation", { name: "Main" })).toBeInTheDocument();
+    // One menu; the top bar adds only the "Where you are" trail.
+    expect(screen.getAllByRole("navigation", { name: "Main" })).toHaveLength(1);
+    expect(screen.getAllByRole("navigation")).toHaveLength(2);
+    expect(screen.getByRole("navigation", { name: "Where you are" })).toBeInTheDocument();
     expect(screen.queryByRole("navigation", { name: "Sections" })).toBeNull();
     // The drawer renders nothing while closed (no hidden second menu to tab into).
     const drawer = document.querySelector("dialog");
@@ -145,9 +161,15 @@ describe("AppShell: one sidebar, no rail and no second list panel", () => {
     expect(within(nav).getByRole("link", { name: "Home" })).not.toHaveAttribute("aria-current");
   });
 
-  it("school theme: white sidebar with a hairline; platform: dark violet with the yellow ring", () => {
+  it("school theme: sidebar on the canvas tone with a hairline; platform: dark neutral with the amber ring", () => {
     const { unmount } = renderWithIntl(shell());
-    expect(inlineSidebar()).toHaveClass("bg-surface", "border-e", "border-border");
+    expect(inlineSidebar()).toHaveClass(
+      "bg-canvas",
+      "border-e",
+      "border-border",
+      "w-60",
+      "collapsed:w-14",
+    );
     expect(inlineSidebar()).not.toHaveClass("platform-chrome");
     expect(screen.getByRole("banner")).not.toHaveClass("bg-platform");
     unmount();
@@ -341,81 +363,193 @@ describe("AppShell: the same sidebar as a drawer below lg (NFR-A11Y-001)", () =>
   });
 });
 
-describe("AppShell: canvas behind the page (docs/17 §3.2, NFR-A11Y-001)", () => {
+describe("AppShell: one flat canvas (docs/17 §3.2 v1.0, owner decision 2026-10-18)", () => {
   function canvas(): HTMLElement {
     const node = document.querySelector<HTMLElement>("[data-canvas]");
     if (!node) throw new Error("no canvas");
     return node;
   }
 
-  it("dense record screens get the near-neutral canvas", () => {
-    for (const route of ["/students", "/students/0193", "/settings/users"]) {
+  it("every console page, dashboards included, is on the same flat canvas", () => {
+    for (const route of ["/", "/students", "/ask", "/settings/users"]) {
       path.current = route;
       const { unmount } = renderWithIntl(shell());
       expect(canvas(), route).toHaveAttribute("data-canvas", "neutral");
-      expect(canvas(), route).toHaveClass("canvas-neutral");
       unmount();
     }
-  });
-
-  it("the school home dashboard keeps the gradient (the body's, so nothing is painted over it)", () => {
-    path.current = "/";
-    renderWithIntl(shell());
-    expect(canvas()).toHaveAttribute("data-canvas", "gradient");
-    expect(canvas()).not.toHaveClass("canvas-neutral");
-  });
-
-  it("platform: the dashboard keeps the gradient, the platform tables are neutral", () => {
     path.current = "/platform";
-    const { unmount } = renderWithIntl(shell({ theme: "platform", homeHref: "/platform" }));
-    expect(canvas()).toHaveAttribute("data-canvas", "gradient");
-    unmount();
-    path.current = "/platform/schools";
     renderWithIntl(shell({ theme: "platform", homeHref: "/platform" }));
     expect(canvas()).toHaveAttribute("data-canvas", "neutral");
   });
 
-  it("a page can choose its canvas explicitly", () => {
+  it("canvasFor always answers the flat canvas; the old prop still compiles", () => {
+    expect(canvasFor("school", "/")).toBe("neutral");
+    expect(canvasFor("platform", "/platform")).toBe("neutral");
+    expect(NEUTRAL_CANVAS_PATHS.school).toContain("/");
     path.current = "/";
     renderWithIntl(shell({ canvas: "neutral" }));
     expect(canvas()).toHaveAttribute("data-canvas", "neutral");
   });
 });
 
-describe("canvasFor (docs/17 §3.2)", () => {
-  it.each(NEUTRAL_CANVAS_PATHS.school)("school %s and its sub-pages are neutral", (prefix) => {
-    expect(canvasFor("school", prefix)).toBe("neutral");
-    expect(canvasFor("school", `${prefix}/sample-id`)).toBe("neutral");
-  });
-
-  it("the school home, Ask and look-alike paths keep the gradient", () => {
-    for (const route of ["/", "", "/ask", "/notices", "/studentsx", "/settingsx/a"]) {
-      expect(canvasFor("school", route), route).toBe("gradient");
-    }
-  });
-
-  it("every platform page but the dashboard is neutral", () => {
-    expect(canvasFor("platform", "/platform")).toBe("gradient");
-    expect(canvasFor("platform", "/platform/")).toBe("gradient");
-    for (const route of ["/platform/schools", "/platform/schools/1", "/platform/audit"]) {
-      expect(canvasFor("platform", route), route).toBe("neutral");
-    }
-  });
-
-  it("covers the screens the owner named", () => {
-    expect([...NEUTRAL_CANVAS_PATHS.school].sort()).toEqual(
-      [
-        "/audit",
-        "/change-requests",
-        "/documents",
-        "/exports",
-        "/findings",
-        "/imports",
-        "/register-photos",
-        "/settings",
-        "/students",
-      ].sort(),
+describe("AppShell: top bar (breadcrumb, palette, preferences)", () => {
+  it("shows where you are from the same navigation: section, then the page", () => {
+    path.current = "/students";
+    const { unmount } = renderWithIntl(shell());
+    const trail = screen.getByRole("navigation", { name: "Where you are" });
+    expect(trail).toHaveTextContent("Records");
+    expect(within(trail).getByText("Students")).toHaveAttribute("aria-current", "page");
+    unmount();
+    // On a sub-page the nav item becomes a link back to its list.
+    path.current = "/students/0193";
+    renderWithIntl(shell());
+    const deeper = screen.getByRole("navigation", { name: "Where you are" });
+    expect(within(deeper).getByRole("link", { name: "Students" })).toHaveAttribute(
+      "href",
+      "/students",
     );
+  });
+
+  it("no trail for a page outside the menu", () => {
+    path.current = "/notifications";
+    renderWithIntl(shell());
+    expect(screen.queryByRole("navigation", { name: "Where you are" })).toBeNull();
+  });
+
+  it("Ctrl+K opens the palette with the menu's pages and the actions; Enter goes there", async () => {
+    const user = userEvent.setup();
+    router.push.mockClear();
+    renderWithIntl(
+      shell({ actions: [{ id: "add", label: "Add a student", href: "/students/new" }] }),
+    );
+    await user.keyboard("{Control>}k{/Control}");
+    const palette = screen.getByRole("dialog", { name: "Search or jump to" });
+    expect(palette).toHaveAttribute("open");
+    const box = within(palette).getByRole("combobox", { name: "Search or jump to" });
+    expect(box).toHaveFocus();
+    // Every page the sidebar shows, and nothing it hides (the same filtered sections).
+    const pages = within(palette).getByRole("group", { name: "Go to" });
+    expect(
+      within(pages)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual(["HomeOverview", "StudentsRecords", "ImportsRecords"]);
+    expect(within(palette).getByRole("group", { name: "Actions" })).toHaveTextContent(
+      "Add a student",
+    );
+    await user.type(box, "imp");
+    const options = within(palette).getAllByRole("option");
+    expect(options[0]).toHaveTextContent("Imports");
+    expect(box).toHaveAttribute("aria-activedescendant", options[0]?.id);
+    await user.keyboard("{Enter}");
+    expect(router.push).toHaveBeenCalledWith("/imports");
+    expect(palette).not.toHaveAttribute("open");
+  });
+
+  it("the search button opens it too; arrows move, Escape closes", async () => {
+    const user = userEvent.setup();
+    renderWithIntl(shell());
+    await user.click(screen.getByRole("button", { name: /^Search or jump to…/ }));
+    const palette = screen.getByRole("dialog", { name: "Search or jump to" });
+    const box = within(palette).getByRole("combobox");
+    const first = within(palette).getAllByRole("option")[0];
+    expect(first).toHaveAttribute("aria-selected", "true");
+    await user.keyboard("{ArrowDown}");
+    expect(within(palette).getAllByRole("option")[1]).toHaveAttribute("aria-selected", "true");
+    await user.keyboard("{ArrowUp}{ArrowUp}");
+    const all = within(palette).getAllByRole("option");
+    expect(all[all.length - 1]).toHaveAttribute("aria-selected", "true");
+    await user.type(box, "zzzz");
+    expect(within(palette).getByText("Nothing matches. Try another word.")).toBeInTheDocument();
+    fireEvent(palette, new Event("close"));
+    expect(screen.queryByRole("combobox")).toBeNull();
+  });
+
+  it("density: the preferences menu switches compact rows and remembers it", async () => {
+    const user = userEvent.setup();
+    renderWithIntl(shell());
+    const prefs = screen.getByRole("button", { name: "Your preferences" });
+    expect(prefs).toHaveAttribute("aria-haspopup", "menu");
+    prefs.focus();
+    await user.keyboard("{Enter}");
+    const menu = screen.getByRole("menu", { name: "Your preferences" });
+    const compact = within(menu).getByRole("menuitemradio", { name: "Compact" });
+    expect(within(menu).getByRole("menuitemradio", { name: "Comfortable" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    await user.click(compact);
+    expect(document.documentElement).toHaveAttribute(DENSITY_ATTRIBUTE, "compact");
+    expect(window.localStorage.getItem(DENSITY_STORAGE_KEY)).toBe("compact");
+    expect(prefs).toHaveFocus();
+    // The head script restores it before the first paint.
+    document.documentElement.removeAttribute(DENSITY_ATTRIBUTE);
+    new Function(SHELL_STATE_SCRIPT)();
+    expect(document.documentElement).toHaveAttribute(DENSITY_ATTRIBUTE, "compact");
+  });
+
+  it("Ctrl+\\ switches the compact sidebar", async () => {
+    const user = userEvent.setup();
+    renderWithIntl(shell());
+    await user.keyboard("{Control>}\\{/Control}");
+    expect(document.documentElement).toHaveAttribute(SIDEBAR_ATTRIBUTE, "collapsed");
+    await user.keyboard("{Control>}\\{/Control}");
+    expect(document.documentElement).not.toHaveAttribute(SIDEBAR_ATTRIBUTE);
+  });
+
+  it("phones: the bottom bar lists its destinations and marks the current one", () => {
+    path.current = "/students";
+    renderWithIntl(
+      shell({
+        bottomBar: [
+          { href: "/", label: "Home", exact: true, icon: "home" },
+          { href: "/students", label: "Students", icon: "users" },
+        ],
+      }),
+    );
+    const bar = screen.getByRole("navigation", { name: "Quick links" });
+    expect(bar).toHaveClass("md:hidden");
+    expect(within(bar).getByRole("link", { name: "Students" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(within(bar).getByRole("link", { name: "Home" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("phones: the bottom bar steps aside while a text field has focus on a touch screen", () => {
+    const original = window.matchMedia;
+    window.matchMedia = vi.fn((query: string) => ({
+      matches: query === "(pointer: coarse)",
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })) as unknown as typeof window.matchMedia;
+    try {
+      renderWithIntl(
+        shell({
+          bottomBar: [
+            { href: "/", label: "Home", exact: true, icon: "home" },
+            { href: "/students", label: "Students", icon: "users" },
+          ],
+          banner: <input aria-label="Marks" />,
+        }),
+      );
+      const bar = screen.getByRole("navigation", { name: "Quick links" });
+      expect(bar).not.toHaveAttribute("hidden");
+      act(() => screen.getByRole("textbox", { name: "Marks" }).focus());
+      expect(screen.queryByRole("navigation", { name: "Quick links" })).toBeNull();
+      expect(bar).toHaveAttribute("hidden");
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
+  it("the top bar is the scroll-padding anchor and the page crumb truncates on tablets", () => {
+    path.current = "/students";
+    renderWithIntl(shell());
+    expect(document.querySelector("header.shell-topbar")).not.toBeNull();
+    const crumb = screen.getByRole("navigation", { name: "Where you are" });
+    expect(crumb).toHaveClass("md:block");
   });
 });
 

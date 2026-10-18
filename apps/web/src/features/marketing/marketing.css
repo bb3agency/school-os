@@ -4,17 +4,55 @@
  * Tailwind classes, never in a style attribute. Motion: transform and opacity only, custom
  * curves from the design-engineering skills, and nothing moves under prefers-reduced-motion
  * (globals.css also cuts every duration to 0.01ms there).
+ *
+ * Direction B "Register paper" (docs/research/2026-10-ui/report.md §6.2, decision §12.1): a
+ * paper canvas, ruled hairlines, warm ink, ONE ledger-green accent and Instrument Serif
+ * headlines. The semantic colour tokens are redefined for the `.mk` scope, so every Tailwind
+ * utility (bg-canvas, text-primary, border-border …) draws the paper palette; product mockups
+ * (`.mk-app`) switch back to the app's "Quiet ledger" tokens, because they show the real UI.
+ * Contrast (checked in features/marketing/register-paper.test.ts): ink on paper 15.3:1,
+ * ink-muted 6.9:1, ink-subtle 5.1:1 (4.8:1 on surface-muted), ledger green 6.6:1 (6.2:1 on its
+ * tint), white on the night band 14.9:1, its muted text 9.8:1.
  */
 
 .mk {
   --mk-ease-out: var(--ease-out); /* shared motion token (docs/17 §5.5) */
   --mk-ease-in-out: var(--ease-in-out);
-  /* Dark band: text colours checked against --color-action #111827. */
-  --mk-night: #0b1220; /* white 18.9:1, --mk-night-muted 11.2:1 */
-  --mk-night-muted: #c3cbd8; /* 10.9:1 on #111827 */
-  --mk-night-line: rgb(255 255 255 / 0.1);
-  --mk-grid-line: rgb(30 64 175 / 0.07);
   --mk-header-h: 4rem;
+
+  /* Register paper palette. */
+  --color-canvas: oklch(0.975 0.008 95); /* #f8f7f1 paper */
+  --color-surface: oklch(0.995 0.004 95); /* #fefdfa sheet */
+  --color-surface-muted: oklch(0.955 0.01 95); /* #f2f0e9 */
+  --color-surface-sunken: oklch(0.94 0.012 95);
+  --color-surface-hover: oklch(0.955 0.01 95);
+  --color-border: oklch(0.89 0.012 95); /* #dddbd2 ruled hairline (decorative) */
+  --color-border-soft: oklch(0.82 0.014 95); /* #c7c4ba secondary buttons */
+  --color-border-control: oklch(0.6 0.012 95); /* #828078 3.7:1 */
+  --color-ink: oklch(0.24 0.01 95); /* #211f1a 15.3:1 */
+  --color-ink-muted: oklch(0.45 0.012 95); /* #57554e 6.9:1 */
+  --color-ink-subtle: oklch(0.52 0.012 95); /* #6b6961 5.1:1 */
+  --color-action: oklch(0.24 0.01 95); /* the near-black primary button, in warm ink */
+  --color-action-hover: oklch(0.34 0.012 95);
+  --color-primary: oklch(0.45 0.09 165); /* #0e6549 ledger green 6.6:1 */
+  --color-primary-hover: oklch(0.38 0.08 165);
+  --color-primary-soft: oklch(0.95 0.03 165); /* #ddf5e9 */
+  --color-accent: oklch(0.45 0.09 165);
+  --color-accent-strong: oklch(0.38 0.08 165);
+  --color-accent-soft: oklch(0.95 0.03 165);
+  --color-brand: oklch(0.45 0.09 165);
+  --color-brand-strong: oklch(0.38 0.08 165);
+  --color-focus: oklch(0.45 0.09 165);
+  --color-info-ink: oklch(0.38 0.08 165); /* 8.4:1 on info-soft */
+  --color-info-soft: oklch(0.95 0.03 165);
+  --color-info-border: oklch(0.82 0.05 165); /* decorative */
+
+  /* Night band: deep ledger ink, flat (no glows). */
+  --mk-night: oklch(0.27 0.035 165); /* #152c22: white 14.9:1 */
+  --mk-night-muted: oklch(0.86 0.02 120); /* #cfd3c5 9.8:1 on the band */
+  --mk-night-line: oklch(0.36 0.03 165);
+  --mk-rule-line: oklch(0.89 0.012 95 / 0.7);
+
   /* The marketing radius scale: larger, softer corners than the app (docs/17 §3). Tailwind's
      rounded-* utilities read these variables, so they apply to everything inside `.mk`. */
   --radius-sm: 0.5rem; /* 8px */
@@ -23,6 +61,38 @@
   --radius-xl: 1.25rem; /* 20px: cards */
   --radius-2xl: 1.5rem; /* 24px: plan cards, tiles */
   --radius-3xl: 2rem; /* 32px: closing bands, large illustrations */
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+/* Product mockups show the real app, so they use its tokens ("Quiet ledger", globals.css). */
+.mk .mk-app {
+  --color-canvas: oklch(0.985 0.002 85);
+  --color-surface: oklch(1 0 0);
+  --color-surface-muted: oklch(0.97 0.003 85);
+  --color-surface-sunken: oklch(0.955 0.005 85);
+  --color-surface-hover: oklch(0.955 0.004 85);
+  --color-border: oklch(0.92 0.004 85);
+  --color-border-soft: oklch(0.86 0.008 85);
+  --color-border-control: oklch(0.62 0.006 85);
+  --color-ink: oklch(0.22 0.006 85);
+  --color-ink-muted: oklch(0.45 0.008 85);
+  --color-ink-subtle: oklch(0.53 0.008 85);
+  --color-action: oklch(0.22 0.006 85);
+  --color-action-hover: oklch(0.32 0.008 85);
+  --color-primary: oklch(0.5 0.13 258);
+  --color-primary-hover: oklch(0.4 0.11 258);
+  --color-primary-soft: oklch(0.95 0.025 258);
+  --color-accent: oklch(0.5 0.13 258);
+  --color-accent-strong: oklch(0.4 0.11 258);
+  --color-accent-soft: oklch(0.95 0.025 258);
+  --color-brand: oklch(0.5 0.13 258);
+  --color-brand-strong: oklch(0.4 0.11 258);
+  --color-focus: oklch(0.5 0.13 258);
+  --color-info-ink: oklch(0.4 0.11 258);
+  --color-info-soft: oklch(0.95 0.025 258);
+  --color-info-border: oklch(0.86 0.05 258);
+  color: var(--color-ink);
 }
 
 /* Anchored headings and focused controls clear the sticky header (WCAG 2.4.11). Scroll
@@ -38,21 +108,29 @@
   min-width: 0;
 }
 
-/* Display type: tight tracking as it grows (Latin only; Telugu keeps normal spacing). */
-.mk-display {
-  letter-spacing: -0.035em;
-  line-height: 1.04;
+/* Display type: Instrument Serif headlines (one weight, 400) with slight optical tracking
+   (Latin only). Telugu switches back to the sans with normal spacing (docs/17 §2 rule 2). */
+.mk-display,
+.mk-title {
+  font-family: var(--font-display);
+  font-weight: 400;
   text-wrap: balance;
 }
 
+.mk-display {
+  letter-spacing: -0.015em;
+  line-height: 1.02;
+}
+
 .mk-title {
-  letter-spacing: -0.025em;
-  line-height: 1.12;
-  text-wrap: balance;
+  letter-spacing: -0.01em;
+  line-height: 1.08;
 }
 
 .mk-display:lang(te),
 .mk-title:lang(te) {
+  font-family: var(--font-sans);
+  font-weight: 600;
   letter-spacing: normal;
   line-height: 1.5;
 }
@@ -61,28 +139,44 @@
   text-wrap: pretty;
 }
 
-/* Hero backdrop: a faint grid fading out from the centre plus two soft lights. Decorative. */
+/* Hero backdrop: plain paper. The ruled lines (`.mk-grid`) are horizontal hairlines like a
+   register page, with a ledger-green margin line, fading out towards the bottom. Decorative. */
 .mk-hero-bg {
-  background-image:
-    radial-gradient(60% 50% at 75% 20%, rgb(96 165 250 / 0.22), transparent 70%),
-    radial-gradient(40% 40% at 10% 10%, rgb(45 212 191 / 0.14), transparent 70%);
+  background-color: var(--color-canvas);
 }
 
 .mk-grid {
+  --mk-margin: 0.5rem;
   background-image:
-    linear-gradient(to right, var(--mk-grid-line) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--mk-grid-line) 1px, transparent 1px);
-  background-size: 48px 48px;
-  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 30%, transparent 75%);
-  mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 30%, transparent 75%);
+    linear-gradient(
+      to right,
+      transparent calc(var(--mk-margin) - 1px),
+      oklch(0.45 0.09 165 / 0.25) calc(var(--mk-margin) - 1px),
+      oklch(0.45 0.09 165 / 0.25) var(--mk-margin),
+      transparent var(--mk-margin)
+    ),
+    linear-gradient(to bottom, transparent calc(2rem - 1px), var(--mk-rule-line) calc(2rem - 1px));
+  background-size:
+    100% 100%,
+    100% 2rem;
+  -webkit-mask-image: linear-gradient(to bottom, #000 35%, transparent 92%);
+  mask-image: linear-gradient(to bottom, #000 35%, transparent 92%);
 }
 
-/* Dark contrast band (security). */
+@media (min-width: 64rem) {
+  .mk-grid {
+    --mk-margin: 3rem;
+  }
+}
+
+/* A ruled list: register rows with a hairline between them (how it works, facts). */
+.mk-ruled > * + * {
+  border-top: 1px solid var(--color-border);
+}
+
+/* Dark contrast band (security, closing call): deep ledger ink, flat. */
 .mk-night {
   background-color: var(--mk-night);
-  background-image:
-    radial-gradient(50% 60% at 85% 0%, rgb(37 99 235 / 0.28), transparent 70%),
-    radial-gradient(40% 50% at 0% 100%, rgb(13 148 136 / 0.18), transparent 70%);
   color: #ffffff;
   --color-focus: #ffffff;
 }
@@ -92,36 +186,48 @@
 }
 
 .mk-night-card {
-  background-color: rgb(255 255 255 / 0.04);
+  background-color: oklch(1 0 0 / 0.04);
   border: 1px solid var(--mk-night-line);
 }
 
-/* A hairline that fades at both ends (section dividers). */
+/* A plain hairline (section dividers). */
 .mk-rule {
   height: 1px;
-  background-image: linear-gradient(
-    to right,
-    transparent,
-    var(--color-border-soft) 20%,
-    var(--color-border-soft) 80%,
-    transparent
-  );
+  background-color: var(--color-border);
 }
 
-/* Mock window chrome. */
+/* Lenis smooth scrolling (home page only, features/marketing/SmoothScroll.tsx): the rules of
+   lenis/dist/lenis.css that we use, kept here so no stylesheet or <style> is injected. */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-stopped {
+  overflow: clip;
+}
+
+.lenis [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-smooth iframe {
+  pointer-events: none;
+}
+
+/* Mock window chrome: a sheet laid on the paper, one soft warm shadow. */
 .mk-window {
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
   box-shadow:
-    0 1px 2px rgb(16 24 40 / 0.05),
-    0 24px 60px -24px rgb(30 64 175 / 0.35),
-    0 0 0 6px rgb(255 255 255 / 0.5);
+    0 1px 2px oklch(0.24 0.01 95 / 0.06),
+    0 18px 40px -24px oklch(0.24 0.01 95 / 0.3);
 }
 
 .mk-float {
   box-shadow:
-    0 1px 2px rgb(16 24 40 / 0.06),
-    0 20px 40px -16px rgb(15 23 42 / 0.28);
+    0 1px 2px oklch(0.24 0.01 95 / 0.06),
+    0 14px 30px -18px oklch(0.24 0.01 95 / 0.32);
 }
 
 /* Header: transparent over the hero, a white bar with a hairline once the page scrolls
@@ -133,7 +239,7 @@
 
 .mk-header[data-scrolled="true"],
 .mk-header[data-open="true"] {
-  background-color: rgb(255 255 255 / 0.96);
+  background-color: oklch(0.975 0.008 95 / 0.97);
   border-bottom-color: var(--color-border);
 }
 
@@ -229,7 +335,7 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  box-shadow: inset 0 0 0 2px rgb(180 35 24 / 0.35);
+  box-shadow: inset 0 0 0 2px oklch(0.53 0.19 27 / 0.35);
   opacity: 0;
   pointer-events: none;
 }
@@ -293,4 +399,9 @@
     color: #000000 !important;
     border-color: #000000 !important;
   }
+}
+
+/* The serif italic has no Telugu glyphs: Telugu text is never slanted. */
+.mk .italic:lang(te) {
+  font-style: normal;
 }

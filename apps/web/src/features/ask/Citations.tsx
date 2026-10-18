@@ -144,11 +144,12 @@ export function CitationChip({
         }}
         className={cn(
           "relative -top-[0.4em] mx-0.5 inline-flex h-[1.35em] min-w-[1.35em] items-center justify-center rounded-full px-1",
-          // A larger invisible hit area on touch screens (the chip itself stays small in text).
-          "pointer-coarse:after:absolute pointer-coarse:after:-inset-2.5 pointer-coarse:after:content-['']",
-          "border border-border-soft bg-surface-muted font-mono text-[0.7rem] leading-none font-semibold text-ink-muted no-underline",
-          "hover:border-primary hover:bg-primary-soft hover:text-primary motion-safe:hover:transition-colors",
-          open && "border-primary bg-primary-soft text-primary",
+          // Compact in the text, with an invisible hit area of at least 24px (WCAG 2.5.8),
+          // larger on touch screens.
+          "after:absolute after:-inset-[5px] after:content-[''] pointer-coarse:after:-inset-2.5",
+          "num border border-border-soft bg-surface-muted text-[0.7rem] leading-none font-semibold text-ink-muted no-underline",
+          "hover:border-accent hover:bg-accent-soft hover:text-accent-strong motion-safe:hover:transition-colors",
+          open && "border-accent bg-accent-soft text-accent-strong",
         )}
       >
         {citation.index}
@@ -187,11 +188,11 @@ export function SourceCard({ citation, id }: { citation: AskCitation; id: string
     <li
       id={id}
       tabIndex={-1}
-      className="chat-enter flex min-w-0 gap-3 rounded-lg border border-border bg-surface p-3 focus:outline-2 focus:outline-primary"
+      className="chat-enter flex min-w-0 gap-2.5 rounded-lg border border-border bg-surface px-3 py-2.5 focus:outline-2 focus:outline-primary"
     >
       <span
         aria-hidden="true"
-        className="flex size-6 shrink-0 items-center justify-center rounded-full bg-surface-muted font-mono text-xs font-semibold text-ink-muted"
+        className="num flex size-6 shrink-0 items-center justify-center rounded-full bg-surface-muted text-xs font-semibold text-ink-muted"
       >
         {citation.index}
       </span>

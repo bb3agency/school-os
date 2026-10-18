@@ -7,10 +7,15 @@
  */
 import { expect, type Locator, type Page } from "@playwright/test";
 
-/** The two viewports every screen must pass: the office PC and a phone. */
+/**
+ * The viewports every screen must pass: the office PC, a phone, the smallest common Android
+ * phone (360×640, teachers and parents; docs/17 §5.7) and a portrait tablet (the fee counter).
+ */
 export const REQUIRED_VIEWPORTS: ReadonlyArray<readonly [number, number]> = [
   [1366, 768],
   [375, 812],
+  [360, 640],
+  [768, 1024],
 ];
 
 export const LOCALES = ["en", "te"] as const;
@@ -351,6 +356,11 @@ export function detectLayout({ vw }: { vw: number }): LayoutReport {
     const crowded = targets.some((other) => {
       if (other === target || other.el.contains(target.el) || target.el.contains(other.el))
         return false;
+      // The console's sticky top bar, the phone bottom bar and docked bars (SaveBar, bulk bar,
+      // Ask composer) sit over the page: a page control that happens to scroll under one is
+      // on another layer, not next to it (it is tapped once scrolled into view).
+      const layer = (el: Element) => el.closest(".bottom-bar, .shell-topbar, [data-dock]");
+      if (layer(target.el) !== layer(other.el)) return false;
       if (circleHitsRect(c, other.r)) return true;
       if (!other.small) return false;
       const o = centre(other.r);

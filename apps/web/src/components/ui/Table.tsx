@@ -9,13 +9,13 @@ import { LoadingState } from "./LoadingState";
 import { NarrowSwitch } from "./NarrowSwitch";
 
 /**
- * `comfortable` (default): rows about 56px high, like the reference tables.
- * `compact`: dense registers and long lists.
+ * `comfortable`: 44px rows. `compact`: 32px rows and 13px text (fine pointers only). Leave
+ * it unset to follow the viewer's density choice (<html data-density>, docs/17 §3.4).
  */
 export type TableDensity = "comfortable" | "compact";
 
 export interface TableProps extends ComponentProps<"table"> {
-  density?: TableDensity;
+  density?: TableDensity | undefined;
   /**
    * Keep the first column (the row's name: student, school, invoice number) in view while
    * a wide table scrolls sideways below md. Use it when the first cell identifies the row.
@@ -48,7 +48,7 @@ const stickyFirst =
  */
 export function Table({
   className,
-  density = "comfortable",
+  density,
   stickyFirstColumn = false,
   reflow = false,
   ...props
@@ -122,7 +122,7 @@ export function Tr(props: ComponentProps<"tr">) {
 }
 
 /** Numbers line up: right-aligned (end), tabular figures, never wrapped mid-number. */
-const NUMERIC = "text-end tabular-nums whitespace-nowrap";
+const NUMERIC = "num text-end tabular-nums whitespace-nowrap";
 
 export interface CellProps {
   /** A numeric column (counts, amounts): right-aligned with tabular figures. */
@@ -139,8 +139,8 @@ export function Th({
     <th
       scope={scope}
       className={cn(
-        "px-4 py-3 text-xs font-semibold whitespace-nowrap text-ink-muted",
-        "group-data-[density=compact]/table:px-3 group-data-[density=compact]/table:py-2",
+        "px-4 py-2.5 text-xs font-semibold whitespace-nowrap text-ink-muted",
+        "compact:px-3 compact:py-1.5",
         numeric && NUMERIC,
         className,
       )}
@@ -153,8 +153,8 @@ export function Td({ className, numeric = false, ...props }: ComponentProps<"td"
   return (
     <td
       className={cn(
-        "px-4 py-4 align-middle text-ink",
-        "group-data-[density=compact]/table:px-3 group-data-[density=compact]/table:py-2 group-data-[density=compact]/table:align-top",
+        "px-4 py-3 align-middle text-ink",
+        "compact:px-3 compact:py-1.5 compact:text-[0.8125rem] compact:leading-5",
         numeric && NUMERIC,
         className,
       )}
@@ -200,6 +200,8 @@ export interface StackedRowsProps<T> {
   columns: ReadonlyArray<Column<T>>;
   rows: readonly T[];
   rowKey: (row: T) => string;
+  /** Draw its own card frame (default); off inside a frame that already has one (DataTableV2). */
+  framed?: boolean;
 }
 
 /**
@@ -214,6 +216,7 @@ export function StackedRows<T>({
   columns,
   rows,
   rowKey,
+  framed = true,
 }: StackedRowsProps<T>) {
   const places = columns.map((column, index) => stackPlace(column, index));
   const titles = columns.filter((_, i) => places[i] === "title");
@@ -222,7 +225,10 @@ export function StackedRows<T>({
   return (
     <div
       data-stacked-list=""
-      className="min-w-0 rounded-xl border border-border bg-surface shadow-card print:shadow-none"
+      className={cn(
+        "min-w-0",
+        framed && "rounded-xl border border-border bg-surface shadow-card print:shadow-none",
+      )}
     >
       {captionHidden ? null : (
         <p className="border-b border-border px-4 py-3 font-semibold text-ink">{caption}</p>
@@ -236,7 +242,7 @@ export function StackedRows<T>({
             {titles.map((column) => (
               <div
                 key={column.key}
-                className="min-w-0 text-ink pointer-coarse:[&_a]:inline-block pointer-coarse:[&_a]:py-3 pointer-coarse:[&_a]:-my-3"
+                className="min-w-0 text-ink [&_a]:inline-block [&_a]:min-h-6 pointer-coarse:[&_a]:py-3 pointer-coarse:[&_a]:-my-3"
               >
                 {column.cell(row)}
               </div>
@@ -288,7 +294,7 @@ export interface DataTableProps<T> {
   emptyAction?: ReactNode;
   /** Hide the caption visually when a heading right above already says the same. */
   captionHidden?: boolean;
-  density?: TableDensity;
+  density?: TableDensity | undefined;
   /** Keep the first column in view while the table scrolls sideways below md. */
   stickyFirstColumn?: boolean;
   /**
@@ -311,7 +317,7 @@ export function DataTable<T>({
   emptyBody,
   emptyAction,
   captionHidden = false,
-  density = "comfortable",
+  density,
   stickyFirstColumn = false,
   stacked = false,
 }: DataTableProps<T>) {

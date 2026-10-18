@@ -17,11 +17,11 @@ import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Select } from "@/components/ui/Select";
 import { StatCard } from "@/components/ui/StatCard";
+import { Steps as StepList } from "@/components/ui/Steps";
 import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { ApiError, useApiMutation, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
-import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
 import { ready, type Loadable } from "@/lib/loadable";
 import { classLabel, useStructureLists, useYearSections } from "@/features/academic-structure/data";
@@ -91,7 +91,7 @@ export function PromotionsScreen({ yearId }: { yearId: string }) {
   );
   if (me === undefined) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader title={t("titlePlain")} breadcrumb={crumbs(t("titlePlain"))} actions={back} />
         <LoadingState label={t("loading")} />
       </div>
@@ -99,7 +99,7 @@ export function PromotionsScreen({ yearId }: { yearId: string }) {
   }
   if (!manage) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader title={t("titlePlain")} breadcrumb={crumbs(t("titlePlain"))} actions={back} />
         <Alert tone="info" title={t("noAccessTitle")}>
           {t("noAccessBody")}
@@ -109,7 +109,7 @@ export function PromotionsScreen({ yearId }: { yearId: string }) {
   }
   if (year.status !== "ready") {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader title={t("titlePlain")} breadcrumb={crumbs(t("titlePlain"))} actions={back} />
         <LoadableNote state={year} />
       </div>
@@ -127,7 +127,7 @@ export function PromotionsScreen({ yearId }: { yearId: string }) {
         ? "preview"
         : "plan";
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={t("title", { label: from.label })}
         description={t("description")}
@@ -149,49 +149,20 @@ const STEPS = ["plan", "preview", "commit", "undo"] as const;
 type StepId = (typeof STEPS)[number];
 
 /**
- * Where the promotion is: plan → preview → promote → undo within 24 hours. An ordered list;
- * the current step has aria-current="step" and finished steps say "Done" to screen readers
- * (the check mark is decorative). "finished" marks every step done (undo time is over).
+ * Where the promotion is: plan, preview, promote, undo within 24 hours (the shared `Steps`:
+ * the current step has aria-current="step", finished ones say "Done"). "finished" marks every
+ * step done (undo time is over). The list sits in a named navigation landmark as before.
  */
 function Steps({ current }: { current: StepId | "finished" }) {
   const t = useTranslations("academicStructure.promotions.steps");
   const index = current === "finished" ? STEPS.length : STEPS.indexOf(current);
   return (
-    <nav
-      aria-label={t("label")}
-      className="rounded-xl border border-border bg-surface px-5 py-4 shadow-card"
-    >
-      <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {STEPS.map((step, position) => {
-          const done = position < index;
-          const now = position === index;
-          return (
-            <li
-              key={step}
-              aria-current={now ? "step" : undefined}
-              className="flex items-center gap-3"
-            >
-              <span
-                aria-hidden="true"
-                className={cn(
-                  "flex size-8 shrink-0 items-center justify-center rounded-full border-2 text-sm font-semibold",
-                  done
-                    ? "border-success bg-success text-white"
-                    : now
-                      ? "border-action bg-action text-on-action"
-                      : "border-border-control bg-surface text-ink-muted",
-                )}
-              >
-                {done ? <Icon name="check" className="size-4" /> : position + 1}
-              </span>
-              <span className={cn("text-sm", now ? "font-semibold text-ink" : "text-ink-muted")}>
-                {done ? <span className="sr-only">{t("done")}: </span> : null}
-                {t(step)}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
+    <nav aria-label={t("label")} className="rounded-xl border border-border bg-surface px-5 py-4">
+      <StepList
+        label={t("label")}
+        current={index}
+        steps={STEPS.map((step) => ({ id: step, label: t(step) }))}
+      />
     </nav>
   );
 }
@@ -237,7 +208,7 @@ function WhenBy({
   if (!at) return <Value>{null}</Value>;
   return (
     <span>
-      <span className="block">{at}</span>
+      <span className="num block whitespace-nowrap">{at}</span>
       {name ? <span className="block text-sm text-ink-muted">{t("byName", { name })}</span> : null}
     </span>
   );
@@ -309,7 +280,7 @@ function StatusCard({
             </Alert>
             {current.can_undo ? (
               <div className="flex flex-wrap items-center gap-3">
-                <p className="text-sm">
+                <p className="num text-sm">
                   {t("undoUntil", { when: formatDateTime(current.undo_until) ?? "" })}
                 </p>
                 <UndoDialog from={from} />
@@ -344,6 +315,7 @@ function UndoDialog({ from }: { from: AcademicYear }) {
       triggerVariant="danger"
       title={t("undoTitle")}
       description={t("undoBody", { from: from.label })}
+      consequence={t("undoConsequence")}
       confirmLabel={t("undoConfirm")}
       confirmVariant="danger"
       schema={z.object({})}
@@ -456,7 +428,7 @@ function PlanCard({
   return (
     <>
       <Card title={t("planTitle")} description={t("planDescription")}>
-        <div className="space-y-6">
+        <div className="space-y-5">
           <div className="max-w-xs space-y-1">
             <Label htmlFor={targetSelectId}>{t("targetField")}</Label>
             <p id={`${targetSelectId}-hint`} className="text-sm text-ink-muted">
@@ -796,7 +768,7 @@ function PreviewCard({
 
   return (
     <Card title={t("previewTitle", { from: from.label, to: toLabel })}>
-      <div className="space-y-6">
+      <div className="space-y-5">
         {stale ? (
           <Alert tone="warning" live>
             {t("stale")}
@@ -850,6 +822,7 @@ function PreviewCard({
               held: counts.held_back,
               graduated: counts.graduated,
             })}
+            consequence={t("commitConsequence", { count: moving, to: toLabel })}
             confirmLabel={t("commitConfirm")}
             schema={z.object({})}
             invalidate={AFTER_PROMOTION_KEYS}

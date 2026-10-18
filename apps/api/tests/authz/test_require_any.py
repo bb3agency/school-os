@@ -233,6 +233,7 @@ FEE_ALL = (
 FEE_SETUP_READERS = ("finance.read", ("fee.manage",), False)
 FEE_VIEWERS = ("fee.collect", ("finance.read",), False)
 FEE_CANCEL_MAKERS = ("fee.collect", ("fee.manage",), False)
+UPI_READERS = ("fee.collect", ("fee.manage", "finance.read", "fee.reconcile"), False)
 
 
 def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
@@ -306,7 +307,12 @@ def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
         ),
         # R2-1B fees (ADR-0042): reads shared by collectors, readers and approvers; every fee
         # permission is school-wide, re-checked by the service (FR-FEE-024).
-        ("GET", "/api/v1/fees/status"): ("finance.read", FEE_ALL[1:], False),
+        ("GET", "/api/v1/fees/status"): ("finance.read", (*FEE_ALL[1:], "fee.reconcile"), False),
+        # R2-2E UPI (ADR-0042 decision 9): the counter, setup, finance readers and reconcilers
+        # see the UPI details and QR; the confirmed vs unconfirmed report also opens to readers.
+        ("GET", "/api/v1/fees/upi-settings"): UPI_READERS,
+        ("GET", "/api/v1/fees/upi-settings/qr.svg"): UPI_READERS,
+        ("GET", "/api/v1/fees/reports/upi"): ("fee.reconcile", ("finance.read",), False),
         ("GET", "/api/v1/fees/settings"): FEE_SETUP_READERS,
         ("GET", "/api/v1/fees/plans"): FEE_SETUP_READERS,
         ("GET", "/api/v1/fees/plans/{plan_id}"): FEE_SETUP_READERS,
@@ -334,6 +340,18 @@ def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
             False,
         ),
         ("GET", "/api/v1/fees/approvals"): ("finance.read", FEE_ALL[1:-1], False),
+        # R2-2D online payments (ADR-0042): the connection is read by its configurer (owner)
+        # and finance readers; links by collectors and readers; online reconciliation by
+        # readers and fee managers (who explain items).
+        ("GET", "/api/v1/payments/connection"): ("payments.configure", ("finance.read",), False),
+        ("GET", "/api/v1/fees/accounts/{account_id}/payment-intents"): FEE_VIEWERS,
+        ("GET", "/api/v1/fees/payment-intents/{intent_id}"): FEE_VIEWERS,
+        ("GET", "/api/v1/fees/reconciliation/online"): ("fee.reconcile", ("finance.read",), False),
+        ("GET", "/api/v1/fees/reconciliation/online/summary"): (
+            "fee.reconcile",
+            ("finance.read",),
+            False,
+        ),
     }
     assert {
         (m, p): (g.sos_permission, g.sos_any_of, g.sos_step_up) for m, p, g in guards

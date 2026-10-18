@@ -264,7 +264,7 @@ export function ChangeRequestDetailScreen({ changeRequestId }: { changeRequestId
   if (request.status === "loading") return <LoadingState label={tc("loading")} />;
   if (!data) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader breadcrumb={crumbs(t("nav"))} title={t("nav")} />
         <Alert tone="danger" title={tc("loadErrorTitle")}>
           {request.status === "error" && request.reason
@@ -313,7 +313,7 @@ export function ChangeRequestDetailScreen({ changeRequestId }: { changeRequestId
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         breadcrumb={crumbs(field)}
         title={td("title", { field })}
@@ -338,18 +338,23 @@ export function ChangeRequestDetailScreen({ changeRequestId }: { changeRequestId
         <Alert tone="info">{td("cannotDecide")}</Alert>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[3fr_2fr]">
+      <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
         <Card title={td("changeTitle")}>
           <div className="space-y-5">
+            {/* Before and after, named in words (never by colour alone): the old value struck
+                through and muted, the new one emphasised. */}
             <div className="grid items-stretch gap-3 sm:grid-cols-[1fr_auto_1fr]">
               <div className={cardClasses({ padding: "sm", tone: "muted" })}>
-                <Eyebrow as="p">{t("oldValue")}</Eyebrow>
+                <Eyebrow as="p">{td("before")}</Eyebrow>
                 <p className="mt-2 font-mono text-lg break-words text-ink-muted">
-                  <DisplayValue
-                    value={data.old_value}
-                    masked={data.masked}
-                    attributeKey={data.attribute_key}
-                  />
+                  <del className="decoration-2">
+                    <span className="sr-only">{t("oldValue")}: </span>
+                    <DisplayValue
+                      value={data.old_value}
+                      masked={data.masked}
+                      attributeKey={data.attribute_key}
+                    />
+                  </del>
                 </p>
               </div>
               <span
@@ -360,14 +365,17 @@ export function ChangeRequestDetailScreen({ changeRequestId }: { changeRequestId
               </span>
               <div className={cardClasses({ padding: "sm", tone: "outline" })}>
                 <Eyebrow as="p" tone="brand">
-                  {t("newValue")}
+                  {td("after")}
                 </Eyebrow>
-                <p className="mt-2 font-mono text-lg break-words text-ink">
-                  <DisplayValue
-                    value={data.new_value}
-                    masked={data.masked}
-                    attributeKey={data.attribute_key}
-                  />
+                <p className="mt-2 font-mono text-lg font-semibold break-words text-ink">
+                  <ins className="no-underline">
+                    <span className="sr-only">{t("newValue")}: </span>
+                    <DisplayValue
+                      value={data.new_value}
+                      masked={data.masked}
+                      attributeKey={data.attribute_key}
+                    />
+                  </ins>
                 </p>
               </div>
             </div>
@@ -394,38 +402,36 @@ export function ChangeRequestDetailScreen({ changeRequestId }: { changeRequestId
               </dd>
               <dt className="text-sm text-ink-muted">{td("reason")}</dt>
               <dd className="whitespace-pre-line">{data.reason}</dd>
-              <dt className="text-sm text-ink-muted">{td("evidence")}</dt>
-              <dd>
-                <EvidenceViewer documentId={data.evidence_document_id} />
-              </dd>
             </dl>
             {data.masked ? <p className="text-sm text-ink-muted">{td("maskedNote")}</p> : null}
           </div>
         </Card>
 
-        <div className="space-y-6">
-          <Card title={td("timelineTitle")}>
-            <Timeline label={td("timelineLabel")} items={steps} />
-            {data.status === "approved" ? (
-              <p className="mt-4 text-sm">{td("approvedNote")}</p>
-            ) : null}
-            {data.status === "expired" ? <p className="mt-4 text-sm">{td("expiredNote")}</p> : null}
-          </Card>
+        <Card title={td("evidence")}>
+          <EvidenceViewer documentId={data.evidence_document_id} />
+        </Card>
+      </div>
 
-          <Card title={td("memoTitle")} description={td("memoBody")}>
-            {/* The memo is an API page with its own strict CSP, served through the BFF. */}
-            <a
-              href={memoHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={buttonClasses("secondary", "md")}
-            >
-              <Icon name="file" className="size-4" />
-              {td("openMemo")}
-              <span className="sr-only"> ({td("newTab")})</span>
-            </a>
-          </Card>
-        </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card title={td("timelineTitle")}>
+          <Timeline label={td("timelineLabel")} items={steps} />
+          {data.status === "approved" ? <p className="mt-4 text-sm">{td("approvedNote")}</p> : null}
+          {data.status === "expired" ? <p className="mt-4 text-sm">{td("expiredNote")}</p> : null}
+        </Card>
+
+        <Card title={td("memoTitle")} description={td("memoBody")}>
+          {/* The memo is an API page with its own strict CSP, served through the BFF. */}
+          <a
+            href={memoHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={buttonClasses("secondary", "md")}
+          >
+            <Icon name="file" className="size-4" />
+            {td("openMemo")}
+            <span className="sr-only"> ({td("newTab")})</span>
+          </a>
+        </Card>
       </div>
 
       <nav aria-label={td("relatedLabel")} className="flex flex-wrap gap-2" data-print="hide">

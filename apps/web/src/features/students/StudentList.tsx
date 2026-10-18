@@ -4,28 +4,18 @@ import type { AcademicYear, SchoolClass, Section } from "@schoolos/api-client";
 import { useLocale, useTranslations } from "next-intl";
 import { useState, type FormEvent } from "react";
 import * as z from "@/lib/zod";
+import { DataTableV2, type ColumnV2 } from "@/components/console/DataTableV2";
 import { Avatar } from "@/components/ui/Avatar";
 import { Pill } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
+import type { FilterChip } from "@/components/ui/FilterChips";
 import { Icon } from "@/components/ui/Icon";
 import { TextField } from "@/components/ui/Input";
+import { Menu, type MenuEntry } from "@/components/ui/Menu";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { Pagination } from "@/components/ui/Pagination";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SelectField, type SelectOption } from "@/components/ui/Select";
-import { NarrowSwitch } from "@/components/ui/NarrowSwitch";
-import {
-  DataTable,
-  StackedRows,
-  Table,
-  TableScroll,
-  TBody,
-  THead,
-  Td,
-  Th,
-  Tr,
-  type Column,
-} from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { classLabel as classDisplay } from "@/lib/school-class";
 import { Link } from "@/i18n/navigation";
@@ -36,7 +26,7 @@ import { UUID_PATTERN } from "@/lib/validation";
 import { containsFullAadhaar } from "./aadhaar";
 import { GuardedTextField } from "./fields";
 import { PERM, useStaffPermissions, type Permissions } from "./me";
-import { Pager, useCursorStack } from "./paging";
+import { useCursorStack } from "./paging";
 import { StudentStatusBadge, useAttributeIndex, useAttributes } from "./parts";
 import {
   STUDENT_STATUSES,
@@ -275,222 +265,68 @@ export function StudentListView({
     onSearch(filtersFromForm(event.currentTarget));
   }
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title={t("title")}
-        description={t("description")}
-        breadcrumb={[{ label: t("crumbHome"), href: "/" }, { label: t("title") }]}
-        actions={
-          <>
-            {permissions.has(PERM.create) ? (
-              <ButtonLink href="/students/new">
-                <Icon name="plus" className="size-4" />
-                {t("add")}
-              </ButtonLink>
-            ) : null}
-            {permissions.has(PERM.importRun) ? (
-              <ButtonLink href="/imports" variant="secondary">
-                {t("import")}
-              </ButtonLink>
-            ) : null}
-            <Button variant="secondary" onClick={() => window.print()}>
-              {t("print")}
-            </Button>
-          </>
-        }
-      />
-      <div data-print="hide">
-        <Card title={t("searchTitle")}>
-          {/*
-            The search stays in this page's memory: a student's or parent's name is personal
-            data and must never end up in the address bar, browser history or access logs.
-          */}
-          <form
-            role="search"
-            aria-label={t("searchTitle")}
-            className="space-y-4"
-            noValidate
-            onSubmit={submit}
-          >
-            <div
-              className={
-                yearOptions.length > 0
-                  ? "grid items-end gap-4 md:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr_1fr]"
-                  : "grid items-end gap-4 md:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr]"
-              }
-            >
-              <GuardedTextField
-                id={SEARCH_FIELD_ID}
-                name="q"
-                type="search"
-                label={t("searchLabel")}
-                hint={t("searchHint")}
-                defaultValue={filters.q ?? ""}
-                maxLength={200}
-                autoComplete="off"
-                spellCheck={false}
-                error={aadhaarBlocked ? ts("aadhaarNotAllowed") : undefined}
-              />
-              {yearOptions.length > 0 ? (
-                <SelectField
-                  name="academic_year_id"
-                  label={t("filterYear")}
-                  placeholder={t("currentYear")}
-                  options={yearOptions}
-                  value={yearId}
-                  onChange={(event) => setYearId(event.currentTarget.value)}
-                />
-              ) : null}
-              <SelectField
-                name="class_id"
-                label={t("filterClass")}
-                placeholder={tc("all")}
-                options={classOptions}
-                value={classId}
-                onChange={(event) => setClassId(event.currentTarget.value)}
-              />
-              <SelectField
-                name="section_id"
-                label={t("filterSection")}
-                placeholder={tc("all")}
-                options={sectionOptions}
-                defaultValue={filters.sectionId ?? ""}
-                key={`section-${yearId}-${classId}`}
-              />
-            </div>
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <div className="flex flex-wrap items-end gap-4">
-                <SegmentedControl
-                  name="status"
-                  legend={t("filterStatus")}
-                  legendVisible
-                  size="sm"
-                  defaultValue={filters.status ?? ""}
-                  options={[
-                    { value: "", label: tc("all") },
-                    ...STUDENT_STATUSES.map((value) => ({
-                      value,
-                      label: ts(`status.${value}`),
-                    })),
-                  ]}
-                />
-                {/*
-                  FR-STU-016 / ADR-0037: the one search field where 12 digits are expected, so
-                  no Aadhaar paste guard here; it matches only the typed APAAR ID, exactly.
-                */}
-                <div className="w-full sm:w-60">
-                  <TextField
-                    name="apaar_id"
-                    label={t("apaarLabel")}
-                    hint={t("apaarHint")}
-                    error={apaarInvalid ? t("apaarInvalid") : undefined}
-                    defaultValue={filters.apaar ?? ""}
-                    maxLength={14}
-                    inputMode="numeric"
-                    autoComplete="off"
-                    spellCheck={false}
-                  />
-                </div>
-                {/* FR-STU-019 / ADR-0039: exact UDISE+ PEN, 11 digits. */}
-                <div className="w-full sm:w-52">
-                  <TextField
-                    name="udise_pen"
-                    label={t("penLabel")}
-                    hint={t("penHint")}
-                    error={penInvalid ? t("penInvalid") : undefined}
-                    defaultValue={filters.pen ?? ""}
-                    maxLength={15}
-                    inputMode="numeric"
-                    autoComplete="off"
-                    spellCheck={false}
-                  />
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {hasFilters ? (
-                  <Button variant="ghost" onClick={onClear}>
-                    {t("clear")}
-                  </Button>
-                ) : null}
-                <Button type="submit">
-                  <Icon name="search" className="size-4" />
-                  {tc("search")}
-                </Button>
-              </div>
-            </div>
-          </form>
-        </Card>
-      </div>
+  // Active filters as chips (docs/17 §4.3). They stay on this page only: the search text is
+  // personal data and never goes into the URL (SEC-008).
+  const classText = (id: string | undefined) =>
+    classOptions.find((option) => option.value === id)?.label ?? id ?? "";
+  const sectionText = (id: string | undefined) =>
+    sectionOptions.find((option) => option.value === id)?.label ?? t("chipSectionChosen");
+  const yearText = (id: string | undefined) =>
+    yearOptions.find((option) => option.value === id)?.label ?? id ?? "";
+  const chips: FilterChip[] =
+    rows === null
+      ? []
+      : [
+          ...(filters.q ? [{ id: "q", label: t("chipSearch"), value: filters.q }] : []),
+          ...(filters.yearId
+            ? [{ id: "yearId", label: t("filterYear"), value: yearText(filters.yearId) }]
+            : []),
+          ...(filters.classId
+            ? [{ id: "classId", label: t("filterClass"), value: classText(filters.classId) }]
+            : []),
+          ...(filters.sectionId
+            ? [
+                {
+                  id: "sectionId",
+                  label: t("filterSection"),
+                  value: sectionText(filters.sectionId),
+                },
+              ]
+            : []),
+          ...(filters.status && isStudentStatus(filters.status)
+            ? [{ id: "status", label: t("filterStatus"), value: ts(`status.${filters.status}`) }]
+            : []),
+          ...(filters.apaar ? [{ id: "apaar", label: t("apaarLabel"), value: filters.apaar }] : []),
+          ...(filters.pen ? [{ id: "pen", label: t("penLabel"), value: filters.pen }] : []),
+        ];
+  // The form keeps defaultValues; a new version remounts it with the filters that remain.
+  const [formVersion, setFormVersion] = useState(0);
+  const removeChip = (id: string) => {
+    const next: StudentFilters = { ...filters, [id]: undefined };
+    if (id === "classId" || id === "yearId") next.sectionId = undefined;
+    if (id === "classId") setClassId("");
+    if (id === "yearId") setYearId("");
+    setFormVersion((value) => value + 1);
+    onSearch(next);
+  };
+  const moreFiltersOpen = Boolean(filters.apaar || filters.pen || apaarInvalid || penInvalid);
 
-      {rows === null ? null : (
-        <section aria-labelledby="student-results" className="space-y-3">
-          <h2 id="student-results" className="text-lg font-semibold text-ink">
-            {t("resultsTitle")}
-          </h2>
-          {rows.status === "ready" && rows.data.length > 0 ? (
-            <StudentRows rows={rows.data} matchedOn={(row) => matchedField(row, index.label)} />
-          ) : (
-            <DataTable
-              caption={t("resultsTitle")}
-              captionHidden
-              columns={[]}
-              state={rows}
-              rowKey={(row) => row.id}
-              emptyTitle={hasFilters ? t("noMatchTitle") : t("emptyTitle")}
-              emptyBody={hasFilters ? t("noMatchBody") : t("emptyBody")}
-            />
-          )}
-          {results?.status === "ready" ? (
-            <Pager
-              label={t("pagesLabel")}
-              page={pageNumber}
-              onPrevious={onPrevious}
-              onNext={onNext}
-            />
-          ) : null}
-        </section>
-      )}
-    </div>
-  );
-}
-
-/** "Found by: Father's name" when the match was not on the name or admission number. */
-function matchedField(row: StudentSummary, label: (key: string) => string): string | null {
-  const field = row.match.field;
-  if (!field || ["full_name", "admission_no", "apaar_id", "udise_pen"].includes(field)) {
-    return null;
-  }
-  return label(field);
-}
-
-/**
- * The results table. The name is the row's one link; it stretches over the whole row, so a
- * click anywhere on the row opens the profile while keyboard users still Tab to one link
- * per student (no row-level tabindex or click handlers).
- */
-function StudentRows({
-  rows,
-  matchedOn,
-}: {
-  rows: readonly StudentSummary[];
-  matchedOn: (row: StudentSummary) => string | null;
-}) {
-  const t = useTranslations("students.list");
-  // Below 640px the same rows as cards: the name stretches over its card (docs/17 §5.7).
-  const columns: Column<StudentSummary>[] = [
+  const columns: ColumnV2<StudentSummary>[] = [
     {
       key: "name",
+      stack: "title",
+      // The name is the row's one link and stretches over the whole row (DataTableV2 rows
+      // are positioned): a click anywhere opens the profile; keyboard users Tab once per row.
       header: t("colName"),
       cell: (row) => {
-        const found = matchedOn(row);
+        const found = matchedField(row, index.label);
         return (
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-44 items-center gap-3">
             {row.display_name ? <Avatar name={row.display_name} size="sm" decorative /> : null}
             <div className="min-w-0">
               <Link
                 href={`/students/${row.id}`}
-                className="font-semibold break-anywhere text-primary underline-offset-4 after:absolute after:inset-0 hover:underline"
+                className="inline-block min-h-6 font-semibold break-anywhere text-primary underline-offset-4 after:absolute after:inset-0 hover:underline"
               >
                 {row.display_name ?? t("unnamed")}
               </Link>
@@ -506,109 +342,247 @@ function StudentRows({
     },
     {
       key: "admission",
+      stack: "field",
       header: t("colAdmissionNo"),
       cell: (row) => (
-        <span className="font-mono text-sm">
+        <span className="block max-w-56 font-mono text-sm break-all">
           <Value>{row.admission_no}</Value>
         </span>
       ),
     },
     {
       key: "class",
+      stack: "field",
       header: t("colClassSection"),
       cell: (row) =>
         row.class_section ? <Pill variant="tag">{row.class_section}</Pill> : <Value>{null}</Value>,
     },
     {
       key: "status",
+      stack: "field",
       header: t("colStatus"),
       cell: (row) => <StudentStatusBadge status={row.status} />,
     },
   ];
-  return (
-    <NarrowSwitch
-      narrow={
-        <StackedRows
-          caption={t("resultsTitle")}
-          captionHidden
-          columns={columns}
-          rows={rows}
-          rowKey={(row) => row.id}
+
+  const more: MenuEntry[] = [
+    ...(permissions.has(PERM.importRun)
+      ? [
+          {
+            kind: "link" as const,
+            id: "import",
+            label: t("import"),
+            href: "/imports",
+            icon: "upload" as const,
+          },
+        ]
+      : []),
+    { id: "print", label: t("print"), icon: "printer", onSelect: () => window.print() },
+  ];
+
+  const toolbar = (
+    // The search stays in this page's memory: a student's or parent's name is personal data
+    // and must never end up in the address bar, browser history or access logs.
+    <form
+      key={formVersion}
+      role="search"
+      aria-label={t("searchTitle")}
+      className="w-full space-y-3"
+      noValidate
+      onSubmit={submit}
+      data-print="hide"
+    >
+      <div
+        className={
+          yearOptions.length > 0
+            ? "grid items-end gap-3 md:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr_1fr_auto]"
+            : "grid items-end gap-3 md:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr_auto]"
+        }
+      >
+        <GuardedTextField
+          id={SEARCH_FIELD_ID}
+          name="q"
+          type="search"
+          label={t("searchLabel")}
+          hint={t("searchHint")}
+          defaultValue={filters.q ?? ""}
+          maxLength={200}
+          autoComplete="off"
+          spellCheck={false}
+          error={aadhaarBlocked ? ts("aadhaarNotAllowed") : undefined}
         />
-      }
-      wide={<StudentTable rows={rows} matchedOn={matchedOn} />}
-    />
+        {yearOptions.length > 0 ? (
+          <SelectField
+            name="academic_year_id"
+            label={t("filterYear")}
+            placeholder={t("currentYear")}
+            options={yearOptions}
+            value={yearId}
+            onChange={(event) => setYearId(event.currentTarget.value)}
+          />
+        ) : null}
+        <SelectField
+          name="class_id"
+          label={t("filterClass")}
+          placeholder={tc("all")}
+          options={classOptions}
+          value={classId}
+          onChange={(event) => setClassId(event.currentTarget.value)}
+        />
+        <SelectField
+          name="section_id"
+          label={t("filterSection")}
+          placeholder={tc("all")}
+          options={sectionOptions}
+          defaultValue={filters.sectionId ?? ""}
+          key={`section-${yearId}-${classId}`}
+        />
+        <div className="flex flex-wrap items-center gap-2 xl:pb-6">
+          <Button type="submit">
+            <Icon name="search" className="size-4" />
+            {tc("search")}
+          </Button>
+          {hasFilters ? (
+            <Button variant="ghost" onClick={onClear}>
+              {t("clear")}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+      <details className="group rounded-lg" open={moreFiltersOpen || undefined}>
+        <summary className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-md text-sm font-semibold text-accent pointer-coarse:min-h-11">
+          <Icon
+            name="chevronRight"
+            className="size-4 group-open:rotate-90 motion-reduce:transition-none"
+          />
+          {t("moreFilters")}
+        </summary>
+        <div className="mt-3 flex flex-wrap items-end gap-4">
+          <SegmentedControl
+            name="status"
+            legend={t("filterStatus")}
+            legendVisible
+            size="sm"
+            defaultValue={filters.status ?? ""}
+            options={[
+              { value: "", label: tc("all") },
+              ...STUDENT_STATUSES.map((value) => ({
+                value,
+                label: ts(`status.${value}`),
+              })),
+            ]}
+          />
+          {/*
+            FR-STU-016 / ADR-0037: the one search field where 12 digits are expected, so
+            no Aadhaar paste guard here; it matches only the typed APAAR ID, exactly.
+          */}
+          <div className="w-full sm:w-60">
+            <TextField
+              name="apaar_id"
+              label={t("apaarLabel")}
+              hint={t("apaarHint")}
+              error={apaarInvalid ? t("apaarInvalid") : undefined}
+              defaultValue={filters.apaar ?? ""}
+              maxLength={14}
+              inputMode="numeric"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </div>
+          {/* FR-STU-019 / ADR-0039: exact UDISE+ PEN, 11 digits. */}
+          <div className="w-full sm:w-52">
+            <TextField
+              name="udise_pen"
+              label={t("penLabel")}
+              hint={t("penHint")}
+              error={penInvalid ? t("penInvalid") : undefined}
+              defaultValue={filters.pen ?? ""}
+              maxLength={15}
+              inputMode="numeric"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </div>
+        </div>
+      </details>
+    </form>
+  );
+
+  const pageRows = rows?.status === "ready" ? rows.data.length : 0;
+  const from = (pageNumber - 1) * PAGE_SIZE + 1;
+
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        title={t("title")}
+        description={t("description")}
+        breadcrumb={[{ label: t("crumbHome"), href: "/" }, { label: t("title") }]}
+        actions={
+          <>
+            {permissions.has(PERM.create) ? (
+              <ButtonLink href="/students/new">
+                <Icon name="plus" className="size-4" />
+                {t("add")}
+              </ButtonLink>
+            ) : null}
+            <Menu
+              label={t("more")}
+              variant="button"
+              trigger={t("more")}
+              entries={more}
+              align="end"
+            />
+          </>
+        }
+      />
+      <DataTableV2
+        id="students"
+        caption={t("resultsTitle")}
+        captionHidden
+        columns={columns}
+        // Blocked (the search held a full Aadhaar number or a bad ID): nothing was sent.
+        state={rows ?? { status: "ready", data: [] }}
+        rowKey={(row) => row.id}
+        toolbar={toolbar}
+        chips={chips}
+        onRemoveChip={removeChip}
+        onClearFilters={onClear}
+        emptyTitle={rows === null ? t("blockedTitle") : t("emptyTitle")}
+        emptyBody={rows === null ? t("blockedBody") : t("emptyBody")}
+        emptyAction={
+          rows !== null && permissions.has(PERM.create) ? (
+            <ButtonLink href="/students/new" variant="secondary" size="sm">
+              <Icon name="plus" className="size-4" />
+              {t("add")}
+            </ButtonLink>
+          ) : undefined
+        }
+        noResultsTitle={rows === null ? t("blockedTitle") : t("noMatchTitle")}
+        footer={
+          results?.status === "ready" && (pageNumber > 1 || onNext) ? (
+            <Pagination
+              from={pageRows === 0 ? 1 : from}
+              to={pageRows === 0 ? 0 : from + pageRows - 1}
+              hasPrevious={Boolean(onPrevious)}
+              hasNext={Boolean(onNext)}
+              onPrevious={() => onPrevious?.()}
+              onNext={() => onNext?.()}
+            />
+          ) : undefined
+        }
+        stacked
+      />
+    </div>
   );
 }
 
-function StudentTable({
-  rows,
-  matchedOn,
-}: {
-  rows: readonly StudentSummary[];
-  matchedOn: (row: StudentSummary) => string | null;
-}) {
-  const t = useTranslations("students.list");
-  const tc = useTranslations("common");
-  return (
-    <TableScroll label={tc("scrollableTable", { caption: t("resultsTitle") })} framed>
-      <Table>
-        <caption className="sr-only">{t("resultsTitle")}</caption>
-        <THead>
-          <Tr>
-            <Th>{t("colName")}</Th>
-            <Th>{t("colAdmissionNo")}</Th>
-            <Th>{t("colClassSection")}</Th>
-            <Th>{t("colStatus")}</Th>
-          </Tr>
-        </THead>
-        <TBody>
-          {rows.map((row) => {
-            const found = matchedOn(row);
-            return (
-              <Tr key={row.id} className="relative">
-                <Td>
-                  <div className="flex min-w-44 items-center gap-3">
-                    {row.display_name ? (
-                      <Avatar name={row.display_name} size="sm" decorative />
-                    ) : null}
-                    <div className="min-w-0">
-                      <Link
-                        href={`/students/${row.id}`}
-                        className="font-semibold text-primary underline-offset-4 after:absolute after:inset-0 hover:underline"
-                      >
-                        {row.display_name ?? t("unnamed")}
-                      </Link>
-                      {found ? (
-                        <p className="text-xs text-ink-muted" data-print="hide">
-                          {t("matchedOn", { field: found })}
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                </Td>
-                <Td>
-                  <span className="block max-w-56 font-mono text-sm break-all">
-                    <Value>{row.admission_no}</Value>
-                  </span>
-                </Td>
-                <Td>
-                  {row.class_section ? (
-                    <Pill variant="tag">{row.class_section}</Pill>
-                  ) : (
-                    <Value>{null}</Value>
-                  )}
-                </Td>
-                <Td>
-                  <StudentStatusBadge status={row.status} />
-                </Td>
-              </Tr>
-            );
-          })}
-        </TBody>
-      </Table>
-    </TableScroll>
-  );
+/** "Found by: Father's name" when the match was not on the name or admission number. */
+function matchedField(row: StudentSummary, label: (key: string) => string): string | null {
+  const field = row.match.field;
+  if (!field || ["full_name", "admission_no", "apaar_id", "udise_pen"].includes(field)) {
+    return null;
+  }
+  return label(field);
 }
 
 /**

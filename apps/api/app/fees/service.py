@@ -14,7 +14,9 @@ FR-FEE-001..014, FR-FEE-018..030). Other modules call only this module.
   print anything; :func:`account_summary` is information for holders of ``finance.read``.
 
 Internal modules: ``setup`` (settings, heads, plans), ``ledger`` (accounts and dues),
-``receipts``, ``approvals`` (maker-checker requests), ``late_fees``, ``reports``.
+``receipts``, ``approvals`` (maker-checker requests), ``late_fees``, ``reports``; R2-2E:
+``upi`` (UPI settings, QR, UTR check, report) and ``statements`` (bank statements, proposals,
+UPI confirmations, exceptions).
 """
 
 from __future__ import annotations
@@ -26,12 +28,23 @@ from collections.abc import Collection
 from sqlalchemy.orm import Session
 
 from app.core import purge as purging
-from app.core.errors import Conflict
 from app.core.records import RecordTable
 from app.fees import _common as c
-from app.fees import approvals, ledger, receipts, reports, setup
+from app.fees import (
+    approvals,
+    ledger,
+    online,
+    receipts,
+    refund_hooks,
+    reports,
+    setup,
+    statements,
+    upi,
+)
 from app.fees import late_fees as late
+from app.fees import online_repository as orepo
 from app.fees import repository as repo
+from app.fees import upi_repository as upi_repo
 from app.fees._common import (
     COLLECT,
     CONCESSION_APPROVE,
@@ -39,6 +52,7 @@ from app.fees._common import (
     MANAGE,
     READ,
     RECEIPT_CANCEL,
+    RECONCILE,
     REFUND_APPROVE,
     REFUND_REQUEST,
     REPORT,
@@ -48,6 +62,7 @@ from app.fees._common import (
     fees_on,
 )
 from app.fees.money import ZERO
+from app.fees.online_schemas import PaymentLinkInfo
 from app.fees.receipts import RENDER_EVENT, RENDER_TASK
 from app.fees.schemas import DueLine, FeeAccountSummary, InstalmentDue, StudentDues
 from app.tenancy import service as tenancy
@@ -113,6 +128,24 @@ dues_list = reports.dues_list
 dues_csv = reports.dues_csv
 
 post_late_fees = late.post_for_school
+
+# R2-2E UPI and bank statements (ADR-0042 decision 9; FR-FEE-014..017)
+get_upi_settings = upi.get_settings
+put_upi_settings = upi.put_settings
+upi_qr_svg = upi.qr_image
+check_utr = upi.check_utr
+upi_report = upi.report
+upi_exception_counts = upi.exception_counts
+statement_presets = statements.presets
+import_statement = statements.import_statement
+list_statements = statements.list_statements
+get_statement = statements.get_statement
+confirm_statement = statements.confirm
+match_line = statements.match
+ignore_line = statements.ignore
+rematch = statements.rematch
+upi_exceptions = statements.exceptions
+erase_statement_narrations = statements.erase_old_narrations
 
 
 # --- data contract for other modules (R2-2F Ask, R2-3G sending, R2-3H parent pages) -------------
@@ -197,21 +230,55 @@ def dues_for_student(
     )
 
 
-class PaymentsNotConnected(Conflict):
-    code = "payments_not_connected"
-
-    def __init__(self) -> None:
-        super().__init__(
-            "Online payments are not connected for this school. Collect the fee at the counter."
-        )
+PaymentsNotConnected = online.PaymentsNotConnected
 
 
 def create_payment_intent(
-    session: Session, account_id: uuid.UUID, instalments: Collection[int], *, created_via: str
+    session: Session,
+    account_id: uuid.UUID,
+    instalments: Collection[int],
+    *,
+    created_via: str,
+    public_handle_id: uuid.UUID | None = None,
 ) -> uuid.UUID:
-    """A payment link for the given instalments (R2-2D builds it on the school's Razorpay
-    account). Until then: 409 ``payments_not_connected``."""
-    raise PaymentsNotConnected()
+    """A payment link on the school's own Razorpay account for the given instalments of the
+    account (R2-2D; FR-PAY-005/006): the amount is what is due on them now; an open link for the
+    same instalments and amount is reused. ``created_via`` is ``parent_page`` (with the dues
+    page's ``public_handle_id``) or ``reminder``; the caller decided who may ask (the parent
+    page's per-handle budget ``public_pay``, FR-PUB-009). Errors: 404 ``module_hidden`` while
+    fees are off; 409 ``payments_not_connected``, ``nothing_due``, ``account_closed``,
+    ``too_many_links``; 502 ``payment_link_failed``. Audit ``fee.payment_link.created``
+    (system). Returns the intent id; :func:`payment_link` gives its URL."""
+    if not fees_on(session, repo.current_tenant_id(session)):
+        raise ModuleHidden()
+    if created_via not in ("parent_page", "reminder"):
+        raise ValueError("staff links are made through the fee routes")
+    intent, _ = online.create_intent(
+        session,
+        account_id=account_id,
+        instalments=instalments,
+        created_via=created_via,
+        created_by=None,
+        public_handle_id=public_handle_id,
+    )
+    return intent.id
+
+
+def payment_link(session: Session, intent_id: uuid.UUID) -> PaymentLinkInfo | None:
+    """The hosted payment page of an intent (short URL, expiry, status, amount) for the parent
+    page's redirect (R2-3H); ``None`` for an unknown intent. No permission check."""
+    return online.link_info(session, intent_id)
+
+
+def payments_connected(session: Session) -> bool:
+    """Whether the school can take online payments now (the parent page's "Pay online")."""
+    return refund_hooks.can_refund_online(session)
+
+
+def upi_payee(session: Session) -> tuple[str, str, str] | None:
+    """The school's ``(payee name, UPI ID, upi:// URI)`` for the parent dues page (R2-3H) or
+    ``None`` when not set. No permission check: the caller decides. The QR encodes the URI."""
+    return upi.payee(session)
 
 
 def receipt_issued_event() -> str:
@@ -226,13 +293,28 @@ def receipt_issued_event() -> str:
 def export_records(session: Session) -> list[RecordTable]:
     """Worker only: every fees table of the current school for its full data export
     (FR-FEE-027; the caller checked ``tenant.export_all`` and audits the export)."""
-    return repo.export_tables(session)
+    return [
+        *repo.export_tables(session),
+        *orepo.export_tables(session),
+        *upi_repo.export_tables(session),
+    ]
 
 
-# Children before parents (migration 0058_fees_core). Registered with app.tenancy at import;
-# purged before students, documents, the academic structure and the members they reference.
+# Children before parents (migrations 0058_fees_core, 0059_payments_online). Registered with
+# app.tenancy at import; purged before students, documents, the academic structure, the members
+# and the public handles they reference. Receipts reference payment intents, so intents go after
+# receipts; the online rows that reference receipts go first.
 _PURGE = purging.PurgeTables(
     deleted=(
+        # R2-2E (0060_fees_upi): confirmations and statement lines reference receipts
+        "fin.upi_confirmations",
+        "fin.bank_statement_lines",
+        "fin.bank_statement_imports",
+        "fin.upi_settings",
+        "fin.reconciliation_items",
+        "fin.reconciliation_runs",
+        "fin.provider_payments",
+        "fin.provider_events",
         "fin.day_closes",
         "fin.ledger_entries",
         "fin.refunds",
@@ -240,6 +322,8 @@ _PURGE = purging.PurgeTables(
         "fin.receipt_allocations",
         "fin.receipts",
         "fin.receipt_counters",
+        "fin.payment_intents",
+        "fin.payment_connections",
         "fin.adjustments",
         "fin.concessions",
         "fin.student_fee_accounts",
@@ -276,6 +360,7 @@ __all__ = [
     "MANAGE",
     "READ",
     "RECEIPT_CANCEL",
+    "RECONCILE",
     "REFUND_APPROVE",
     "REFUND_REQUEST",
     "RENDER_EVENT",
@@ -290,6 +375,9 @@ __all__ = [
     "dues_for_student",
     "enabled",
     "export_records",
+    "payment_link",
+    "payments_connected",
     "purge_tenant_data",
     "tenant_data_counts",
+    "upi_payee",
 ]

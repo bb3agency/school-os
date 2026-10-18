@@ -46,8 +46,12 @@ export function Breadcrumb({ items, label }: { items: readonly Crumb[]; label?: 
 }
 
 /**
- * Top of every page: breadcrumb, eyebrow, the page's one `<h1>`, a description, a badge
- * and actions on the right. A white card by default (`plain` drops the card).
+ * Top of every page (docs/17 v1.0): a plain header row on the canvas, no card: the page's one
+ * `<h1>` (22px semibold), a badge, a one-line description and the actions on the right (one
+ * primary, the rest secondary or in a menu). Inside the console the top bar already shows
+ * where the page sits (section and page), so a two-crumb trail ("Home › This page") is not
+ * repeated here; a deeper trail (a record under its list) still shows above the title.
+ * `plain` is kept for older callers; every header is plain now.
  */
 export function PageHeader({
   title,
@@ -56,7 +60,6 @@ export function PageHeader({
   badge,
   breadcrumb,
   eyebrow,
-  plain = false,
   className,
 }: {
   title: ReactNode;
@@ -74,17 +77,16 @@ export function PageHeader({
     <header
       className={cn(
         "mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-3 md:mb-6",
-        !plain &&
-          "rounded-xl border border-border bg-surface px-4 py-4 shadow-card sm:px-5 md:px-6 md:py-5 print:border-0 print:p-0 print:shadow-none",
+        "pt-2 print:p-0",
         className,
       )}
     >
       {/* Title block takes the row; actions sit on its right when they fit, else below. */}
       <div className="min-w-0 max-w-3xl flex-[1_1_18rem] space-y-1.5">
-        {breadcrumb && breadcrumb.length > 0 ? <Breadcrumb items={breadcrumb} /> : null}
+        {breadcrumb && breadcrumb.length > 2 ? <Breadcrumb items={breadcrumb} /> : null}
         {eyebrow ? <Eyebrow>{eyebrow}</Eyebrow> : null}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <h1 className="min-w-0 text-xl font-semibold break-anywhere text-ink sm:text-2xl">
+          <h1 className="min-w-0 text-xl font-semibold break-anywhere text-ink sm:text-[1.375rem] sm:leading-7">
             {title}
           </h1>
           {badge}

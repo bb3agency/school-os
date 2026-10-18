@@ -2,13 +2,15 @@
 
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useRef, useState, type FormEvent } from "react";
+import { DataTableV2, type ColumnV2 } from "@/components/console";
 import { Alert } from "@/components/ui/Alert";
 import { Pill, type PillVariant } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
+import { Button, buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ErrorSummary } from "@/components/ui/ErrorSummary";
+import { Icon } from "@/components/ui/Icon";
 import { Field } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { DataTable, type Column } from "@/components/ui/Table";
 import { FileDropZone, fileInputClasses } from "@/features/imports/parts";
 import { extensionOf, uploadDocument, type UploadProgress } from "@/features/imports/upload";
 import { PERM, useStaffPermissions, type Permissions } from "@/features/students/me";
@@ -29,6 +31,8 @@ import {
 
 export const EXTRACTION_KEY = ["staff", "extraction"] as const;
 const ACCEPT = ".jpg,.jpeg,.png,image/jpeg,image/png";
+/** The upload card's id: the header's primary action jumps to it. */
+const UPLOAD_ANCHOR = "upload-photos";
 
 /** Workflow pills: being read = in progress, rows to check = review, all checked = done. */
 const batchPill: Record<BatchStatus, PillVariant> = {
@@ -75,7 +79,9 @@ export function UploadPhotos({ onStarted }: { onStarted: (batch: ExtractionBatch
   const api = useBffClient("staff");
   const fileRef = useRef<HTMLInputElement>(null);
   const statusId = useId();
+  const photosId = `${statusId}-photos`;
   const [problem, setProblem] = useState<PhotoProblem | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [error, setError] = useState<unknown>(undefined);
   const busy = progress !== null;
@@ -109,7 +115,8 @@ export function UploadPhotos({ onStarted }: { onStarted: (batch: ExtractionBatch
     setProblem(found);
     setError(undefined);
     if (found) {
-      fileRef.current?.focus();
+      // The error summary takes focus and links to the field (docs/17 §4.4).
+      setAttempt((value) => value + 1);
       return;
     }
     start(files)
@@ -135,21 +142,27 @@ export function UploadPhotos({ onStarted }: { onStarted: (batch: ExtractionBatch
     return t("photoOf", { current: value.current, total: value.total, stage });
   };
 
+  const problemText =
+    problem === "photosTooMany"
+      ? t("photosTooMany", { max: MAX_PHOTOS })
+      : problem
+        ? t(problem)
+        : undefined;
+
   return (
     <form noValidate onSubmit={onSubmit} className="space-y-4">
+      <ErrorSummary
+        errors={problemText ? [{ fieldId: photosId, message: problemText }] : []}
+        attempt={attempt}
+      />
       <Field
+        id={photosId}
         label={t("photos")}
         hint={t("photosHint", {
           max: MAX_PHOTOS,
           size: formatBytes(MAX_PHOTO_BYTES, locale) ?? "25 MB",
         })}
-        error={
-          problem === "photosTooMany"
-            ? t("photosTooMany", { max: MAX_PHOTOS })
-            : problem
-              ? t(problem)
-              : undefined
-        }
+        error={problemText}
       >
         {({ id, describedBy, invalid }) => (
           <FileDropZone title={t("dropTitle")} icon="camera" disabled={busy}>
@@ -218,15 +231,16 @@ export function RegisterPhotosView({
   const locale = useLocale() as Locale;
   const count = (value: number) => formatCount(value, locale) ?? String(value);
   const canUpload = permissions.has(PERM.importRun) && permissions.has(PERM.documentUpload);
+  const historyId = useId();
 
-  const columns: Column<ExtractionBatch>[] = [
+  const columns: ColumnV2<ExtractionBatch>[] = [
     {
       key: "started",
       header: t("colStarted"),
       cell: (row) => (
         <Link
           href={`/register-photos/${row.id}`}
-          className="font-semibold text-primary underline underline-offset-4"
+          className="num font-semibold text-primary underline underline-offset-4"
         >
           {formatDateTime(row.created_at) ?? t("open")}
           <span className="sr-only">{t("openHint")}</span>
@@ -237,30 +251,29 @@ export function RegisterPhotosView({
       key: "pages",
       header: t("colPages"),
       numeric: true,
-      cell: (row) => (
-        <span className="tabular-nums">
-          {t("pagesDone", { done: count(row.pages_done), total: count(row.page_count) })}
-        </span>
-      ),
+      cell: (row) => t("pagesDone", { done: count(row.pages_done), total: count(row.page_count) }),
     },
     {
       key: "pending",
       header: t("colPending"),
+      numeric: true,
       cell: (row) =>
         row.items_pending > 0 ? (
           <Pill variant="review">{count(row.items_pending)}</Pill>
         ) : (
-          <span className="tabular-nums">{count(row.items_pending)}</span>
+          count(row.items_pending)
         ),
     },
     {
       key: "confirmed",
       header: t("colConfirmed"),
-      cell: (row) => <span className="tabular-nums">{count(row.items_confirmed)}</span>,
+      numeric: true,
+      cell: (row) => count(row.items_confirmed),
     },
     {
       key: "withheld",
       header: t("colWithheld"),
+      numeric: true,
       cell: (row) =>
         row.pages_withheld > 0 ? (
           <Pill variant="negative">{count(row.pages_withheld)}</Pill>
@@ -275,32 +288,51 @@ export function RegisterPhotosView({
     },
   ];
 
+  // Jumps to the upload card on this page; the form's submit stays the one primary button.
+  const uploadLink = (
+    <a href={`#${UPLOAD_ANCHOR}`} className={buttonClasses("secondary")}>
+      <Icon name="camera" className="size-4" />
+      {t("uploadAction")}
+    </a>
+  );
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={t("title")}
         description={t("description")}
         breadcrumb={[{ label: tn("home"), href: "/" }, { label: t("title") }]}
+        actions={canUpload ? uploadLink : undefined}
       />
       {canUpload ? (
-        <Card title={t("uploadTitle")} description={t("uploadDescription")}>
-          <UploadPhotos onStarted={onStarted} />
-        </Card>
-      ) : null}
-      <Card title={t("historyTitle")}>
-        <div className="space-y-3">
-          <DataTable
-            caption={t("historyTitle")}
-            captionHidden
-            columns={columns}
-            state={batches}
-            rowKey={(row) => row.id}
-            emptyTitle={t("emptyTitle")}
-            emptyBody={t("emptyBody")}
-          />
-          <Pager label={t("pagesLabel")} page={page} onPrevious={onPrevious} onNext={onNext} />
+        <div id={UPLOAD_ANCHOR} tabIndex={-1} className="scroll-mt-20 focus:outline-none">
+          <Card title={t("uploadTitle")} description={t("uploadDescription")}>
+            <UploadPhotos onStarted={onStarted} />
+          </Card>
         </div>
-      </Card>
+      ) : null}
+      <section aria-labelledby={historyId} className="space-y-3">
+        <h2 id={historyId} className="text-lg font-semibold text-ink">
+          {t("historyTitle")}
+        </h2>
+        <DataTableV2
+          id="register-photo-batches"
+          stacked
+          caption={t("historyTitle")}
+          captionHidden
+          columns={columns}
+          state={batches}
+          rowKey={(row) => row.id}
+          emptyTitle={t("emptyTitle")}
+          emptyBody={t("emptyBody")}
+          emptyAction={canUpload ? uploadLink : undefined}
+          footer={
+            onNext || onPrevious ? (
+              <Pager label={t("pagesLabel")} page={page} onPrevious={onPrevious} onNext={onNext} />
+            ) : undefined
+          }
+        />
+      </section>
     </div>
   );
 }

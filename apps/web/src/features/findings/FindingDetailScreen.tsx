@@ -14,7 +14,6 @@ import { TextAreaField } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
-import { Table, TableScroll, TBody, THead, Td, Th, Tr } from "@/components/ui/Table";
 import { Timeline } from "@/components/ui/Timeline";
 import { Value } from "@/components/ui/Value";
 import { CR_APPROVE, CR_REQUEST, ifMatch } from "@/features/change-requests/types";
@@ -34,7 +33,13 @@ import {
   useRules,
 } from "./data";
 import { FindingStatusBadge, SeverityBadge, SourceChip } from "./parts";
-import { isUnresolved, SCHOOL_RECORD_ROUTE, type Bilingual, type Finding } from "./types";
+import {
+  isUnresolved,
+  SCHOOL_RECORD_ROUTE,
+  type Bilingual,
+  type Finding,
+  type FindingValue,
+} from "./types";
 
 const resolveSchema = z
   .object({
@@ -92,6 +97,59 @@ function BothLanguages({ text: message }: { text: Bilingual }) {
   );
 }
 
+/**
+ * The values side by side: one column per source (Register, Aadhaar, UDISE+ …) from md, so
+ * the office compares them at a glance; stacked on phones. Sensitive (C3) values stay masked.
+ */
+function SourceColumns({ finding }: { finding: Finding }) {
+  const t = useTranslations("findings");
+  const td = useTranslations("findings.detail");
+  const locale = useLocale();
+  const attributes = useAttributes();
+  if (finding.values.length === 0) {
+    return <p className="text-sm text-ink-muted">{t("noValues")}</p>;
+  }
+  const bySource = new Map<string, FindingValue[]>();
+  for (const item of finding.values) {
+    bySource.set(item.source, [...(bySource.get(item.source) ?? []), item]);
+  }
+  return (
+    <ul
+      aria-label={td("valuesTitle")}
+      className="grid gap-3 md:grid-cols-[repeat(auto-fit,minmax(12rem,1fr))]"
+    >
+      {[...bySource.entries()].map(([source, items]) => (
+        <li key={source} className="min-w-0 rounded-lg border border-border-soft p-3">
+          <p className="flex items-center gap-2">
+            <span className="sr-only">{td("colSource")}: </span>
+            <SourceChip source={source} />
+          </p>
+          <dl className="mt-3 space-y-3">
+            {items.map((item) => (
+              <div key={item.value_id}>
+                <dt className="text-xs text-ink-muted">
+                  {attributeLabel(attributes.data, item.attribute_key, locale)}
+                </dt>
+                <dd className="mt-0.5 flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-base break-words text-ink">
+                    {item.value ?? item.masked ?? t("noValue")}
+                  </span>
+                  {item.sensitive || item.value === null ? (
+                    <Pill variant="tag">
+                      <Icon name="lock" className="size-3" />
+                      {t("maskedNote")}
+                    </Pill>
+                  ) : null}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function correctionHref(finding: Finding): string {
   const params = new URLSearchParams({ student_id: finding.student.id, finding_id: finding.id });
   if (finding.attribute_key) params.set("attribute_key", finding.attribute_key);
@@ -141,7 +199,7 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
   if (finding.status === "loading") return <LoadingState label={tc("loading")} />;
   if (finding.status !== "ready") {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader
           breadcrumb={[{ label: t("title"), href: "/findings" }, { label: td("problem") }]}
           title={td("problem")}
@@ -169,7 +227,7 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         breadcrumb={[{ label: t("title"), href: "/findings" }, { label: data.rule_id }]}
         title={td("title", { rule: data.rule_id })}
@@ -294,7 +352,11 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
         </Alert>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[3fr_2fr]">
+      <Card title={td("valuesTitle")} description={td("valuesBody")}>
+        <SourceColumns finding={data} />
+      </Card>
+
+      <div className="grid gap-4 xl:grid-cols-[3fr_2fr]">
         <Card title={td("whatTitle")}>
           <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-[max-content_1fr]">
             <dt className="text-sm text-ink-muted">{t("colStudent")}</dt>
@@ -358,48 +420,6 @@ export function FindingDetailScreen({ findingId }: { findingId: string }) {
           )}
         </Card>
       </div>
-
-      <Card title={td("valuesTitle")} description={td("valuesBody")}>
-        {data.values.length === 0 ? (
-          <p className="text-sm text-ink-muted">{t("noValues")}</p>
-        ) : (
-          <TableScroll label={tc("scrollableTable", { caption: td("valuesTitle") })}>
-            <Table>
-              <caption className="sr-only">{td("valuesTitle")}</caption>
-              <THead>
-                <Tr>
-                  <Th>{td("colSource")}</Th>
-                  <Th>{t("colField")}</Th>
-                  <Th>{td("colValue")}</Th>
-                </Tr>
-              </THead>
-              <TBody>
-                {data.values.map((item) => (
-                  <Tr key={item.value_id}>
-                    <Td>
-                      <SourceChip source={item.source} />
-                    </Td>
-                    <Td>{attributeLabel(attributes.data, item.attribute_key, locale)}</Td>
-                    <Td>
-                      <span className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono">
-                          {item.value ?? item.masked ?? t("noValue")}
-                        </span>
-                        {item.sensitive || item.value === null ? (
-                          <Pill variant="tag">
-                            <Icon name="lock" className="size-3" />
-                            {t("maskedNote")}
-                          </Pill>
-                        ) : null}
-                      </span>
-                    </Td>
-                  </Tr>
-                ))}
-              </TBody>
-            </Table>
-          </TableScroll>
-        )}
-      </Card>
 
       <Card title={td("historyTitle")}>
         <Timeline

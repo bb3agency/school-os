@@ -2,9 +2,12 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent } from "react";
+import * as z from "@/lib/zod";
+import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
+import { Icon } from "@/components/ui/Icon";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { TextAreaField, TextField } from "@/components/ui/Input";
@@ -55,56 +58,68 @@ function Editor({ notice, onSaved }: { notice: Notice; onSaved: () => Promise<vo
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<unknown>(undefined);
   const [pending, setPending] = useState(false);
-  const changed = fields.some((f) => values[f] !== notice[f]);
+  // The last version the server has (it moves on when approving saves the edit first).
+  const [base, setBase] = useState<Notice>(notice);
+  const formId = useId();
+  const changed = fields.some((f) => values[f] !== base[f]);
   const personal = fields.filter((f) => looksPersonal(values[f]));
 
-  async function save(event?: FormEvent<HTMLFormElement>): Promise<Notice | null> {
-    event?.preventDefault();
+  /** PATCH the draft when it changed (explicit save; drafts are never saved by themselves). */
+  async function patch(body: Partial<Record<Field, string>>): Promise<Notice> {
+    const saved = await unwrap(
+      api.PATCH("/api/v1/notices/{notice_id}", {
+        params: { path: { notice_id: notice.id } },
+        headers: { "If-Match": ifMatch(base.version) },
+        body,
+      }),
+    );
+    setBase(saved);
+    return saved;
+  }
+
+  function parse() {
     const parsed = (telugu ? noticeSchema : noticeEnglishSchema).safeParse(values);
     if (!parsed.success) {
       setErrors(zodErrorKeys(parsed.error));
       return null;
     }
     setErrors({});
+    return parsed.data;
+  }
+
+  async function save(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    const body = parse();
+    if (!body) return;
     setError(undefined);
-    if (!changed) return notice;
+    if (!changed) return;
     setPending(true);
     try {
-      const saved = await unwrap(
-        api.PATCH("/api/v1/notices/{notice_id}", {
-          params: { path: { notice_id: notice.id } },
-          headers: { "If-Match": ifMatch(notice.version) },
-          body: parsed.data,
-        }),
-      );
+      await patch(body);
       await onSaved();
-      return saved;
     } catch (failure) {
       setError(failure);
-      return null;
     } finally {
       setPending(false);
     }
   }
 
-  async function approve() {
-    const saved = await save();
-    if (!saved) return;
-    setPending(true);
-    try {
-      await unwrap(
-        api.POST("/api/v1/notices/{notice_id}/approve", {
-          params: { path: { notice_id: notice.id } },
-          headers: { "If-Match": ifMatch(saved.version) },
-          body: {},
-        }),
-      );
-      await onSaved();
-    } catch (failure) {
-      setError(failure);
-    } finally {
-      setPending(false);
-    }
+  /**
+   * Approve (confirmed in a dialog): an edit not saved yet is saved first, then the notice is
+   * approved with the version that save returned. Errors stay in the dialog.
+   */
+  async function approve(): Promise<Notice> {
+    const body = parse();
+    if (!body) throw new Error("invalid notice");
+    setError(undefined);
+    const current = changed ? await patch(body) : base;
+    return unwrap(
+      api.POST("/api/v1/notices/{notice_id}/approve", {
+        params: { path: { notice_id: notice.id } },
+        headers: { "If-Match": ifMatch(current.version) },
+        body: {},
+      }),
+    );
   }
 
   const fieldError = (name: Field) =>
@@ -118,56 +133,61 @@ function Editor({ notice, onSaved }: { notice: Notice; onSaved: () => Promise<vo
   const complete = noticeComplete(values, { telugu });
 
   return (
-    <form onSubmit={(event) => void save(event)} noValidate className="space-y-4">
-      <div className={telugu ? "grid gap-4 lg:grid-cols-2" : "max-w-3xl"}>
-        <fieldset className="space-y-3">
-          {telugu ? <legend className="font-semibold text-ink">{t("english")}</legend> : null}
-          <TextField
-            label={t("title")}
-            lang="en"
-            maxLength={120}
-            value={values.title_en}
-            onChange={set("title_en")}
-            error={fieldError("title_en")}
-          />
-          <TextAreaField
-            label={t("body")}
-            lang="en"
-            rows={7}
-            maxLength={1500}
-            value={values.body_en}
-            onChange={set("body_en")}
-            error={fieldError("body_en")}
-          />
-        </fieldset>
-        {telugu ? (
+    <div className="space-y-4">
+      <form id={formId} onSubmit={(event) => void save(event)} noValidate className="space-y-4">
+        <div className={telugu ? "grid gap-4 lg:grid-cols-2" : "max-w-3xl"}>
           <fieldset className="space-y-3">
-            <legend className="font-semibold text-ink">{t("telugu")}</legend>
+            {telugu ? <legend className="font-semibold text-ink">{t("english")}</legend> : null}
             <TextField
               label={t("title")}
-              lang="te"
+              lang="en"
               maxLength={120}
-              value={values.title_te}
-              onChange={set("title_te")}
-              error={fieldError("title_te")}
+              value={values.title_en}
+              onChange={set("title_en")}
+              error={fieldError("title_en")}
             />
             <TextAreaField
               label={t("body")}
-              lang="te"
+              lang="en"
               rows={7}
               maxLength={1500}
-              value={values.body_te}
-              onChange={set("body_te")}
-              error={fieldError("body_te")}
-              className="leading-loose"
+              value={values.body_en}
+              onChange={set("body_en")}
+              error={fieldError("body_en")}
             />
           </fieldset>
-        ) : null}
-      </div>
-      <p className="text-sm text-ink-muted">{t("noPersonal")}</p>
-      <div className="flex flex-wrap gap-3">
+          {telugu ? (
+            <fieldset className="space-y-3">
+              <legend className="font-semibold text-ink">{t("telugu")}</legend>
+              <TextField
+                label={t("title")}
+                lang="te"
+                maxLength={120}
+                value={values.title_te}
+                onChange={set("title_te")}
+                error={fieldError("title_te")}
+              />
+              <TextAreaField
+                label={t("body")}
+                lang="te"
+                rows={7}
+                maxLength={1500}
+                value={values.body_te}
+                onChange={set("body_te")}
+                error={fieldError("body_te")}
+                className="leading-loose"
+              />
+            </fieldset>
+          ) : null}
+        </div>
+        <p className="text-sm text-ink-muted">{t("noPersonal")}</p>
+      </form>
+      {/* The buttons sit outside the <form> (the approve dialog has its own form); Save
+          still submits it through `form`. */}
+      <div className="flex flex-wrap items-center gap-3" data-print="hide">
         <Button
           type="submit"
+          form={formId}
           variant="secondary"
           disabled={pending || !changed}
           aria-disabled={pending || !changed || undefined}
@@ -175,21 +195,35 @@ function Editor({ notice, onSaved }: { notice: Notice; onSaved: () => Promise<vo
           {t("save")}
         </Button>
         {can(NOTICE_APPROVE) ? (
-          <Button
-            type="button"
-            onClick={() => void approve()}
-            disabled={pending || !complete || personal.length > 0}
-            aria-disabled={pending || !complete || personal.length > 0 || undefined}
-          >
-            {t("approve")}
-          </Button>
+          <ActionDialog
+            triggerLabel={t("approve")}
+            triggerVariant="primary"
+            triggerDisabled={pending || !complete || personal.length > 0}
+            title={t("approveTitle")}
+            description={t("approveBody")}
+            confirmLabel={t("approve")}
+            consequence={t("approveConsequence")}
+            schema={z.object({})}
+            errorNamespace="notices"
+            submit={() => approve()}
+            onSuccess={() => void onSaved()}
+          />
         ) : (
           <p className="text-sm text-ink-muted">{t("approverNeeded")}</p>
         )}
+        <p role="status" className="flex items-center gap-2 text-sm">
+          {changed ? (
+            <span className="font-semibold text-warning-ink">{t("unsaved")}</span>
+          ) : (
+            <span className="num text-ink-muted">
+              {t("lastSaved", { when: formatDateTime(base.updated_at) ?? "" })}
+            </span>
+          )}
+        </p>
       </div>
       {!complete ? <p className="text-sm text-ink-muted">{t("incomplete")}</p> : null}
       <ApiErrorAlert error={error} namespace="notices" />
-    </form>
+    </div>
   );
 }
 
@@ -355,6 +389,7 @@ function Approved({ notice, onChanged }: { notice: Notice; onChanged: () => Prom
       <div className="flex flex-wrap gap-3" data-print="hide">
         <Button onClick={() => void copy()}>{t("copy")}</Button>
         <Button variant="secondary" onClick={() => window.print()}>
+          <Icon name="printer" className="size-4" />
           {t("print")}
         </Button>
         {notice.files_available ? (
@@ -425,7 +460,7 @@ export function NoticeDetailScreen({ noticeId }: { noticeId: string }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <LoadGate data={detail}>
         {(notice) => (
           <>

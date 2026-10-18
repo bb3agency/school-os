@@ -9,15 +9,18 @@ import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ErrorSummary, type SummaryError } from "@/components/ui/ErrorSummary";
 import { TextField } from "@/components/ui/Input";
 import { Toggle } from "@/components/ui/Toggle";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SaveBar } from "@/components/ui/SaveBar";
 import { Value } from "@/components/ui/Value";
 import { CertificateFormatCard } from "@/features/certificates/CertificateFormatCard";
 import { LetterheadCard } from "@/features/certificates/LetterheadCard";
 import { BoardsCard } from "./BoardsCard";
 import { ParentLanguageCard } from "./ParentLanguageCard";
+import { useFormDirty } from "./useFormDirty";
 import { known, schoolTone } from "@/features/status";
 import { ApiError, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { refreshSessionInfo } from "@/lib/bff/session-client";
@@ -115,7 +118,7 @@ export function SchoolSettingsScreen() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={t("title")}
         description={t("description")}
@@ -236,11 +239,17 @@ function SettingsEditor({ tenant }: { tenant: TenantProfile }) {
     await queryClient.invalidateQueries({ queryKey: TENANT_KEY });
     setGeneration((value) => value + 1);
   };
+  // Discard: remount the form so every field shows the loaded values again.
+  const discard = () => {
+    setOutcome(null);
+    setGeneration((value) => value + 1);
+  };
   return (
     <SettingsForm
       key={`${tenant.version}:${generation}`}
       tenant={tenant}
       onReload={reload}
+      onDiscard={discard}
       outcome={outcome}
       setOutcome={setOutcome}
     />
@@ -252,11 +261,13 @@ type Outcome = "saved" | "unchanged" | null;
 function SettingsForm({
   tenant,
   onReload,
+  onDiscard,
   outcome,
   setOutcome,
 }: {
   tenant: TenantProfile;
   onReload: () => Promise<void>;
+  onDiscard: () => void;
   outcome: Outcome;
   setOutcome: (outcome: Outcome) => void;
 }) {
@@ -266,11 +277,18 @@ function SettingsForm({
   const api = useBffClient("staff");
   const languagesId = useId();
   const dateId = useId();
-  const saveId = useId();
+  const fieldId = useId();
+  const idleId = `${fieldId}-idle`;
+  const budgetId = `${fieldId}-budget`;
   const [reloading, setReloading] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const settings = tenant.settings;
   const queryClient = useQueryClient();
   const telugu = useTeluguEnabled();
+  const { ref: formRef, dirty, onChange: onFormChange } = useFormDirty();
+  // The switches are controlled here so the save bar sees them change.
+  const [aiOn, setAiOn] = useState(settings.ai_features_enabled ?? true);
+  const [memoryOn, setMemoryOn] = useState(settings.ai_memory_enabled ?? true);
 
   /**
    * A saved setting applies without a reload (FR-TEN-012): GET /me through the BFF sets the
@@ -299,6 +317,7 @@ function SettingsForm({
           : ["en"],
     }),
     invalidate: [TENANT_KEY],
+    onInvalid: () => setAttempt((value) => value + 1),
     submit: async (data): Promise<TenantProfile | null> => {
       setOutcome(null);
       const patch = changedSettings(settings, data);
@@ -320,6 +339,16 @@ function SettingsForm({
   const errors = form.errors;
   const languagesError = errors.languages;
   const dateError = errors.date_format;
+  const firstLanguageId = `${languagesId}-${LANGUAGES[0]}`;
+  const firstDateId = `${dateId}-${DATE_FORMATS[0]}`;
+  const summary: SummaryError[] = [
+    telugu && languagesError ? { fieldId: firstLanguageId, message: languagesError } : null,
+    dateError ? { fieldId: firstDateId, message: dateError } : null,
+    errors.idle_timeout_minutes ? { fieldId: idleId, message: errors.idle_timeout_minutes } : null,
+    errors.ai_monthly_budget_inr
+      ? { fieldId: budgetId, message: errors.ai_monthly_budget_inr }
+      : null,
+  ].filter((item): item is SummaryError => item !== null);
 
   // Checkbox and radio "chips": the native input stays (keyboard, form value); the label
   // around it gets a soft outline, and a blue fill when checked (`:has()`, Baseline).
@@ -327,7 +356,14 @@ function SettingsForm({
     "inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-md border border-border-soft bg-surface px-3 text-sm has-checked:border-primary has-checked:bg-primary-soft";
 
   return (
-    <form noValidate onSubmit={form.onSubmit} className="space-y-6">
+    <form
+      ref={formRef}
+      noValidate
+      onSubmit={form.onSubmit}
+      onChange={onFormChange}
+      className="space-y-5"
+    >
+      <ErrorSummary errors={summary} attempt={attempt} />
       <Card title={t("groups.languages.title")} description={t("groups.languages.description")}>
         <div className="space-y-6">
           {telugu ? (
@@ -343,6 +379,7 @@ function SettingsForm({
                 {LANGUAGES.map((code) => (
                   <label key={code} className={chip}>
                     <input
+                      id={`${languagesId}-${code}`}
                       type="checkbox"
                       name="languages"
                       value={code}
@@ -371,6 +408,7 @@ function SettingsForm({
               {DATE_FORMATS.map((format) => (
                 <label key={format} className={chip}>
                   <input
+                    id={`${dateId}-${format}`}
                     type="radio"
                     name="date_format"
                     value={format}
@@ -392,6 +430,7 @@ function SettingsForm({
 
       <Card title={t("groups.session.title")} description={t("groups.session.description")}>
         <TextField
+          id={idleId}
           name="idle_timeout_minutes"
           label={t("form.idleField")}
           hint={t("form.idleHint")}
@@ -412,7 +451,8 @@ function SettingsForm({
               name="ai_features_enabled"
               label={t("form.aiToggle")}
               description={t("form.aiHint")}
-              defaultChecked={settings.ai_features_enabled ?? true}
+              checked={aiOn}
+              onCheckedChange={setAiOn}
               labelFirst
             />
           </div>
@@ -422,11 +462,13 @@ function SettingsForm({
               name="ai_memory_enabled"
               label={t("form.memoryToggle")}
               description={t("form.memoryHint")}
-              defaultChecked={settings.ai_memory_enabled ?? true}
+              checked={memoryOn}
+              onCheckedChange={setMemoryOn}
               labelFirst
             />
           </div>
           <TextField
+            id={budgetId}
             name="ai_monthly_budget_inr"
             label={t("form.budgetField")}
             hint={t("form.budgetHint")}
@@ -440,37 +482,24 @@ function SettingsForm({
         </div>
       </Card>
 
-      <section
-        aria-labelledby={`${saveId}-title`}
-        className="space-y-4 rounded-xl border border-border bg-surface p-5 shadow-card md:p-6 print:hidden"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="min-w-0 space-y-1">
-            <h2 id={`${saveId}-title`} className="font-semibold text-ink">
-              {t("saveBar.title")}
-            </h2>
-            <p className="text-sm text-ink-muted">{t("saveBar.body")}</p>
-            <p className="text-sm text-ink-muted">{tc("stepUpNote")}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            {stale ? (
-              <Button
-                variant="secondary"
-                disabled={reloading}
-                onClick={() => {
-                  setReloading(true);
-                  void onReload().finally(() => setReloading(false));
-                }}
-              >
-                {t("form.reload")}
-              </Button>
-            ) : null}
-            <Button type="submit" disabled={form.pending} aria-disabled={form.pending || undefined}>
-              {form.pending ? tc("working") : t("form.save")}
-            </Button>
-          </div>
+      <div className="space-y-3 print:hidden">
+        <div className="space-y-1 text-sm text-ink-muted">
+          <p>{t("saveBar.body")}</p>
+          <p>{tc("stepUpNote")}</p>
         </div>
         <ApiErrorAlert error={form.error} namespace="schoolSettings" />
+        {stale ? (
+          <Button
+            variant="secondary"
+            disabled={reloading}
+            onClick={() => {
+              setReloading(true);
+              void onReload().finally(() => setReloading(false));
+            }}
+          >
+            {t("form.reload")}
+          </Button>
+        ) : null}
         {outcome === "saved" ? (
           <Alert tone="success" live>
             {t("form.saved")}
@@ -481,7 +510,15 @@ function SettingsForm({
             {t("form.nothingChanged")}
           </Alert>
         ) : null}
-      </section>
+      </div>
+      <SaveBar dirty={dirty}>
+        <Button variant="secondary" disabled={!dirty || form.pending} onClick={onDiscard}>
+          {t("discard")}
+        </Button>
+        <Button type="submit" disabled={form.pending} aria-disabled={form.pending || undefined}>
+          {form.pending ? tc("working") : t("form.save")}
+        </Button>
+      </SaveBar>
     </form>
   );
 }

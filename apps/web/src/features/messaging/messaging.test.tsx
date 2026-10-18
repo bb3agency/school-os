@@ -26,6 +26,7 @@ import {
 import { parseSignupMessage } from "./embedded-signup";
 import { GuardianOptinsCard } from "./GuardianOptins";
 import { MessagesScreen } from "./MessagesScreen";
+import { connectStep } from "./WhatsAppSettingsScreen";
 
 /**
  * WhatsApp messaging screens (R2-1C; ADR-0043; US-2201, US-2202, US-2208, US-2209):
@@ -435,5 +436,50 @@ describe("delivery log (US-2208)", () => {
     const call = stub.callsTo("POST /bff/api/v1/messages/search")[0];
     expect(call?.url.search).toBe("");
     expect(JSON.parse(call?.body ?? "{}")).toMatchObject({ guardian_id: GUARDIAN, limit: 50 });
+  });
+
+  it("filters by status in the POST body and shows the filter as a removable chip", async () => {
+    signedIn([READ]);
+    stub.routes["POST /bff/api/v1/messages/search"] = () =>
+      Response.json({ items: [], next_cursor: null } satisfies MessagePage);
+    renderWithIntl(<MessagesScreen />);
+    expect(await screen.findByText(en.log.emptyTitle)).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText(en.log.status), "failed");
+    expect(await screen.findByText(en.log.noResultsTitle)).toBeInTheDocument();
+    const search = "POST /bff/api/v1/messages/search";
+    await waitFor(() =>
+      expect(JSON.parse(stub.callsTo(search).at(-1)?.body ?? "{}")).toMatchObject({
+        status: "failed",
+      }),
+    );
+    expect(stub.callsTo(search).every((c) => c.url.search === "")).toBe(true);
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: `Remove filter ${en.log.status}: ${en.log.statuses.failed}`,
+      }),
+    );
+    expect(await screen.findByText(en.log.emptyTitle)).toBeInTheDocument();
+  });
+});
+
+describe("WhatsApp set-up steps", () => {
+  it("derive the step from the account's state only", () => {
+    expect(connectStep({ connected: false, status: null })).toBe(0);
+    expect(connectStep({ connected: false, status: "connecting" })).toBe(1);
+    expect(connectStep({ connected: true, status: "active" })).toBe(2);
+  });
+
+  it("the settings form says when changes are not saved yet and can discard them", async () => {
+    signedIn([CONFIGURE, READ]);
+    stub.routes["GET /bff/api/v1/messaging/account"] = () => Response.json(connected());
+    stub.routes["GET /bff/api/v1/messaging/settings"] = () => Response.json(settings());
+    renderWithIntl(<WhatsAppSettingsPage />);
+    const phone = await screen.findByLabelText(new RegExp(en.settings.officePhone));
+    expect(screen.getByText(messages.en.ui.saveBar.noChanges)).toBeInTheDocument();
+    await userEvent.type(phone, "9000011111");
+    expect(screen.getByText(messages.en.ui.saveBar.unsaved)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: en.settings.discard }));
+    expect(await screen.findByLabelText(new RegExp(en.settings.officePhone))).toHaveValue("");
+    expect(stub.callsTo("PUT /bff/api/v1/messaging/settings")).toHaveLength(0);
   });
 });

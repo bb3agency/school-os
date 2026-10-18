@@ -3,17 +3,18 @@
 import { TICKET_CATEGORIES, TICKET_PRIORITIES, type SupportTicket } from "@schoolos/api-client";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
+import { DataTableV2, type ColumnV2 } from "@/components/console/DataTableV2";
 import * as z from "@/lib/zod";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ErrorSummary, type SummaryError } from "@/components/ui/ErrorSummary";
 import { TextAreaField, TextField } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
-import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { known, priorityTone, ticketTone } from "@/features/status";
 import { TicketThread } from "@/features/support/TicketThread";
@@ -38,6 +39,14 @@ function StudentDataWarning() {
   );
 }
 
+/** Ids of the new-ticket fields, for the error summary's links. */
+const FIELD_IDS = {
+  subject: "support-subject",
+  category: "support-category",
+  priority: "support-priority",
+  body: "support-body",
+} as const;
+
 const ticketSchema = z.object({
   subject: text(200),
   category: z.enum(TICKET_CATEGORIES, { error: "chooseOption" }),
@@ -55,6 +64,7 @@ export function SupportScreen() {
   const tcat = useTranslations("support.categories");
   const api = useBffClient("staff");
   const [opened, setOpened] = useState<SupportTicket | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const can = useStaffCan();
   // The API returns only what the caller may read; this changes the wording only.
   const allTickets = can(SUPPORT_MANAGE);
@@ -77,20 +87,26 @@ export function SupportScreen() {
           body: data,
         }),
       ),
+    onInvalid: () => setAttempt((value) => value + 1),
     onSuccess: (ticket, element) => {
       element.reset();
       setOpened(ticket);
     },
   });
 
-  const columns: Column<SupportTicket>[] = [
+  const summary: SummaryError[] = Object.entries(FIELD_IDS).flatMap(([name, fieldId]) => {
+    const message = form.errors[name];
+    return message ? [{ fieldId, message }] : [];
+  });
+
+  const columns: ColumnV2<SupportTicket>[] = [
     {
       key: "number",
       header: t("colNumber"),
       cell: (row) => (
         <Link
           href={`/support/${row.id}`}
-          className="font-mono text-xs text-primary underline underline-offset-4 hover:no-underline"
+          className="font-mono text-xs whitespace-nowrap text-primary underline underline-offset-4 hover:no-underline"
         >
           {row.number}
         </Link>
@@ -106,24 +122,32 @@ export function SupportScreen() {
       key: "updated",
       header: t("colUpdated"),
       cell: (row) => (
-        <span className="font-mono text-xs whitespace-nowrap text-ink-muted">
+        <span className="num font-mono text-xs whitespace-nowrap text-ink-muted">
           <Value>{formatDateTime(row.updated_at ?? row.created_at)}</Value>
         </span>
       ),
     },
   ];
+  const paged = Boolean(pager.onPrevious || pager.onNext);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={t("title")}
         description={t("description")}
         breadcrumb={[{ label: t("home"), href: "/" }, { label: t("title") }]}
       />
       <StudentDataWarning />
-      <div className="grid gap-6 xl:grid-cols-[3fr_2fr]">
-        <Card title={listTitle} {...(allTickets ? {} : { description: t("ownOnlyNote") })}>
-          <DataTable
+      <div className="grid gap-4 xl:grid-cols-[3fr_2fr]">
+        <section aria-labelledby="support-list-title" className="min-w-0 space-y-3">
+          <div className="space-y-1">
+            <h2 id="support-list-title" className="text-lg font-semibold text-ink">
+              {listTitle}
+            </h2>
+            {allTickets ? null : <p className="text-sm text-ink-muted">{t("ownOnlyNote")}</p>}
+          </div>
+          <DataTableV2
+            id="support-tickets"
             caption={listTitle}
             captionHidden
             columns={columns}
@@ -131,14 +155,20 @@ export function SupportScreen() {
             rowKey={(row) => row.id}
             emptyTitle={t("emptyTitle")}
             emptyBody={t("emptyBody")}
+            footer={paged ? <Pager label={t("pagesLabel")} {...pager} /> : undefined}
+            stacked
           />
-          <div className="mt-4">
-            <Pager label={t("pagesLabel")} {...pager} />
-          </div>
-        </Card>
-        <Card title={t("newTitle")} description={t("newBody")} tone="default">
+        </section>
+        <Card
+          title={t("newTitle")}
+          description={t("newBody")}
+          tone="default"
+          className="min-w-0 self-start"
+        >
           <form noValidate onSubmit={form.onSubmit} className="space-y-4">
+            <ErrorSummary errors={summary} attempt={attempt} />
             <TextField
+              id={FIELD_IDS.subject}
               name="subject"
               label={t("subject")}
               error={form.errors.subject}
@@ -147,6 +177,7 @@ export function SupportScreen() {
             />
             <div className="grid gap-4 md:grid-cols-2">
               <SelectField
+                id={FIELD_IDS.category}
                 name="category"
                 label={t("category")}
                 error={form.errors.category}
@@ -154,6 +185,7 @@ export function SupportScreen() {
                 options={TICKET_CATEGORIES.map((value) => ({ value, label: tcat(value) }))}
               />
               <SelectField
+                id={FIELD_IDS.priority}
                 name="priority"
                 label={t("priority")}
                 hint={t("priorityHint")}
@@ -163,6 +195,7 @@ export function SupportScreen() {
               />
             </div>
             <TextAreaField
+              id={FIELD_IDS.body}
               name="body"
               label={t("message")}
               hint={ts("piiShortHint")}
@@ -232,7 +265,7 @@ export function SupportTicketScreen({ ticketId }: { ticketId: string }) {
   const data = ticket.data;
   const priority = known(priorityTone, data.priority);
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={`${data.number} · ${data.subject}`}
         badge={<Badge tone={ticketTone[data.status]}>{tstatus(data.status)}</Badge>}

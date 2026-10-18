@@ -223,7 +223,8 @@ describe("US-1901 recording a decision", () => {
     await user.selectOptions(screen.getByLabelText(am.record.relationship), "mother");
     await user.type(screen.getByLabelText(am.record.decidedOn), "15/07/2026");
     await user.click(screen.getByRole("button", { name: am.record.submit }));
-    expect(await screen.findByText(am.validation.formRequired)).toBeInTheDocument();
+    // Under the field and in the error summary at the top of the form.
+    expect(await screen.findAllByText(am.validation.formRequired)).toHaveLength(2);
     expect(stub.callsTo(`POST /bff/api/v1/students/${ID.student}/apaar-consent`)).toEqual([]);
   });
 

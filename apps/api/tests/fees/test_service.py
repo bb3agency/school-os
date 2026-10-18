@@ -905,12 +905,26 @@ def test_head_patch_needs_version(school: Any) -> None:
 def test_data_contract_account_summary_and_dues(school: Any) -> None:
     sid = F.student(school)
     F.account(school, sid)
+    online = __import__("sys").modules["sos_test_fees_online_support"]
+    online.disconnect_if_connected(school)
     with tenant_session(school.tenant_id) as s:
         summary = fees.account_summary(s, [sid])[sid]
         dues = fees.dues_for_student(s, sid)
+        assert fees.payments_connected(s) is False
         with pytest.raises(Conflict) as err:
-            fees.create_payment_intent(s, summary.account_id, [1], created_via="staff")
+            fees.create_payment_intent(s, summary.account_id, [1], created_via="parent_page")
     assert err.value.code == "payments_not_connected"
+    # R2-2D: once the school's Razorpay account is connected, the parent page gets a link.
+    online.connect(school)
+    with tenant_session(school.tenant_id) as s:
+        intent_id = fees.create_payment_intent(
+            s, summary.account_id, [1], created_via="parent_page"
+        )
+        link = fees.payment_link(s, intent_id)
+    assert link is not None
+    assert link.amount == D("3500.00")
+    assert link.status == "created"
+    assert link.short_url.startswith("https://")
     assert dues is not None
     assert dues.total_due == D("7000.00")
     assert summary.overdue == D("3500.00")

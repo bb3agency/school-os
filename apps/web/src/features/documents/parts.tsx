@@ -115,6 +115,29 @@ export function aclExtra(form: HTMLFormElement): { acl: string[] } {
   };
 }
 
+/**
+ * Field errors in the order of `ids` (form field name → input id) for `ErrorSummary`; an error
+ * whose field is not listed links to the form's first field instead of being dropped.
+ */
+export function summaryErrors(
+  errors: Record<string, string>,
+  ids: Record<string, string>,
+): { fieldId: string; message: string }[] {
+  const names = Object.keys(ids);
+  const fallback = ids[names[0] ?? ""] ?? "";
+  const seen = new Set<string>();
+  const out: { fieldId: string; message: string }[] = [];
+  for (const name of [...names, ...Object.keys(errors)]) {
+    const message = errors[name];
+    const fieldId = ids[name] ?? fallback;
+    // One line per field (the summary keys its links by field id).
+    if (!message || seen.has(fieldId)) continue;
+    seen.add(fieldId);
+    out.push({ fieldId, message });
+  }
+  return out;
+}
+
 /** Server field (`acl.3.principal_ref`) → form field. */
 export function documentFieldMap(field: string): string | undefined {
   const [head] = field.split(".");
@@ -217,9 +240,12 @@ export function AclSummary({ acl }: { acl: readonly AclEntry[] }) {
 export function AclFields({
   errors,
   initial = [],
+  firstId,
 }: {
   errors: Record<string, string>;
   initial?: readonly AclEntry[];
+  /** Id of the first choice, so an error summary can link to this group. */
+  firstId?: string;
 }) {
   const t = useTranslations("documents.acl");
   const tc = useTranslations("common");
@@ -253,6 +279,7 @@ export function AclFields({
         {(["school", "limited"] as const).map((value) => (
           <label key={value} className={box}>
             <input
+              id={value === "school" ? firstId : undefined}
               type="radio"
               name="visibility"
               value={value}

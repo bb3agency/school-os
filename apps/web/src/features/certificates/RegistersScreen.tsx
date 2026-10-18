@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
+import { Pill } from "@/components/ui/Badge";
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
@@ -95,6 +96,7 @@ function RegisterCard({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<unknown>(undefined);
   const year = yearId || current;
+  const yearLabel = years.find((one) => one.id === year)?.label ?? null;
   const href = `/bff${REGISTER_PATHS[kind]}${registerQuery(kind, year, type)}`;
 
   async function prepare() {
@@ -112,9 +114,43 @@ function RegisterCard({
   }
 
   return (
-    <Card title={t(`${kind}.title`)} description={t(`${kind}.body`)}>
+    <Card
+      title={t(`${kind}.title`)}
+      description={t(`${kind}.body`)}
+      actions={
+        <Pill variant="tag" icon="file">
+          {t("a4")}
+        </Pill>
+      }
+    >
       <div className="space-y-4">
-        <div className="grid gap-4">
+        {/* The sheet as it prints: an A4 landscape page with the register's heading. The rows
+            themselves are only in the print view (opening it is the one audited view). */}
+        <div
+          aria-hidden="true"
+          className="flex flex-col justify-between gap-4 rounded-md border border-border bg-surface p-4 sm:aspect-[297/210] sm:p-6"
+          data-print="hide"
+        >
+          <div className="space-y-1 border-b border-border pb-3 text-center">
+            <p className="text-xs font-semibold tracking-wide text-ink-muted uppercase">
+              {t("sheetSchool")}
+            </p>
+            <p className="font-semibold text-ink">{t(`${kind}.title`)}</p>
+            {yearLabel ? (
+              <p className="num text-sm text-ink-muted">{t("sheetYear", { label: yearLabel })}</p>
+            ) : null}
+          </div>
+          <div className="grid flex-1 grid-cols-6 gap-px overflow-hidden rounded-sm border border-border bg-border">
+            {Array.from({ length: 24 }, (_, index) => (
+              <span
+                key={index}
+                className={index < 6 ? "min-h-5 bg-surface-muted" : "min-h-5 bg-surface"}
+              />
+            ))}
+          </div>
+          <p className="text-center text-xs text-ink-muted">{t("sheetNote")}</p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
           <SelectField
             label={t("year")}
             value={year}
@@ -141,7 +177,11 @@ function RegisterCard({
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <Button variant="secondary" onClick={() => void prepare()} disabled={pending}>
+          <Button
+            variant={ready ? "secondary" : "primary"}
+            onClick={() => void prepare()}
+            disabled={pending}
+          >
             {pending ? tc("working") : t("prepare")}
           </Button>
           {ready ? (
@@ -175,6 +215,7 @@ export function RegistersScreen() {
   const tc = useTranslations("common");
   const api = useBffClient("staff");
   const can = useStaffCan();
+  const [kind, setKind] = useState<RegisterKind>("transfer");
   const years = useQuery({
     queryKey: ["staff", "certificates", "register-years"],
     queryFn: () =>
@@ -186,7 +227,7 @@ export function RegistersScreen() {
     retry: false,
   });
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={t("title")}
         description={t("description")}
@@ -203,10 +244,39 @@ export function RegistersScreen() {
       {years.isError ? <ApiErrorAlert error={years.error} namespace="certificates" /> : null}
       {years.isPending ? <LoadingState label={tc("loading")} /> : null}
       {years.data ? (
-        <div className="grid gap-4 xl:grid-cols-3">
-          {REGISTERS.map((kind) => (
-            <RegisterCard key={kind} kind={kind} years={years.data.data} />
-          ))}
+        // Print-first: the register picker on the left (on top on phones), the chosen
+        // register's A4 sheet beside it.
+        <div className="grid items-start gap-4 lg:grid-cols-[minmax(15rem,20rem)_minmax(0,1fr)]">
+          <Card padding="sm">
+            <fieldset className="space-y-2">
+              <legend className="mb-2 text-sm font-semibold text-ink">{t("pickerLegend")}</legend>
+              {REGISTERS.map((item) => (
+                <label
+                  key={item}
+                  className="grid cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-0.5 rounded-lg border border-border-soft p-3 text-sm has-[:checked]:border-primary has-[:checked]:bg-primary-soft"
+                >
+                  {/* Named by the register's title; its one-line summary is the description. */}
+                  <input
+                    type="radio"
+                    name="register"
+                    value={item}
+                    checked={kind === item}
+                    onChange={() => setKind(item)}
+                    aria-labelledby={`register-${item}-title`}
+                    aria-describedby={`register-${item}-body`}
+                    className="row-span-2 mt-0.5 size-4"
+                  />
+                  <span id={`register-${item}-title`} className="min-w-0 font-semibold text-ink">
+                    {t(`${item}.title`)}
+                  </span>
+                  <span id={`register-${item}-body`} className="col-start-2 min-w-0 text-ink-muted">
+                    {t(`${item}.body`)}
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+          </Card>
+          <RegisterCard key={kind} kind={kind} years={years.data.data} />
         </div>
       ) : null}
     </div>

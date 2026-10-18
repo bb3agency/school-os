@@ -35,6 +35,9 @@ def _load(name: str, path: Path) -> ModuleType:
 
 
 F = _load("sos_test_fees_support", Path(__file__).with_name("support.py"))
+# R2-2E: synthetic bank statements and UPI helpers.
+U = _load("sos_test_fees_upi_support", Path(__file__).with_name("upi_support.py"))
+P = _load("sos_test_fees_online_support", Path(__file__).with_name("online_support.py"))
 W = F.W
 world = W.world
 api = W.api
@@ -88,6 +91,32 @@ def school(world: Any, admin_engine: Engine) -> Any:
     return s
 
 
+@pytest.fixture(scope="session")
+def other_school(world: Any, admin_engine: Engine) -> Any:
+    """A second synthetic school with fees on (owner, accountant, office staff): the other
+    school of wrong-school webhook and cross-school checks (R2-2D)."""
+    F.install()
+    s = W.School(W.provision_school())
+    s.people["owner"] = W.add_member(admin_engine, s.tenant_id, ["owner"])
+    W.build_structure(s, s.people["owner"])
+    for role in ("accountant", "office_staff"):
+        s.people[role] = W.add_member(admin_engine, s.tenant_id, [role])
+    F.enable(admin_engine, s.tenant_id)
+    return s
+
+
 @pytest.fixture(autouse=True)
 def _keyring_and_store() -> Any:
     return F.install()
+
+
+@pytest.fixture(autouse=True)
+def _fresh_fake_provider() -> Any:
+    """The fake provider's failure switches are per test (its links and payments may stay)."""
+    from app.fees.providers.fake import STATE
+
+    STATE.fail_next.clear()
+    STATE.dead.clear()
+    yield STATE
+    STATE.fail_next.clear()
+    STATE.dead.clear()

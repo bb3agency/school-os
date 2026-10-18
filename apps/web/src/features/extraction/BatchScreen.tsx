@@ -1,7 +1,8 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import { useState } from "react";
+import { useId, useState } from "react";
+import { DataTableV2, type ColumnV2 } from "@/components/console";
 import { Alert } from "@/components/ui/Alert";
 import { Badge, Pill, type PillVariant } from "@/components/ui/Badge";
 import { ButtonLink, buttonClasses } from "@/components/ui/Button";
@@ -13,7 +14,6 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { ProgressRing } from "@/components/ui/ProgressRing";
 import { SelectField } from "@/components/ui/Select";
 import { StatCard } from "@/components/ui/StatCard";
-import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { POLL_MS, usePolledQuery } from "@/features/imports/poll";
 import { PERM, useStaffPermissions, type Permissions } from "@/features/students/me";
@@ -68,8 +68,9 @@ function PagesCard({ batch }: { batch: ExtractionBatchDetail }) {
   const t = useTranslations("extraction.pages");
   const tf = useTranslations("extraction.pageFailure");
   const locale = useLocale() as Locale;
+  const headingId = useId();
   const count = (value: number) => formatCount(value, locale) ?? String(value);
-  const columns: Column<ExtractionPage>[] = [
+  const columns: ColumnV2<ExtractionPage>[] = [
     {
       key: "page",
       header: t("colPage"),
@@ -93,23 +94,33 @@ function PagesCard({ batch }: { batch: ExtractionBatchDetail }) {
       key: "rows",
       header: t("colRows"),
       numeric: true,
-      cell: (row) => <span className="tabular-nums">{count(row.row_count)}</span>,
+      cell: (row) => count(row.row_count),
     },
     {
       key: "low",
       header: t("colLowConfidence"),
+      numeric: true,
       cell: (row) =>
         row.low_confidence_count > 0 ? (
           <Badge tone="warning">{count(row.low_confidence_count)}</Badge>
         ) : (
-          <span className="tabular-nums">{count(row.low_confidence_count)}</span>
+          count(row.low_confidence_count)
         ),
     },
     { key: "aadhaar", header: t("colAadhaar"), cell: (row) => <PageAadhaarState page={row} /> },
   ];
   return (
-    <Card title={t("title")} description={t("description")}>
-      <DataTable
+    <section aria-labelledby={headingId} className="space-y-3">
+      <div className="space-y-1">
+        <h2 id={headingId} className="text-lg font-semibold text-ink">
+          {t("title")}
+        </h2>
+        <p className="text-sm text-ink-muted">{t("description")}</p>
+      </div>
+      <DataTableV2
+        id="register-photo-pages"
+        // Phones: one card per row (docs/17 §5.7).
+        stacked
         caption={t("title")}
         captionHidden
         columns={columns}
@@ -117,7 +128,7 @@ function PagesCard({ batch }: { batch: ExtractionBatchDetail }) {
         rowKey={(row) => row.id}
         emptyTitle={t("emptyTitle")}
       />
-    </Card>
+    </section>
   );
 }
 
@@ -197,7 +208,7 @@ function QueueItem({ row, batch }: { row: ExtractionItem; batch: ExtractionBatch
         )}
         <Link
           href={`/register-photos/items/${row.id}`}
-          className={buttonClasses(pending ? "primary" : "secondary", "sm")}
+          className={buttonClasses("secondary", "sm")}
         >
           {pending ? t("review") : t("view")}
           <span className="sr-only"> {where}</span>
@@ -269,6 +280,24 @@ function QueueCard({ batch }: { batch: ExtractionBatchDetail }) {
   );
 }
 
+/** "12 of 40 reviewed": rows saved or discarded out of the rows found so far (header line). */
+export function ReviewProgress({
+  batch,
+}: {
+  batch: Pick<ExtractionBatchDetail, "items_total" | "items_pending">;
+}) {
+  const t = useTranslations("extraction.batch");
+  const locale = useLocale() as Locale;
+  if (batch.items_total <= 0) return null;
+  const count = (value: number) => formatCount(value, locale) ?? String(value);
+  const done = Math.max(0, batch.items_total - batch.items_pending);
+  return (
+    <span className="num text-sm font-semibold text-ink-muted">
+      {t("reviewed", { done: count(done), total: count(batch.items_total) })}
+    </span>
+  );
+}
+
 export interface BatchViewProps {
   batch: Loadable<ExtractionBatchDetail>;
   permissions: Permissions;
@@ -288,7 +317,7 @@ export function BatchView({ batch, permissions }: BatchViewProps) {
   ];
   if (batch.status !== "ready") {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader
           title={t("loadingTitle")}
           breadcrumb={[...crumbs, { label: t("loadingTitle") }]}
@@ -303,11 +332,16 @@ export function BatchView({ batch, permissions }: BatchViewProps) {
   const title = t("title", { date: formatDateTime(data.created_at) ?? "" });
   const percentRead = data.page_count > 0 ? (data.pages_done / data.page_count) * 100 : null;
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={title}
         breadcrumb={[...crumbs, { label: title }]}
-        badge={<BatchStatusBadge status={data.status} />}
+        badge={
+          <>
+            <BatchStatusBadge status={data.status} />
+            <ReviewProgress batch={data} />
+          </>
+        }
         description={t(`next.${data.status}`)}
         actions={
           data.items_pending > 0 && permissions.has(PERM.importRun) ? (
@@ -341,7 +375,7 @@ export function BatchView({ batch, permissions }: BatchViewProps) {
             <ProgressRing value={percentRead} size="lg" color={1} label={t("stat.pages")} />
             <div>
               <Eyebrow>{t("stat.pages")}</Eyebrow>
-              <p className="mt-1 font-display text-3xl text-ink tabular-nums">
+              <p className="num mt-1 text-3xl font-semibold text-ink">
                 {t("statPages", { done: count(data.pages_done), total: count(data.page_count) })}
               </p>
             </div>

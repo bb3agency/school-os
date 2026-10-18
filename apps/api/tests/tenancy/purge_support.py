@@ -1127,6 +1127,150 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             t=t,
             m=ids["m1"],
         )
+        # --- R2-2D online payments (0059_payments_online): one row in every online table ------
+        o = {k: uuid.uuid4() for k in ("handle", "conn", "intent", "run")}
+        _run(
+            c,
+            "INSERT INTO core.public_handles (id, tenant_id, kind, key_hash, target_type, "
+            "target_id) VALUES (:i, :t, 'razorpay_route', :k, 'payment_connection', :c)",
+            i=o["handle"],
+            t=t,
+            k=uuid.uuid4().bytes * 2,
+            c=o["conn"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.payment_connections (id, tenant_id, mode, environment, status, "
+            "key_id, key_secret_ciphertext, webhook_secret_ciphertext, route_ciphertext, "
+            "route_handle_id, connected_by) VALUES (:i, :t, 'manual_keys', 'test', 'active', "
+            "'rzp_test_SYNTHPURGE', '\\x01', '\\x02', '\\x03', :h, :m)",
+            i=o["conn"],
+            t=t,
+            h=o["handle"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.payment_intents (id, tenant_id, account_id, connection_id, "
+            "intent_code, amount, instalments, provider_link_id, short_url, expires_at, "
+            "created_via, created_by) VALUES (:i, :t, :a, :c, 'PURGE123', 50, '{1}', "
+            "'plink_SYNTHPURGE', 'https://rzp.example.test/purge', now() + interval '7 days', "
+            "'staff', :m)",
+            i=o["intent"],
+            t=t,
+            a=f["acct"],
+            c=o["conn"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.provider_events (id, tenant_id, connection_id, event_id, event_type, "
+            "payload_ciphertext) VALUES (:i, :t, :c, 'evt_SYNTHPURGE', 'payment.captured', "
+            "'\\x00')",
+            i=uuid.uuid4(),
+            t=t,
+            c=o["conn"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.provider_payments (id, tenant_id, connection_id, "
+            "provider_payment_id, intent_id, amount, currency, method, status) VALUES (:i, :t, "
+            ":c, 'pay_SYNTHPURGE', :n, 50, 'INR', 'upi', 'captured')",
+            i=uuid.uuid4(),
+            t=t,
+            c=o["conn"],
+            n=o["intent"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.reconciliation_runs (id, tenant_id, run_date) "
+            "VALUES (:i, :t, '2026-09-01')",
+            i=o["run"],
+            t=t,
+        )
+        _run(
+            c,
+            "INSERT INTO fin.reconciliation_items (id, tenant_id, run_id, kind, reason_code, "
+            "dedupe_key, provider_payment_id, intent_id) VALUES (:i, :t, :r, "
+            "'paid_not_receipted', 'no_receipt', 'paid_not_receipted:pay_SYNTHPURGE', "
+            "'pay_SYNTHPURGE', :n)",
+            i=uuid.uuid4(),
+            t=t,
+            r=o["run"],
+            n=o["intent"],
+        )
+        # --- R2-2E UPI (0060_fees_upi): settings, a statement, a credit and its confirmation --
+        upi = {k: uuid.uuid4() for k in ("rcpt", "imp", "line")}
+        _run(
+            c,
+            "INSERT INTO fin.receipts (id, tenant_id, account_id, financial_year, receipt_no, "
+            "receipt_number, receipt_date, amount, mode, utr, collected_by, content, "
+            "content_sha256) VALUES (:i, :t, :a, '2026-27', 2, 'RCT/2026-27/000002', "
+            "'2026-09-01', 20, 'upi_qr', '629112345678', :m, '{}'::jsonb, :h)",
+            i=upi["rcpt"],
+            t=t,
+            a=f["acct"],
+            m=ids["m1"],
+            h=b"\x00" * 32,
+        )
+        _run(
+            c,
+            "INSERT INTO fin.receipt_allocations (id, tenant_id, receipt_id, instalment_no, "
+            "head_id, amount) VALUES (:i, :t, :r, 1, :h, 20)",
+            i=uuid.uuid4(),
+            t=t,
+            r=upi["rcpt"],
+            h=f["head"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.ledger_entries (id, tenant_id, account_id, entry_kind, amount, "
+            "instalment_no, head_id, entry_date, receipt_id) VALUES (:i, :t, :a, 'payment', -20, "
+            "1, :h, '2026-09-01', :r)",
+            i=uuid.uuid4(),
+            t=t,
+            a=f["acct"],
+            h=f["head"],
+            r=upi["rcpt"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.upi_settings (id, tenant_id, payee_name, vpa, updated_by) VALUES "
+            "(:i, :t, 'Synthetic School', 'synthetic.school@sbi', :m)",
+            i=uuid.uuid4(),
+            t=t,
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.bank_statement_imports (id, tenant_id, preset_key, preset_version, "
+            "file_kind, file_sha256, line_count, credit_count, duplicate_count, proposed_count, "
+            "imported_by, file_deleted_at) VALUES (:i, :t, 'generic', 1, 'csv', :h, 1, 1, 0, 0, "
+            ":m, now())",
+            i=upi["imp"],
+            t=t,
+            h=b"\x11" * 32,
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.bank_statement_lines (id, tenant_id, import_id, line_no, value_date, "
+            "amount, ref_kind, utr_or_ref) VALUES (:i, :t, :p, 6, '2026-09-01', 20, 'utr', "
+            "'629112345678')",
+            i=upi["line"],
+            t=t,
+            p=upi["imp"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.upi_confirmations (id, tenant_id, receipt_id, statement_line_id, "
+            "match_kind, confirmed_by) VALUES (:i, :t, :r, :l, 'manual', :m)",
+            i=uuid.uuid4(),
+            t=t,
+            r=upi["rcpt"],
+            l=upi["line"],
+            m=ids["m1"],
+        )
         # --- audit chain (retained by design; ADR-0029) -------------------------------------
         _run(
             c,

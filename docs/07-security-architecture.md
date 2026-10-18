@@ -240,6 +240,8 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | fee.refund.request (R2-1B) | — | ✓ | — | — | ✓ | — | — | — | — |
 | fee.refund.approve (R2-1B: maker-checker; principal or accountant, D17) | — | ✓ᴿ | — | — | ✓ᴿ | — | — | — | — |
 | fee.report (R2-1B: download the day book and dues lists, bulk personal financial data) | ✓ᴿ | ✓ᴿ | — | — | ✓ᴿ | — | — | — | ✓ᴿ |
+| fee.reconcile (R2-2E: import bank statements, confirm UPI receipts seen in the bank, work through UPI exceptions; school-wide only) | — | ✓ | — | — | ✓ | — | — | — | — |
+| payments.configure (R2-2D: connect, test, rotate the webhook secret of, or disconnect the school's own Razorpay account; ADR-0042) | ✓ᴿ | — | — | — | — | — | — | — | — |
 
 `auditor_readonly` memberships are time-bound (default 14 days) and read-only.
 
@@ -327,12 +329,15 @@ Platform roles belong to SchoolOS staff (operators), not to schools (ADR-0013). 
 | fee.refund.approve (maker-checker; principal or accountant, D17) | — | ✓ᴿ | — | — | ✓ᴿ | — | — | — | — |
 | fee.reconcile (bank statement import, UPI confirmations, reconciliation items) | — | ✓ | — | — | ✓ | — | — | — | — |
 | fee.report (download the day book and dues lists: bulk personal financial data) | ✓ᴿ | ✓ᴿ | — | — | ✓ᴿ | — | — | — | ✓ᴿ |
-| payments.configure (connect, rotate, disconnect the school's Razorpay account) | ✓ᴿ | — | — | — | — | — | — | — | — |
 | message.send (send an approved notice, resend, revoke a parent link; wave R2-3G) | — | ✓ | ✓ | — | — | — | — | — | — |
 
 `messaging.configure`, `messaging.optin.record` and `message.read` moved to the §6.2 matrix when wave R2-1C built them (2026-10-17, migration `0057_messaging_core`).
 
-**R2-1B (2026-10-18):** the eight `fee.*` keys of the table above except `fee.reconcile` (R2-2E) are in the catalog, `roles.yaml` and the §6.2 matrix; every fee route requires them school-wide (a section-scoped custom role holding `fee.collect` gets 403). `finance.read` now also reads fee accounts, plans, dues and the daily report. `payments.configure` (R2-2D) and the messaging keys (R2-1C) stay planned here.
+**R2-1B (2026-10-18):** the eight `fee.*` keys of the table above except `fee.reconcile` (R2-2E) are in the catalog, `roles.yaml` and the §6.2 matrix; every fee route requires them school-wide (a section-scoped custom role holding `fee.collect` gets 403). `finance.read` now also reads fee accounts, plans, dues and the daily report. The messaging keys moved with R2-1C.
+
+**R2-2D (2026-10-18):** `payments.configure`ᴿ (owner) is in the catalog, `roles.yaml` and the §6.2 matrix (migration `0059_payments_online`). Payment links use `fee.collect` (reads also `finance.read`); online refunds keep `fee.refund.request` / `fee.refund.approve`ᴿ (maker-checker before anything is sent to Razorpay); the online reconciliation list is read with `finance.read` or `fee.manage` and an exception is explained with `fee.manage` (principal, accountant: the holders `fee.reconcile` will have; the lead may switch the explain route to `fee.reconcile` when R2-2E lands).
+
+**R2-2E (2026-10-18):** `fee.reconcile` is in the catalog, `roles.yaml` and the §6.2 matrix (principal and accountant, school-wide, no step-up; migration `0060_fees_upi`). It guards statement import, proposals review, confirmations (bulk and one by one), dismissing a credit, "find matches again" and the UPI exceptions list; the UPI report also opens to `finance.read`. Since the merge with R2-2D, the online reconciliation list and summary (`GET /fees/reconciliation/online*`) need `fee.reconcile` or `finance.read` and explaining an online item needs `fee.reconcile` (was `fee.manage`). UPI settings are read by any of `fee.collect`, `fee.manage`, `finance.read`, `fee.reconcile` and changed with `fee.manage`; the counter's UTR check needs `fee.collect`. Release note: run the system-role sync after migrating.
 
 Unchanged keys used by R2: `certificate.approve`ᴿ (add or withdraw a verification code), `tenant.settings.manage`ᴿ (parent language, TC format), `student.update_nonidentity` (guardian language), `tenant.billing.read` (AI answer usage numbers).
 
@@ -435,6 +440,8 @@ Therefore: **No personal data in URLs.** Names (student, parent, staff), phone n
 - **Monitoring:** `security.rate_limited`, `security.auth.failed`, `security.rate_limit.unavailable` (API) and `signin_failed`, `step_up_failed`, `auth_rate_limited` (BFF) carry IDs and `ip_hash` (keyed HMAC of the address) only. CloudWatch metric filters turn them into `SchoolOS/Security/<env>` metrics with alarms (docs/10 §12); the event names are pinned by `tests/deploy/test_security_log_events.py`.
 
 ### 11.2 Public endpoints and webhooks (R2, planned; ADR-0042, ADR-0043, ADR-0045, ADR-0046, ADR-0047)
+
+**Razorpay webhook as built (R2-2D, 2026-10-18).** `POST /api/v1/webhooks/razorpay/{route}`: the route value is a 24-character `razorpay_route` handle made at connect (unknown, revoked or disconnected: 404 before any secret is read); the verifier reads the school's current and, for 7 days after a rotation, previous secret in that school's own `tenant_session`; `X-Razorpay-Signature` must be 64 hex characters equal (constant time) to HMAC-SHA256 of the raw body (anything else 401 without detail, logged as `security.webhook.rejected` with a reason code); `x-razorpay-event-id` is required; body ≤ 256 KB (413 before verification); the event is stored minimised and encrypted, then 200; a duplicate event id is 200 without effect. Nothing on the webhook path creates a receipt: the worker re-fetches the payment and its order from Razorpay with the school's credentials first (T28), and a receipt is unique per provider payment and per link (T29). Secrets (SEC-035) are wrapped bound to the connection row, shown once (connect, rotate) with `Cache-Control: no-store` and kept out of the idempotency store, exports, audit summaries and logs.
 
 R2 adds the first internet-facing routes that take no staff session: parent link pages (`/p/*`), certificate verification (`/v/*`), and provider webhooks (`/api/v1/webhooks/razorpay/{route}`, `/api/v1/webhooks/meta`).
 
@@ -544,8 +551,8 @@ Tests (planned, `apps/api/tests/security/`): route enumeration with the new guar
 | SEC-028 | Heartbeat authentication: per-deployment HMAC-SHA256 keys (KMS-wrapped, rotatable), ±5 min timestamp window, nonce replay cache, strict schema without personal data, rate limit | M0 |
 | SEC-029 | Two-person rule for tenant offboarding (M0) and emergency break-glass (M1), enforced in service and DB | M0 / M1 |
 | SEC-030 | Dedicated host hardening baseline (§13), patching SLAs, off-host encrypted backups, restore test before go-live | Before first dedicated-tier school |
-| SEC-034 | (R2, planned) Webhook authentication: per-school Razorpay secrets and the Meta app secret, HMAC-SHA256 over the raw body in constant time, body limits, event-id dedupe, store-before-acknowledge, provider re-fetch before money is recorded; signature and replay tests | R2 wave 1-2 |
-| SEC-035 | (R2, planned) Per-school provider secrets (Razorpay OAuth tokens or keys, webhook secrets, Meta business token, number PIN) wrapped bound to their row; never returned, exported or logged; refresh, rotation and revocation jobs; platform secrets in Secrets Manager | R2 wave 1-2 |
+| SEC-034 | (R2; Meta built in R2-1C, Razorpay built in R2-2D 2026-10-18, §11.2) Webhook authentication: per-school Razorpay secrets and the Meta app secret, HMAC-SHA256 over the raw body in constant time, body limits, event-id dedupe, store-before-acknowledge, provider re-fetch before money is recorded; signature and replay tests | R2 wave 1-2 |
+| SEC-035 | (R2; built for Meta in R2-1C and Razorpay in R2-2D: `fin.payment_connections`, refresh, rotation and revocation jobs) Per-school provider secrets (Razorpay OAuth tokens or keys, webhook secrets, Meta business token, number PIN) wrapped bound to their row; never returned, exported or logged; refresh, rotation and revocation jobs; platform secrets in Secrets Manager | R2 wave 1-2 |
 | SEC-036 | (R2; foundation built in R2-0, 2026-10-17) Public surface: separate origin, strict CSP, no staff cookies, BFF service token, uniform 404, `no-referrer`, `no-store`, `noindex`, per-IP and per-handle rate limits, WAF rules on `/p/` and `/v/`; penetration test before first use (NFR-SEC-007) | R2 wave 0-3 |
 | SEC-037 | (R2; foundation built in R2-0, 2026-10-17) Parent link tokens: 256-bit random, SHA-256 only stored, per guardian, expiry, automatic and manual revocation, exchange-and-redirect to a cookie, minimal content | R2 wave 0, 3 |
 | SEC-038 | (R2, planned) Financial integrity: append-only ledger, frozen receipts, gap-free receipt and refund series, maker-checker with DB `CHECK` on concessions, adjustments, cancellations and refunds, step-up on approvals, daily collection report per collector | R2 wave 1 |

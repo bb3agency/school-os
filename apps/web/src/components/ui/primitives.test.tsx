@@ -355,11 +355,11 @@ describe("grouped sidebar navigation (the AppShell tests are in shell/AppShell.t
     }
   });
 
-  it("rows are at least 40px tall (WCAG 2.5.8) and labels wrap instead of clipping", () => {
+  it("rows are 32px tall with a mouse, 44px on touch (WCAG 2.5.8) and labels wrap instead of clipping", () => {
     path.current = "/";
     renderWithIntl(<SidebarNav label="Main" sections={SECTIONS} />);
     for (const link of screen.getAllByRole("link")) {
-      expect(link).toHaveClass("min-h-10");
+      expect(link).toHaveClass("min-h-8", "pointer-coarse:min-h-11");
       const label = link.querySelector("span:not([aria-hidden])");
       expect(label).not.toHaveClass("truncate");
       expect(label).toHaveClass("break-words");

@@ -2,23 +2,17 @@ import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import { cn } from "@/lib/cn";
-import { BrandMark } from "./Brand";
+import { Wordmark } from "./Brand";
 import { SkipLink } from "./SkipLink";
 
-/** Round "S" mark + wordmark (the same as the console sidebar's), for pages outside it. */
-export function Wordmark({ className }: { className?: string }) {
-  const t = useTranslations("common");
-  return (
-    <span className={cn("inline-flex items-center gap-2.5", className)}>
-      <BrandMark />
-      <span className="text-lg font-semibold text-ink">{t("appName")}</span>
-    </span>
-  );
-}
+/** The wordmark lives in Brand.tsx; re-exported for older imports. */
+export { Wordmark };
 
 /**
- * Floating top bar + centred main on the gradient canvas, for pages outside a school
- * (school picker, "no access yet", signed-out, dev helpers). `wide` for tables.
+ * Pages outside a school (school picker, "no access yet", signed-out, step-up return, not
+ * found, dev helpers): a plain 56px top bar on the canvas with a hairline under it (the same
+ * language as the console's top bar, docs/17 §5.2; no floating card) and one centred column.
+ * `wide` for tables.
  */
 export function MinimalShell({
   children,
@@ -33,20 +27,20 @@ export function MinimalShell({
   return (
     <div className="flex min-h-viewport flex-col">
       <SkipLink label={t("skipToContent")} />
-      <div className="px-page pt-3 md:pt-5" data-print="hide">
-        <header className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border border-border bg-surface px-3 py-2 shadow-card sm:px-4 sm:py-2.5">
+      <header className="border-b border-border bg-canvas" data-print="hide">
+        <div className="px-page mx-auto flex min-h-14 w-full max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2">
           <Wordmark />
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
             {headerActions}
             <LanguageSwitcher />
           </div>
-        </header>
-      </div>
+        </div>
+      </header>
       <main
         id="main"
         tabIndex={-1}
         className={cn(
-          "px-page mx-auto w-full flex-1 py-6 focus:outline-none md:py-12",
+          "px-page mx-auto w-full flex-1 py-8 focus:outline-none md:py-14",
           wide ? "max-w-5xl" : "max-w-3xl",
         )}
       >

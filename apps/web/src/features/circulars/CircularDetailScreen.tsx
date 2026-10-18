@@ -3,10 +3,12 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useState, type FormEvent, type ReactNode } from "react";
+import * as z from "@/lib/zod";
+import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Pill } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { TextField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -330,15 +332,14 @@ export function CircularDetailScreen({ documentId }: { documentId: string }) {
         }),
       ),
     );
+  // Marking reviewed confirms through a dialog (docs/17 §4: consequence line); same call.
   const review = (reading: Reading) =>
-    run(() =>
-      unwrap(
-        api.POST("/api/v1/circulars/{document_id}/review", {
-          params: { path: { document_id: documentId } },
-          headers: { "If-Match": ifMatch(reading.version) },
-          body: {},
-        }),
-      ),
+    unwrap(
+      api.POST("/api/v1/circulars/{document_id}/review", {
+        params: { path: { document_id: documentId } },
+        headers: { "If-Match": ifMatch(reading.version) },
+        body: {},
+      }),
     );
   const draftNotice = () =>
     run(async () => {
@@ -352,7 +353,7 @@ export function CircularDetailScreen({ documentId }: { documentId: string }) {
     });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <LoadGate data={detail}>
         {(circular) => {
           const reading = circular.reading;
@@ -368,14 +369,24 @@ export function CircularDetailScreen({ documentId }: { documentId: string }) {
                   { label: circular.title },
                 ]}
                 actions={
-                  <Link
-                    href={`/documents/${circular.document_id}`}
-                    className="text-sm text-primary underline underline-offset-4"
-                  >
-                    {t("openDocument")}
-                  </Link>
+                  <>
+                    <ButtonLink href={`/documents/${circular.document_id}`} variant="secondary">
+                      {t("openDocument")}
+                    </ButtonLink>
+                    {canReview &&
+                    (circular.reading_status === "not_read" || reading?.can_retry === true) ? (
+                      <Button
+                        onClick={() => void read()}
+                        disabled={pending}
+                        aria-disabled={pending || undefined}
+                      >
+                        {circular.reading_status === "not_read" ? t("readNow") : t("tryAgain")}
+                      </Button>
+                    ) : null}
+                  </>
                 }
               />
+              <ApiErrorAlert error={error} namespace="circulars" />
               {circular.reading_status === "not_read" ? (
                 <Alert tone="info" title={t("notReadTitle")}>
                   <p>{t("notReadBody")}</p>
@@ -391,18 +402,6 @@ export function CircularDetailScreen({ documentId }: { documentId: string }) {
                   <p>{translateOr(tr, reading.error_code ?? "other", "other")}</p>
                   <p className="mt-1">{t("needsReviewBody")}</p>
                 </Alert>
-              ) : null}
-              {canReview &&
-              (circular.reading_status === "not_read" || reading?.can_retry === true) ? (
-                <div>
-                  <Button
-                    onClick={() => void read()}
-                    disabled={pending}
-                    aria-disabled={pending || undefined}
-                  >
-                    {circular.reading_status === "not_read" ? t("readNow") : t("tryAgain")}
-                  </Button>
-                </div>
               ) : null}
               {reading?.status === "ready" ? (
                 <ReadingCard circular={circular} reading={reading} />
@@ -443,14 +442,18 @@ export function CircularDetailScreen({ documentId }: { documentId: string }) {
                           ? t("reviewPending", { count: open.length })
                           : t("reviewReady")}
                       </p>
-                      <Button
-                        variant="secondary"
-                        onClick={() => void review(reading)}
-                        disabled={pending || open.length > 0}
-                        aria-disabled={pending || open.length > 0 || undefined}
-                      >
-                        {t("markReviewed")}
-                      </Button>
+                      <ActionDialog
+                        triggerLabel={t("markReviewed")}
+                        triggerDisabled={pending || open.length > 0}
+                        title={t("markReviewedTitle")}
+                        description={t("markReviewedBody")}
+                        confirmLabel={t("markReviewed")}
+                        consequence={t("markReviewedConsequence")}
+                        schema={z.object({})}
+                        invalidate={[KEYS.circulars, KEYS.tasks]}
+                        errorNamespace="circulars"
+                        submit={() => review(reading)}
+                      />
                     </div>
                   ) : (
                     <p className="text-sm text-ink-muted">{t("notReviewed")}</p>
@@ -473,7 +476,6 @@ export function CircularDetailScreen({ documentId }: { documentId: string }) {
                   )}
                 </Card>
               ) : null}
-              <ApiErrorAlert error={error} namespace="circulars" />
             </>
           );
         }}

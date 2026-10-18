@@ -7,8 +7,10 @@ import * as z from "@/lib/zod";
 import { Alert } from "@/components/ui/Alert";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge, Pill } from "@/components/ui/Badge";
-import { Button, ButtonLink, type ButtonSize, type ButtonVariant } from "@/components/ui/Button";
+import { Button, type ButtonSize, type ButtonVariant } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import type { IconName } from "@/components/ui/Icon";
+import { Menu } from "@/components/ui/Menu";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { TextField } from "@/components/ui/Input";
 import { SelectField } from "@/components/ui/Select";
@@ -69,16 +71,26 @@ import {
 
 export const studentKey = (id: string) => ["staff", "students", id] as const;
 
-/** Findings and change requests are other screens: link to them by URL (filtered). */
-function RelatedLinks({ studentId, permissions }: { studentId: string; permissions: Permissions }) {
-  const t = useTranslations("students.detail");
+/** Findings, change requests, certificates and APAAR consent are other screens: link to them
+    by URL (filtered to this student), from the header's "Go to" menu. */
+export function relatedLinks(
+  studentId: string,
+  permissions: Permissions,
+  t: (key: string) => string,
+): { href: string; label: string; icon: IconName }[] {
   const q = `student_id=${encodeURIComponent(studentId)}`;
-  const links = [
+  return [
     ...(permissions.has(PERM.findingsRead)
-      ? [{ href: `/findings?${q}`, label: t("findingsLink") }]
+      ? [{ href: `/findings?${q}`, label: t("findingsLink"), icon: "shieldCheck" as const }]
       : []),
     ...(permissions.has(PERM.requestChange) || permissions.has(PERM.approveChange)
-      ? [{ href: `/change-requests?${q}`, label: t("changeRequestsLink") }]
+      ? [
+          {
+            href: `/change-requests?${q}`,
+            label: t("changeRequestsLink"),
+            icon: "clipboard" as const,
+          },
+        ]
       : []),
     // US-1101: certificates are issued from the checked record, starting here.
     ...(permissions.has(PERM.certificateIssue)
@@ -86,13 +98,14 @@ function RelatedLinks({ studentId, permissions }: { studentId: string; permissio
           {
             href: `/students/${encodeURIComponent(studentId)}/certificates/new`,
             label: t("issueCertificateLink"),
+            icon: "plus" as const,
           },
         ]
       : []),
     ...(permissions.has(PERM.certificateRead) ||
     permissions.has(PERM.certificateIssue) ||
     permissions.has(PERM.certificateApprove)
-      ? [{ href: `/certificates?${q}`, label: t("certificatesLink") }]
+      ? [{ href: `/certificates?${q}`, label: t("certificatesLink"), icon: "file" as const }]
       : []),
     // ADR-0039 (US-1901): the parent's APAAR consent decision and form.
     ...(permissions.has(PERM.apaarRead) || permissions.has(PERM.apaarRecord)
@@ -100,24 +113,11 @@ function RelatedLinks({ studentId, permissions }: { studentId: string; permissio
           {
             href: `/apaar/students/${encodeURIComponent(studentId)}`,
             label: t("apaarConsentLink"),
+            icon: "checkCircle" as const,
           },
         ]
       : []),
   ];
-  if (links.length === 0) return null;
-  return (
-    <nav aria-label={t("relatedLabel")} data-print="hide">
-      <ul className="flex flex-wrap gap-2">
-        {links.map((link) => (
-          <li key={link.href}>
-            <ButtonLink href={link.href} variant="secondary" size="sm">
-              {link.label}
-            </ButtonLink>
-          </li>
-        ))}
-      </ul>
-    </nav>
-  );
 }
 
 function canonicalState(canonical: CanonicalValue): "verified" | "provisional" | "unverified" {
@@ -601,9 +601,13 @@ export function StudentDetailView({
 
   if (student.status !== "ready") {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader
-          breadcrumb={[{ label: tl("title"), href: "/students" }, { label: t("loadingTitle") }]}
+          breadcrumb={[
+            { label: tl("crumbHome"), href: "/" },
+            { label: tl("title"), href: "/students" },
+            { label: t("loadingTitle") },
+          ]}
           title={t("loadingTitle")}
         />
         <LoadGate state={student} />
@@ -731,10 +735,28 @@ export function StudentDetailView({
     </Card>
   );
 
+  const goTo = relatedLinks(data.id, permissions, (key) => t(key as "findingsLink"));
+  const meta: { id: string; label: string; value: ReactNode; mono?: boolean }[] = [
+    {
+      id: "admission",
+      label: t("admissionShort"),
+      value: <Value>{data.admission_no}</Value>,
+      mono: true,
+    },
+    { id: "class", label: t("metaClass"), value: data.enrollment?.label ?? t("noClass") },
+    ...(data.enrollment?.roll_no
+      ? [{ id: "roll", label: t("rollNo"), value: data.enrollment.roll_no, mono: true }]
+      : []),
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
-        breadcrumb={[{ label: tl("title"), href: "/students" }, { label: name }]}
+        breadcrumb={[
+          { label: tl("crumbHome"), href: "/" },
+          { label: tl("title"), href: "/students" },
+          { label: name },
+        ]}
         title={
           <span className="inline-flex items-center gap-3">
             {avatarName ? <Avatar name={avatarName} size="lg" decorative /> : null}
@@ -742,28 +764,39 @@ export function StudentDetailView({
           </span>
         }
         badge={<StudentStatusBadge status={data.status} />}
-        actions={canEdit ? <StatusDialog student={data} /> : null}
-        description={
-          <span className="mt-1 flex flex-wrap items-center gap-2">
-            <Pill variant="tag" size="md">
-              {t("admissionShort")}{" "}
-              <span className="font-mono text-ink">
-                <Value>{data.admission_no}</Value>
-              </span>
-            </Pill>
-            <Pill variant="tag" size="md">
-              {data.enrollment?.label ?? t("noClass")}
-            </Pill>
-            {data.enrollment?.roll_no ? (
-              <Pill variant="tag" size="md">
-                {t("rollNo")} <span className="font-mono text-ink">{data.enrollment.roll_no}</span>
-              </Pill>
+        actions={
+          <>
+            {canEdit ? <StatusDialog student={data} /> : null}
+            {goTo.length > 0 ? (
+              <Menu
+                label={t("relatedLabel")}
+                variant="button"
+                align="end"
+                trigger={t("goTo")}
+                entries={goTo.map((link) => ({
+                  kind: "link" as const,
+                  id: link.href,
+                  label: link.label,
+                  href: link.href,
+                  icon: link.icon,
+                }))}
+              />
             ) : null}
-          </span>
+          </>
+        }
+        description={
+          <dl className="mt-1 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm">
+            {meta.map((item) => (
+              <div key={item.id} className="flex items-baseline gap-1.5">
+                <dt className="text-ink-muted">{item.label}</dt>
+                <dd className={item.mono ? "font-mono text-ink" : "text-ink"}>{item.value}</dd>
+              </div>
+            ))}
+          </dl>
         }
       />
-      <RelatedLinks studentId={data.id} permissions={permissions} />
       <Tabs
+        variant="underline"
         label={t("tabsLabel")}
         items={[
           { id: "details", label: t("tabDetails"), panel: detailsPanel },

@@ -408,7 +408,7 @@ export function ChatScreen({ conversationId }: { conversationId: string | null }
   );
 
   return (
-    <div className="chat-fade chat-canvas relative -mb-6 flex flex-col rounded-xl border border-border bg-surface shadow-card">
+    <div className="chat-fade chat-canvas relative -mb-6 flex flex-col rounded-xl border border-border bg-surface">
       {/* Header: the chat's title (the page's h1), its options, and the Ask sections. */}
       <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-4 py-3 sm:px-6">
         <h1 className="min-w-0 flex-1 text-base font-semibold break-anywhere text-ink">
@@ -453,7 +453,7 @@ export function ChatScreen({ conversationId }: { conversationId: string | null }
             <div className="chat-enter space-y-2 pb-6 text-center">
               <span
                 aria-hidden="true"
-                className="ai-gradient mx-auto mb-4 flex size-12 items-center justify-center rounded-full text-white"
+                className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full border border-info-border bg-accent-soft text-accent"
               >
                 <Icon name="sparkles" className="size-6" />
               </span>
@@ -505,10 +505,11 @@ export function ChatScreen({ conversationId }: { conversationId: string | null }
         {/* The composer stays mounted in the same place (focus and text survive the first
             question); it docks to the bottom once the chat has messages. */}
         <div
+          data-dock={empty ? undefined : ""}
           className={cn(
             empty
               ? "relative"
-              : "chat-dock sticky bottom-0 z-10 -mx-4 px-4 pt-6 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:-mx-6 sm:px-6",
+              : "chat-dock sticky bottom-[var(--dock-offset)] z-10 -mx-4 px-4 pt-6 pb-[max(0.75rem,var(--dock-safe))] sm:-mx-6 sm:px-6",
           )}
         >
           {!stick.pinned && !empty ? (
@@ -547,7 +548,7 @@ export function ChatScreen({ conversationId }: { conversationId: string | null }
                       composer.current?.setText(t(`examples.${key}`));
                       setError(undefined);
                     }}
-                    className="flex w-full items-start gap-3 rounded-xl border border-border bg-surface p-3.5 text-start text-sm text-ink shadow-raised hover:border-primary hover:bg-primary-soft motion-safe:hover:transition-colors"
+                    className="flex w-full items-start gap-3 rounded-xl border border-border bg-surface p-3.5 text-start text-sm text-ink hover:border-accent hover:bg-accent-soft motion-safe:hover:transition-colors"
                   >
                     <Icon name="message" className="mt-0.5 size-4 shrink-0 text-primary" />
                     <span>{t(`examples.${key}`)}</span>

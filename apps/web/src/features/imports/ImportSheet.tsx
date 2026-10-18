@@ -20,6 +20,7 @@ import { ProblemAlert } from "@/features/students/ProblemAlert";
 import type { Locale } from "@/i18n/routing";
 import { ApiError, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { IssueText, importKey, useTargetLabel } from "./ImportDetail";
+import { ImportStatusBadge } from "./ImportsScreen";
 
 type Schemas = components["schemas"];
 export type ImportSheet = Schemas["ImportSheetOut"];
@@ -91,7 +92,7 @@ export function ImportSheetScreen({ importId }: { importId: string }) {
 
   if (sheet.status !== "ready") {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader title={t("title")} breadcrumb={[...crumbs, { label: t("title") }]} />
         <LoadGate state={sheet} />
         {sheet.status === "error" ? (
@@ -218,10 +219,11 @@ export function ImportSheetScreen({ importId }: { importId: string }) {
 
   const title = t("title");
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={title}
         breadcrumb={[...crumbs, { label: title }]}
+        badge={<ImportStatusBadge status={data.status} />}
         description={canEdit ? t("descriptionEdit") : t("descriptionRead")}
         actions={
           <span className="flex flex-wrap gap-2" data-print="hide">

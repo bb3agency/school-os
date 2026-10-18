@@ -133,7 +133,7 @@ export function ReadyBar({
 }) {
   return (
     <div className="min-w-40 space-y-1">
-      <span className="block text-sm tabular-nums">{label}</span>
+      <span className="num block text-sm">{label}</span>
       <progress
         max={Math.max(students, 1)}
         value={ready}

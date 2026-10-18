@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import {
   TICKET_CATEGORIES,
   TICKET_PRIORITIES,
@@ -18,7 +20,8 @@ import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
 import { Timeline, type TimelineItem } from "@/components/ui/Timeline";
-import { DataTable, type Column } from "@/components/ui/Table";
+import { DataTableV2 } from "@/components/console/DataTableV2";
+import type { Column } from "@/components/ui/Table";
 import { TicketThread } from "@/features/support/TicketThread";
 import { known, priorityTone, ticketTone } from "@/features/status";
 import { Link } from "@/i18n/navigation";
@@ -61,10 +64,13 @@ function PriorityBadge({ priority }: { priority: string }) {
 export function TicketTable({
   tickets,
   caption,
+  toolbar,
   schoolName,
 }: {
   tickets: Loadable<readonly SupportTicket[]>;
   caption: string;
+  /** Filters above the rows, inside the table card (docs/17 §4.3). */
+  toolbar?: ReactNode;
   schoolName?: (tenantId: string) => string;
 }) {
   const t = useTranslations("platform.support");
@@ -113,7 +119,11 @@ export function TicketTable({
     },
   ];
   return (
-    <DataTable
+    <DataTableV2
+      id="platform.tickets"
+      // Phones: one card per row (docs/17 §5.7).
+      stacked
+      toolbar={toolbar}
       caption={caption}
       captionHidden
       columns={columns}
@@ -254,39 +264,46 @@ export function PlatformSupportScreen({ filters = {} }: { filters?: TicketFilter
         }
       />
       <StudentDataWarning />
-      <FilterCard
-        clearHref={
-          filters.status || filters.priority || filters.mine ? "/platform/support" : undefined
+      <TicketTable
+        toolbar={
+          <FilterCard
+            bare
+            clearHref={
+              filters.status || filters.priority || filters.mine ? "/platform/support" : undefined
+            }
+          >
+            <SelectField
+              name="status"
+              label={t("colStatus")}
+              placeholder={tc("all")}
+              defaultValue={filters.status ?? ""}
+              options={TICKET_STATUSES.map((value) => ({ value, label: tstatus(value) }))}
+              className="w-52"
+            />
+            <SelectField
+              name="priority"
+              label={t("colPriority")}
+              placeholder={tc("all")}
+              defaultValue={filters.priority ?? ""}
+              options={TICKET_PRIORITIES.map((value) => ({ value, label: tprio(value) }))}
+              className="w-44"
+            />
+            <label className="flex min-h-10 items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="mine"
+                value="true"
+                defaultChecked={filters.mine ?? false}
+                className="size-4 accent-primary"
+              />
+              {t("assignedToMe")}
+            </label>
+          </FilterCard>
         }
-      >
-        <SelectField
-          name="status"
-          label={t("colStatus")}
-          placeholder={tc("all")}
-          defaultValue={filters.status ?? ""}
-          options={TICKET_STATUSES.map((value) => ({ value, label: tstatus(value) }))}
-          className="w-52"
-        />
-        <SelectField
-          name="priority"
-          label={t("colPriority")}
-          placeholder={tc("all")}
-          defaultValue={filters.priority ?? ""}
-          options={TICKET_PRIORITIES.map((value) => ({ value, label: tprio(value) }))}
-          className="w-44"
-        />
-        <label className="flex min-h-10 items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            name="mine"
-            value="true"
-            defaultChecked={filters.mine ?? false}
-            className="size-4 accent-primary"
-          />
-          {t("assignedToMe")}
-        </label>
-      </FilterCard>
-      <TicketTable tickets={tickets} caption={t("title")} schoolName={nameOf} />
+        tickets={tickets}
+        caption={t("title")}
+        schoolName={nameOf}
+      />
       <Pager label={t("pagesLabel")} {...pager} />
     </div>
   );

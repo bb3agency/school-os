@@ -386,6 +386,15 @@ templates:
     te:
       title: "మీ ఆమోదం కోసం {kind, select, concession {ఫీజు రాయితీ} adjustment {ఫీజు సర్దుబాటు} cancellation {రసీదు రద్దు} refund {ఫీజు వాపసు} other {ఫీజు అభ్యర్థన}} వేచి ఉంది"
       body: "ఒక {kind, select, concession {ఫీజు రాయితీ} adjustment {ఫీజు సర్దుబాటు} cancellation {రసీదు రద్దు} refund {ఫీజు వాపసు} other {ఫీజు అభ్యర్థన}} రెండవ వ్యక్తి ఆమోదం కోసం వేచి ఉంది. ఫీజులు > ఆమోదాలు తెరిచి చూసి ఆమోదించండి లేదా తిరస్కరించండి."
+  # R2-2E (FR-FEE-017, FR-FEE-026): each morning to fee.reconcile holders, counts only.
+  fee.upi_exceptions:
+    params: [unconfirmed, credits]
+    en:
+      title: "UPI payments to check against the bank"
+      body: "{unconfirmed, plural, =0 {No UPI receipt is waiting} one {# UPI receipt is not yet seen in a bank statement} other {# UPI receipts are not yet seen in a bank statement}} and {credits, plural, =0 {no bank credit needs matching} one {# bank credit needs matching} other {# bank credits need matching}}. Open Fees > Reconcile, import the latest bank statement and confirm the matches."
+    te:
+      title: "బ్యాంకుతో సరిచూడాల్సిన UPI చెల్లింపులు"
+      body: "{unconfirmed, plural, =0 {ఏ UPI రసీదూ వేచి లేదు} one {# UPI రసీదు ఇంకా బ్యాంకు స్టేట్‌మెంట్‌లో కనిపించలేదు} other {# UPI రసీదులు ఇంకా బ్యాంకు స్టేట్‌మెంట్‌లో కనిపించలేదు}}, {credits, plural, =0 {సరిపోల్చాల్సిన బ్యాంకు జమ ఏదీ లేదు} one {# బ్యాంకు జమను సరిపోల్చాలి} other {# బ్యాంకు జమలను సరిపోల్చాలి}}. ఫీజులు > సరిపోల్చడం తెరిచి, తాజా బ్యాంకు స్టేట్‌మెంట్ దిగుమతి చేసి సరిపోలికలను నిర్ధారించండి."
   fee.request_decided:
     params: [request_id, kind, account_id, decision]
     resource_type: fee_request
@@ -395,3 +404,40 @@ templates:
     te:
       title: "మీ ఫీజు అభ్యర్థన {decision, select, approved {ఆమోదించబడింది} other {తిరస్కరించబడింది}}"
       body: "మీ {kind, select, concession {ఫీజు రాయితీ} adjustment {ఫీజు సర్దుబాటు} cancellation {రసీదు రద్దు} refund {ఫీజు వాపసు} other {ఫీజు}} అభ్యర్థన {decision, select, approved {ఆమోదించబడింది, విద్యార్థి ఫీజు ఖాతా నవీకరించబడింది} other {తిరస్కరించబడింది; కారణం చూడటానికి తెరవండి}}."
+  # --- R2-2D online payments (ADR-0042; FR-PAY-010..012, FR-FEE-026): ids, codes and counts ---
+  payments.connection_revoked:
+    params: [connection_id, reason]
+    resource_type: payment_connection
+    en:
+      title: Online fee payments have stopped
+      body: "Razorpay no longer accepts SchoolOS's access to the school's account, so no new payment links can be made. Open Settings > Online payments and connect the account again."
+    te:
+      title: ఆన్‌లైన్ ఫీజు చెల్లింపులు ఆగిపోయాయి
+      body: "పాఠశాల ఖాతాకు SchoolOS యాక్సెస్‌ను Razorpay ఇక అంగీకరించడం లేదు, కాబట్టి కొత్త చెల్లింపు లింకులు చేయలేము. సెట్టింగులు > ఆన్‌లైన్ చెల్లింపులు తెరిచి ఖాతాను మళ్ళీ కనెక్ట్ చేయండి."
+  payments.authorization_expiring:
+    params: [connection_id, days]
+    resource_type: payment_connection
+    en:
+      title: Reconnect Razorpay soon
+      body: "SchoolOS's access to the school's Razorpay account ends in {days, plural, =0 {less than a day} one {# day} other {# days}}. Open Settings > Online payments and connect the account again so payment links keep working."
+    te:
+      title: త్వరలో Razorpayని మళ్ళీ కనెక్ట్ చేయండి
+      body: "పాఠశాల Razorpay ఖాతాకు SchoolOS యాక్సెస్ {days, plural, =0 {ఒక రోజు లోపు} one {# రోజులో} other {# రోజుల్లో}} ముగుస్తుంది. చెల్లింపు లింకులు పనిచేస్తూ ఉండటానికి సెట్టింగులు > ఆన్‌లైన్ చెల్లింపులు తెరిచి ఖాతాను మళ్ళీ కనెక్ట్ చేయండి."
+  payments.refund_failed:
+    params: [refund_id, account_id]
+    resource_type: fee_refund
+    en:
+      title: An online refund failed
+      body: Razorpay could not refund the payment you asked to refund. Open Fees > Online reconciliation to see it, then refund the parent another way or ask again.
+    te:
+      title: ఒక ఆన్‌లైన్ వాపసు విఫలమైంది
+      body: మీరు అడిగిన చెల్లింపును Razorpay వాపసు చేయలేకపోయింది. చూడటానికి ఫీజులు > ఆన్‌లైన్ సరిపోలిక తెరవండి, తర్వాత తల్లిదండ్రులకు వేరే విధంగా వాపసు చేయండి లేదా మళ్ళీ అడగండి.
+  payments.reconciliation_exceptions:
+    params: [count, run_id]
+    resource_type: fee_reconciliation_run
+    en:
+      title: "Online payments to check: {count}"
+      body: "This morning's check of Razorpay payments found {count, plural, one {# item} other {# items}} that need a person: payments without a receipt, amounts that differ, refunds or missing settlements. Open Fees > Online reconciliation."
+    te:
+      title: "తనిఖీ చేయాల్సిన ఆన్‌లైన్ చెల్లింపులు: {count}"
+      body: "ఈ ఉదయం Razorpay చెల్లింపుల తనిఖీలో ఒక వ్యక్తి చూడాల్సిన {count, plural, one {# అంశం} other {# అంశాలు}} కనిపించాయి: రసీదు లేని చెల్లింపులు, తేడా ఉన్న మొత్తాలు, వాపసులు లేదా జమ కాని సెటిల్‌మెంట్లు. ఫీజులు > ఆన్‌లైన్ సరిపోలిక తెరవండి."

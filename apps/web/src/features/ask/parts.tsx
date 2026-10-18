@@ -143,11 +143,11 @@ export function SourceChip({
     <li
       id={anchorId}
       tabIndex={anchorId ? -1 : undefined}
-      className="space-y-3 rounded-lg border border-border bg-surface p-4 focus:outline-2 focus:outline-primary"
+      className="min-w-0 space-y-2.5 rounded-lg border border-border bg-surface p-3 focus:outline-2 focus:outline-primary"
     >
       <div className="flex items-start gap-3">
         {index !== undefined ? (
-          <Pill variant="command" className="mt-0.5 shrink-0">
+          <Pill variant="command" className="num mt-0.5 shrink-0">
             {index}
           </Pill>
         ) : (
@@ -187,7 +187,7 @@ export function SourceChip({
         </div>
       </div>
       {quote ? (
-        <blockquote className="rounded-md border-l-4 border-border-soft bg-surface-muted px-3 py-2 text-sm whitespace-pre-line text-ink">
+        <blockquote className="rounded-md border-s-4 border-border-soft bg-surface-muted px-3 py-2 text-sm whitespace-pre-line text-ink break-anywhere">
           {displayText(quote)}
         </blockquote>
       ) : null}

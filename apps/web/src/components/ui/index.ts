@@ -53,6 +53,12 @@ export {
 export { NarrowSwitch } from "./NarrowSwitch";
 export { Dialog } from "./Dialog";
 export { EmptyState } from "./EmptyState";
+export {
+  Illustration,
+  ILLUSTRATIONS,
+  illustrationSrc,
+  type IllustrationName,
+} from "./Illustration";
 export { Eyebrow, type EyebrowTone } from "./Eyebrow";
 export { Icon, ICON_NAMES, type IconName } from "./Icon";
 export {
@@ -84,3 +90,14 @@ export { Tabs, type TabItem, type TabsVariant } from "./Tabs";
 export { Timeline, type TimelineItem, type TimelineStatus } from "./Timeline";
 export { Toggle, type ToggleProps } from "./Toggle";
 export { UsageMeter } from "./UsageMeter";
+export { Drawer, type DrawerProps } from "./Drawer";
+export { ErrorSummary, type SummaryError } from "./ErrorSummary";
+export { FilterChips, type FilterChip } from "./FilterChips";
+export { Kbd } from "./Kbd";
+export { Menu, type MenuEntry, type MenuProps } from "./Menu";
+export { Pagination, type PaginationProps } from "./Pagination";
+export { Popover, type PopoverProps } from "./Popover";
+export { SaveBar } from "./SaveBar";
+export { HeroFigure } from "./HeroFigure";
+export { Steps, type Step } from "./Steps";
+export { ToastProvider, useToast, type ToastInput, type ToastTone } from "./Toaster";

@@ -1,15 +1,16 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
+import { DataTableV2, type ColumnV2 } from "@/components/console";
 import { Alert } from "@/components/ui/Alert";
 import { Pill } from "@/components/ui/Badge";
 import { ButtonLink } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { LoadingState } from "@/components/ui/LoadingState";
+import { Menu } from "@/components/ui/Menu";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { TabNav } from "@/components/ui/TabNav";
-import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { useRetentionDays } from "@/features/admin/data";
 import { Pager, useCursorStack } from "@/features/students/paging";
@@ -18,7 +19,7 @@ import type { Locale } from "@/i18n/routing";
 import { useStaffCan, useStaffMeQuery } from "@/lib/bff/staff-me";
 import { formatCount, formatDateTime } from "@/lib/format";
 import type { Loadable } from "@/lib/loadable";
-import { useExportList, useExportProfiles } from "./data";
+import { EXPORT_KEYS, useExportList, useExportProfiles } from "./data";
 import type { ExportListFilters } from "./filters";
 import { ExportStatusBadge, exportTitle, RequesterName } from "./parts";
 import { EXPORT_PERM, EXPORT_SCREEN_PERMISSIONS, isExportBusy, type Export } from "./types";
@@ -47,11 +48,12 @@ export function ExportsScreen({ filters }: { filters: ExportListFilters }) {
   const profiles = useExportProfiles(can([EXPORT_PERM.board, EXPORT_PERM.portal]));
   // FR-ADM-002: the school may keep export files for less than the default.
   const keptDays = useRetentionDays("exports", allowed);
+  const queryClient = useQueryClient();
 
   if (me.isPending) return <LoadingState label={tc("loading")} />;
   if (!allowed) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader title={t("title")} />
         <Alert tone="warning" title={t("noAccessTitle")}>
           {t("noAccessBody")}
@@ -67,7 +69,7 @@ export function ExportsScreen({ filters }: { filters: ExportListFilters }) {
   const next = list.status === "ready" ? list.data.next_cursor : null;
   const busy = list.status === "ready" && list.data.data.some((row) => isExportBusy(row.status));
 
-  const columns: Column<Export>[] = [
+  const columns: ColumnV2<Export>[] = [
     {
       key: "what",
       header: tl("colWhat"),
@@ -89,7 +91,7 @@ export function ExportsScreen({ filters }: { filters: ExportListFilters }) {
       key: "students",
       header: tl("colStudents"),
       numeric: true,
-      cell: (row) => <span className="tabular-nums">{count(row.student_count)}</span>,
+      cell: (row) => <span className="num">{count(row.student_count)}</span>,
     },
     {
       key: "formats",
@@ -119,103 +121,116 @@ export function ExportsScreen({ filters }: { filters: ExportListFilters }) {
     {
       key: "created",
       header: tl("colCreated"),
-      cell: (row) => <Value>{formatDateTime(row.created_at)}</Value>,
+      cell: (row) => (
+        <span className="num whitespace-nowrap">
+          <Value>{formatDateTime(row.created_at)}</Value>
+        </span>
+      ),
     },
     {
       key: "expires",
       header: tl("colExpires"),
       cell: (row) =>
-        row.status === "expired" ? tl("deleted") : <Value>{formatDateTime(row.expires_at)}</Value>,
+        row.status === "expired" ? (
+          tl("deleted")
+        ) : (
+          <span className="num whitespace-nowrap">
+            <Value>{formatDateTime(row.expires_at)}</Value>
+          </span>
+        ),
     },
   ];
 
   const canPrecheck = can([EXPORT_PERM.board, EXPORT_PERM.portal]);
   const canList = can(EXPORT_PERM.studentList);
 
-  const types: { key: string; href: string; action: string; primary: boolean }[] = [
-    ...(canPrecheck
-      ? [
-          {
-            key: "precheck",
-            href: "/exports/new/precheck",
-            action: t("newPrecheck"),
-            primary: true,
-          },
-        ]
-      : []),
-    ...(canList
-      ? [
-          {
-            key: "studentList",
-            href: "/exports/new/student-list",
-            action: t("newStudentList"),
-            primary: !canPrecheck,
-          },
-        ]
-      : []),
-  ];
+  // One primary: the pre-check (the job most offices come here for); the student list is the
+  // primary only for members who may not make pre-checks, else it sits under "More".
+  const actions = (
+    <>
+      {canPrecheck && canList ? (
+        <Menu
+          label={t("more")}
+          variant="button"
+          align="end"
+          trigger={t("more")}
+          entries={[
+            {
+              kind: "link",
+              id: "student-list",
+              label: t("newStudentList"),
+              href: "/exports/new/student-list",
+              icon: "plus",
+            },
+          ]}
+        />
+      ) : null}
+      {canPrecheck ? (
+        <ButtonLink href="/exports/new/precheck">
+          <Icon name="plus" className="size-4" />
+          {t("newPrecheck")}
+        </ButtonLink>
+      ) : canList ? (
+        <ButtonLink href="/exports/new/student-list">
+          <Icon name="plus" className="size-4" />
+          {t("newStudentList")}
+        </ButtonLink>
+      ) : null}
+    </>
+  );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={t("title")}
         description={
           keptDays === null ? t("descriptionSchoolPeriod") : t("description", { days: keptDays })
         }
         breadcrumb={[{ label: tn("home"), href: "/" }, { label: t("title") }]}
+        actions={canPrecheck || canList ? actions : null}
       />
-      {types.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          {types.map((type) => (
-            <Card
-              key={type.key}
-              eyebrow={tl(`types.${type.key as "precheck"}.eyebrow`)}
-              title={tl(`types.${type.key as "precheck"}.title`)}
-              description={tl(`types.${type.key as "precheck"}.body`)}
-            >
-              <ButtonLink href={type.href} variant={type.primary ? "primary" : "secondary"}>
-                <Icon name="plus" className="size-4" />
-                {type.action}
-              </ButtonLink>
-            </Card>
-          ))}
-        </div>
-      ) : null}
-      <Card
-        title={tl("historyTitle")}
-        description={view === "all" ? tl("wholeSchoolHint") : tl("mineHint")}
-      >
-        <div className="space-y-4">
-          {canSeeAll ? (
-            <TabNav
-              label={tl("viewsLabel")}
-              activeId={view}
-              items={[
-                { id: "me", href: "/exports", label: tl("mine") },
-                { id: "all", href: "/exports?view=all", label: tl("wholeSchool") },
-              ]}
-            />
-          ) : null}
-          <div role="status" aria-live="polite" className="text-sm text-ink-muted">
-            {busy ? tl("updating") : null}
+      <div role="status" aria-live="polite" className="text-sm text-ink-muted empty:hidden">
+        {busy ? tl("updating") : null}
+      </div>
+      <DataTableV2
+        id="exports"
+        stacked
+        caption={view === "all" ? tl("wholeSchool") : tl("mine")}
+        captionHidden
+        columns={columns}
+        state={rows}
+        rowKey={(row) => row.id}
+        toolbar={
+          <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-2">
+            {canSeeAll ? (
+              <TabNav
+                label={tl("viewsLabel")}
+                activeId={view}
+                items={[
+                  { id: "me", href: "/exports", label: tl("mine") },
+                  { id: "all", href: "/exports?view=all", label: tl("wholeSchool") },
+                ]}
+              />
+            ) : null}
+            <p className="text-sm text-ink-muted">
+              {view === "all" ? tl("wholeSchoolHint") : tl("mineHint")}
+            </p>
           </div>
-          <DataTable
-            caption={view === "all" ? tl("wholeSchool") : tl("mine")}
-            captionHidden
-            columns={columns}
-            state={rows}
-            rowKey={(row) => row.id}
-            emptyTitle={tl("emptyTitle")}
-            emptyBody={canPrecheck || canList ? tl("emptyBodyMaker") : tl("emptyBody")}
-          />
-          <Pager
-            label={tl("pagesLabel")}
-            page={pages.page}
-            onPrevious={pages.hasPrevious ? pages.previous : undefined}
-            onNext={next ? () => pages.next(next) : undefined}
-          />
-        </div>
-      </Card>
+        }
+        emptyTitle={tl("emptyTitle")}
+        emptyBody={canPrecheck || canList ? tl("emptyBodyMaker") : tl("emptyBody")}
+        onRetry={() => void queryClient.invalidateQueries({ queryKey: EXPORT_KEYS.all })}
+        footer={
+          pages.hasPrevious || next ? (
+            <Pager
+              label={tl("pagesLabel")}
+              page={pages.page}
+              onPrevious={pages.hasPrevious ? pages.previous : undefined}
+              onNext={next ? () => pages.next(next) : undefined}
+            />
+          ) : undefined
+        }
+      />
     </div>
   );
 }

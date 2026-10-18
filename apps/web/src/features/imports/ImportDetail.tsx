@@ -4,16 +4,18 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
 import * as z from "@/lib/zod";
+import { DataTableV2, type ColumnV2 } from "@/components/console";
 import { Alert } from "@/components/ui/Alert";
 import { Badge, Pill, type PillVariant } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Card, cardClasses } from "@/components/ui/Card";
+import { ErrorSummary, type SummaryError } from "@/components/ui/ErrorSummary";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { Icon } from "@/components/ui/Icon";
+import { Menu, type MenuEntry } from "@/components/ui/Menu";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField, type SelectOption } from "@/components/ui/Select";
 import { StatCard } from "@/components/ui/StatCard";
-import { DataTable, type Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
 import { containsFullAadhaar } from "@/features/students/aadhaar";
 import { GuardedTextField } from "@/features/students/fields";
@@ -168,6 +170,21 @@ function MappingForm({ batch, attributes, label, onChecked, initialPreset }: Map
   const [formError, setFormError] = useState<string | null>(null);
   const [failure, setFailure] = useState<unknown>(undefined);
   const [pending, setPending] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const selectId = (index: number) => `${errorId}-col-${index}`;
+  const headerOf = (column: ImportColumn) =>
+    column.header || t("noHeader", { number: column.index + 1 });
+  const summary: SummaryError[] = [
+    ...(formError && batch.columns[0]
+      ? [{ fieldId: selectId(batch.columns[0].index), message: formError }]
+      : []),
+    ...batch.columns
+      .filter((column) => errors[column.index])
+      .map((column) => ({
+        fieldId: selectId(column.index),
+        message: `${headerOf(column)}: ${errors[column.index] ?? ""}`,
+      })),
+  ];
 
   const options: SelectOption[] = useMemo(
     () => [
@@ -198,9 +215,8 @@ function MappingForm({ batch, attributes, label, onChecked, initialPreset }: Map
     setFailure(undefined);
     setFormError(hasAdmission ? null : ti("admission_no_not_mapped"));
     if (duplicates.size > 0 || !hasAdmission) {
-      requestAnimationFrame(() =>
-        form.querySelector<HTMLElement>("[aria-invalid='true'], [data-mapping-error]")?.focus(),
-      );
+      // The error summary takes focus and links to each column to fix (docs/17 §4.4).
+      setAttempt((value) => value + 1);
       return;
     }
     const columns = Object.entries(targets)
@@ -239,6 +255,7 @@ function MappingForm({ batch, attributes, label, onChecked, initialPreset }: Map
           else unmapped = true;
         }
         setErrors(server);
+        if (Object.keys(server).length > 0) setAttempt((value) => value + 1);
         if (Object.keys(server).length === 0 || unmapped) setFailure(error);
       })
       .finally(() => setPending(false));
@@ -257,13 +274,7 @@ function MappingForm({ batch, attributes, label, onChecked, initialPreset }: Map
         disabled={pending}
         onApply={applyPreset}
       />
-      {formError ? (
-        <div data-mapping-error tabIndex={-1} id={errorId}>
-          <Alert tone="danger" live>
-            {formError}
-          </Alert>
-        </div>
-      ) : null}
+      <ErrorSummary errors={summary} attempt={attempt} />
       <div className="space-y-2">
         {/* Column titles for sighted users; each select is named "Field for the column …". */}
         <div aria-hidden="true" className="hidden gap-4 px-4 sm:grid sm:grid-cols-2">
@@ -272,7 +283,7 @@ function MappingForm({ batch, attributes, label, onChecked, initialPreset }: Map
         </div>
         <ul aria-label={t("tableLabel")} className="space-y-2">
           {batch.columns.map((column) => {
-            const header = column.header || t("noHeader", { number: column.index + 1 });
+            const header = headerOf(column);
             return (
               <li
                 key={column.index}
@@ -290,6 +301,7 @@ function MappingForm({ batch, attributes, label, onChecked, initialPreset }: Map
                 </div>
                 <SelectField
                   key={`${column.index}-${preset.generation}`}
+                  id={selectId(column.index)}
                   name={`col-${column.index}`}
                   label={t("targetFor", { header })}
                   className="[&>label]:sr-only"
@@ -346,6 +358,7 @@ function RowsCard({
   const t = useTranslations("imports.rows");
   const ts = useTranslations("sheets.import");
   const api = useBffClient("staff");
+  const headingId = useId();
   const [filter, setFilter] = useState<RowFilterChoice>(initialFilter);
   const pages = useCursorStack();
   const query = {
@@ -364,7 +377,7 @@ function RowsCard({
     rows.status === "ready" ? { status: "ready", data: rows.data.data } : rows;
   const next = rows.status === "ready" ? rows.data.next_cursor : null;
 
-  const columns: Column<ImportRow>[] = [
+  const columns: ColumnV2<ImportRow>[] = [
     {
       key: "row",
       header: t("colRow"),
@@ -441,48 +454,72 @@ function RowsCard({
     },
   ];
 
+  const choose = (value: RowFilterChoice) => {
+    pages.reset();
+    setFilter(value);
+  };
+  const chips =
+    filter === "all" ? [] : [{ id: "status", label: t("filter"), value: t(`filters.${filter}`) }];
+  const onPrevious = pages.hasPrevious ? pages.previous : undefined;
+  const onNext = next ? () => pages.next(next) : undefined;
+
   return (
-    <Card title={t("title")} description={t("description")}>
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-end gap-3" data-print="hide">
-          <SelectField
-            className="w-full max-w-xs"
-            label={t("filter")}
-            value={filter}
-            onChange={(event) => {
-              const value = ROW_FILTERS.find((item) => item === event.currentTarget.value);
-              pages.reset();
-              setFilter(value ?? "all");
-            }}
-            options={ROW_FILTERS.map((value) => ({ value, label: t(`filters.${value}`) }))}
-          />
-          {sheetEditable && batch.error_count > 0 ? (
-            <span className="flex flex-col gap-1">
-              <ButtonLink href={`/imports/${batch.id}/sheet`} variant="secondary">
-                <Icon name="layers" className="size-4" />
-                {ts("fixInSheet")}
-              </ButtonLink>
-              <span className="max-w-sm text-xs text-ink-muted">{ts("fixInSheetHint")}</span>
-            </span>
-          ) : null}
-        </div>
-        <DataTable
-          caption={t("title")}
-          captionHidden
-          columns={columns}
-          state={list}
-          rowKey={(row) => String(row.row_no)}
-          emptyTitle={t("emptyTitle")}
-          emptyBody={t("emptyBody")}
-        />
-        <Pager
-          label={t("pagesLabel")}
-          page={pages.page}
-          onPrevious={pages.hasPrevious ? pages.previous : undefined}
-          onNext={next ? () => pages.next(next) : undefined}
-        />
+    <section aria-labelledby={headingId} className="space-y-3">
+      <div className="space-y-1">
+        <h2 id={headingId} className="text-lg font-semibold text-ink">
+          {t("title")}
+        </h2>
+        <p className="text-sm text-ink-muted">{t("description")}</p>
       </div>
-    </Card>
+      <DataTableV2
+        id="import-rows"
+        // Phones: one card per row (docs/17 §5.7).
+        stacked
+        caption={t("title")}
+        captionHidden
+        columns={columns}
+        state={list}
+        rowKey={(row) => String(row.row_no)}
+        toolbar={
+          <div className="flex w-full flex-wrap items-end gap-3">
+            <SelectField
+              className="w-full max-w-xs"
+              label={t("filter")}
+              value={filter}
+              onChange={(event) => {
+                const value = ROW_FILTERS.find((item) => item === event.currentTarget.value);
+                choose(value ?? "all");
+              }}
+              options={ROW_FILTERS.map((value) => ({ value, label: t(`filters.${value}`) }))}
+            />
+            {sheetEditable && batch.error_count > 0 ? (
+              <span className="flex flex-col gap-1">
+                <ButtonLink href={`/imports/${batch.id}/sheet`} variant="secondary">
+                  <Icon name="layers" className="size-4" />
+                  {ts("fixInSheet")}
+                </ButtonLink>
+                <span className="max-w-sm text-xs text-ink-muted">{ts("fixInSheetHint")}</span>
+              </span>
+            ) : null}
+          </div>
+        }
+        chips={chips}
+        onRemoveChip={() => choose("all")}
+        onClearFilters={() => choose("all")}
+        emptyTitle={t("emptyTitle")}
+        emptyBody={t("emptyBody")}
+        footer={
+          onPrevious || onNext ? (
+            <Pager
+              label={t("pagesLabel")}
+              page={pages.page}
+              onPrevious={onPrevious}
+              onNext={onNext}
+            />
+          ) : undefined
+        }
+      />
+    </section>
   );
 }
 
@@ -750,6 +787,7 @@ export function ImportDetailView({
   const t = useTranslations("imports.detail");
   const tl = useTranslations("imports.list");
   const tn = useTranslations("school.nav");
+  const ts = useTranslations("sheets.import");
   const label = useTargetLabel(attributes);
   const [checked, setChecked] = useState(0);
 
@@ -759,7 +797,7 @@ export function ImportDetailView({
   ];
   if (batch.status !== "ready") {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader
           title={t("loadingTitle")}
           breadcrumb={[...crumbs, { label: t("loadingTitle") }]}
@@ -771,17 +809,62 @@ export function ImportDetailView({
   const data = batch.data;
   const canRun = permissions.has(PERM.importRun);
   const canCommit = permissions.has(PERM.importCommit);
+  const canUpload = canRun && permissions.has(PERM.documentUpload);
   const editable = MAPPING_EDITABLE.has(data.status) && canRun;
+  const sheetAvailable = canRun && HAS_SHEET.has(data.status) && !data.raw_file_deleted_at;
 
   const title = t("title", { date: formatDateTime(data.created_at) ?? "" });
 
+  // The current step's next action is the one primary: add the rows once they are checked,
+  // or upload again after a file could not be read. Mapping has its own submit below.
+  const primary =
+    data.status === "validated" && data.can_commit && canCommit ? (
+      <CommitDialog batch={data} />
+    ) : data.status === "failed" && canUpload ? (
+      <ButtonLink href="/imports">
+        <Icon name="upload" className="size-4" />
+        {t("uploadAgain")}
+      </ButtonLink>
+    ) : null;
+  const more: MenuEntry[] = [
+    ...(sheetAvailable
+      ? [
+          {
+            kind: "link" as const,
+            id: "sheet",
+            label: ts("open"),
+            href: `/imports/${data.id}/sheet`,
+            icon: "layers" as const,
+          },
+        ]
+      : []),
+    ...((data.status === "committed" || data.status === "reverted") && canUpload
+      ? [
+          {
+            kind: "link" as const,
+            id: "new",
+            label: t("newImport"),
+            href: "/imports",
+            icon: "upload" as const,
+          },
+        ]
+      : []),
+    { kind: "link", id: "list", label: t("backToList"), href: "/imports", icon: "chevronLeft" },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={title}
         breadcrumb={[...crumbs, { label: title }]}
         badge={<ImportStatusBadge status={data.status} />}
         description={t(`next.${data.status as "parsed"}`)}
+        actions={
+          <>
+            {primary}
+            <Menu label={t("more")} variant="button" trigger={t("more")} entries={more} />
+          </>
+        }
       />
       <div className={cardClasses()}>
         <div className="space-y-5">
@@ -796,13 +879,13 @@ export function ImportDetailView({
             {data.committed_at ? (
               <div>
                 <dt className="text-ink-muted">{t("committedAt")}</dt>
-                <dd className="text-ink">{formatDateTime(data.committed_at)}</dd>
+                <dd className="num text-ink">{formatDateTime(data.committed_at)}</dd>
               </div>
             ) : null}
             {data.reverted_at ? (
               <div>
                 <dt className="text-ink-muted">{t("revertedAt")}</dt>
-                <dd className="text-ink">{formatDateTime(data.reverted_at)}</dd>
+                <dd className="num text-ink">{formatDateTime(data.reverted_at)}</dd>
               </div>
             ) : null}
           </dl>
@@ -816,14 +899,13 @@ export function ImportDetailView({
 
       <Stats batch={data} />
 
-      {canRun && HAS_SHEET.has(data.status) && !data.raw_file_deleted_at ? (
+      {sheetAvailable ? (
         <SheetLink importId={data.id} editable={MAPPING_EDITABLE.has(data.status)} />
       ) : null}
 
       {data.status === "validated" ? (
         <Card title={t("readyTitle")} description={t("readyDescription")}>
           <div className="flex flex-wrap items-center gap-3" data-print="hide">
-            {data.can_commit && canCommit ? <CommitDialog batch={data} /> : null}
             {!canCommit ? (
               <p className="text-sm text-ink-muted">{t("noCommitPermission")}</p>
             ) : null}

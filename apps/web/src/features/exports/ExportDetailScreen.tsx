@@ -11,6 +11,7 @@ import { Card, cardClasses } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { StatCard } from "@/components/ui/StatCard";
 import { Value } from "@/components/ui/Value";
 import { useRetentionDays } from "@/features/admin/data";
 import { attributeLabel } from "@/features/findings/data";
@@ -28,7 +29,7 @@ import {
   useExportAttributes,
   useExportProfiles,
 } from "./data";
-import { ExportStatusBadge, exportTitle, RequesterName, ScopeSummary } from "./parts";
+import { ExportStatusBadge, ExportSteps, exportTitle, RequesterName, ScopeSummary } from "./parts";
 import {
   EXPORT_PERM,
   exportKeptDays,
@@ -100,7 +101,7 @@ function Downloads({ row }: { row: Export }) {
     <div className="space-y-3">
       {downloadNeedsStepUp(row) ? <p className="text-sm">{tc("stepUpNote")}</p> : null}
       <ul className="grid gap-3 sm:grid-cols-2">
-        {files.map((file) => {
+        {files.map((file, index) => {
           const size = formatBytes(file.size_bytes, locale);
           return (
             <li
@@ -115,12 +116,11 @@ function Downloads({ row }: { row: Export }) {
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block font-semibold text-ink">{tf(file.format)}</span>
-                {size ? (
-                  <span className="block font-mono text-xs text-ink-muted">{size}</span>
-                ) : null}
+                {size ? <span className="num block text-xs text-ink-muted">{size}</span> : null}
               </span>
+              {/* One primary: the first file; the others are the same download in another type. */}
               <Button
-                variant="primary"
+                variant={index === 0 ? "primary" : "secondary"}
                 onClick={() => void download(file.format)}
                 disabled={pending !== null}
                 aria-disabled={pending !== null || undefined}
@@ -247,7 +247,7 @@ export function ExportDetailScreen({ exportId }: { exportId: string }) {
   if (state.status !== "ready") {
     const missing = state.status === "error" && state.reason === "not_found";
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <PageHeader title={t("title")} breadcrumb={[...crumbs, { label: td("title") }]} />
         <Alert
           tone={missing ? "warning" : "danger"}
@@ -267,14 +267,31 @@ export function ExportDetailScreen({ exportId }: { exportId: string }) {
     isStructureColumn(key)
       ? t(`columns.${key}`)
       : (attributeLabel(attributes.data, key, locale) ?? key);
+  const fileCount = (row.files ?? []).length || (row.formats ?? []).length;
+  // Pick is done; SchoolOS checks and makes the files (a failed export stays at this step);
+  // then download, or every step done once the files are deleted.
+  const step = row.status === "ready" ? 2 : row.status === "expired" ? 3 : 1;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={title}
         breadcrumb={[...crumbs, { label: title }]}
         badge={<ExportStatusBadge status={row.status} />}
       />
+      <ExportSteps current={step} />
+      <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <StatCard
+          label={td("students")}
+          value={count(row.student_count)}
+          unavailableLabel={tc("notAvailable")}
+        />
+        <StatCard
+          label={td("formats")}
+          value={fileCount > 0 ? count(fileCount) : null}
+          unavailableLabel={tc("notAvailable")}
+        />
+      </dl>
       <Card title={td("filesTitle")}>
         {/* Announces status changes while polling; the buttons stay outside the live region. */}
         <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">
@@ -288,15 +305,20 @@ export function ExportDetailScreen({ exportId }: { exportId: string }) {
             <RequesterName row={row} />
           </Item>
           <Item label={td("created")}>
-            <Value>{formatDateTime(row.created_at)}</Value>
+            <span className="num">
+              <Value>{formatDateTime(row.created_at)}</Value>
+            </span>
           </Item>
           <Item label={td("finished")}>
-            <Value>{formatDateTime(row.finished_at)}</Value>
+            <span className="num">
+              <Value>{formatDateTime(row.finished_at)}</Value>
+            </span>
           </Item>
           <Item label={row.status === "expired" ? td("deletedOn") : td("expires")}>
-            <Value>{formatDateTime(row.expires_at)}</Value>
+            <span className="num">
+              <Value>{formatDateTime(row.expires_at)}</Value>
+            </span>
           </Item>
-          <Item label={td("students")}>{count(row.student_count)}</Item>
           <Item label={td("scope")}>
             <ScopeSummary scope={row.scope} />
           </Item>
