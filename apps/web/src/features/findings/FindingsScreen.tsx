@@ -335,6 +335,7 @@ export function FindingsScreen({ filters }: { filters: FindingFilters }) {
               {t("rulesLink")}
             </ButtonLink>
             <Button variant="secondary" onClick={() => window.print()}>
+              <Icon name="printer" className="size-4" />
               {t("print")}
             </Button>
           </>

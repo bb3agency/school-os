@@ -194,28 +194,29 @@ export function AskCard({
   return (
     <div
       className={cn(
-        "mk-app ai-gradient ai-chrome rounded-xl border border-transparent p-4 text-white sm:p-5",
+        // The product's Ask panel: the accent tint (docs/17 §5.3), not a blue gradient.
+        "mk-app rounded-xl border border-info-border bg-accent-soft p-4 text-ink sm:p-5",
         className,
       )}
     >
-      <p className="eyebrow flex items-center gap-1.5 text-white">
-        <Icon name="sparkles" className="size-4" />
+      <p className="eyebrow flex items-center gap-1.5 text-ink">
+        <Icon name="sparkles" className="size-4 text-accent" />
         {t("label")}
       </p>
-      <p className="mt-3 ms-auto w-fit max-w-[90%] rounded-lg rounded-br-sm bg-surface px-3 py-2 text-sm text-ink">
+      <p className="mt-3 ms-auto w-fit max-w-[90%] rounded-lg rounded-br-sm border border-border bg-surface px-3 py-2 text-sm text-ink">
         {t("question")}
       </p>
-      <p className="mt-3 text-sm leading-relaxed text-white">
+      <p className="mt-3 text-sm leading-relaxed text-ink">
         {t("answer")}
         <sup className="ms-0.5 font-mono text-[0.6875rem]">[1]</sup>
         <sup className="font-mono text-[0.6875rem]">[2]</sup>
       </p>
-      <p className="eyebrow mt-3 text-white">{t("sources")}</p>
+      <p className="eyebrow mt-3 text-ink-muted">{t("sources")}</p>
       <ul className="mt-1.5 flex flex-wrap gap-1.5">
         {[t("sourceRegister"), t("sourceRecord")].map((source, index) => (
           <li
             key={source}
-            className="inline-flex items-center gap-1 rounded-full bg-surface px-2.5 py-0.5 text-xs font-semibold text-ink"
+            className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-0.5 text-xs font-semibold text-ink"
           >
             <span className="font-mono text-primary">[{index + 1}]</span>
             {source}
@@ -223,7 +224,7 @@ export function AskCard({
         ))}
       </ul>
       {notFound ? (
-        <p className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-white/40 px-2.5 py-0.5 text-xs text-white">
+        <p className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-0.5 text-xs text-ink-muted">
           <Icon name="search" className="size-3" />
           {t("notFound")}
         </p>

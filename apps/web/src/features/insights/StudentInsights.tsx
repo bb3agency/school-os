@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { Pill, type PillVariant } from "@/components/ui/Badge";
+import { Icon } from "@/components/ui/Icon";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -354,6 +355,7 @@ function TimelineBody({ data, studentId }: { data: TimelineData; studentId: stri
         <div className="flex flex-wrap gap-2" data-print="hide">
           {actions}
           <Button variant="secondary" onClick={() => window.print()}>
+            <Icon name="printer" className="size-4" />
             {t("print")}
           </Button>
         </div>

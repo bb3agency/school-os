@@ -248,8 +248,8 @@ export function UiReference({ telugu = false }: { telugu?: boolean }) {
               <Icon name="close" className="size-4" />
             </IconButton>
           </Row>
-          <div className="ai-gradient ai-chrome rounded-xl p-5">
-            <Button variant="inverse">Inverse on blue</Button>
+          <div className="rounded-xl bg-action p-5">
+            <Button variant="inverse">Inverse on dark</Button>
           </div>
         </Section>
 

@@ -190,6 +190,8 @@ export function ReceiptsScreen() {
       ) : (
         <DataTableV2
           id="fees-receipts"
+          // Phones: one card per row (docs/17 §5.7).
+          stacked
           caption={t("listTitle")}
           captionHidden
           density="compact"

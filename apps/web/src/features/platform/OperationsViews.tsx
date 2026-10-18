@@ -579,6 +579,8 @@ export function FleetScreen({ status = "" }: { status?: string }) {
       <Card title={t("deploymentsTitle")}>
         <DataTableV2
           id="platform.fleet-deployments"
+          // Phones: one card per row (docs/17 §5.7).
+          stacked
           caption={t("deploymentsTitle")}
           captionHidden
           columns={columns}
@@ -846,6 +848,8 @@ export function BreakGlassScreen() {
       <Alert tone="info">{t("m1Note")}</Alert>
       <DataTableV2
         id="platform.break-glass"
+        // Phones: one card per row (docs/17 §5.7).
+        stacked
         caption={t("title")}
         captionHidden
         columns={columns}
