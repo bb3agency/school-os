@@ -200,6 +200,8 @@ export interface StackedRowsProps<T> {
   columns: ReadonlyArray<Column<T>>;
   rows: readonly T[];
   rowKey: (row: T) => string;
+  /** Draw its own card frame (default); off inside a frame that already has one (DataTableV2). */
+  framed?: boolean;
 }
 
 /**
@@ -214,6 +216,7 @@ export function StackedRows<T>({
   columns,
   rows,
   rowKey,
+  framed = true,
 }: StackedRowsProps<T>) {
   const places = columns.map((column, index) => stackPlace(column, index));
   const titles = columns.filter((_, i) => places[i] === "title");
@@ -222,7 +225,10 @@ export function StackedRows<T>({
   return (
     <div
       data-stacked-list=""
-      className="min-w-0 rounded-xl border border-border bg-surface shadow-card print:shadow-none"
+      className={cn(
+        "min-w-0",
+        framed && "rounded-xl border border-border bg-surface shadow-card print:shadow-none",
+      )}
     >
       {captionHidden ? null : (
         <p className="border-b border-border px-4 py-3 font-semibold text-ink">{caption}</p>
@@ -236,7 +242,7 @@ export function StackedRows<T>({
             {titles.map((column) => (
               <div
                 key={column.key}
-                className="min-w-0 text-ink pointer-coarse:[&_a]:inline-block pointer-coarse:[&_a]:py-3 pointer-coarse:[&_a]:-my-3"
+                className="min-w-0 text-ink [&_a]:inline-block [&_a]:min-h-6 pointer-coarse:[&_a]:py-3 pointer-coarse:[&_a]:-my-3"
               >
                 {column.cell(row)}
               </div>

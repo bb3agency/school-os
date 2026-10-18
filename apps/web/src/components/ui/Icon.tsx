@@ -113,6 +113,10 @@ const paths = {
   newChat: (
     <path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6m-1.5-8.5a2.1 2.1 0 0 1 3 3L13 15l-4 1 1-4Z" />
   ),
+  // Print a register, list or certificate (window.print(); A4 print CSS, docs/17 §2 rule 5).
+  printer: (
+    <path d="M7 9V3h10v6M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2M7 14h10v7H7Z" />
+  ),
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof paths;

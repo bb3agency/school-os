@@ -22,8 +22,11 @@ export interface SegmentedControlProps {
   /** Form field name; generated when omitted. The checked value submits with a form. */
   name?: string;
   size?: "sm" | "md";
-  /** Stretch the segments to fill the width. */
-  block?: boolean;
+  /**
+   * Stretch the segments to fill the width: `true` always, `"phone"` (default) below 640px
+   * only, so thumbs get wide targets (docs/17 §5.7), `false` never.
+   */
+  block?: boolean | "phone";
   className?: string;
 }
 
@@ -43,7 +46,7 @@ export function SegmentedControl({
   onValueChange,
   name,
   size = "md",
-  block = false,
+  block = "phone",
   className,
 }: SegmentedControlProps) {
   const generated = useId();
@@ -57,14 +60,18 @@ export function SegmentedControl({
   }
 
   return (
-    <fieldset className={cn("min-w-0", className)}>
+    <fieldset className={cn("min-w-0", block === "phone" && "max-sm:w-full", className)}>
       <legend className={legendVisible ? "mb-1 text-sm font-semibold text-ink" : "sr-only"}>
         {legend}
       </legend>
       <div
         className={cn(
           "max-w-full flex-wrap gap-1 rounded-lg bg-surface-sunken p-1",
-          block ? "flex w-full" : "inline-flex",
+          block === true
+            ? "flex w-full"
+            : block === "phone"
+              ? "inline-flex max-sm:flex max-sm:w-full"
+              : "inline-flex",
         )}
       >
         {options.map((option) => (
@@ -78,7 +85,8 @@ export function SegmentedControl({
               "has-disabled:cursor-not-allowed has-disabled:opacity-60",
               size === "sm" ? "min-h-8 px-3 text-xs" : "min-h-9 px-4 text-sm",
               "pointer-coarse:min-h-11 pointer-coarse:min-w-11",
-              block && "flex-1",
+              block === true && "flex-1",
+              block === "phone" && "max-sm:flex-1",
             )}
           >
             <input

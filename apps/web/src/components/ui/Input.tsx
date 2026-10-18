@@ -60,6 +60,8 @@ export function SearchInput({
         <input
           id={inputId}
           type="search"
+          // Phones label the keyboard's Enter key "Search" (docs/17 §5.7); a caller may override.
+          enterKeyHint="search"
           className={cn(controlClasses, "min-h-10 pl-10 pointer-coarse:min-h-11", className)}
           {...props}
         />

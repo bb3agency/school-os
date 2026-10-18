@@ -88,8 +88,8 @@ export function KpiCard({
       aria-labelledby={labelId}
       className={cn(cardClasses({ padding: "md" }), "flex flex-col gap-3", className)}
     >
-      <div className="flex items-start justify-between gap-3">
-        <p id={labelId} className="text-sm text-ink-muted">
+      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+        <p id={labelId} className="min-w-0 text-sm text-ink-muted">
           {href ? (
             <Link href={href} className="underline-offset-4 hover:text-ink hover:underline">
               {label}

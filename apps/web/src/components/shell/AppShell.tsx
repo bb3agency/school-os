@@ -27,6 +27,7 @@ import { useDialogClose } from "@/lib/dialog-motion";
 import { Wordmark } from "./Brand";
 import { canvasFor, type ShellCanvas } from "./canvas";
 import { useDensity } from "./density";
+import { useOnScreenKeyboard } from "./keyboard";
 import { MotionProvider } from "./MotionProvider";
 import { Sidebar } from "./Sidebar";
 import { sidebarControlClasses, sidebarThemes } from "./sidebar-theme";
@@ -173,6 +174,8 @@ export function AppShell({
   const [collapsed, toggleCollapsed] = useSidebarCollapsed();
   const [density, setDensity] = useDensity();
   const [tip, setTip] = useState<Tip | null>(null);
+  // The phone bottom bar steps aside while the on-screen keyboard is up (docs/17 §5.7).
+  const keyboardOpen = useOnScreenKeyboard();
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLDialogElement>(null);
@@ -396,9 +399,12 @@ export function AppShell({
           </div>
 
           <div className="flex min-w-0 flex-1 flex-col print:block">
-            <header className={cn("shell-gutter sticky top-0 z-30", topbar.bar)} data-print="hide">
+            <header
+              className={cn("shell-topbar shell-gutter sticky top-0 z-30", topbar.bar)}
+              data-print="hide"
+            >
               <div className="shell-frame flex min-h-12 flex-wrap items-center gap-x-3 gap-y-2 py-1.5">
-                <div className="flex min-w-0 flex-1 items-center gap-3 lg:hidden">
+                <div className="flex min-w-0 flex-1 items-center gap-3 md:flex-none lg:hidden">
                   <button
                     ref={menuButtonRef}
                     type="button"
@@ -427,19 +433,24 @@ export function AppShell({
                 {crumbs ? (
                   <nav
                     aria-label={tu("shell.breadcrumb")}
-                    className="hidden min-w-0 flex-1 lg:block"
+                    className="hidden min-w-0 flex-1 md:block"
                   >
+                    {/* Tablets (md to lg) show only the page, on one line; phones leave it to
+                        the page heading (docs/17 §5.7). */}
                     <ol
                       className={cn(
-                        "flex min-w-0 flex-wrap items-center gap-1.5 text-sm",
+                        "flex min-w-0 items-center gap-1.5 text-sm lg:flex-wrap",
                         topbar.crumb,
                       )}
                     >
-                      <li>{crumbs.section}</li>
-                      <li aria-hidden="true">
+                      <li className="max-lg:hidden">{crumbs.section}</li>
+                      <li aria-hidden="true" className="max-lg:hidden">
                         <Icon name="chevronRight" className="size-3.5" />
                       </li>
-                      <li className="min-w-0 break-anywhere">
+                      <li
+                        className="min-w-0 max-lg:truncate lg:break-anywhere"
+                        title={crumbs.item.label}
+                      >
                         {crumbs.onItem ? (
                           <span
                             aria-current="page"
@@ -465,7 +476,7 @@ export function AppShell({
                     </ol>
                   </nav>
                 ) : (
-                  <div className="hidden flex-1 lg:block" />
+                  <div className="hidden flex-1 md:block" />
                 )}
                 <div className="ms-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
                   <button
@@ -475,7 +486,7 @@ export function AppShell({
                     aria-keyshortcuts="Control+K Meta+K"
                     onClick={() => setPaletteOpen(true)}
                     className={cn(
-                      "pressable inline-flex min-h-9 items-center gap-2 rounded-md border px-2.5 text-sm pointer-coarse:min-h-11",
+                      "pressable inline-flex min-h-9 items-center justify-center gap-2 rounded-md border px-2.5 text-sm pointer-coarse:min-h-11 pointer-coarse:min-w-11",
                       topbar.search,
                     )}
                   >
@@ -592,6 +603,9 @@ export function AppShell({
             <nav
               aria-label={tu("shell.quickLinks")}
               data-print="hide"
+              // Hidden while the on-screen keyboard is up: it would cover the field, the
+              // SaveBar or the Ask composer (docs/17 §5.7).
+              hidden={keyboardOpen}
               className={cn(
                 "bottom-bar fixed inset-x-0 bottom-0 z-30 border-t md:hidden",
                 theme === "platform"

@@ -515,6 +515,42 @@ describe("AppShell: top bar (breadcrumb, palette, preferences)", () => {
     );
     expect(within(bar).getByRole("link", { name: "Home" })).not.toHaveAttribute("aria-current");
   });
+
+  it("phones: the bottom bar steps aside while a text field has focus on a touch screen", () => {
+    const original = window.matchMedia;
+    window.matchMedia = vi.fn((query: string) => ({
+      matches: query === "(pointer: coarse)",
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })) as unknown as typeof window.matchMedia;
+    try {
+      renderWithIntl(
+        shell({
+          bottomBar: [
+            { href: "/", label: "Home", exact: true, icon: "home" },
+            { href: "/students", label: "Students", icon: "users" },
+          ],
+          banner: <input aria-label="Marks" />,
+        }),
+      );
+      const bar = screen.getByRole("navigation", { name: "Quick links" });
+      expect(bar).not.toHaveAttribute("hidden");
+      act(() => screen.getByRole("textbox", { name: "Marks" }).focus());
+      expect(screen.queryByRole("navigation", { name: "Quick links" })).toBeNull();
+      expect(bar).toHaveAttribute("hidden");
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
+  it("the top bar is the scroll-padding anchor and the page crumb truncates on tablets", () => {
+    path.current = "/students";
+    renderWithIntl(shell());
+    expect(document.querySelector("header.shell-topbar")).not.toBeNull();
+    const crumb = screen.getByRole("navigation", { name: "Where you are" });
+    expect(crumb).toHaveClass("md:block");
+  });
 });
 
 describe("AppShell in Telugu (NFR-I18N-001)", () => {

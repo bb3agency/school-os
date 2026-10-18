@@ -138,6 +138,7 @@
       "noResults": "No rows match these filters",
       "noResultsBody": "Remove a filter or clear them all to see more.",
       "clearFilters": "Clear filters",
+      "select": "Select",
       "selectAll": "Select all rows on this page",
       "selected": "{count, plural, one {# selected} other {# selected}}",
       "bulkActions": "Actions for the selected rows",
