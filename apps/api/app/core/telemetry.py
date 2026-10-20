@@ -47,7 +47,7 @@ from sqlalchemy.engine import Connection, Engine, ExceptionContext, ExecutionCon
 
 from app.core.config import Settings
 from app.core.logging import get_context
-from app.core.redaction import redact
+from app.core.redaction import redact, redact_log
 
 __all__ = [
     "ALLOWED_SPAN_ATTRIBUTES",
@@ -100,7 +100,11 @@ _provider: TracerProvider | None = None
 def _clean_value(key: str, value: object) -> object:
     if isinstance(value, str):
         text = value[:_MAX_ATTRIBUTE_LENGTH]
-        return redact(text) if key in _REDACTED_TEXT_ATTRIBUTES else text
+        if key in _REDACTED_TEXT_ATTRIBUTES:
+            return redact(text)
+        # Instrumentation attributes under ``messaging.*`` (Celery) carry ids only; mask any key,
+        # token or provider id that slips in (R2-3I, SEC-037).
+        return redact_log(text) if key.startswith(ALLOWED_SPAN_ATTRIBUTE_PREFIXES) else text
     if isinstance(value, Sequence) and not isinstance(value, bytes):
         return tuple(redact(v) if isinstance(v, str) else v for v in value)
     return value
@@ -123,7 +127,7 @@ def _sanitize_event(event: Event) -> Event:
 def sanitize_span(span: ReadableSpan) -> ReadableSpan:
     """Return a copy of ``span`` that is safe to export (no PII, allowlisted attributes)."""
     return ReadableSpan(
-        name=redact(span.name),
+        name=redact_log(span.name),
         context=span.context,
         parent=span.parent,
         resource=span.resource,
