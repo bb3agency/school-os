@@ -58,3 +58,7 @@ The exchange answers `{kind, expires_at}`; the `__Host-sos_parent` cookie carrie
 - **Opt-in page = confirmation and language only.** It shows the categories with their state and sets "Read messages in" (ADR-0044 decision 4). It records no opt-in (ADR-0043 decision 7 accepts only the join message, a signed form or in person) and no opt-out (STOP on WhatsApp stays the parent's way; a page button would need a new opt-out method and a migration, left for an owner decision).
 - **Pay (decision 9).** The 5-a-day limit counts new payment links only; choosing the same instalments again returns the same open link. The redirect target must be an https Razorpay host (API `pay_redirect_hosts`, BFF check, CSP `form-action`). The return page reads the status through the dues link and checks again with a meta refresh (no JavaScript).
 - **Notice PDF.** Offered while the rendered PDF is kept (6 days after rendering, `circulars/config.yaml`); a 30-day link after that shows the text without the PDF button.
+
+## Follow-up (2026-10-21, wave R2-3J built)
+
+Decision 5's "the notice is withdrawn" is built: `POST /notices/{id}/withdraw` (`notice.approve`, FR-NOTICE-009) revokes the notice's open parent links through `public.service.revoke_for_target` in the withdrawing transaction (reason `notice_withdrawn`, so `/p/*` answers the uniform 404 at once), and the outbox event `notice.withdrawn` has the WhatsApp sender cancel the messages not sent yet and revoke any link issued meanwhile. A withdrawn notice's page never comes back (`withdrawn` is final in the database).
