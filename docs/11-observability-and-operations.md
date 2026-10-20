@@ -26,7 +26,7 @@
  "status":200,"duration_ms":84}
 ```
 
-- Loggers pass structured fields only; `core.logging` drops non-allowlisted keys and runs `redact()` (Aadhaar/Verhoeff, 10-digit mobiles, emails) on any free-text field as a last line of defence.
+- Loggers pass structured fields only; `core.logging` drops non-allowlisted keys and runs `redact_log()` on every string value as a last line of defence: `redact()` (Aadhaar/Verhoeff, mobiles in every Indian form, emails) plus credentials and provider identifiers (bearer tokens and JWTs, `name=value` secrets such as OAuth `code`, Meta access tokens, Razorpay ids, key ids and signatures, parent link tokens, route values, certificate codes, UPI/bank UTRs, 12-22 digit numbers; R2-3I). Local tracebacks, span names and `messaging.*` span attributes use the same function; UUIDs stay readable.
 - Never log request/response bodies, SQL bind values, prompts, completions, file contents or tokens.
 - Levels: `ERROR` (needs action), `WARN` (degraded), `INFO` (business events), `DEBUG` (disabled in prod).
 - Retention: 400 days in ap-south-1 (covers CERT-In 180 days in India and DPDP 1-year logs).

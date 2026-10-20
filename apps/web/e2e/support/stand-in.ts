@@ -12,6 +12,7 @@ import { createFakeIdp, type FakeIdp } from "../../src/test/fake-idp";
 import { askAnswer, askEvents, resetAsk } from "./ask-api";
 import { FILES_PREFIX, journeyAnswer, resetJourney } from "./journey-api";
 import { r1Answer, resetR1 } from "./r1-api";
+import { r2Answer, resetR2 } from "./r2-api";
 import { resetSheets, sheetAnswer } from "./sheet-api";
 
 export const IDP_PORT = Number(process.env.E2E_IDP_PORT ?? 8089);
@@ -831,6 +832,7 @@ async function startApi(): Promise<Server> {
     if (url.pathname === "/__e2e/reset" && method === "POST") {
       resetJourney();
       resetR1();
+      resetR2();
       resetAsk();
       resetSheets();
       return send(response, 204, "");
@@ -882,8 +884,16 @@ async function startApi(): Promise<Server> {
       );
     }
     const subject = subjectOf(request);
+    const publicToken = request.headers["x-sos-public-token"];
     const [status, answer] =
       askAnswer(method, url.pathname, body) ??
+      r2Answer(
+        method,
+        url,
+        subject,
+        body,
+        typeof publicToken === "string" ? publicToken : undefined,
+      ) ??
       r1Answer(method, url, subject, body) ??
       journeyAnswer(method, url, subject, body) ??
       apiAnswer(method, url.pathname, subject);
