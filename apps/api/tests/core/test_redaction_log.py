@@ -75,6 +75,10 @@ PARENT_TOKEN = tokens.new_parent_token()
 ROUTE_VALUE = tokens.new_route_token()
 _CROCKFORD = "ABCDEFGHJKMNPQRSTVWXYZ23456789"
 CERT_CODE = "SYNT" + "".join(secrets.choice(_CROCKFORD) for _ in range(11)) + "7"
+# Fixed draws with almost no digits (a random draw may have any mix; the rule must not need digits).
+CERT_CODE_FEW_DIGITS = "SYNTJXGDNVC7NEZ7"
+CERT_CODE_NO_DIGITS = "SYNTJXGDNVCPNEZQ"
+CERT_CODE_PRINTED = "SYNT-JXGD-NVC7-NEZ7"
 JWT = "eyJhbGciOiJSUzI1NiJ9." + _alnum(30) + "." + _alnum(40)
 
 SECRETS = {
@@ -88,6 +92,9 @@ SECRETS = {
     "parent_token": PARENT_TOKEN,
     "route_value": ROUTE_VALUE,
     "cert_code": CERT_CODE,
+    "cert_code_few_digits": CERT_CODE_FEW_DIGITS,
+    "cert_code_no_digits": CERT_CODE_NO_DIGITS,
+    "cert_code_printed": CERT_CODE_PRINTED,
     "jwt": JWT,
     **{f"razorpay_id_{i}": v for i, v in enumerate(RAZORPAY_IDS)},
 }

@@ -412,6 +412,12 @@ _ROUTE_VALUE_RE = re.compile(
 _UPPER_CODE_RE = re.compile(
     r"(?<![A-Za-z0-9])(?!XXXX)(?=(?:[A-Z]*[0-9]){4})(?=(?:[0-9]*[A-Z]){2})[A-Z0-9]{10,32}(?![A-Za-z0-9])"
 )
+# Certificate verification codes (``certificates.codes``: 16 Crockford base32 characters, plain or
+# printed in dashed groups of four) whatever their mix of digits and letters.
+_CERT_CODE_RE = re.compile(
+    r"(?<![A-Za-z0-9-])(?:[0-9A-HJKMNP-TV-Z]{4}-){3}[0-9A-HJKMNP-TV-Z]{4}(?![A-Za-z0-9-])"
+    r"|(?<![A-Za-z0-9])[0-9A-HJKMNP-TV-Z]{16}(?![A-Za-z0-9])"
+)
 # UPI UTR/RRN (12 digits), NEFT/IMPS references, WABA and phone-number ids (15-16 digits).
 _LONG_NUMBER_RE = re.compile(r"(?<![0-9A-Za-z])[0-9]{12,22}(?![0-9A-Za-z])")
 
@@ -426,6 +432,7 @@ def _mask_credentials(segment: str) -> str:
     segment = _MIXED_KEY_RE.sub(TOKEN_MASK, segment)
     segment = _ROUTE_VALUE_RE.sub(TOKEN_MASK, segment)
     segment = _UPPER_CODE_RE.sub(ID_MASK, segment)
+    segment = _CERT_CODE_RE.sub(ID_MASK, segment)
     return _LONG_NUMBER_RE.sub(NUMBER_MASK, segment)
 
 
