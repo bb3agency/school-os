@@ -362,6 +362,7 @@ def test_D31_a_suspended_school_makes_no_payment_link_and_counts_no_view(
             created_by=owner.user_id,
         )
     key = issued.key
+    assert key is not None
     _reset_budgets()
     assert P.current(public_client, key).status_code == 200  # live while active
     views = P.handle_row(admin_engine, issued.handle_id)["view_count"]
