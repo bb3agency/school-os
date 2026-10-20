@@ -2987,8 +2987,7 @@
       "map": "Map columns",
       "check": "Check rows",
       "add": "Add",
-      "done": "Done:",
-      "stopped": "Stopped:"
+      "done": "Done:"
     },
     "library": {
       "title": "Template library",
@@ -3228,6 +3227,11 @@
       "corrected": "Corrected by hand",
       "correctedCount": "{count, plural, one {# value} other {# values}}",
       "openingNext": "Opening the next row",
+      "rowNavLabel": "Rows of this batch",
+      "rowPosition": "Row {position} of {total}",
+      "previousRow": "Previous row",
+      "nextRow": "Next row",
+      "rowKeysHint": "Outside a field, press P for the previous row and N for the next.",
       "allChecked": "Every row has been checked. Going back to the photos…",
       "discard": "Reset to what was read"
     },
@@ -3515,6 +3519,11 @@
     "noSectionsBody": "There are no students in the classes this check covers that you can see this year.",
     "sectionsTitle": "Sections",
     "sectionsHint": "Open a section to see each student and print parent verification slips.",
+    "overviewTitle": "Every board and portal",
+    "overviewHint": "Students ready in each section, one column per check. Open a figure to see that section's students.",
+    "allSections": "All sections",
+    "notCovered": "Not covered",
+    "notCoveredHint": "This check does not cover this section's class.",
     "colSection": "Section",
     "colReady": "Ready",
     "colStatus": "Readiness",
@@ -3599,6 +3608,11 @@
     "byYou": "Asked by you",
     "bySomeoneElse": "Asked by someone else",
     "waitingForYou": "Waiting for you",
+    "tabWaitingForMe": "Waiting for me",
+    "tabMine": "Asked by me",
+    "emptyWaitingTitle": "Nothing is waiting for you",
+    "emptyWaitingBody": "Requests someone else asks for show here until you approve or reject them.",
+    "emptyMineTitle": "You have not asked for any corrections",
     "open": "Open",
     "showMore": "Show more",
     "emptyTitle": "No correction requests",
@@ -4866,6 +4880,7 @@
       "aclTitle": "Who can see it",
       "scanNote": "After you upload, SchoolOS checks the file for viruses. You can open it once the check has passed, usually within a few minutes.",
       "uploading": "Uploading…",
+      "uploadProgress": "Sending the file: {percent} done",
       "dropTitle": "Choose the file, or drag it here"
     },
     "errors": {
@@ -6602,7 +6617,6 @@
       "retryPdf": "Make the PDF again",
       "issuedActionsTitle": "Duplicate or cancel",
       "issuedActionsBody": "Issue a marked duplicate for a lost certificate, or cancel one issued by mistake.",
-      "relatedLabel": "Related pages",
       "openStudent": "Open the student",
       "allForStudent": "All certificates of this student",
       "backToList": "Back to certificates",
@@ -7084,7 +7098,8 @@
       "draft": "Draft",
       "approved": "Approved",
       "drafting": "Drafting…",
-      "draft_failed": "AI draft failed"
+      "draft_failed": "AI draft failed",
+      "withdrawn": "Withdrawn"
     },
     "fromCircular": "Made from a circular",
     "aiDrafted": "Drafted by AI from the circular only. Check every date and word before approving.",
@@ -7186,6 +7201,10 @@
       "notice_not_draft_failed": {
         "title": "Nothing to try again",
         "body": "AI is drafting this notice now or has already drafted it. The page shows the latest."
+      },
+      "notice_withdrawn": {
+        "title": "The notice was withdrawn",
+        "body": "A withdrawn notice cannot be changed or sent. Start a new notice."
       }
     },
     "draftingTitle": "Drafting the notice",
@@ -7198,6 +7217,17 @@
       "title": "AI could not draft this notice",
       "body": "Try again, or write the notice yourself below.",
       "retry": "Try AI draft again"
+    },
+    "withdraw": {
+      "action": "Withdraw notice",
+      "title": "Withdraw this notice?",
+      "body": "Use this when a notice was wrong or should no longer reach parents. The notice stays on record with your reason.",
+      "reason": "Why withdraw it",
+      "reasonHint": "At least 10 characters. Kept with the notice.",
+      "consequence": "Parent links to this notice stop working at once and WhatsApp messages not sent yet are cancelled. Messages already delivered cannot be called back.",
+      "withdrawnTitle": "Withdrawn notice",
+      "withdrawnBy": "Withdrawn by {name} on {when}.",
+      "reasonLine": "Reason: {reason}"
     }
   },
   "attendance": {
@@ -8036,8 +8066,7 @@
       "parent_optin": "School messages on WhatsApp"
     },
     "view": {
-      "validUntil": "This link works until {date}.",
-      "detailsSoon": "The details of this page will appear here soon."
+      "validUntil": "This link works until {date}."
     },
     "footer": {
       "fromSchool": "From {school}, sent through SchoolOS",
@@ -8222,7 +8251,7 @@
     },
     "settings": {
       "title": "When messages are sent",
-      "description": "Switches are read by the sending features as they arrive.",
+      "description": "What the school sends, when, and how many messages a day at most.",
       "switches": "Messages the school sends",
       "switch": {
         "notices_enabled": "School notices",
@@ -8249,7 +8278,9 @@
       "officePhoneHint": "Parents who write to the WhatsApp number are told to call this number.",
       "save": "Save settings",
       "saved": "Saved.",
-      "discard": "Discard changes"
+      "discard": "Discard changes",
+      "noMessageDates": "Days without automatic messages",
+      "noMessageDatesHint": "School holidays as DD/MM/YYYY, separated by commas. Absence alerts and fee reminders are not sent on these days."
     },
     "optins": {
       "title": "WhatsApp messages",
@@ -8356,7 +8387,19 @@
         "number_not_registered": "The school's number is not registered",
         "template_parameters": "The message text did not fit",
         "provider_error": "WhatsApp did not accept the message",
-        "other": "WhatsApp did not deliver it"
+        "other": "WhatsApp did not deliver it",
+        "purpose_off": "These messages were switched off",
+        "too_late": "Too late to be useful, so not sent",
+        "already_sent": "Already got this notice",
+        "notices_off": "School notices are switched off in WhatsApp settings.",
+        "user_stopped_marketing": "The parent stopped business messages",
+        "template_missing": "The message is missing in Meta",
+        "template_text_too_long": "The message text was too long",
+        "template_policy": "Meta refused the message",
+        "template_disabled": "Meta switched this message off",
+        "media_error": "WhatsApp could not deliver the attachment",
+        "unsupported_message": "The parent's WhatsApp cannot show this message",
+        "notice_withdrawn": "The notice was withdrawn"
       }
     },
     "slips": {
@@ -8419,7 +8462,184 @@
       "too_many_slips": {
         "title": "Too many slips at once",
         "body": "Too many slips at once. Print one section at a time."
+      },
+      "preview_invalid": {
+        "title": "Check again before sending",
+        "body": "This check no longer matches. Choose Check who will get it again."
+      },
+      "preview_expired": {
+        "title": "The check has expired",
+        "body": "More than 30 minutes have passed. Choose Check who will get it again."
+      },
+      "preview_stale": {
+        "title": "Who will get it has changed",
+        "body": "Parents joined or stopped messages since the check. Check again, then send."
+      },
+      "notice_not_approved": {
+        "title": "Approve the notice first",
+        "body": "Only approved notices can be sent to parents."
+      },
+      "notices_off": {
+        "title": "School notices are switched off",
+        "body": "Switch on school notices in WhatsApp settings, then send."
+      },
+      "messaging_paused": {
+        "title": "Sending is paused",
+        "body": "Sending is paused. Resume it in WhatsApp settings first."
+      },
+      "messaging_currency_not_inr": {
+        "title": "Billing is not in rupees",
+        "body": "Set INR billing in Meta's Billing Hub, then send."
+      },
+      "template_not_approved": {
+        "title": "Meta has not approved the message yet",
+        "body": "Meta has not approved the notice message yet. Try again later."
+      },
+      "template_paused": {
+        "title": "The message is paused",
+        "body": "The notice message is paused. Check WhatsApp settings."
+      },
+      "receipt_cancelled": {
+        "title": "The receipt is cancelled",
+        "body": "Cancelled receipts are not sent to parents."
+      },
+      "no_opted_in_guardian": {
+        "title": "No guardian agreed",
+        "body": "No guardian of this student agreed to fee messages on WhatsApp. Record an opt-in first."
+      },
+      "already_queued": {
+        "title": "Already sent",
+        "body": "This receipt was already sent to every guardian who agreed."
       }
+    },
+    "historyTitle": "Message history",
+    "send": {
+      "title": "Send on WhatsApp",
+      "description": "Send this notice to the parents who agreed to school notices on WhatsApp, from the school's own number.",
+      "sections": "Sections",
+      "noSections": "No sections in the current academic year.",
+      "chooseAll": "Choose all sections",
+      "clearAll": "Clear all sections",
+      "check": "Check who will get it",
+      "chooseFirst": "Choose at least one section first.",
+      "previewLabel": "Who will get this notice",
+      "recipients": "Messages to send",
+      "guardians": "Guardians in these sections",
+      "cost": "Estimated Meta cost",
+      "costNote": "Includes GST. The school pays Meta directly; SchoolOS charges nothing for messages.",
+      "languagesLine": "Languages: {languages}.",
+      "fallbacks": "{count} will get English: the message in their language is not ready.",
+      "skippedTitle": "Not sent to",
+      "blockedTitle": "Nothing can be sent now",
+      "blockedOther": "WhatsApp cannot send messages now.",
+      "openSettings": "Open WhatsApp settings",
+      "resend": "Send again to the {count} guardians who already got this notice",
+      "reason": "Why send it again",
+      "reasonHint": "At least 10 characters. Kept with the record of this send.",
+      "reasonTooShort": "Write at least 10 characters.",
+      "consequence": "Messages go out from the school's WhatsApp number outside quiet hours and cannot be called back. Each parent gets a link to the full notice.",
+      "confirm": "Send to {count} parents",
+      "nobody": "Nobody in these sections can get this notice yet.",
+      "queued": "The messages are queued. Delivery counts update below."
+    },
+    "broadcasts": {
+      "title": "Notice broadcasts",
+      "description": "Notices sent on WhatsApp and how many reached the parents.",
+      "columns": {
+        "notice": "Notice",
+        "when": "Sent",
+        "recipients": "Messages",
+        "delivery": "Delivery",
+        "section": "Class and section"
+      },
+      "untitled": "Notice without a title",
+      "resent": "Sent again",
+      "emptyTitle": "No notices sent on WhatsApp yet",
+      "emptyBody": "Open an approved notice and choose Send on WhatsApp.",
+      "more": "Show more",
+      "deliveredOf": "{delivered} of {total} delivered",
+      "finished": "Finished",
+      "stillSending": "Still sending",
+      "countsLine": "Waiting {waiting} · Sent {sent} · Delivered {delivered} · Read {read} · Not delivered {failed}",
+      "openReport": "Open the delivery report",
+      "earlier": "Sent before",
+      "sentOn": "Sent {when}",
+      "report": "Delivery report",
+      "reportDescription": "How many parents got this notice, by class and section. Updates while sending.",
+      "reportMeta": "Sent {when}. Estimated Meta cost {cost} incl. GST.",
+      "openNotice": "Open the notice",
+      "bySection": "By class and section",
+      "noSection": "Not in a section now",
+      "reasonsTitle": "Why some were not delivered",
+      "notFoundTitle": "Report not found",
+      "notFoundBody": "This report does not exist, or WhatsApp messages are not offered here."
+    },
+    "automatic": {
+      "title": "Automatic messages",
+      "description": "Absence alerts, fee reminders and fee receipts go out by themselves to parents who agreed.",
+      "kinds": {
+        "absence": "Absence alerts",
+        "reminders": "Fee reminders",
+        "receipts": "Fee receipts"
+      },
+      "on": "On",
+      "off": "Off",
+      "at": "Daily at {time}",
+      "afterReceipt": "Right after each receipt",
+      "waiting": "{count} messages are waiting to be sent (quiet hours, the daily limit or a retry).",
+      "runs": "Recent runs",
+      "columns": {
+        "day": "Day",
+        "job": "Messages",
+        "queued": "Queued",
+        "delivered": "Delivered",
+        "failed": "Not delivered"
+      },
+      "jobs": {
+        "absence_alerts": "Absence alerts",
+        "fee_reminders": "Fee reminders"
+      },
+      "emptyTitle": "No automatic messages yet",
+      "emptyBody": "Runs appear here once absence alerts or fee reminders are switched on.",
+      "changeNote": "Switch them on or off, change the time and add holidays in WhatsApp settings. Reminder days follow the fee settings.",
+      "openSettings": "Open WhatsApp settings"
+    },
+    "feeReminders": {
+      "title": "Send fee reminders on WhatsApp",
+      "descriptionRows": "{count, plural, one {# student chosen.} other {# students chosen.}} Each guardian who agreed to fee messages gets the amount overdue, the oldest due date and a link to pay.",
+      "descriptionAll": "Everyone in this list. Each guardian who agreed to fee messages gets the amount overdue, the oldest due date and a link to pay.",
+      "checking": "Checking who will get it…",
+      "previewLabel": "Who will get a reminder",
+      "recipients": "Messages to send",
+      "guardians": "Guardians",
+      "cost": "Estimated Meta cost",
+      "skippedStudents": "Students left out",
+      "skippedGuardians": "Guardians left out",
+      "accountReasons": {
+        "nothing_due": "Nothing overdue now",
+        "below_minimum": "Less than the school's smallest reminder amount",
+        "no_guardian": "No guardian on record"
+      },
+      "alreadySent": "Already reminded today",
+      "consequence": "Messages go out from the school's WhatsApp number outside quiet hours and cannot be called back. A guardian gets at most one reminder a day for each student.",
+      "confirm": "{count, plural, one {Send # reminder} other {Send # reminders}}",
+      "nobody": "Nobody chosen can get a reminder now.",
+      "queued": "{count, plural, =0 {Nothing new was queued: everyone was reminded already.} one {# reminder is queued. It goes out outside quiet hours.} other {# reminders are queued. They go out outside quiet hours.}}",
+      "done": "Done"
+    },
+    "receipt": {
+      "label": "WhatsApp",
+      "send": "Send on WhatsApp",
+      "hint": "{count, plural, one {To the guardian who agreed to fee messages.} other {To the # guardians who agreed to fee messages.}}",
+      "queued": "Waiting to go out on WhatsApp (outside quiet hours).",
+      "sent": "Sent on WhatsApp.",
+      "delivered": "Delivered on WhatsApp.",
+      "read": "Read on WhatsApp.",
+      "failed": "Not delivered on WhatsApp: {reason}.",
+      "skipped": "Not sent on WhatsApp: {reason}.",
+      "noOptin": "No guardian agreed to fee messages on WhatsApp.",
+      "cancelled": "Cancelled receipts are not sent on WhatsApp.",
+      "blocked": "WhatsApp cannot send messages now. Check WhatsApp settings."
     }
   },
   "fees": {
@@ -8441,7 +8661,8 @@
       "dues": "Fee dues",
       "setup": "Fee setup",
       "reconcile": "Reconcile UPI",
-      "upiSettings": "UPI QR"
+      "upiSettings": "UPI QR",
+      "feeSettings": "Fee settings"
     },
     "modes": {
       "cash": "Cash",
@@ -8800,7 +9021,10 @@
       },
       "filterLabel": "Filter dues",
       "totalsLabel": "Totals of overdue fees",
-      "noResultsTitle": "No student in this class has an overdue fee"
+      "noResultsTitle": "No student in this class has an overdue fee",
+      "selectRow": "Select {name}",
+      "sendReminder": "Send reminder",
+      "remindAll": "Send reminders to everyone in this list"
     },
     "setup": {
       "title": "Fee setup",
@@ -9135,6 +9359,43 @@
       "upiSettingsLink": "UPI QR settings",
       "amountInr": "Amount (₹)",
       "noStatementsBody": "Download the account statement from the bank's website as Excel or CSV and read it above. Matches are proposed for you to confirm."
+    },
+    "settings": {
+      "title": "Fee settings",
+      "description": "The receipt paper, the line printed on every receipt, and when WhatsApp fee reminders go.",
+      "receiptsTitle": "Receipts",
+      "paperSize": "Receipt paper size",
+      "paperA5": "A5 (half an A4 page)",
+      "paperA4": "A4",
+      "gstNote": "Line printed on every receipt",
+      "gstNoteHint": "For example, that school fees are exempt from GST. At most 200 characters.",
+      "remindersTitle": "Fee reminders on WhatsApp",
+      "remindersDescription": "The days around each instalment's due date on which the automatic reminder goes, at 10:00. Up to 5 days.",
+      "remindersOff": "Automatic fee reminders are switched off in WhatsApp settings, so these days are not used now.",
+      "reminderLegend": "Reminder {n}",
+      "when": "When",
+      "days": "Days",
+      "before": "Before the due date",
+      "on": "On the due date",
+      "after": "After the due date",
+      "addDay": "Add a reminder day",
+      "removeDay": "Remove reminder {n}",
+      "noDays": "No automatic reminders. Add a day to send them.",
+      "minimum": "Smallest amount to remind about (₹)",
+      "minimumHint": "An instalment with less due than this gets no reminder. 0 reminds about any amount.",
+      "valueBefore": "{days, plural, one {# day before} other {# days before}}",
+      "valueOn": "On the due date",
+      "valueAfter": "{days, plural, one {# day after} other {# days after}}",
+      "save": "Save fee settings",
+      "discard": "Discard changes",
+      "saved": "Saved.",
+      "readOnly": "Only the accountant or principal can change these.",
+      "errors": {
+        "days": "Enter a whole number of days from 1 to 60.",
+        "repeated": "This day is already in the list. Remove one of them.",
+        "minimum": "Enter an amount of 0 or more, with at most 2 decimals.",
+        "gstNote": "Write the line, in at most 200 characters."
+      }
     }
   },
   "payments": {

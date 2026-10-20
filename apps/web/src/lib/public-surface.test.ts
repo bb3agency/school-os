@@ -82,8 +82,27 @@ describe("public origin (FR-PUB-001)", () => {
     expect(csp).toContain("default-src 'self'");
     expect(csp).toContain("frame-ancestors 'none'");
     expect(csp).toContain("object-src 'none'");
-    expect(csp).not.toMatch(/https?:\/\//);
+    // The only third-party origins: Razorpay's hosted pages as form targets (R2-3H, FR-PUB-010).
+    const directives = new Map(
+      csp.split("; ").map((d) => [d.split(" ")[0], d.split(" ").slice(1)] as const),
+    );
+    expect(directives.get("form-action")).toEqual([
+      "'self'",
+      "https://rzp.io",
+      "https://*.rzp.io",
+      "https://razorpay.com",
+      "https://*.razorpay.com",
+    ]);
+    const others = csp
+      .split("; ")
+      .filter((d) => !d.startsWith("form-action"))
+      .join("; ");
+    expect(others).not.toMatch(/https?:\/\//);
     expect(csp).not.toContain("unsafe");
+    expect(csp).not.toContain("example.test");
+    // The verification pages take no third-party form target at all.
+    const verify = buildPublicCsp({ nonce: "bm9uY2U=", isDev: false, https: true, pay: false });
+    expect(verify).not.toMatch(/https?:\/\//);
     const headers = publicSecurityHeaders(csp, true);
     expect(headers["Referrer-Policy"]).toBe("no-referrer");
     expect(headers["Cache-Control"]).toBe("private, no-store");

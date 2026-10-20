@@ -240,6 +240,20 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
         "method": "in_person",
         "decided_on": "2026-10-01",
     },
+    # R2-3G WhatsApp sending: another school's notice or message is 404 like a random id.
+    ("POST", "/api/v1/notices/{notice_id}/broadcasts/preview"): {
+        "section_ids": ["0192f3a4-0000-7000-8000-000000000a01"]
+    },
+    ("POST", "/api/v1/notices/{notice_id}/broadcasts"): {
+        "preview_token": "bp_0192f3a4000070008000000000000a01",
+        "section_ids": ["0192f3a4-0000-7000-8000-000000000a01"],
+    },
+    ("POST", "/api/v1/messages/{message_id}/revoke-link"): None,
+    # R2-3J: another school's receipt or notice is 404 like a random id.
+    ("POST", "/api/v1/fees/receipts/{receipt_id}/whatsapp"): None,
+    ("POST", "/api/v1/notices/{notice_id}/withdraw"): {
+        "reason": "The date in this notice was wrong"
+    },
     # APAAR consent register (ADR-0039): another school's student is 404 like a random id.
     ("POST", "/api/v1/students/{student_id}/apaar-consent"): {
         "status": "refused",
@@ -336,6 +350,10 @@ ACTOR.update(
             ("GET", "/api/v1/extraction-items/{item_id}"),
             ("POST", "/api/v1/extraction-items/{item_id}/confirm"),
             ("POST", "/api/v1/extraction-items/{item_id}/reject"),
+            # R2-3G: message.send is the principal's and the office admin's (not the owner's).
+            ("POST", "/api/v1/notices/{notice_id}/broadcasts/preview"),
+            ("POST", "/api/v1/notices/{notice_id}/broadcasts"),
+            ("POST", "/api/v1/messages/{message_id}/revoke-link"),
             # FR-KB-030: the owner cannot manage verified answers; the principal can.
             ("POST", "/api/v1/knowledge/verified-answers/{answer_id}/review"),
             ("POST", "/api/v1/knowledge/verified-answers/{answer_id}/retire"),
@@ -677,6 +695,53 @@ def _b_notice(w: Any) -> uuid.UUID:
     return value
 
 
+def _b_broadcast(w: Any) -> uuid.UUID:
+    """A confirmed WhatsApp broadcast of school B's notice and one message of it (R2-3G)."""
+    if "bola_broadcast" not in w.b.ids:
+        notice = _b_notice(w)
+        broadcast, message = uuid.uuid4(), uuid.uuid4()
+        with _ADMIN[0].begin() as c:
+            c.execute(
+                text(
+                    "INSERT INTO msg.broadcasts (id, tenant_id, notice_id, section_ids, status, "
+                    "requested_by, confirmed_by, confirmed_at, expires_at) VALUES (:b, :t, :n, "
+                    "ARRAY[:s]::uuid[], 'sending', :u, :u, now(), now())"
+                ),
+                {
+                    "b": broadcast,
+                    "t": w.b.tenant_id,
+                    "n": notice,
+                    "s": w.b.ids["section_9a"],
+                    "u": w.b.people["owner"].user_id,
+                },
+            )
+            c.execute(
+                text(
+                    "INSERT INTO msg.messages (id, tenant_id, purpose, kind, template_key, "
+                    "template_version, language, guardian_id, source_type, source_id, "
+                    "dedupe_key, broadcast_id) VALUES (:m, :t, 'school_notice', 'template', "
+                    "'school_notice', 2, 'en', :g, 'parent_notice', :n, 'notice', :b)"
+                ),
+                {
+                    "m": message,
+                    "t": w.b.tenant_id,
+                    "g": SW.ensure_students(w)["b_gb"],
+                    "n": notice,
+                    "b": broadcast,
+                },
+            )
+        w.b.ids["bola_broadcast"] = broadcast
+        w.b.ids["bola_message"] = message
+    value: uuid.UUID = w.b.ids["bola_broadcast"]
+    return value
+
+
+def _b_message(w: Any) -> uuid.UUID:
+    _b_broadcast(w)
+    value: uuid.UUID = w.b.ids["bola_message"]
+    return value
+
+
 def _m5() -> ModuleType:
     """tests/insights/support.py (M5 exams, flags and notes through the real services)."""
     name = "sos_test_insights_support"
@@ -843,6 +908,9 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     # R2-2D online payments: a payment link and a reconciliation item of school B.
     "intent_id": lambda w: _b_fee(w, "intent_id"),
     "recon_item_id": lambda w: _b_fee(w, "recon_item_id"),
+    # R2-3G WhatsApp sending: a broadcast and one of its messages in school B.
+    "broadcast_id": _b_broadcast,
+    "message_id": _b_message,
 }
 
 

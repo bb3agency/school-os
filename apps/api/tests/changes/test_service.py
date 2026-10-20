@@ -254,6 +254,41 @@ def test_SEC_015_scoped_requester_reaches_only_students_in_scope(
     assert {CR.SW.active_section(admin_engine, sid) for sid in listed_students} == {section_9a}
 
 
+def test_SEC_015_waiting_for_me_follows_the_approve_scope_and_expiry(
+    school: Any, admin_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A section-scoped approver's inbox holds only open requests of their sections."""
+    clerk = school.people["office_admin"]
+    inside = CR.submit(
+        admin_engine, school, clerk, "office_admin", student_id=CR.student(school, "section_9a")
+    )
+    outside = CR.submit(
+        admin_engine, school, clerk, "office_admin", student_id=CR.student(school, "section_9c")
+    )
+    approver = school.people["principal"]
+    section_9a = school.ids["section_9a"]
+    base = CR.SW.ctx_for(
+        school.tenant_id, approver, "principal", section_ids=frozenset({section_9a})
+    )
+    scoped = dataclasses.replace(
+        base, scoped_permissions=base.permissions, auth_time=dt.datetime.now(dt.UTC)
+    )
+    with tenant_session(school.tenant_id, approver.user_id) as s:
+        inbox = {
+            r.id for r in changes.list_requests(s, scoped, waiting_for_me=True, limit=200).data
+        }
+    assert inside.id in inbox
+    assert outside.id not in inbox
+    # An expired request no longer waits for anyone (even before the daily expiry job).
+    later = inside.expires_at + dt.timedelta(minutes=1)
+    monkeypatch.setattr(changes, "_now", lambda session: later)
+    with tenant_session(school.tenant_id, approver.user_id) as s:
+        inbox = {
+            r.id for r in changes.list_requests(s, scoped, waiting_for_me=True, limit=200).data
+        }
+    assert inside.id not in inbox
+
+
 # --- approve (FR-CR-002, FR-CR-003) --------------------------------------------------------------
 
 

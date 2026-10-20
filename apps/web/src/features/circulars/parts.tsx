@@ -38,6 +38,7 @@ const noticePill: Record<NoticeStatus, PillVariant> = {
   draft: "tag",
   draft_failed: "review",
   approved: "done",
+  withdrawn: "negative",
 };
 
 /** A parent notice's state in words (drafting, draft, AI draft failed, approved). */

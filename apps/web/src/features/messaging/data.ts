@@ -16,7 +16,9 @@ import type { Loadable } from "@/lib/loadable";
 export const CONFIGURE = "messaging.configure";
 export const RECORD = "messaging.optin.record";
 export const READ = "message.read";
-export const MESSAGING_PERMISSIONS = [CONFIGURE, RECORD, READ] as const;
+/** R2-3G: send an approved notice, send again, revoke a parent link (principal, office admin). */
+export const SEND = "message.send";
+export const MESSAGING_PERMISSIONS = [CONFIGURE, RECORD, READ, SEND] as const;
 export const CATEGORIES = ["notices", "attendance", "fees"] as const;
 export type Category = (typeof CATEGORIES)[number];
 
@@ -30,6 +32,18 @@ export type Message = S["MessagingMessageOut"];
 export type MessagePage = S["MessagingMessagePage"];
 export type MessageStatus = Message["status"];
 export type MessagePurpose = Message["purpose"];
+export type BroadcastPreview = S["BroadcastPreviewOut"];
+export type Broadcast = S["BroadcastOut"];
+export type BroadcastPage = S["BroadcastPage"];
+export type BroadcastReport = S["BroadcastReportOut"];
+export type Automatic = S["AutomaticOut"];
+export type SendRun = S["SendRunOut"];
+/** R2-3J (FR-MSG-025): manual fee reminders from the dues list. */
+export type FeeReminderSelection = S["FeeReminderSelectionIn"];
+export type FeeReminderPreview = S["FeeReminderPreviewOut"];
+export type FeeRemindersSent = S["FeeRemindersOut"];
+/** R2-3J (FR-MSG-026): "Send on WhatsApp" for one receipt. */
+export type ReceiptWhatsApp = S["ReceiptWhatsAppOut"];
 
 export const MESSAGE_STATUSES: readonly MessageStatus[] = [
   "queued",
@@ -54,7 +68,18 @@ export const KEYS = {
   settings: ["staff", "messaging", "settings"] as const,
   optins: (guardianId: string) => ["staff", "messaging", "optins", guardianId] as const,
   messages: (filter: string) => ["staff", "messaging", "messages", filter] as const,
+  broadcasts: ["staff", "messaging", "broadcasts"] as const,
+  broadcast: (id: string) => ["staff", "messaging", "broadcasts", id] as const,
+  noticeBroadcasts: (noticeId: string) =>
+    ["staff", "messaging", "broadcasts", "notice", noticeId] as const,
+  automatic: ["staff", "messaging", "automatic"] as const,
+  feeReminderPreview: (selection: string) =>
+    ["staff", "messaging", "fee-reminders", "preview", selection] as const,
+  receipt: (receiptId: string) => ["staff", "messaging", "receipt", receiptId] as const,
 } as const;
+
+/** While a broadcast is sending, its counts are asked for again this often (live report). */
+export const LIVE_REFRESH_MS = 5000;
 
 /** `W/"3"` for If-Match (the API's ETag format). */
 export function ifMatch(version: number): string {
@@ -132,7 +157,41 @@ export const settingsSchema = z.object({
     .string()
     .trim()
     .regex(/^(\+?91[\s-]?)?[0-9\s-]{10,13}$|^$/, { error: "invalidPhone" }),
+  no_message_dates: z
+    .string()
+    .trim()
+    .refine((value) => parseDayList(value) !== null, { error: "invalidDate" }),
 });
+
+const DAY = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+
+/**
+ * "26/01/2027, 15/08/2027" (DD/MM/YYYY, commas or new lines) → ["2027-01-26", "2027-08-15"]
+ * (sorted, no repeats); `null` when any entry is not a real date or there are more than 60.
+ */
+export function parseDayList(value: string): string[] | null {
+  const parts = value
+    .split(/[,\n]/)
+    .map((part) => part.trim())
+    .filter((part) => part !== "");
+  const out = new Set<string>();
+  for (const part of parts) {
+    const match = DAY.exec(part);
+    if (!match) return null;
+    const [, d = "", m = "", y = ""] = match;
+    const iso = `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+    const date = new Date(`${iso}T00:00:00Z`);
+    if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== iso) return null;
+    out.add(iso);
+  }
+  if (out.size > 60) return null;
+  return [...out].sort();
+}
+
+/** ["2027-01-26"] → "26/01/2027" for the form. */
+export function formatDayList(days: readonly string[]): string {
+  return days.map((iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`).join(", ");
+}
 
 export const optinSchema = z
   .object({
@@ -160,6 +219,7 @@ export function settingsBody(input: z.output<typeof settingsSchema>) {
     quiet_end: hhmm(input.quiet_end) + ":00",
     daily_cap: input.daily_cap === "" ? null : Number(input.daily_cap),
     office_phone: input.office_phone === "" ? null : input.office_phone,
+    no_message_dates: parseDayList(input.no_message_dates) ?? [],
   };
 }
 
@@ -167,4 +227,21 @@ export function settingsBody(input: z.output<typeof settingsSchema>) {
 export function estimatedCost(count: number, rate: string, gstPercent: string): number {
   const perMessage = Number(rate) * (1 + Number(gstPercent) / 100);
   return Math.round(count * perMessage * 100) / 100;
+}
+
+export function useAutomatic(enabled = true): Loadable<Automatic> {
+  const api = useBffClient("staff");
+  return useApiQuery(KEYS.automatic, () => unwrap(api.GET("/api/v1/messaging/automatic")), {
+    enabled,
+  });
+}
+
+/** Messages that reached the parent's phone (delivered or read) out of those queued. */
+export function deliveredCount(counts: Record<string, number>): number {
+  return (counts.delivered ?? 0) + (counts.read ?? 0);
+}
+
+/** Every message of a broadcast (any status). */
+export function totalCount(counts: Record<string, number>): number {
+  return Object.values(counts).reduce((sum, n) => sum + n, 0);
 }

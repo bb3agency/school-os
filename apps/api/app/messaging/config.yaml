@@ -38,6 +38,9 @@ keywords:
   # The quick-reply button "Stop messages" on every business-initiated template sends this
   # payload (FR-MSG-010).
   stop_button_payload: SOS_STOP
+  # Labels of that quick reply on version 1 templates (sent before owner decision D32 removed
+  # the button): a tap on an old message still stops messages.
+  stop_button_labels: [Stop messages, సందేశాలు ఆపండి]
 
 # Automatic reply to any other inbound message: at most one per number per IST day, inside the
 # open service window; the inbound text is never stored (ADR-0043 decision 9, FR-MSG-018).
@@ -56,6 +59,35 @@ sending:
   permanent_error_codes: [131026, 131047, 131050, 131051, 131052, 132000, 132001, 132005, 132007, 132012, 132015, 132016, 133010]
   transient_error_codes: [4, 80007, 130429, 131000, 131016, 131048, 131056, 133004]
   max_attempts: 3
+  # Wave R2-3G (FR-MSG-011, FR-MSG-016; ADR-0043 decision 10). Minutes after a transient send
+  # error before the next try (attempt 1 -> 2, 2 -> 3): all three within an hour.
+  retry_backoff_minutes: [5, 20]
+  # Absence alerts and receipts may go out only until this IST time (the school's quiet hours
+  # start later for the other purposes; FR-MSG-011).
+  early_close: "20:00"
+  early_close_purposes: [absence_alert, fee_receipt]
+  # A queued message older than this is skipped (``too_late``) instead of being sent late; an
+  # absence alert never goes out after its own IST day.
+  max_queue_hours: 48
+  # Per school and sender run (the beat runs every minute; Meta allows far more per second).
+  batch_per_run: 300
+  # How long a sender holds a message it is sending (another run leaves it alone).
+  claim_seconds: 300
+
+# Notice broadcasts (FR-MSG-012, US-2204): the preview the sender confirms stays valid this long.
+broadcasts:
+  preview_minutes: 30
+  max_sections: 300
+  # Previews never confirmed are deleted after this many hours.
+  preview_retention_hours: 24
+  # Manual fee reminders from the dues list (R2-3J, FR-MSG-025): most accounts per send (the
+  # dues list shows at most fees config limits.dues_max_rows, 5000, rows).
+  max_reminder_accounts: 5000
+
+# Automatic messages (FR-MSG-013, FR-MSG-014; owner decision D25). IST times; absence alerts use
+# the school's own time from msg.settings.
+automatic:
+  fee_reminder_time: "10:00"
 
 # Messaging limits Meta reports per business portfolio (unique users per moving 24 hours).
 messaging_limits:

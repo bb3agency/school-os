@@ -8,6 +8,7 @@ import { useProfiles } from "@/features/findings/data";
 export const READINESS_KEYS = {
   all: ["staff", "dq", "readiness"],
   summary: (profile: string) => ["staff", "dq", "readiness", profile, "summary"] as const,
+  overview: ["staff", "dq", "readiness", "overview"] as const,
   section: (profile: string, section: string) =>
     ["staff", "dq", "readiness", profile, "section", section] as const,
   student: (profile: string, student: string) =>
@@ -33,6 +34,20 @@ export function useReadinessSummary(profile: string) {
           params: { path: { profile_key: profile } },
         }),
       ),
+    retry: false,
+  });
+}
+
+/**
+ * Every readiness profile listed for the school in one call (GET /dq/readiness), for the
+ * one-column-per-portal overview. Enabled only when the school has two or more checks.
+ */
+export function useReadinessOverview(enabled: boolean) {
+  const api = useBffClient("staff");
+  return useQuery({
+    queryKey: READINESS_KEYS.overview,
+    queryFn: () => unwrap(api.GET("/api/v1/dq/readiness", {})),
+    enabled,
     retry: false,
   });
 }

@@ -21,6 +21,8 @@ import { afterActionOf } from "./after";
 import { BatchView, lowestConfidence } from "./BatchScreen";
 import {
   ItemReviewView,
+  RowNav,
+  rowNeighbours,
   NextItemScreen,
   confirmBody,
   fieldBox,
@@ -30,12 +32,13 @@ import {
 import { UploadPhotos, checkPhotos } from "./RegisterPhotosScreen";
 
 const replace = vi.fn();
+const push = vi.fn();
 vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
   return {
     ...actual,
     usePathname: () => "/register-photos",
-    useRouter: () => ({ push: vi.fn(), replace, refresh: vi.fn(), prefetch: vi.fn() }),
+    useRouter: () => ({ push, replace, refresh: vi.fn(), prefetch: vi.fn() }),
     useSearchParams: () => new URLSearchParams(),
     useParams: () => ({ locale: "en" }),
   };
@@ -425,6 +428,41 @@ describe("US-402 AC1/AC2: check one row beside its page photo", () => {
     expect(screen.getByText(xm.review.noPermissionTitle)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: xm.review.confirm })).toBeNull();
     expect(screen.queryByRole("button", { name: xm.reject.open })).toBeNull();
+  });
+
+  it("moves to the previous / next row of the batch with links and P / N outside a field", async () => {
+    expect(rowNeighbours(["a", "b", "c"], "b")).toEqual({
+      position: 2,
+      total: 3,
+      previous: "a",
+      next: "c",
+    });
+    expect(rowNeighbours(["a", "b"], "a")).toMatchObject({ previous: null, next: "b" });
+    expect(rowNeighbours(["a"], "z")).toBeNull();
+    push.mockReset();
+    const user = userEvent.setup();
+    view();
+    renderWithIntl(
+      <RowNav neighbours={{ position: 2, total: 3, previous: ID.item, next: ID.item2 }} />,
+    );
+    const nav = screen.getByRole("navigation", { name: xm.review.rowNavLabel });
+    expect(within(nav).getByText("Row 2 of 3")).toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: xm.review.nextRow })).toHaveAttribute(
+      "href",
+      `/register-photos/items/${ID.item2}`,
+    );
+    // Typing N in a field types it; it never moves on.
+    await user.type(screen.getByLabelText(/Full name/), "n");
+    expect(push).not.toHaveBeenCalled();
+    await user.click(document.body);
+    await user.keyboard("n");
+    expect(push).toHaveBeenLastCalledWith(
+      expect.stringContaining(`/register-photos/items/${ID.item2}`),
+    );
+    await user.keyboard("p");
+    expect(push).toHaveBeenLastCalledWith(
+      expect.stringContaining(`/register-photos/items/${ID.item}`),
+    );
   });
 
   it("explains a row someone else already checked (409)", async () => {

@@ -102,6 +102,7 @@ from app.messaging.schemas import (
     OptinIn,
     SectionOptinSummaryOut,
 )
+from app.messaging.sends import repository as sends_repo
 from app.messaging.webhook import ParsedEvent
 from app.notifications import service as notifications
 from app.ops import service as ops
@@ -873,6 +874,7 @@ def _settings_out(session: Session, row: MessagingSettings) -> MessagingSettings
         daily_cap=row.daily_cap,
         default_daily_cap=cfg.default_daily_cap(account.messaging_limit if account else None),
         office_phone=row.office_phone,
+        no_message_dates=sorted(row.no_message_dates or []),
         utility_rate_inr=str(cfg.cost.utility_rate_inr),
         gst_percent=str(cfg.cost.gst_percent),
         version=row.version,
@@ -897,6 +899,7 @@ def get_messaging_settings(session: Session, ctx: UserContext) -> MessagingSetti
                 a.messaging_limit if (a := repo.live_account(session)) else None
             ),
             office_phone=None,
+            no_message_dates=[],
             utility_rate_inr=str(load_config().cost.utility_rate_inr),
             gst_percent=str(load_config().cost.gst_percent),
             version=0,
@@ -939,9 +942,19 @@ def update_messaging_settings(
         "quiet_end": data.quiet_end,
         "daily_cap": data.daily_cap,
         "office_phone": office,
+        "no_message_dates": (
+            sorted(set(data.no_message_dates))
+            if data.no_message_dates is not None
+            else sorted(row.no_message_dates or [])
+        ),
         "updated_by": ctx.user_id,
     }
-    changed = sorted(k for k, v in values.items() if k != "updated_by" and getattr(row, k) != v)
+    changed = sorted(
+        k
+        for k, v in values.items()
+        if k != "updated_by"
+        and (sorted(getattr(row, k) or []) if k == "no_message_dates" else getattr(row, k)) != v
+    )
     row = repo.update_settings(session, row.id, values)
     _audit(
         session,
@@ -1322,12 +1335,19 @@ def queue_message(
     variables: Mapping[str, str] | None = None,
     text_key: cat.TextKey | None = None,
     created_by: uuid.UUID | None = None,
+    variables_by_language: Mapping[str, Mapping[str, str]] | None = None,
+    broadcast_id: uuid.UUID | None = None,
+    next_attempt_at: dt.datetime | None = None,
+    audit_each: bool = True,
 ) -> QueuedMessage | None:
     """Queue one message to a guardian (idempotent per purpose, source, guardian and dedupe
     key; ``None`` when it exists). Template purposes take the catalogue variables (encrypted on
     the row, never logged); ``optin_stopped`` is a free-form text. Language: the guardian's,
     else the school's parent language; Telugu falls back to English when the Telugu template is
-    not usable (``language_fallback``, FR-LANG-004). Audit ``messaging.message.queued``."""
+    not usable (``language_fallback``, FR-LANG-004). ``variables_by_language`` (R2-3G): the
+    variables per language when they differ (a notice title); a language missing there falls
+    back to English. ``broadcast_id`` / ``next_attempt_at``: the notice broadcast and the
+    earliest send time. Audit ``messaging.message.queued`` (``audit_each``)."""
     own = students.guardian_language(session, guardian_id) if guardian_id else None
     language: Language = parent_language(tenancy.parent_language(session), own)
     fallback = False
@@ -1346,6 +1366,10 @@ def queue_message(
             )
             if not rules.template_usable(state):
                 language, fallback = "en", True
+        if variables_by_language is not None:
+            if language not in variables_by_language:
+                language, fallback = "en", True
+            variables = variables_by_language[language]
         values = cat.check_variables(purpose, variables or {})
     else:
         values = []
@@ -1381,9 +1405,13 @@ def queue_message(
         phone_last4=phone.last4 if phone else None,
         vars_ciphertext=vars_blob,
         created_by=created_by,
+        broadcast_id=broadcast_id,
+        next_attempt_at=next_attempt_at,
     )
     if row is None:
         return None
+    if not audit_each:
+        return QueuedMessage(row.id, True)
     _audit(
         session,
         action="messaging.message.queued",
@@ -1423,7 +1451,11 @@ def _optin_state(
 
 
 def _prepare(
-    session: Session, message: Message, to_override: str | None, text_body: str | None
+    session: Session,
+    message: Message,
+    to_override: str | None,
+    text_body: str | None,
+    url_suffix: str | None = None,
 ) -> _Prepared | str:
     """Everything needed to call the provider, or the skip reason."""
     account = repo.live_account(session)
@@ -1488,9 +1520,8 @@ def _prepare(
             name=template_row.provider_name,
             language=cat.meta_language(message.language),  # type: ignore[arg-type]
             body_values=values,
+            url_suffix=url_suffix if "url" in buttons else None,
             url_button_index=buttons.index("url") if "url" in buttons else None,
-            stop_button_index=buttons.index("stop") if "stop" in buttons else None,
-            stop_payload=load_config().keywords.stop_button_payload,
         )
     return _Prepared(
         message_id=message.id,
@@ -1508,6 +1539,7 @@ def deliver(
     *,
     to: str | None = None,
     text_body: str | None = None,
+    url_suffix: str | None = None,
 ) -> str:
     """Send one queued message now (worker). Checks the account, template, opt-in and number
     (:mod:`app.messaging.eligibility`; FR-MSG-011 as far as this wave goes), decrypts the
@@ -1515,13 +1547,14 @@ def deliver(
     outcome: ``sent`` with Meta's message id, ``skipped`` with the reason, ``failed`` with the
     error for permanent errors, or still ``queued`` with one more attempt for transient ones.
     ``to`` (10-digit mobile) / ``text_body``: a free-form reply to the number that wrote (inside
-    its window).
+    its window). ``url_suffix``: the parent link token for a template with a URL button
+    (issued by the sender just before, ADR-0046; never logged).
     Returns the resulting status."""
     with tenant_session(tenant_id) as session:
         message = repo.get_message(session, message_id, lock=True)
         if message is None or message.status != "queued":
             return message.status if message is not None else "missing"
-        prepared = _prepare(session, message, to, text_body)
+        prepared = _prepare(session, message, to, text_body, url_suffix)
         if isinstance(prepared, str):
             repo.update_message(session, message_id, {"status": "skipped", "skip_reason": prepared})
             return "skipped"
@@ -1609,6 +1642,9 @@ def _message_out(row: Message) -> MessagingMessageOut:
         error_code=row.error_code,
         error_reason=_error_reason(row.error_code),
         attempts=row.attempts,
+        broadcast_id=row.broadcast_id,
+        next_attempt_at=row.next_attempt_at,
+        has_link=row.public_handle_id is not None,
         queued_at=row.queued_at,
         sent_at=row.sent_at,
         delivered_at=row.delivered_at,
@@ -2094,6 +2130,54 @@ def live_tenant_ids() -> list[uuid.UUID]:
         return tenancy.list_tenant_ids(session, ("active",))
 
 
+# --- helpers for the sending wave (app.messaging.sends; R2-3G) --------------------------------
+
+record_audit = _audit
+optin_for_current_number = _for_current_number
+error_reason = _error_reason
+ist_today = _today
+
+
+def account_block(session: Session, template_key: str) -> str | None:
+    """Why nothing of ``template_key`` can be sent now (account not connected, paused, not INR
+    from 2027, the English template not usable), or ``None`` (FR-MSG-011; the per-guardian
+    checks come later)."""
+    account = repo.live_account(session)
+    state = rules.AccountState(account.status, account.currency) if account else None
+    template = None
+    if account is not None:
+        item = cat.template(template_key)
+        row = repo.template_for(session, account.id, template_key, item.version, "en")
+        template = (
+            rules.TemplateState(row.status, row.provider_category, row.paused_by_sos)
+            if row
+            else None
+        )
+    return rules.skip_reason(
+        account=state,
+        template=template,
+        needs_template=True,
+        optin=None,
+        needs_optin=False,
+        phone="9000000000",  # the number is checked per guardian
+        today=_today(session),
+        inr_required_from=load_config().sending.inr_required_from,
+    )
+
+
+def telugu_usable(session: Session, template_key: str) -> bool:
+    """Whether the Telugu version of ``template_key`` is approved and usable now."""
+    account = repo.live_account(session)
+    if account is None:
+        return False
+    item = cat.template(template_key)
+    row = repo.template_for(session, account.id, template_key, item.version, "te")
+    state = (
+        rules.TemplateState(row.status, row.provider_category, row.paused_by_sos) if row else None
+    )
+    return rules.template_usable(state)
+
+
 # --- full data export and offboarding (FR-ADM-001, FR-PLT-005, ADR-0029) ----------------------
 
 
@@ -2153,8 +2237,9 @@ key_rotation.register_reencryptor("messaging", reencrypt_batch)
 def export_records(session: Session) -> list[RecordTable]:
     """The school's messaging records for its full data export: accounts (no token or PIN),
     templates, settings, opt-ins and message history (no blind indexes, variables or handles).
-    Join codes, inbound kinds and the provider inbox are not exported (hashes, raw payloads)."""
-    return repo.export_tables(session)
+    Join codes, inbound kinds and the provider inbox are not exported (hashes, raw payloads).
+    R2-3G adds the notice broadcasts and the automatic-run history."""
+    return [*repo.export_tables(session), *sends_repo.export_tables(session)]
 
 
 _PURGE = purging.PurgeTables(
@@ -2162,6 +2247,9 @@ _PURGE = purging.PurgeTables(
         "msg.provider_events",
         "msg.inbound_events",
         "msg.messages",
+        # 0061_messaging_sends: messages reference broadcasts
+        "msg.send_runs",
+        "msg.broadcasts",
         "msg.join_codes",
         "msg.optins",
         "msg.settings",
@@ -2184,10 +2272,55 @@ tenancy.register_data_owner(
 )
 
 
+# --- R2-3H parent opt-in page (ADR-0046 decision 2 "Opt-in"; ADR-0043 decision 7) ---------------
+
+
+@dataclass(frozen=True, slots=True)
+class ParentCategoryState:
+    category: str
+    status: str  # opted_in | opted_out | not_asked
+    stopped_by_parent: bool
+
+
+def parent_optin_state(
+    session: Session, guardian_id: uuid.UUID
+) -> tuple[ParentCategoryState, ...] | None:
+    """The guardian's current choice per category for the parent opt-in page, or ``None`` when
+    WhatsApp messages are not offered here (FR-MSG-024). Read only: the page never records an
+    opt-in (ADR-0043 decision 7 accepts only the join message, a signed form or in person) and
+    stopping stays the parent's ``STOP`` on WhatsApp (FR-MSG-010). "Opted in" counts only for
+    the guardian's current number. No permission check: the caller holds a live opt-in link."""
+    if not available():
+        return None
+    current = repo.current_optins(session, [guardian_id])
+    return tuple(
+        ParentCategoryState(
+            category=state.category,
+            status=(
+                "opted_in"
+                if state.status == "opted_in" and state.for_current_number
+                else ("opted_out" if state.status == "opted_out" else "not_asked")
+            ),
+            stopped_by_parent=state.stopped_by_parent,
+        )
+        for state in _category_states(session, guardian_id, current)
+    )
+
+
+def office_phone(session: Session) -> str | None:
+    """The school office phone set in the WhatsApp settings (the parent dues page shows it,
+    ADR-0046 decision 2 "Dues"); ``None`` when unset or messaging is not offered."""
+    if not available():
+        return None
+    row = repo.get_settings(session)
+    return row.office_phone if row is not None else None
+
+
 __all__ = [
     "CONFIGURE",
     "READ",
     "RECORD",
+    "ParentCategoryState",
     "QueuedMessage",
     "available",
     "connect_embedded_signup",
@@ -2202,6 +2335,8 @@ __all__ = [
     "join_slips",
     "list_templates",
     "live_tenant_ids",
+    "office_phone",
+    "parent_optin_state",
     "process_inbox",
     "provision_templates",
     "purge_expired",

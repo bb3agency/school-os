@@ -19,7 +19,14 @@ from app.authz.dependencies import TenantDB, require, require_any
 from app.authz.http import Cursor, IdempotencyDep, IfMatch, Limit, Page, etag
 from app.changes import service
 from app.changes.memo import STYLE_CSP
-from app.changes.schemas import ApproveIn, ChangeRequestCreate, ChangeRequestOut, RejectIn, Status
+from app.changes.schemas import (
+    ApproveIn,
+    ChangeRequestCreate,
+    ChangeRequestOut,
+    Me,
+    RejectIn,
+    Status,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["change-requests"])
 
@@ -65,14 +72,29 @@ def list_change_requests(
     db: TenantDB,
     status: Annotated[Status | None, Query()] = None,
     student_id: uuid.UUID | None = None,
+    waiting_for: Annotated[Me | None, Query()] = None,
+    requested_by: Annotated[Me | None, Query()] = None,
     limit: Limit = 50,
     cursor: Cursor = None,
 ) -> Page[ChangeRequestOut]:
     """Change requests of students you can see, newest first (permission
     ``student.identity_change.request`` or ``student.identity_change.approve``). Values of
-    sensitive (C3) fields are masked."""
+    sensitive (C3) fields are masked.
+
+    Inbox filters: ``waiting_for=me`` lists the requests you may decide now (pending and not
+    expired, on students in your approve scope, never your own: maker-checker), empty without
+    ``student.identity_change.approve``; ``requested_by=me`` lists the requests you submitted.
+    All filters combine, so ``waiting_for=me`` with another status or with ``requested_by=me``
+    gives an empty page."""
     return service.list_requests(
-        db, ctx, status=status, student_id=student_id, limit=limit, cursor=cursor
+        db,
+        ctx,
+        status=status,
+        student_id=student_id,
+        waiting_for_me=waiting_for == "me",
+        requested_by_me=requested_by == "me",
+        limit=limit,
+        cursor=cursor,
     )
 
 

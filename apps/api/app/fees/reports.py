@@ -12,12 +12,14 @@ import datetime as dt
 import io
 import uuid
 from collections import defaultdict
+from collections.abc import Sequence
+from dataclasses import dataclass
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
 from app.authz.context import UserContext
-from app.core.errors import ValidationFailed
+from app.core.errors import NotFound, ValidationFailed
 from app.core.ids import new_id
 from app.core.spreadsheet import safe_cell
 from app.fees import _common as c
@@ -386,6 +388,72 @@ def dues_list(
     return _dues(session, ctx, section_id=section_id, class_id=class_id)
 
 
+@dataclass(frozen=True, slots=True)
+class ReminderAccount:
+    """One fee account chosen for a manual WhatsApp reminder (R2-3J; FR-MSG-025): ids, the
+    collectable amount overdue today and its oldest due date. ``minimum`` is the school's
+    minimum reminder amount (``fin.fee_settings``)."""
+
+    account_id: uuid.UUID
+    student_id: uuid.UUID
+    overdue: Decimal
+    oldest_due_on: dt.date | None
+    minimum: Decimal
+
+
+def reminder_accounts(
+    session: Session,
+    ctx: UserContext,
+    *,
+    account_ids: Sequence[uuid.UUID] | None,
+    section_id: uuid.UUID | None,
+    class_id: uuid.UUID | None,
+) -> list[ReminderAccount]:
+    """The accounts a manual fee reminder is about (``finance.read`` school-wide; FR-FEE-020's
+    filter). ``account_ids``: exactly these accounts of the current year (404 for an id that is
+    not one: another school's, an older year's, unknown); otherwise every account in the dues
+    list for the filter (overdue above zero). Amounts and ids only; nothing is written."""
+    c.require_on(session, ctx)
+    c.require_school_wide(ctx, c.READ)
+    today = c.today(session)
+    year = tenancy.get_current_academic_year(session)
+    if year is None:
+        if account_ids:
+            raise NotFound("Fee account not found")
+        return []
+    if account_ids is not None:
+        wanted = list(dict.fromkeys(account_ids))
+        found = repo.accounts_by_id(session, wanted)
+        if any((a := found.get(i)) is None or a.academic_year_id != year.id for i in wanted):
+            raise NotFound("Fee account not found")
+        accounts = [found[i] for i in wanted]
+    elif section_id is None and class_id is None:
+        accounts = repo.accounts_for_year(session, year.id)
+    else:
+        ids = students.list_students_in_scope(
+            session,
+            ctx,
+            section_ids=[section_id] if section_id else None,
+            class_ids=[class_id] if class_id else None,
+        )
+        accounts = repo.accounts_for_year(session, year.id, ids)
+    dues = ledger.dues_of(session, accounts, today)
+    row = repo.get_settings(session)
+    minimum = row.min_reminder_amount if row is not None else ZERO
+    if account_ids is None:
+        accounts = [a for a in accounts if dues[a.id].overdue > 0]
+    return [
+        ReminderAccount(
+            account_id=a.id,
+            student_id=a.student_id,
+            overdue=dues[a.id].overdue,
+            oldest_due_on=dues[a.id].oldest_due_on,
+            minimum=minimum,
+        )
+        for a in accounts
+    ]
+
+
 def dues_csv(
     session: Session, ctx: UserContext, *, section_id: uuid.UUID | None, class_id: uuid.UUID | None
 ) -> tuple[str, str]:
@@ -432,4 +500,13 @@ def dues_csv(
     return f"fee-dues-{out.as_of.isoformat()}.csv", text
 
 
-__all__ = ["close_day", "daily_csv", "daily_print", "daily_report", "dues_csv", "dues_list"]
+__all__ = [
+    "ReminderAccount",
+    "close_day",
+    "daily_csv",
+    "daily_print",
+    "daily_report",
+    "dues_csv",
+    "dues_list",
+    "reminder_accounts",
+]

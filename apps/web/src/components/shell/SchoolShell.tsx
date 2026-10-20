@@ -351,6 +351,14 @@ export function SchoolShell({
           icon: "server",
         },
         {
+          // R2-3J (FR-MSG-014, US-2205): receipt paper, GST line and fee reminder days.
+          href: "/settings/fees",
+          label: t("fees.nav.feeSettings"),
+          permission: ["fee.manage", "finance.read"],
+          feature: "fees",
+          icon: "settings",
+        },
+        {
           // R2-2E (US-2109 AC1, FR-FEE-015): the school's UPI ID and static QR.
           href: "/settings/upi",
           label: t("fees.nav.upiSettings"),

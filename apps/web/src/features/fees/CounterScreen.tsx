@@ -50,6 +50,7 @@ import {
   type DueLine,
   type Receipt,
 } from "./data";
+import { ReceiptWhatsApp } from "@/features/messaging/ReceiptWhatsApp";
 import { Amount, FeesGate, NoAccess } from "./parts";
 import { UpiCounterHelp } from "./UpiCounter";
 
@@ -737,7 +738,8 @@ function PaymentForm({
   );
 }
 
-/** After saving: the receipt number large, Print focused (P), Next student (N). */
+/** After saving: the receipt number large, Print focused (P), Next student (N), and "Send on
+ * WhatsApp" as a secondary button without a shortcut (FR-MSG-026). */
 function SavedPanel({
   saved,
   printRef,
@@ -783,6 +785,10 @@ function SavedPanel({
         >
           {t("openReceipt")}
         </Link>
+      </div>
+      {/* FR-MSG-026: a secondary action after the receipt is saved; Print keeps the focus. */}
+      <div className="mt-4">
+        <ReceiptWhatsApp receiptId={saved.id} />
       </div>
     </Card>
   );

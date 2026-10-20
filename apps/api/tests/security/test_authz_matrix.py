@@ -1568,6 +1568,11 @@ SPECS: dict[tuple[str, str], Builder] = {
         {},
     ),
     # Board and portal readiness (ADR-0040): the class teacher reaches 9A only.
+    ("GET", "/api/v1/dq/readiness"): lambda w, r, a: (
+        "/api/v1/dq/readiness?profile_keys=bseap-ssc-2027",
+        None,
+        {},
+    ),
     ("GET", "/api/v1/dq/readiness/{profile_key}"): lambda w, r, a: (
         "/api/v1/dq/readiness/bseap-ssc-2027",
         None,
@@ -2276,6 +2281,132 @@ SPECS.update(
 )
 
 
+# --- R2-3G WhatsApp sending (ADR-0043): an approved notice and a broadcast of school A ----------
+
+_SENDS: dict[str, uuid.UUID] = {}
+
+
+def _send_notice(w: Any) -> uuid.UUID:
+    if "notice" not in _SENDS:
+        _SENDS["notice"] = CI.complete_notice(w.a, approved=True)[0]
+    return _SENDS["notice"]
+
+
+def _send_broadcast(w: Any, a: Engine) -> uuid.UUID:
+    if "broadcast" not in _SENDS:
+        broadcast = uuid.uuid4()
+        with a.begin() as c:
+            c.execute(
+                text(
+                    "INSERT INTO msg.broadcasts (id, tenant_id, notice_id, section_ids, status, "
+                    "requested_by, confirmed_by, confirmed_at, expires_at) VALUES (:b, :t, :n, "
+                    "ARRAY[:s]::uuid[], 'sending', :u, :u, now(), now())"
+                ),
+                {
+                    "b": broadcast,
+                    "t": w.a.tenant_id,
+                    "n": _send_notice(w),
+                    "s": w.a.ids["section_9a"],
+                    "u": w.a.people["owner"].user_id,
+                },
+            )
+        _SENDS["broadcast"] = broadcast
+    return _SENDS["broadcast"]
+
+
+def _send_section(w: Any) -> list[str]:
+    return [str(w.a.ids["section_9a"])]
+
+
+SPECS.update(
+    {
+        ("POST", "/api/v1/notices/{notice_id}/broadcasts/preview"): lambda w, r, a: (
+            f"/api/v1/notices/{_send_notice(w)}/broadcasts/preview",
+            {"section_ids": _send_section(w)},
+            {},
+        ),
+        # A preview token that is not the caller's: the guard passed, the service says 409.
+        ("POST", "/api/v1/notices/{notice_id}/broadcasts"): lambda w, r, a: (
+            f"/api/v1/notices/{_send_notice(w)}/broadcasts",
+            {"preview_token": "bp_" + uuid.uuid4().hex, "section_ids": _send_section(w)},
+            {"Idempotency-Key": str(uuid.uuid4())},
+        ),
+        ("GET", "/api/v1/notices/{notice_id}/broadcasts"): lambda w, r, a: (
+            f"/api/v1/notices/{_send_notice(w)}/broadcasts",
+            None,
+            {},
+        ),
+        ("GET", "/api/v1/messaging/broadcasts"): lambda w, r, a: (
+            "/api/v1/messaging/broadcasts",
+            None,
+            {},
+        ),
+        ("GET", "/api/v1/messaging/broadcasts/{broadcast_id}"): lambda w, r, a: (
+            f"/api/v1/messaging/broadcasts/{_send_broadcast(w, a)}",
+            None,
+            {},
+        ),
+        ("GET", "/api/v1/messaging/automatic"): lambda w, r, a: (
+            "/api/v1/messaging/automatic",
+            None,
+            {},
+        ),
+        # A message without a parent link: the guard passed, the service says 404.
+        ("POST", "/api/v1/messages/{message_id}/revoke-link"): lambda w, r, a: (
+            f"/api/v1/messages/{uuid.uuid4()}/revoke-link",
+            None,
+            {},
+        ),
+    }
+)
+
+
+# --- R2-3J: manual fee reminders, a receipt on WhatsApp, notice withdrawal ---------------------
+
+# Guard passed; the service refuses: manual fee reminders also need finance.read (FR-MSG-025).
+REMINDER_ROUTES = frozenset(
+    {("POST", "/api/v1/fees/reminders/preview"), ("POST", "/api/v1/fees/reminders")}
+)
+
+
+def _withdraw_notice(w: Any, r: str, a: Engine) -> tuple[str, Any, dict[str, str]]:
+    notice_id, version = CI.complete_notice(w.a, approved=True)
+    return (
+        f"/api/v1/notices/{notice_id}/withdraw",
+        {"reason": "The date in this notice was wrong"},
+        {"If-Match": f'"{version}"'},
+    )
+
+
+SPECS.update(
+    {
+        ("POST", "/api/v1/fees/reminders/preview"): lambda w, r, a: (
+            "/api/v1/fees/reminders/preview",
+            {"all_matching": True},
+            {},
+        ),
+        # A digest that is not the preview's: the guard passed, the service says 409.
+        ("POST", "/api/v1/fees/reminders"): lambda w, r, a: (
+            "/api/v1/fees/reminders",
+            {"all_matching": True, "preview_token": "fr_" + "0" * 40},
+            {"Idempotency-Key": str(uuid.uuid4())},
+        ),
+        ("GET", "/api/v1/fees/receipts/{receipt_id}/whatsapp"): lambda w, r, a: (
+            f"/api/v1/fees/receipts/{_fees()._shared_receipt(w, a)}/whatsapp",
+            None,
+            {},
+        ),
+        # No guardian opted in (or WhatsApp not connected): the guard passed, the service says 409.
+        ("POST", "/api/v1/fees/receipts/{receipt_id}/whatsapp"): lambda w, r, a: (
+            f"/api/v1/fees/receipts/{_fees()._shared_receipt(w, a)}/whatsapp",
+            None,
+            {"Idempotency-Key": str(uuid.uuid4())},
+        ),
+        ("POST", "/api/v1/notices/{notice_id}/withdraw"): _withdraw_notice,
+    }
+)
+
+
 # --- R2-1B fees (ADR-0042): fees on for school A around each call -------------------------------
 
 
@@ -2378,6 +2509,15 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911 - one answer per r
         return 201
     if (method, path) in _fees().ONLINE_REFUSED:
         return 409  # guard passed; no Razorpay partner application in tests (R2-2D)
+    if (method, path) == ("POST", "/api/v1/notices/{notice_id}/broadcasts"):
+        return 409  # guard passed; the preview token is not the caller's (R2-3G)
+    if (method, path) == ("POST", "/api/v1/messages/{message_id}/revoke-link"):
+        return 404  # guard passed; no such message with a link (R2-3G)
+    if (method, path) in (
+        ("POST", "/api/v1/fees/reminders"),
+        ("POST", "/api/v1/fees/receipts/{receipt_id}/whatsapp"),
+    ):
+        return 409  # guard passed; a stale digest / nobody to send to (R2-3J)
     if (method, path) == ("POST", "/api/v1/users/{user_id}/invitation-email"):
         return 409  # guard passed; the service refuses (email off in tests)
     if method == "POST" and path.startswith("/api/v1/me/invitations/"):
@@ -2434,6 +2574,8 @@ def test_SEC_003_role_route_matrix(
     )
     if needs_create:
         expected = 403
+    if key in REMINDER_ROUTES and granted and "finance.read" not in held:
+        expected = 403  # R2-3J: the fees service checks finance.read (FR-MSG-025)
     assert res.status_code == expected, f"{role} {key}: {res.status_code} {res.text}"
     if needs_create:
         assert res.json()["code"] == "student_create_required"

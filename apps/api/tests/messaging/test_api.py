@@ -194,7 +194,7 @@ def test_FR_MSG_006_templates_created_and_synced(world: Any, api: Any) -> None:
     assert items[("absence_alert", "te")]["reviewed"] is False
     # URL-button templates need SOS_PUBLIC_BASE_URL (unset in these tests): not created yet.
     assert items[("school_notice", "en")]["status"] == "not_created"
-    assert items[("school_notice", "en")]["provider_name"] == "sos_school_notice_v1_en"
+    assert items[("school_notice", "en")]["provider_name"] == "sos_school_notice_v2_en"
     assert (
         api.call(world.person("teacher"), "GET", "/api/v1/messaging/templates").status_code == 403
     )
@@ -206,7 +206,7 @@ def test_FR_MSG_007_template_moved_to_marketing_is_paused_and_owners_told(
     _, waba = M.connect(world.a)
     value = {
         "message_template_id": M.digits(12),
-        "message_template_name": "sos_absence_alert_v1_te",
+        "message_template_name": "sos_absence_alert_v2_te",
         "message_template_language": "te",
         "previous_category": "UTILITY",
         "new_category": "MARKETING",
@@ -434,7 +434,7 @@ def test_FR_MSG_009_join_slip_code_from_the_guardians_own_number(
     }
     confirm = [s for s in STATE.sent if s["to"] == "91" + mobile]
     assert confirm
-    assert confirm[0]["name"] == "sos_optin_confirm_v1_en"
+    assert confirm[0]["name"] == "sos_optin_confirm_v2_en"
     # Single use: the same code again records nothing more.
     M.deliver_webhook(api, world.a, M.inbound(waba, "91" + mobile, text_body=f"JOIN {code}"))
     assert len(_optins(admin_engine, guardian)) == 2

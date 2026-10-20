@@ -17,6 +17,8 @@ import {
   RECORD,
   estimatedCost,
   sectionSlipsHref,
+  formatDayList,
+  parseDayList,
   settingsBody,
   type Account,
   type GuardianOptins,
@@ -123,6 +125,7 @@ function settings(overrides: Partial<Settings> = {}): Settings {
     daily_cap: null,
     default_daily_cap: 225,
     office_phone: null,
+    no_message_dates: [],
     utility_rate_inr: "0.115",
     gst_percent: "18",
     version: 0,
@@ -220,8 +223,17 @@ describe("helpers", () => {
         quiet_end: "07:00",
         daily_cap: "",
         office_phone: "",
+        no_message_dates: "15/08/2027, 26/01/2027",
       }),
-    ).toMatchObject({ absence_alert_time: "11:00:00", daily_cap: null, office_phone: null });
+    ).toMatchObject({
+      absence_alert_time: "11:00:00",
+      daily_cap: null,
+      office_phone: null,
+      no_message_dates: ["2027-01-26", "2027-08-15"],
+    });
+    expect(parseDayList("31/02/2027")).toBeNull();
+    expect(parseDayList("")).toEqual([]);
+    expect(formatDayList(["2027-01-26"])).toBe("26/01/2027");
     expect(sectionSlipsHref("s-1", ["notices", "fees"])).toBe(
       "/bff/api/v1/sections/s-1/join-slips?categories=notices&categories=fees",
     );
@@ -419,6 +431,7 @@ describe("delivery log (US-2208)", () => {
           error_code: "meta:131026",
           error_reason: "not_on_whatsapp",
           attempts: 1,
+          has_link: false,
           queued_at: "2026-10-17T05:30:00Z",
           sent_at: null,
           delivered_at: null,

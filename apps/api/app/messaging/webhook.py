@@ -26,8 +26,7 @@ from dataclasses import dataclass, field
 from typing import Any, Final
 
 from app.core.logging import get_logger
-from app.messaging.catalogue import catalogue
-from app.messaging.config import classify
+from app.messaging.config import classify, load_config
 from app.messaging.runtime import settings as messaging_settings
 from app.public.config import WebhookProvider
 from app.public.service import ResolvedHandle
@@ -192,7 +191,8 @@ def _inbound_event(message: dict[str, Any]) -> ParsedEvent | None:
             text = label if isinstance(label, str) else None
     keyword, code = classify(text, payload)
     if keyword == "other" and kind_of == "button" and text is not None:
-        # The template's quick reply arrives as its label ("Stop messages" / Telugu).
+        # A version 1 template's quick reply arrives as its label ("Stop messages" / Telugu);
+        # templates no longer carry it (D32), but old messages may still be tapped.
         keyword, code = _stop_label(text)
     # The text itself ends here (FR-MSG-018): only the classification is kept.
     return ParsedEvent(
@@ -204,12 +204,7 @@ def _inbound_event(message: dict[str, Any]) -> ParsedEvent | None:
 
 
 def _stop_label(text: str) -> tuple[Any, str | None]:
-    labels = {
-        t.text(lang).stop_label
-        for t in catalogue().templates.values()
-        for lang in ("en", "te")
-        if t.text(lang).stop_label
-    }
+    labels = set(load_config().keywords.stop_button_labels)
     return ("stop", None) if text.strip() in labels else ("other", None)
 
 

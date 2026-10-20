@@ -250,6 +250,47 @@ def test_docs_09_list_pages_with_a_cursor(school: Any, api: Any, admin_engine: E
     assert bad.status_code == 422
 
 
+def test_docs_09_inbox_waiting_for_me_and_mine(school: Any, api: Any, admin_engine: Engine) -> None:
+    """``waiting_for=me``: open requests the caller may decide, never their own (SEC-014);
+    ``requested_by=me``: the caller's own requests."""
+    by_clerk = _submit(api, admin_engine, school, "office_admin", CR.student(school)).json()["id"]
+    by_dual = _submit(api, admin_engine, school, "dual", CR.student(school)).json()["id"]
+
+    def ids(who: str, **params: Any) -> set[str]:
+        res = api.call(school.people[who], "GET", BASE, params={"limit": 200, **params})
+        assert res.status_code == 200, res.text
+        return {r["id"] for r in res.json()["data"]}
+
+    principal_inbox = ids("principal", waiting_for="me")
+    assert {by_clerk, by_dual} <= principal_inbox
+    dual_inbox = ids("dual", waiting_for="me")
+    assert by_clerk in dual_inbox
+    assert by_dual not in dual_inbox, "maker-checker: never your own request"
+    items = api.call(
+        school.people["dual"], "GET", BASE, params={"waiting_for": "me", "limit": 200}
+    ).json()["data"]
+    assert all(r["status"] == "pending" and r["can_decide"] for r in items)
+    # Without the approve permission nothing waits for you.
+    assert ids("office_admin", waiting_for="me") == set()
+    # Mine: only the caller's requests.
+    mine = ids("office_admin", requested_by="me")
+    assert by_clerk in mine
+    assert by_dual not in mine
+    assert by_dual in ids("dual", requested_by="me")
+    assert ids("principal", requested_by="me") == set()
+    # Filters combine; contradictory ones give an empty page.
+    assert ids("principal", waiting_for="me", status="approved") == set()
+    assert ids("dual", waiting_for="me", requested_by="me") == set()
+    assert by_clerk in ids("principal", waiting_for="me", status="pending")
+    # Decided requests leave the inbox.
+    assert _decide(api, school, "principal", by_clerk, "approve").status_code == 200
+    assert by_clerk not in ids("dual", waiting_for="me")
+    assert by_clerk in ids("office_admin", requested_by="me", status="approved")
+    for bad in ({"waiting_for": "someone"}, {"requested_by": str(uuid.uuid4())}):
+        res = api.call(school.people["principal"], "GET", BASE, params=bad)
+        assert res.status_code == 422
+
+
 def test_SEC_003_readers_need_request_or_approve_permission(school: Any, api: Any) -> None:
     res = api.call(school.people["accountant"], "GET", BASE)
     assert res.status_code == 403
@@ -290,6 +331,8 @@ def test_SEC_001_other_school_cannot_reach_requests(
     assert res.status_code == 404
     listed = api.call(b_owner, "GET", BASE, params={"limit": 200}).json()["data"]
     assert rid not in {r["id"] for r in listed}
+    inbox = api.call(b_owner, "GET", BASE, params={"limit": 200, "waiting_for": "me"})
+    assert rid not in {r["id"] for r in inbox.json()["data"]}
     assert CR.row(admin_engine, uuid.UUID(rid))["status"] == "pending"
 
 

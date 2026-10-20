@@ -7,7 +7,8 @@ SEC-008, NFR-OBS-001, CLAUDE.md invariant 5: logs carry IDs and technical data o
 - ``event`` is a constant snake/dot-case name (``change_request.approved``). Free text is replaced
   by ``log.invalid_event``. Standard-library records keep only their constant message *template*;
   their arguments and ``extra`` are never rendered.
-- Every string value passes through ``core.redaction.redact`` (Aadhaar/Verhoeff, mobiles, emails)
+- Every string value passes through ``core.redaction.redact_log`` (Aadhaar/Verhoeff, mobiles,
+  emails, credentials and provider identifiers: tokens, signatures, Razorpay ids, UTRs; R2-3I)
   as a last line of defence.
 - Exceptions are logged as ``error_type`` only; a redacted traceback is added in ``local`` only.
 - Context (request_id, tenant_id, user_id, job_id, ...) is bound with ``bind_context`` and merged
@@ -39,7 +40,7 @@ from opentelemetry import trace
 from structlog.typing import EventDict, Processor, WrappedLogger
 
 from app.core.config import Environment, Settings, get_settings
-from app.core.redaction import redact
+from app.core.redaction import redact_log
 
 __all__ = [
     "ALLOWED_FIELDS",
@@ -196,7 +197,7 @@ def _exceptions(_: WrappedLogger, __: str, ed: EventDict) -> EventDict:
         ed.setdefault("error_type", info[0].__name__)
         if _static.local:
             text = "".join(traceback.format_exception(*info))
-            ed["traceback"] = redact(text)[-_TRACEBACK_MAX:]
+            ed["traceback"] = redact_log(text)[-_TRACEBACK_MAX:]
     return ed
 
 
@@ -233,14 +234,14 @@ def _redact_value(key: str, value: Any) -> Any:
         if abs(value) < 10**9:
             return value
         text = str(value)
-        masked = redact(text)
+        masked = redact_log(text)
         return value if masked == text else masked
     text = str(value)[:_VALUE_MAX]
     if key in _UUID_FIELDS and _UUID_RE.fullmatch(text):
         return text
     if key in _HEX_FIELDS and _HEX_RE.fullmatch(text):
         return text
-    return redact(text)
+    return redact_log(text)
 
 
 def _redact(_: WrappedLogger, __: str, ed: EventDict) -> EventDict:

@@ -7,8 +7,9 @@ Pure module (no database or web). Loads and validates the packaged catalogue onc
   never created) and has an English and a Telugu body with the same positional variables
   ``{{1}}..{{n}}``, in order, neither first nor last in the body (Meta's rule);
 - variables are short typed strings with a maximum length (PRV-026: only what the purpose needs);
-- buttons are a dynamic URL to the parent link page (ADR-0046) and/or the "Stop messages" quick
-  reply (FR-MSG-010);
+- buttons: only the dynamic URL to the parent link page (ADR-0046); no opt-out button and no
+  "reply STOP" text (owner decision D32: utility messages only; an inbound STOP is still honoured,
+  FR-MSG-010);
 - ``reviewed`` per language (FR-LANG-005).
 
 :func:`provider_name` gives the deterministic name a template has in every school's WABA
@@ -42,7 +43,7 @@ Purpose = Literal[
 TemplatePurpose = Literal[
     "optin_confirm", "school_notice", "absence_alert", "fee_reminder", "fee_receipt"
 ]
-Button = Literal["url", "stop"]
+Button = Literal["url"]
 TextKey = Literal["optin_stopped", "auto_reply", "auto_reply_no_phone"]
 
 _VAR: Final = re.compile(r"\{\{(\d+)\}\}")
@@ -59,7 +60,6 @@ SLIP_KEYS: Final = frozenset(
         "category_fees",
         "step_scan",
         "step_send",
-        "stop_note",
         "voluntary",
         "valid_until",
         "footer",
@@ -80,7 +80,6 @@ class TemplateText(_Model):
     reviewed: bool
     body: str = Field(min_length=10, max_length=1024)
     url_label: str | None = Field(default=None, min_length=1, max_length=25)
-    stop_label: str | None = Field(default=None, min_length=1, max_length=25)
 
 
 class Template(_Model):
@@ -103,8 +102,6 @@ class Template(_Model):
             raise ValueError("variable names repeat")
         if len(set(self.buttons)) != len(self.buttons):
             raise ValueError("buttons repeat")
-        if self.purpose != "optin_confirm" and "stop" not in self.buttons:
-            raise ValueError("every business-initiated template offers the stop quick reply")
         wanted = set(range(1, len(self.variables) + 1))
         for language in LANGUAGES:
             text = self.text(language)
@@ -116,8 +113,8 @@ class Template(_Model):
                 raise ValueError(f"{language} body may not start or end with a variable")
             if ("url" in self.buttons) != (text.url_label is not None):
                 raise ValueError(f"{language} url_label exactly when a url button is listed")
-            if ("stop" in self.buttons) != (text.stop_label is not None):
-                raise ValueError(f"{language} stop_label exactly when a stop button is listed")
+            if re.search(r"\bSTOP\b|ఆపు", text.body):
+                raise ValueError(f"{language} body may not ask parents to reply STOP (D32)")
         if contains_telugu(self.en.body) or not contains_telugu(self.te.body):
             raise ValueError("the en body is English and the te body Telugu")
         return self
@@ -235,7 +232,7 @@ def build_components(key: str, language: Language, public_base_url: str | None) 
                 }
             )
         else:
-            buttons.append({"type": "QUICK_REPLY", "text": text.stop_label})
+            raise ValueError(f"unknown button {button!r}")  # pragma: no cover - Literal
     if buttons:
         components.append({"type": "BUTTONS", "buttons": buttons})
     return components

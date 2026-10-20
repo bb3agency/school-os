@@ -86,7 +86,13 @@ def test_FR_PUB_008_current_gives_the_frame_and_counts_views(
     assert first.status_code == 200, first.text
     body = first.json()
     # Field allowlist (FR-PUB-009): nothing about the student, guardian or other schools.
-    assert set(body) == {"kind", "expires_at", "language", "school_name"}
+    assert set(body) == {
+        "kind", "expires_at", "language", "school_name", "notice", "receipt", "dues", "optin"
+    }  # fmt: skip
+    assert body["receipt"] is None
+    assert body["dues"] is None
+    assert body["optin"] is None
+    assert set(body["notice"]) == {"title", "body", "date", "has_pdf"}  # R2-3H content
     assert body["kind"] == "parent_notice"
     assert body["school_name"] == "Synthetic Model School"
     assert P.current(public_client, issued.key).status_code == 200
@@ -98,7 +104,7 @@ def test_FR_PUB_008_current_gives_the_frame_and_counts_views(
         if e["resource_id"] == issued.handle_id
     ]
     assert len(viewed) == 1
-    assert viewed[0]["summary"] == {"kind": "parent_notice", "target_type": "notice"}
+    assert viewed[0]["summary"] == {"kind": "parent_notice", "target_type": "parent_notice"}
 
 
 def test_FR_PUB_008_language_is_guardian_then_school_then_english_with_telugu_off(

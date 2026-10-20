@@ -24,6 +24,8 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 from collections.abc import Collection
+from dataclasses import dataclass
+from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
@@ -34,6 +36,7 @@ from app.fees import (
     approvals,
     ledger,
     online,
+    parent_pages,
     receipts,
     refund_hooks,
     reports,
@@ -63,7 +66,7 @@ from app.fees._common import (
 )
 from app.fees.money import ZERO
 from app.fees.online_schemas import PaymentLinkInfo
-from app.fees.receipts import RENDER_EVENT, RENDER_TASK
+from app.fees.receipts import MESSAGE_EVENT, RENDER_EVENT, RENDER_TASK
 from app.fees.schemas import DueLine, FeeAccountSummary, InstalmentDue, StudentDues
 from app.tenancy import service as tenancy
 
@@ -126,6 +129,9 @@ daily_csv = reports.daily_csv
 close_day = reports.close_day
 dues_list = reports.dues_list
 dues_csv = reports.dues_csv
+# R2-3J: the accounts of a manual WhatsApp fee reminder (FR-MSG-025; messaging.sends)
+ReminderAccount = reports.ReminderAccount
+reminder_accounts = reports.reminder_accounts
 
 post_late_fees = late.post_for_school
 
@@ -281,10 +287,119 @@ def upi_payee(session: Session) -> tuple[str, str, str] | None:
     return upi.payee(session)
 
 
+# R2-3H parent pages (ADR-0046 decisions 2 and 9; FR-PUB-009): allowlisted reads and the pay
+# step for app.public.pages; no permission check (the caller holds a live parent link).
+ParentReceipt = parent_pages.ParentReceipt
+ParentDues = parent_pages.ParentDues
+ParentPayment = parent_pages.ParentPayment
+ParentPaymentStatus = parent_pages.ParentPaymentStatus
+parent_receipt = parent_pages.receipt
+parent_receipt_pdf = parent_pages.receipt_pdf
+parent_account_student = parent_pages.account_student
+parent_dues = parent_pages.dues
+parent_pay = parent_pages.pay
+parent_payment = parent_pages.payment
+parent_upi_qr = upi.payee_qr
+
+
 def receipt_issued_event() -> str:
     """Outbox event written in the issuing transaction (payload: ``receipt_id``,
     ``account_id``, ``user_id``); the PDF render consumes it today, the receipt message later."""
     return RENDER_EVENT
+
+
+def receipt_message_event() -> str:
+    """Outbox event written next to :func:`receipt_issued_event` in the issuing transaction
+    (payload: ``receipt_id``, ``account_id``); the WhatsApp receipt message consumes it (R2-3G,
+    FR-MSG-015)."""
+    return MESSAGE_EVENT
+
+
+@dataclass(frozen=True, slots=True)
+class ReceiptForMessage:
+    """What a receipt message carries (FR-MSG-015): ids, number, amount and date only."""
+
+    receipt_id: uuid.UUID
+    account_id: uuid.UUID
+    student_id: uuid.UUID
+    receipt_number: str
+    amount: Decimal
+    receipt_date: dt.date
+    cancelled: bool
+
+
+def receipt_for_message(session: Session, receipt_id: uuid.UUID) -> ReceiptForMessage | None:
+    """The receipt of the current school for its WhatsApp message (system read; R2-3G).
+    ``None`` while fees are off or for an unknown receipt."""
+    if not fees_on(session, repo.current_tenant_id(session)):
+        return None
+    row = repo.get_receipt(session, receipt_id)
+    if row is None:
+        return None
+    account = repo.get_account(session, row.account_id)
+    if account is None:  # pragma: no cover - composite FK
+        return None
+    return ReceiptForMessage(
+        receipt_id=row.id,
+        account_id=row.account_id,
+        student_id=account.student_id,
+        receipt_number=row.receipt_number,
+        amount=row.amount,
+        receipt_date=row.receipt_date,
+        cancelled=row.status != "issued",
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class ReminderDue:
+    """One instalment of one fee account due for a reminder today (FR-MSG-014)."""
+
+    account_id: uuid.UUID
+    student_id: uuid.UUID
+    instalment_no: int
+    due_on: dt.date
+    amount: Decimal
+    offset_days: int
+
+
+def reminder_dues(session: Session, today: dt.date) -> list[ReminderDue]:
+    """Instalments of the current year's open accounts whose collectable amount still due is
+    above zero and at least the school's minimum, and whose due date is ``today`` minus one of
+    the school's reminder offsets (default -3, 0, +7 days; ``fin.fee_settings``). System read for
+    the daily fee reminders (R2-3G; FR-MSG-014, US-2205); an instalment already paid is never
+    listed. Empty while fees are off."""
+    if not fees_on(session, repo.current_tenant_id(session)):
+        return []
+    current = tenancy.get_current_academic_year(session)
+    if current is None:
+        return []
+    row = repo.get_settings(session)
+    offsets = sorted(set(row.reminder_offsets)) if row is not None else [-3, 0, 7]
+    minimum = row.min_reminder_amount if row is not None else ZERO
+    wanted = {today - dt.timedelta(days=o): o for o in offsets}
+    accounts = [a for a in repo.accounts_for_year(session, current.id) if a.status == "open"]
+    out: list[ReminderDue] = []
+    for account_id, dues in ledger.dues_of(session, accounts, today).items():
+        per: dict[int, list[DueLine]] = {}
+        for _, line in dues.lines:
+            if line.collectable and line.due_on is not None:
+                per.setdefault(line.instalment_no, []).append(line)
+        for no, lines in sorted(per.items()):
+            due_on = lines[0].due_on
+            amount = sum((x.due for x in lines), ZERO)
+            if due_on is None or due_on not in wanted or amount <= 0 or amount < minimum:
+                continue
+            out.append(
+                ReminderDue(
+                    account_id=account_id,
+                    student_id=dues.account.student_id,
+                    instalment_no=no,
+                    due_on=due_on,
+                    amount=amount,
+                    offset_days=wanted[due_on],
+                )
+            )
+    return out
 
 
 # --- full data export and offboarding ------------------------------------------------------------
@@ -358,6 +473,7 @@ __all__ = [
     "CONCESSION_APPROVE",
     "CONCESSION_REQUEST",
     "MANAGE",
+    "MESSAGE_EVENT",
     "READ",
     "RECEIPT_CANCEL",
     "RECONCILE",
@@ -368,16 +484,34 @@ __all__ = [
     "REPORT",
     "DayClosed",
     "ModuleHidden",
+    "ParentDues",
+    "ParentPayment",
+    "ParentPaymentStatus",
+    "ParentReceipt",
     "PaymentsNotConnected",
+    "ReceiptForMessage",
+    "ReminderAccount",
+    "ReminderDue",
     "SelfApprovalForbidden",
     "account_summary",
     "create_payment_intent",
     "dues_for_student",
     "enabled",
     "export_records",
+    "parent_account_student",
+    "parent_dues",
+    "parent_pay",
+    "parent_payment",
+    "parent_receipt",
+    "parent_receipt_pdf",
+    "parent_upi_qr",
     "payment_link",
     "payments_connected",
     "purge_tenant_data",
+    "receipt_for_message",
+    "receipt_message_event",
+    "reminder_accounts",
+    "reminder_dues",
     "tenant_data_counts",
     "upi_payee",
 ]

@@ -350,6 +350,12 @@ RESPONSE_FIELD_ALLOWLIST = {
     # R2-1C (ADR-0043): catalogue template codes of WhatsApp messages, not secrets.
     "app.messaging.schemas.MessagingTemplateOut.template_key": "message catalogue code",
     "app.messaging.schemas.MessagingMessageOut.template_key": "message catalogue code",
+    # R2-3G: the preview's id (bp_<uuid>) that pins the counts the sender confirms; it grants
+    # nothing (the confirmation re-checks the caller and recomputes the audience).
+    "app.messaging.sends.schemas.BroadcastPreviewOut.preview_token": "broadcast preview id",
+    # R2-3J (FR-MSG-025): a digest of who would get a fee reminder; it grants nothing either.
+    "app.messaging.sends.schemas.FeeReminderPreviewOut.preview_token": "fee reminder preview "
+    "digest",
     "app.identity.schemas.PermissionOut.key": "permission key",
     "app.identity.schemas.RoleOut.key": "role key",
     "app.platform.schemas.FlagOut.key": "feature flag key",
@@ -409,6 +415,11 @@ IDEMPOTENCY_EXEMPT = {
     ("POST", "/api/v1/fleet/heartbeat"): "machine route; nonce and timestamp make it replay-safe",
     ("POST", "/api/v1/public/links/exchange"): "a read: checks a parent link token, stores "
     "nothing (ADR-0046; no member, so no per-person replay store)",
+    # R2-3H parent pages (ADR-0046 decision 9, ADR-0044 decision 4).
+    ("POST", "/api/v1/public/links/current/pay"): "idempotent per link and instalments: an open "
+    "payment link for the same choice is returned again (reused), never a second one",
+    ("POST", "/api/v1/public/links/current/optin"): "sets one value (the guardian's message "
+    "language); repeating it changes nothing",
     ("POST", "/api/v1/edge/tally/enrol"): "machine route; the one-time code is consumed",
     ("POST", "/api/v1/edge/tally/syncs"): "machine route; sync ids are unique per device",
     ("POST", "/api/v1/sections/{section_id}/attendance"): "an upsert keyed by student and day",
@@ -425,6 +436,11 @@ IDEMPOTENCY_EXEMPT = {
     ("POST", "/api/v1/webhooks/meta"): "machine route; signed, replayed bodies and event keys "
     "are deduplicated",
     ("POST", "/api/v1/messaging/account/resume"): "a state transition (409 when not paused)",
+    ("POST", "/api/v1/notices/{notice_id}/broadcasts/preview"): "computes counts (R2-3G); the "
+    "stored preview sends nothing and expires in 30 minutes",
+    ("POST", "/api/v1/messages/{message_id}/revoke-link"): "a state transition (revoked false on "
+    "repeat)",
+    ("POST", "/api/v1/fees/reminders/preview"): "computes counts (R2-3J); stores and sends nothing",
     ("POST", "/api/v1/messaging/templates/sync"): "re-reads Meta; creating is idempotent per "
     "template name",
     ("POST", "/api/v1/messaging/join-slips"): "a print view; each print makes new single-use "

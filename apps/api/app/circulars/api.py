@@ -32,6 +32,7 @@ from app.circulars.schemas import (
     NoticeRenderIn,
     NoticeStatus,
     NoticeUpdate,
+    NoticeWithdrawIn,
     ReviewIn,
     SuggestionConfirmIn,
     SuggestionDismissIn,
@@ -345,6 +346,25 @@ def approve_notice(
     ``notice_personal_data``); 409 ``notice_approved`` or ``notice_drafting``. The A4 PDF and
     the image are made next."""
     out = service.approve_notice(db, ctx, notice_id, version)
+    response.headers["ETag"] = etag(out.version)
+    return out
+
+
+@router.post("/notices/{notice_id}/withdraw", response_model=NoticeOut)
+def withdraw_notice(
+    ctx: NoticeApprover,
+    db: TenantDB,
+    *,
+    notice_id: uuid.UUID,
+    body: NoticeWithdrawIn,
+    version: IfMatch,
+    response: Response,
+) -> NoticeOut:
+    """Withdraw an approved notice (R2-3J, FR-NOTICE-009; ``notice.approve``; ``If-Match``):
+    it stays on record with the reason, its parent links stop working at once (FR-PUB-007) and
+    WhatsApp messages not yet sent are cancelled. 409 ``notice_not_approved``,
+    ``notice_withdrawn``; 422 ``reason``. Audited."""
+    out = service.withdraw_notice(db, ctx, notice_id, body, version)
     response.headers["ETag"] = etag(out.version)
     return out
 

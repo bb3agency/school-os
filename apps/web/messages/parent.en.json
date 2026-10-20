@@ -1,0 +1,108 @@
+{
+  "common": {
+    "openPdf": "Open the PDF",
+    "pdfNotReady": "The PDF is not ready yet. Open this page again later.",
+    "pdfUnavailable": "The PDF could not be opened just now. Try again in a few minutes.",
+    "back": "Back to the page",
+    "rupees": "₹{amount}"
+  },
+  "notice": {
+    "dated": "Dated {date}"
+  },
+  "receipt": {
+    "cancelled": "Cancelled on {date}. The school cancelled this receipt.",
+    "number": "Receipt number",
+    "date": "Date",
+    "child": "Student",
+    "class": "Class",
+    "admissionNo": "Admission number",
+    "mode": "Paid by",
+    "item": "Fee",
+    "amount": "Amount",
+    "total": "Total",
+    "inWords": "In words: {words}",
+    "savePdf": "Save as PDF",
+    "keep": "Keep this receipt. It is the school's record of your payment.",
+    "modes": {
+      "cash": "Cash",
+      "cheque": "Cheque",
+      "bank_transfer": "Bank transfer",
+      "upi_qr": "UPI",
+      "razorpay": "Online payment",
+      "other": "Other"
+    }
+  },
+  "dues": {
+    "title": "Fees due for {name}",
+    "titleNoName": "Fees due",
+    "asOf": "As on {date}",
+    "nothingDue": "Nothing is due now. Thank you.",
+    "dueOn": "Due on {date}",
+    "noDate": "No due date",
+    "overdue": "Overdue",
+    "lateFee": "includes late fee {amount}",
+    "total": "Total due",
+    "lateTotal": "Late fees included: {amount}",
+    "choose": "Choose what to pay",
+    "payOnline": "Pay {amount} online",
+    "payOnlineChosen": "Pay the ticked fees online",
+    "payOnlineNote": "You will go to Razorpay's page for the school's own account. The school sends your receipt after the payment.",
+    "upiTitle": "Pay by UPI",
+    "upiHow": "Scan this QR with any UPI app and type the amount. Show the payment to the school office if they ask.",
+    "upiQrAlt": "UPI QR code of {payee}",
+    "upiPayee": "Payee: {payee}",
+    "upiId": "UPI ID: {id}",
+    "paidAlready": "Paid already? The school will send your receipt.",
+    "office": "School office: {phone}",
+    "noCard": "This page never asks for card or bank details.",
+    "errors": {
+      "choose": "Tick at least one fee to pay.",
+      "not_connected": "Online payment is not available for this school now. Pay at the school office or by UPI.",
+      "nothing_due": "Nothing is due on the fees you ticked. Open this page again to see what is due now.",
+      "too_many": "Too many payment pages are open for this student. Ask the school office.",
+      "limit": "Too many payment tries from this link today. Try again tomorrow or ask the school office.",
+      "failed": "The payment page could not be opened. Try again in a few minutes.",
+      "expired": "This link has expired. Ask the school office for a new one."
+    }
+  },
+  "paid": {
+    "title": "Payment",
+    "thanks": "Thank you. Your payment of {amount} was received.",
+    "receipt": "The school will send your receipt on WhatsApp.",
+    "receiptReady": "The school has made your receipt and will send it on WhatsApp.",
+    "waiting": "Waiting for Razorpay to confirm your payment of {amount}…",
+    "waitingNote": "This page checks again by itself. You can also close it: if you paid, the school will send your receipt.",
+    "stillWaiting": "Razorpay has not confirmed the payment yet. If money left your account, the school will send your receipt when it arrives.",
+    "checkAgain": "Check again",
+    "notPaid": "This payment was not completed. Open the fees page to try again.",
+    "unknown": "We could not find this payment. If money left your account, the school will send your receipt.",
+    "backToDues": "Back to the fees"
+  },
+  "optin": {
+    "title": "School messages on WhatsApp",
+    "intro": "These are the messages {school} sends you on WhatsApp.",
+    "categories": {
+      "notices": "Notices",
+      "attendance": "Attendance alerts",
+      "fees": "Fee messages"
+    },
+    "status": {
+      "opted_in": "You get these",
+      "opted_out": "Stopped",
+      "not_asked": "Not joined"
+    },
+    "stoppedByYou": "You asked the school to stop these messages.",
+    "howToJoin": "To get messages you have not joined, ask the school office for a joining slip.",
+    "languageTitle": "Read messages in",
+    "languageEn": "English",
+    "languageTe": "తెలుగు (Telugu)",
+    "languageSchool": "The school's choice ({language})",
+    "languageNames": {
+      "en": "English",
+      "te": "Telugu"
+    },
+    "save": "Save my choice",
+    "saved": "Saved. Messages and pages from the school will be in your choice.",
+    "saveFailed": "Your choice was not saved. Try again in a few minutes."
+  }
+}

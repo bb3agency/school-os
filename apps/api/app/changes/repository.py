@@ -103,8 +103,15 @@ def list_requests(
     student_id: uuid.UUID | None,
     after: tuple[dt.datetime, uuid.UUID] | None,
     limit: int,
+    requested_by: uuid.UUID | None = None,
+    not_requested_by: uuid.UUID | None = None,
+    open_at: dt.datetime | None = None,
 ) -> Sequence[ChangeRequest]:
-    """Newest first; ``student_ids`` limits the rows to the caller's reach (``None`` = all)."""
+    """Newest first; ``student_ids`` limits the rows to the caller's reach (``None`` = all).
+
+    ``requested_by`` keeps one maker's requests, ``not_requested_by`` drops them (maker-checker
+    inbox) and ``open_at`` keeps only requests still open at that time (pending, not expired).
+    """
     stmt = select(ChangeRequest)
     if student_ids is not None:
         ids = sorted(student_ids)
@@ -113,6 +120,12 @@ def list_requests(
         stmt = stmt.where(ChangeRequest.status == status)
     if student_id is not None:
         stmt = stmt.where(ChangeRequest.student_id == student_id)
+    if requested_by is not None:
+        stmt = stmt.where(ChangeRequest.requested_by == requested_by)
+    if not_requested_by is not None:
+        stmt = stmt.where(ChangeRequest.requested_by != not_requested_by)
+    if open_at is not None:
+        stmt = stmt.where(ChangeRequest.status == "pending", ChangeRequest.expires_at > open_at)
     if after is not None:
         at, last_id = after
         stmt = stmt.where(

@@ -11,6 +11,13 @@ Public API
   where phone numbers and emails are legitimate content).
 - ``redact(text)``: masks Aadhaar-like numbers, Indian mobile numbers and email addresses
   (logs, traces, error reports: last line of defence, docs/11 §2).
+- ``redact_log(text)``: ``redact`` plus credentials and provider identifiers (structured logs,
+  local tracebacks, span names; R2-3I, SEC-008, SEC-037): bearer tokens and JWTs, ``name=value``
+  secrets in query strings (OAuth ``code``, ``state``, ``hub.verify_token``, ...), Meta access
+  tokens, Razorpay ids (``pay_``, ``order_``, ``plink_``, key ids, ...), hex signatures (40+
+  hex characters), long mixed-case keys (parent link tokens, Razorpay route values), upper-case
+  codes with digits (certificate codes, bank UTRs) and 12-22 digit numbers (UPI UTRs, WABA ids).
+  Not for content pipelines: only logs and traces, where such values are never needed.
 - ``contains_full_aadhaar(text)``: input rejection (FR-STU-012).
 - ``find_aadhaar(text)``: where the numbers ``mask_aadhaar`` masks are (image redaction,
   PRV-016: callers map the character ranges to OCR bounding boxes).
@@ -55,6 +62,7 @@ __all__ = [
     "find_aadhaar",
     "mask_aadhaar",
     "redact",
+    "redact_log",
     "verhoeff_check_digit",
     "verhoeff_valid",
 ]
@@ -357,6 +365,91 @@ def redact(text: str) -> str:
     """Mask Aadhaar-like numbers, Indian mobile numbers and emails. Idempotent, NFC output."""
     out = _fixpoint(unicodedata.normalize("NFC", text), mobiles=True)
     return _EMAIL_RE.sub(EMAIL_MASK, out)
+
+
+# --- Credentials and provider identifiers (logs and traces only; R2-3I) ---------------------
+
+TOKEN_MASK = "[redacted-token]"  # noqa: S105 (a mask, not a secret)
+ID_MASK = "[redacted-id]"
+NUMBER_MASK = "[redacted-number]"
+_SECRET_MASK = "[redacted]"  # noqa: S105 (a mask, not a secret)
+
+_BEARER_RE = re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]+")
+_JWT_RE = re.compile(r"\beyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]*")
+# ``name=value`` pairs whose value is a credential (query strings, form bodies, headers echoed
+# in an exception message). The name is kept so the line still says what was there.
+_PAIR_RE = re.compile(
+    r"(?i)(?<![A-Za-z0-9_])("
+    r"code|state|token|access_token|refresh_token|id_token|client_secret|secret|password|"
+    r"signature|sig|sha256|key|api_key|key_secret|hub\.verify_token|hub\.challenge|"
+    r"razorpay_signature|razorpay_payment_id|razorpay_payment_link_id|utr|rrn"
+    r")([=:]\s?)([^\s&\"',;]+)"
+)
+_META_TOKEN_RE = re.compile(r"(?<![A-Za-z0-9])EAA[A-Za-z0-9]{20,}")
+# Razorpay entity ids and key ids: a known prefix and 14 base62 characters (at least one digit
+# or capital, so snake_case names such as ``order_received`` stay readable).
+_RAZORPAY_ID_RE = re.compile(
+    r"(?<![A-Za-z0-9])(?:rzp_live|rzp_test|pay|order|plink|rfnd|cust|inv|setl|sub|qr|txn|evt|"
+    r"acc|disp|pout|fa|va|aov|card|token)_(?=[A-Za-z0-9]*[A-Z0-9])[A-Za-z0-9]{10,20}"
+    r"(?![A-Za-z0-9])"
+)
+_HEX_SECRET_RE = re.compile(r"(?<![0-9A-Za-z])[0-9a-fA-F]{40,}(?![0-9A-Za-z])")
+# Random keys: 20+ URL-safe characters with capitals, small letters and a digit, ``_`` or ``-``
+# (parent link tokens, Meta and OAuth codes). snake_case names, CamelCase class names (local
+# tracebacks stay readable) and lower-case hex request ids never match.
+_MIXED_KEY_RE = re.compile(
+    r"(?<![A-Za-z0-9_-])(?=[A-Za-z0-9_-]*[A-Z])(?=[A-Za-z0-9_-]*[a-z])"
+    r"(?=[A-Za-z0-9_-]*[0-9_-])[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])"
+)
+# Razorpay route values (``public.tokens.new_route_token``: 24 letters and digits) even in the
+# rare draw without a digit.
+_ROUTE_VALUE_RE = re.compile(
+    r"(?<![A-Za-z0-9_-])(?=[A-Za-z0-9]*[A-Z])(?=[A-Za-z0-9]*[a-z])[A-Za-z0-9]{24}"
+    r"(?![A-Za-z0-9_-])"
+)
+# Upper-case codes with digits: certificate verification codes, bank UTRs (``HDFCR520261021...``);
+# never the ``XXXXXX1234`` a masked mobile number already is.
+_UPPER_CODE_RE = re.compile(
+    r"(?<![A-Za-z0-9])(?!XXXX)(?=(?:[A-Z]*[0-9]){4})(?=(?:[0-9]*[A-Z]){2})[A-Z0-9]{10,32}(?![A-Za-z0-9])"
+)
+# Certificate verification codes (``certificates.codes``: 16 Crockford base32 characters, plain or
+# printed in dashed groups of four) whatever their mix of digits and letters.
+_CERT_CODE_RE = re.compile(
+    r"(?<![A-Za-z0-9-])(?:[0-9A-HJKMNP-TV-Z]{4}-){3}[0-9A-HJKMNP-TV-Z]{4}(?![A-Za-z0-9-])"
+    r"|(?<![A-Za-z0-9])[0-9A-HJKMNP-TV-Z]{16}(?![A-Za-z0-9])"
+)
+# UPI UTR/RRN (12 digits), NEFT/IMPS references, WABA and phone-number ids (15-16 digits).
+_LONG_NUMBER_RE = re.compile(r"(?<![0-9A-Za-z])[0-9]{12,22}(?![0-9A-Za-z])")
+
+
+def _mask_credentials(segment: str) -> str:
+    segment = _BEARER_RE.sub(lambda m: f"{m.group(1)} {TOKEN_MASK}", segment)
+    segment = _JWT_RE.sub(TOKEN_MASK, segment)
+    segment = _PAIR_RE.sub(lambda m: f"{m.group(1)}{m.group(2)}{_SECRET_MASK}", segment)
+    segment = _META_TOKEN_RE.sub(TOKEN_MASK, segment)
+    segment = _RAZORPAY_ID_RE.sub(ID_MASK, segment)
+    segment = _HEX_SECRET_RE.sub(TOKEN_MASK, segment)
+    segment = _MIXED_KEY_RE.sub(TOKEN_MASK, segment)
+    segment = _ROUTE_VALUE_RE.sub(TOKEN_MASK, segment)
+    segment = _UPPER_CODE_RE.sub(ID_MASK, segment)
+    segment = _CERT_CODE_RE.sub(ID_MASK, segment)
+    return _LONG_NUMBER_RE.sub(NUMBER_MASK, segment)
+
+
+def redact_log(text: str) -> str:
+    """:func:`redact` plus credentials and provider identifiers (see the module docstring).
+
+    For log lines, tracebacks and span names only. UUIDs are kept verbatim (they are the ids
+    logs are meant to carry). Idempotent: ``redact_log(redact_log(x)) == redact_log(x)``."""
+    out = redact(text)
+    pieces: list[str] = []
+    cursor = 0
+    for m in _UUID_RE.finditer(out):
+        pieces.append(_mask_credentials(out[cursor : m.start()]))
+        pieces.append(m.group(0))
+        cursor = m.end()
+    pieces.append(_mask_credentials(out[cursor:]))
+    return "".join(pieces)
 
 
 def contains_full_aadhaar(text: str) -> bool:

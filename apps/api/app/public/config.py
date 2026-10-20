@@ -29,6 +29,14 @@ WebhookProvider = Literal["razorpay", "meta"]
 HANDLE_KINDS: Final[tuple[HandleKind, ...]] = get_args(HandleKind)
 PARENT_KINDS: Final[tuple[ParentKind, ...]] = get_args(ParentKind)
 WEBHOOK_PROVIDERS: Final[tuple[WebhookProvider, ...]] = get_args(WebhookProvider)
+# What each parent link points at (R2-3H pages <-> R2-3G sends; rememory 0ca03e6a). A parent page
+# renders a handle only when its target_type is the one of its kind (else the uniform 404).
+PARENT_TARGET_TYPES: Final[dict[ParentKind, str]] = {
+    "parent_notice": "parent_notice",  # ops.parent_notices.id (approved)
+    "parent_receipt": "fee_receipt",  # fin.receipts.id
+    "parent_dues": "fee_account",  # fin.student_fee_accounts.id
+    "parent_optin": "guardian",  # the guardian's id (same as guardian_id)
+}
 # The database refuses to delete expired handles sooner (policy purge_expired_only, 0055).
 MIN_PURGE_AFTER_DAYS: Final = 30
 
@@ -50,6 +58,22 @@ class PublicConfig(_Model):
     route_token_length: int = Field(ge=24, le=64)
     webhook_providers: dict[WebhookProvider, WebhookProviderConfig]
     replay_window_hours: int = Field(ge=1, le=24 * 30)
+    pay_redirect_hosts: tuple[str, ...] = Field(min_length=1)
+
+    @field_validator("pay_redirect_hosts")
+    @classmethod
+    def _plain_hosts(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        for host in value:
+            if not host or host != host.lower() or "/" in host or ":" in host or "*" in host:
+                raise ValueError("pay_redirect_hosts are lower-case host names")
+        return value
+
+    def pay_redirect_allowed(self, host: str | None) -> bool:
+        """``host`` is one of the hosts (or a subdomain of one)."""
+        if not host:
+            return False
+        host = host.lower()
+        return any(host == h or host.endswith("." + h) for h in self.pay_redirect_hosts)
 
     @field_validator("lifetimes_days")
     @classmethod
@@ -87,6 +111,7 @@ __all__ = [
     "HANDLE_KINDS",
     "MIN_PURGE_AFTER_DAYS",
     "PARENT_KINDS",
+    "PARENT_TARGET_TYPES",
     "WEBHOOK_PROVIDERS",
     "HandleKind",
     "ParentKind",
