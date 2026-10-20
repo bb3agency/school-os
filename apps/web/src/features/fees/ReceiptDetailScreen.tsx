@@ -31,6 +31,7 @@ import {
   toPaise,
   type Receipt,
 } from "./data";
+import { ReceiptWhatsApp } from "@/features/messaging/ReceiptWhatsApp";
 import {
   Amount,
   FeesGate,
@@ -431,6 +432,7 @@ export function ReceiptDetailScreen({ receiptId }: { receiptId: string }) {
           <div className="space-y-5">
             {header(r)}
             <ApiErrorAlert error={pdf.error} namespace="fees" />
+            {r.status === "issued" ? <ReceiptWhatsApp receiptId={r.id} /> : null}
             {r.status === "cancelled" ? (
               <Alert
                 tone="warning"

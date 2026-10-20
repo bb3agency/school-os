@@ -26,6 +26,17 @@ FR-MSG-011..017, FR-MSG-022).
   permanent ones are final. **Nothing is sent while a school is suspended** (D31): the sweep
   only visits active schools, the woken task is held by ``ops.TenantTask`` and the sender checks
   the school's status again.
+- **Manual sends (R2-3J).** Fee reminders chosen on the dues list (FR-MSG-025: preview with a
+  stateless token that pins who gets one, confirm with ``Idempotency-Key``, one per account and
+  guardian and IST day, dedupe key ``manual:<date>``) and "Send on WhatsApp" for one receipt
+  (FR-MSG-026: the receipt message path, dedupe key ``receipt``, so it is never sent twice).
+  The automatic switches (fee reminders, fee receipts) govern the automatic messages only; a
+  fee message a person queued (``created_by``) is not skipped as ``purpose_off``. Quiet hours,
+  the cap, the account pause and D31 apply to every message.
+- **Notice withdrawal (R2-3J, FR-NOTICE-009, FR-PUB-007).** The outbox event
+  ``notice.withdrawn`` cancels the notice's queued messages (``skipped`` / ``notice_withdrawn``)
+  and revokes its parent links again (circulars revokes them in the withdrawing transaction);
+  the sender also skips a notice message whose notice is no longer approved.
 - **Logs and audit (invariant 5, FR-MSG-022).** IDs, codes and counts only; phone numbers stay
   in ``sis.guardians`` and are decrypted only by ``messaging.service.deliver`` in the worker.
 """
@@ -33,6 +44,7 @@ FR-MSG-011..017, FR-MSG-022).
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import uuid
 from collections import Counter, defaultdict
 from collections.abc import Mapping, Sequence
@@ -46,7 +58,7 @@ from app.authz.context import UserContext
 from app.authz.http import decode_cursor, encode_cursor
 from app.circulars import service as circulars
 from app.core.db import tenant_session
-from app.core.errors import Conflict, NotFound, ValidationFailed
+from app.core.errors import Conflict, Forbidden, NotFound, ValidationFailed
 from app.core.ids import new_id
 from app.core.languages import Language, contains_telugu, parent_language
 from app.core.logging import get_logger
@@ -66,6 +78,12 @@ from app.messaging.sends.schemas import (
     BroadcastPreviewIn,
     BroadcastPreviewOut,
     BroadcastReportOut,
+    FeeReminderPreviewOut,
+    FeeRemindersConfirmIn,
+    FeeReminderSelectionIn,
+    FeeRemindersOut,
+    ReceiptMessageOut,
+    ReceiptWhatsAppOut,
     RevokeLinkOut,
     SectionCountsOut,
     SendRunOut,
@@ -80,6 +98,12 @@ READ: Final = "message.read"
 SEND_EVENT: Final = "messaging.send"
 SEND_TASK: Final = "messaging.send_due"
 RECEIPT_TASK: Final = "messaging.receipt_message"
+NOTICE_WITHDRAWN_TASK: Final = "messaging.notice_withdrawn"
+FEE_COLLECT: Final = "fee.collect"
+REMINDER_TOKEN_PREFIX: Final = "fr_"  # noqa: S105 - a preview digest prefix, not a secret
+# Purposes whose switch is about the automatic messages only (R2-3J): a person may still send
+# one by hand (FR-MSG-025, FR-MSG-026). Notices are always sent by hand and keep their switch.
+MANUAL_ALLOWED: Final = frozenset({"fee_reminder", "fee_receipt"})
 TOKEN_PREFIX: Final = "bp_"  # noqa: S105 - a preview id prefix, not a secret
 SENDING_PURPOSES: Final = frozenset(
     {"school_notice", "absence_alert", "fee_reminder", "fee_receipt"}
@@ -101,6 +125,7 @@ _SWITCH: Final = {
 
 ops.register_outbox_route(SEND_EVENT, SEND_TASK)
 ops.register_outbox_route(fees.receipt_message_event(), RECEIPT_TASK)
+ops.register_outbox_route(circulars.notice_withdrawn_event(), NOTICE_WITHDRAWN_TASK)
 
 log = get_logger(__name__)
 
@@ -125,9 +150,12 @@ _BLOCK_TEXT: Final = {
     "messaging_not_connected": "Connect the school's WhatsApp number first.",
     "messaging_paused": "Sending is paused. Resume it in WhatsApp settings first.",
     "messaging_currency_not_inr": "Set INR billing in Meta's Billing Hub first.",
-    "template_not_approved": "Meta has not approved the notice message yet.",
-    "template_paused": "The notice message is paused. Check WhatsApp settings.",
+    "template_not_approved": "Meta has not approved this message yet.",
+    "template_paused": "This message is paused. Check WhatsApp settings.",
     "notices_off": "Turn on notices in WhatsApp settings first.",
+    "receipt_cancelled": "This receipt is cancelled. Cancelled receipts are not sent.",
+    "no_opted_in_guardian": "No guardian of this student agreed to get fee messages.",
+    "already_queued": "This receipt was already sent to every guardian who agreed.",
 }
 
 
@@ -738,6 +766,48 @@ def run_fee_reminders(tenant_id: uuid.UUID, now: dt.datetime) -> dict[str, int]:
     return {"ran": 1, "queued": queued}
 
 
+def _queue_receipt(
+    session: Session,
+    receipt: fees.ReceiptForMessage,
+    guardian_ids: Sequence[uuid.UUID],
+    *,
+    created_by: uuid.UUID | None,
+) -> int:
+    """Queue the receipt message to ``guardian_ids`` (FR-MSG-015; dedupe key ``receipt``: once
+    per receipt and guardian, whoever asks). Returns how many were new."""
+    name = students.first_names(session, [receipt.student_id]).get(receipt.student_id)
+    if name is None:
+        return 0
+    school = tenancy.school_display_name(session)
+    queued = 0
+    for guardian_id in guardian_ids:
+        out = messaging.queue_message(
+            session,
+            purpose="fee_receipt",
+            guardian_id=guardian_id,
+            student_id=receipt.student_id,
+            source_type="fee_receipt",
+            source_id=receipt.receipt_id,
+            dedupe_key="receipt",
+            variables={
+                "school_name": school,
+                "amount": rules.parent_amount(receipt.amount),
+                "child_first_name": name,
+                "receipt_number": receipt.receipt_number,
+                "date": rules.parent_date(receipt.receipt_date),
+            },
+            created_by=created_by,
+        )
+        queued += int(out is not None)
+    return queued
+
+
+def _receipt_guardians(session: Session, receipt: fees.ReceiptForMessage) -> list[uuid.UUID]:
+    """The student's guardians opted in for fee messages."""
+    briefs = students.guardians_of_students(session, [receipt.student_id])
+    return sorted(_optins(session, sorted({b.guardian_id for b in briefs}), "fees"))
+
+
 def queue_receipt_message(tenant_id: uuid.UUID, receipt_id: uuid.UUID) -> dict[str, int]:
     """The receipt message (FR-MSG-015, US-2206) to each guardian of the student opted in for
     fees: receipt number, amount, date and a link to the receipt page. Idempotent per receipt
@@ -750,34 +820,338 @@ def queue_receipt_message(tenant_id: uuid.UUID, receipt_id: uuid.UUID) -> dict[s
         receipt = fees.receipt_for_message(session, receipt_id)
         if receipt is None or receipt.cancelled:
             return {"queued": 0}
-        briefs = students.guardians_of_students(session, [receipt.student_id])
-        opted = _optins(session, sorted({b.guardian_id for b in briefs}), "fees")
-        name = students.first_names(session, [receipt.student_id]).get(receipt.student_id)
-        if name is None:
-            return {"queued": 0}
-        school = tenancy.school_display_name(session)
-        queued = 0
-        for guardian_id in sorted({b.guardian_id for b in briefs} & opted):
-            out = messaging.queue_message(
-                session,
-                purpose="fee_receipt",
-                guardian_id=guardian_id,
-                student_id=receipt.student_id,
-                source_type="fee_receipt",
-                source_id=receipt.receipt_id,
-                dedupe_key="receipt",
-                variables={
-                    "school_name": school,
-                    "amount": rules.parent_amount(receipt.amount),
-                    "child_first_name": name,
-                    "receipt_number": receipt.receipt_number,
-                    "date": rules.parent_date(receipt.receipt_date),
-                },
-            )
-            queued += int(out is not None)
+        queued = _queue_receipt(
+            session, receipt, _receipt_guardians(session, receipt), created_by=None
+        )
     if queued:
         send_due(tenant_id)
     return {"queued": queued}
+
+
+# --- "Send on WhatsApp" for one receipt (R2-3J; FR-MSG-026) --------------------------------------
+
+
+def _receipt_caller(ctx: UserContext) -> None:
+    """The counter (``fee.collect``) or a sender (``message.send``), school-wide (fee
+    permissions are never section-scoped, FR-FEE-024)."""
+    for permission in (FEE_COLLECT, SEND):
+        if ctx.has(permission) and ctx.scope_for(permission).school_wide:
+            return
+    raise Forbidden()
+
+
+def _receipt(session: Session, receipt_id: uuid.UUID) -> fees.ReceiptForMessage:
+    receipt = fees.receipt_for_message(session, receipt_id)
+    if receipt is None:
+        raise NotFound("Receipt not found")
+    return receipt
+
+
+@dataclass(frozen=True, slots=True)
+class _ReceiptState:
+    reason: str | None
+    pending: list[uuid.UUID]
+    opted: int
+    messages: list[Message]
+
+
+def _receipt_state(session: Session, receipt: fees.ReceiptForMessage) -> _ReceiptState:
+    """Why the receipt cannot be sent now (or ``None``), the opted-in guardians who have no
+    receipt message yet, and the receipt's messages."""
+    messages = repo.source_messages(session, "fee_receipt", receipt.receipt_id)
+    have = {m.guardian_id for m in messages}
+    opted = _receipt_guardians(session, receipt)
+    pending = [g for g in opted if g not in have]
+    reason = messaging.account_block(session, "fee_receipt")
+    if reason is None and receipt.cancelled:
+        reason = "receipt_cancelled"
+    if reason is None and not opted:
+        reason = "no_opted_in_guardian"
+    if reason is None and not pending:
+        reason = "already_queued"
+    return _ReceiptState(reason=reason, pending=pending, opted=len(opted), messages=messages)
+
+
+def _receipt_out(receipt: fees.ReceiptForMessage, state: _ReceiptState) -> ReceiptWhatsAppOut:
+    return ReceiptWhatsAppOut(
+        receipt_id=receipt.receipt_id,
+        can_send=state.reason is None,
+        blocked_reason=state.reason,
+        opted_in_guardians=state.opted,
+        messages=[
+            ReceiptMessageOut(
+                id=m.id,
+                status=m.status,
+                skip_reason=m.skip_reason,
+                failure_reason=(
+                    (messaging.error_reason(m.error_code) or "provider_error")
+                    if m.status == "failed"
+                    else None
+                ),
+                language=m.language,
+                queued_at=m.queued_at,
+                status_at=m.status_at,
+            )
+            for m in state.messages
+        ],
+    )
+
+
+def receipt_whatsapp(
+    session: Session, ctx: UserContext, receipt_id: uuid.UUID
+) -> ReceiptWhatsAppOut:
+    """Whether the receipt can be sent on WhatsApp now and its messages' status (FR-MSG-026;
+    ``fee.collect`` or ``message.send``, school-wide). 404 for an unknown receipt, another
+    school's, or while fees are off."""
+    _receipt_caller(ctx)
+    messaging.ensure_available()
+    receipt = _receipt(session, receipt_id)
+    return _receipt_out(receipt, _receipt_state(session, receipt))
+
+
+def send_receipt_whatsapp(
+    session: Session, ctx: UserContext, receipt_id: uuid.UUID
+) -> ReceiptWhatsAppOut:
+    """Queue the receipt message to the guardians opted in for fee messages who have none yet
+    (FR-MSG-026, US-2206; ``fee.collect`` or ``message.send``; ``Idempotency-Key``). The same
+    path as the automatic receipt message (dedupe key ``receipt``: never twice to a guardian);
+    sent outside quiet hours (until 20:00 IST). Errors: 404; 409 with the reason as its code
+    (``messaging_not_connected``, ``messaging_paused``, ``template_not_approved``,
+    ``template_paused``, ``messaging_currency_not_inr``, ``receipt_cancelled``,
+    ``no_opted_in_guardian``, ``already_queued``). Audit ``messaging.receipt.sent``."""
+    _receipt_caller(ctx)
+    messaging.ensure_available()
+    receipt = _receipt(session, receipt_id)
+    state = _receipt_state(session, receipt)
+    if state.reason is not None:
+        raise SendingBlocked(state.reason)
+    queued = _queue_receipt(session, receipt, state.pending, created_by=ctx.user_id)
+    messaging.record_audit(
+        session,
+        action="messaging.receipt.sent",
+        resource_type="fee_receipt",
+        resource_id=receipt.receipt_id,
+        summary={"queued": queued, "guardians": len(state.pending)},
+    )
+    if queued:
+        ops.enqueue_event(session, SEND_EVENT, {"receipt_id": str(receipt.receipt_id)})
+    return _receipt_out(receipt, _receipt_state(session, receipt))
+
+
+# --- manual fee reminders from the dues list (R2-3J; FR-MSG-025) ---------------------------------
+
+
+@dataclass
+class _ReminderPlan:
+    day: dt.date
+    accounts: int = 0
+    items: list[tuple[fees.ReminderAccount, uuid.UUID]] = field(default_factory=list)
+    skipped_accounts: Counter[str] = field(default_factory=Counter)
+    skipped_guardians: Counter[str] = field(default_factory=Counter)
+
+    def token(self) -> str:
+        """A digest of who gets a reminder, for how much, and who is left out (the preview the
+        person saw); the confirmation recomputes it."""
+        parts = [self.day.isoformat()]
+        parts += sorted(f"{a.account_id}:{g}:{a.overdue}" for a, g in self.items)
+        parts += [f"a.{k}={v}" for k, v in sorted(self.skipped_accounts.items())]
+        parts += [f"g.{k}={v}" for k, v in sorted(self.skipped_guardians.items())]
+        digest = hashlib.sha256("|".join(parts).encode()).hexdigest()
+        return REMINDER_TOKEN_PREFIX + digest[:40]
+
+    def counts(self) -> dict[str, Any]:
+        return {
+            "accounts": self.accounts,
+            "recipients": len(self.items),
+            "skipped_accounts": dict(self.skipped_accounts),
+            "skipped_guardians": dict(self.skipped_guardians),
+        }
+
+
+def _reminder_dedupe(day: dt.date) -> str:
+    return f"manual:{day.isoformat()}"
+
+
+def _guardian_reason(
+    session: Session, guardian_id: uuid.UUID, has_phone: bool, optin: Any
+) -> str | None:
+    if optin is None:
+        return "no_optin"
+    if optin.status != "opted_in":
+        return "opted_out"
+    if not has_phone:
+        return "no_mobile_number"
+    if not messaging.optin_for_current_number(session, guardian_id, optin):
+        return "optin_for_other_number"
+    return None
+
+
+def _reminder_plan(
+    session: Session, ctx: UserContext, data: FeeReminderSelectionIn
+) -> _ReminderPlan:
+    picked = fees.reminder_accounts(
+        session,
+        ctx,
+        account_ids=data.account_ids,
+        section_id=data.section_id,
+        class_id=data.class_id,
+    )
+    if len(picked) > load_config().broadcasts.max_reminder_accounts:
+        raise ValidationFailed([_error("account_ids", "too_many")])
+    plan = _ReminderPlan(day=messaging.ist_today(session), accounts=len(picked))
+    due: list[fees.ReminderAccount] = []
+    for account in picked:
+        if account.overdue <= 0 or account.oldest_due_on is None:
+            plan.skipped_accounts["nothing_due"] += 1
+        elif account.overdue < account.minimum:
+            plan.skipped_accounts["below_minimum"] += 1
+        else:
+            due.append(account)
+    student_ids = sorted({a.student_id for a in due})
+    briefs = students.guardians_of_students(session, student_ids)
+    by_student: dict[uuid.UUID, dict[uuid.UUID, bool]] = defaultdict(dict)
+    for brief in briefs:
+        by_student[brief.student_id][brief.guardian_id] = brief.has_phone
+    names = students.first_names(session, student_ids)
+    current = mrepo.current_optins(session, sorted({b.guardian_id for b in briefs}))
+    already = repo.reminded(session, [a.account_id for a in due], _reminder_dedupe(plan.day))
+    for account in due:
+        guardians = by_student.get(account.student_id, {})
+        if not guardians or account.student_id not in names:
+            plan.skipped_accounts["no_guardian"] += 1
+            continue
+        for guardian_id, has_phone in sorted(guardians.items()):
+            reason = (
+                "already_sent"
+                if (account.account_id, guardian_id) in already
+                else _guardian_reason(
+                    session, guardian_id, has_phone, current.get((guardian_id, "fees"))
+                )
+            )
+            if reason is not None:
+                plan.skipped_guardians[reason] += 1
+                continue
+            plan.items.append((account, guardian_id))
+    return plan
+
+
+def preview_fee_reminders(
+    session: Session, ctx: UserContext, data: FeeReminderSelectionIn
+) -> FeeReminderPreviewOut:
+    """Who would get a fee reminder for the chosen dues-list rows (or all matching its filter),
+    who is left out and why, and the estimated Meta cost (FR-MSG-025; ``message.send`` and
+    ``finance.read``, school-wide). Nothing is sent or stored. Errors: 404 an account that is
+    not one of this year's; 422 ``account_ids`` (``too_many``) or the selection."""
+    messaging.ensure_available()
+    plan = _reminder_plan(session, ctx, data)
+    cfg = load_config().cost
+    return FeeReminderPreviewOut(
+        preview_token=plan.token(),
+        accounts_reminded=len({a.account_id for a, _ in plan.items}),
+        guardians=len({g for _, g in plan.items}),
+        estimated_cost_inr=_cost(len(plan.items)),
+        utility_rate_inr=str(cfg.utility_rate_inr),
+        gst_percent=str(cfg.gst_percent),
+        blocked_reason=messaging.account_block(session, "fee_reminder"),
+        **plan.counts(),
+    )
+
+
+def confirm_fee_reminders(
+    session: Session, ctx: UserContext, data: FeeRemindersConfirmIn
+) -> FeeRemindersOut:
+    """Queue the previewed fee reminders (FR-MSG-025; ``message.send`` and ``finance.read``;
+    ``Idempotency-Key``): one per account and opted-in guardian, at most once a day each
+    (dedupe key ``manual:<IST date>``), with the overdue amount, the oldest due date and a link
+    to the dues page; sent outside quiet hours and within the daily cap. Errors: 409
+    ``preview_stale`` (who gets one changed: preview again) and the blocking reasons
+    (``messaging_not_connected``, ``messaging_paused``, ``template_not_approved``,
+    ``template_paused``, ``messaging_currency_not_inr``). Audit ``messaging.fee_reminders.sent``
+    (counts) and ``messaging.message.queued`` per message."""
+    messaging.ensure_available()
+    plan = _reminder_plan(session, ctx, data)  # checks finance.read first (403)
+    blocked = messaging.account_block(session, "fee_reminder")
+    if blocked is not None:
+        raise SendingBlocked(blocked)
+    if plan.token() != data.preview_token:
+        raise PreviewStale("Who would get a reminder has changed. Preview again.")
+    dedupe = _reminder_dedupe(plan.day)
+    names = students.first_names(session, sorted({a.student_id for a, _ in plan.items}))
+    school = tenancy.school_display_name(session)
+    queued = 0
+    for account, guardian_id in plan.items:
+        due_on = account.oldest_due_on or plan.day  # never None here (nothing_due otherwise)
+        out = messaging.queue_message(
+            session,
+            purpose="fee_reminder",
+            guardian_id=guardian_id,
+            student_id=account.student_id,
+            source_type="fee_account",
+            source_id=account.account_id,
+            dedupe_key=dedupe,
+            variables={
+                "school_name": school,
+                "amount": rules.parent_amount(account.overdue),
+                "child_first_name": names[account.student_id],
+                "due_date": rules.parent_date(due_on),
+            },
+            created_by=ctx.user_id,
+        )
+        queued += int(out is not None)
+    counts = plan.counts()
+    messaging.record_audit(
+        session,
+        action="messaging.fee_reminders.sent",
+        resource_type="fee_reminders",
+        resource_id=None,
+        summary={
+            **counts,
+            "queued": queued,
+            "all_matching": data.all_matching,
+            "section_id": data.section_id,
+            "class_id": data.class_id,
+        },
+    )
+    if queued:
+        ops.enqueue_event(session, SEND_EVENT, {"fee_reminders": queued})
+    return FeeRemindersOut(queued=queued, **counts)
+
+
+# --- notice withdrawal (R2-3J; FR-NOTICE-009, FR-PUB-007) ----------------------------------------
+
+
+def cancel_notice_messages(tenant_id: uuid.UUID, notice_id: uuid.UUID) -> dict[str, int]:
+    """Consumer of ``notice.withdrawn``: the notice's queued messages are skipped
+    (``notice_withdrawn``) and its open parent links revoked (again: a link issued while the
+    notice was being withdrawn). A message the sender is handing to Meta at this moment (under
+    its claim lease) is left to the sender; its link is revoked here all the same. Audit
+    ``messaging.notice_messages.cancelled`` (counts)."""
+    with tenant_session(tenant_id) as session:
+        now = mrepo.now(session)
+        lease = now + dt.timedelta(seconds=load_config().sending.claim_seconds)
+        cancelled = 0
+        for message_id in repo.queued_source_message_ids(session, "school_notice", notice_id):
+            message = repo.get_message(session, message_id, lock=True)
+            if message is None or message.status != "queued":
+                continue
+            if message.next_attempt_at is not None and now < message.next_attempt_at <= lease:
+                continue  # being sent now (the sender re-checks the notice before a new try)
+            _skip(session, message, "notice_withdrawn")
+            cancelled += 1
+        revoked = public.revoke_for_target(
+            session, "parent_notice", notice_id, reason="notice_withdrawn", by_user=False
+        )
+        _finish_broadcasts(session)
+        if cancelled or revoked:
+            messaging.record_audit(
+                session,
+                action="messaging.notice_messages.cancelled",
+                resource_type="parent_notice",
+                resource_id=notice_id,
+                summary={"cancelled": cancelled, "links_revoked": revoked},
+                system=True,
+            )
+    return {"cancelled": cancelled, "revoked": revoked}
 
 
 # --- the sender (worker) ------------------------------------------------------------------------
@@ -807,6 +1181,11 @@ def _skip(session: Session, message: Message, reason: str) -> str:
     return "skipped"
 
 
+def _notice_live(session: Session, notice_id: uuid.UUID) -> bool:
+    notice = circulars.notice_for_sending(session, notice_id)
+    return notice is not None and notice.approved
+
+
 def _claim(session: Session, message_id: uuid.UUID, now: dt.datetime) -> _Claim | str:  # noqa: PLR0911 - one return per outcome
     """Check the rules for one queued message and claim it, or say why it waits / was
     skipped (``deferred``, ``skipped``, ``busy``)."""
@@ -819,8 +1198,11 @@ def _claim(session: Session, message_id: uuid.UUID, now: dt.datetime) -> _Claim 
     if not _active(session):
         return "held"
     settings = _settings(session)
-    if not _switch_on(settings, message.purpose):
+    manual = message.created_by is not None and message.purpose in MANUAL_ALLOWED
+    if not manual and not _switch_on(settings, message.purpose):
         return _skip(session, message, "purpose_off")
+    if message.purpose == "school_notice" and not _notice_live(session, message.source_id):
+        return _skip(session, message, "notice_withdrawn")
     if rules.too_late(message.purpose, message.queued_at, now, max_queue_hours=cfg.max_queue_hours):
         return _skip(session, message, "too_late")
     quiet_start = settings.quiet_start if settings else dt.time(21, 0)
@@ -936,6 +1318,7 @@ def purge_expired(tenant_id: uuid.UUID) -> dict[str, int]:
 
 __all__ = [
     "LINKS",
+    "NOTICE_WITHDRAWN_TASK",
     "READ",
     "RECEIPT_TASK",
     "SEND",
@@ -943,13 +1326,18 @@ __all__ = [
     "SEND_TASK",
     "automatic",
     "broadcast_report",
+    "cancel_notice_messages",
     "confirm_broadcast",
+    "confirm_fee_reminders",
     "list_broadcasts",
     "preview_broadcast",
+    "preview_fee_reminders",
     "purge_expired",
     "queue_receipt_message",
+    "receipt_whatsapp",
     "revoke_link",
     "run_absence_alerts",
     "run_fee_reminders",
     "send_due",
+    "send_receipt_whatsapp",
 ]

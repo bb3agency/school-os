@@ -7098,7 +7098,8 @@
       "draft": "Draft",
       "approved": "Approved",
       "drafting": "Drafting…",
-      "draft_failed": "AI draft failed"
+      "draft_failed": "AI draft failed",
+      "withdrawn": "Withdrawn"
     },
     "fromCircular": "Made from a circular",
     "aiDrafted": "Drafted by AI from the circular only. Check every date and word before approving.",
@@ -7200,6 +7201,10 @@
       "notice_not_draft_failed": {
         "title": "Nothing to try again",
         "body": "AI is drafting this notice now or has already drafted it. The page shows the latest."
+      },
+      "notice_withdrawn": {
+        "title": "The notice was withdrawn",
+        "body": "A withdrawn notice cannot be changed or sent. Start a new notice."
       }
     },
     "draftingTitle": "Drafting the notice",
@@ -7212,6 +7217,17 @@
       "title": "AI could not draft this notice",
       "body": "Try again, or write the notice yourself below.",
       "retry": "Try AI draft again"
+    },
+    "withdraw": {
+      "action": "Withdraw notice",
+      "title": "Withdraw this notice?",
+      "body": "Use this when a notice was wrong or should no longer reach parents. The notice stays on record with your reason.",
+      "reason": "Why withdraw it",
+      "reasonHint": "At least 10 characters. Kept with the notice.",
+      "consequence": "Parent links to this notice stop working at once and WhatsApp messages not sent yet are cancelled. Messages already delivered cannot be called back.",
+      "withdrawnTitle": "Withdrawn notice",
+      "withdrawnBy": "Withdrawn by {name} on {when}.",
+      "reasonLine": "Reason: {reason}"
     }
   },
   "attendance": {
@@ -8382,7 +8398,8 @@
         "template_policy": "Meta refused the message",
         "template_disabled": "Meta switched this message off",
         "media_error": "WhatsApp could not deliver the attachment",
-        "unsupported_message": "The parent's WhatsApp cannot show this message"
+        "unsupported_message": "The parent's WhatsApp cannot show this message",
+        "notice_withdrawn": "The notice was withdrawn"
       }
     },
     "slips": {
@@ -8481,6 +8498,18 @@
       "template_paused": {
         "title": "The message is paused",
         "body": "The notice message is paused. Check WhatsApp settings."
+      },
+      "receipt_cancelled": {
+        "title": "The receipt is cancelled",
+        "body": "Cancelled receipts are not sent to parents."
+      },
+      "no_opted_in_guardian": {
+        "title": "No guardian agreed",
+        "body": "No guardian of this student agreed to fee messages on WhatsApp. Record an opt-in first."
+      },
+      "already_queued": {
+        "title": "Already sent",
+        "body": "This receipt was already sent to every guardian who agreed."
       }
     },
     "historyTitle": "Message history",
@@ -8574,6 +8603,43 @@
       "emptyBody": "Runs appear here once absence alerts or fee reminders are switched on.",
       "changeNote": "Switch them on or off, change the time and add holidays in WhatsApp settings. Reminder days follow the fee settings.",
       "openSettings": "Open WhatsApp settings"
+    },
+    "feeReminders": {
+      "title": "Send fee reminders on WhatsApp",
+      "descriptionRows": "{count, plural, one {# student chosen.} other {# students chosen.}} Each guardian who agreed to fee messages gets the amount overdue, the oldest due date and a link to pay.",
+      "descriptionAll": "Everyone in this list. Each guardian who agreed to fee messages gets the amount overdue, the oldest due date and a link to pay.",
+      "checking": "Checking who will get it…",
+      "previewLabel": "Who will get a reminder",
+      "recipients": "Messages to send",
+      "guardians": "Guardians",
+      "cost": "Estimated Meta cost",
+      "skippedStudents": "Students left out",
+      "skippedGuardians": "Guardians left out",
+      "accountReasons": {
+        "nothing_due": "Nothing overdue now",
+        "below_minimum": "Less than the school's smallest reminder amount",
+        "no_guardian": "No guardian on record"
+      },
+      "alreadySent": "Already reminded today",
+      "consequence": "Messages go out from the school's WhatsApp number outside quiet hours and cannot be called back. A guardian gets at most one reminder a day for each student.",
+      "confirm": "{count, plural, one {Send # reminder} other {Send # reminders}}",
+      "nobody": "Nobody chosen can get a reminder now.",
+      "queued": "{count, plural, =0 {Nothing new was queued: everyone was reminded already.} one {# reminder is queued. It goes out outside quiet hours.} other {# reminders are queued. They go out outside quiet hours.}}",
+      "done": "Done"
+    },
+    "receipt": {
+      "label": "WhatsApp",
+      "send": "Send on WhatsApp",
+      "hint": "{count, plural, one {To the guardian who agreed to fee messages.} other {To the # guardians who agreed to fee messages.}}",
+      "queued": "Waiting to go out on WhatsApp (outside quiet hours).",
+      "sent": "Sent on WhatsApp.",
+      "delivered": "Delivered on WhatsApp.",
+      "read": "Read on WhatsApp.",
+      "failed": "Not delivered on WhatsApp: {reason}.",
+      "skipped": "Not sent on WhatsApp: {reason}.",
+      "noOptin": "No guardian agreed to fee messages on WhatsApp.",
+      "cancelled": "Cancelled receipts are not sent on WhatsApp.",
+      "blocked": "WhatsApp cannot send messages now. Check WhatsApp settings."
     }
   },
   "fees": {
@@ -8595,7 +8661,8 @@
       "dues": "Fee dues",
       "setup": "Fee setup",
       "reconcile": "Reconcile UPI",
-      "upiSettings": "UPI QR"
+      "upiSettings": "UPI QR",
+      "feeSettings": "Fee settings"
     },
     "modes": {
       "cash": "Cash",
@@ -8954,7 +9021,10 @@
       },
       "filterLabel": "Filter dues",
       "totalsLabel": "Totals of overdue fees",
-      "noResultsTitle": "No student in this class has an overdue fee"
+      "noResultsTitle": "No student in this class has an overdue fee",
+      "selectRow": "Select {name}",
+      "sendReminder": "Send reminder",
+      "remindAll": "Send reminders to everyone in this list"
     },
     "setup": {
       "title": "Fee setup",
@@ -9289,6 +9359,43 @@
       "upiSettingsLink": "UPI QR settings",
       "amountInr": "Amount (₹)",
       "noStatementsBody": "Download the account statement from the bank's website as Excel or CSV and read it above. Matches are proposed for you to confirm."
+    },
+    "settings": {
+      "title": "Fee settings",
+      "description": "The receipt paper, the line printed on every receipt, and when WhatsApp fee reminders go.",
+      "receiptsTitle": "Receipts",
+      "paperSize": "Receipt paper size",
+      "paperA5": "A5 (half an A4 page)",
+      "paperA4": "A4",
+      "gstNote": "Line printed on every receipt",
+      "gstNoteHint": "For example, that school fees are exempt from GST. At most 200 characters.",
+      "remindersTitle": "Fee reminders on WhatsApp",
+      "remindersDescription": "The days around each instalment's due date on which the automatic reminder goes, at 10:00. Up to 5 days.",
+      "remindersOff": "Automatic fee reminders are switched off in WhatsApp settings, so these days are not used now.",
+      "reminderLegend": "Reminder {n}",
+      "when": "When",
+      "days": "Days",
+      "before": "Before the due date",
+      "on": "On the due date",
+      "after": "After the due date",
+      "addDay": "Add a reminder day",
+      "removeDay": "Remove reminder {n}",
+      "noDays": "No automatic reminders. Add a day to send them.",
+      "minimum": "Smallest amount to remind about (₹)",
+      "minimumHint": "An instalment with less due than this gets no reminder. 0 reminds about any amount.",
+      "valueBefore": "{days, plural, one {# day before} other {# days before}}",
+      "valueOn": "On the due date",
+      "valueAfter": "{days, plural, one {# day after} other {# days after}}",
+      "save": "Save fee settings",
+      "discard": "Discard changes",
+      "saved": "Saved.",
+      "readOnly": "Only the accountant or principal can change these.",
+      "errors": {
+        "days": "Enter a whole number of days from 1 to 60.",
+        "repeated": "This day is already in the list. Remove one of them.",
+        "minimum": "Enter an amount of 0 or more, with at most 2 decimals.",
+        "gstNote": "Write the line, in at most 200 characters."
+      }
     }
   },
   "payments": {

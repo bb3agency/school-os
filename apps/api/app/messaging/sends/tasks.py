@@ -3,7 +3,8 @@
 Outbox consumers (``ops.TenantTask``: held while the school is suspended or offboarding, D31):
 - ``messaging.send_due``: send the school's queued messages whose time has come (woken by a
   confirmed broadcast or an automatic run);
-- ``messaging.receipt_message``: the receipt message for ``fee.receipt.message``.
+- ``messaging.receipt_message``: the receipt message for ``fee.receipt.message``;
+- ``messaging.notice_withdrawn``: a withdrawn notice's queued messages and links (R2-3J).
 
 Beat (registered through ``app.messaging.tasks.beat_schedule``): ``messaging.send_sweep`` every
 minute (quiet hours ending, retries, the next day's cap), ``messaging.automatic_runs`` every five
@@ -83,6 +84,25 @@ def receipt_message(
     )
 
 
+@shared_task(
+    name=service.NOTICE_WITHDRAWN_TASK,
+    base=TenantTask,
+    bind=True,
+    queue="maintenance",
+    acks_late=True,
+    ignore_result=True,
+)
+def notice_withdrawn(
+    self: Task[Any, Any], tenant_id: str, event_id: str, payload: dict[str, Any]
+) -> dict[str, int]:
+    """R2-3J (FR-NOTICE-009, FR-PUB-007): cancel a withdrawn notice's queued messages and
+    revoke its parent links. Runs with messaging off too (links exist only when it was on)."""
+    del self, event_id
+    return service.cancel_notice_messages(
+        uuid.UUID(tenant_id), uuid.UUID(str(payload["notice_id"]))
+    )
+
+
 @shared_task(name="messaging.send_sweep", acks_late=True, ignore_result=True)
 def send_sweep() -> dict[str, int]:
     return _each_school("send", service.send_due)
@@ -107,4 +127,11 @@ def beat_schedule() -> dict[str, dict[str, Any]]:
     }
 
 
-__all__ = ["automatic_runs", "beat_schedule", "receipt_message", "send_due", "send_sweep"]
+__all__ = [
+    "automatic_runs",
+    "beat_schedule",
+    "notice_withdrawn",
+    "receipt_message",
+    "send_due",
+    "send_sweep",
+]

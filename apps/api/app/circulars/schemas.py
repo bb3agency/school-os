@@ -18,7 +18,7 @@ TaskStatus = Literal["open", "in_progress", "done", "cancelled"]
 TaskSource = Literal["manual", "circular"]
 TaskView = Literal["mine", "all"]
 DueWindow = Literal["overdue", "week", "later"]
-NoticeStatus = Literal["drafting", "draft", "draft_failed", "approved"]
+NoticeStatus = Literal["drafting", "draft", "draft_failed", "approved", "withdrawn"]
 NoticeSource = Literal["circular", "staff_text", "blank"]
 RenderStatus = Literal["queued", "ready", "failed"]
 NoticeFileFormat = Literal["pdf", "png"]
@@ -218,6 +218,13 @@ class NoticeApproveIn(_In):
     """Approve the notice as it is now (both languages filled, no personal numbers)."""
 
 
+class NoticeWithdrawIn(_In):
+    """Withdraw an approved notice (R2-3J, FR-NOTICE-009): why, for the record (10-500
+    characters, no personal numbers)."""
+
+    reason: Text = Field(min_length=10, max_length=500)
+
+
 class NoticeRenderIn(_In):
     """Render the A4 PDF and the image again (files are kept for a few days only)."""
 
@@ -232,7 +239,8 @@ class NoticeOut(_Out):
     document_id: uuid.UUID | None
     status: NoticeStatus = Field(
         description="drafting (the AI is drafting it in the background: ask again shortly), "
-        "draft, draft_failed (see draft_error: try again or write it yourself) or approved."
+        "draft, draft_failed (see draft_error: try again or write it yourself), approved or "
+        "withdrawn (its parent links stopped working; R2-3J)."
     )
     ai_drafted: bool
     draft_error: str | None = Field(
@@ -247,6 +255,9 @@ class NoticeOut(_Out):
     created_by: MemberOut | None
     approved_by: MemberOut | None
     approved_at: dt.datetime | None
+    withdrawn_by: MemberOut | None = None
+    withdrawn_at: dt.datetime | None = None
+    withdraw_reason: str | None = None
     render_status: RenderStatus | None
     render_error: str | None
     files_available: bool
@@ -277,6 +288,7 @@ __all__ = [
     "NoticeRedraftIn",
     "NoticeRenderIn",
     "NoticeUpdate",
+    "NoticeWithdrawIn",
     "ReadingOut",
     "ReviewIn",
     "SuggestionConfirmIn",

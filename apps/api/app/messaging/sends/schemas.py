@@ -11,7 +11,14 @@ import unicodedata
 import uuid
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    model_validator,
+)
 
 BroadcastStatus = Literal["previewed", "sending", "done"]
 RunJob = Literal["absence_alerts", "fee_reminders"]
@@ -147,6 +154,98 @@ class RevokeLinkOut(_Out):
     revoked: bool
 
 
+# --- R2-3J: manual fee reminders from the dues list (FR-MSG-025) --------------------------------
+
+
+class FeeReminderSelectionIn(_In):
+    """Which fee accounts get a reminder: the rows chosen on the dues list (``account_ids``,
+    current year), or ``all_matching`` the dues list's filter (``section_id`` / ``class_id``,
+    none = the whole school). Exactly one of the two (422 ``selection``)."""
+
+    account_ids: list[uuid.UUID] | None = Field(default=None, min_length=1, max_length=5000)
+    all_matching: bool = False
+    section_id: uuid.UUID | None = None
+    class_id: uuid.UUID | None = None
+
+    @model_validator(mode="after")
+    def _one_selection(self) -> FeeReminderSelectionIn:
+        if (self.account_ids is None) == (not self.all_matching):
+            raise ValueError("choose rows (account_ids) or all_matching, not both or neither")
+        if self.account_ids is not None and (self.section_id or self.class_id):
+            raise ValueError("a filter applies only to all_matching")
+        return self
+
+
+class FeeRemindersConfirmIn(FeeReminderSelectionIn):
+    """Confirm a preview (``Idempotency-Key``): the same selection and the preview token, which
+    pins who gets a reminder (409 ``preview_stale`` when that changed)."""
+
+    preview_token: str = Field(min_length=8, max_length=80)
+
+
+class FeeReminderPreviewOut(_Out):
+    preview_token: str
+    accounts: int = Field(description="Fee accounts chosen.")
+    accounts_reminded: int = Field(description="Accounts with at least one message to queue.")
+    guardians: int = Field(description="Different guardians who will get a message.")
+    recipients: int = Field(
+        description="Messages that will be queued (one per account and guardian)."
+    )
+    skipped_accounts: dict[str, int] = Field(
+        description="Accounts left out by reason code (nothing_due, below_minimum, no_guardian)."
+    )
+    skipped_guardians: dict[str, int] = Field(
+        description="Guardians of chosen accounts left out by reason code (no_optin, opted_out, "
+        "optin_for_other_number, no_mobile_number, already_sent: reminded today already)."
+    )
+    estimated_cost_inr: str = Field(description="Rupees incl. GST, paid by the school to Meta.")
+    utility_rate_inr: str
+    gst_percent: str
+    blocked_reason: str | None = Field(
+        description="Why nothing can be sent now (messaging_not_connected, messaging_paused, "
+        "template_not_approved, template_paused, messaging_currency_not_inr); null when it can."
+    )
+
+
+class FeeRemindersOut(_Out):
+    accounts: int
+    recipients: int
+    queued: int
+    skipped_accounts: dict[str, int]
+    skipped_guardians: dict[str, int]
+
+
+# --- R2-3J: "Send on WhatsApp" for one receipt (FR-MSG-026) --------------------------------------
+
+
+class ReceiptMessageOut(_Out):
+    """One receipt message: its status now (no phone number, no text)."""
+
+    id: uuid.UUID
+    status: str
+    skip_reason: str | None
+    failure_reason: str | None
+    language: str
+    queued_at: dt.datetime
+    status_at: dt.datetime
+
+
+class ReceiptWhatsAppOut(_Out):
+    """Whether the receipt can go on WhatsApp now and what was queued for it (FR-MSG-026).
+    ``can_send``: connected, not paused, the receipt template approved, the receipt not
+    cancelled and at least one guardian opted in for fee messages who has none yet."""
+
+    receipt_id: uuid.UUID
+    can_send: bool
+    blocked_reason: str | None = Field(
+        description="messaging_not_connected, messaging_paused, template_not_approved, "
+        "template_paused, messaging_currency_not_inr, receipt_cancelled, no_opted_in_guardian "
+        "or already_queued; null when it can be sent."
+    )
+    opted_in_guardians: int
+    messages: list[ReceiptMessageOut]
+
+
 __all__ = [
     "AutomaticOut",
     "BroadcastConfirmIn",
@@ -156,6 +255,12 @@ __all__ = [
     "BroadcastPreviewOut",
     "BroadcastReportOut",
     "BroadcastStatus",
+    "FeeReminderPreviewOut",
+    "FeeReminderSelectionIn",
+    "FeeRemindersConfirmIn",
+    "FeeRemindersOut",
+    "ReceiptMessageOut",
+    "ReceiptWhatsAppOut",
     "RevokeLinkOut",
     "SectionCountsOut",
     "SendRunOut",

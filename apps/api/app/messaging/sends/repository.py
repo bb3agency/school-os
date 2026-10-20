@@ -113,6 +113,40 @@ def guardians_sent_notice(
     return {g for g in session.scalars(stmt) if g is not None}
 
 
+def reminded(
+    session: Session, account_ids: Collection[uuid.UUID], dedupe_key: str
+) -> set[tuple[uuid.UUID, uuid.UUID]]:
+    """(account, guardian) pairs that already have a fee reminder with ``dedupe_key`` (a manual
+    reminder of the day; R2-3J, FR-MSG-025)."""
+    if not account_ids:
+        return set()
+    stmt = select(Message.source_id, Message.guardian_id).where(
+        Message.purpose == "fee_reminder",
+        Message.source_id.in_(list(account_ids)),
+        Message.dedupe_key == dedupe_key,
+    )
+    return {(a, g) for a, g in session.execute(stmt) if g is not None}
+
+
+def source_messages(session: Session, purpose: str, source_id: uuid.UUID) -> list[Message]:
+    """The messages of one purpose about one source (a receipt), oldest first."""
+    stmt = (
+        select(Message)
+        .where(Message.purpose == purpose, Message.source_id == source_id)
+        .order_by(Message.queued_at, Message.id)
+    )
+    return list(session.scalars(stmt))
+
+
+def queued_source_message_ids(
+    session: Session, purpose: str, source_id: uuid.UUID
+) -> list[uuid.UUID]:
+    stmt = select(Message.id).where(
+        Message.purpose == purpose, Message.source_id == source_id, Message.status == "queued"
+    )
+    return list(session.scalars(stmt.order_by(Message.id)))
+
+
 # --- the sender -------------------------------------------------------------------------------
 
 

@@ -62,6 +62,7 @@ from app.circulars.schemas import (
     NoticeFileFormat,
     NoticeOut,
     NoticeUpdate,
+    NoticeWithdrawIn,
     ReadingOut,
     SuggestionConfirmIn,
     SuggestionOut,
@@ -94,6 +95,7 @@ from app.identity.schemas import MembershipAccess, RoleAccess, RoleOut, UserOut
 from app.knowledge import service as knowledge
 from app.notifications import service as notifications
 from app.ops import service as ops
+from app.public import service as public
 from app.tenancy import service as tenancy
 
 log = get_logger(__name__)
@@ -113,10 +115,14 @@ RENDER_EVENT: Final = "circulars.notice.render_requested"
 RENDER_TASK: Final = "circulars.render_notice"
 DRAFT_EVENT: Final = "circulars.notice.draft_requested"
 DRAFT_TASK: Final = "circulars.draft_notice"
+# R2-3J (FR-NOTICE-009): written in the withdrawing transaction; the WhatsApp sender consumes it.
+WITHDRAWN_EVENT: Final = "notice.withdrawn"
 SOURCE_UNAVAILABLE: Final = "source_unavailable"
 DRAFT_FAILED: Final = "ai_unavailable"
 DOCUMENT_GONE: Final = "document_gone"
 ACTIVE: Final = ("open", "in_progress")
+# Notices written for parents (approved, or approved and later withdrawn): every drafter sees them.
+PUBLISHED: Final = ("approved", "withdrawn")
 IST: Final = ZoneInfo("Asia/Kolkata")
 SYSTEM_ID: Final = uuid.UUID(int=0)
 NOTICE_MIME: Final[dict[str, str]] = {"pdf": "application/pdf", "png": "image/png"}
@@ -1150,7 +1156,7 @@ def _files_available(notice: ParentNotice, now: dt.datetime | None = None) -> bo
 
 
 def _notice_out(session: Session, notice: ParentNotice) -> NoticeOut:
-    people = _user_members(session, [notice.created_by, notice.approved_by])
+    people = _user_members(session, [notice.created_by, notice.approved_by, notice.withdrawn_by])
     return NoticeOut(
         id=notice.id,
         source=notice.source,
@@ -1166,6 +1172,9 @@ def _notice_out(session: Session, notice: ParentNotice) -> NoticeOut:
         created_by=people.get(notice.created_by),
         approved_by=people.get(notice.approved_by) if notice.approved_by else None,
         approved_at=notice.approved_at,
+        withdrawn_by=people.get(notice.withdrawn_by) if notice.withdrawn_by else None,
+        withdrawn_at=notice.withdrawn_at,
+        withdraw_reason=notice.withdraw_reason,
         render_status=notice.render_status,
         render_error=notice.render_error,
         files_available=_files_available(notice),
@@ -1465,7 +1474,7 @@ def _notice_visible(session: Session, ctx: UserContext, notice: ParentNotice) ->
     """A-16 (with DL-08): a notice not yet approved that was drafted from a circular is shown
     only to its drafter and to people who may read that circular (its AI text comes from it).
     Approved notices are written for parents, so every drafter sees them."""
-    if notice.status == "approved" or notice.source != "circular":
+    if notice.status in PUBLISHED or notice.source != "circular":
         return True
     if notice.created_by == ctx.user_id or notice.document_id is None:
         return True
@@ -1525,6 +1534,7 @@ def update_notice(
     notice = _visible_notice(session, ctx, notice_id, lock=True)
     _check_version(notice.version, version)
     _refuse_drafting(notice)
+    _refuse_withdrawn(notice)
     if notice.status == "approved":
         raise Conflict(
             "An approved notice cannot be changed. Start a new one.", code="notice_approved"
@@ -1551,6 +1561,11 @@ def _refuse_drafting(notice: ParentNotice) -> None:
         )
 
 
+def _refuse_withdrawn(notice: ParentNotice) -> None:
+    if notice.status == "withdrawn":
+        raise Conflict("This notice was withdrawn. Start a new one.", code="notice_withdrawn")
+
+
 def _queue_render(session: Session, notice_id: uuid.UUID) -> None:
     ops.enqueue_event(session, RENDER_EVENT, {"notice_id": notice_id})
 
@@ -1569,6 +1584,7 @@ def approve_notice(
     notice = _visible_notice(session, ctx, notice_id, lock=True)
     _check_version(notice.version, version)
     _refuse_drafting(notice)
+    _refuse_withdrawn(notice)
     if notice.status == "approved":
         raise Conflict("This notice is already approved.", code="notice_approved")
     texts = {
@@ -1639,6 +1655,52 @@ def request_render(
     _queue_render(session, notice.id)
     _audit(session, "notice.render_requested", "parent_notice", notice.id, {})
     return _notice_out(session, notice)
+
+
+def withdraw_notice(
+    session: Session,
+    ctx: UserContext,
+    notice_id: uuid.UUID,
+    data: NoticeWithdrawIn,
+    version: int,
+) -> NoticeOut:
+    """Withdraw an approved notice (R2-3J, FR-NOTICE-009; ``notice.approve``; ``If-Match``):
+    the notice stays on record (``withdrawn``, who, when and why; never edited or approved
+    again), its parent links stop working at once in this transaction (FR-PUB-007, reason
+    ``notice_withdrawn``: the page answers the uniform 404) and the outbox event
+    ``notice.withdrawn`` has the WhatsApp sender cancel the messages not yet sent. Errors: 409
+    ``notice_not_approved`` (a draft is simply not approved), ``notice_withdrawn``; 422
+    ``reason`` (``notice_personal_data``). Audit ``notice.withdrawn`` (links revoked)."""
+    if not ctx.has(NOTICE_APPROVE):
+        raise Forbidden()
+    notice = _visible_notice(session, ctx, notice_id, lock=True)
+    _check_version(notice.version, version)
+    _refuse_withdrawn(notice)
+    if notice.status != "approved":
+        raise Conflict("Only an approved notice can be withdrawn.", code="notice_not_approved")
+    _refuse_personal({"reason": data.reason})
+    notice = repo.update_notice(
+        session,
+        notice.id,
+        {
+            "status": "withdrawn",
+            "withdrawn_by": ctx.user_id,
+            "withdrawn_at": _now(),
+            "withdraw_reason": data.reason,
+        },
+    )
+    revoked = public.revoke_for_target(
+        session, "parent_notice", notice.id, reason="notice_withdrawn"
+    )
+    ops.enqueue_event(session, WITHDRAWN_EVENT, {"notice_id": notice.id})
+    _audit(session, "notice.withdrawn", "parent_notice", notice.id, {"links_revoked": revoked})
+    return _notice_out(session, notice)
+
+
+def notice_withdrawn_event() -> str:
+    """Outbox event written when a notice is withdrawn (payload ``notice_id``; R2-3J): the
+    WhatsApp sender cancels the notice's queued messages."""
+    return WITHDRAWN_EVENT
 
 
 def download_url(
@@ -1906,6 +1968,7 @@ __all__ = [
     "list_tasks",
     "mark_reviewed",
     "notice_for_sending",
+    "notice_withdrawn_event",
     "on_version_indexed",
     "parent_notice",
     "parent_notice_pdf",
@@ -1922,4 +1985,5 @@ __all__ = [
     "today_ist",
     "update_notice",
     "update_task",
+    "withdraw_notice",
 ]

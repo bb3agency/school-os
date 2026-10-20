@@ -118,6 +118,10 @@ class ParentNotice(Base):
     created_by: Mapped[uuid.UUID]
     approved_by: Mapped[uuid.UUID | None]
     approved_at: Mapped[dt.datetime | None]
+    # 0062_messaging_finish (R2-3J, FR-NOTICE-009): who withdrew an approved notice, when, why.
+    withdrawn_by: Mapped[uuid.UUID | None]
+    withdrawn_at: Mapped[dt.datetime | None]
+    withdraw_reason: Mapped[str | None] = mapped_column(Text)
     render_status: Mapped[str | None] = mapped_column(Text)
     render_error: Mapped[str | None] = mapped_column(Text)
     pdf_key: Mapped[str | None] = mapped_column(Text)

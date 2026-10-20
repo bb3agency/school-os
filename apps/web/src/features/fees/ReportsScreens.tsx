@@ -8,6 +8,7 @@ import { DataTableV2, type ColumnV2 } from "@/components/console";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
+import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import type { FilterChip } from "@/components/ui/FilterChips";
 import { TextField } from "@/components/ui/Input";
@@ -16,6 +17,8 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
 import { StatCard } from "@/components/ui/StatCard";
 import { Table, TableScroll, TBody, Td, Th, THead, Tr } from "@/components/ui/Table";
+import { FeeRemindersDialog, useCanSendFeeReminders } from "@/features/messaging/FeeReminders";
+import type { FeeReminderSelection } from "@/features/messaging/data";
 import { Link } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
@@ -424,6 +427,14 @@ export function DuesScreen() {
   const api = useBffClient("staff");
   const queryClient = useQueryClient();
   const [classId, setClassId] = useState("");
+  // FR-MSG-025: reminders for the rows chosen on the visible page, or everyone in the list.
+  const canRemind = useCanSendFeeReminders();
+  const [remind, setRemind] = useState<FeeReminderSelection | null>(null);
+  const [remindOpen, setRemindOpen] = useState(false);
+  const openReminders = (selection: FeeReminderSelection) => {
+    setRemind(selection);
+    setRemindOpen(true);
+  };
   const classes = useApiQuery(
     ["staff", "fees", "classes"],
     () => unwrap(api.GET("/api/v1/classes", { params: { query: { limit: 200 } } })),
@@ -499,27 +510,38 @@ export function DuesScreen() {
     ],
     [t],
   );
+  const moreEntries: MenuEntry[] = [];
+  if (allowed && can(REPORT)) {
+    moreEntries.push({
+      id: "csv",
+      label: csv.pending ? tc("working") : t("csv"),
+      icon: "file",
+      disabled: csv.pending,
+      onSelect: csv.run,
+    });
+  }
+  if (allowed && canRemind && dues.status === "ready" && dues.data.rows.length > 0) {
+    moreEntries.push({
+      id: "remind-all",
+      label: t("remindAll"),
+      icon: "megaphone",
+      onSelect: () =>
+        openReminders(classId ? { all_matching: true, class_id: classId } : { all_matching: true }),
+    });
+  }
   const header = (
     <PageHeader
       title={t("title")}
       description={t("description")}
       breadcrumb={[{ label: tn("home"), href: "/" }, { label: t("title") }]}
       actions={
-        allowed && can(REPORT) ? (
+        moreEntries.length > 0 ? (
           <Menu
             label={tu("moreActions")}
             variant="button"
             trigger={tu("more")}
             align="end"
-            entries={[
-              {
-                id: "csv",
-                label: csv.pending ? tc("working") : t("csv"),
-                icon: "file",
-                disabled: csv.pending,
-                onSelect: csv.run,
-              },
-            ]}
+            entries={moreEntries}
           />
         ) : null
       }
@@ -602,7 +624,32 @@ export function DuesScreen() {
             noResultsTitle={t("noResultsTitle")}
             onRetry={() => void queryClient.invalidateQueries({ queryKey: KEYS.dues("", classId) })}
             stacked
+            {...(canRemind
+              ? {
+                  selection: {
+                    rowLabel: (row: DuesRow) =>
+                      t("selectRow", { name: row.display_name ?? t("noName") }),
+                    actions: (selected: readonly DuesRow[]) => (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() =>
+                          openReminders({
+                            account_ids: selected.map((row) => row.account_id),
+                            all_matching: false,
+                          })
+                        }
+                      >
+                        {t("sendReminder")}
+                      </Button>
+                    ),
+                  },
+                }
+              : {})}
           />
+          {canRemind ? (
+            <FeeRemindersDialog selection={remind} open={remindOpen} onOpenChange={setRemindOpen} />
+          ) : null}
         </>
       )}
     </div>

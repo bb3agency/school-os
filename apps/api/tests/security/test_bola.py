@@ -249,6 +249,11 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
         "section_ids": ["0192f3a4-0000-7000-8000-000000000a01"],
     },
     ("POST", "/api/v1/messages/{message_id}/revoke-link"): None,
+    # R2-3J: another school's receipt or notice is 404 like a random id.
+    ("POST", "/api/v1/fees/receipts/{receipt_id}/whatsapp"): None,
+    ("POST", "/api/v1/notices/{notice_id}/withdraw"): {
+        "reason": "The date in this notice was wrong"
+    },
     # APAAR consent register (ADR-0039): another school's student is 404 like a random id.
     ("POST", "/api/v1/students/{student_id}/apaar-consent"): {
         "status": "refused",

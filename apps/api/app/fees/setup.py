@@ -135,7 +135,13 @@ def put_settings(
         action="fee.settings.updated",
         resource_type="fee_settings",
         resource_id=row.id,
-        summary={"paper_size": row.paper_size, "version": row.version},
+        summary={
+            "paper_size": row.paper_size,
+            # R2-3J (FR-MSG-014): the reminder days and minimum are audited with their values.
+            "reminder_offsets": list(row.reminder_offsets),
+            "min_reminder_amount": f"{row.min_reminder_amount:.2f}",
+            "version": row.version,
+        },
     )
     return _settings_out(row)
 

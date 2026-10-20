@@ -80,6 +80,9 @@ broadcasts:
   max_sections: 300
   # Previews never confirmed are deleted after this many hours.
   preview_retention_hours: 24
+  # Manual fee reminders from the dues list (R2-3J, FR-MSG-025): most accounts per send (the
+  # dues list shows at most fees config limits.dues_max_rows, 5000, rows).
+  max_reminder_accounts: 5000
 
 # Automatic messages (FR-MSG-013, FR-MSG-014; owner decision D25). IST times; absence alerts use
 # the school's own time from msg.settings.
