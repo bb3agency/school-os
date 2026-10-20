@@ -10,6 +10,7 @@ from sos_worker.celery_app import celery_app
 TASKS = (
     "messaging.send_due",
     "messaging.receipt_message",
+    "messaging.notice_withdrawn",
     "messaging.send_sweep",
     "messaging.automatic_runs",
 )
@@ -27,6 +28,8 @@ def test_FR_MSG_015_outbox_routes() -> None:
     assert ops.OUTBOX_ROUTES["messaging.send"] == "messaging.send_due"
     assert ops.OUTBOX_ROUTES["fee.receipt.message"] == "messaging.receipt_message"
     assert ops.OUTBOX_ROUTES["fee.receipt.issued"] == "fees.render_receipt"
+    # R2-3J (FR-NOTICE-009): a withdrawn notice's queued messages are cancelled by the sender.
+    assert ops.OUTBOX_ROUTES["notice.withdrawn"] == "messaging.notice_withdrawn"
 
 
 def test_FR_MSG_011_sender_and_automatic_runs_are_scheduled() -> None:

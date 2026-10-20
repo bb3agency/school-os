@@ -10583,6 +10583,246 @@
         "title": "FeePlanPatch",
         "type": "object"
       },
+      "FeeReminderPreviewOut": {
+        "properties": {
+          "accounts": {
+            "description": "Fee accounts chosen.",
+            "title": "Accounts",
+            "type": "integer"
+          },
+          "accounts_reminded": {
+            "description": "Accounts with at least one message to queue.",
+            "title": "Accounts Reminded",
+            "type": "integer"
+          },
+          "blocked_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why nothing can be sent now (messaging_not_connected, messaging_paused, template_not_approved, template_paused, messaging_currency_not_inr); null when it can.",
+            "title": "Blocked Reason"
+          },
+          "estimated_cost_inr": {
+            "description": "Rupees incl. GST, paid by the school to Meta.",
+            "title": "Estimated Cost Inr",
+            "type": "string"
+          },
+          "gst_percent": {
+            "title": "Gst Percent",
+            "type": "string"
+          },
+          "guardians": {
+            "description": "Different guardians who will get a message.",
+            "title": "Guardians",
+            "type": "integer"
+          },
+          "preview_token": {
+            "title": "Preview Token",
+            "type": "string"
+          },
+          "recipients": {
+            "description": "Messages that will be queued (one per account and guardian).",
+            "title": "Recipients",
+            "type": "integer"
+          },
+          "skipped_accounts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Accounts left out by reason code (nothing_due, below_minimum, no_guardian).",
+            "title": "Skipped Accounts",
+            "type": "object"
+          },
+          "skipped_guardians": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Guardians of chosen accounts left out by reason code (no_optin, opted_out, optin_for_other_number, no_mobile_number, already_sent: reminded today already).",
+            "title": "Skipped Guardians",
+            "type": "object"
+          },
+          "utility_rate_inr": {
+            "title": "Utility Rate Inr",
+            "type": "string"
+          }
+        },
+        "required": [
+          "preview_token",
+          "accounts",
+          "accounts_reminded",
+          "guardians",
+          "recipients",
+          "skipped_accounts",
+          "skipped_guardians",
+          "estimated_cost_inr",
+          "utility_rate_inr",
+          "gst_percent",
+          "blocked_reason"
+        ],
+        "title": "FeeReminderPreviewOut",
+        "type": "object"
+      },
+      "FeeReminderSelectionIn": {
+        "additionalProperties": false,
+        "description": "Which fee accounts get a reminder: the rows chosen on the dues list (``account_ids``,\ncurrent year), or ``all_matching`` the dues list's filter (``section_id`` / ``class_id``,\nnone = the whole school). Exactly one of the two (422 ``selection``).",
+        "properties": {
+          "account_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "maxItems": 5000,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Ids"
+          },
+          "all_matching": {
+            "default": false,
+            "title": "All Matching",
+            "type": "boolean"
+          },
+          "class_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Id"
+          },
+          "section_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Id"
+          }
+        },
+        "title": "FeeReminderSelectionIn",
+        "type": "object"
+      },
+      "FeeRemindersConfirmIn": {
+        "additionalProperties": false,
+        "description": "Confirm a preview (``Idempotency-Key``): the same selection and the preview token, which\npins who gets a reminder (409 ``preview_stale`` when that changed).",
+        "properties": {
+          "account_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "maxItems": 5000,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Ids"
+          },
+          "all_matching": {
+            "default": false,
+            "title": "All Matching",
+            "type": "boolean"
+          },
+          "class_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Id"
+          },
+          "preview_token": {
+            "maxLength": 80,
+            "minLength": 8,
+            "title": "Preview Token",
+            "type": "string"
+          },
+          "section_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Id"
+          }
+        },
+        "required": [
+          "preview_token"
+        ],
+        "title": "FeeRemindersConfirmIn",
+        "type": "object"
+      },
+      "FeeRemindersOut": {
+        "properties": {
+          "accounts": {
+            "title": "Accounts",
+            "type": "integer"
+          },
+          "queued": {
+            "title": "Queued",
+            "type": "integer"
+          },
+          "recipients": {
+            "title": "Recipients",
+            "type": "integer"
+          },
+          "skipped_accounts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Skipped Accounts",
+            "type": "object"
+          },
+          "skipped_guardians": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Skipped Guardians",
+            "type": "object"
+          }
+        },
+        "required": [
+          "accounts",
+          "recipients",
+          "queued",
+          "skipped_accounts",
+          "skipped_guardians"
+        ],
+        "title": "FeeRemindersOut",
+        "type": "object"
+      },
       "FeeSettingsIn": {
         "additionalProperties": false,
         "properties": {
@@ -10614,6 +10854,7 @@
             "type": "string"
           },
           "reminder_offsets": {
+            "description": "Days relative to an instalment's due date on which the automatic WhatsApp fee reminder goes (negative = before, 0 = on the day, positive = after; FR-MSG-014). At most 5 different days; empty = no automatic reminders.",
             "items": {
               "maximum": 60.0,
               "minimum": -60.0,
@@ -17405,12 +17646,13 @@
             "type": "string"
           },
           "status": {
-            "description": "drafting (the AI is drafting it in the background: ask again shortly), draft, draft_failed (see draft_error: try again or write it yourself) or approved.",
+            "description": "drafting (the AI is drafting it in the background: ask again shortly), draft, draft_failed (see draft_error: try again or write it yourself), approved or withdrawn (its parent links stopped working; R2-3J).",
             "enum": [
               "drafting",
               "draft",
               "draft_failed",
-              "approved"
+              "approved",
+              "withdrawn"
             ],
             "title": "Status",
             "type": "string"
@@ -17431,6 +17673,39 @@
           "version": {
             "title": "Version",
             "type": "integer"
+          },
+          "withdraw_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withdraw Reason"
+          },
+          "withdrawn_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withdrawn At"
+          },
+          "withdrawn_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/app__circulars__schemas__MemberOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -17524,6 +17799,23 @@
           }
         },
         "title": "NoticeUpdate",
+        "type": "object"
+      },
+      "NoticeWithdrawIn": {
+        "additionalProperties": false,
+        "description": "Withdraw an approved notice (R2-3J, FR-NOTICE-009): why, for the record (10-500\ncharacters, no personal numbers).",
+        "properties": {
+          "reason": {
+            "maxLength": 500,
+            "minLength": 10,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "NoticeWithdrawIn",
         "type": "object"
       },
       "NotificationOut": {
@@ -24496,6 +24788,67 @@
         "title": "ReceiptListItem",
         "type": "object"
       },
+      "ReceiptMessageOut": {
+        "description": "One receipt message: its status now (no phone number, no text).",
+        "properties": {
+          "failure_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Reason"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "queued_at": {
+            "format": "date-time",
+            "title": "Queued At",
+            "type": "string"
+          },
+          "skip_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skip Reason"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "status_at": {
+            "format": "date-time",
+            "title": "Status At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "skip_reason",
+          "failure_reason",
+          "language",
+          "queued_at",
+          "status_at"
+        ],
+        "title": "ReceiptMessageOut",
+        "type": "object"
+      },
       "ReceiptOut": {
         "properties": {
           "account_id": {
@@ -24771,6 +25124,52 @@
           "class_section"
         ],
         "title": "ReceiptRef",
+        "type": "object"
+      },
+      "ReceiptWhatsAppOut": {
+        "description": "Whether the receipt can go on WhatsApp now and what was queued for it (FR-MSG-026).\n``can_send``: connected, not paused, the receipt template approved, the receipt not\ncancelled and at least one guardian opted in for fee messages who has none yet.",
+        "properties": {
+          "blocked_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "messaging_not_connected, messaging_paused, template_not_approved, template_paused, messaging_currency_not_inr, receipt_cancelled, no_opted_in_guardian or already_queued; null when it can be sent.",
+            "title": "Blocked Reason"
+          },
+          "can_send": {
+            "title": "Can Send",
+            "type": "boolean"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ReceiptMessageOut"
+            },
+            "title": "Messages",
+            "type": "array"
+          },
+          "opted_in_guardians": {
+            "title": "Opted In Guardians",
+            "type": "integer"
+          },
+          "receipt_id": {
+            "format": "uuid",
+            "title": "Receipt Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "receipt_id",
+          "can_send",
+          "blocked_reason",
+          "opted_in_guardians",
+          "messages"
+        ],
+        "title": "ReceiptWhatsAppOut",
         "type": "object"
       },
       "ReconciliationItemOut": {
@@ -47123,6 +47522,146 @@
         ]
       }
     },
+    "/api/v1/fees/receipts/{receipt_id}/whatsapp": {
+      "get": {
+        "description": "Whether the receipt can be sent on WhatsApp now and the status of its messages\n(FR-MSG-026; ``fee.collect`` or ``message.send``, school-wide). 404 unknown receipt.",
+        "operationId": "receipt_whatsapp_api_v1_fees_receipts__receipt_id__whatsapp_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receipt_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Receipt Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptWhatsAppOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Receipt Whatsapp",
+        "tags": [
+          "messaging"
+        ]
+      },
+      "post": {
+        "description": "Send the receipt on WhatsApp to the guardians opted in for fee messages who have not got\nit yet (FR-MSG-026, US-2206; ``fee.collect`` or ``message.send``; ``Idempotency-Key``);\nnever twice to a guardian. Errors: 404; 409 ``receipt_cancelled``, ``no_opted_in_guardian``,\n``already_queued``, ``messaging_not_connected``, ``messaging_paused``,\n``template_not_approved``, ``template_paused``, ``messaging_currency_not_inr``. Audited.",
+        "operationId": "send_receipt_whatsapp_api_v1_fees_receipts__receipt_id__whatsapp_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receipt_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Receipt Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptWhatsAppOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Send Receipt Whatsapp",
+        "tags": [
+          "messaging"
+        ]
+      }
+    },
     "/api/v1/fees/reconciliation/online": {
       "get": {
         "description": "Online payment exceptions, newest first (``fee.reconcile`` or ``finance.read``).",
@@ -53184,6 +53723,144 @@
         ]
       }
     },
+    "/api/v1/messaging/fee-reminders": {
+      "post": {
+        "description": "Send the previewed fee reminders (FR-MSG-025; ``message.send`` and ``finance.read``;\n``Idempotency-Key``): one per account and opted-in guardian, at most once a day, sent\noutside quiet hours within the daily cap. Errors: 409 ``preview_stale`` (preview again),\n``messaging_not_connected``, ``messaging_paused``, ``template_not_approved``,\n``template_paused``, ``messaging_currency_not_inr``. Audited.",
+        "operationId": "send_fee_reminders_api_v1_messaging_fee_reminders_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeeRemindersConfirmIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeeRemindersOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Send Fee Reminders",
+        "tags": [
+          "messaging"
+        ]
+      }
+    },
+    "/api/v1/messaging/fee-reminders/preview": {
+      "post": {
+        "description": "Before sending fee reminders from the dues list: accounts chosen, messages to queue,\naccounts and guardians left out by reason, and the estimated Meta cost incl. GST\n(FR-MSG-025; ``message.send`` and ``finance.read``, school-wide). Choose rows\n(``account_ids``) or ``all_matching`` the dues list's filter. Nothing is sent. Errors: 403\nwithout ``finance.read``; 404 an account that is not one of this year's (or fees off); 422\nthe selection, ``account_ids`` ``too_many``.",
+        "operationId": "preview_fee_reminders_api_v1_messaging_fee_reminders_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeeReminderSelectionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeeReminderPreviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Preview Fee Reminders",
+        "tags": [
+          "messaging"
+        ]
+      }
+    },
     "/api/v1/messaging/join-slips": {
       "post": {
         "description": "Printable join slips for the guardians (with a mobile number) of chosen students or a\nsection, in each guardian's parent language, each with a new single-use code and a QR code\nfor the school's WhatsApp number (FR-MSG-009; ``messaging.optin.record``, scope). Errors: 409\n``messaging_not_connected``, ``no_slips``, ``too_many_slips``. Audited (count).",
@@ -53483,7 +54160,8 @@
                     "drafting",
                     "draft",
                     "draft_failed",
-                    "approved"
+                    "approved",
+                    "withdrawn"
                   ],
                   "type": "string"
                 },
@@ -54361,6 +55039,84 @@
           }
         },
         "summary": "Render Notice",
+        "tags": [
+          "circulars"
+        ]
+      }
+    },
+    "/api/v1/notices/{notice_id}/withdraw": {
+      "post": {
+        "description": "Withdraw an approved notice (R2-3J, FR-NOTICE-009; ``notice.approve``; ``If-Match``):\nit stays on record with the reason, its parent links stop working at once (FR-PUB-007) and\nWhatsApp messages not yet sent are cancelled. 409 ``notice_not_approved``,\n``notice_withdrawn``; 422 ``reason``. Audited.",
+        "operationId": "withdraw_notice_api_v1_notices__notice_id__withdraw_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "notice_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Notice Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoticeWithdrawIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Withdraw Notice",
         "tags": [
           "circulars"
         ]

@@ -353,6 +353,9 @@ RESPONSE_FIELD_ALLOWLIST = {
     # R2-3G: the preview's id (bp_<uuid>) that pins the counts the sender confirms; it grants
     # nothing (the confirmation re-checks the caller and recomputes the audience).
     "app.messaging.sends.schemas.BroadcastPreviewOut.preview_token": "broadcast preview id",
+    # R2-3J (FR-MSG-025): a digest of who would get a fee reminder; it grants nothing either.
+    "app.messaging.sends.schemas.FeeReminderPreviewOut.preview_token": "fee reminder preview "
+    "digest",
     "app.identity.schemas.PermissionOut.key": "permission key",
     "app.identity.schemas.RoleOut.key": "role key",
     "app.platform.schemas.FlagOut.key": "feature flag key",

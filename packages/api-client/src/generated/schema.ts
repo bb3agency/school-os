@@ -3339,6 +3339,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/fees/receipts/{receipt_id}/whatsapp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Receipt Whatsapp
+         * @description Whether the receipt can be sent on WhatsApp now and the status of its messages
+         *     (FR-MSG-026; ``fee.collect`` or ``message.send``, school-wide). 404 unknown receipt.
+         */
+        get: operations["receipt_whatsapp_api_v1_fees_receipts__receipt_id__whatsapp_get"];
+        put?: never;
+        /**
+         * Send Receipt Whatsapp
+         * @description Send the receipt on WhatsApp to the guardians opted in for fee messages who have not got
+         *     it yet (FR-MSG-026, US-2206; ``fee.collect`` or ``message.send``; ``Idempotency-Key``);
+         *     never twice to a guardian. Errors: 404; 409 ``receipt_cancelled``, ``no_opted_in_guardian``,
+         *     ``already_queued``, ``messaging_not_connected``, ``messaging_paused``,
+         *     ``template_not_approved``, ``template_paused``, ``messaging_currency_not_inr``. Audited.
+         */
+        post: operations["send_receipt_whatsapp_api_v1_fees_receipts__receipt_id__whatsapp_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/fees/reconciliation/online": {
         parameters: {
             query?: never;
@@ -5017,6 +5046,55 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/messaging/fee-reminders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Fee Reminders
+         * @description Send the previewed fee reminders (FR-MSG-025; ``message.send`` and ``finance.read``;
+         *     ``Idempotency-Key``): one per account and opted-in guardian, at most once a day, sent
+         *     outside quiet hours within the daily cap. Errors: 409 ``preview_stale`` (preview again),
+         *     ``messaging_not_connected``, ``messaging_paused``, ``template_not_approved``,
+         *     ``template_paused``, ``messaging_currency_not_inr``. Audited.
+         */
+        post: operations["send_fee_reminders_api_v1_messaging_fee_reminders_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/messaging/fee-reminders/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Fee Reminders
+         * @description Before sending fee reminders from the dues list: accounts chosen, messages to queue,
+         *     accounts and guardians left out by reason, and the estimated Meta cost incl. GST
+         *     (FR-MSG-025; ``message.send`` and ``finance.read``, school-wide). Choose rows
+         *     (``account_ids``) or ``all_matching`` the dues list's filter. Nothing is sent. Errors: 403
+         *     without ``finance.read``; 404 an account that is not one of this year's (or fees off); 422
+         *     the selection, ``account_ids`` ``too_many``.
+         */
+        post: operations["preview_fee_reminders_api_v1_messaging_fee_reminders_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/messaging/join-slips": {
         parameters: {
             query?: never;
@@ -5305,6 +5383,29 @@ export interface paths {
          *     a few days). 409 ``notice_not_approved`` or ``render_in_progress``.
          */
         post: operations["render_notice_api_v1_notices__notice_id__render_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notices/{notice_id}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw Notice
+         * @description Withdraw an approved notice (R2-3J, FR-NOTICE-009; ``notice.approve``; ``If-Match``):
+         *     it stays on record with the reason, its parent links stop working at once (FR-PUB-007) and
+         *     WhatsApp messages not yet sent are cancelled. 409 ``notice_not_approved``,
+         *     ``notice_withdrawn``; 422 ``reason``. Audited.
+         */
+        post: operations["withdraw_notice_api_v1_notices__notice_id__withdraw_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -12716,6 +12817,115 @@ export interface components {
             /** Name */
             name?: string | null;
         };
+        /** FeeReminderPreviewOut */
+        FeeReminderPreviewOut: {
+            /**
+             * Accounts
+             * @description Fee accounts chosen.
+             */
+            accounts: number;
+            /**
+             * Accounts Reminded
+             * @description Accounts with at least one message to queue.
+             */
+            accounts_reminded: number;
+            /**
+             * Blocked Reason
+             * @description Why nothing can be sent now (messaging_not_connected, messaging_paused, template_not_approved, template_paused, messaging_currency_not_inr); null when it can.
+             */
+            blocked_reason: string | null;
+            /**
+             * Estimated Cost Inr
+             * @description Rupees incl. GST, paid by the school to Meta.
+             */
+            estimated_cost_inr: string;
+            /** Gst Percent */
+            gst_percent: string;
+            /**
+             * Guardians
+             * @description Different guardians who will get a message.
+             */
+            guardians: number;
+            /** Preview Token */
+            preview_token: string;
+            /**
+             * Recipients
+             * @description Messages that will be queued (one per account and guardian).
+             */
+            recipients: number;
+            /**
+             * Skipped Accounts
+             * @description Accounts left out by reason code (nothing_due, below_minimum, no_guardian).
+             */
+            skipped_accounts: {
+                [key: string]: number;
+            };
+            /**
+             * Skipped Guardians
+             * @description Guardians of chosen accounts left out by reason code (no_optin, opted_out, optin_for_other_number, no_mobile_number, already_sent: reminded today already).
+             */
+            skipped_guardians: {
+                [key: string]: number;
+            };
+            /** Utility Rate Inr */
+            utility_rate_inr: string;
+        };
+        /**
+         * FeeRemindersConfirmIn
+         * @description Confirm a preview (``Idempotency-Key``): the same selection and the preview token, which
+         *     pins who gets a reminder (409 ``preview_stale`` when that changed).
+         */
+        FeeRemindersConfirmIn: {
+            /** Account Ids */
+            account_ids?: string[] | null;
+            /**
+             * All Matching
+             * @default false
+             */
+            all_matching: boolean;
+            /** Class Id */
+            class_id?: string | null;
+            /** Preview Token */
+            preview_token: string;
+            /** Section Id */
+            section_id?: string | null;
+        };
+        /**
+         * FeeReminderSelectionIn
+         * @description Which fee accounts get a reminder: the rows chosen on the dues list (``account_ids``,
+         *     current year), or ``all_matching`` the dues list's filter (``section_id`` / ``class_id``,
+         *     none = the whole school). Exactly one of the two (422 ``selection``).
+         */
+        FeeReminderSelectionIn: {
+            /** Account Ids */
+            account_ids?: string[] | null;
+            /**
+             * All Matching
+             * @default false
+             */
+            all_matching: boolean;
+            /** Class Id */
+            class_id?: string | null;
+            /** Section Id */
+            section_id?: string | null;
+        };
+        /** FeeRemindersOut */
+        FeeRemindersOut: {
+            /** Accounts */
+            accounts: number;
+            /** Queued */
+            queued: number;
+            /** Recipients */
+            recipients: number;
+            /** Skipped Accounts */
+            skipped_accounts: {
+                [key: string]: number;
+            };
+            /** Skipped Guardians */
+            skipped_guardians: {
+                [key: string]: number;
+            };
+        };
         /** FeeSettingsIn */
         FeeSettingsIn: {
             /** Gst Note */
@@ -12727,7 +12937,10 @@ export interface components {
              * @enum {string}
              */
             paper_size: "A5" | "A4";
-            /** Reminder Offsets */
+            /**
+             * Reminder Offsets
+             * @description Days relative to an instalment's due date on which the automatic WhatsApp fee reminder goes (negative = before, 0 = on the day, positive = after; FR-MSG-014). At most 5 different days; empty = no automatic reminders.
+             */
             reminder_offsets: number[];
         };
         /** FeeSettingsOut */
@@ -15136,10 +15349,10 @@ export interface components {
             source: "circular" | "staff_text" | "blank";
             /**
              * Status
-             * @description drafting (the AI is drafting it in the background: ask again shortly), draft, draft_failed (see draft_error: try again or write it yourself) or approved.
+             * @description drafting (the AI is drafting it in the background: ask again shortly), draft, draft_failed (see draft_error: try again or write it yourself), approved or withdrawn (its parent links stopped working; R2-3J).
              * @enum {string}
              */
-            status: "drafting" | "draft" | "draft_failed" | "approved";
+            status: "drafting" | "draft" | "draft_failed" | "approved" | "withdrawn";
             /** Title En */
             title_en: string;
             /** Title Te */
@@ -15151,6 +15364,11 @@ export interface components {
             updated_at: string;
             /** Version */
             version: number;
+            /** Withdraw Reason */
+            withdraw_reason?: string | null;
+            /** Withdrawn At */
+            withdrawn_at?: string | null;
+            withdrawn_by?: components["schemas"]["app__circulars__schemas__MemberOut"] | null;
         };
         /**
          * NoticeRedraftIn
@@ -15172,6 +15390,15 @@ export interface components {
             title_en?: string | null;
             /** Title Te */
             title_te?: string | null;
+        };
+        /**
+         * NoticeWithdrawIn
+         * @description Withdraw an approved notice (R2-3J, FR-NOTICE-009): why, for the record (10-500
+         *     characters, no personal numbers).
+         */
+        NoticeWithdrawIn: {
+            /** Reason */
+            reason: string;
         };
         /**
          * NotificationOut
@@ -17602,6 +17829,35 @@ export interface components {
             /** Student Name */
             student_name: string;
         };
+        /**
+         * ReceiptMessageOut
+         * @description One receipt message: its status now (no phone number, no text).
+         */
+        ReceiptMessageOut: {
+            /** Failure Reason */
+            failure_reason: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Language */
+            language: string;
+            /**
+             * Queued At
+             * Format: date-time
+             */
+            queued_at: string;
+            /** Skip Reason */
+            skip_reason: string | null;
+            /** Status */
+            status: string;
+            /**
+             * Status At
+             * Format: date-time
+             */
+            status_at: string;
+        };
         /** ReceiptOut */
         ReceiptOut: {
             /**
@@ -17711,6 +17967,30 @@ export interface components {
             student_name: string;
             /** Utr */
             utr: string | null;
+        };
+        /**
+         * ReceiptWhatsAppOut
+         * @description Whether the receipt can go on WhatsApp now and what was queued for it (FR-MSG-026).
+         *     ``can_send``: connected, not paused, the receipt template approved, the receipt not
+         *     cancelled and at least one guardian opted in for fee messages who has none yet.
+         */
+        ReceiptWhatsAppOut: {
+            /**
+             * Blocked Reason
+             * @description messaging_not_connected, messaging_paused, template_not_approved, template_paused, messaging_currency_not_inr, receipt_cancelled, no_opted_in_guardian or already_queued; null when it can be sent.
+             */
+            blocked_reason: string | null;
+            /** Can Send */
+            can_send: boolean;
+            /** Messages */
+            messages: components["schemas"]["ReceiptMessageOut"][];
+            /** Opted In Guardians */
+            opted_in_guardians: number;
+            /**
+             * Receipt Id
+             * Format: uuid
+             */
+            receipt_id: string;
         };
         /** ReconciliationItemOut */
         ReconciliationItemOut: {
@@ -28679,6 +28959,108 @@ export interface operations {
             };
         };
     };
+    receipt_whatsapp_api_v1_fees_receipts__receipt_id__whatsapp_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                receipt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceiptWhatsAppOut"];
+                };
+            };
+            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    send_receipt_whatsapp_api_v1_fees_receipts__receipt_id__whatsapp_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                receipt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceiptWhatsAppOut"];
+                };
+            };
+            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     list_online_reconciliation_api_v1_fees_reconciliation_online_get: {
         parameters: {
             query?: {
@@ -32507,6 +32889,112 @@ export interface operations {
             };
         };
     };
+    send_fee_reminders_api_v1_messaging_fee_reminders_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeeRemindersConfirmIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeeRemindersOut"];
+                };
+            };
+            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    preview_fee_reminders_api_v1_messaging_fee_reminders_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeeReminderSelectionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeeReminderPreviewOut"];
+                };
+            };
+            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     join_slips_api_v1_messaging_join_slips_post: {
         parameters: {
             query?: never;
@@ -32740,7 +33228,7 @@ export interface operations {
                 cursor?: string | null;
                 /** @description Page size (max 200). */
                 limit?: number;
-                status?: ("drafting" | "draft" | "draft_failed" | "approved") | null;
+                status?: ("drafting" | "draft" | "draft_failed" | "approved" | "withdrawn") | null;
             };
             header?: never;
             path?: never;
@@ -33243,6 +33731,54 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoticeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    withdraw_notice_api_v1_notices__notice_id__withdraw_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notice_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoticeWithdrawIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

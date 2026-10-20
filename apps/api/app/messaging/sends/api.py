@@ -1,7 +1,9 @@
 """WhatsApp sending routes (docs/09 §4 "Messaging"; R2-3G; US-2204..US-2208; FR-MSG-012,
 FR-MSG-017; FR-PUB-007). Included in ``app.messaging.api.router`` (prefix ``/api/v1``).
 
-Sending declares ``message.send`` school-wide (principal and office admin); the reports declare
+Sending declares ``message.send`` school-wide (principal and office admin; manual fee reminders
+also need ``finance.read``, checked by ``fees.service``); a receipt's "Send on WhatsApp" declares
+``fee.collect`` or ``message.send`` (R2-3J); the reports declare
 ``message.read`` (a class teacher's scoped grant counts the students of their sections only). On a
 dedicated host or with messaging off every route answers ``404 module_unavailable``.
 """
@@ -14,7 +16,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Query, Response
 
 from app.authz.context import UserContext
-from app.authz.dependencies import TenantDB, require
+from app.authz.dependencies import TenantDB, require, require_any
 from app.authz.http import IdempotencyDep
 from app.messaging.sends import service
 from app.messaging.sends.schemas import (
@@ -25,6 +27,11 @@ from app.messaging.sends.schemas import (
     BroadcastPreviewIn,
     BroadcastPreviewOut,
     BroadcastReportOut,
+    FeeReminderPreviewOut,
+    FeeRemindersConfirmIn,
+    FeeReminderSelectionIn,
+    FeeRemindersOut,
+    ReceiptWhatsAppOut,
     RevokeLinkOut,
 )
 
@@ -32,6 +39,8 @@ router = APIRouter()
 
 Sender = Annotated[UserContext, Depends(require(service.SEND, scope="school"))]
 Reader = Annotated[UserContext, Depends(require(service.READ))]
+# R2-3J: the counter (fee.collect) or a sender; the service requires either school-wide.
+ReceiptSender = Annotated[UserContext, Depends(require_any(service.FEE_COLLECT, service.SEND))]
 
 _UNAVAILABLE: dict[int | str, dict[str, Any]] = {
     404: {"description": "``module_unavailable`` on a dedicated host or with messaging off."}
@@ -133,6 +142,74 @@ def revoke_link(ctx: Sender, db: TenantDB, message_id: uuid.UUID) -> RevokeLinkO
     """Stop the parent link a message carried from working, at once (ADR-0046 decision 5,
     FR-PUB-007; ``message.send``). ``revoked`` false when it had already stopped. Audited."""
     return service.revoke_link(db, ctx, message_id)
+
+
+# --- R2-3J: manual fee reminders (FR-MSG-025) and receipts on WhatsApp (FR-MSG-026) ------------
+
+
+@router.post(
+    "/messaging/fee-reminders/preview",
+    response_model=FeeReminderPreviewOut,
+    responses=_UNAVAILABLE,
+)
+def preview_fee_reminders(
+    ctx: Sender, db: TenantDB, body: FeeReminderSelectionIn, response: Response
+) -> FeeReminderPreviewOut:
+    """Before sending fee reminders from the dues list: accounts chosen, messages to queue,
+    accounts and guardians left out by reason, and the estimated Meta cost incl. GST
+    (FR-MSG-025; ``message.send`` and ``finance.read``, school-wide). Choose rows
+    (``account_ids``) or ``all_matching`` the dues list's filter. Nothing is sent. Errors: 403
+    without ``finance.read``; 404 an account that is not one of this year's (or fees off); 422
+    the selection, ``account_ids`` ``too_many``."""
+    response.headers["Cache-Control"] = "no-store"
+    return service.preview_fee_reminders(db, ctx, body)
+
+
+@router.post(
+    "/messaging/fee-reminders",
+    response_model=FeeRemindersOut,
+    status_code=202,
+    responses=_UNAVAILABLE,
+)
+def send_fee_reminders(
+    *, ctx: Sender, db: TenantDB, body: FeeRemindersConfirmIn, idem: IdempotencyDep
+) -> Response:
+    """Send the previewed fee reminders (FR-MSG-025; ``message.send`` and ``finance.read``;
+    ``Idempotency-Key``): one per account and opted-in guardian, at most once a day, sent
+    outside quiet hours within the daily cap. Errors: 409 ``preview_stale`` (preview again),
+    ``messaging_not_connected``, ``messaging_paused``, ``template_not_approved``,
+    ``template_paused``, ``messaging_currency_not_inr``. Audited."""
+    return idem.run(db, body, lambda: service.confirm_fee_reminders(db, ctx, body), status_code=202)
+
+
+@router.get(
+    "/fees/receipts/{receipt_id}/whatsapp",
+    response_model=ReceiptWhatsAppOut,
+    responses=_UNAVAILABLE,
+)
+def receipt_whatsapp(ctx: ReceiptSender, db: TenantDB, receipt_id: uuid.UUID) -> ReceiptWhatsAppOut:
+    """Whether the receipt can be sent on WhatsApp now and the status of its messages
+    (FR-MSG-026; ``fee.collect`` or ``message.send``, school-wide). 404 unknown receipt."""
+    return service.receipt_whatsapp(db, ctx, receipt_id)
+
+
+@router.post(
+    "/fees/receipts/{receipt_id}/whatsapp",
+    response_model=ReceiptWhatsAppOut,
+    status_code=202,
+    responses=_UNAVAILABLE,
+)
+def send_receipt_whatsapp(
+    *, ctx: ReceiptSender, db: TenantDB, receipt_id: uuid.UUID, idem: IdempotencyDep
+) -> Response:
+    """Send the receipt on WhatsApp to the guardians opted in for fee messages who have not got
+    it yet (FR-MSG-026, US-2206; ``fee.collect`` or ``message.send``; ``Idempotency-Key``);
+    never twice to a guardian. Errors: 404; 409 ``receipt_cancelled``, ``no_opted_in_guardian``,
+    ``already_queued``, ``messaging_not_connected``, ``messaging_paused``,
+    ``template_not_approved``, ``template_paused``, ``messaging_currency_not_inr``. Audited."""
+    return idem.run(
+        db, None, lambda: service.send_receipt_whatsapp(db, ctx, receipt_id), status_code=202
+    )
 
 
 __all__ = ["router"]

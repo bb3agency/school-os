@@ -129,6 +129,9 @@ daily_csv = reports.daily_csv
 close_day = reports.close_day
 dues_list = reports.dues_list
 dues_csv = reports.dues_csv
+# R2-3J: the accounts of a manual WhatsApp fee reminder (FR-MSG-025; messaging.sends)
+ReminderAccount = reports.ReminderAccount
+reminder_accounts = reports.reminder_accounts
 
 post_late_fees = late.post_for_school
 
@@ -487,6 +490,7 @@ __all__ = [
     "ParentReceipt",
     "PaymentsNotConnected",
     "ReceiptForMessage",
+    "ReminderAccount",
     "ReminderDue",
     "SelfApprovalForbidden",
     "account_summary",
@@ -506,6 +510,7 @@ __all__ = [
     "purge_tenant_data",
     "receipt_for_message",
     "receipt_message_event",
+    "reminder_accounts",
     "reminder_dues",
     "tenant_data_counts",
     "upi_payee",

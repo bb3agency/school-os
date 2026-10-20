@@ -109,6 +109,8 @@ class BroadcastConfig(_Model):
     preview_minutes: int = Field(ge=1, le=240)
     max_sections: int = Field(ge=1, le=300)
     preview_retention_hours: int = Field(ge=1, le=720)
+    # R2-3J (FR-MSG-025): most fee accounts in one manual reminder from the dues list.
+    max_reminder_accounts: int = Field(ge=1, le=5000)
 
 
 class AutomaticConfig(_Model):

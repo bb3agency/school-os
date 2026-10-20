@@ -15,7 +15,14 @@ import uuid
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+)
 
 HeadKind = Literal["tuition", "admission", "exam", "books", "transport", "other"]
 PlanStatus = Literal["draft", "active", "superseded"]
@@ -114,8 +121,23 @@ class FeeSettingsOut(_Out):
 class FeeSettingsIn(_In):
     paper_size: PaperSize
     gst_note: GstNote
-    reminder_offsets: list[Annotated[int, Field(ge=-60, le=60)]] = Field(max_length=5)
+    reminder_offsets: list[Annotated[int, Field(ge=-60, le=60)]] = Field(
+        max_length=5,
+        description=(
+            "Days relative to an instalment's due date on which the automatic WhatsApp fee "
+            "reminder goes (negative = before, 0 = on the day, positive = after; FR-MSG-014). "
+            "At most 5 different days; empty = no automatic reminders."
+        ),
+    )
     min_reminder_amount: Money = Field(ge=0)
+
+    @field_validator("reminder_offsets")
+    @classmethod
+    def _different_days(cls, value: list[int]) -> list[int]:
+        # R2-3J: the web editor shows a repeated day as an error instead of dropping it.
+        if len(set(value)) != len(value):
+            raise ValueError("each reminder day may be listed once")
+        return value
 
 
 # --- heads -------------------------------------------------------------------------------------
