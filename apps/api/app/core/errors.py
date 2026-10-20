@@ -89,6 +89,21 @@ class ServiceUnavailable(DomainError):
     status, code, title = 503, "service_unavailable", "Service temporarily unavailable"
 
 
+# Paths whose segments may be keys (parent link tokens, certificate codes, Razorpay route values):
+# their problem ``instance`` is the route template, never the raw path (R2-3I; SEC-037).
+_KEYED_PREFIXES = ("/api/v1/public/", "/api/v1/webhooks/")
+
+
+def _instance(request: Request) -> str:
+    path = request.url.path
+    if not path.startswith(_KEYED_PREFIXES):
+        return path
+    template = getattr(request.scope.get("route"), "path", None)
+    if isinstance(template, str) and template.startswith(_KEYED_PREFIXES):
+        return template
+    return next(p for p in _KEYED_PREFIXES if path.startswith(p))
+
+
 def problem(
     request: Request,
     *,
@@ -104,7 +119,7 @@ def problem(
         "title": title,
         "status": status,
         "code": code,
-        "instance": request.url.path,
+        "instance": _instance(request),
         "request_id": getattr(request.state, "request_id", None),
     }
     if detail:
