@@ -38,6 +38,12 @@ export type BroadcastPage = S["BroadcastPage"];
 export type BroadcastReport = S["BroadcastReportOut"];
 export type Automatic = S["AutomaticOut"];
 export type SendRun = S["SendRunOut"];
+/** R2-3J (FR-MSG-025): manual fee reminders from the dues list. */
+export type FeeReminderSelection = S["FeeReminderSelectionIn"];
+export type FeeReminderPreview = S["FeeReminderPreviewOut"];
+export type FeeRemindersSent = S["FeeRemindersOut"];
+/** R2-3J (FR-MSG-026): "Send on WhatsApp" for one receipt. */
+export type ReceiptWhatsApp = S["ReceiptWhatsAppOut"];
 
 export const MESSAGE_STATUSES: readonly MessageStatus[] = [
   "queued",
@@ -67,6 +73,9 @@ export const KEYS = {
   noticeBroadcasts: (noticeId: string) =>
     ["staff", "messaging", "broadcasts", "notice", noticeId] as const,
   automatic: ["staff", "messaging", "automatic"] as const,
+  feeReminderPreview: (selection: string) =>
+    ["staff", "messaging", "fee-reminders", "preview", selection] as const,
+  receipt: (receiptId: string) => ["staff", "messaging", "receipt", receiptId] as const,
 } as const;
 
 /** While a broadcast is sending, its counts are asked for again this often (live report). */

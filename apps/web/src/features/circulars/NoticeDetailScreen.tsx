@@ -441,13 +441,89 @@ function Approved({ notice, onChanged }: { notice: Notice; onChanged: () => Prom
   );
 }
 
+const withdrawSchema = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(1, { error: "required" })
+    .min(10, { error: "reasonTooShort" })
+    .max(500, { error: "tooLong" }),
+});
+
+/**
+ * "Withdraw notice" (R2-3J, FR-NOTICE-009; `notice.approve`): with a reason, confirmed in a
+ * dialog with the consequence line. The notice stays on record; its parent links stop working
+ * at once and WhatsApp messages not sent yet are cancelled (FR-PUB-007).
+ */
+function WithdrawNotice({ notice, onDone }: { notice: Notice; onDone: () => Promise<void> }) {
+  const t = useTranslations("notices.withdraw");
+  const api = useBffClient("staff");
+  return (
+    <ActionDialog
+      triggerLabel={t("action")}
+      triggerVariant="secondary"
+      title={t("title")}
+      description={t("body")}
+      confirmLabel={t("action")}
+      confirmVariant="danger"
+      consequence={t("consequence")}
+      schema={withdrawSchema}
+      errorNamespace="notices"
+      submit={(input) =>
+        unwrap(
+          api.POST("/api/v1/notices/{notice_id}/withdraw", {
+            params: { path: { notice_id: notice.id } },
+            headers: { "If-Match": ifMatch(notice.version) },
+            body: input,
+          }),
+        )
+      }
+      onSuccess={() => void onDone()}
+    >
+      {(errors) => (
+        <TextAreaField
+          name="reason"
+          label={t("reason")}
+          hint={t("reasonHint")}
+          error={errors.reason}
+          maxLength={500}
+          rows={3}
+        />
+      )}
+    </ActionDialog>
+  );
+}
+
+/** A withdrawn notice: what it said, who withdrew it, when and why. Nothing to copy or send. */
+function Withdrawn({ notice }: { notice: Notice }) {
+  const t = useTranslations("notices");
+  return (
+    <div className="space-y-4">
+      <Alert tone="warning" title={t("withdraw.withdrawnTitle")}>
+        {t("withdraw.withdrawnBy", {
+          name: notice.withdrawn_by?.display_name ?? t("formerStaff"),
+          when: formatDateTime(notice.withdrawn_at) ?? "",
+        })}{" "}
+        {notice.withdraw_reason
+          ? t("withdraw.reasonLine", { reason: notice.withdraw_reason })
+          : null}
+      </Alert>
+      <article className="space-y-2 rounded-lg border border-border bg-surface p-5" lang="en">
+        <h2 className="text-xl font-semibold text-ink-muted">{notice.title_en}</h2>
+        <p className="whitespace-pre-wrap text-ink-muted">{notice.body_en}</p>
+      </article>
+    </div>
+  );
+}
+
 /**
  * One parent notice (US-1605, US-1606): while the AI drafts it in the background the page shows
  * progress and asks again (FR-NOTICE-003); if the AI could not draft it, try again or write it
  * yourself. Edit the English (and, while Telugu is switched on, Telugu; ADR-0036) text of a
  * draft (an AI draft is marked as such),
  * approve it (`notice.approve`), then copy the text for the parents' groups, print it on A4 or
- * download the PDF or image. Approved notices cannot change.
+ * download the PDF or image. Approved notices cannot change; a `notice.approve` holder may
+ * withdraw one with a reason (R2-3J, FR-NOTICE-009).
  */
 export function NoticeDetailScreen({ noticeId }: { noticeId: string }) {
   const t = useTranslations("notices");
@@ -455,6 +531,7 @@ export function NoticeDetailScreen({ noticeId }: { noticeId: string }) {
   const tr = useTranslations("notices.draftError");
   const queryClient = useQueryClient();
   const detail = useNotice(noticeId, true);
+  const can = useStaffCan();
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: KEYS.notices });
@@ -473,6 +550,11 @@ export function NoticeDetailScreen({ noticeId }: { noticeId: string }) {
                 { label: notice.title_en || t("untitled") },
               ]}
               badge={<NoticeStatusPill status={notice.status} />}
+              actions={
+                notice.status === "approved" && can(NOTICE_APPROVE) ? (
+                  <WithdrawNotice notice={notice} onDone={refresh} />
+                ) : null
+              }
             />
             {notice.document_id ? (
               <p className="text-sm" data-print="hide">
@@ -496,13 +578,17 @@ export function NoticeDetailScreen({ noticeId }: { noticeId: string }) {
               title={
                 notice.status === "approved"
                   ? t("approvedTitle")
-                  : isNoticeDrafting(notice.status)
-                    ? t("draftingTitle")
-                    : t("editTitle")
+                  : notice.status === "withdrawn"
+                    ? t("withdraw.withdrawnTitle")
+                    : isNoticeDrafting(notice.status)
+                      ? t("draftingTitle")
+                      : t("editTitle")
               }
             >
               {notice.status === "approved" ? (
                 <Approved notice={notice} onChanged={refresh} />
+              ) : notice.status === "withdrawn" ? (
+                <Withdrawn notice={notice} />
               ) : isNoticeDrafting(notice.status) ? (
                 <Drafting notice={notice} />
               ) : (

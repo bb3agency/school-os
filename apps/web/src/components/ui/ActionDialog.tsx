@@ -53,6 +53,11 @@ export interface ActionDialogProps<TSchema extends z.ZodType, TResult> {
   description?: ReactNode;
   confirmLabel: ReactNode;
   confirmVariant?: ButtonVariant;
+  /**
+   * Keeps the confirm button disabled (e.g. while a preview loads, or when it says nothing can
+   * be done). The reason must be visible in the dialog body.
+   */
+  confirmDisabled?: boolean;
   /** Risky actions: say up front that the server may ask for MFA again (ADR-0018). */
   stepUp?: boolean;
   /** Two-person actions: explain that a different operator must do the second step. */
@@ -96,6 +101,7 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
   description,
   confirmLabel,
   confirmVariant = "primary",
+  confirmDisabled = false,
   stepUp = false,
   note,
   consequence,
@@ -238,8 +244,8 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
                       type="submit"
                       variant={confirmVariant}
                       aria-describedby={consequence ? consequenceId : undefined}
-                      disabled={form.pending}
-                      aria-disabled={form.pending || undefined}
+                      disabled={form.pending || confirmDisabled}
+                      aria-disabled={form.pending || confirmDisabled || undefined}
                       loading={form.pending}
                     >
                       {form.pending ? t("working") : confirmLabel}
