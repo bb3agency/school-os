@@ -31,8 +31,8 @@ S = sys.modules["sos_test_messaging_sends_support"]
 F = sys.modules["sos_test_fees_support"]
 W = sys.modules["sos_test_api_world"]
 
-PREVIEW = "/api/v1/messaging/fee-reminders/preview"
-SEND = "/api/v1/messaging/fee-reminders"
+PREVIEW = "/api/v1/fees/reminders/preview"
+SEND = "/api/v1/fees/reminders"
 
 
 def _sent_to(mobile: str) -> list[dict[str, Any]]:
@@ -194,6 +194,7 @@ def test_FR_MSG_025_nothing_due_minimum_and_validation(send_school: Any, api: An
             )
 
     # Either rows or all_matching, never both or neither; a filter only with all_matching.
+    bad: dict[str, Any]
     for bad in (
         {},
         {"account_ids": [str(account)], "all_matching": True},

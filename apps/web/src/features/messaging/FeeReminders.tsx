@@ -145,7 +145,7 @@ export function FeeRemindersDialog({
   useEffect(() => {
     if (!open || !selection) return;
     let current = true;
-    unwrap(api.POST("/api/v1/messaging/fee-reminders/preview", { body: selection }))
+    unwrap(api.POST("/api/v1/fees/reminders/preview", { body: selection }))
       .then((out) => {
         if (current) setAnswer({ for: selection, preview: out, error: undefined });
       })
@@ -180,7 +180,7 @@ export function FeeRemindersDialog({
       submit={(_, idempotencyKey) => {
         if (!selection || !preview) throw new Error("no preview");
         return unwrap(
-          api.POST("/api/v1/messaging/fee-reminders", {
+          api.POST("/api/v1/fees/reminders", {
             headers: { "Idempotency-Key": idempotencyKey },
             body: { ...selection, preview_token: preview.preview_token },
           }),

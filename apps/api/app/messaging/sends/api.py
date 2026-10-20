@@ -148,7 +148,7 @@ def revoke_link(ctx: Sender, db: TenantDB, message_id: uuid.UUID) -> RevokeLinkO
 
 
 @router.post(
-    "/messaging/fee-reminders/preview",
+    "/fees/reminders/preview",
     response_model=FeeReminderPreviewOut,
     responses=_UNAVAILABLE,
 )
@@ -166,7 +166,7 @@ def preview_fee_reminders(
 
 
 @router.post(
-    "/messaging/fee-reminders",
+    "/fees/reminders",
     response_model=FeeRemindersOut,
     status_code=202,
     responses=_UNAVAILABLE,

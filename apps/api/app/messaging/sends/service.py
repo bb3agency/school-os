@@ -1069,10 +1069,10 @@ def confirm_fee_reminders(
     ``template_paused``, ``messaging_currency_not_inr``). Audit ``messaging.fee_reminders.sent``
     (counts) and ``messaging.message.queued`` per message."""
     messaging.ensure_available()
+    plan = _reminder_plan(session, ctx, data)  # checks finance.read first (403)
     blocked = messaging.account_block(session, "fee_reminder")
     if blocked is not None:
         raise SendingBlocked(blocked)
-    plan = _reminder_plan(session, ctx, data)
     if plan.token() != data.preview_token:
         raise PreviewStale("Who would get a reminder has changed. Preview again.")
     dedupe = _reminder_dedupe(plan.day)

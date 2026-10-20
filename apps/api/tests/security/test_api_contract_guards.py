@@ -440,6 +440,7 @@ IDEMPOTENCY_EXEMPT = {
     "stored preview sends nothing and expires in 30 minutes",
     ("POST", "/api/v1/messages/{message_id}/revoke-link"): "a state transition (revoked false on "
     "repeat)",
+    ("POST", "/api/v1/fees/reminders/preview"): "computes counts (R2-3J); stores and sends nothing",
     ("POST", "/api/v1/messaging/templates/sync"): "re-reads Meta; creating is idempotent per "
     "template name",
     ("POST", "/api/v1/messaging/join-slips"): "a print view; each print makes new single-use "

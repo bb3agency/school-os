@@ -2361,6 +2361,52 @@ SPECS.update(
 )
 
 
+# --- R2-3J: manual fee reminders, a receipt on WhatsApp, notice withdrawal ---------------------
+
+# Guard passed; the service refuses: manual fee reminders also need finance.read (FR-MSG-025).
+REMINDER_ROUTES = frozenset(
+    {("POST", "/api/v1/fees/reminders/preview"), ("POST", "/api/v1/fees/reminders")}
+)
+
+
+def _withdraw_notice(w: Any, r: str, a: Engine) -> tuple[str, Any, dict[str, str]]:
+    notice_id, version = CI.complete_notice(w.a, approved=True)
+    return (
+        f"/api/v1/notices/{notice_id}/withdraw",
+        {"reason": "The date in this notice was wrong"},
+        {"If-Match": f'"{version}"'},
+    )
+
+
+SPECS.update(
+    {
+        ("POST", "/api/v1/fees/reminders/preview"): lambda w, r, a: (
+            "/api/v1/fees/reminders/preview",
+            {"all_matching": True},
+            {},
+        ),
+        # A digest that is not the preview's: the guard passed, the service says 409.
+        ("POST", "/api/v1/fees/reminders"): lambda w, r, a: (
+            "/api/v1/fees/reminders",
+            {"all_matching": True, "preview_token": "fr_" + "0" * 40},
+            {"Idempotency-Key": str(uuid.uuid4())},
+        ),
+        ("GET", "/api/v1/fees/receipts/{receipt_id}/whatsapp"): lambda w, r, a: (
+            f"/api/v1/fees/receipts/{_fees()._shared_receipt(w, a)}/whatsapp",
+            None,
+            {},
+        ),
+        # No guardian opted in (or WhatsApp not connected): the guard passed, the service says 409.
+        ("POST", "/api/v1/fees/receipts/{receipt_id}/whatsapp"): lambda w, r, a: (
+            f"/api/v1/fees/receipts/{_fees()._shared_receipt(w, a)}/whatsapp",
+            None,
+            {"Idempotency-Key": str(uuid.uuid4())},
+        ),
+        ("POST", "/api/v1/notices/{notice_id}/withdraw"): _withdraw_notice,
+    }
+)
+
+
 # --- R2-1B fees (ADR-0042): fees on for school A around each call -------------------------------
 
 
@@ -2467,6 +2513,11 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911 - one answer per r
         return 409  # guard passed; the preview token is not the caller's (R2-3G)
     if (method, path) == ("POST", "/api/v1/messages/{message_id}/revoke-link"):
         return 404  # guard passed; no such message with a link (R2-3G)
+    if (method, path) in (
+        ("POST", "/api/v1/fees/reminders"),
+        ("POST", "/api/v1/fees/receipts/{receipt_id}/whatsapp"),
+    ):
+        return 409  # guard passed; a stale digest / nobody to send to (R2-3J)
     if (method, path) == ("POST", "/api/v1/users/{user_id}/invitation-email"):
         return 409  # guard passed; the service refuses (email off in tests)
     if method == "POST" and path.startswith("/api/v1/me/invitations/"):
@@ -2523,6 +2574,8 @@ def test_SEC_003_role_route_matrix(
     )
     if needs_create:
         expected = 403
+    if key in REMINDER_ROUTES and granted and "finance.read" not in held:
+        expected = 403  # R2-3J: the fees service checks finance.read (FR-MSG-025)
     assert res.status_code == expected, f"{role} {key}: {res.status_code} {res.text}"
     if needs_create:
         assert res.json()["code"] == "student_create_required"

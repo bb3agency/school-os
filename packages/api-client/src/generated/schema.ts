@@ -3505,6 +3505,55 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/fees/reminders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Fee Reminders
+         * @description Send the previewed fee reminders (FR-MSG-025; ``message.send`` and ``finance.read``;
+         *     ``Idempotency-Key``): one per account and opted-in guardian, at most once a day, sent
+         *     outside quiet hours within the daily cap. Errors: 409 ``preview_stale`` (preview again),
+         *     ``messaging_not_connected``, ``messaging_paused``, ``template_not_approved``,
+         *     ``template_paused``, ``messaging_currency_not_inr``. Audited.
+         */
+        post: operations["send_fee_reminders_api_v1_fees_reminders_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/reminders/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Fee Reminders
+         * @description Before sending fee reminders from the dues list: accounts chosen, messages to queue,
+         *     accounts and guardians left out by reason, and the estimated Meta cost incl. GST
+         *     (FR-MSG-025; ``message.send`` and ``finance.read``, school-wide). Choose rows
+         *     (``account_ids``) or ``all_matching`` the dues list's filter. Nothing is sent. Errors: 403
+         *     without ``finance.read``; 404 an account that is not one of this year's (or fees off); 422
+         *     the selection, ``account_ids`` ``too_many``.
+         */
+        post: operations["preview_fee_reminders_api_v1_fees_reminders_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/fees/reports/daily": {
         parameters: {
             query?: never;
@@ -5040,55 +5089,6 @@ export interface paths {
         get: operations["broadcast_report_api_v1_messaging_broadcasts__broadcast_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/messaging/fee-reminders": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Send Fee Reminders
-         * @description Send the previewed fee reminders (FR-MSG-025; ``message.send`` and ``finance.read``;
-         *     ``Idempotency-Key``): one per account and opted-in guardian, at most once a day, sent
-         *     outside quiet hours within the daily cap. Errors: 409 ``preview_stale`` (preview again),
-         *     ``messaging_not_connected``, ``messaging_paused``, ``template_not_approved``,
-         *     ``template_paused``, ``messaging_currency_not_inr``. Audited.
-         */
-        post: operations["send_fee_reminders_api_v1_messaging_fee_reminders_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/messaging/fee-reminders/preview": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Preview Fee Reminders
-         * @description Before sending fee reminders from the dues list: accounts chosen, messages to queue,
-         *     accounts and guardians left out by reason, and the estimated Meta cost incl. GST
-         *     (FR-MSG-025; ``message.send`` and ``finance.read``, school-wide). Choose rows
-         *     (``account_ids``) or ``all_matching`` the dues list's filter. Nothing is sent. Errors: 403
-         *     without ``finance.read``; 404 an account that is not one of this year's (or fees off); 422
-         *     the selection, ``account_ids`` ``too_many``.
-         */
-        post: operations["preview_fee_reminders_api_v1_messaging_fee_reminders_preview_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -29375,6 +29375,112 @@ export interface operations {
             };
         };
     };
+    send_fee_reminders_api_v1_fees_reminders_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeeRemindersConfirmIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeeRemindersOut"];
+                };
+            };
+            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    preview_fee_reminders_api_v1_fees_reminders_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeeReminderSelectionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeeReminderPreviewOut"];
+                };
+            };
+            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     fee_daily_report_api_v1_fees_reports_daily_get: {
         parameters: {
             query?: {
@@ -32856,112 +32962,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BroadcastReportOut"];
-                };
-            };
-            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
-            429: {
-                headers: {
-                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
-                    RateLimit?: string;
-                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
-                    "RateLimit-Policy"?: string;
-                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
-                    "Retry-After"?: number;
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    send_fee_reminders_api_v1_messaging_fee_reminders_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["FeeRemindersConfirmIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FeeRemindersOut"];
-                };
-            };
-            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
-            429: {
-                headers: {
-                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
-                    RateLimit?: string;
-                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
-                    "RateLimit-Policy"?: string;
-                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
-                    "Retry-After"?: number;
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    preview_fee_reminders_api_v1_messaging_fee_reminders_preview_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["FeeReminderSelectionIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FeeReminderPreviewOut"];
                 };
             };
             /** @description ``module_unavailable`` on a dedicated host or with messaging off. */

@@ -224,9 +224,8 @@ describe("Send reminder from the dues list (FR-MSG-025)", () => {
 
   it("previews the chosen rows, then sends with the preview token", async () => {
     signedIn(["finance.read", SEND, READ]);
-    stub.routes["POST /bff/api/v1/messaging/fee-reminders/preview"] = () =>
-      Response.json(reminderPreview());
-    stub.routes["POST /bff/api/v1/messaging/fee-reminders"] = () =>
+    stub.routes["POST /bff/api/v1/fees/reminders/preview"] = () => Response.json(reminderPreview());
+    stub.routes["POST /bff/api/v1/fees/reminders"] = () =>
       Response.json(
         { accounts: 1, recipients: 1, queued: 1, skipped_accounts: {}, skipped_guardians: {} },
         { status: 202 },
@@ -240,7 +239,7 @@ describe("Send reminder from the dues list (FR-MSG-025)", () => {
     expect(await within(dialog).findByText(en.messaging.log.reasons.no_optin)).toBeInTheDocument();
     expect(within(dialog).getByText("₹0.14")).toBeInTheDocument();
     expect(
-      JSON.parse(stub.callsTo("POST /bff/api/v1/messaging/fee-reminders/preview")[0]?.body ?? "{}"),
+      JSON.parse(stub.callsTo("POST /bff/api/v1/fees/reminders/preview")[0]?.body ?? "{}"),
     ).toEqual({ account_ids: [ACCOUNT_A], all_matching: false });
     const confirm = within(dialog).getByRole("button", { name: "Send 1 reminder" });
     expect(confirm).toHaveAccessibleDescription(en.messaging.feeReminders.consequence);
@@ -248,7 +247,7 @@ describe("Send reminder from the dues list (FR-MSG-025)", () => {
     expect(
       await within(dialog).findByText("1 reminder is queued. It goes out outside quiet hours."),
     ).toBeInTheDocument();
-    const sent = stub.callsTo("POST /bff/api/v1/messaging/fee-reminders");
+    const sent = stub.callsTo("POST /bff/api/v1/fees/reminders");
     expect(sent).toHaveLength(1);
     expect(sent[0]?.headers.get("Idempotency-Key")).toBeTruthy();
     expect(JSON.parse(sent[0]?.body ?? "{}")).toEqual({
@@ -260,7 +259,7 @@ describe("Send reminder from the dues list (FR-MSG-025)", () => {
 
   it("keeps the send button disabled when sending is blocked", async () => {
     signedIn(["finance.read", SEND, READ]);
-    stub.routes["POST /bff/api/v1/messaging/fee-reminders/preview"] = () =>
+    stub.routes["POST /bff/api/v1/fees/reminders/preview"] = () =>
       Response.json(reminderPreview({ blocked_reason: "messaging_paused" }));
     renderWithIntl(<DuesScreen />);
     await userEvent.click(

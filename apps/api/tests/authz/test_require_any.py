@@ -298,6 +298,18 @@ def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
         # R2-1C WhatsApp (ADR-0043): configurers and readers share the account state and the
         # settings; readers and recorders share a guardian's opt-ins (scope in the service).
         ("GET", "/api/v1/messaging/account"): ("messaging.configure", ("message.read",), False),
+        # R2-3J (FR-MSG-026): the counter or a sender sends one receipt; the service requires
+        # either school-wide.
+        ("GET", "/api/v1/fees/receipts/{receipt_id}/whatsapp"): (
+            "fee.collect",
+            ("message.send",),
+            False,
+        ),
+        ("POST", "/api/v1/fees/receipts/{receipt_id}/whatsapp"): (
+            "fee.collect",
+            ("message.send",),
+            False,
+        ),
         ("GET", "/api/v1/messaging/templates"): ("messaging.configure", ("message.read",), False),
         ("GET", "/api/v1/messaging/settings"): ("message.read", ("messaging.configure",), False),
         ("GET", "/api/v1/guardians/{guardian_id}/optins"): (
