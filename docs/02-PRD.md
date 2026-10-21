@@ -6,7 +6,7 @@
 | Scope | Core capabilities C1–C14 (milestones M0–M2) + extension points |
 | Related | 01-BRD (why), 03-TRD (how well), 06-RAG, 07-Security, 16-Platform admin panel |
 | Changes | 0.4: C15 certificates and registers (M3) with US-1101..US-1108, proposed from the roadmap scope (PO to confirm). 0.3: US-1305 invoice number example uses the implemented 16-character format. 0.2: C14 platform admin panel (M0) with US-1301..US-1310; C13 folded into C14; C12 "Plan & billing" page (US-1204); US-202 uses `tenant.structure.manage`; promotions moved to M1. 0.1: baseline |
-| Changes | 0.7 (2026-10-21): R2 status: what is built and what stays open after waves R2-0..R2-3H (R2 introduction, C20, C21, C23, C24, C25 notes). 0.6 (2026-10-14): R2 stories C20-C25 (US-2001..US-2006, US-2101..US-2112, US-2201..US-2210, US-2301..US-2303, US-2401..US-2405, US-2501..US-2504) from owner decisions D4-D9 (docs/18 §8; ADR-0042..ADR-0047); R2 personas; capability map rows C18-C25; §9 non-goals updated. 0.5: C17 student timeline and early warning (M5) with US-1701..US-1709, proposed from the roadmap scope (PO to confirm). 0.4: C16 circulars, tasks and parent notices (M4) with US-1601..US-1606, proposed from the roadmap scope for the product owner to confirm. 0.3: US-1305 invoice number example uses the implemented 16-character format. 0.2: C14 platform admin panel (M0) with US-1301..US-1310; C13 folded into C14; C12 "Plan & billing" page (US-1204); US-202 uses `tenant.structure.manage`; promotions moved to M1. 0.1: baseline |
+| Changes | 0.8 (2026-10-21): R3 planned stories C26-C31 (US-2601..US-2609, US-2701..US-2703, US-2801..US-2804, US-2901..US-2904, US-3001..US-3004, US-3101..US-3104; ADR-0048..ADR-0053; lead decisions D36-D46); R3 personas; capability map rows C26-C31. 0.7 (2026-10-21): R2 status: what is built and what stays open after waves R2-0..R2-3H (R2 introduction, C20, C21, C23, C24, C25 notes). 0.6 (2026-10-14): R2 stories C20-C25 (US-2001..US-2006, US-2101..US-2112, US-2201..US-2210, US-2301..US-2303, US-2401..US-2405, US-2501..US-2504) from owner decisions D4-D9 (docs/18 §8; ADR-0042..ADR-0047); R2 personas; capability map rows C18-C25; §9 non-goals updated. 0.5: C17 student timeline and early warning (M5) with US-1701..US-1709, proposed from the roadmap scope (PO to confirm). 0.4: C16 circulars, tasks and parent notices (M4) with US-1601..US-1606, proposed from the roadmap scope for the product owner to confirm. 0.3: US-1305 invoice number example uses the implemented 16-character format. 0.2: C14 platform admin panel (M0) with US-1301..US-1310; C13 folded into C14; C12 "Plan & billing" page (US-1204); US-202 uses `tenant.structure.manage`; promotions moved to M1. 0.1: baseline |
 
 ---
 
@@ -65,6 +65,12 @@ Extension points for later modules: circulars→tasks & notices (M4), student ti
 | C23 | Parent language per school (ADR-0044) | R2 |
 | C24 | Parent link pages, no parent login (ADR-0046, ADR-0047) | R2 |
 | C25 | Ask the school finish-up: answer usage, search-only explanations, source resolution, e2e | R2 |
+| C26 | DPDP processor pack: legal templates (not legal advice), notice records, data-principal requests and grievances, record classes (ADR-0048) | R3 |
+| C27 | Consent register for optional purposes, with one view of APAAR and WhatsApp opt-ins (ADR-0049) | R3 |
+| C28 | Breach handling: SchoolOS incident records and the school's breach register with clocks (ADR-0050) | R3 |
+| C29 | CBSE Appendix IX public disclosure page and file (ADR-0051) | R3 |
+| C30 | RTE 25% register: admissions, documents, reimbursement claims (ADR-0052; designed, not scheduled while D10 stands) | R3 (gated) |
+| C31 | Portal calendar and readiness reminders (ADR-0053) | R3 |
 
 Extension points for later modules: certificates & registers (M3), circulars→tasks & notices (M4, C16 below), student timeline & early warning (M5), Tally connector (M6).
 
@@ -731,6 +737,129 @@ The conversation screens, source chips, follow-ups, feedback, verified answers, 
 - AC1: Playwright covers ask and stream, citations and popovers, feedback, follow-ups, rename/pin/delete, memory add/confirm/forget, search-only and budget banners, keyboard-only use at 1366×768 and a 375 px phone.
 
 *As built (R2-2F, 2026-10-17):* US-2501..US-2504 are built (usage meter and banners, search-only reasons, `/knowledge/resolve`, Playwright Ask journeys in `e2e/ask.spec.ts`; docs/14 R2-2F status). US-2112 (C21) stays open.
+
+---
+
+### R3 · Compliance pack and differentiation (C26-C31)
+
+Stories of the 2026-27 plan, release R3 (docs/18 §3 R3, planned Apr-Jun 2027, before DPDP's day-to-day duties start in mid-May 2027; docs/08 §2). **Status: planned (documented 2026-10-21), not built.** The engineering choices are in ADR-0048..ADR-0053, accepted by the lead engineer on 2026-10-21 because the owner asked not to be asked (lead decisions D36-D46, docs/18 §8; the owner may revisit any of them). **C30 (RTE register) is designed but not scheduled**: owner decision D10 left the RTE register out of this year's build and stands until the owner reopens it (D43). Everything about the law comes from docs/08 and is **not legal advice** (D30). US numbers: no `US` sequence exists in the id reservation tool, so these are the next free numbers by capability (US-2601 onwards). Every story also carries the standing definition of done (CLAUDE.md §8).
+
+**R3 personas** (in addition to §2 and the R2 personas):
+
+| Persona | Who | Top jobs in R3 |
+|---|---|---|
+| **Principal as grievance officer** | Named in the school's privacy notice as the contact (`privacy_contact`) | Answer parents' requests and complaints within 7 days, decide what can be erased, sign off access reports, record breaches and meet the 72-hour report |
+| **Lakshmi, office admin** | Logs requests at the counter, prints forms, prepares the CBSE disclosure and RTE claims | Know what is due this week, never hand a child's data to the wrong adult |
+| **Owner / correspondent** | Signs the DPA with SchoolOS, issues notices | Show an inspector or a parent that the school follows DPDP and CBSE rules |
+| **Exam coordinator** | Owns UDISE+, SSC and CBSE submissions | Be reminded before each portal window with the number of students not yet ready |
+| **Parent** | Asks the office what the school holds, wants a correction, withdraws a photo consent, complains | A clear answer by a date, in writing |
+
+#### C26 · DPDP processor pack: notices, data-principal requests, grievances, record classes (R3.1; ADR-0048)
+
+**US-2601** · As the owner, I want SchoolOS's DPA, privacy notice, terms and DPIA templates so that the school can sign and issue them before real data goes in. [FR-DPDP-001, FR-DPDP-002]
+- AC1: The templates (`docs/legal/`) say "Not legal advice" at the top, carry a version, list their placeholders, and mark every point the law summary (docs/08) does not settle as "(to confirm)".
+- AC2: In SchoolOS I can preview the parents' and staff notices filled with the school's name, address and privacy contact, and download them as A4 PDF.
+
+**US-2602** · As the principal, I want to record which notice we issued, when and how, so that we can prove parents were told. [FR-DPDP-003, PRV-001]
+- AC1: Given I hold `privacy.request.manage`, I record a notice issue (audience, template version, language, date, channel, the final PDF as a document); the list shows every issue with its version, newest first.
+- AC2: When SchoolOS publishes a newer template version, the privacy page says "A newer notice version exists" until we record issuing it.
+
+**US-2603** · As the principal, I want the school's privacy contact set once and printed everywhere it is needed. [FR-DPDP-004, PRV-011]
+- AC1: Given I hold `tenant.settings.manage` with step-up, I set the contact (name or designation, office phone, e-mail); notices, letters and access reports print it; staff see it in the app footer.
+
+**US-2604** · As office admin, I want to log a parent's request or complaint with a due date so that nothing is forgotten. [FR-DPDP-005..007, NFR-PRV-004]
+- AC1: I choose the kind (access, correction, erasure, nomination, consent withdrawal, grievance, other), the child or guardian or staff member it is about, who asked and how I checked who they are (in person with a document seen, their phone matches the guardian's number on record, or a staff member signed in); the due date is 7 days after receipt (the school may set fewer, never more).
+- AC2: The request text and my notes are never shown in logs or audit entries; the list shows kind, subject, status and days left, with overdue ones first.
+- AC3: I can print an acknowledgement letter with the reference and due date.
+
+**US-2605** · As the principal, I want an access report for one child, guardian or staff member so that I can answer "what do you hold about us?". [FR-DPDP-008..010, NFR-PRV-007]
+- AC1: The report lists, per kind of record, what SchoolOS holds about that person, where it came from and how long it is kept; never another child's data and never an Aadhaar number (only "last 4 digits and as-printed details held").
+- AC2: The report is released only by someone other than the person who logged the request, with step-up; it is downloadable for 24 hours to print or hand over; SchoolOS does not send it.
+- AC3: Every module that holds personal data contributes to the report (a test fails when a new module forgets).
+
+**US-2606** · As the principal, I want a correction request to lead to the usual change request with evidence, so that official records are corrected properly. [FR-DPDP-011]
+- AC1: From the request I open a change request (identity fields) or the normal edit; the request shows its linked changes and closes when they are decided; SchoolOS never edits a record because a request says so.
+
+**US-2607** · As the principal, I want to see what can lawfully be erased before I decide, so that I never delete an official record by mistake. [FR-DPDP-012..014, PRV-009]
+- AC1: For an erasure request the screen lists each kind of record with "can be erased", "kept: legal obligation", "kept: official record" or "kept until <date>", with the reason in words from the record-class catalogue.
+- AC2: Approving (step-up, not the person who logged it) erases what can be erased in one go and lists anything needing a manual step; the admission register, issued certificates, financial records in their 8-year period and the audit log are never erased on request.
+
+**US-2608** · As a guardian or staff member, I want to name someone to act for me, and as the principal I want to answer complaints in writing, within the same register. [FR-DPDP-015, FR-DPDP-016]
+- AC1: A nomination records the nominee's name, relationship and contact (restricted) and can be withdrawn.
+- AC2: A grievance is closed only with a written response, which I can print from the letter template.
+
+**US-2609** · As the owner, I want to see every kind of record SchoolOS keeps with its retention and whether it can be erased. [FR-DPDP-017]
+- AC1: The Data retention screen shows the record classes read-only (owner module, retention, basis, erasure rule); they match docs/05 §13 exactly (test).
+
+#### C27 · Consent register for optional purposes (R3.1; ADR-0049)
+
+**US-2701** · As the principal, I want to choose the optional purposes the school asks parents to consent to (for example photos on the website) with a clear description. [FR-DPDP-020, PRV-006]
+- AC1: Given `tenant.settings.manage` with step-up, I enable suggested purposes or add our own (label, what, why, who receives it, for how long); editing a purpose already answered makes a new version.
+
+**US-2702** · As office staff, I want to record each family's decision with the signed form and print forms that offer "I do not agree" next to "I agree". [FR-DPDP-021..023]
+- AC1: Same rules as the APAAR register: `given` needs the signed form; history is append-only; withdrawal only after a given consent; no Aadhaar number on forms or notes.
+- AC2: No decision counts as "not given" wherever SchoolOS checks a purpose.
+
+**US-2703** · As the principal, I want one view of a child's consents: optional purposes, APAAR and the guardians' WhatsApp opt-ins. [FR-DPDP-024..026]
+- AC1: The view shows each with its own source and date; APAAR and WhatsApp are changed only on their own screens. Section counts per purpose for class teachers of their sections.
+
+#### C28 · Breach handling (R3.1; ADR-0050)
+
+**US-2801** · As a SchoolOS operator, I want to record an incident with its CERT-In and school-notice clocks so that we meet 6 hours and 24 hours. [FR-DPDP-030, FR-DPDP-031]
+- AC1: The incident holds categories and counts only (a summary with names, numbers or e-mail addresses is refused); two operators confirm the affected schools before any school is notified.
+
+**US-2802** · As the principal, I want SchoolOS's notice to appear in our breach register at once, marked urgent. [FR-DPDP-032]
+- AC1: Within a minute of confirmation the owner and principal get an urgent in-app notification and the register shows the notice with its facts.
+
+**US-2803** · As the principal, I want to record our own breaches (a lost register, a mis-sent message) with the Board and family duties and their clocks. [FR-DPDP-033..035, PRV-008]
+- AC1: Each open breach shows the next duty and the time left: Board notice, detailed Board report at 72 hours, families notified; each records when and how it was done. Reminders reach the owner and principal at 24 and 60 hours while the report is not recorded.
+
+**US-2804** · As the principal, I want draft notices for families and an outline for the Board filled from the record, so that I can act quickly. [FR-DPDP-036, FR-DPDP-037]
+- AC1: Drafts come from the breach runbook templates; a family notice can become a parent-notice draft that is approved and sent like any notice; SchoolOS never sends one by itself.
+
+#### C29 · CBSE Appendix IX public disclosure (R3.2; ADR-0051)
+
+**US-2901** · As the principal of a CBSE school, I want the Appendix IX disclosure filled from what SchoolOS already holds so that I only type what is missing. [FR-DISC-001..004]
+- AC1: Given our boards include CBSE, the disclosure screen lists Appendix IX in CBSE's order; school details, sections, teacher-section ratio, staff counts by role and the fee structure (when fees are on) are filled from SchoolOS and marked "From SchoolOS"; the rest are fields to type, documents to choose, or a link.
+- AC2: The format says it is built from public sources and not yet confirmed with a CBSE school (D3).
+
+**US-2902** · As the principal, I want to publish the disclosure only when I decide, and to know exactly what is public. [FR-DISC-005..007]
+- AC1: Publishing (step-up) freezes the page as it is; later changes to records do not change it until I publish again. I can withdraw it with a reason.
+- AC2: Before publishing I confirm that the chosen documents contain no student's personal data; the page never shows a child's name or any count below 10 ("fewer than 10").
+
+**US-2903** · As a parent or a CBSE inspector, I want to open the school's disclosure from a link on the school website. [FR-DISC-008..010]
+- AC1: The link opens a read-only page on the public origin with the published content and the documents, "Published by <school> on <date>"; a withdrawn or unknown link shows the same "not found" page as other public links.
+
+**US-2904** · As office admin, I want the disclosure as a file for our own website. [FR-DISC-011]
+- AC1: I download the published version as one HTML file (no scripts) and as an A4 PDF.
+
+#### C30 · RTE 25% register (designed; not scheduled while D10 stands; ADR-0052)
+
+**US-3001** · As office admin, I want to record each child admitted under RTE Section 12(1)(c) with the lottery or allotment reference and the documents seen. [FR-RTE-001..004]
+- AC1: Only when the school says RTE applies; category from the state file (AP: unverified, D3); documents are links to uploaded documents with who verified them; no Aadhaar number or income figure stored.
+
+**US-3002** · As the principal, I want RTE status visible only to the people who need it. [FR-RTE-005, FR-RTE-006]
+- AC1: Class teachers and teachers never see it; it is not printed on certificates or registers, not in messages, parent pages or Ask answers.
+
+**US-3003** · As the accountant, I want to prepare each period's reimbursement claim from the register and track what the state paid. [FR-RTE-007..010]
+- AC1: A claim lists RTE children enrolled in the period with the amounts the state file defines; marking it submitted freezes it; received amounts are recorded per claim and per child.
+
+**US-3004** · As office admin, I want an RTE admission to propose the fee concession for a person to approve. [FR-RTE-011]
+- AC1: "Request RTE concession" creates a pending concession of type `rte`; approval follows the normal maker-checker; nothing is approved automatically.
+
+#### C31 · Portal calendar and readiness reminders (R3.3; ADR-0053)
+
+**US-3101** · As exam coordinator, I want the year's portal windows (UDISE+ freeze, SSC nominal roll, CBSE registration and LOC, CISCE, APAAR drives) listed for our school. [FR-RDY-001..003]
+- AC1: Events apply by board and classes; each shows "Expected around …" (shipped, unverified) or "Confirmed" (by a person, with where the date came from).
+
+**US-3102** · As the principal, I want to confirm a date and choose who owns the work. [FR-RDY-004, FR-RDY-005]
+- AC1: Given `readiness.calendar.manage`, I confirm opening and closing dates with a source (a circular document, a portal screen, a phone call) and an owner; I can add the school's own events.
+
+**US-3103** · As the owner of a portal task, I want reminders 30, 14, 7 and 1 days before the window closes, with how many students are not ready. [FR-RDY-006..008]
+- AC1: One task per event with the closing date as due date, and in-app notifications at each lead day with counts only ("UDISE+ freeze in 14 days: 142 of 160 ready"); no message to parents.
+
+**US-3104** · As staff, I want the next window shown on the readiness screens. [FR-RDY-009, FR-RDY-010]
+- AC1: Each readiness profile shows its next window and state (expected, confirmed, open now, closed); a confirmed circular deadline can be linked to an event.
 
 ## 5. Data-quality rules catalog (initial)
 
