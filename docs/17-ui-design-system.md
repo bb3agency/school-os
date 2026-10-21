@@ -51,7 +51,9 @@ under reduced motion. Light theme only.
    control, drawer scroll lock), `:modal`, native `<dialog>`, `<details>`, `accent-color`,
    `env()`, `dvh` (after a `vh` fallback), `@media (prefers-reduced-motion)`,
    `@media (forced-colors)`, `:where()` (the `collapsed:` variant), `inert` (via the modal
-   dialog). Not used: `backdrop-filter` (slow office PCs), anchor positioning,
+   dialog). With a fallback: `scrollbar-width` / `scrollbar-color` / `scrollbar-gutter` (the
+   `scrollbar-quiet` utility on the sidebar menu; a browser without them keeps its own scrollbar,
+   and the compact rail's icons stay centred either way). Not used: `backdrop-filter` (slow office PCs), anchor positioning,
    container queries, `appearance: base-select`.
 5. **Print.** Gradients, shadows and tints disappear; cards print as plain bordered boxes; chrome
    (`data-print="hide"`) is hidden; A4 margins; Telugu line height 1.8.
@@ -492,6 +494,12 @@ the compact width is right on the first paint (no layout shift); the `collapsed:
 variant (`globals.css`) styles only inside the inline sidebar. React reads the attribute with
 `useSyncExternalStore` (server snapshot "expanded"), so hydration never mismatches. Without
 storage the sidebar simply starts expanded.
+
+**Menu scrollbar.** The menu scrolls on its own with a thin, faded-ink thumb on a clear track
+(`scrollbar-quiet`, a little darker while the pointer is over the menu; faded white on the operator
+chrome). In the compact rail the scrollbar's room is reserved on both sides
+(`scrollbar-gutter: stable both-edges`, no side padding), so the icons and the active highlight
+stay centred whether or not the menu scrolls.
 
 **Themes.** School: the sidebar and top bar sit on the canvas tone (so they read quieter than
 the white content) with hairlines. Operator console: dark neutral sidebar and top bar

@@ -69,7 +69,10 @@ export function Sidebar({
         sections={sections}
         theme={theme}
         className={cn(
-          "min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pt-1 pb-4",
+          "scrollbar-quiet min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pt-1 pb-4",
+          // Compact rail (56px): the scrollbar's room is kept on both sides, so the icons and
+          // the active highlight stay centred whether or not the menu scrolls.
+          "collapsed:px-0 collapsed:[scrollbar-gutter:stable_both-edges]",
           // The menu scrolls on its own; its edge shows where the account area starts.
           account ? cn("border-b", styles.divider) : undefined,
         )}
