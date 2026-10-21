@@ -69459,7 +69459,7 @@
         ]
       },
       "post": {
-        "description": "Meta's events for every connected school. The signature (app secret over the raw body)\nwas checked by the guard; each entry is routed by its WABA id to one school, its events are\nstored (encrypted, deduplicated) and the worker applies them. A replayed delivery and events\nof unknown or disconnected accounts are acknowledged without effect.",
+        "description": "Meta's events for every connected school. The signature (app secret over the raw body)\nwas checked by the guard; each entry is routed by its WABA id to one school, its events are\nstored (encrypted, deduplicated) and the worker applies them. A replayed delivery and events\nof unknown or disconnected accounts are acknowledged without effect. A suspended school's\naccount: only parents' STOP replies are recorded (silently, nothing is sent); everything\nelse is acknowledged without effect (owner decisions D31, D35).",
         "operationId": "meta_webhook_api_v1_webhooks_meta_post",
         "responses": {
           "200": {
