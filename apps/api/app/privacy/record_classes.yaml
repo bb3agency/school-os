@@ -401,29 +401,6 @@ classes:
     erasure: allowed_after_retention
     source: Recorded by the school, or SchoolOS's notice of an incident
 
-  # --- R3-1C disclosure and R3-1D portal calendar (classified at the R3-1B integration) ------
-  disclosure:
-    label: CBSE public disclosure
-    owner: disclosure
-    tables: [ops.disclosure_drafts, ops.disclosure_snapshots, ops.disclosure_snapshot_documents]
-    classification: C1
-    docs_row: Disclosure snapshots (
-    retention: Life of the school
-    basis: The school's Appendix IX page as drafted and published; no student data (ADR-0051).
-    erasure: no_personal_data
-    source: Entered and published by the school
-
-  portal_calendar:
-    label: Portal calendar dates and reminders
-    owner: dq
-    tables: [ops.portal_calendar_dates, ops.portal_reminders]
-    classification: C1
-    docs_row: Portal calendar dates and reminders
-    retention: 2 academic years
-    basis: Confirmed portal dates and which reminders were sent; configuration, nothing about one person.
-    erasure: no_personal_data
-    source: SchoolOS's calendar and the school's confirmations
-
   public_links:
     label: Parent links and certificate check codes
     owner: public
