@@ -344,7 +344,7 @@ permissions:
     step_up: true
 
   # --- R3-1C CBSE Appendix IX disclosure (ADR-0051; docs/07 §6.2; FR-DISC-*). Migration
-  # 0066_disclosure upserts these into core.permissions. School-wide only; CBSE schools only.
+  # 0067_disclosure upserts these into core.permissions. School-wide only; CBSE schools only.
   disclosure.edit:
     description: Edit the CBSE Appendix IX disclosure draft, see what was published and download the published files
     sensitivity: normal

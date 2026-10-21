@@ -751,7 +751,7 @@ Conventions as above and as the R2 section: `Idempotency-Key` on creating POSTs,
 
 #### Disclosure (R3.2; FR-DISC-001..012)
 
-**As built (R3-1C, `wip/r3-disclosure`, migration `0066_disclosure`, 2026-10-21).** All routes below are built. Errors: 404 `module_hidden` (no CBSE), 412 on a stale `If-Match` (`W/"0"` before the first save), 422 per item (`inputs.<key>` / `documents.<key>`: `aadhaar_not_allowed`, `phone_not_allowed`, `markup_not_allowed`, `https_only`, `document_not_found`, `document_not_publishable`, ...), 422 `confirmation_required` / `incomplete`, 409 `snapshot_not_live`, `not_published`, `files_not_ready`, `files_failed`. The public routes answer `Cache-Control: private, no-store` and `X-Robots-Tag: noindex, nofollow`.
+**As built (R3-1C, `wip/r3-disclosure`, migration `0067_disclosure`, 2026-10-21).** All routes below are built. Errors: 404 `module_hidden` (no CBSE), 412 on a stale `If-Match` (`W/"0"` before the first save), 422 per item (`inputs.<key>` / `documents.<key>`: `aadhaar_not_allowed`, `phone_not_allowed`, `markup_not_allowed`, `https_only`, `document_not_found`, `document_not_publishable`, ...), 422 `confirmation_required` / `incomplete`, 409 `snapshot_not_live`, `not_published`, `files_not_ready`, `files_failed`. The public routes answer `Cache-Control: private, no-store` and `X-Robots-Tag: noindex, nofollow`.
 
 | Method | Path | Guard |
 |---|---|---|

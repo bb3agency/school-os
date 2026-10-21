@@ -36,7 +36,7 @@ record), deletes every ``school_disclosure`` handle (as the owner, FORCE lifted 
 statement and restored in the same transaction) before narrowing the CHECK back, and deletes the
 two permissions unless a role still holds them.
 
-Revision ID: 0066_disclosure
+Revision ID: 0067_disclosure
 Revises: 0062_messaging_finish
 Create Date: 2026-10-21
 """
@@ -46,7 +46,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0066_disclosure"
+revision = "0067_disclosure"
 down_revision = "0062_messaging_finish"
 branch_labels = None
 depends_on = None

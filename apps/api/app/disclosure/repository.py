@@ -1,4 +1,4 @@
-"""Database access for the disclosure (0066_disclosure; ADR-0051). Callers inside
+"""Database access for the disclosure (0067_disclosure; ADR-0051). Callers inside
 ``app.disclosure`` only; every function runs in the school's ``tenant_session`` (RLS)."""
 
 from __future__ import annotations

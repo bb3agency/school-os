@@ -665,7 +665,7 @@ Release R3 of the 2026-27 plan (docs/18 §3 R3; before DPDP's day-to-day duties 
 
 ### 3.28 CBSE Appendix IX public disclosure (FR-DISC) (R3.2; ADR-0051)
 
-**As built (R3-1C, `wip/r3-disclosure`, migration `0066_disclosure`, 2026-10-21).** FR-DISC-001..012 are built and tested (`apps/api/tests/disclosure/`). Notes: the live page is the **latest** snapshot unless it was withdrawn (withdrawing applies to the live snapshot only, 409 `snapshot_not_live`; publishing again makes a new live snapshot at the same link); the raw 22-character key is kept on the draft (`link_key`) so staff can copy the link again (only its hash is in `core.public_handles`); a published document version cannot be deleted (documents delete guard `document_published`); a school that drops CBSE from its boards stops showing the page (uniform 404).
+**As built (R3-1C, `wip/r3-disclosure`, migration `0067_disclosure`, 2026-10-21).** FR-DISC-001..012 are built and tested (`apps/api/tests/disclosure/`). Notes: the live page is the **latest** snapshot unless it was withdrawn (withdrawing applies to the live snapshot only, 409 `snapshot_not_live`; publishing again makes a new live snapshot at the same link); the raw 22-character key is kept on the draft (`link_key`) so staff can copy the link again (only its hash is in `core.public_handles`); a published document version cannot be deleted (documents delete guard `document_published`); a school that drops CBSE from its boards stops showing the page (uniform 404).
 
 | ID | Requirement | V |
 |---|---|---|

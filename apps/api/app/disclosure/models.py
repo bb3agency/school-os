@@ -1,4 +1,4 @@
-"""Disclosure tables (migration 0066_disclosure; docs/05 §16.4; ADR-0051).
+"""Disclosure tables (migration 0067_disclosure; docs/05 §16.4; ADR-0051).
 
 Describes the tables for typed queries only; DDL (RLS, column grants, the snapshot guard
 trigger, the composite FKs into ``kb`` and ``core.public_handles``) lives in the migration.

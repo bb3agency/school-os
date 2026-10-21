@@ -854,7 +854,7 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             i=uuid.uuid4(),
             t=t,
         )
-        # --- CBSE disclosure (R3-1C, 0066_disclosure): a draft, a snapshot and its document --
+        # --- CBSE disclosure (R3-1C, 0067_disclosure): a draft, a snapshot and its document --
         snapshot = uuid.uuid4()
         _run(
             c,

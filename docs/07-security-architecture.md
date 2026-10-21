@@ -368,7 +368,7 @@ Unchanged keys used by R2: `certificate.approve`ᴿ (add or withdraw a verificat
 | rte.manage (R3-2E: record RTE admissions and documents, request the RTE concession) | — | ✓ | ✓ | — | — | — | — | — | — |
 | rte.claim.manage (R3-2E: prepare, submit and record reimbursement claims) | — | ✓ | ✓ | — | ✓ | — | — | — | — |
 
-`disclosure.edit` and `disclosure.publish`ᴿ are **built** (R3-1C, migration `0066_disclosure`) and live in §6.2.
+`disclosure.edit` and `disclosure.publish`ᴿ are **built** (R3-1C, migration `0067_disclosure`) and live in §6.2.
 
 Unchanged keys used by R3: `tenant.settings.manage`ᴿ (privacy contact, request target, consent purposes, `rte_applicable`), `student.read_basic` (the reach of request lists), `dq.readiness.read` (calendar), `task.read` (portal tasks), `fee.concession.request` is **not** needed for "Request RTE concession" (the RTE module asks `fees.service` with the caller's `rte.manage`; the approval still needs `fee.concession.approve`ᴿ).
 
@@ -509,7 +509,7 @@ Tests (planned 2026-10-14, `apps/api/tests/security/`; built across R2-0..R2-3H 
 
 ### 11.3 Public disclosure page (R3; ADR-0051; built R3-1C)
 
-**As built (R3-1C, `wip/r3-disclosure`, migration `0066_disclosure`, 2026-10-21).** The two routes live in `app/disclosure/api.py` (`public_router`, like certificate verification) and are in `tests/public/test_surface_security.py` (uniform 404 for unknown, malformed, revoked, other-kind, unpublished and suspended-school keys; failure budget; service token only; headers). The snapshot allowlist, small-count suppression, withdrawn and suspended cases are in `tests/disclosure/test_api.py`. The penetration-test scope entry (NFR-SEC-008) is R3-2F's.
+**As built (R3-1C, `wip/r3-disclosure`, migration `0067_disclosure`, 2026-10-21).** The two routes live in `app/disclosure/api.py` (`public_router`, like certificate verification) and are in `tests/public/test_surface_security.py` (uniform 404 for unknown, malformed, revoked, other-kind, unpublished and suspended-school keys; failure budget; service token only; headers). The snapshot allowlist, small-count suppression, withdrawn and suspended cases are in `tests/disclosure/test_api.py`. The penetration-test scope entry (NFR-SEC-008) is R3-2F's.
 
 The Appendix IX page adds one read-only public route family on the parent origin (TB12): `GET /api/v1/public/disclosure/{key}` and `/documents/{n}`, through the BFF with the service token and no user token, guarded by `require_public_handle("school_disclosure")`.
 
