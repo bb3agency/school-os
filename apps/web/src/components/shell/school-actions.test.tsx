@@ -78,3 +78,29 @@ describe("palette actions and bottom bars come from the same permission rule (do
     expect(screen.getByRole("navigation", { name: "Quick links" })).toHaveTextContent("Attendance");
   });
 });
+
+describe("the school menu", () => {
+  it("has each section once and each page once, with every permission and feature on", () => {
+    // The sidebar keys sections by id: two waves each adding a "privacy" section gave React a
+    // duplicate key and two Privacy headings (R3-1A + R3-1B merge).
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    renderWithIntl(
+      <SchoolShell
+        permissions={null}
+        features={{ tally: true, messaging: true, fees: true, disclosure: true }}
+        account={{ kind: "staff", displayName: "Sample Principal", roles: ["principal"] }}
+      >
+        <h1>Today</h1>
+      </SchoolShell>,
+    );
+    const duplicateKeys = errors.mock.calls.filter((call) => String(call[0]).includes("same key"));
+    errors.mockRestore();
+    expect(duplicateKeys).toEqual([]);
+    const menu = screen.getByRole("navigation", { name: "Main" });
+    const hrefs = within(menu)
+      .getAllByRole("link")
+      .map((link) => link.getAttribute("href"));
+    expect(hrefs.filter((href, i) => hrefs.indexOf(href) !== i)).toEqual([]);
+    expect(within(menu).getAllByText("Privacy")).toHaveLength(1);
+  });
+});

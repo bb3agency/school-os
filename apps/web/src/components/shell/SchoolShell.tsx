@@ -191,7 +191,9 @@ export function SchoolShell({
       ],
     },
     {
-      // R3-1A (ADR-0048; docs/17 §5.10): parents' privacy requests, complaints and notices.
+      // R3 privacy duties (docs/17 §5.10): requests, complaints and notices (R3-1A, ADR-0048),
+      // the breach register and consent purposes (R3-1B, ADR-0049/0050). One section: the
+      // sidebar keys sections by id.
       id: "privacy",
       items: [
         {
@@ -205,6 +207,18 @@ export function SchoolShell({
           label: t("privacy.nav.notices"),
           permission: "privacy.read",
           icon: "file",
+        },
+        {
+          href: "/privacy/breaches",
+          label: t("breaches.nav"),
+          permission: "privacy.breach.read",
+          icon: "alert",
+        },
+        {
+          href: "/settings/consent-purposes",
+          label: t("consents.purposes.nav"),
+          permission: "tenant.settings.manage",
+          icon: "checkCircle",
         },
       ],
     },
@@ -328,25 +342,6 @@ export function SchoolShell({
           permission: ["fee.manage", "finance.read"],
           feature: "fees",
           icon: "layers",
-        },
-      ],
-    },
-    {
-      // R3 (docs/17 §5.10): privacy duties. R3-1B adds the breach register and consent
-      // purposes; R3-1A adds requests and notices here (privacy.read).
-      id: "privacy",
-      items: [
-        {
-          href: "/privacy/breaches",
-          label: t("breaches.nav"),
-          permission: "privacy.breach.read",
-          icon: "shieldCheck",
-        },
-        {
-          href: "/settings/consent-purposes",
-          label: t("consents.purposes.nav"),
-          permission: "tenant.settings.manage",
-          icon: "checkCircle",
         },
       ],
     },
