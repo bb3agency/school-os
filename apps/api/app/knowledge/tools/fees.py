@@ -19,6 +19,15 @@ and the as-of date and sync time; ``scope`` fingerprints the caller's ``finance.
 re-checked when the answer is shown again, audit W3-09): no person, ledger or amount in the URI.
 Amounts are written in Indian grouping with two decimals, exactly as stored (``Decimal``), so
 the accountant can compare them with Tally. Read-only; no network.
+
+**With fees on (FR-KB-044, R2-4).** While the school keeps its fees in SchoolOS (FR-FEE-001,
+``fees.service.enabled``), the tool reads the fee ledger through ``fees.service`` instead and
+Tally is not consulted: offered with ``finance.read`` school-wide whatever the connector flag;
+with a student, the current year's balance, the overdue amount, what is due per instalment and
+the last payment date (``fees.service.ask_student_fees``; a student without a fee account gets
+"no fee account", never a figure); without one, the school and per-class totals, numbers only
+(``fees.service.ask_school_fees``). Sources stay ``sos://fee/{id}#s{scope}`` with an id derived
+from the school, the subject, "ledger" and the as-of date.
 """
 
 from __future__ import annotations
@@ -33,6 +42,7 @@ from zoneinfo import ZoneInfo
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from app.core.errors import DomainError
+from app.fees import service as fees
 from app.knowledge import sources
 from app.knowledge.config.tools import ToolConfig
 from app.knowledge.domain import SearchResultBlock, ToolOutcome, ToolSpec
@@ -107,8 +117,11 @@ class GetFeeDuesTool:
         return ctx.has(self._spec.permission) and tally.can_read_fees(ctx)
 
     def available(self, session: Session, ctx: UserContext) -> bool:
-        """Offered only with the permission AND the school's connector flag (ADR-0032 §8)."""
-        return self.allowed(ctx) and tally.fee_tool_available(session, ctx)
+        """Offered with the permission AND either fees on (the ledger, FR-KB-044) or the
+        school's Tally connector flag (ADR-0032 §8)."""
+        if not self.allowed(ctx):
+            return False
+        return fees.enabled(session, ctx.tenant_id) or tally.fee_tool_available(session, ctx)
 
     def run(
         self, session: Session, ctx: UserContext, call_id: str, arguments: Mapping[str, object]
@@ -119,7 +132,9 @@ class GetFeeDuesTool:
         scope = sources.scope_fingerprint(ctx.scope_for(self._spec.permission))
         try:
             args = FeeArgs.model_validate(dict(arguments))
-            if args.student_id is None:
+            if fees.enabled(session, ctx.tenant_id):
+                block = self._ledger(session, ctx, args.student_id, scope)
+            elif args.student_id is None:
                 block = self._summary(ctx.tenant_id, tally.fee_summary(session, ctx), scope)
             else:
                 block = self._student(
@@ -135,6 +150,77 @@ class GetFeeDuesTool:
     ) -> str:
         key = uuid.uuid5(_NAMESPACE, f"{tenant_id}|{subject}|{as_of}|{synced}")
         return sources.fee_dues(key, scope=scope)
+
+    # --- the SchoolOS fee ledger (fees on; FR-KB-044) -------------------------------------------
+
+    def _ledger(
+        self, session: Session, ctx: UserContext, student_id: uuid.UUID | None, scope: str
+    ) -> SearchResultBlock:
+        if student_id is None:
+            return self._ledger_summary(ctx.tenant_id, fees.ask_school_fees(session, ctx), scope)
+        return self._ledger_student(
+            ctx.tenant_id, fees.ask_student_fees(session, ctx, student_id), scope
+        )
+
+    def _ledger_student(
+        self, tenant_id: uuid.UUID, found: fees.AskStudentFees, scope: str
+    ) -> SearchResultBlock:
+        name = found.display_name or "(no name recorded)"
+        who = f"{name} (admission number {found.admission_no or 'none'}"
+        who += f", class {found.class_section})" if found.class_section else ")"
+        year = f" for {found.year_label}" if found.year_label else ""
+        source = self._source(
+            tenant_id, f"ledger|{found.student_id}", found.as_of, found.has_account, scope
+        )
+        title = f"Fee account · {name}"
+        if not found.has_account:
+            text = (
+                f"{who} has no fee account{year} in SchoolOS, so there is no fee figure for this "
+                "student. The accountant applies the class fee plan on the fee screens."
+            )
+            return SearchResultBlock(source=source, title=title, text=text)
+        parts = [
+            f"{i.label}{f' due {_date(i.due_on)}' if i.due_on else ''}: {inr(i.due)}"
+            f"{' (overdue)' if i.overdue else ''}"
+            for i in found.instalments
+        ]
+        text = f"Fee balance for {who}{year}: {inr(found.balance)}"
+        if found.overdue > 0:
+            text += f", of which {inr(found.overdue)} is overdue"
+        if found.oldest_due_on is not None:
+            text += f" (oldest due date {_date(found.oldest_due_on)})"
+        text += "."
+        if parts:
+            text += f" Due by instalment: {'; '.join(parts)}."
+        if found.last_payment_on is not None:
+            text += f" Last payment on {_date(found.last_payment_on)}."
+        text += f" From the SchoolOS fee ledger as of {_date(found.as_of)}."
+        return SearchResultBlock(source=source, title=title, text=text)
+
+    def _ledger_summary(
+        self, tenant_id: uuid.UUID, found: fees.AskSchoolFees, scope: str
+    ) -> SearchResultBlock:
+        source = self._source(tenant_id, "ledger|summary", found.as_of, found.year_label, scope)
+        year = f" for {found.year_label}" if found.year_label else ""
+        n = found.students_owing
+        text = (
+            f"Fee dues{year} from the SchoolOS fee ledger: {n} student"
+            f"{'s' if n != 1 else ''} with a balance, {inr(found.balance)} in total, "
+            f"{inr(found.overdue)} of it overdue."
+        )
+        if found.classes:
+            rows = [
+                f"{k.class_name}: {k.students_owing} student{'s' if k.students_owing != 1 else ''}"
+                f", {inr(k.balance)} ({inr(k.overdue)} overdue)"
+                for k in found.classes
+            ]
+            text += f" By class: {'; '.join(rows)}."
+        text += f" As of {_date(found.as_of)}."
+        return SearchResultBlock(
+            source=source, title="Fee dues from the fee ledger · school totals", text=text
+        )
+
+    # --- Tally (fees off; M6) ------------------------------------------------------------------
 
     def _student(
         self, tenant_id: uuid.UUID, dues: tally.StudentFeeDues, scope: str
