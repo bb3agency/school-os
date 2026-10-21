@@ -27,6 +27,19 @@ const localVariant = (port: number) =>
   process.env.E2E_BASE_URL ? undefined : `http://localhost:${port}`;
 const contactBaseURL = process.env.E2E_CONTACT_BASE_URL ?? localVariant(CONTACT_PORT);
 const dedicatedBaseURL = process.env.E2E_DEDICATED_BASE_URL ?? localVariant(DEDICATED_PORT);
+/**
+ * Parent link pages (ADR-0046; e2e/parent-pages.spec.ts, tests tagged @parent): one more server
+ * from the same build whose PUBLIC_BASE_URL is its own origin, so the staff origin above stays
+ * exactly as it is (no public surface on it). Against a running stack, set
+ * E2E_PUBLIC_BASE_URL (or PUBLIC_BASE_URL) to the stack's public origin instead.
+ */
+const PUBLIC_PORT = Number(process.env.E2E_PUBLIC_PORT ?? PORT + 4);
+const publicBaseURL =
+  process.env.E2E_PUBLIC_BASE_URL ?? process.env.PUBLIC_BASE_URL ?? localVariant(PUBLIC_PORT);
+// The spec reads the public origin from the environment (workers load this file too).
+if (publicBaseURL && !process.env.E2E_PUBLIC_BASE_URL) {
+  process.env.E2E_PUBLIC_BASE_URL = publicBaseURL;
+}
 /** Sign-in e2e with the scripted stand-in IdP and canned API (needs Valkey at REDIS_URL). */
 const standIn = process.env.E2E_STAND_IN === "1";
 const IDP_PORT = Number(process.env.E2E_IDP_PORT ?? 8089);
@@ -68,10 +81,20 @@ export default defineConfig({
       // The product default: Telugu switched off (ADR-0036), shared tier, no SOS_PUBLIC_*.
       name: "chromium",
       metadata: { telugu: false },
-      // The public-site variants run only in their own projects below.
-      grepInvert: /@contact|@dedicated/,
+      // The public-site variants and the parent pages run only in their own projects below.
+      grepInvert: /@contact|@dedicated|@parent/,
       use: desktop,
     },
+    ...(publicBaseURL
+      ? [
+          {
+            name: "chromium-parent",
+            metadata: { telugu: false, parent: true },
+            grep: /@parent/,
+            use: { ...desktop, baseURL: publicBaseURL },
+          },
+        ]
+      : []),
     ...(teluguBaseURL
       ? [
           {
@@ -121,6 +144,12 @@ export default defineConfig({
             base: `http://localhost:${DEDICATED_PORT}`,
             telugu: false,
             extra: { SOS_DEPLOYMENT_MODE: "dedicated" },
+          },
+          {
+            port: PUBLIC_PORT,
+            base: `http://localhost:${PUBLIC_PORT}`,
+            telugu: false,
+            extra: { PUBLIC_BASE_URL: `http://localhost:${PUBLIC_PORT}` },
           },
         ].map(({ port, base, telugu, extra }) => ({
           command: `npx next start --port ${port}`,

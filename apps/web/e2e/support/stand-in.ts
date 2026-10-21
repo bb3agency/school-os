@@ -12,7 +12,7 @@ import { createFakeIdp, type FakeIdp } from "../../src/test/fake-idp";
 import { askAnswer, askEvents, resetAsk } from "./ask-api";
 import { FILES_PREFIX, journeyAnswer, resetJourney } from "./journey-api";
 import { r1Answer, resetR1 } from "./r1-api";
-import { r2Answer, resetR2 } from "./r2-api";
+import { lastReceiptRequest, r2Answer, resetR2 } from "./r2-api";
 import { resetSheets, sheetAnswer } from "./sheet-api";
 
 export const IDP_PORT = Number(process.env.E2E_IDP_PORT ?? 8089);
@@ -836,6 +836,9 @@ async function startApi(): Promise<Server> {
       resetAsk();
       resetSheets();
       return send(response, 204, "");
+    }
+    if (url.pathname === "/__e2e/r2/receipt-request" && method === "GET") {
+      return send(response, 200, JSON.stringify(lastReceiptRequest()));
     }
     if (url.pathname.startsWith(FILES_PREFIX)) {
       const name = url.pathname.slice(FILES_PREFIX.length).replace(/[^a-z0-9.-]/g, "");

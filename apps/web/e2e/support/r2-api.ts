@@ -286,19 +286,28 @@ function envelope(token: string): Schemas["LinkEnvelopeOut"] | null {
 
 interface R2State {
   account: Schemas["AccountOut"];
+  /** The last receipt request body the API got (Chromium may not expose a fetch body). */
+  lastReceiptRequest: Body | null;
   receipts: Map<string, Schemas["ReceiptOut"]>;
   language: "en" | "te" | "school";
 }
 
 const state: R2State = {
   account: freshAccount(),
+  lastReceiptRequest: null,
   receipts: new Map(),
   language: "school",
 };
 
+/** What the browser sent for the last receipt, as the API received it through the BFF. */
+export function lastReceiptRequest(): Body | null {
+  return state.lastReceiptRequest;
+}
+
 export function resetR2(): void {
   state.account = freshAccount();
   state.receipts.clear();
+  state.lastReceiptRequest = null;
   state.language = "school";
 }
 
@@ -315,6 +324,7 @@ function rupees(value: number): string {
 
 /** Oldest due first, like the API's default allocation (FR-FEE-010). */
 function saveReceipt(body: Body): [number, unknown] {
+  state.lastReceiptRequest = body;
   const amount = typeof body.amount === "string" && MONEY.test(body.amount) ? body.amount : null;
   const mode = body.mode;
   if (body.account_id !== state.account.id || amount === null || mode !== "cash") {
@@ -472,6 +482,20 @@ export function r2Answer(
   if (path === `/api/v1/fees/accounts/${state.account.id}` && get) return [200, state.account];
   if (path.startsWith("/api/v1/fees/accounts/") && get) return notFound;
   if (path === "/api/v1/fees/receipts" && post) return saveReceipt(body);
+  // R2-3J "Send on WhatsApp" on the saved panel (FR-MSG-026): WhatsApp is not connected in the
+  // stand-in, so the panel shows nothing for it.
+  if (/^\/api\/v1\/fees\/receipts\/[^/]+\/whatsapp$/.test(path) && get) {
+    return [
+      200,
+      {
+        receipt_id: path.split("/")[5] ?? "",
+        can_send: false,
+        blocked_reason: "messaging_not_connected",
+        opted_in_guardians: 0,
+        messages: [],
+      } satisfies Schemas["ReceiptWhatsAppOut"],
+    ];
+  }
   if (path.startsWith("/api/v1/fees/receipts/") && get) {
     const receipt = state.receipts.get(path.split("/")[5] ?? "");
     return receipt ? [200, receipt] : notFound;
