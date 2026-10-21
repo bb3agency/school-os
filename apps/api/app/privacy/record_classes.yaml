@@ -234,6 +234,28 @@ classes:
     erasure: refused_official_record
     source: Made by SchoolOS
 
+  portal_calendar:
+    label: Portal calendar dates and reminders
+    owner: dq
+    tables: [ops.portal_calendar_dates, ops.portal_reminders]
+    classification: C1
+    docs_row: Portal calendar dates and reminders
+    retention: 2 academic years
+    basis: Portal and board dates the school confirmed and which reminders were sent; nothing about one student.
+    erasure: no_personal_data
+    source: Confirmed by school staff from a circular or the portal
+
+  school_disclosure:
+    label: CBSE public disclosure (Appendix IX)
+    owner: disclosure
+    tables: [ops.disclosure_drafts, ops.disclosure_snapshots, ops.disclosure_snapshot_documents]
+    classification: C1
+    docs_row: Disclosure snapshots
+    retention: Life of the school
+    basis: The record of what the school published as CBSE requires; school-level facts and counts, no student data.
+    erasure: refused_official_record
+    source: Entered and published by the school
+
   imports:
     label: Spreadsheet imports
     owner: imports

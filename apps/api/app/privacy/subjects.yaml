@@ -116,4 +116,5 @@ no_personal_data:
   disclosure: The school's CBSE Appendix IX page (drafts, published snapshots and their documents); no student data (ADR-0051).
   ops: Background job runs, the outbox and idempotency keys hold ids and counts only.
   admin: Whole-school archives asked for by the owner and the school's retention settings; nothing about one person.
+  disclosure: The school's public CBSE disclosure holds school-level facts and counts that the school publishes on purpose; nothing about one student.
   tenancy: The school's structure (years, classes, sections) and its encryption keys; nothing about one person.
