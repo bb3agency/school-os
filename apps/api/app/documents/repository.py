@@ -485,6 +485,7 @@ STUDENT_DOCUMENT_LINKS: tuple[tuple[str, str, str], ...] = (
     ("sis.attribute_values", "evidence_document_id", "student_id"),
     ("sis.certificates", "document_id", "student_id"),
     ("sis.change_requests", "evidence_document_id", "student_id"),
+    ("sis.consents", "evidence_document_id", "student_id"),
     ("sis.extraction_items", "document_id", "student_id"),
 )
 
