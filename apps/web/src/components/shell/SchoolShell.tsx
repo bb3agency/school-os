@@ -89,6 +89,13 @@ export function SchoolShell({
           permission: "student.read_basic",
           icon: "users",
         },
+        {
+          // R3-1B (ADR-0049, US-2603): families' answers on the school's optional purposes.
+          href: "/consents",
+          label: t("consents.nav"),
+          permission: ["consent.read", "consent.record"],
+          icon: "checkCircle",
+        },
         { href: "/imports", label: t("imports.nav"), permission: "import.run", icon: "upload" },
         {
           href: "/register-photos",
@@ -294,6 +301,25 @@ export function SchoolShell({
           permission: ["fee.manage", "finance.read"],
           feature: "fees",
           icon: "layers",
+        },
+      ],
+    },
+    {
+      // R3 (docs/17 §5.10): privacy duties. R3-1B adds the breach register and consent
+      // purposes; R3-1A adds requests and notices here (privacy.read).
+      id: "privacy",
+      items: [
+        {
+          href: "/privacy/breaches",
+          label: t("breaches.nav"),
+          permission: "privacy.breach.read",
+          icon: "shieldCheck",
+        },
+        {
+          href: "/settings/consent-purposes",
+          label: t("consents.purposes.nav"),
+          permission: "tenant.settings.manage",
+          icon: "checkCircle",
         },
       ],
     },

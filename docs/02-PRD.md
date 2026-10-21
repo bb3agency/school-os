@@ -803,6 +803,8 @@ Stories of the 2026-27 plan, release R3 (docs/18 §3 R3, planned Apr-Jun 2027, b
 **US-2703** · As the principal, I want one view of a child's consents: optional purposes, APAAR and the guardians' WhatsApp opt-ins. [FR-DPDP-024..026]
 - AC1: The view shows each with its own source and date; APAAR and WhatsApp are changed only on their own screens. Section counts per purpose for class teachers of their sections.
 
+*As built (R3-1B, 2026-10-21):* US-2701..US-2703 work: Settings > Consent purposes (suggested purposes, the school's own, a new form version when an answered text changes), the student's Consents tab (record a decision with the signed form, history, the one view with APAAR and WhatsApp opt-ins), Consents (section counts per purpose, print forms, PDF). Linking a parent's withdrawal request (C26) lands when the requests register merges.
+
 #### C28 · Breach handling (R3.1; ADR-0050)
 
 **US-2801** · As a SchoolOS operator, I want to record an incident with its CERT-In and school-notice clocks so that we meet 6 hours and 24 hours. [FR-DPDP-030, FR-DPDP-031]
@@ -816,6 +818,8 @@ Stories of the 2026-27 plan, release R3 (docs/18 §3 R3, planned Apr-Jun 2027, b
 
 **US-2804** · As the principal, I want draft notices for families and an outline for the Board filled from the record, so that I can act quickly. [FR-DPDP-036, FR-DPDP-037]
 - AC1: Drafts come from the breach runbook templates; a family notice can become a parent-notice draft that is approved and sent like any notice; SchoolOS never sends one by itself.
+
+*As built (R3-1B, 2026-10-21):* US-2801..US-2804 work: operators record incidents (categories and counts only) and two operators confirm the affected schools; the school's register receives the notice within a minute with an urgent notification to the owner and principal; schools record their own breaches with the three duties, their clocks and reminders at 24 and 60 hours; the family notice and Board outline are drafted from the record, and the family notice can become a parent-notice draft that is approved and sent like any notice.
 
 #### C29 · CBSE Appendix IX public disclosure (R3.2; ADR-0051)
 

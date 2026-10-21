@@ -39,6 +39,10 @@
 | Fold WhatsApp opt-ins in | Opt-ins are per guardian and category with STOP semantics and Meta policy; different subject and lifecycle |
 | Free-text "consents" note on the student | Not evidence; no versions; cannot answer "who agreed to what, when" |
 
+## Follow-up as built (R3-1B, 2026-10-21)
+
+Built in `0067_consents_breach` and `app/privacy/consents_*.py`: purposes with frozen text (trigger) and versions, the append-only register, forms (print and PDF, `only_unanswered` filter), `consent_state`, the one consent view (`apaar.service.current_decision`, `messaging.service.optin_states`; each part shown only to readers of that register). Open at merge with R3-1A: the composite FK of `privacy_request_id`, the call from the `consent_withdrawal` request flow, the access-report contributor (`consents_service.student_decisions`).
+
 ## Related requirements
 
 FR-DPDP-020..026, PRV-006, PRV-035; docs/02 C27; docs/03 §3.27; docs/05 §16.2; docs/07 §6.8; docs/08 §16; docs/17 §5.10.

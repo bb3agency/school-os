@@ -28,6 +28,7 @@ import PlatformAnnouncementsPage from "./[locale]/platform/announcements/page";
 import PlatformAuditPage from "./[locale]/platform/audit/page";
 import PlatformBreakGlassPage from "./[locale]/platform/break-glass/page";
 import PlatformFlagsPage from "./[locale]/platform/flags/page";
+import PlatformIncidentsPage from "./[locale]/platform/incidents/page";
 import PlatformFleetPage from "./[locale]/platform/fleet/page";
 import PlatformInvoicesPage from "./[locale]/platform/invoices/page";
 import PlatformOperatorsPage from "./[locale]/platform/operators/page";
@@ -40,6 +41,10 @@ import PlatformSubscriptionsPage from "./[locale]/platform/subscriptions/page";
 import PlatformSupportPage from "./[locale]/platform/support/page";
 import PlatformUsagePage from "./[locale]/platform/usage/page";
 import SchoolSupportPage from "./[locale]/(school)/support/page";
+import ConsentsPage from "./[locale]/(school)/consents/page";
+import ConsentPurposesPage from "./[locale]/(school)/settings/consent-purposes/page";
+import BreachesPage from "./[locale]/(school)/privacy/breaches/page";
+import NewBreachPage from "./[locale]/(school)/privacy/breaches/new/page";
 
 type Messages = (typeof messages)["en"];
 type PageCase = {
@@ -148,6 +153,24 @@ const pages: PageCase[] = [
     name: "break-glass",
     title: (m) => m.platform.breakGlass.title,
     render: () => <PlatformBreakGlassPage />,
+  },
+  {
+    name: "incidents",
+    title: (m) => m.platform.incidents.title,
+    render: () => <PlatformIncidentsPage />,
+  },
+  // R3-1B (ADR-0049, ADR-0050): consents and the breach register.
+  { name: "consents", title: (m) => m.consents.title, render: () => <ConsentsPage /> },
+  {
+    name: "consent purposes",
+    title: (m) => m.consents.purposes.title,
+    render: () => <ConsentPurposesPage />,
+  },
+  { name: "breach register", title: (m) => m.breaches.title, render: () => <BreachesPage /> },
+  {
+    name: "record a breach",
+    title: (m) => m.breaches.form.title,
+    render: () => <NewBreachPage />,
   },
   {
     name: "operators",

@@ -72,6 +72,8 @@ apps/api/app/
   notifications/ in-app notifications, bilingual templates
   admin/         tenant admin, retention settings, data export
   ops/           tenant-side job runs, outbox, idempotency keys
+  privacy/       R3 DPDP pack: consents for optional purposes (consents_*), the breach register and the
+                 pull of SchoolOS incident notices (breach_*, breach_sync; ADR-0049, ADR-0050)
   fees/          fee heads, plans, student accounts, append-only ledger, gap-free receipts, concessions,
                  cancellations and refunds (maker-checker), late fees, reports, day close (schema fin; ADR-0042;
                  the school is always the merchant, SchoolOS never holds money)

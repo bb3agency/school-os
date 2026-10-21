@@ -108,6 +108,13 @@ export function PlatformShell({
       items: [
         { href: "/platform/break-glass", label: t("platform.nav.breakGlass"), icon: "key" },
         {
+          // R3-1B (ADR-0050): SchoolOS incident records, CERT-In clock, school notices.
+          href: "/platform/incidents",
+          label: t("platform.nav.incidents"),
+          anyOf: ["platform.incidents.read"],
+          icon: "alert",
+        },
+        {
           href: "/platform/operators",
           label: t("platform.nav.operators"),
           anyOf: ["platform.operators.manage"],

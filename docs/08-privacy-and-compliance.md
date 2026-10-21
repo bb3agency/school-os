@@ -301,6 +301,8 @@ The sub-processor register (§1) lists them in a separate block **"Providers the
 
 **Status: planned (R3, documented 2026-10-21), not built.** Decisions: ADR-0048 (templates, notice records, record classes, data-principal requests and grievances), ADR-0049 (consents for optional purposes), ADR-0050 (breach handling), ADR-0051 (CBSE Appendix IX disclosure), ADR-0052 (RTE register; designed, not scheduled while owner decision D10 stands), ADR-0053 (portal calendar reminders); lead decisions D36-D46 (docs/18 §8). **Not legal advice.** Nothing in this section adds a legal claim beyond §2, §3, §4 and §6; points this document does not settle are marked **(to confirm)** and listed in §16.4.
 
+**R3-1B as built (2026-10-21):** PRV-035 (consents) and PRV-036 (breach register and processor incidents) are built (`0067_consents_breach`; docs/03 §3.27 "As built"). Breach descriptions and containment steps are encrypted with the school's key and never logged or audited; incident records hold categories and counts only; nothing is sent to families or the Board automatically.
+
 ### 16.1 How R3 completes the obligation mapping (§3)
 
 | Obligation (§3) | Before R3 | R3 adds |

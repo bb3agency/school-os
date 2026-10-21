@@ -10,6 +10,8 @@ step_up_max_age_seconds: 300
 two_person:
   - platform.tenants.offboard
   - platform.breakglass.emergency
+  # R3-1B (ADR-0050): the affected schools of an incident are confirmed by two operators.
+  - platform.incidents.manage
 
 # Audit 2026-10-05 A-13 / A-14 (owner decision 2026-10-07). A two-person request (offboarding,
 # emergency break-glass, a critical announcement) expires when the second operator has not acted
@@ -34,6 +36,9 @@ roles:
     - platform.support.read
     - platform.breakglass.request
     - platform.audit.read
+    # R3-1B (ADR-0050)
+    - platform.incidents.read
+    - platform.incidents.manage
   support_agent:
     - platform.tenants.read
     - platform.usage.read
@@ -42,6 +47,8 @@ roles:
     - platform.support.manage
     - platform.breakglass.request
     - platform.announcements.manage
+    # R3-1B (ADR-0050)
+    - platform.incidents.read
   billing_admin:
     - platform.tenants.read
     - platform.plans.manage
@@ -60,3 +67,5 @@ roles:
     - platform.fleet.read
     - platform.support.read
     - platform.audit.read
+    # R3-1B (ADR-0050)
+    - platform.incidents.read

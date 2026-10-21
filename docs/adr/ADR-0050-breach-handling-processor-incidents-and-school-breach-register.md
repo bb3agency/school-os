@@ -39,6 +39,10 @@
 | Send parents' breach notices automatically on WhatsApp | The school is the fiduciary and decides wording and channel; an automatic message to every parent could itself cause harm |
 | Hold affected children's names in the incident record | Puts student data in the control plane (invariant, ADR-0013) |
 
+## Follow-up as built (R3-1B, 2026-10-21)
+
+Built in `0067_consents_breach`: `platform.incidents` / `incident_schools` with `app/platform/incidents.py` (two-operator confirmation through `app.platform.two_person`; a school added after the first confirmation clears it), the school-side pull in `app/privacy/breach_sync.py` (the only privacy file importing the control plane; import-linter `tenant-side-without-control-plane` lists every other privacy module; `tests/platform/test_boundaries.py` pins that `incidents.py` imports nothing tenant-side), the register with encrypted description and containment, duties and clocks, reminders (`ops.breach_reminders`), drafts from `app/privacy/breach_templates.yaml` (tested against `docs/legal/breach-runbook.md`) and the M4 notice draft without the description. The dedicated-tier `critical` announcement remains a manual operator step.
+
 ## Related requirements
 
 FR-DPDP-030..038, PRV-008, PRV-017, PRV-036, SEC-052; docs/02 C28; docs/03 §3.27; docs/05 §16.3; docs/07 §6.8; docs/08 §16; docs/11 §7; docs/16 (incidents page, when built); `docs/legal/breach-runbook.md`.

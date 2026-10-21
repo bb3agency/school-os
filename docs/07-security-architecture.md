@@ -248,6 +248,10 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | fee.report (R2-1B: download the day book and dues lists, bulk personal financial data) | ✓ᴿ | ✓ᴿ | — | — | ✓ᴿ | — | — | — | ✓ᴿ |
 | fee.reconcile (R2-2E: import bank statements, confirm UPI receipts seen in the bank, work through UPI exceptions; school-wide only) | — | ✓ | — | — | ✓ | — | — | — | — |
 | payments.configure (R2-2D: connect, test, rotate the webhook secret of, or disconnect the school's own Razorpay account; ADR-0042) | ✓ᴿ | — | — | — | — | — | — | — | — |
+| consent.read (R3-1B: optional-purpose consents, the consent view with APAAR and WhatsApp opt-ins, section counts, print consent forms; ADR-0049) | ✓ | ✓ | ✓ | ✓ | — | ✓ | S | — | ✓ |
+| consent.record (R3-1B: record a family's decision with the signed form, print forms; ADR-0049) | — | ✓ | ✓ | ✓ | — | — | — | — | — |
+| privacy.breach.read (R3-1B: the school's breach register, duties, clocks and drafts; ADR-0050) | ✓ | ✓ | — | — | — | — | — | — | ✓ |
+| privacy.breach.manage (R3-1B: record and update breaches, duties, affected people, the parent-notice draft) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
 
 `auditor_readonly` memberships are time-bound (default 14 days) and read-only.
 
@@ -303,6 +307,8 @@ Platform roles belong to SchoolOS staff (operators), not to schools (ADR-0013). 
 | platform.breakglass.emergency ᴿ 2P | ✓ | — | — | — | — |
 | platform.operators.manage ᴿ | ✓ | — | — | — | — |
 | platform.audit.read | ✓ | ✓ | — | — | ✓ |
+| platform.incidents.read (R3-1B; ADR-0050) | ✓ | ✓ | ✓ | — | ✓ |
+| platform.incidents.manage ᴿ 2P (R3-1B: incident records; two operators confirm the affected schools) | ✓ | ✓ | — | — | — |
 
 `platform_support` is unrelated: it is the tenant-side temporary role granted by break-glass (§6.4).
 
@@ -357,10 +363,6 @@ Unchanged keys used by R2: `certificate.approve`ᴿ (add or withdraw a verificat
 | privacy.read (R3-1A: requests and grievances list and detail within the reader's student reach, notice records, record classes, consent purposes) | ✓ | ✓ | ✓ | — | — | — | — | — | ✓ |
 | privacy.request.manage (R3-1A: log requests and grievances, record verification, link change requests, build access reports, record notice issues, write responses) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
 | privacy.request.decide (R3-1A: release an access report, approve or refuse an erasure, close a grievance; maker-checker against the person who logged it) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
-| consent.read (R3-1B: optional-purpose consents and the consent view; ADR-0049) | ✓ | ✓ | ✓ | ✓ | — | ✓ | S | — | ✓ |
-| consent.record (R3-1B: record a decision with the signed form, print forms) | — | ✓ | ✓ | ✓ | — | — | — | — | — |
-| privacy.breach.read (R3-1B: the school's breach register; ADR-0050) | ✓ | ✓ | — | — | — | — | — | — | ✓ |
-| privacy.breach.manage (R3-1B: record and update breaches, duties and drafts) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
 | disclosure.edit (R3-1C: edit the Appendix IX draft, download published files; ADR-0051) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
 | disclosure.publish (R3-1C: publish, withdraw, change the link) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
 | readiness.calendar.manage (R3-1D: confirm portal dates, add school events, choose owners; ADR-0053) | — | ✓ | ✓ | — | — | ✓ | — | — | — |
@@ -370,7 +372,7 @@ Unchanged keys used by R2: `certificate.approve`ᴿ (add or withdraw a verificat
 
 Unchanged keys used by R3: `tenant.settings.manage`ᴿ (privacy contact, request target, consent purposes, `rte_applicable`), `student.read_basic` (the reach of request lists), `dq.readiness.read` (calendar), `task.read` (portal tasks), `fee.concession.request` is **not** needed for "Request RTE concession" (the RTE module asks `fees.service` with the caller's `rte.manage`; the approval still needs `fee.concession.approve`ᴿ).
 
-**Platform (control plane, R3-1B; §6.5 when built):** `platform.incidents.read` (platform_owner, platform_engineer, support_agent, platform_viewer) and `platform.incidents.manage` ᴿ 2P (platform_owner, platform_engineer; marking schools affected needs two different operators).
+**Built by R3-1B (2026-10-21, migration `0067_consents_breach`):** `consent.read`, `consent.record`, `privacy.breach.read`, `privacy.breach.manage`ᴿ are in the catalog, `roles.yaml` and the §6.2 matrix; `platform.incidents.read` (platform_owner, platform_engineer, support_agent, platform_viewer) and `platform.incidents.manage` ᴿ 2P (platform_owner, platform_engineer; marking schools affected needs two different operators) are in §6.5 and `app/platform/roles.yaml`.
 
 **Public guard (R3-1C):** `require_public_handle("school_disclosure")` on `GET /api/v1/public/disclosure/{key}` and `…/documents/{n}`, listed in `app/public/public_routes.yaml` (§11.3).
 

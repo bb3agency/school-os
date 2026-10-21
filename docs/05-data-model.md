@@ -1563,7 +1563,7 @@ CREATE TABLE core.public_handles (
 
 **Rules for every tenant table below**: as §15 (UUIDv7 `id`, `tenant_id` first, `UNIQUE (tenant_id, id)`, RLS ENABLE + FORCE with `tenant_isolation`, composite FKs, the restrictive `offboarding_purge` policy with `SELECT, DELETE` for `sos_purger`, no `definer_access`, nothing for `sos_platform`, `version` on mutable rows, append-only tables with SELECT and INSERT only for `sos_app` and a trigger refusing UPDATE/DELETE outside the offboarding purge). Encrypted columns use the school's DEK with AAD `<schema>.<table>|<column>|<id>` and are listed in `app.students.rotation.CIPHERTEXT_COLUMNS` (re-encrypted on DEK rotation). **No new schema** (lead decision D46): tables go in `ops` (school operations and compliance records) and `sis` (records about students); the control-plane incident tables go in `platform`.
 
-**Migrations (numbers re-chained at merge as in R1/R2; `0063` is R2-4's):** `0064_privacy_requests` (wave R3-1A: §16.1), `0065_consents_breach` (R3-1B: §16.2, §16.3, the platform incident tables), `0066_disclosure` (R3-1C: §16.4 and the `core.public_handles.kind` CHECK), `0067_portal_calendar` (R3-1D: §16.6 and the `ops.tasks.source` CHECK), `0068_rte_register` (R3-2E, only if the owner reopens D10: §16.5). Each ships its permissions (docs/07 §6.8) and needs the system-role sync after migrating (ADR-0022).
+**Migrations (numbers re-chained at merge as in R1/R2; `0063` is R2-4's):** `0064_privacy_requests` (wave R3-1A: §16.1), `0067_consents_breach` (R3-1B: §16.2, §16.3, the platform incident tables), `0066_disclosure` (R3-1C: §16.4 and the `core.public_handles.kind` CHECK), `0067_portal_calendar` (R3-1D: §16.6 and the `ops.tasks.source` CHECK), `0068_rte_register` (R3-2E, only if the owner reopens D10: §16.5). Each ships its permissions (docs/07 §6.8) and needs the system-role sync after migrating (ADR-0022).
 
 ### 16.1 Notices, requests and grievances (`ops`; ADR-0048, FR-DPDP-001..018)
 
@@ -1579,12 +1579,16 @@ Access reports are exports of kind `subject_report` in `ops.exports` (existing t
 
 ### 16.2 Consents for optional purposes (`sis`; ADR-0049, FR-DPDP-020..026)
 
+**As built (R3-1B, `0067_consents_breach`).** As below, plus `created_at`/`updated_at` on purposes; the frozen-text trigger is `sis.tg_consent_purposes_frozen` (and `form_version` never goes down); decisions are append-only by grants (SELECT, INSERT) and trigger `consents_append_only` (DELETE only in the offboarding purge); `privacy_request_id` has no FK until R3-1A's `ops.privacy_requests` is merged. Offboarding owner `privacy_consents`.
+
 | Table | Class | Key columns and rules |
 |---|---|---|
 | `sis.consent_purposes` | C1 | `key` (unique per school, `^[a-z][a-z0-9_]{2,40}$`), `label_en`, `label_te` (nullable), `description` (≤ 1000), `form_version int`, `active`, `suggested_key` (from `app/privacy/consent_purposes.yaml`, nullable), `created_by`, `version`. A trigger refuses changing `label_*`/`description` once a consent references the current `form_version` (the service bumps the version instead) |
 | `sis.consents` | C2 | **Append-only.** As `sis.apaar_consents` (§5.9) plus `purpose_id` → `sis.consent_purposes`, `form_version`: `student_id`, `seq` (`UNIQUE (tenant_id, student_id, purpose_id, seq)`), `status` (`given`,`refused`,`pending`,`withdrawn`), `relationship`, `guardian_id` (`ON DELETE SET NULL (guardian_id)`), `decided_on`, `form_language`, `evidence_document_id` → `kb.documents` (required for `given`; the document cannot be deleted while it is evidence), `note` (≤ 500, never logged), `privacy_request_id` (nullable, the withdrawal request), `recorded_by`, `recorded_at` |
 
 ### 16.3 Breach register and incidents (`ops`, `platform`; ADR-0050, FR-DPDP-030..038)
+
+**As built (R3-1B, `0067_consents_breach`).** `ops.breach_records` also has `containment_ciphertext` (C3, encrypted like the description; both in `CIPHERTEXT_COLUMNS`), `processor_facts jsonb` (severity, approximate count, window of a SchoolOS notice; codes and counts only), `close_reason` (10-500, needed to close with a duty open), `created_at`/`updated_at`; method codes `email`, `portal`, `letter`, `phone`, `in_person`, `whatsapp`, `sos_notice`, `other`; `sos_app` may update only the facts, status and duty columns, never delete. `ops.breach_affected` rows are replaced as a whole (`sos_app` SELECT, INSERT, DELETE). `platform.incidents` also has `created_by` and `first_confirmed_at` (the first confirmation; `confirmed_at` is the second); `sos_platform` SELECT, INSERT, UPDATE on both incident tables, nothing for `sos_app`. Offboarding owner `privacy_breach`; the incident tables stay with SchoolOS (no personal data).
 
 | Table | Class | Key columns and rules |
 |---|---|---|

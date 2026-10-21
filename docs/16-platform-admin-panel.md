@@ -270,6 +270,10 @@ Queue with SLA timers, filters by status, priority, school, assignee. Ticket vie
 *Permission:* `platform.breakglass.request` to create (M1); any platform role to view the list.
 M0 shows the list and status of requests (requested, approved, active, expired, revoked, denied) with school, reason, scope and times. The approval workflow lives in the school app (07 §6.4) and arrives in M1. Emergency access without school approval needs `platform.breakglass.emergency` (ᴿ, two-person) and is reported to the school within 24 hours. **Using an active grant** ([ADR-0023](adr/ADR-0023-operator-sign-in-for-break-glass-across-user-pools.md) option C): for an `active` request the list offers **Open the school (support sign-in)**, a link to `/bff/auth/support/login?request=<request id>&tenant=<school id>`. The operator signs in again (MFA, fresh sign-in) with the support app client of the operator pool; the school app shows a read-only "SchoolOS support" banner and a sign-out button. The session start is recorded as `breakglass.session_started` in both chains. A host without the support client (`SOS_SUPPORT_OIDC_AUDIENCE` / `SUPPORT_OIDC_CLIENT_ID` unset) keeps the grant unusable (fail closed). **Emergency rules (audit 2026-10-05 A-13):** `emergency=true` needs `reason_code` `security_incident` or `legal_obligation` (422 otherwise); both confirmations must come within the request lifetime (`confirm_by` in the list), and the second re-checks the first confirmer and its own role age (§5.19). A request still `requested` can be **withdrawn** (`POST /platform/break-glass-requests/{id}/withdraw`, `platform.breakglass.request`; audit `breakglass.withdrawn`): it ends as `revoked`, the school stops seeing it and a school approval answers `409 request_withdrawn`.
 
+### 5.15a Incidents (R3-1B; ADR-0050)
+*Permission:* `platform.incidents.read` to view (platform_owner, platform_engineer, support_agent, platform_viewer); `platform.incidents.manage` (ᴿ, two-person) to open, update and confirm (platform_owner, platform_engineer).
+SchoolOS's own incident records: T0 (noticed), severity P1-P4, status, a summary of **categories and counts only** (a run of 6 or more digits, an e-mail address or more than 500 characters is refused, in the form and by the database), CERT-In flag with its clock (T0 + 6 h) and report time, lead operator. Affected schools: category codes, approximate number of people, window; two different operators confirm the list (two-person rules of §5.19); adding a school clears a first confirmation, and the list is frozen after the second. Each shared-tier school's worker then pulls the notice into its breach register (school notified when pulled; clock confirmation + 24 h); for a dedicated school the operator records the phone or e-mail notice (`notified_tenant_ids`). Everything is in the platform audit chain; never a name, number or record.
+
 ### 5.16 Operators and roles
 *Permission:* `platform.operators.manage` (ᴿ).
 Invite (email, name, roles), resend invite, assign or remove roles, deactivate. An operator cannot change their own roles. At least one active `platform_owner` must remain. Operators must enrol MFA before first use. Changing roles keeps the original `granted_at`/`granted_by` of every role that stays (only added roles get new rows), because the two-person waiting period counts from the real grant (§5.19, audit 2026-10-05 A-14).
@@ -343,6 +347,8 @@ Catalog: the `platform.*` entries of `apps/api/app/authz/permissions.yaml` (desc
 | `platform.breakglass.emergency` ᴿ 2P | ✓ | — | — | — | — |
 | `platform.operators.manage` ᴿ | ✓ | — | — | — | — |
 | `platform.audit.read` | ✓ | ✓ | — | — | ✓ |
+| `platform.incidents.read` | ✓ | ✓ | ✓ | — | ✓ |
+| `platform.incidents.manage` ᴿ 2P | ✓ | ✓ | — | — | — |
 
 Notes:
 - Two-person permissions held only by `platform_owner` mean **at least two active owners** are needed to offboard a school or use emergency break-glass (see §19, Q1).
@@ -937,6 +943,11 @@ Conventions from 09 §2 apply (problem+json, `Idempotency-Key` on creating POSTs
 | POST | `/platform/break-glass-requests` | `platform.breakglass.request` | 201 | Records the request (school approval workflow: M1). `scope` is `{}` (the whole school) or `section_id` and/or `class_id` (UUIDs); any other key is `422` (audit DL-10) |
 | POST | `/platform/break-glass-requests/{request_id}/emergency-confirm` | `platform.breakglass.emergency` ᴿ | 200 | Two different operators (SEC-029), within the request lifetime, with the re-checks of §5.19 |
 | POST | `/platform/break-glass-requests/{request_id}/withdraw` | `platform.breakglass.request` | 200 | Withdraw a waiting request (→ `revoked`; `409 invalid_state` otherwise) |
+| GET | `/platform/incidents` · `/{incident_id}` | `platform.incidents.read` | 200 | Newest first, cursor-paged; clocks (R3-1B, §5.15a) |
+| POST | `/platform/incidents` | `platform.incidents.manage` ᴿ | 201 | Summary: categories and counts only (422 otherwise) |
+| PATCH | `/platform/incidents/{incident_id}` | `platform.incidents.manage` ᴿ | 200 | `If-Match`; status, CERT-In report, schools told by phone or e-mail |
+| POST | `/platform/incidents/{incident_id}/schools` | `platform.incidents.manage` ᴿ | 200 | Upsert per school; 409 `incident_confirmed` after the second confirmation |
+| POST | `/platform/incidents/{incident_id}/confirm` | `platform.incidents.manage` ᴿ 2P | 200 | Two different operators (409 `same_operator`, `no_schools`, two-person codes) |
 | GET | `/platform/operators` | `platform.operators.manage` (no step-up) | 200 | |
 | POST | `/platform/operators` | `platform.operators.manage` ᴿ | 201 | Invite |
 | PUT | `/platform/operators/{operator_id}/roles` | `platform.operators.manage` ᴿ | 200 | Not own roles; keep ≥ 1 owner |

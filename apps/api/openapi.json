@@ -917,6 +917,105 @@
         "title": "AdjustmentOut",
         "type": "object"
       },
+      "AffectedCountsOut": {
+        "properties": {
+          "guardians": {
+            "title": "Guardians",
+            "type": "integer"
+          },
+          "staff": {
+            "title": "Staff",
+            "type": "integer"
+          },
+          "students": {
+            "title": "Students",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "students",
+          "guardians",
+          "staff"
+        ],
+        "title": "AffectedCountsOut",
+        "type": "object"
+      },
+      "AffectedIn": {
+        "additionalProperties": false,
+        "description": "The full list of affected people (replaces the previous list; ids only).",
+        "properties": {
+          "guardian_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 5000,
+            "title": "Guardian Ids",
+            "type": "array"
+          },
+          "membership_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 5000,
+            "title": "Membership Ids",
+            "type": "array"
+          },
+          "student_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 5000,
+            "title": "Student Ids",
+            "type": "array"
+          }
+        },
+        "title": "AffectedIn",
+        "type": "object"
+      },
+      "AffectedOut": {
+        "properties": {
+          "breach_id": {
+            "format": "uuid",
+            "title": "Breach Id",
+            "type": "string"
+          },
+          "guardian_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Guardian Ids",
+            "type": "array"
+          },
+          "membership_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Membership Ids",
+            "type": "array"
+          },
+          "student_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Student Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "breach_id",
+          "student_ids",
+          "guardian_ids",
+          "membership_ids"
+        ],
+        "title": "AffectedOut",
+        "type": "object"
+      },
       "AgentConfigOut": {
         "properties": {
           "company": {
@@ -1411,6 +1510,44 @@
         "title": "AnnouncementOut",
         "type": "object"
       },
+      "AnswerCounts": {
+        "properties": {
+          "given": {
+            "title": "Given",
+            "type": "integer"
+          },
+          "not_answered": {
+            "title": "Not Answered",
+            "type": "integer"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "integer"
+          },
+          "refused": {
+            "title": "Refused",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "withdrawn": {
+            "title": "Withdrawn",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "given",
+          "refused",
+          "pending",
+          "withdrawn",
+          "not_answered"
+        ],
+        "title": "AnswerCounts",
+        "type": "object"
+      },
       "ApaarSettingsIn": {
         "additionalProperties": false,
         "properties": {
@@ -1475,6 +1612,57 @@
           "version"
         ],
         "title": "ApaarSettingsOut",
+        "type": "object"
+      },
+      "ApaarStateOut": {
+        "description": "The APAAR register's current decision (read-only here; recorded on /apaar).",
+        "properties": {
+          "decided_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided On"
+          },
+          "has_form": {
+            "title": "Has Form",
+            "type": "boolean"
+          },
+          "recorded_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recorded At"
+          },
+          "status": {
+            "enum": [
+              "given",
+              "refused",
+              "pending",
+              "withdrawn"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "decided_on",
+          "has_form",
+          "recorded_at"
+        ],
+        "title": "ApaarStateOut",
         "type": "object"
       },
       "ApprovalItem": {
@@ -3229,6 +3417,568 @@
           "note"
         ],
         "title": "BoardFieldOut",
+        "type": "object"
+      },
+      "BreachCreate": {
+        "additionalProperties": false,
+        "description": "Record a breach (FR-DPDP-033). ``origin`` ``processor_notice`` is for a notice SchoolOS\ngave by phone or e-mail on a dedicated host (FR-DPDP-038); on the shared platform those\narrive by themselves.",
+        "properties": {
+          "approx_children": {
+            "default": 0,
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Approx Children",
+            "type": "integer"
+          },
+          "approx_guardians": {
+            "default": 0,
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Approx Guardians",
+            "type": "integer"
+          },
+          "approx_staff": {
+            "default": 0,
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Approx Staff",
+            "type": "integer"
+          },
+          "categories": {
+            "items": {
+              "enum": [
+                "identity",
+                "contact",
+                "aadhaar_partial",
+                "academic",
+                "attendance",
+                "financial",
+                "documents",
+                "insights",
+                "staff",
+                "other"
+              ],
+              "type": "string"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Categories",
+            "type": "array"
+          },
+          "containment": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "minLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Steps taken to contain it. Encrypted; never logged.",
+            "title": "Containment"
+          },
+          "description": {
+            "description": "What happened. Encrypted; never logged.",
+            "maxLength": 4000,
+            "minLength": 10,
+            "title": "Description",
+            "type": "string"
+          },
+          "noticed_at": {
+            "description": "T0: when the school noticed it (not future).",
+            "format": "date-time",
+            "title": "Noticed At",
+            "type": "string"
+          },
+          "origin": {
+            "default": "school",
+            "enum": [
+              "school",
+              "processor_notice"
+            ],
+            "title": "Origin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "noticed_at",
+          "description",
+          "categories"
+        ],
+        "title": "BreachCreate",
+        "type": "object"
+      },
+      "BreachDetailOut": {
+        "properties": {
+          "affected": {
+            "$ref": "#/components/schemas/AffectedCountsOut"
+          },
+          "approx_children": {
+            "title": "Approx Children",
+            "type": "integer"
+          },
+          "approx_guardians": {
+            "title": "Approx Guardians",
+            "type": "integer"
+          },
+          "approx_staff": {
+            "title": "Approx Staff",
+            "type": "integer"
+          },
+          "categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "close_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close Reason"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "containment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Containment"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "duties": {
+            "items": {
+              "$ref": "#/components/schemas/DutyOut"
+            },
+            "title": "Duties",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "next_duty": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NextDutyOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "noticed_at": {
+            "format": "date-time",
+            "title": "Noticed At",
+            "type": "string"
+          },
+          "origin": {
+            "enum": [
+              "school",
+              "processor_notice"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "platform_incident_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Platform Incident Id"
+          },
+          "processor_facts": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProcessorFactsOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recorded_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recorded By Name"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "contained",
+              "closed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "origin",
+          "platform_incident_id",
+          "noticed_at",
+          "categories",
+          "approx_children",
+          "approx_guardians",
+          "approx_staff",
+          "status",
+          "duties",
+          "next_duty",
+          "processor_facts",
+          "closed_at",
+          "created_at",
+          "version",
+          "description",
+          "containment",
+          "close_reason",
+          "affected",
+          "recorded_by_name"
+        ],
+        "title": "BreachDetailOut",
+        "type": "object"
+      },
+      "BreachOut": {
+        "properties": {
+          "approx_children": {
+            "title": "Approx Children",
+            "type": "integer"
+          },
+          "approx_guardians": {
+            "title": "Approx Guardians",
+            "type": "integer"
+          },
+          "approx_staff": {
+            "title": "Approx Staff",
+            "type": "integer"
+          },
+          "categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "duties": {
+            "items": {
+              "$ref": "#/components/schemas/DutyOut"
+            },
+            "title": "Duties",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "next_duty": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NextDutyOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "noticed_at": {
+            "format": "date-time",
+            "title": "Noticed At",
+            "type": "string"
+          },
+          "origin": {
+            "enum": [
+              "school",
+              "processor_notice"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "platform_incident_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Platform Incident Id"
+          },
+          "processor_facts": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProcessorFactsOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "open",
+              "contained",
+              "closed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "origin",
+          "platform_incident_id",
+          "noticed_at",
+          "categories",
+          "approx_children",
+          "approx_guardians",
+          "approx_staff",
+          "status",
+          "duties",
+          "next_duty",
+          "processor_facts",
+          "closed_at",
+          "created_at",
+          "version"
+        ],
+        "title": "BreachOut",
+        "type": "object"
+      },
+      "BreachUpdate": {
+        "additionalProperties": false,
+        "description": "Change facts, status or record a duty as done (FR-DPDP-034). Closing needs all three\nduties recorded or a ``close_reason``.",
+        "properties": {
+          "approx_children": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approx Children"
+          },
+          "approx_guardians": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approx Guardians"
+          },
+          "approx_staff": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approx Staff"
+          },
+          "board_notice": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DutyIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "board_report": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DutyIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "categories": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "identity",
+                    "contact",
+                    "aadhaar_partial",
+                    "academic",
+                    "attendance",
+                    "financial",
+                    "documents",
+                    "insights",
+                    "staff",
+                    "other"
+                  ],
+                  "type": "string"
+                },
+                "maxItems": 10,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categories"
+          },
+          "close_reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the breach is closed with a duty not recorded.",
+            "title": "Close Reason"
+          },
+          "containment": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "minLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Containment"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "minLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "people_notified": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DutyIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "open",
+                  "contained",
+                  "closed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "title": "BreachUpdate",
         "type": "object"
       },
       "BreakGlassIn": {
@@ -7040,6 +7790,53 @@
         "title": "ConsentSummaryOut",
         "type": "object"
       },
+      "ConsentViewOut": {
+        "description": "The one read-only consent view of a student (FR-DPDP-025): optional purposes, the APAAR\ndecision and the guardians' WhatsApp opt-ins, each from its own register.",
+        "properties": {
+          "apaar": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApaarStateOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when the reader cannot see the APAAR register (apaar.consent.read)."
+          },
+          "purposes": {
+            "items": {
+              "$ref": "#/components/schemas/PurposeStateOut"
+            },
+            "title": "Purposes",
+            "type": "array"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "whatsapp": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WhatsappStateOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when the reader cannot see opt-ins (message.read)."
+          }
+        },
+        "required": [
+          "student_id",
+          "purposes",
+          "apaar",
+          "whatsapp"
+        ],
+        "title": "ConsentViewOut",
+        "type": "object"
+      },
       "ContentLine": {
         "properties": {
           "key": {
@@ -9031,6 +9828,39 @@
         "title": "DocumentUpdate",
         "type": "object"
       },
+      "DraftOut": {
+        "description": "A draft filled from the record and the school's privacy contact (FR-DPDP-036); unfilled\nplaceholders print ``[not set]``. Nothing is sent.",
+        "properties": {
+          "draft": {
+            "enum": [
+              "family_notice",
+              "board_outline"
+            ],
+            "title": "Draft",
+            "type": "string"
+          },
+          "template_version": {
+            "title": "Template Version",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "draft",
+          "template_version",
+          "title",
+          "text"
+        ],
+        "title": "DraftOut",
+        "type": "object"
+      },
       "DueLine": {
         "description": "One (instalment, head) line of a fee account; ``head_id`` null = the late-fee line of that\ninstalment. ``due`` = charged - concessions + late fee + adjustments - paid + refunded.",
         "properties": {
@@ -9363,6 +10193,114 @@
           "reason"
         ],
         "title": "DuplicateRequest",
+        "type": "object"
+      },
+      "DutyIn": {
+        "additionalProperties": false,
+        "properties": {
+          "done_at": {
+            "format": "date-time",
+            "title": "Done At",
+            "type": "string"
+          },
+          "method": {
+            "enum": [
+              "email",
+              "portal",
+              "letter",
+              "phone",
+              "in_person",
+              "whatsapp",
+              "sos_notice",
+              "other"
+            ],
+            "title": "Method",
+            "type": "string"
+          }
+        },
+        "required": [
+          "done_at",
+          "method"
+        ],
+        "title": "DutyIn",
+        "type": "object"
+      },
+      "DutyOut": {
+        "properties": {
+          "default_rule": {
+            "description": "True for the Board's initial notice: the 24 h limit is a SchoolOS default (to confirm), not a number in the Rules.",
+            "title": "Default Rule",
+            "type": "boolean"
+          },
+          "done_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Done At"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it is due (null: without delay, no fixed clock).",
+            "title": "Due At"
+          },
+          "key": {
+            "enum": [
+              "board_notice",
+              "board_report",
+              "people_notified"
+            ],
+            "title": "Key",
+            "type": "string"
+          },
+          "method": {
+            "anyOf": [
+              {
+                "enum": [
+                  "email",
+                  "portal",
+                  "letter",
+                  "phone",
+                  "in_person",
+                  "whatsapp",
+                  "sos_notice",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method"
+          },
+          "overdue": {
+            "title": "Overdue",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "due_at",
+          "done_at",
+          "method",
+          "overdue",
+          "default_rule"
+        ],
+        "title": "DutyOut",
         "type": "object"
       },
       "EmbeddedSignupIn": {
@@ -10056,7 +10994,8 @@
               "portal_precheck",
               "student_list",
               "readiness_slips",
-              "apaar_consent_forms"
+              "apaar_consent_forms",
+              "consent_forms"
             ],
             "title": "Kind",
             "type": "string"
@@ -12021,6 +12960,52 @@
         "title": "GuardianCreate",
         "type": "object"
       },
+      "GuardianOptinsBrief": {
+        "properties": {
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/OptinCategoryOut"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "guardian_id": {
+            "format": "uuid",
+            "title": "Guardian Id",
+            "type": "string"
+          },
+          "relationship": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relationship"
+          }
+        },
+        "required": [
+          "guardian_id",
+          "full_name",
+          "relationship",
+          "categories"
+        ],
+        "title": "GuardianOptinsBrief",
+        "type": "object"
+      },
       "GuardianOptinsOut": {
         "properties": {
           "categories": {
@@ -13166,6 +14151,733 @@
           "reverted_at"
         ],
         "title": "ImportSummary",
+        "type": "object"
+      },
+      "IncidentDetailOut": {
+        "properties": {
+          "cert_in_due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "T0 + 6 h while CERT-In is required and not yet reported.",
+            "title": "Cert In Due At"
+          },
+          "cert_in_reported_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cert In Reported At"
+          },
+          "cert_in_required": {
+            "title": "Cert In Required",
+            "type": "boolean"
+          },
+          "confirm_by": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the first confirmation expires without a second one.",
+            "title": "Confirm By"
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          },
+          "confirmed_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed By"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "created_by": {
+            "format": "uuid",
+            "title": "Created By",
+            "type": "string"
+          },
+          "first_confirmed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Confirmed At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "lead_operator_id": {
+            "format": "uuid",
+            "title": "Lead Operator Id",
+            "type": "string"
+          },
+          "opened_at": {
+            "format": "date-time",
+            "title": "Opened At",
+            "type": "string"
+          },
+          "schools": {
+            "items": {
+              "$ref": "#/components/schemas/IncidentSchoolOut"
+            },
+            "title": "Schools",
+            "type": "array"
+          },
+          "schools_count": {
+            "title": "Schools Count",
+            "type": "integer"
+          },
+          "schools_notified": {
+            "title": "Schools Notified",
+            "type": "integer"
+          },
+          "second_confirmed_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Second Confirmed By"
+          },
+          "severity": {
+            "enum": [
+              "P1",
+              "P2",
+              "P3",
+              "P4"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "contained",
+              "resolved",
+              "closed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "opened_at",
+          "severity",
+          "status",
+          "summary",
+          "cert_in_required",
+          "cert_in_reported_at",
+          "cert_in_due_at",
+          "lead_operator_id",
+          "created_by",
+          "confirmed_by",
+          "first_confirmed_at",
+          "second_confirmed_by",
+          "confirmed_at",
+          "confirm_by",
+          "schools_count",
+          "schools_notified",
+          "created_at",
+          "version",
+          "schools"
+        ],
+        "title": "IncidentDetailOut",
+        "type": "object"
+      },
+      "IncidentIn": {
+        "additionalProperties": false,
+        "description": "Open an incident record. ``summary``: what kind of data and roughly how much (no names,\nnumbers, e-mail addresses or record text).",
+        "properties": {
+          "cert_in_required": {
+            "default": false,
+            "title": "Cert In Required",
+            "type": "boolean"
+          },
+          "lead_operator_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Defaults to the operator opening the record.",
+            "title": "Lead Operator Id"
+          },
+          "opened_at": {
+            "description": "T0: when SchoolOS noticed the incident.",
+            "format": "date-time",
+            "title": "Opened At",
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "P1",
+              "P2",
+              "P3",
+              "P4"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "summary": {
+            "maxLength": 500,
+            "minLength": 10,
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "opened_at",
+          "severity",
+          "summary"
+        ],
+        "title": "IncidentIn",
+        "type": "object"
+      },
+      "IncidentOut": {
+        "properties": {
+          "cert_in_due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "T0 + 6 h while CERT-In is required and not yet reported.",
+            "title": "Cert In Due At"
+          },
+          "cert_in_reported_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cert In Reported At"
+          },
+          "cert_in_required": {
+            "title": "Cert In Required",
+            "type": "boolean"
+          },
+          "confirm_by": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the first confirmation expires without a second one.",
+            "title": "Confirm By"
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          },
+          "confirmed_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed By"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "created_by": {
+            "format": "uuid",
+            "title": "Created By",
+            "type": "string"
+          },
+          "first_confirmed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Confirmed At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "lead_operator_id": {
+            "format": "uuid",
+            "title": "Lead Operator Id",
+            "type": "string"
+          },
+          "opened_at": {
+            "format": "date-time",
+            "title": "Opened At",
+            "type": "string"
+          },
+          "schools_count": {
+            "title": "Schools Count",
+            "type": "integer"
+          },
+          "schools_notified": {
+            "title": "Schools Notified",
+            "type": "integer"
+          },
+          "second_confirmed_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Second Confirmed By"
+          },
+          "severity": {
+            "enum": [
+              "P1",
+              "P2",
+              "P3",
+              "P4"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "contained",
+              "resolved",
+              "closed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "opened_at",
+          "severity",
+          "status",
+          "summary",
+          "cert_in_required",
+          "cert_in_reported_at",
+          "cert_in_due_at",
+          "lead_operator_id",
+          "created_by",
+          "confirmed_by",
+          "first_confirmed_at",
+          "second_confirmed_by",
+          "confirmed_at",
+          "confirm_by",
+          "schools_count",
+          "schools_notified",
+          "created_at",
+          "version"
+        ],
+        "title": "IncidentOut",
+        "type": "object"
+      },
+      "IncidentPatch": {
+        "additionalProperties": false,
+        "properties": {
+          "cert_in_reported_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cert In Reported At"
+          },
+          "cert_in_required": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cert In Required"
+          },
+          "lead_operator_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lead Operator Id"
+          },
+          "notified_tenant_ids": {
+            "description": "Schools told by phone or e-mail (dedicated hosts have no pull): records when the school was notified.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 500,
+            "title": "Notified Tenant Ids",
+            "type": "array"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "enum": [
+                  "P1",
+                  "P2",
+                  "P3",
+                  "P4"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "open",
+                  "contained",
+                  "resolved",
+                  "closed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          }
+        },
+        "title": "IncidentPatch",
+        "type": "object"
+      },
+      "IncidentSchoolIn": {
+        "additionalProperties": false,
+        "properties": {
+          "approx_people": {
+            "maximum": 10000000.0,
+            "minimum": 0.0,
+            "title": "Approx People",
+            "type": "integer"
+          },
+          "categories": {
+            "items": {
+              "enum": [
+                "identity",
+                "contact",
+                "aadhaar_partial",
+                "academic",
+                "attendance",
+                "financial",
+                "documents",
+                "insights",
+                "staff",
+                "other"
+              ],
+              "type": "string"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Categories",
+            "type": "array"
+          },
+          "tenant_id": {
+            "format": "uuid",
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "window_from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window From"
+          },
+          "window_to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window To"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "categories",
+          "approx_people"
+        ],
+        "title": "IncidentSchoolIn",
+        "type": "object"
+      },
+      "IncidentSchoolOut": {
+        "properties": {
+          "approx_people": {
+            "title": "Approx People",
+            "type": "integer"
+          },
+          "categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
+          "notice_due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Confirmation + 24 h while the school has not been notified.",
+            "title": "Notice Due At"
+          },
+          "pulled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pulled At"
+          },
+          "school_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "School Name"
+          },
+          "school_notified_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "School Notified At"
+          },
+          "tenant_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Code"
+          },
+          "tenant_id": {
+            "format": "uuid",
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "window_from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window From"
+          },
+          "window_to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window To"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "school_name",
+          "tenant_code",
+          "mode",
+          "categories",
+          "approx_people",
+          "window_from",
+          "window_to",
+          "school_notified_at",
+          "pulled_at",
+          "notice_due_at"
+        ],
+        "title": "IncidentSchoolOut",
         "type": "object"
       },
       "IndicatorsOut": {
@@ -17348,6 +19060,50 @@
         "title": "NationalIdMatch",
         "type": "object"
       },
+      "NextDutyOut": {
+        "properties": {
+          "due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "hours_left": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whole hours until due (negative when overdue); null without a clock.",
+            "title": "Hours Left"
+          },
+          "key": {
+            "enum": [
+              "board_notice",
+              "board_report",
+              "people_notified"
+            ],
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "due_at",
+          "hours_left"
+        ],
+        "title": "NextDutyOut",
+        "type": "object"
+      },
       "NoteIn": {
         "additionalProperties": false,
         "properties": {
@@ -17523,6 +19279,26 @@
           "mime_type"
         ],
         "title": "NoticeDownloadOut",
+        "type": "object"
+      },
+      "NoticeDraftOut": {
+        "description": "The parent notice created in M4 (``source = staff_text``; approval needed).",
+        "properties": {
+          "notice_id": {
+            "format": "uuid",
+            "title": "Notice Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "notice_id",
+          "status"
+        ],
+        "title": "NoticeDraftOut",
         "type": "object"
       },
       "NoticeOut": {
@@ -18456,6 +20232,37 @@
         "title": "OperatorRolesIn",
         "type": "object"
       },
+      "OptinCategoryOut": {
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "decided_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided On"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category",
+          "status",
+          "decided_on"
+        ],
+        "title": "OptinCategoryOut",
+        "type": "object"
+      },
       "OptinEntryOut": {
         "properties": {
           "category": {
@@ -19350,6 +21157,33 @@
           "next_cursor"
         ],
         "title": "Page[ImportSummary]",
+        "type": "object"
+      },
+      "Page_IncidentOut_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/IncidentOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Page[IncidentOut]",
         "type": "object"
       },
       "Page_InsightFlagOut_": {
@@ -22625,6 +24459,71 @@
         "title": "PrintedField",
         "type": "object"
       },
+      "ProcessorFactsOut": {
+        "description": "What SchoolOS reported (codes, counts and times only).",
+        "properties": {
+          "approx_people": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approx People"
+          },
+          "opened_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opened At"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity"
+          },
+          "window_from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window From"
+          },
+          "window_to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window To"
+          }
+        },
+        "title": "ProcessorFactsOut",
+        "type": "object"
+      },
       "ProfileOut": {
         "properties": {
           "applies_to_classes": {
@@ -23612,6 +25511,760 @@
           "issued_on"
         ],
         "title": "PublicDuplicate",
+        "type": "object"
+      },
+      "PurposeConsentEntryOut": {
+        "properties": {
+          "decided_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided On"
+          },
+          "evidence_document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Document Id"
+          },
+          "form_language": {
+            "anyOf": [
+              {
+                "enum": [
+                  "en",
+                  "te"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form Language"
+          },
+          "form_version": {
+            "title": "Form Version",
+            "type": "integer"
+          },
+          "guardian_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guardian Id"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "privacy_request_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Privacy Request Id"
+          },
+          "purpose_id": {
+            "format": "uuid",
+            "title": "Purpose Id",
+            "type": "string"
+          },
+          "recorded_at": {
+            "format": "date-time",
+            "title": "Recorded At",
+            "type": "string"
+          },
+          "recorded_by": {
+            "format": "uuid",
+            "title": "Recorded By",
+            "type": "string"
+          },
+          "recorded_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recorded By Name"
+          },
+          "relationship": {
+            "anyOf": [
+              {
+                "enum": [
+                  "father",
+                  "mother",
+                  "guardian"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relationship"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "given",
+              "refused",
+              "pending",
+              "withdrawn"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "purpose_id",
+          "form_version",
+          "seq",
+          "status",
+          "relationship",
+          "guardian_id",
+          "decided_on",
+          "form_language",
+          "evidence_document_id",
+          "note",
+          "privacy_request_id",
+          "recorded_by",
+          "recorded_by_name",
+          "recorded_at"
+        ],
+        "title": "PurposeConsentEntryOut",
+        "type": "object"
+      },
+      "PurposeConsentFormsCreate": {
+        "additionalProperties": false,
+        "description": "FR-DPDP-023: consent forms for the school's optional purposes as one PDF (the same forms\nas ``GET /consents/forms``). ``only_unanswered`` (section only) prints only students with an\nactive purpose not answered yet; ``language`` is the school's parent language when left out.",
+        "properties": {
+          "language": {
+            "anyOf": [
+              {
+                "enum": [
+                  "en",
+                  "te"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "only_unanswered": {
+            "default": false,
+            "title": "Only Unanswered",
+            "type": "boolean"
+          },
+          "section_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Id"
+          },
+          "student_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Id"
+          }
+        },
+        "title": "PurposeConsentFormsCreate",
+        "type": "object"
+      },
+      "PurposeConsentIn": {
+        "additionalProperties": false,
+        "description": "A family's decision on one purpose as written on the returned form (FR-DPDP-021).\n\n``given`` needs the signed form (``evidence_document_id``: a document uploaded with purpose\n``evidence``). Every decision but ``pending`` names who decided (``relationship``, and\n``guardian_id`` when that guardian is on the student's record) and the date on the form.",
+        "properties": {
+          "decided_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided On"
+          },
+          "evidence_document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The signed form, uploaded first as a document (evidence).",
+            "title": "Evidence Document Id"
+          },
+          "form_language": {
+            "anyOf": [
+              {
+                "enum": [
+                  "en",
+                  "te"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form Language"
+          },
+          "guardian_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guardian Id"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional note (at most 500 characters; no Aadhaar numbers).",
+            "title": "Note"
+          },
+          "purpose_id": {
+            "format": "uuid",
+            "title": "Purpose Id",
+            "type": "string"
+          },
+          "relationship": {
+            "anyOf": [
+              {
+                "enum": [
+                  "father",
+                  "mother",
+                  "guardian"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relationship"
+          },
+          "status": {
+            "enum": [
+              "given",
+              "refused",
+              "pending",
+              "withdrawn"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "purpose_id",
+          "status"
+        ],
+        "title": "PurposeConsentIn",
+        "type": "object"
+      },
+      "PurposeConsentSummaryOut": {
+        "description": "Counts per active purpose and section of the current academic year, for the students the\ncaller may see (FR-DPDP-026). Counts only.",
+        "properties": {
+          "purposes": {
+            "items": {
+              "$ref": "#/components/schemas/PurposeSummaryOut"
+            },
+            "title": "Purposes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "purposes"
+        ],
+        "title": "PurposeConsentSummaryOut",
+        "type": "object"
+      },
+      "PurposeCreate": {
+        "additionalProperties": false,
+        "description": "Enable a suggested purpose (``suggested_key`` only; its text is copied and may be edited\nlater) or add the school's own (``key``, ``label_en``, ``description``; ``label_te``\noptional).",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "minLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What is used, why, who receives it and for how long (10-1000 characters).",
+            "title": "Description"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z][a-z0-9_]{2,40}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          },
+          "label_en": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label En"
+          },
+          "label_te": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Te"
+          },
+          "suggested_key": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z][a-z0-9_]{2,40}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Key"
+          }
+        },
+        "title": "PurposeCreate",
+        "type": "object"
+      },
+      "PurposeListOut": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/PurposeOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/PurposeSuggestionOut"
+            },
+            "title": "Suggestions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "data",
+          "suggestions"
+        ],
+        "title": "PurposeListOut",
+        "type": "object"
+      },
+      "PurposeOut": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "answered": {
+            "description": "Decisions recorded for this purpose (all versions).",
+            "title": "Answered",
+            "type": "integer"
+          },
+          "current_version_answered": {
+            "description": "True when a decision refers to the current form_version: a text change will make a new version.",
+            "title": "Current Version Answered",
+            "type": "boolean"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "form_version": {
+            "title": "Form Version",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label_en": {
+            "title": "Label En",
+            "type": "string"
+          },
+          "label_te": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Te"
+          },
+          "suggested_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Key"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "label_en",
+          "label_te",
+          "description",
+          "form_version",
+          "active",
+          "suggested_key",
+          "answered",
+          "current_version_answered",
+          "version"
+        ],
+        "title": "PurposeOut",
+        "type": "object"
+      },
+      "PurposeSectionCountsOut": {
+        "properties": {
+          "class_section": {
+            "title": "Class Section",
+            "type": "string"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/AnswerCounts"
+          },
+          "section_id": {
+            "format": "uuid",
+            "title": "Section Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "section_id",
+          "class_section",
+          "counts"
+        ],
+        "title": "PurposeSectionCountsOut",
+        "type": "object"
+      },
+      "PurposeStateOut": {
+        "description": "One purpose for one student: the current answer and (in the register) the history.",
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "answer": {
+            "enum": [
+              "given",
+              "refused",
+              "pending",
+              "withdrawn",
+              "not_answered"
+            ],
+            "title": "Answer",
+            "type": "string"
+          },
+          "current": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PurposeConsentEntryOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "form_version": {
+            "title": "Form Version",
+            "type": "integer"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/PurposeConsentEntryOut"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label_en": {
+            "title": "Label En",
+            "type": "string"
+          },
+          "purpose_id": {
+            "format": "uuid",
+            "title": "Purpose Id",
+            "type": "string"
+          },
+          "state": {
+            "description": "given only when the latest decision is given; anything else (no decision, pending, refused, withdrawn, purpose switched off) is not_given (FR-DPDP-024).",
+            "enum": [
+              "given",
+              "not_given"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "purpose_id",
+          "key",
+          "label_en",
+          "active",
+          "form_version",
+          "answer",
+          "state",
+          "current"
+        ],
+        "title": "PurposeStateOut",
+        "type": "object"
+      },
+      "PurposeSuggestionOut": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "enabled": {
+            "description": "True when the school already has a purpose from it.",
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label_en": {
+            "title": "Label En",
+            "type": "string"
+          },
+          "label_te": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Te"
+          }
+        },
+        "required": [
+          "key",
+          "label_en",
+          "label_te",
+          "description",
+          "enabled"
+        ],
+        "title": "PurposeSuggestionOut",
+        "type": "object"
+      },
+      "PurposeSummaryOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label_en": {
+            "title": "Label En",
+            "type": "string"
+          },
+          "purpose_id": {
+            "format": "uuid",
+            "title": "Purpose Id",
+            "type": "string"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/PurposeSectionCountsOut"
+            },
+            "title": "Sections",
+            "type": "array"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/AnswerCounts"
+          }
+        },
+        "required": [
+          "purpose_id",
+          "key",
+          "label_en",
+          "totals",
+          "sections"
+        ],
+        "title": "PurposeSummaryOut",
+        "type": "object"
+      },
+      "PurposeUpdate": {
+        "additionalProperties": false,
+        "description": "Edit the text or switch a purpose on or off. Changing the text of a purpose families have\nanswered makes a new ``form_version``; earlier answers stay with their version.",
+        "properties": {
+          "active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active"
+          },
+          "clear_label_te": {
+            "default": false,
+            "title": "Clear Label Te",
+            "type": "boolean"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "minLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "label_en": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label En"
+          },
+          "label_te": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Te"
+          }
+        },
+        "title": "PurposeUpdate",
         "type": "object"
       },
       "ReadinessCounts": {
@@ -28661,6 +31314,34 @@
           "version"
         ],
         "title": "StudentConsentOut",
+        "type": "object"
+      },
+      "StudentConsentsOut": {
+        "description": "Every purpose of the school for one student. ``version`` is the number of decisions\nrecorded for the student (send it back as ``If-Match``).",
+        "properties": {
+          "purposes": {
+            "items": {
+              "$ref": "#/components/schemas/PurposeStateOut"
+            },
+            "title": "Purposes",
+            "type": "array"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "student_id",
+          "purposes",
+          "version"
+        ],
+        "title": "StudentConsentsOut",
         "type": "object"
       },
       "StudentCreate": {
@@ -33736,6 +36417,29 @@
           "events"
         ],
         "title": "WebhookSetupOut",
+        "type": "object"
+      },
+      "WhatsappStateOut": {
+        "description": "The guardians' WhatsApp opt-ins (read-only here; recorded in the opt-in panel).",
+        "properties": {
+          "available": {
+            "description": "False when WhatsApp messaging is off on this host.",
+            "title": "Available",
+            "type": "boolean"
+          },
+          "guardians": {
+            "items": {
+              "$ref": "#/components/schemas/GuardianOptinsBrief"
+            },
+            "title": "Guardians",
+            "type": "array"
+          }
+        },
+        "required": [
+          "available",
+          "guardians"
+        ],
+        "title": "WhatsappStateOut",
         "type": "object"
       },
       "WriteResultOut": {
@@ -39485,6 +42189,412 @@
         ]
       }
     },
+    "/api/v1/consent-purposes": {
+      "get": {
+        "description": "The school's optional purposes (switched-off ones last) and the suggestions it may enable\n(permission ``consent.read``, ``consent.record`` or ``tenant.settings.manage``).",
+        "operationId": "list_purposes_api_v1_consent_purposes_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurposeListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List Purposes",
+        "tags": [
+          "consents"
+        ]
+      },
+      "post": {
+        "description": "Enable a suggested purpose or add the school's own (permission\n``tenant.settings.manage``, MFA within 5 minutes). Errors: ``purpose_exists``,\n``too_many_purposes`` (409), ``unknown_suggestion`` (422). Accepts ``Idempotency-Key``.",
+        "operationId": "create_purpose_api_v1_consent_purposes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PurposeCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurposeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create Purpose",
+        "tags": [
+          "consents"
+        ]
+      }
+    },
+    "/api/v1/consent-purposes/{purpose_id}": {
+      "patch": {
+        "description": "Edit a purpose's text or switch it on or off (``tenant.settings.manage``, step-up,\n``If-Match``). Changing the text of a purpose families answered makes the next\n``form_version``; earlier answers stay with their version.",
+        "operationId": "update_purpose_api_v1_consent_purposes__purpose_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "purpose_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Purpose Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PurposeUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurposeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update Purpose",
+        "tags": [
+          "consents"
+        ]
+      }
+    },
+    "/api/v1/consents/forms": {
+      "get": {
+        "description": "Consent forms for one student or one section as print-ready A4 pages, one per student,\nwith \"I agree\" and \"I do not agree\" for every active purpose (permission ``consent.read`` or\n``consent.record``). Never prints an Aadhaar number. Errors: ``no_forms``,\n``too_many_forms``, ``no_purposes`` (409). The print is audited.",
+        "operationId": "print_forms_api_v1_consents_forms_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "student_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Student Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "section_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Section Id"
+            }
+          },
+          {
+            "description": "Sections only: students with a purpose not answered yet.",
+            "in": "query",
+            "name": "only_unanswered",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Sections only: students with a purpose not answered yet.",
+              "title": "Only Unanswered",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the printed form; the school's parent language if left out.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "en",
+                    "te"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Language of the printed form; the school's parent language if left out.",
+              "title": "Language"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Print-ready A4 pages (one per student)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Print Forms",
+        "tags": [
+          "consents"
+        ]
+      }
+    },
+    "/api/v1/consents/summary": {
+      "get": {
+        "description": "Counts per active purpose and section of the current year (permission ``consent.read``\nor ``consent.record``; class teachers: their sections). Counts only.",
+        "operationId": "consent_summary_api_v1_consents_summary_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "section_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Section Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "purpose_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Purpose Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurposeConsentSummaryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Consent Summary",
+        "tags": [
+          "consents"
+        ]
+      }
+    },
     "/api/v1/documents": {
       "get": {
         "description": "Documents you may see, newest first (permission ``document.read``; filtered by the\ndocument ACL and your class/section scopes).",
@@ -42815,6 +45925,72 @@
           }
         },
         "summary": "Create Consent Forms Export",
+        "tags": [
+          "exports"
+        ]
+      }
+    },
+    "/api/v1/exports/consent-forms": {
+      "post": {
+        "description": "Print the consent forms for the school's optional purposes of one student or one section\nto a PDF (FR-DPDP-023; the same forms as ``GET /consents/forms``). Permission\n``consent.read`` or ``consent.record`` in scope (404 outside it) and ``student.read_basic``,\nwith a recent sign-in with MFA (428). ``only_unanswered`` (sections only) prints only\nstudents with a purpose not answered yet. The PDF is made in the background (202). Errors:\n409 ``no_forms``, ``too_many_forms``, ``no_purposes``; 422 ``section_only``. Accepts\n``Idempotency-Key``.",
+        "operationId": "create_purpose_consent_forms_export_api_v1_exports_consent_forms_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PurposeConsentFormsCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create Purpose Consent Forms Export",
         "tags": [
           "exports"
         ]
@@ -57700,6 +60876,480 @@
         ]
       }
     },
+    "/api/v1/platform/incidents": {
+      "get": {
+        "description": "SchoolOS incident records, newest first, with the CERT-In clock (T0 + 6 h) and how many\naffected schools were notified.",
+        "operationId": "list_incidents_api_v1_platform_incidents_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_IncidentOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List Incidents",
+        "tags": [
+          "platform"
+        ]
+      },
+      "post": {
+        "description": "Open an incident record (step-up). The summary holds categories and counts only: a run of\n6 or more digits or an e-mail address is refused (422). ``Idempotency-Key`` optional.",
+        "operationId": "create_incident_api_v1_platform_incidents_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create Incident",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/incidents/{incident_id}": {
+      "get": {
+        "description": "One incident with its affected schools and their school-notice clocks (confirmation +\n24 h). ``ETag`` for ``If-Match`` on PATCH.",
+        "operationId": "get_incident_api_v1_platform_incidents__incident_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get Incident",
+        "tags": [
+          "platform"
+        ]
+      },
+      "patch": {
+        "description": "Status, severity, summary, CERT-In report time, lead operator, and schools told by phone\nor e-mail (dedicated hosts). ``If-Match`` required (400 ``if_match_required``, 412 stale).",
+        "operationId": "update_incident_api_v1_platform_incidents__incident_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update Incident",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/incidents/{incident_id}/confirm": {
+      "post": {
+        "description": "Two different operators confirm the affected schools (SEC-029) before any school is\nnotified. ``409 same_operator``, ``no_schools``, ``incident_confirmed``,\n``request_expired``, ``requester_not_authorised`` or ``approver_not_eligible``.",
+        "operationId": "confirm_incident_api_v1_platform_incidents__incident_id__confirm_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Confirm Incident",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/incidents/{incident_id}/schools": {
+      "post": {
+        "description": "Mark a school as affected: category codes, approximate number of people, window. Clears\na first confirmation; ``409 incident_confirmed`` after the second.",
+        "operationId": "add_incident_school_api_v1_platform_incidents__incident_id__schools_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentSchoolIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Add Incident School",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
     "/api/v1/platform/invoice-runs": {
       "post": {
         "description": "Generate drafts for a month now (idempotent per month; the beat job does the same).",
@@ -62530,6 +66180,555 @@
         ]
       }
     },
+    "/api/v1/privacy/breaches": {
+      "get": {
+        "description": "The school's breach register: open breaches first by their next duty's clock (time left\nin hours), then closed ones (permission ``privacy.breach.read``).",
+        "operationId": "list_breaches_api_v1_privacy_breaches_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BreachOut"
+                  },
+                  "title": "Response List Breaches Api V1 Privacy Breaches Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List Breaches",
+        "tags": [
+          "breaches"
+        ]
+      },
+      "post": {
+        "description": "Record a breach: when it was noticed, what happened (encrypted, never logged), the kinds\nof data and approximate numbers of children, guardians and staff (permission\n``privacy.breach.manage``, MFA within 5 minutes). Accepts ``Idempotency-Key``. Errors:\n``date_in_future``, ``pulled_automatically``, ``aadhaar_full_number_rejected`` (422).",
+        "operationId": "create_breach_api_v1_privacy_breaches_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BreachCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BreachDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create Breach",
+        "tags": [
+          "breaches"
+        ]
+      }
+    },
+    "/api/v1/privacy/breaches/{breach_id}": {
+      "get": {
+        "description": "One breach with its texts, three duties and their clocks, and affected counts\n(permission ``privacy.breach.read``). ``ETag`` for ``If-Match`` on PATCH.",
+        "operationId": "get_breach_api_v1_privacy_breaches__breach_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "breach_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Breach Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BreachDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get Breach",
+        "tags": [
+          "breaches"
+        ]
+      },
+      "patch": {
+        "description": "Change facts or status, or record a duty as done with when and how (permission\n``privacy.breach.manage``, step-up, ``If-Match``). Errors: ``breach_closed``,\n``duties_open`` (409), stale ``If-Match`` (412).",
+        "operationId": "update_breach_api_v1_privacy_breaches__breach_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "breach_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Breach Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BreachUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BreachDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update Breach",
+        "tags": [
+          "breaches"
+        ]
+      }
+    },
+    "/api/v1/privacy/breaches/{breach_id}/affected": {
+      "get": {
+        "description": "The affected students, guardians and staff (ids only; permission\n``privacy.breach.read``).",
+        "operationId": "get_affected_api_v1_privacy_breaches__breach_id__affected_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "breach_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Breach Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AffectedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get Affected",
+        "tags": [
+          "breaches"
+        ]
+      },
+      "put": {
+        "description": "Replace the list of affected people, to prepare individual notices (ids of this school\nonly, at most 5,000; permission ``privacy.breach.manage``, step-up).",
+        "operationId": "set_affected_api_v1_privacy_breaches__breach_id__affected_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "breach_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Breach Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AffectedIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AffectedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Set Affected",
+        "tags": [
+          "breaches"
+        ]
+      }
+    },
+    "/api/v1/privacy/breaches/{breach_id}/drafts/{draft}": {
+      "get": {
+        "description": "The family notice or the Board outline filled from the record and the school's privacy\ncontact (``[not set]`` where the school has not filled a value). Nothing is sent\n(permission ``privacy.breach.read``).",
+        "operationId": "get_draft_api_v1_privacy_breaches__breach_id__drafts__draft__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "breach_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Breach Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "draft",
+            "required": true,
+            "schema": {
+              "maxLength": 20,
+              "pattern": "^(family_notice|board_outline)$",
+              "title": "Draft",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get Draft",
+        "tags": [
+          "breaches"
+        ]
+      }
+    },
+    "/api/v1/privacy/breaches/{breach_id}/notice-draft": {
+      "post": {
+        "description": "Turn the family notice into a parent notice draft (M4), to be completed, approved and\nsent like any notice; SchoolOS never sends a breach notice by itself (permission\n``privacy.breach.manage`` with step-up, and ``notice.draft``: 403 otherwise).",
+        "operationId": "create_notice_draft_api_v1_privacy_breaches__breach_id__notice_draft_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "breach_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Breach Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeDraftOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create Notice Draft",
+        "tags": [
+          "breaches"
+        ]
+      }
+    },
     "/api/v1/public/certificates/{code}": {
       "get": {
         "description": "Check a certificate by its verification code (FR-CERT-021, FR-CERT-022; ADR-0045),\ncalled by the web app's verification page with its service token and no user token. The\ncaller sends the normalised code (16 characters, upper case, no dashes). A valid code\nanswers the school's printed name and place, the type, serial, date of issue and exactly the\nprinted content (a cancelled certificate: no content); anything else is the uniform 404.\nEach check is counted and audited. There is no lookup by serial, name or date of birth.",
@@ -65736,6 +69935,218 @@
         "summary": "Preview Certificate",
         "tags": [
           "certificates"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/consent-view": {
+      "get": {
+        "description": "The one read-only consent view of a student: optional purposes, the APAAR decision and the\nguardians' WhatsApp opt-ins, each from its own register (permission ``consent.read``; class\nteachers: their sections). APAAR and WhatsApp parts are null for readers of neither.",
+        "operationId": "consent_view_api_v1_students__student_id__consent_view_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsentViewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Consent View",
+        "tags": [
+          "consents"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/consents": {
+      "get": {
+        "description": "Every purpose's current answer and history for one student (permission ``consent.read``\nor ``consent.record``; class teachers: their sections). ``ETag`` is the number of decisions,\nfor ``If-Match`` on the next one.",
+        "operationId": "get_student_consents_api_v1_students__student_id__consents_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentConsentsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get Student Consents",
+        "tags": [
+          "consents"
+        ]
+      },
+      "post": {
+        "description": "Record a family's decision on one purpose: ``given`` (with the signed form), ``refused``,\n``withdrawn`` (after a given consent) or ``pending`` (form sent home). Appended; nothing is\noverwritten (permission ``consent.record``). Accepts ``Idempotency-Key`` and ``If-Match``.\nErrors: ``consent_not_given`` / ``consent_already_decided`` / ``purpose_inactive`` (409),\nstale ``If-Match`` (412), ``signed_form_required`` and other field errors (422).",
+        "operationId": "record_consent_api_v1_students__student_id__consents_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PurposeConsentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentConsentsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Record Consent",
+        "tags": [
+          "consents"
         ]
       }
     },

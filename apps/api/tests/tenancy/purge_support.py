@@ -582,6 +582,58 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             i=uuid.uuid4(),
             t=t,
         )
+        # --- R3-1B consents and breach register (0067_consents_breach, ADR-0049, ADR-0050) -----
+        purpose_id, breach_id = uuid.uuid4(), uuid.uuid4()
+        _run(
+            c,
+            "INSERT INTO sis.consent_purposes (id, tenant_id, key, label_en, description, "
+            "created_by) VALUES (:i, :t, 'photos_school_media', 'Photos on the website', "
+            "'What: photos at events. Why: school news. Who: the public.', :u)",
+            i=purpose_id,
+            t=t,
+            u=u["user"],
+        )
+        _run(
+            c,
+            "INSERT INTO sis.consents (id, tenant_id, student_id, purpose_id, form_version, seq, "
+            "status, relationship, guardian_id, decided_on, evidence_document_id, recorded_by, "
+            "recorded_by_membership) VALUES (:i, :t, :s, :p, 1, 1, 'given', 'mother', :g, "
+            "'2026-07-01', :d, :u, :m)",
+            i=uuid.uuid4(),
+            t=t,
+            s=ids["student"],
+            p=purpose_id,
+            g=ids["guardian"],
+            d=ids["doc"],
+            u=u["user"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO ops.breach_records (id, tenant_id, origin, noticed_at, categories, "
+            "approx_children, recorded_by) VALUES (:i, :t, 'school', now(), ARRAY['identity'], "
+            "2, :u)",
+            i=breach_id,
+            t=t,
+            u=u["user"],
+        )
+        _run(
+            c,
+            "INSERT INTO ops.breach_affected (id, tenant_id, breach_id, student_id) "
+            "VALUES (:i, :t, :b, :s)",
+            i=uuid.uuid4(),
+            t=t,
+            b=breach_id,
+            s=ids["student"],
+        )
+        _run(
+            c,
+            "INSERT INTO ops.breach_reminders (id, tenant_id, breach_id, reminder) "
+            "VALUES (:i, :t, :b, 'board_24h')",
+            i=uuid.uuid4(),
+            t=t,
+            b=breach_id,
+        )
         # --- public handles (R2-0, ADR-0047) ----------------------------------------------------
         _run(
             c,

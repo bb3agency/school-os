@@ -15,6 +15,10 @@ purge_order:
   # R2-1B (ADR-0042): the fee ledger references students, documents, the structure and
   # members, so it goes before all of them (and before public, like every R2 module).
   - fees
+  # R3-1B (ADR-0049, ADR-0050): consents reference students, guardians, documents and
+  # members; breach records reference students, guardians and members (docs/05 §16.7).
+  - privacy_consents
+  - privacy_breach
   # R2-0 (ADR-0047): public handles next (they reference guardians and the school's keys'
   # tenant), before students (docs/05 §15.6).
   - public

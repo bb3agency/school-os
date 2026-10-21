@@ -945,6 +945,9 @@ _EXPORT_PERMISSIONS = (
     "dq.readiness.read",
     "apaar.consent.read",
     "apaar.consent.record",
+    # R3-1B (FR-DPDP-023): consent forms for optional purposes.
+    "consent.read",
+    "consent.record",
 )
 
 
@@ -2444,6 +2447,23 @@ def _upi() -> ModuleType:
 SPECS.update(_upi().matrix_specs())
 
 
+def _privacy() -> ModuleType:
+    """tests/privacy/security_support.py (R3-1B consents and breaches of school A)."""
+    name = "sos_test_privacy_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "privacy" / "security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+SPECS.update(_privacy().matrix_specs())
+
+
 def _success(method: str, path: str) -> int:  # noqa: PLR0911 - one answer per route family
     creates = {
         "/api/v1/users",
@@ -2503,9 +2523,11 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911 - one answer per r
         # R2-1C: template provisioning and sync run in the worker.
         "/api/v1/messaging/templates/sync",
     }
-    if method == "POST" and path in accepted:
+    if method == "POST" and (path in accepted or path in _privacy().MATRIX_ACCEPTED):
         return 202
-    if method == "POST" and path in _fees().MATRIX_CREATES | _upi().MATRIX_CREATES:
+    if method == "POST" and path in (
+        _fees().MATRIX_CREATES | _upi().MATRIX_CREATES | _privacy().MATRIX_CREATES
+    ):
         return 201
     if (method, path) in _fees().ONLINE_REFUSED:
         return 409  # guard passed; no Razorpay partner application in tests (R2-2D)

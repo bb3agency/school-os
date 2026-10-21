@@ -336,6 +336,8 @@ ACTOR: dict[tuple[str, str], str] = dict.fromkeys(
         ("GET", "/api/v1/students/{student_id}/timeline"),
         # ADR-0039: recording APAAR consent is not an owner permission (docs/07 §6.2).
         ("POST", "/api/v1/students/{student_id}/apaar-consent"),
+        # ADR-0049: recording consents for optional purposes is not an owner permission.
+        ("POST", "/api/v1/students/{student_id}/consents"),
         # ADR-0043: recording WhatsApp opt-ins is not an owner permission (docs/07 §6.2).
         ("POST", "/api/v1/guardians/{guardian_id}/optins"),
         ("GET", "/api/v1/sections/{section_id}/join-slips"),
@@ -826,6 +828,20 @@ def _b_upi(w: Any, key: str) -> uuid.UUID:
     return value
 
 
+def _privacy() -> ModuleType:
+    """tests/privacy/security_support.py (R3-1B: a consent purpose and a breach of school B)."""
+    name = "sos_test_privacy_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "privacy" / "security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
 def _module_on(path: str, w: Any) -> contextlib.AbstractContextManager[None]:
     """Tally routes need school A's connector flag; fee routes school A's fees switched on."""
     if _fees().is_fee_path(path):
@@ -911,6 +927,9 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     # R2-3G WhatsApp sending: a broadcast and one of its messages in school B.
     "broadcast_id": _b_broadcast,
     "message_id": _b_message,
+    # R3-1B (ADR-0049, ADR-0050): a consent purpose and a breach record of school B.
+    "purpose_id": lambda w: _privacy().b_purpose(_ADMIN[0], w),
+    "breach_id": lambda w: _privacy().b_breach(_ADMIN[0], w),
 }
 
 
@@ -936,6 +955,7 @@ ID_ROUTES = _id_routes()
 
 BODIES.update(_fees().BOLA_BODIES)
 BODIES.update(_upi().BOLA_BODIES)
+BODIES.update(_privacy().BOLA_BODIES)
 
 # Required query parameters of ID routes, so the request reaches the object lookup.
 QUERY: dict[tuple[str, str], dict[str, str]] = {
@@ -947,7 +967,12 @@ QUERY: dict[tuple[str, str], dict[str, str]] = {
 
 
 # Path parameters that are not object ids (a row number inside the object in the path).
-PLAIN_PARAMS: dict[str, str] = {"row_no": "2", "profile_key": "bseap-ssc-2027"}
+PLAIN_PARAMS: dict[str, str] = {
+    "row_no": "2",
+    "profile_key": "bseap-ssc-2027",
+    # R3-1B: the breach draft's template key (not an object id).
+    "draft": "family_notice",
+}
 
 
 def _fill(path: str, value: uuid.UUID) -> str:

@@ -24,6 +24,8 @@ ExportKind = Literal[
     # (FR-APC-007) printed to PDF by the worker, kept and downloaded like other exports.
     "readiness_slips",
     "apaar_consent_forms",
+    # R3-1B (FR-DPDP-023): consent forms for the school's optional purposes.
+    "consent_forms",
 ]
 ExportStatus = Literal["queued", "running", "ready", "failed", "expired"]
 PrecheckFormat = Literal["xlsx", "pdf"]
@@ -126,6 +128,15 @@ class ConsentFormsCreate(_PrintTarget):
     school's parent-form language when left out (owner decision D9)."""
 
     status: ConsentFormStatus | None = None
+    language: Language | None = None
+
+
+class PurposeConsentFormsCreate(_PrintTarget):
+    """FR-DPDP-023: consent forms for the school's optional purposes as one PDF (the same forms
+    as ``GET /consents/forms``). ``only_unanswered`` (section only) prints only students with an
+    active purpose not answered yet; ``language`` is the school's parent language when left out."""
+
+    only_unanswered: bool = False
     language: Language | None = None
 
 

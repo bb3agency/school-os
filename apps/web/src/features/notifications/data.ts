@@ -56,6 +56,8 @@ const LINKS: Record<string, (id: string) => string> = {
   payment_connection: () => "/settings/payments",
   fee_refund: () => "/fees/reconcile/online",
   fee_reconciliation_run: () => "/fees/reconcile/online",
+  // R3-1B (ADR-0050): a breach duty is due or overdue, or SchoolOS reported a breach.
+  breach_record: (id) => `/privacy/breaches/${id}`,
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

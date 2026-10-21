@@ -1,0 +1,50 @@
+# App copy of the school-facing breach templates (R3-1B; ADR-0050 decision 3; FR-DPDP-036).
+# Source: docs/legal/breach-runbook.md §4 templates B and C, same template_version. A test
+# compares this text with the runbook (after stripping Markdown); change both together.
+# Not legal advice (D30).
+template_version: "0.1 (2026-10-21)"
+
+# Duty clocks (ADR-0050 decision 2, decision 5). The Board's initial notice is due "without
+# delay": SchoolOS shows it overdue after board_notice_hours, a SchoolOS default (to confirm).
+clocks:
+  board_notice_hours: 24
+  board_report_hours: 72
+  # Reminders to the owner and principal while the detailed report is not recorded.
+  reminders:
+    board_24h: 24
+    report_60h: 60
+# How often the school-side worker pulls SchoolOS notices and sends due reminders.
+sweep_interval_seconds: 60
+# PUT /privacy/breaches/{id}/affected: at most this many ids in one list.
+max_affected: 5000
+
+category_labels:
+  identity: names and identity details
+  contact: phone numbers and addresses
+  aadhaar_partial: Aadhaar last 4 digits and as-printed details
+  academic: marks and academic records
+  attendance: attendance records
+  financial: fee and payment records
+  documents: uploaded documents
+  insights: early-warning notes and flags
+  staff: staff records
+  other: other records
+
+templates:
+  family_notice:
+    title: "{{school_short_name}}: information about your child's records"
+    body: >-
+      On {{noticed_at}} we learned that {{what_happened}}. The information involved:
+      {{data_categories}}. What this may mean for you: {{likely_consequences}}. What we have
+      done: {{what_we_did}}. What you can do: {{what_you_can_do}}.
+
+      We are sorry. If you have questions, contact {{privacy_contact_name}} on
+      {{privacy_contact_phone}} or {{privacy_contact_email}}.
+  board_outline:
+    title: "Breach notice outline for the Data Protection Board ({{school_legal_name}})"
+    body: >-
+      Initial notice: who you are ({{school_legal_name}}, contact), what happened and when it
+      was noticed, data categories and approximate numbers, likely consequences, immediate
+      steps. Detailed report (within 72 hours): the same facts in full, cause as known, measures
+      taken and planned, how affected people were told and when, and the processor's report if
+      one applies.

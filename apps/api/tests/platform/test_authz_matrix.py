@@ -52,6 +52,9 @@ DOC_MATRIX: dict[str, tuple[str, bool]] = {
     "platform.breakglass.emergency": ("10000", True),
     "platform.operators.manage": ("10000", True),
     "platform.audit.read": ("11001", False),
+    # R3-1B (ADR-0050): SchoolOS incident records; two operators confirm affected schools.
+    "platform.incidents.read": ("11101", False),
+    "platform.incidents.manage": ("11000", True),
 }
 
 
@@ -64,6 +67,7 @@ def test_FR_PLT_028_catalog_matches_documented_matrix() -> None:
             assert (key in cat.roles[role]) is (mark == "1"), f"{role} {key}"
     assert cat.permissions["platform.tenants.offboard"].two_person
     assert cat.permissions["platform.breakglass.emergency"].two_person
+    assert cat.permissions["platform.incidents.manage"].two_person
 
 
 def api_routes(routes: list[Any]) -> list[APIRoute]:

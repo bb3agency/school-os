@@ -164,6 +164,7 @@ routes:
   # print jobs: slips and consent forms printed to PDF by Chromium (FR-DQ-047, FR-APC-007)
   POST /api/v1/exports/readiness-slips: [exports, render]
   POST /api/v1/exports/apaar-consent-forms: [exports, render]
+  POST /api/v1/exports/consent-forms: [exports, render]
   GET /api/v1/audit/export: [exports]
   POST /api/v1/documents/{document_id}/sheet/export: [exports]
   GET /api/v1/imports/{import_id}/sheet/export: [exports]
@@ -199,6 +200,7 @@ routes:
   GET /api/v1/dq/readiness/{profile_key}/slips: [render]
   GET /api/v1/students/{student_id}/apaar-consent/form: [render]
   GET /api/v1/sections/{section_id}/apaar-consent-forms: [render]
+  GET /api/v1/consents/forms: [render]
   # queue-heavy school jobs
   POST /api/v1/dq/runs: [heavy_jobs]
   POST /api/v1/dq/readiness/{profile_key}/runs: [heavy_jobs]

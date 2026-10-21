@@ -11,6 +11,8 @@ sources:
   # R1 printed parent forms (ADR-0039, ADR-0040); docs/18 §9: wording review still open.
   apaar.consent_form: {reviewed: false}
   dq.readiness_slip: {reviewed: false}
+  # R3-1B printed consent form for optional purposes (ADR-0049; app/privacy/consent_purposes.yaml).
+  privacy.consent_form: {reviewed: false}
   # R2-0 public page shell (apps/web messages te.json "public" namespace).
   public.shell: {reviewed: false}
   # R2-3H parent pages (apps/web messages/parent.te.json: notice, receipt, dues, payment, opt-in).
