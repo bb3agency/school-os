@@ -1,4 +1,4 @@
-"""Database access for the privacy request register (0064_privacy_requests; ADR-0048).
+"""Database access for the privacy request register (0065_privacy_requests; ADR-0048).
 
 Callers inside ``app.privacy`` only. Every function runs in a ``core.db.tenant_session``: RLS
 limits each statement to that school. Notices, events, links and counters are insert-only for

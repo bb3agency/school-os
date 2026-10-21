@@ -35,6 +35,7 @@ export type ErrorNamespace =
   | "messaging"
   | "platform.announcements"
   | "payments"
+  | "privacy"
   | "platform.invoices.payments";
 
 type LooseTranslator = ((key: string) => string) & { has: (key: string) => boolean };

@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { StepUpHost } from "@/components/session/StepUpHost";
 import { SchoolShell } from "@/components/shell/SchoolShell";
 import { NotificationBell } from "@/features/notifications/NotificationBell";
+import { PrivacyContactFooter } from "@/features/privacy/PrivacyContactFooter";
 import { AnnouncementBanner } from "@/features/school/AnnouncementBanner";
 import { SuspendedBanner, type SchoolStatus } from "@/features/school-status/SuspendedBanner";
 import { SupportAccessBanner } from "@/features/support-access/SupportAccessBanner";
@@ -118,6 +119,8 @@ export default async function SchoolLayout({ children }: { children: ReactNode }
       }
     >
       {children}
+      {/* FR-DPDP-004: the school's privacy contact, small, at the foot of every page. */}
+      <PrivacyContactFooter contact={settings?.privacy_contact ?? null} />
     </SchoolShell>
   );
 }

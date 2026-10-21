@@ -408,6 +408,7 @@ def test_FR_TEN_012_me_carries_session_settings(api: Any, admin_engine: Engine) 
         "idle_timeout_minutes": 15,
         "date_format": "DD/MM/YYYY",
         "languages": ["en", "te"],
+        "privacy_contact": None,
     }
     etag = api.call(owner, "GET", "/api/v1/tenant").headers["ETag"]
     res = api.call(
@@ -423,6 +424,7 @@ def test_FR_TEN_012_me_carries_session_settings(api: Any, admin_engine: Engine) 
         "idle_timeout_minutes": 7,
         "date_format": "YYYY-MM-DD",
         "languages": ["te"],
+        "privacy_contact": None,
     }
     chosen = api.call(staff, "POST", "/api/v1/me/active-tenant", json={"tenant_id": str(tid)})
     assert chosen.status_code == 200, chosen.text

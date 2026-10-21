@@ -70,6 +70,8 @@ apps/api/app/
                  guards for unauthenticated routes (require_public_handle, require_webhook_signature,
                  require_meta_verify_token; pinned in public/public_routes.yaml)
   notifications/ in-app notifications, bilingual templates
+  privacy/       DPDP requests and grievances, access reports, lawful erasure, notices, record classes,
+                 subject-report registry subjects.yaml (contributors: each module's service.subject_report)
   admin/         tenant admin, retention settings, data export
   ops/           tenant-side job runs, outbox, idempotency keys
   fees/          fee heads, plans, student accounts, append-only ledger, gap-free receipts, concessions,

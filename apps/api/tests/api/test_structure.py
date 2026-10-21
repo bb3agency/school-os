@@ -239,6 +239,9 @@ def test_FR_TEN_012_settings_read_and_update(school: Any, api: Any, admin_engine
         "certificate_format": {"transfer": "generic-v1"},
         "print_restricted_tc_fields": False,
         "fees_enabled": False,
+        # R3-1A (ADR-0048, FR-DPDP-004, FR-DPDP-006): no contact yet, 7-day target.
+        "privacy_contact": None,
+        "privacy_request_target_days": 7,
     }
     owner = school.people["owner"]
     etag = got.headers["ETag"]

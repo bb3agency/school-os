@@ -124,6 +124,7 @@ function freshTenant(): Schemas["TenantOut"] {
       current_erp_name: "",
       fees_enabled: false,
       parent_language: "en",
+      privacy_request_target_days: 7,
     },
     version: 3,
   };

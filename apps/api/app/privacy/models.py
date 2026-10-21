@@ -1,4 +1,4 @@
-"""Privacy request register tables in schema ``ops`` (migration 0064_privacy_requests; docs/05
+"""Privacy request register tables in schema ``ops`` (migration 0065_privacy_requests; docs/05
 §16.1; ADR-0048).
 
 Models describe tables for typed queries only; DDL (RLS, grants, triggers, composite FKs into

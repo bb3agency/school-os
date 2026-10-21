@@ -297,7 +297,7 @@ permissions:
     step_up: false
 
   # --- R3-1A privacy requests (ADR-0048, US-2601..US-2609, FR-DPDP-001..018) -----------------
-  # Migration 0064_privacy_requests upserts these into core.permissions. School-wide only.
+  # Migration 0065_privacy_requests upserts these into core.permissions. School-wide only.
   privacy.read:
     description: See privacy requests and complaints about people you may see, the notices the school issued and the record classes
     sensitivity: sensitive

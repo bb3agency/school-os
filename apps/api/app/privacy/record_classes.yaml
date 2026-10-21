@@ -175,7 +175,7 @@ classes:
     classification: C3
     docs_row: Provider webhook inboxes
     retention: 90 days (payments) / 30 days (messaging) after processing
-    basis: Raw notices from the payment provider, kept briefly to settle disputes.
+    basis: Raw notices from the payment provider, kept briefly to settle disputes. Not attributable to one person (no student reference in the payload); deleted by retention.
     erasure: allowed_after_retention
     source: Sent by the school's payment provider
 
@@ -308,7 +308,7 @@ classes:
     classification: C2
     docs_row: Opt-ins (
     retention: While the guardian exists; then deleted with the guardian (the audit event keeps the fact for the audit retention)
-    basis: Evidence that the parent agreed to receive messages.
+    basis: Evidence that the parent agreed to receive messages. Erasure records an opt-out (STOP) and revokes links; the history stays as consent evidence until the guardian record is deleted.
     erasure: allowed
     source: Given by the parent
 

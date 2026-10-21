@@ -791,6 +791,8 @@ Stories of the 2026-27 plan, release R3 (docs/18 §3 R3, planned Apr-Jun 2027, b
 **US-2609** · As the owner, I want to see every kind of record SchoolOS keeps with its retention and whether it can be erased. [FR-DPDP-017]
 - AC1: The Data retention screen shows the record classes read-only (owner module, retention, basis, erasure rule); they match docs/05 §13 exactly (test).
 
+*Status of C26 (2026-10-21):* **built** in wave R3-1A (US-2601 AC2, US-2602..US-2609; US-2601 AC1 was the docs/legal templates). The web screens are `/privacy/requests` (list, new, detail), `/privacy/notices` and `/settings/privacy`.
+
 #### C27 · Consent register for optional purposes (R3.1; ADR-0049)
 
 **US-2701** · As the principal, I want to choose the optional purposes the school asks parents to consent to (for example photos on the website) with a clear description. [FR-DPDP-020, PRV-006]
