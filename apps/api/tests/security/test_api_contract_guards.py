@@ -286,6 +286,11 @@ NON_UUID_PATH_PARAMS = {
     ("GET", "/api/v1/public/certificates/{code}", "code"),
     # R2-2D: the Razorpay webhook route value (ADR-0047 decision 3), bounded; the guard resolves.
     ("POST", "/api/v1/webhooks/razorpay/{route}", "route"),
+    # R3-1C: the disclosure link key (ADR-0051), bounded; the guard shape-checks and resolves it;
+    # a published document's number (bounded int).
+    ("GET", "/api/v1/public/disclosure/{key}", "key"),
+    ("GET", "/api/v1/public/disclosure/{key}/documents/{n}", "key"),
+    ("GET", "/api/v1/public/disclosure/{key}/documents/{n}", "n"),
 }
 
 
@@ -334,6 +339,15 @@ RESPONSE_FIELD_ALLOWLIST = {
     "app.certificates.schemas.CertificatePreview.format_key": "TC format code",
     "app.certificates.schemas.CertificateOut.format_key": "TC format code",
     "app.dq.schemas.FindingOut.attribute_key": "attribute catalog key",
+    # R3-1C (ADR-0051): disclosure format, section and item codes.
+    "app.disclosure.schemas.DisclosureFormatOut.key": "disclosure format code",
+    "app.disclosure.schemas.FormatSectionOut.key": "disclosure section code",
+    "app.disclosure.schemas.FormatItemOut.key": "disclosure item code",
+    "app.disclosure.schemas.PublicSectionOut.key": "disclosure section code",
+    "app.disclosure.schemas.PublicItemOut.key": "disclosure item code",
+    "app.disclosure.schemas.DisclosureDraftOut.format_key": "disclosure format code",
+    "app.disclosure.schemas.SnapshotOut.format_key": "disclosure format code",
+    "app.disclosure.schemas.SnapshotDetailOut.format_key": "disclosure format code",
     "app.dq.schemas.FindingValue.attribute_key": "attribute catalog key",
     "app.dq.schemas.FindingOut.profile_key": "DQ profile code",
     "app.dq.schemas.ProfileOut.key": "DQ profile code",
@@ -412,6 +426,8 @@ ACTION_SEGMENTS = {
 
 # Creating POSTs that do not take Idempotency-Key, with the reason.
 IDEMPOTENCY_EXEMPT = {
+    ("POST", "/api/v1/disclosure/link/rotate"): "a state change (step-up, audited): a repeat "
+    "only issues another link and revokes the previous one",
     ("POST", "/api/v1/fleet/heartbeat"): "machine route; nonce and timestamp make it replay-safe",
     ("POST", "/api/v1/public/links/exchange"): "a read: checks a parent link token, stores "
     "nothing (ADR-0046; no member, so no per-person replay store)",

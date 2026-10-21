@@ -64,6 +64,9 @@ roles:
       fee.report: school_step_up
       # R2-2D online payments (ADR-0042 decision 6; docs/07 §6.2): the owner connects Razorpay
       payments.configure: school_step_up
+      # R3-1C CBSE disclosure (ADR-0051; docs/07 §6.2)
+      disclosure.edit: school
+      disclosure.publish: school_step_up
 
   principal:
     name_en: Principal
@@ -141,6 +144,9 @@ roles:
       fee.report: school_step_up
       # R2-2E UPI and bank statements (ADR-0042 decision 9)
       fee.reconcile: school
+      # R3-1C CBSE disclosure (ADR-0051; docs/07 §6.2)
+      disclosure.edit: school
+      disclosure.publish: school_step_up
 
   office_admin:
     name_en: Office admin
@@ -193,6 +199,8 @@ roles:
       # R2-1B fees (ADR-0042; docs/07 §6.2): school-wide only, never scoped (FR-FEE-024)
       fee.collect: school
       fee.concession.request: school
+      # R3-1C CBSE disclosure (ADR-0051; docs/07 §6.2)
+      disclosure.edit: school
 
   office_staff:
     name_en: Office staff

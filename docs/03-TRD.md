@@ -665,6 +665,8 @@ Release R3 of the 2026-27 plan (docs/18 §3 R3; before DPDP's day-to-day duties 
 
 ### 3.28 CBSE Appendix IX public disclosure (FR-DISC) (R3.2; ADR-0051)
 
+**As built (R3-1C, `wip/r3-disclosure`, migration `0066_disclosure`, 2026-10-21).** FR-DISC-001..012 are built and tested (`apps/api/tests/disclosure/`). Notes: the live page is the **latest** snapshot unless it was withdrawn (withdrawing applies to the live snapshot only, 409 `snapshot_not_live`; publishing again makes a new live snapshot at the same link); the raw 22-character key is kept on the draft (`link_key`) so staff can copy the link again (only its hash is in `core.public_handles`); a published document version cannot be deleted (documents delete guard `document_published`); a school that drops CBSE from its boards stops showing the page (uniform 404).
+
 | ID | Requirement | V |
 |---|---|---|
 | FR-DISC-001 | The disclosure MUST be offered only to schools whose `boards` include `CBSE` (FR-TEN-020); others get `404 module_hidden`. Its format is `app/disclosure/formats/cbse-appendix-ix.yaml` (sections and items in CBSE's order, `source` URLs, `verified: false`, D3). | T |
@@ -675,7 +677,7 @@ Release R3 of the 2026-27 plan (docs/18 §3 R3; before DPDP's day-to-day duties 
 | FR-DISC-006 | The format MUST contain no item naming or describing an individual child; result counts below 10 MUST be published as "fewer than 10" and the derived pass percentage omitted for them (NFR-PRV-006). | T |
 | FR-DISC-007 | A published snapshot MAY be withdrawn with a reason (10-500; `disclosure.publish`ᴿ); the public page then answers the uniform 404; audited `disclosure.withdrawn`. | T |
 | FR-DISC-008 | Publishing the first time MUST issue one `school_disclosure` public handle (22-character base64url key from 128 random bits; no expiry; one live per school); "Change the link" revokes it and issues a new one (`disclosure.publish`ᴿ). `core.public_handles.kind` CHECK gains `school_disclosure` (ADR-0051 amends ADR-0047 decision 1); the resolver is unchanged (active schools only). | T |
-| FR-DISC-009 | `GET /public/disclosure/{key}` (`require_public_handle("school_disclosure")`, listed in `public_routes.yaml`) MUST return the latest non-withdrawn snapshot as an explicit allowlist; `GET /public/disclosure/{key}/documents/{n}` MUST give a presigned URL (≤ 5 min) only for document versions in that snapshot. | T |
+| FR-DISC-009 | `GET /public/disclosure/{key}` (`require_public_handle("school_disclosure")`, listed in `public_routes.yaml`) MUST return the latest snapshot unless it is withdrawn as an explicit allowlist; `GET /public/disclosure/{key}/documents/{n}` MUST give a presigned URL (≤ 5 min) only for document versions in that snapshot. | T |
 | FR-DISC-010 | Public disclosure responses MUST carry the FR-PUB-010 headers (`no-referrer`, `private, no-store`, `noindex`, strict CSP) without a cookie exchange; limits `public_ip` and `public_lookup_fail`; unknown, revoked, withdrawn and suspended-school keys give the uniform 404; views counted per day per snapshot (no visitor data). | T |
 | FR-DISC-011 | Each snapshot MUST be downloadable by `disclosure.edit` as a self-contained HTML file (no scripts, no external requests except the hosted document links) and an A4 PDF (`pdf` queue). | T |
 | FR-DISC-012 | Drafts and snapshots MUST be in the full data export and the offboarding purge (handle purged with `public`); snapshots are kept for the life of the school (the record of what was published). | T |

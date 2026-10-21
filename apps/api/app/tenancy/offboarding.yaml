@@ -9,6 +9,9 @@ purge_order:
   # references core.public_handles (certificates reference only students, documents and the
   # academic structure, all purged later).
   - certificates
+  # R3-1C (ADR-0051): disclosure rows reference public handles (the draft's link), documents and
+  # their versions (published versions), so they go before public and documents.
+  - disclosure
   # R2-1C (ADR-0043): messaging rows reference public handles, guardians and students, so they
   # go first.
   - messaging

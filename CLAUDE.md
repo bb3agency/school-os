@@ -77,6 +77,8 @@ apps/api/app/
                  the school is always the merchant, SchoolOS never holds money)
   messaging/     WhatsApp parent messages via Meta Cloud API (schema msg; ADR-0043): connect, utility
                  template catalogue, guardian opt-ins, STOP, signed webhooks, delivery log
+  disclosure/    CBSE Appendix IX disclosure (R3-1C; ADR-0051): format file, draft, frozen snapshots,
+                 public handle kind school_disclosure, /public/disclosure/{key} routes, HTML/PDF files
   platform/      control plane: operators, school provisioning, plans, subscriptions, invoices,
                  payments (billing), usage, fleet + heartbeat, feature flags, announcements,
                  support tickets, platform audit (DB role sos_platform; routes /api/v1/platform/*)

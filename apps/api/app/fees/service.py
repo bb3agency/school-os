@@ -195,6 +195,47 @@ def account_summary(
     }
 
 
+@dataclass(frozen=True, slots=True)
+class FeeStructureHead:
+    name: str
+    annual_amount: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class FeeStructureRow:
+    """One class's general fee plan (no category) as published: heads and annual amounts."""
+
+    class_id: uuid.UUID
+    heads: tuple[FeeStructureHead, ...]
+    annual_total: Decimal
+
+
+def fee_structure(session: Session, academic_year_id: uuid.UUID) -> list[FeeStructureRow]:
+    """The school's fee structure for a year (R3-1C CBSE disclosure, ADR-0051; FR-DISC-003):
+    the active general plan (no category) of each class, its heads and annual amounts. Plans
+    only: no account, student or payment data. No permission check: the caller
+    (``disclosure.edit``) decides; callers check :func:`enabled` first."""
+    plans = [
+        p
+        for p in repo.list_plans(session, academic_year_id=academic_year_id, status="active")
+        if p.category_code is None
+    ]
+    lines = repo.plan_lines(session, [p.id for p in plans])
+    heads = repo.heads_by_id(session)
+    by_plan: dict[uuid.UUID, list[FeeStructureHead]] = {}
+    for line in lines:
+        head = heads.get(line.head_id)
+        by_plan.setdefault(line.plan_id, []).append(
+            FeeStructureHead(name=head.name if head else "", annual_amount=line.annual_amount)
+        )
+    out: list[FeeStructureRow] = []
+    for plan in plans:
+        items = tuple(by_plan.get(plan.id, ()))
+        total = sum((h.annual_amount for h in items), ZERO)
+        out.append(FeeStructureRow(class_id=plan.class_id, heads=items, annual_total=total))
+    return out
+
+
 def dues_for_student(
     session: Session, student_id: uuid.UUID, *, academic_year_id: uuid.UUID | None = None
 ) -> StudentDues | None:
@@ -483,6 +524,8 @@ __all__ = [
     "RENDER_TASK",
     "REPORT",
     "DayClosed",
+    "FeeStructureHead",
+    "FeeStructureRow",
     "ModuleHidden",
     "ParentDues",
     "ParentPayment",
@@ -498,6 +541,7 @@ __all__ = [
     "dues_for_student",
     "enabled",
     "export_records",
+    "fee_structure",
     "parent_account_student",
     "parent_dues",
     "parent_pay",

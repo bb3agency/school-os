@@ -1596,6 +1596,8 @@ Access reports are exports of kind `subject_report` in `ops.exports` (existing t
 
 ### 16.4 Disclosure (`ops`, `core`; ADR-0051, FR-DISC-001..012)
 
+**As built (R3-1C, `wip/r3-disclosure`, migration `0066_disclosure`, 2026-10-21).** As designed, with these refinements: `ops.disclosure_drafts` also holds the school's current link (`link_handle_id` composite FK into `core.public_handles`, the raw 22-character `link_key` so staff can copy the link again, `link_created_at`; all or none; `sos_readonly` cannot read `link_key`); `UNIQUE (tenant_id)`. `ops.disclosure_snapshots` columns `pdf_status`/`html_status` (`queued`, `ready`, `failed`), `pdf_key`/`html_key` (files under the school's `exports/` prefix, bucket rule `export-7d`; a download after `files_keep_days` makes them again), `files_rendered_at`, `files_error`; the app may UPDATE only the withdrawal, view and file columns, never DELETE (trigger `tg_disclosure_snapshots_guard`: a withdrawal is final, content frozen). `ops.disclosure_snapshot_documents` (`n` 1..200 per snapshot, `item_key`, `document_id`, `version_id`, `title`; composite FKs into `kb.documents` and `kb.document_versions`; insert-only). `core.public_handles`: kind CHECK widened, partial unique index `public_handles_one_disclosure (tenant_id) WHERE kind = 'school_disclosure' AND revoked_at IS NULL`. Offboarding: `disclosure` purges right after `certificates`, before `public` and `documents`.
+
 | Table | Class | Key columns and rules |
 |---|---|---|
 | `ops.disclosure_drafts` | C1 | One per school: `format_key`, `format_version`, `inputs jsonb` (item key → value; validated against the format), `documents jsonb` (item key → `[document_id]`), `updated_by`, `version` |

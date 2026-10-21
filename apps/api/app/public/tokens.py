@@ -36,10 +36,28 @@ def new_parent_token() -> str:
     return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
 
 
+def new_disclosure_key() -> str:
+    """A fresh disclosure link key (22 base64url characters for 16 bytes; ADR-0051)."""
+    raw = secrets.token_bytes(rules().disclosure_key_bytes)
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+
+
 def new_route_token() -> str:
     """A fresh Razorpay webhook route value (24 letters and digits)."""
     length = rules().route_token_length
     return "".join(secrets.choice(_ROUTE_ALPHABET) for _ in range(length))
+
+
+def new_key(kind: HandleKind) -> str:
+    """A fresh key of a kind the service generates (parent kinds, ``razorpay_route``,
+    ``school_disclosure``)."""
+    if is_parent_kind(kind):
+        return new_parent_token()
+    if kind == "school_disclosure":
+        return new_disclosure_key()
+    if kind == "razorpay_route":
+        return new_route_token()
+    raise ValueError(f"{kind} keys are given by the caller")
 
 
 def is_well_formed(kind: HandleKind, key: str) -> bool:
@@ -48,6 +66,9 @@ def is_well_formed(kind: HandleKind, key: str) -> bool:
         return False
     if is_parent_kind(kind):
         length = _b64url_length(rules().parent_token_bytes)
+        return len(key) == length and re.fullmatch(r"[A-Za-z0-9_-]+", key) is not None
+    if kind == "school_disclosure":
+        length = _b64url_length(rules().disclosure_key_bytes)
         return len(key) == length and re.fullmatch(r"[A-Za-z0-9_-]+", key) is not None
     if kind == "razorpay_route":
         return len(key) == rules().route_token_length and key.isalnum()
@@ -61,4 +82,11 @@ def key_hash(key: str) -> bytes:
     return hashlib.sha256(key.encode("ascii")).digest()
 
 
-__all__ = ["is_well_formed", "key_hash", "new_parent_token", "new_route_token"]
+__all__ = [
+    "is_well_formed",
+    "key_hash",
+    "new_disclosure_key",
+    "new_key",
+    "new_parent_token",
+    "new_route_token",
+]

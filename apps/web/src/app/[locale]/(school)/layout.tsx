@@ -27,6 +27,8 @@ const FEE_PERMISSIONS = [
 ];
 /** Permissions that use the WhatsApp screens (R2-1C, ADR-0043). */
 const MESSAGING_PERMISSIONS = ["message.read", "messaging.configure"];
+// R3-1C (ADR-0051): the CBSE disclosure editors.
+const DISCLOSURE_PERMISSION = "disclosure.edit";
 
 /** Codes that mean "this session has no usable school right now: pick one". */
 const CHOOSE_AGAIN = new Set(["active_tenant_required", "no_membership", "invalid_active_tenant"]);
@@ -90,6 +92,13 @@ export default async function SchoolLayout({ children }: { children: ReactNode }
     ? await apiGetAsSession<unknown>("staff", "/api/v1/messaging/settings")
     : null;
   const messaging = messagingSettings?.status === 200;
+  // R3-1C (FR-DISC-001): the CBSE disclosure item shows only in CBSE schools; its link route
+  // answers 404 module_hidden elsewhere. Asked only for people who can edit it.
+  const disclosureUser = !suspended && (profile?.permissions ?? []).includes(DISCLOSURE_PERMISSION);
+  const disclosureLink = disclosureUser
+    ? await apiGetAsSession<unknown>("staff", "/api/v1/disclosure/link")
+    : null;
+  const disclosure = disclosureLink?.status === 200;
 
   const activeTenantId = profile?.tenant_id ?? session.activeTenantId;
   const schoolName =
@@ -107,7 +116,7 @@ export default async function SchoolLayout({ children }: { children: ReactNode }
       permissions={profile?.permissions ?? (suspended ? [] : null)}
       canSwitchSchool={(profile?.tenant_ids.length ?? 0) > 1}
       languages={settings?.languages ?? null}
-      features={{ tally, fees, messaging }}
+      features={{ tally, fees, messaging, disclosure }}
       banner={
         <>
           {support ? <SupportAccessBanner /> : null}

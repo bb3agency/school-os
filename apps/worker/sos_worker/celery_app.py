@@ -50,6 +50,7 @@ import app.breakglass.service  # isort: skip
 import app.changes.service  # isort: skip
 import app.circulars.service  # isort: skip
 import app.documents.service  # isort: skip
+import app.disclosure.service  # isort: skip
 import app.dq.service  # isort: skip
 import app.exports.service  # isort: skip
 import app.extraction.service  # isort: skip
@@ -96,6 +97,8 @@ TASK_MODULES: list[str] = [
     "app.fees.upi_tasks",
     # R2-2D online payments: webhook inbox, online refunds, link cancels, reconciliation.
     "app.fees.tasks_online",
+    # R3-1C CBSE disclosure (ADR-0051): the HTML file and A4 PDF of a snapshot (queue pdf).
+    "app.disclosure.tasks",
 ]
 
 
@@ -191,6 +194,8 @@ def create_celery() -> Celery:
             # FR-NOTICE-003: parent notices are drafted in the background, next to the reading.
             "circulars.draft_notice": {"queue": "ingest"},
             "circulars.render_notice": {"queue": "pdf"},
+            # R3-1C (FR-DISC-011): the disclosure's HTML file and A4 PDF on the Chromium workers.
+            "disclosure.render_files": {"queue": "pdf"},
             "circulars.send_task_reminders": {"queue": "maintenance"},
             # M5 (FR-EW-005..006, FR-EW-017): the early-warning rules after attendance and
             # marks writes (outbox consumer) and daily, overdue reminders and the retention

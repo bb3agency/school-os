@@ -20,6 +20,8 @@ from app.core.health import router as health_router
 from app.core.logging import setup_logging
 from app.core.middleware import install_middleware
 from app.core.telemetry import setup_telemetry
+from app.disclosure.api import public_router as disclosure_public_router
+from app.disclosure.api import router as disclosure_router
 from app.documents.api import router as documents_router
 from app.dq.api import router as dq_router
 from app.exports.api import router as exports_router
@@ -119,6 +121,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     messaging_webhook.install()
     # R2-1A: certificate verification by code (ADR-0045), pinned in public_routes.yaml.
     app.include_router(certificates_public_router)
+    # R3-1C CBSE Appendix IX disclosure (ADR-0051): staff routes answer 404 module_hidden
+    # outside CBSE schools; the public page routes are pinned in public_routes.yaml.
+    app.include_router(disclosure_router)
+    app.include_router(disclosure_public_router)
     # Control plane + fleet heartbeat: shared deployment only (ADR-0017); 404 on dedicated hosts.
     if settings.deployment_mode is DeploymentMode.SHARED:
         app.include_router(platform_router)

@@ -167,10 +167,20 @@ describe("school layout reads /me from the server (FR-IAM-013)", () => {
     });
     type Features = ShellProps & { features: { tally?: boolean } };
     const off = (await SchoolLayout({ children: "x" })) as ReactElement<Features>;
-    expect(off.props.features).toEqual({ tally: false, fees: false, messaging: false });
+    expect(off.props.features).toEqual({
+      tally: false,
+      fees: false,
+      messaging: false,
+      disclosure: false,
+    });
     connector = 200;
     const on = (await SchoolLayout({ children: "x" })) as ReactElement<Features>;
-    expect(on.props.features).toEqual({ tally: true, fees: false, messaging: false });
+    expect(on.props.features).toEqual({
+      tally: true,
+      fees: false,
+      messaging: false,
+      disclosure: false,
+    });
   });
 
   it("shows the fee menu only while fees are on for the school (R2-1B, FR-FEE-001)", async () => {
@@ -189,10 +199,20 @@ describe("school layout reads /me from the server (FR-IAM-013)", () => {
     });
     type Features = ShellProps & { features: { fees?: boolean } };
     const off = (await SchoolLayout({ children: "x" })) as ReactElement<Features>;
-    expect(off.props.features).toEqual({ tally: false, fees: false, messaging: false });
+    expect(off.props.features).toEqual({
+      tally: false,
+      fees: false,
+      messaging: false,
+      disclosure: false,
+    });
     fees = 200;
     const on = (await SchoolLayout({ children: "x" })) as ReactElement<Features>;
-    expect(on.props.features).toEqual({ tally: false, fees: true, messaging: false });
+    expect(on.props.features).toEqual({
+      tally: false,
+      fees: true,
+      messaging: false,
+      disclosure: false,
+    });
     expect(h.apiCalls.some((r) => new URL(r.url).pathname === "/api/v1/tally/status")).toBe(false);
   });
 
@@ -212,10 +232,42 @@ describe("school layout reads /me from the server (FR-IAM-013)", () => {
     });
     type Features = ShellProps & { features: { messaging?: boolean } };
     const off = (await SchoolLayout({ children: "x" })) as ReactElement<Features>;
-    expect(off.props.features).toEqual({ tally: false, fees: false, messaging: false });
+    expect(off.props.features).toEqual({
+      tally: false,
+      fees: false,
+      messaging: false,
+      disclosure: false,
+    });
     settings = 200;
     const on = (await SchoolLayout({ children: "x" })) as ReactElement<Features>;
-    expect(on.props.features).toEqual({ tally: false, fees: false, messaging: true });
+    expect(on.props.features).toEqual({
+      tally: false,
+      fees: false,
+      messaging: true,
+      disclosure: false,
+    });
+  });
+
+  it("shows the CBSE disclosure menu only in CBSE schools (R3-1C, FR-DISC-001)", async () => {
+    await signInDirect("staff", HARNESS_TENANT);
+    const editor = { ...HARNESS_ME, permissions: ["disclosure.edit"] };
+    let link = 404;
+    h.setApi((request) => {
+      const path = new URL(request.url).pathname;
+      if (path === "/api/v1/me") return json(editor);
+      if (path === "/api/v1/disclosure/link") {
+        return link === 200
+          ? json({ url: null, created_at: null })
+          : json({ status: 404, code: "module_hidden" }, 404);
+      }
+      return defaultApi(request);
+    });
+    type Features = ShellProps & { features: { disclosure?: boolean } };
+    const off = (await SchoolLayout({ children: "x" })) as ReactElement<Features>;
+    expect(off.props.features.disclosure).toBe(false);
+    link = 200;
+    const on = (await SchoolLayout({ children: "x" })) as ReactElement<Features>;
+    expect(on.props.features.disclosure).toBe(true);
   });
 
   it("does not ask for the Tally status for people without a Tally permission", async () => {
@@ -223,12 +275,20 @@ describe("school layout reads /me from the server (FR-IAM-013)", () => {
     const element = (await SchoolLayout({ children: "x" })) as ReactElement<
       ShellProps & { features: { tally?: boolean } }
     >;
-    expect(element.props.features).toEqual({ tally: false, fees: false, messaging: false });
+    expect(element.props.features).toEqual({
+      tally: false,
+      fees: false,
+      messaging: false,
+      disclosure: false,
+    });
     expect(h.apiCalls.some((r) => new URL(r.url).pathname === "/api/v1/tally/status")).toBe(false);
     expect(h.apiCalls.some((r) => new URL(r.url).pathname === "/api/v1/messaging/settings")).toBe(
       false,
     );
     expect(h.apiCalls.some((r) => new URL(r.url).pathname === "/api/v1/fees/status")).toBe(false);
+    expect(h.apiCalls.some((r) => new URL(r.url).pathname === "/api/v1/disclosure/link")).toBe(
+      false,
+    );
   });
 
   it("goes back to the picker when the API says the school must be chosen again", async () => {
