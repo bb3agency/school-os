@@ -441,3 +441,17 @@ templates:
     te:
       title: "తనిఖీ చేయాల్సిన ఆన్‌లైన్ చెల్లింపులు: {count}"
       body: "ఈ ఉదయం Razorpay చెల్లింపుల తనిఖీలో ఒక వ్యక్తి చూడాల్సిన {count, plural, one {# అంశం} other {# అంశాలు}} కనిపించాయి: రసీదు లేని చెల్లింపులు, తేడా ఉన్న మొత్తాలు, వాపసులు లేదా జమ కాని సెటిల్‌మెంట్లు. ఫీజులు > ఆన్‌లైన్ సరిపోలిక తెరవండి."
+
+  # R3-1D portal calendar (FR-RDY-006, FR-RDY-007; ADR-0053). Staff only, never parents (D45).
+  # Params are a portal code and counts: the readiness of the event's linked profile across the
+  # school (students 0 when the event links no profile with a readiness check). The link opens
+  # the school's portal calendar (resource id: the academic year).
+  portal_calendar.reminder:
+    params: [portal, days, ready, students]
+    resource_type: portal_calendar
+    en:
+      title: "{portal, select, udise_plus {UDISE+} bseap {AP SSC board} cbse {CBSE} cisce {CISCE} apaar {APAAR} other {Portal}} window closes {days, plural, =0 {today} one {tomorrow} other {in # days}}"
+      body: "{students, plural, =0 {Check the dates and who owns the work on the portal calendar.} other {{ready} of # students are ready. Open the portal calendar to see the window and fix what is not ready.}}"
+    te:
+      title: "{portal, select, udise_plus {UDISE+} bseap {AP SSC బోర్డు} cbse {CBSE} cisce {CISCE} apaar {APAAR} other {పోర్టల్}} గడువు {days, plural, =0 {ఈరోజే} one {రేపు} other {# రోజుల్లో}} ముగుస్తుంది"
+      body: "{students, plural, =0 {పోర్టల్ క్యాలెండర్‌లో తేదీలు, పని ఎవరిదో చూడండి.} other {# మంది విద్యార్థుల్లో {ready} మంది సిద్ధంగా ఉన్నారు. గడువు చూడటానికి, సిద్ధంగా లేనివాటిని సరిచేయడానికి పోర్టల్ క్యాలెండర్ తెరవండి.}}"

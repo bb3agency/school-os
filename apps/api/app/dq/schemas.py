@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import datetime as dt
+import re
 import uuid
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 # needs_confirmation (A-01): a blocker a write without evidence removed; unresolved until a
 # dq.findings.waive holder confirms it (POST /dq/findings/{id}/resolve, step-up).
@@ -268,6 +269,32 @@ class ReadinessSectionOut(ReadinessCounts):
     class_id: uuid.UUID
 
 
+# --- portal calendar (FR-RDY-001..010, ADR-0053) ----------------------------------------------
+
+CalendarState = Literal["expected", "confirmed", "open", "closed"]
+CalendarSourceKind = Literal["circular", "portal", "phone", "other"]
+CalendarPortal = Literal["udise_plus", "bseap", "cbse", "cisce", "apaar", "school"]
+EVENT_KEY_PATTERN = r"^([a-z][a-z0-9_]{2,63}|school:[a-z0-9][a-z0-9-]{1,47})$"
+
+
+class PortalWindowOut(_Out):
+    """The next portal window of a readiness profile (FR-RDY-009): the dates in force (confirmed
+    by the school, else the calendar file's unverified expectation) and its state."""
+
+    event_key: str
+    academic_year_id: uuid.UUID
+    portal: CalendarPortal
+    label_en: str
+    label_te: str
+    opens_on: dt.date
+    closes_on: dt.date
+    opens_approximate: bool
+    closes_approximate: bool
+    confirmed: bool
+    state: CalendarState
+    days_left: int = Field(description="Days until the window closes (0 on the closing day).")
+
+
 class ReadinessSummaryOut(_Out):
     """Class/section readiness ("142 of 160 ready", US-504 AC3), limited to your scope."""
 
@@ -275,6 +302,11 @@ class ReadinessSummaryOut(_Out):
     totals: ReadinessCounts
     sections: list[ReadinessSectionOut]
     last_run: RunOut | None
+    next_window: PortalWindowOut | None = Field(
+        default=None,
+        description="The next window of this profile on the school's portal calendar that has "
+        "not closed (FR-RDY-009); null when none is known.",
+    )
 
 
 class ReadinessOverviewOut(_Out):
@@ -355,3 +387,132 @@ class ReadinessRunIn(_In):
     """Sections, classes or students to check; empty = the profile's classes in your scope."""
 
     scope: RunScopeIn = Field(default_factory=RunScopeIn)
+
+
+class CalendarMemberOut(_Out):
+    membership_id: uuid.UUID
+    display_name: str | None
+
+
+class CalendarReadinessOut(_Out):
+    """Readiness counts of one linked profile in the reader's scope ("142 of 160 ready")."""
+
+    profile_key: str
+    label_en: str
+    ready: int
+    students: int
+
+
+class ExpectedWindowOut(_Out):
+    """The calendar file's expectation (never official; ``verified`` says so)."""
+
+    opens_on: dt.date
+    closes_on: dt.date
+    opens_approximate: bool
+    closes_approximate: bool
+
+
+class CalendarEventOut(_Out):
+    """One event of the school's portal calendar (US-3101): the file's expectation or the
+    school's own event, the dates in force, who confirmed them and from where, the owner of
+    the work and the readiness of the linked profiles."""
+
+    event_key: str
+    academic_year_id: uuid.UUID
+    own: bool = Field(description="An event the school added itself (FR-RDY-005).")
+    portal: CalendarPortal
+    label_en: str
+    label_te: str
+    profile_keys: list[str]
+    boards: list[str]
+    classes: list[str]
+    expected: ExpectedWindowOut | None
+    opens_on: dt.date
+    closes_on: dt.date
+    opens_approximate: bool
+    closes_approximate: bool
+    confirmed: bool
+    state: CalendarState
+    days_left: int
+    source_kind: CalendarSourceKind | None
+    document_id: uuid.UUID | None
+    confirmed_by: CalendarMemberOut | None
+    confirmed_at: dt.datetime | None
+    owner: CalendarMemberOut | None
+    lead_days: list[int]
+    sources: list[str]
+    verified: bool
+    readiness: list[CalendarReadinessOut]
+    version: int | None = Field(
+        description="ETag of the school's confirmation (send it as If-Match); null while the "
+        "dates are only expected."
+    )
+
+
+class CalendarOut(_Out):
+    academic_year_id: uuid.UUID
+    academic_year_label: str
+    events: list[CalendarEventOut]
+
+
+def _check_window(opens_on: dt.date, closes_on: dt.date) -> None:
+    if closes_on < opens_on:
+        raise ValueError("closes_on must be on or after opens_on")
+
+
+class CalendarConfirmIn(_In):
+    """Confirmed dates of a calendar event, where they came from and who owns the work
+    (FR-RDY-004)."""
+
+    academic_year_id: uuid.UUID
+    opens_on: dt.date
+    closes_on: dt.date
+    source_kind: CalendarSourceKind
+    document_id: uuid.UUID | None = None
+    owner_membership_id: uuid.UUID | None = None
+
+    @model_validator(mode="after")
+    def _window(self) -> CalendarConfirmIn:
+        _check_window(self.opens_on, self.closes_on)
+        return self
+
+
+class CalendarEventIn(_In):
+    """The school's own event (FR-RDY-005): a label in the school's words (no personal data),
+    its dates, the readiness profiles it concerns and an owner."""
+
+    academic_year_id: uuid.UUID
+    label: str = Field(min_length=3, max_length=120)
+    opens_on: dt.date
+    closes_on: dt.date
+    profile_keys: list[Annotated[str, StringConstraints(max_length=64)]] = Field(
+        default_factory=list, max_length=5
+    )
+    source_kind: CalendarSourceKind
+    document_id: uuid.UUID | None = None
+    owner_membership_id: uuid.UUID | None = None
+
+    @model_validator(mode="after")
+    def _window(self) -> CalendarEventIn:
+        _check_window(self.opens_on, self.closes_on)
+        for key in self.profile_keys:
+            if not re.match(PROFILE_PATTERN, key):
+                raise ValueError("profile_keys must be profile keys such as bseap-ssc-2027")
+        return self
+
+
+class PortalTaskLinkIn(_In):
+    """Link a task confirmed from a circular to a calendar event (FR-RDY-010)."""
+
+    event_key: str = Field(pattern=EVENT_KEY_PATTERN, max_length=64)
+    academic_year_id: uuid.UUID | None = Field(
+        default=None, description="The academic year of the event; default the current one."
+    )
+
+
+class CalendarAssigneeOut(_Out):
+    """An active member who can own a portal window (names and role keys only)."""
+
+    membership_id: uuid.UUID
+    display_name: str
+    roles: list[str]

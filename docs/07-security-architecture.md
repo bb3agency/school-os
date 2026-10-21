@@ -198,6 +198,7 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | dq.findings.waive | — | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — |
 | dq.readiness.read (board and portal readiness, parent verification slips; Aadhaar-as-printed values on them only with student.read_sensitive; ADR-0040) | ✓ | ✓ | ✓ | ✓ | — | ✓ | S | — | ✓ |
 | dq.readiness.manage (run readiness checks that store DQ-030 findings) | — | ✓ | ✓ | ✓ | — | ✓ | — | — | — |
+| readiness.calendar.manage (R3-1D: confirm portal dates, add the school's own events, choose owners; linking a circular task also needs task.manage; ADR-0053) | — | ✓ | ✓ | — | — | ✓ | — | — | — |
 | document.upload (new versions and metadata edits only of documents the caller uploaded, unless they also hold document.manage_acl; AA-10) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | S | — | — |
 | document.read | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | S | S | ✓ |
 | document.manage_acl (also gates document delete) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
@@ -363,7 +364,6 @@ Unchanged keys used by R2: `certificate.approve`ᴿ (add or withdraw a verificat
 | privacy.breach.manage (R3-1B: record and update breaches, duties and drafts) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
 | disclosure.edit (R3-1C: edit the Appendix IX draft, download published files; ADR-0051) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
 | disclosure.publish (R3-1C: publish, withdraw, change the link) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
-| readiness.calendar.manage (R3-1D: confirm portal dates, add school events, choose owners; ADR-0053) | — | ✓ | ✓ | — | — | ✓ | — | — | — |
 | rte.read (R3-2E, not scheduled: RTE register and claims, C3; ADR-0052) | ✓ | ✓ | ✓ | — | ✓ | — | — | — | ✓ |
 | rte.manage (R3-2E: record RTE admissions and documents, request the RTE concession) | — | ✓ | ✓ | — | — | — | — | — | — |
 | rte.claim.manage (R3-2E: prepare, submit and record reimbursement claims) | — | ✓ | ✓ | — | ✓ | — | — | — | — |

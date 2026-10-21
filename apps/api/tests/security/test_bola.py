@@ -184,6 +184,8 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("POST", "/api/v1/circular-suggestions/{suggestion_id}/dismiss"): {},
     ("PATCH", "/api/v1/tasks/{task_id}"): {"title": "Synthetic"},
     ("POST", "/api/v1/tasks/{task_id}/status"): {"status": "done"},
+    # R3-1D (FR-RDY-010): link a circular task to a portal calendar event.
+    ("POST", "/api/v1/tasks/{task_id}/portal-event"): {"event_key": "bseap_ssc_2027_nominal_roll"},
     ("PATCH", "/api/v1/notices/{notice_id}"): {"title_en": "Synthetic"},
     ("POST", "/api/v1/notices/{notice_id}/approve"): {},
     ("POST", "/api/v1/notices/{notice_id}/render"): {},
@@ -339,6 +341,8 @@ ACTOR: dict[tuple[str, str], str] = dict.fromkeys(
         # ADR-0043: recording WhatsApp opt-ins is not an owner permission (docs/07 §6.2).
         ("POST", "/api/v1/guardians/{guardian_id}/optins"),
         ("GET", "/api/v1/sections/{section_id}/join-slips"),
+        # R3-1D: readiness.calendar.manage is not an owner permission (docs/07 §6.2).
+        ("POST", "/api/v1/tasks/{task_id}/portal-event"),
     ),
     "principal",
 )
@@ -925,8 +929,10 @@ def _id_routes() -> list[tuple[str, str]]:
         if str(rc.path).startswith(("/api/v1/public/", "/api/v1/webhooks/")):
             continue
         params = set(re.findall(r"{(\w+)}", str(rc.path)))
-        # A readiness profile key (ADR-0040) names configuration, not an object of the school.
-        if isinstance(rc.original_route, APIRoute) and params - {"profile_key"}:
+        # A readiness profile key (ADR-0040) names configuration, not an object of the school;
+        # so does a portal calendar event key (ADR-0053): it is looked up only inside the
+        # caller's school (cross-school 404 in tests/dq/test_calendar_api.py).
+        if isinstance(rc.original_route, APIRoute) and params - {"profile_key", "event_key"}:
             out.extend((m, str(rc.path)) for m in sorted(rc.methods or ()))
     return sorted(out)
 

@@ -53,6 +53,9 @@ import {
 } from "./data";
 import { DuePill, LoadGate, TaskStatusPill } from "./parts";
 import { canEditTask, TaskEditDialog } from "./TaskEditDialog";
+import { LinkPortalEventDialog } from "@/features/portal-calendar/LinkPortalEventDialog";
+
+const CALENDAR_MANAGE = "readiness.calendar.manage";
 
 /** The inbox groups, in the order they are shown (research report §8.4: grouped by due date). */
 export const TASK_GROUPS = ["overdue", "today", "week", "later", "earlier", "noDate"] as const;
@@ -117,6 +120,7 @@ function RowActions({
 }) {
   const t = useTranslations("tasks");
   const api = useBffClient("staff");
+  const can = useStaffCan();
   const queryClient = useQueryClient();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<unknown>(undefined);
@@ -160,6 +164,10 @@ function RowActions({
           </Button>
         ))}
         {manager && canEditTask(task) ? <TaskEditDialog task={task} onSaved={onEdited} /> : null}
+        {/* R3-1D (FR-RDY-010): a circular's deadline can confirm a portal window's date. */}
+        {manager && task.source === "circular" && canEditTask(task) && can(CALENDAR_MANAGE) ? (
+          <LinkPortalEventDialog task={task} />
+        ) : null}
       </div>
       <ApiErrorAlert error={error} namespace="tasks" />
     </div>

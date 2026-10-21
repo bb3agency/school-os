@@ -768,6 +768,8 @@ Conventions as above and as the R2 section: `Idempotency-Key` on creating POSTs,
 
 #### Portal calendar (R3.3; FR-RDY-001..010)
 
+**Built** (R3-1D, branch `wip/r3-portal-calendar`, migration `0067_portal_calendar`, 2026-10-21): the four routes below plus `GET /dq/calendar/assignees` (`readiness.calendar.manage`; active staff who can own a window). `PUT` needs no `If-Match` for the first confirmation and `If-Match` for any change (400 `if_match_required`, 412 `version_mismatch`); `DELETE` takes `?academic_year_id=` and `If-Match`; `POST /tasks/{task_id}/portal-event` answers 422 `not_circular_task` for a manual or portal task and 403 without a school-wide `task.manage`. `GET /dq/readiness` and `GET /dq/readiness/{profile_key}` carry `next_window` (`PortalWindowOut` or null). `GET /dq/calendar` has the readiness read budgets (`readiness_reads`, `readiness_school`). `TaskOut` carries `portal_event_key`.
+
 | Method | Path | Guard |
 |---|---|---|
 | GET | `/dq/calendar?academic_year_id=` (applicable events with state and dates in force) | `dq.readiness.read` |

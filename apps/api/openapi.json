@@ -3765,6 +3765,493 @@
         "title": "BroadcastReportOut",
         "type": "object"
       },
+      "CalendarAssigneeOut": {
+        "description": "An active member who can own a portal window (names and role keys only).",
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "membership_id": {
+            "format": "uuid",
+            "title": "Membership Id",
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "membership_id",
+          "display_name",
+          "roles"
+        ],
+        "title": "CalendarAssigneeOut",
+        "type": "object"
+      },
+      "CalendarConfirmIn": {
+        "additionalProperties": false,
+        "description": "Confirmed dates of a calendar event, where they came from and who owns the work\n(FR-RDY-004).",
+        "properties": {
+          "academic_year_id": {
+            "format": "uuid",
+            "title": "Academic Year Id",
+            "type": "string"
+          },
+          "closes_on": {
+            "format": "date",
+            "title": "Closes On",
+            "type": "string"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "opens_on": {
+            "format": "date",
+            "title": "Opens On",
+            "type": "string"
+          },
+          "owner_membership_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Membership Id"
+          },
+          "source_kind": {
+            "enum": [
+              "circular",
+              "portal",
+              "phone",
+              "other"
+            ],
+            "title": "Source Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "academic_year_id",
+          "opens_on",
+          "closes_on",
+          "source_kind"
+        ],
+        "title": "CalendarConfirmIn",
+        "type": "object"
+      },
+      "CalendarEventIn": {
+        "additionalProperties": false,
+        "description": "The school's own event (FR-RDY-005): a label in the school's words (no personal data),\nits dates, the readiness profiles it concerns and an owner.",
+        "properties": {
+          "academic_year_id": {
+            "format": "uuid",
+            "title": "Academic Year Id",
+            "type": "string"
+          },
+          "closes_on": {
+            "format": "date",
+            "title": "Closes On",
+            "type": "string"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "label": {
+            "maxLength": 120,
+            "minLength": 3,
+            "title": "Label",
+            "type": "string"
+          },
+          "opens_on": {
+            "format": "date",
+            "title": "Opens On",
+            "type": "string"
+          },
+          "owner_membership_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Membership Id"
+          },
+          "profile_keys": {
+            "items": {
+              "maxLength": 64,
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "Profile Keys",
+            "type": "array"
+          },
+          "source_kind": {
+            "enum": [
+              "circular",
+              "portal",
+              "phone",
+              "other"
+            ],
+            "title": "Source Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "academic_year_id",
+          "label",
+          "opens_on",
+          "closes_on",
+          "source_kind"
+        ],
+        "title": "CalendarEventIn",
+        "type": "object"
+      },
+      "CalendarEventOut": {
+        "description": "One event of the school's portal calendar (US-3101): the file's expectation or the\nschool's own event, the dates in force, who confirmed them and from where, the owner of\nthe work and the readiness of the linked profiles.",
+        "properties": {
+          "academic_year_id": {
+            "format": "uuid",
+            "title": "Academic Year Id",
+            "type": "string"
+          },
+          "boards": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Boards",
+            "type": "array"
+          },
+          "classes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Classes",
+            "type": "array"
+          },
+          "closes_approximate": {
+            "title": "Closes Approximate",
+            "type": "boolean"
+          },
+          "closes_on": {
+            "format": "date",
+            "title": "Closes On",
+            "type": "string"
+          },
+          "confirmed": {
+            "title": "Confirmed",
+            "type": "boolean"
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          },
+          "confirmed_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalendarMemberOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "days_left": {
+            "title": "Days Left",
+            "type": "integer"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "event_key": {
+            "title": "Event Key",
+            "type": "string"
+          },
+          "expected": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpectedWindowOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "label_en": {
+            "title": "Label En",
+            "type": "string"
+          },
+          "label_te": {
+            "title": "Label Te",
+            "type": "string"
+          },
+          "lead_days": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Lead Days",
+            "type": "array"
+          },
+          "opens_approximate": {
+            "title": "Opens Approximate",
+            "type": "boolean"
+          },
+          "opens_on": {
+            "format": "date",
+            "title": "Opens On",
+            "type": "string"
+          },
+          "own": {
+            "description": "An event the school added itself (FR-RDY-005).",
+            "title": "Own",
+            "type": "boolean"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalendarMemberOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "portal": {
+            "enum": [
+              "udise_plus",
+              "bseap",
+              "cbse",
+              "cisce",
+              "apaar",
+              "school"
+            ],
+            "title": "Portal",
+            "type": "string"
+          },
+          "profile_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Profile Keys",
+            "type": "array"
+          },
+          "readiness": {
+            "items": {
+              "$ref": "#/components/schemas/CalendarReadinessOut"
+            },
+            "title": "Readiness",
+            "type": "array"
+          },
+          "source_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "circular",
+                  "portal",
+                  "phone",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Kind"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "state": {
+            "enum": [
+              "expected",
+              "confirmed",
+              "open",
+              "closed"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "verified": {
+            "title": "Verified",
+            "type": "boolean"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "ETag of the school's confirmation (send it as If-Match); null while the dates are only expected.",
+            "title": "Version"
+          }
+        },
+        "required": [
+          "event_key",
+          "academic_year_id",
+          "own",
+          "portal",
+          "label_en",
+          "label_te",
+          "profile_keys",
+          "boards",
+          "classes",
+          "expected",
+          "opens_on",
+          "closes_on",
+          "opens_approximate",
+          "closes_approximate",
+          "confirmed",
+          "state",
+          "days_left",
+          "source_kind",
+          "document_id",
+          "confirmed_by",
+          "confirmed_at",
+          "owner",
+          "lead_days",
+          "sources",
+          "verified",
+          "readiness",
+          "version"
+        ],
+        "title": "CalendarEventOut",
+        "type": "object"
+      },
+      "CalendarMemberOut": {
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "membership_id": {
+            "format": "uuid",
+            "title": "Membership Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "membership_id",
+          "display_name"
+        ],
+        "title": "CalendarMemberOut",
+        "type": "object"
+      },
+      "CalendarOut": {
+        "properties": {
+          "academic_year_id": {
+            "format": "uuid",
+            "title": "Academic Year Id",
+            "type": "string"
+          },
+          "academic_year_label": {
+            "title": "Academic Year Label",
+            "type": "string"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/CalendarEventOut"
+            },
+            "title": "Events",
+            "type": "array"
+          }
+        },
+        "required": [
+          "academic_year_id",
+          "academic_year_label",
+          "events"
+        ],
+        "title": "CalendarOut",
+        "type": "object"
+      },
+      "CalendarReadinessOut": {
+        "description": "Readiness counts of one linked profile in the reader's scope (\"142 of 160 ready\").",
+        "properties": {
+          "label_en": {
+            "title": "Label En",
+            "type": "string"
+          },
+          "profile_key": {
+            "title": "Profile Key",
+            "type": "string"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "integer"
+          },
+          "students": {
+            "title": "Students",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "profile_key",
+          "label_en",
+          "ready",
+          "students"
+        ],
+        "title": "CalendarReadinessOut",
+        "type": "object"
+      },
       "CancellationOut": {
         "properties": {
           "cancelled_on": {
@@ -9878,6 +10365,37 @@
           "version"
         ],
         "title": "ExamOut",
+        "type": "object"
+      },
+      "ExpectedWindowOut": {
+        "description": "The calendar file's expectation (never official; ``verified`` says so).",
+        "properties": {
+          "closes_approximate": {
+            "title": "Closes Approximate",
+            "type": "boolean"
+          },
+          "closes_on": {
+            "format": "date",
+            "title": "Closes On",
+            "type": "string"
+          },
+          "opens_approximate": {
+            "title": "Opens Approximate",
+            "type": "boolean"
+          },
+          "opens_on": {
+            "format": "date",
+            "title": "Opens On",
+            "type": "string"
+          }
+        },
+        "required": [
+          "opens_on",
+          "closes_on",
+          "opens_approximate",
+          "closes_approximate"
+        ],
+        "title": "ExpectedWindowOut",
         "type": "object"
       },
       "ExplainIn": {
@@ -22263,6 +22781,123 @@
         "title": "PlatformAuditEventOut",
         "type": "object"
       },
+      "PortalTaskLinkIn": {
+        "additionalProperties": false,
+        "description": "Link a task confirmed from a circular to a calendar event (FR-RDY-010).",
+        "properties": {
+          "academic_year_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The academic year of the event; default the current one.",
+            "title": "Academic Year Id"
+          },
+          "event_key": {
+            "maxLength": 64,
+            "pattern": "^([a-z][a-z0-9_]{2,63}|school:[a-z0-9][a-z0-9-]{1,47})$",
+            "title": "Event Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "event_key"
+        ],
+        "title": "PortalTaskLinkIn",
+        "type": "object"
+      },
+      "PortalWindowOut": {
+        "description": "The next portal window of a readiness profile (FR-RDY-009): the dates in force (confirmed\nby the school, else the calendar file's unverified expectation) and its state.",
+        "properties": {
+          "academic_year_id": {
+            "format": "uuid",
+            "title": "Academic Year Id",
+            "type": "string"
+          },
+          "closes_approximate": {
+            "title": "Closes Approximate",
+            "type": "boolean"
+          },
+          "closes_on": {
+            "format": "date",
+            "title": "Closes On",
+            "type": "string"
+          },
+          "confirmed": {
+            "title": "Confirmed",
+            "type": "boolean"
+          },
+          "days_left": {
+            "description": "Days until the window closes (0 on the closing day).",
+            "title": "Days Left",
+            "type": "integer"
+          },
+          "event_key": {
+            "title": "Event Key",
+            "type": "string"
+          },
+          "label_en": {
+            "title": "Label En",
+            "type": "string"
+          },
+          "label_te": {
+            "title": "Label Te",
+            "type": "string"
+          },
+          "opens_approximate": {
+            "title": "Opens Approximate",
+            "type": "boolean"
+          },
+          "opens_on": {
+            "format": "date",
+            "title": "Opens On",
+            "type": "string"
+          },
+          "portal": {
+            "enum": [
+              "udise_plus",
+              "bseap",
+              "cbse",
+              "cisce",
+              "apaar",
+              "school"
+            ],
+            "title": "Portal",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "expected",
+              "confirmed",
+              "open",
+              "closed"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "event_key",
+          "academic_year_id",
+          "portal",
+          "label_en",
+          "label_te",
+          "opens_on",
+          "closes_on",
+          "opens_approximate",
+          "closes_approximate",
+          "confirmed",
+          "state",
+          "days_left"
+        ],
+        "title": "PortalWindowOut",
+        "type": "object"
+      },
       "PrecheckCreate": {
         "additionalProperties": false,
         "description": "US-501 AC4: a board or portal pre-check report.",
@@ -24179,6 +24814,17 @@
                 "type": "null"
               }
             ]
+          },
+          "next_window": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PortalWindowOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The next window of this profile on the school's portal calendar that has not closed (FR-RDY-009); null when none is known."
           },
           "profile": {
             "$ref": "#/components/schemas/ReadinessProfileOut"
@@ -29937,10 +30583,23 @@
           "owner": {
             "$ref": "#/components/schemas/app__circulars__schemas__MemberOut"
           },
+          "portal_event_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The portal calendar event of a portal task (source portal_calendar).",
+            "title": "Portal Event Key"
+          },
           "source": {
             "enum": [
               "manual",
-              "circular"
+              "circular",
+              "portal_calendar"
             ],
             "title": "Source",
             "type": "string"
@@ -40640,6 +41299,348 @@
         "summary": "Add Version",
         "tags": [
           "documents"
+        ]
+      }
+    },
+    "/api/v1/dq/calendar": {
+      "get": {
+        "description": "The school's portal calendar for an academic year (default: the current one): UDISE+,\nboard registration and nominal-roll windows, APAAR drives and the school's own events that\nconcern this school (by its boards and classes), soonest closing first (permission\n``dq.readiness.read``). Each shows the dates in force: ``confirmed`` by a person at the\nschool, else the calendar file's unverified expectation (\"Expected around ...\"); its state\n(``expected``, ``confirmed``, ``open``, ``closed``); the owner; and the readiness of its\nlinked profiles in your scope (\"142 of 160 ready\").",
+        "operationId": "get_calendar_api_v1_dq_calendar_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "academic_year_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Academic Year Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get Calendar",
+        "tags": [
+          "data-quality"
+        ]
+      },
+      "post": {
+        "description": "Add the school's own event: a label in the school's words (no personal data), its dates,\nthe readiness profiles it concerns and an owner (permission ``readiness.calendar.manage``).\nIt gets reminders like the portal windows. Accepts ``Idempotency-Key``. Audited.",
+        "operationId": "add_calendar_event_api_v1_dq_calendar_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalendarEventIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarEventOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Add Calendar Event",
+        "tags": [
+          "data-quality"
+        ]
+      }
+    },
+    "/api/v1/dq/calendar/assignees": {
+      "get": {
+        "description": "Active staff who can own a portal window (permission ``readiness.calendar.manage``).",
+        "operationId": "calendar_assignees_api_v1_dq_calendar_assignees_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CalendarAssigneeOut"
+                  },
+                  "title": "Response Calendar Assignees Api V1 Dq Calendar Assignees Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Calendar Assignees",
+        "tags": [
+          "data-quality"
+        ]
+      }
+    },
+    "/api/v1/dq/calendar/{event_key}": {
+      "delete": {
+        "description": "Remove the school's own event, or undo a confirmation so the expected dates show again\n(permission ``readiness.calendar.manage``; ``If-Match``). Reminders already sent stay in\nthe history. Audited.",
+        "operationId": "remove_calendar_event_api_v1_dq_calendar__event_key__delete",
+        "parameters": [
+          {
+            "description": "Calendar event, e.g. bseap_ssc_2027_nominal_roll, or school:<slug> for the school's own event",
+            "in": "path",
+            "name": "event_key",
+            "required": true,
+            "schema": {
+              "description": "Calendar event, e.g. bseap_ssc_2027_nominal_roll, or school:<slug> for the school's own event",
+              "maxLength": 64,
+              "pattern": "^([a-z][a-z0-9_]{2,63}|school:[a-z0-9][a-z0-9-]{1,47})$",
+              "title": "Event Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "academic_year_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Academic Year Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Remove Calendar Event",
+        "tags": [
+          "data-quality"
+        ]
+      },
+      "put": {
+        "description": "Confirm an event's opening and closing dates, where they came from (a circular, the\nportal, a phone call; optionally the document) and who owns the work (permission\n``readiness.calendar.manage``). Confirmed dates win over the expected ones. The first\nconfirmation needs no ``If-Match``; changing one does (400 ``if_match_required``, 412 when\nstale). An event that does not concern the school: 404. Audited.",
+        "operationId": "confirm_calendar_event_api_v1_dq_calendar__event_key__put",
+        "parameters": [
+          {
+            "description": "Calendar event, e.g. bseap_ssc_2027_nominal_roll, or school:<slug> for the school's own event",
+            "in": "path",
+            "name": "event_key",
+            "required": true,
+            "schema": {
+              "description": "Calendar event, e.g. bseap_ssc_2027_nominal_roll, or school:<slug> for the school's own event",
+              "maxLength": 64,
+              "pattern": "^([a-z][a-z0-9_]{2,63}|school:[a-z0-9][a-z0-9-]{1,47})$",
+              "title": "Event Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalendarConfirmIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarEventOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Confirm Calendar Event",
+        "tags": [
+          "data-quality"
         ]
       }
     },
@@ -68538,6 +69539,84 @@
         "summary": "Update Task",
         "tags": [
           "circulars"
+        ]
+      }
+    },
+    "/api/v1/tasks/{task_id}/portal-event": {
+      "post": {
+        "description": "Link a task confirmed from a circular's deadline to a portal calendar event: the task's\ndue date becomes the event's confirmed closing date, from that circular (permission\n``readiness.calendar.manage`` and a school-wide ``task.manage``, else 403; a task you cannot\nreach: 404; a task not from a circular: 422 ``not_circular_task``). A person's action, never\nautomatic. Accepts ``Idempotency-Key``. Audited.",
+        "operationId": "link_task_to_portal_event_api_v1_tasks__task_id__portal_event_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortalTaskLinkIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarEventOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Link Task To Portal Event",
+        "tags": [
+          "data-quality"
         ]
       }
     },

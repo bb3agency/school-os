@@ -95,6 +95,7 @@ roles:
       dq.findings.waive: school_step_up
       dq.readiness.read: school
       dq.readiness.manage: school
+      readiness.calendar.manage: school  # R3-1D (ADR-0053)
       document.upload: school
       document.read: school
       document.manage_acl: school
@@ -167,6 +168,7 @@ roles:
       dq.findings.waive: school_step_up
       dq.readiness.read: school
       dq.readiness.manage: school
+      readiness.calendar.manage: school  # R3-1D (ADR-0053)
       document.upload: school
       document.read: school
       document.manage_acl: school
@@ -268,6 +270,7 @@ roles:
       dq.findings.resolve: school
       dq.readiness.read: school
       dq.readiness.manage: school
+      readiness.calendar.manage: school  # R3-1D (ADR-0053)
       document.upload: school
       document.read: school
       kb.ask: school

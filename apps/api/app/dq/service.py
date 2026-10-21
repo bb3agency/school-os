@@ -1361,11 +1361,18 @@ __all__ = [
 
 
 # --- offboarding purge (FR-PLT-005, ADR-0029) ------------------------------------------------
-# Data-quality findings and runs.
+# Data-quality findings and runs, and the portal calendar (confirmed dates, reminders).
 # Registered with app.tenancy at import; the offboarding job counts them as sos_app and deletes
 # them as sos_purger (children before parents) inside the school's tenant_session.
 _PURGE = purging.PurgeTables(
-    deleted=("sis.dq_findings", "sis.dq_runs"),
+    # R3-1D portal calendar (ops; migration 0067): reminders reference ops.tasks, so dq is
+    # purged before circulars (app/tenancy/offboarding.yaml).
+    deleted=(
+        "ops.portal_reminders",
+        "ops.portal_calendar_dates",
+        "sis.dq_findings",
+        "sis.dq_runs",
+    ),
 )
 
 

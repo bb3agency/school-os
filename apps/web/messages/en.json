@@ -1853,7 +1853,9 @@
       "date_too_early": "This date is too long ago. Check the date on the form.",
       "filter_required": "Choose a student or a guardian first.",
       "before_current_decision": "This date is before the decision already recorded. Check the date on the form.",
-      "invalid_number": "Enter a whole number."
+      "invalid_number": "Enter a whole number.",
+      "not_circular_task": "Only a task confirmed from a circular can confirm a portal date.",
+      "unknown_profile": "Choose a readiness check from the list."
     },
     "api": {
       "generic": {
@@ -9681,6 +9683,121 @@
         "title": "The fee account is closed",
         "body": "Payment links are made only for open fee accounts."
       }
+    }
+  },
+  "portalCalendar": {
+    "nav": "Portal calendar",
+    "title": "Portal calendar",
+    "description": "UDISE+, board registration and nominal-roll windows and APAAR drives for your school, with who owns the work and how many students are ready.",
+    "descriptionYear": "Academic year {year}: UDISE+, board registration and nominal-roll windows and APAAR drives for your school, with who owns the work and how many students are ready.",
+    "unverifiedTitle": "Expected dates are not official",
+    "unverifiedBody": "Dates marked “Expected around” come from public notices and earlier years. Confirm each date when the circular or the portal shows it; confirmed dates are used for reminders.",
+    "tableCaption": "Portal and board windows",
+    "colEvent": "Window",
+    "colWindow": "Dates",
+    "colOwner": "Owner",
+    "colState": "State",
+    "colReadiness": "Students ready",
+    "ownEvent": "Our own event",
+    "noOwner": "Nobody yet",
+    "formerStaff": "Former staff member",
+    "noReadiness": "No readiness check",
+    "expectedAround": "Expected around {range}",
+    "confirmedRange": "Confirmed: {from} – {to}",
+    "closesIn": "{days, plural, =0 {Closes today} one {Closes tomorrow} other {Closes in # days}}",
+    "nextWindow": "Next window: {event}.",
+    "openCalendar": "Portal calendar",
+    "emptyTitle": "No portal windows for this year",
+    "emptyBody": "None of the shipped windows concern your school's boards and classes. Add your own event if a circular names a date.",
+    "state": {
+      "expected": "Expected",
+      "confirmed": "Confirmed",
+      "open": "Open now",
+      "closed": "Closed"
+    },
+    "portal": {
+      "udise_plus": "UDISE+",
+      "bseap": "AP SSC board (BSEAP)",
+      "cbse": "CBSE",
+      "cisce": "CISCE",
+      "apaar": "APAAR",
+      "school": "Our own event"
+    },
+    "dialog": {
+      "opensOn": "Opens on",
+      "closesOn": "Closes on",
+      "dateHint": "Type the date as {format}, for example {example}.",
+      "dateInvalid": "Type a date as {format}, for example {example}.",
+      "closesInvalid": "Type a date as {format} that is on or after the opening date.",
+      "source": "Where the date came from",
+      "sourceHint": "So others can check it later.",
+      "sourceKind": {
+        "circular": "A circular",
+        "portal": "The portal screen",
+        "phone": "A phone call",
+        "other": "Somewhere else"
+      },
+      "document": "Circular or document",
+      "documentHint": "Optional. Pick the circular that gives the date.",
+      "noDocument": "No document",
+      "keptDocument": "The document already linked",
+      "owner": "Who owns the work",
+      "ownerHint": "They get a task and reminders 30, 14, 7 and 1 days before the window closes.",
+      "nobody": "Nobody yet",
+      "formerStaff": "Former staff member",
+      "label": "Event name",
+      "labelHint": "In your own words, for example “Mandal UDISE+ review meeting”. No names of students or parents."
+    },
+    "confirm": {
+      "open": "Confirm dates",
+      "change": "Change dates",
+      "title": "Confirm the dates",
+      "description": "{event}: type the dates the circular or the portal gives.",
+      "save": "Save dates",
+      "consequence": "Reminders and the owner's task follow these dates from tomorrow morning."
+    },
+    "add": {
+      "open": "Add our own event",
+      "title": "Add our own event",
+      "description": "A date your school must meet that is not in the list, such as a mandal meeting or a district deadline.",
+      "save": "Add event"
+    },
+    "remove": {
+      "openOwn": "Remove",
+      "openConfirmed": "Undo confirmation",
+      "titleOwn": "Remove this event?",
+      "titleConfirmed": "Undo the confirmed dates?",
+      "confirmOwn": "Remove event",
+      "confirmConfirmed": "Undo confirmation",
+      "consequenceOwn": "No more reminders will be sent for it. Reminders already sent stay in the history.",
+      "consequenceConfirmed": "The expected dates show again and nobody owns the work until you confirm again."
+    },
+    "errors": {
+      "version_mismatch": {
+        "title": "Changed meanwhile",
+        "body": "Someone else changed these dates. The page shows the latest; try again."
+      },
+      "if_match_required": {
+        "title": "Reload first",
+        "body": "These dates were confirmed meanwhile. Reload the page and try again."
+      },
+      "not_found": {
+        "title": "Not on your calendar",
+        "body": "This window does not concern your school, or it was removed. Reload the page."
+      },
+      "conflict": {
+        "title": "Try again",
+        "body": "An event with this name was just added. Save it again."
+      }
+    },
+    "link": {
+      "open": "Link to a portal window",
+      "title": "Link to a portal window",
+      "description": "The task is due on {date}. Choose the portal window this circular's deadline is for.",
+      "event": "Portal window",
+      "choose": "Choose a window",
+      "save": "Link and confirm the date",
+      "consequence": "The window's closing date becomes the task's due date, confirmed from this circular."
     }
   }
 }

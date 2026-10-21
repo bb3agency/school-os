@@ -22,6 +22,7 @@ from app.core.config import get_settings
 from app.core.logging import bind_task_context, clear_context, reset_context, setup_logging
 from app.core.telemetry import setup_telemetry
 from app.documents.tasks import beat_schedule as documents_beat_schedule
+from app.dq.tasks import beat_schedule as dq_beat_schedule
 from app.exports.tasks import beat_schedule as exports_beat_schedule
 from app.fees.tasks import beat_schedule as fees_beat_schedule
 from app.fees.upi_tasks import beat_schedule as fees_upi_beat_schedule
@@ -141,6 +142,8 @@ def create_celery() -> Celery:
             "imports.commit": {"queue": "ingest"},
             "imports.purge_raw_files": {"queue": "maintenance"},
             # FR-DQ-002: data-quality runs (outbox consumers and queued runs) on queue "dq".
+            # R3-1D (FR-RDY-006): the daily portal calendar reminders are database work only.
+            "dq.send_portal_reminders": {"queue": "maintenance"},
             "dq.*": {"queue": "dq"},
             # US-402: register-photo extraction runs on the ocr queue.
             "extraction.*": {"queue": "ocr"},
@@ -233,6 +236,8 @@ def create_celery() -> Celery:
             **admin_beat_schedule(),
             # FR-TASK-007: task due-soon and overdue reminders (daily, 07:10 IST).
             **circulars_beat_schedule(),
+            # FR-RDY-006 (R3-1D): portal calendar reminders to staff (daily, 07:30 IST).
+            **dq_beat_schedule(),
             # docs/05 §13: Ask-the-school questions and answers deleted after 180 days (daily).
             **knowledge_beat_schedule(),
             # FR-EW-005, FR-EW-006, FR-EW-017: early-warning rules (17:40 IST), overdue flag

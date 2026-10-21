@@ -19,12 +19,14 @@ purge_order:
   # tenant), before students (docs/05 §15.6).
   - public
   - tally
+  # R3-1D (ADR-0053): ops.portal_reminders (dq) references ops.tasks (circulars), so dq goes
+  # before circulars; nothing between them references dq's tables.
+  - dq
   - circulars
   - insights
   - academics
   - knowledge
   - extraction
-  - dq
   - changes
   - apaar
   - students

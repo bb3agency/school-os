@@ -154,6 +154,13 @@ export function SchoolShell({
           icon: "checkCircle",
         },
         {
+          // R3-1D (US-3101, ADR-0053): portal and board windows with reminders to staff.
+          href: "/findings/calendar",
+          label: t("portalCalendar.nav"),
+          permission: "dq.readiness.read",
+          icon: "calendar",
+        },
+        {
           href: "/change-requests",
           label: t("changeRequests.nav"),
           permission: ["student.identity_change.request", "student.identity_change.approve"],

@@ -221,6 +221,21 @@ def tasks_to_remind(session: Session, *, until: dt.date) -> list[Task]:
     )
 
 
+def portal_tasks(session: Session, event_key: str) -> list[Task]:
+    """Tasks of one portal calendar event that are not cancelled, newest first (FR-RDY-006)."""
+    return list(
+        session.execute(
+            select(Task)
+            .where(
+                Task.source == "portal_calendar",
+                Task.portal_event_key == event_key,
+                Task.status != "cancelled",
+            )
+            .order_by(Task.created_at.desc(), Task.id.desc())
+        ).scalars()
+    )
+
+
 # --- notices --------------------------------------------------------------------------------------
 
 

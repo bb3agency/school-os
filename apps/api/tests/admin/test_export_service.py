@@ -159,6 +159,9 @@ EXPECTED_TABLES = {
     "change_requests",
     "dq_runs",
     "dq_findings",
+    # R3-1D (0067_portal_calendar, ADR-0053): confirmed portal dates and reminders sent.
+    "portal_calendar_dates",
+    "portal_reminders",
     "import_batches",
     "import_mapping_templates",
     "documents",

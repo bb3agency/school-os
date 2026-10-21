@@ -54,7 +54,8 @@ apps/api/app/
   students/      students, guardians, per-source attribute values, canonical view
   imports/       Excel/CSV/Sheets import (spreadsheet onboarding, 24-hour revert)
   extraction/    register-photo extraction, verification queue (provider interface, Aadhaar masking)
-  dq/            data-quality rules engine, findings, name matching
+  dq/            data-quality rules engine, findings, name matching, portal calendar and staff
+                 readiness reminders (calendar.py, calendar_service.py, portal_tasks.py; ADR-0053)
   changes/       change requests (maker-checker) for identity fields
   documents/     upload, storage, versions, ACLs, virus scan hook
   knowledge/     ingestion, chunking, embeddings, retrieval, tools, prompts, gateway, evals
