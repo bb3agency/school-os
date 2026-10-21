@@ -93,7 +93,7 @@ Each release is a set of user stories that ships whole (tests, authz/BOLA, audit
 
 | Wave | Agents in parallel | Content |
 |---|---|---|
-| R3-1 | 4 | A privacy requests, notices, record classes, access reports and erasure · B consents and breach handling · C CBSE disclosure · D portal calendar |
+| R3-1 | 4 | A privacy requests, notices, record classes, access reports and erasure · B consents and breach handling · C CBSE disclosure (**built 2026-10-21**, migration `0065_disclosure`) · D portal calendar |
 | R3-2 | 1 (+1 if D10 is reopened) | F hardening · E RTE register only if the owner reopens D10 |
 
 ### R4 · Commercial and growth (alongside R1-R3)

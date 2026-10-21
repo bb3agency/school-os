@@ -17,7 +17,9 @@
  * (Razorpay's return page).
  */
 export const PUBLIC_PREFIX = "/p";
-const PUBLIC_PATH = /^\/p(?:\/|$)/;
+/** R3-1C (ADR-0051): the CBSE disclosure pages `/d/<key>` and `/d/<key>/documents/<n>`. */
+export const DISCLOSURE_PREFIX = "/d";
+const PUBLIC_PATH = /^\/(?:p|d)(?:\/|$)/;
 /** Paths the `(public)` route group really serves; anything else under /p is the expired page. */
 const SERVED = [
   /^\/p\/view$/,
@@ -25,6 +27,9 @@ const SERVED = [
   /^\/p\/(?:document|pay|paid|optin)$/,
   /^\/p\/[A-Za-z0-9_-]{1,128}$/,
   /^\/p\/fonts\/telugu\/[A-Za-z0-9._-]{1,80}$/,
+  // R3-1C: the page checks the key's shape itself and answers the uniform "not found".
+  /^\/d\/[A-Za-z0-9_-]{1,64}$/,
+  /^\/d\/[A-Za-z0-9_-]{1,64}\/documents\/[0-9]{1,3}$/,
 ];
 /** A parent link token: 32 random bytes, base64url without padding (ADR-0046 decision 3). */
 export const PARENT_TOKEN = /^[A-Za-z0-9_-]{43}$/;

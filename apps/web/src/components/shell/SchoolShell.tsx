@@ -25,6 +25,8 @@ export interface SchoolFeatures {
   messaging?: boolean;
   /** R2-1B fee ledger and receipts (`fees.enabled` plus the school's own switch, FR-FEE-001). */
   fees?: boolean;
+  /** R3-1C CBSE Appendix IX disclosure (ADR-0051): schools whose boards include CBSE only. */
+  disclosure?: boolean;
 }
 
 interface SchoolNavSection {
@@ -380,6 +382,14 @@ export function SchoolShell({
           permission: ["payments.configure", "finance.read"],
           feature: "fees",
           icon: "creditCard",
+        },
+        {
+          // R3-1C (US-2901, ADR-0051): the CBSE Appendix IX disclosure, CBSE schools only.
+          href: "/settings/disclosure",
+          label: t("disclosure.nav"),
+          permission: "disclosure.edit",
+          feature: "disclosure",
+          icon: "file",
         },
         {
           // R2-1C (US-2201, ADR-0043): the school's own WhatsApp number and its settings.

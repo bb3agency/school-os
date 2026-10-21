@@ -629,3 +629,31 @@ a.public-button:hover {
     display: none;
   }
 }
+
+/* --- R3-1C CBSE Appendix IX disclosure page (/d/{key}; ADR-0051; docs/17 §5.10) --------------- */
+.public-disclosure .public-lines dd {
+  overflow-wrap: anywhere;
+}
+.public-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.public-table-scroll:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+.public-doc-list {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+.public-doc-list li + li {
+  margin-top: 0.25rem;
+}
+@media print {
+  .public-disclosure .public-card {
+    break-inside: avoid-page;
+  }
+  .public-table-scroll {
+    overflow: visible;
+  }
+}

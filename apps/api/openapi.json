@@ -8579,6 +8579,38 @@
         "title": "DeploymentPatch",
         "type": "object"
       },
+      "DerivedValueOut": {
+        "description": "A value filled from SchoolOS records as it is now (school settings or derived).",
+        "properties": {
+          "table": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TableOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "value",
+          "table"
+        ],
+        "title": "DerivedValueOut",
+        "type": "object"
+      },
       "DeviceOut": {
         "properties": {
           "agent_version": {
@@ -8733,6 +8765,166 @@
           "other"
         ],
         "title": "DiffSegment",
+        "type": "object"
+      },
+      "DisclosureDraftIn": {
+        "additionalProperties": false,
+        "description": "The whole draft: typed values and chosen documents by item key (empty values clear).",
+        "properties": {
+          "documents": {
+            "maxProperties": 100,
+            "patternProperties": {
+              "^[a-z][a-z0-9_]{1,63}$": {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "maxItems": 10,
+                "type": "array"
+              }
+            },
+            "title": "Documents",
+            "type": "object"
+          },
+          "inputs": {
+            "maxProperties": 100,
+            "patternProperties": {
+              "^[a-z][a-z0-9_]{1,63}$": {}
+            },
+            "title": "Inputs",
+            "type": "object"
+          }
+        },
+        "title": "DisclosureDraftIn",
+        "type": "object"
+      },
+      "DisclosureDraftOut": {
+        "properties": {
+          "documents": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/DraftDocumentOut"
+              },
+              "type": "array"
+            },
+            "title": "Documents",
+            "type": "object"
+          },
+          "format_key": {
+            "title": "Format Key",
+            "type": "string"
+          },
+          "format_version": {
+            "title": "Format Version",
+            "type": "integer"
+          },
+          "from_schoolos": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/DerivedValueOut"
+            },
+            "description": "School and derived items by item key, as they are now (not frozen).",
+            "title": "From Schoolos",
+            "type": "object"
+          },
+          "inputs": {
+            "additionalProperties": true,
+            "title": "Inputs",
+            "type": "object"
+          },
+          "missing": {
+            "description": "Required items still empty (publishing refuses).",
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing",
+            "type": "array"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "updated_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By Name"
+          },
+          "version": {
+            "description": "0 until the draft is first saved; send it in If-Match.",
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "format_key",
+          "format_version",
+          "inputs",
+          "documents",
+          "from_schoolos",
+          "missing",
+          "version",
+          "updated_at",
+          "updated_by_name"
+        ],
+        "title": "DisclosureDraftOut",
+        "type": "object"
+      },
+      "DisclosureFormatOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/FormatSectionOut"
+            },
+            "title": "Sections",
+            "type": "array"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/FormatSourceOut"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "verified": {
+            "description": "false: built from public sources, not yet confirmed with a CBSE school (D3).",
+            "title": "Verified",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "version",
+          "title",
+          "verified",
+          "sources",
+          "sections"
+        ],
+        "title": "DisclosureFormatOut",
         "type": "object"
       },
       "DocSheetCellOut": {
@@ -9526,6 +9718,39 @@
           }
         },
         "title": "DocumentUpdate",
+        "type": "object"
+      },
+      "DraftDocumentOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "publishable": {
+            "description": "A clean PDF of a circular, policy or other school document (not C3).",
+            "title": "Publishable",
+            "type": "boolean"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null when the document is gone or hidden from you.",
+            "title": "Title"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "publishable"
+        ],
+        "title": "DraftDocumentOut",
         "type": "object"
       },
       "DueLine": {
@@ -11637,6 +11862,35 @@
         "title": "FieldOut",
         "type": "object"
       },
+      "FileLinkOut": {
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "mime_type": {
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "expires_at",
+          "filename",
+          "mime_type"
+        ],
+        "title": "FileLinkOut",
+        "type": "object"
+      },
       "FindingOut": {
         "properties": {
           "attribute_key": {
@@ -12140,6 +12394,109 @@
         "title": "FleetVersionOut",
         "type": "object"
       },
+      "FormatItemOut": {
+        "properties": {
+          "contact": {
+            "title": "Contact",
+            "type": "boolean"
+          },
+          "fill": {
+            "enum": [
+              "school",
+              "derived",
+              "input",
+              "document",
+              "link"
+            ],
+            "title": "Fill",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "max_length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Length"
+          },
+          "max_rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Rows"
+          },
+          "max_value": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Value"
+          },
+          "required": {
+            "title": "Required",
+            "type": "boolean"
+          },
+          "takes_documents": {
+            "description": "The item accepts school documents (PDFs).",
+            "title": "Takes Documents",
+            "type": "boolean"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "text",
+                  "integer",
+                  "number",
+                  "yes_no",
+                  "email",
+                  "phone",
+                  "results"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "fill",
+          "type",
+          "required",
+          "contact",
+          "takes_documents",
+          "max_length",
+          "max_value",
+          "max_rows"
+        ],
+        "title": "FormatItemOut",
+        "type": "object"
+      },
       "FormatLineOut": {
         "properties": {
           "fill": {
@@ -12179,6 +12536,32 @@
           "restricted"
         ],
         "title": "FormatLineOut",
+        "type": "object"
+      },
+      "FormatSectionOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FormatItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "items"
+        ],
+        "title": "FormatSectionOut",
         "type": "object"
       },
       "FormatSourceOut": {
@@ -15859,6 +16242,40 @@
           "student_id"
         ],
         "title": "LinkIn",
+        "type": "object"
+      },
+      "LinkOut": {
+        "properties": {
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The public page link; null before the first publish.",
+            "title": "Url"
+          }
+        },
+        "required": [
+          "url",
+          "created_at"
+        ],
+        "title": "LinkOut",
         "type": "object"
       },
       "LinkedStudentOut": {
@@ -24255,6 +24672,83 @@
         "title": "PublicCertificateOut",
         "type": "object"
       },
+      "PublicDisclosureOut": {
+        "description": "The published disclosure page (the explicit allowlist; FR-DISC-009).",
+        "properties": {
+          "format_version": {
+            "title": "Format Version",
+            "type": "integer"
+          },
+          "published_at": {
+            "format": "date-time",
+            "title": "Published At",
+            "type": "string"
+          },
+          "school_name": {
+            "title": "School Name",
+            "type": "string"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/PublicSectionOut"
+            },
+            "title": "Sections",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "school_name",
+          "title",
+          "published_at",
+          "format_version",
+          "sections"
+        ],
+        "title": "PublicDisclosureOut",
+        "type": "object"
+      },
+      "PublicDocumentLinkOut": {
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "expires_at"
+        ],
+        "title": "PublicDocumentLinkOut",
+        "type": "object"
+      },
+      "PublicDocumentOut": {
+        "properties": {
+          "n": {
+            "description": "Number of the document in GET .../documents/{n}.",
+            "minimum": 1.0,
+            "title": "N",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "n",
+          "title"
+        ],
+        "title": "PublicDocumentOut",
+        "type": "object"
+      },
       "PublicDuplicate": {
         "properties": {
           "copy_no": {
@@ -24277,6 +24771,104 @@
           "issued_on"
         ],
         "title": "PublicDuplicate",
+        "type": "object"
+      },
+      "PublicItemOut": {
+        "properties": {
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/PublicDocumentOut"
+            },
+            "title": "Documents",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "link": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link"
+          },
+          "table": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TableOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "key",
+          "label"
+        ],
+        "title": "PublicItemOut",
+        "type": "object"
+      },
+      "PublicSectionOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PublicItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "items"
+        ],
+        "title": "PublicSectionOut",
+        "type": "object"
+      },
+      "PublishIn": {
+        "additionalProperties": false,
+        "properties": {
+          "confirm_no_student_data": {
+            "description": "The publisher confirms the chosen documents contain no student's personal data (FR-DISC-005); false or missing answers 422 confirmation_required.",
+            "title": "Confirm No Student Data",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "confirm_no_student_data"
+        ],
+        "title": "PublishIn",
         "type": "object"
       },
       "ReadinessCounts": {
@@ -28684,6 +29276,250 @@
         "title": "SkippedStudent",
         "type": "object"
       },
+      "SnapshotDetailOut": {
+        "properties": {
+          "content": {
+            "$ref": "#/components/schemas/PublicDisclosureOut"
+          },
+          "documents": {
+            "title": "Documents",
+            "type": "integer"
+          },
+          "format_key": {
+            "title": "Format Key",
+            "type": "string"
+          },
+          "format_version": {
+            "title": "Format Version",
+            "type": "integer"
+          },
+          "html_status": {
+            "enum": [
+              "queued",
+              "ready",
+              "failed"
+            ],
+            "title": "Html Status",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "live": {
+            "description": "The page shows this snapshot now.",
+            "title": "Live",
+            "type": "boolean"
+          },
+          "pdf_status": {
+            "enum": [
+              "queued",
+              "ready",
+              "failed"
+            ],
+            "title": "Pdf Status",
+            "type": "string"
+          },
+          "published_at": {
+            "format": "date-time",
+            "title": "Published At",
+            "type": "string"
+          },
+          "published_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published By Name"
+          },
+          "views_by_day": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Views By Day",
+            "type": "object"
+          },
+          "views_total": {
+            "description": "Views counted in the last 90 days (no visitor data).",
+            "title": "Views Total",
+            "type": "integer"
+          },
+          "withdraw_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withdraw Reason"
+          },
+          "withdrawn_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withdrawn At"
+          },
+          "withdrawn_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withdrawn By Name"
+          }
+        },
+        "required": [
+          "id",
+          "format_key",
+          "format_version",
+          "published_at",
+          "published_by_name",
+          "withdrawn_at",
+          "withdrawn_by_name",
+          "withdraw_reason",
+          "live",
+          "documents",
+          "views_total",
+          "pdf_status",
+          "html_status",
+          "content",
+          "views_by_day"
+        ],
+        "title": "SnapshotDetailOut",
+        "type": "object"
+      },
+      "SnapshotOut": {
+        "properties": {
+          "documents": {
+            "title": "Documents",
+            "type": "integer"
+          },
+          "format_key": {
+            "title": "Format Key",
+            "type": "string"
+          },
+          "format_version": {
+            "title": "Format Version",
+            "type": "integer"
+          },
+          "html_status": {
+            "enum": [
+              "queued",
+              "ready",
+              "failed"
+            ],
+            "title": "Html Status",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "live": {
+            "description": "The page shows this snapshot now.",
+            "title": "Live",
+            "type": "boolean"
+          },
+          "pdf_status": {
+            "enum": [
+              "queued",
+              "ready",
+              "failed"
+            ],
+            "title": "Pdf Status",
+            "type": "string"
+          },
+          "published_at": {
+            "format": "date-time",
+            "title": "Published At",
+            "type": "string"
+          },
+          "published_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published By Name"
+          },
+          "views_total": {
+            "description": "Views counted in the last 90 days (no visitor data).",
+            "title": "Views Total",
+            "type": "integer"
+          },
+          "withdraw_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withdraw Reason"
+          },
+          "withdrawn_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withdrawn At"
+          },
+          "withdrawn_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withdrawn By Name"
+          }
+        },
+        "required": [
+          "id",
+          "format_key",
+          "format_version",
+          "published_at",
+          "published_by_name",
+          "withdrawn_at",
+          "withdrawn_by_name",
+          "withdraw_reason",
+          "live",
+          "documents",
+          "views_total",
+          "pdf_status",
+          "html_status"
+        ],
+        "title": "SnapshotOut",
+        "type": "object"
+      },
       "StaffMemberOut": {
         "description": "One entry of the staff directory (e.g. choosing a class teacher): no contact details.",
         "properties": {
@@ -30466,6 +31302,33 @@
           "received_at"
         ],
         "title": "SyncOut",
+        "type": "object"
+      },
+      "TableOut": {
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "rows": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "columns",
+          "rows"
+        ],
+        "title": "TableOut",
         "type": "object"
       },
       "TaskCreate": {
@@ -34481,6 +35344,22 @@
           "events"
         ],
         "title": "WebhookSetupOut",
+        "type": "object"
+      },
+      "WithdrawIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "maxLength": 500,
+            "minLength": 10,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "WithdrawIn",
         "type": "object"
       },
       "WriteResultOut": {
@@ -40227,6 +41106,590 @@
         "summary": "Unarchive Class",
         "tags": [
           "school"
+        ]
+      }
+    },
+    "/api/v1/disclosure/draft": {
+      "get": {
+        "description": "The draft (typed values, chosen documents) with the values SchoolOS fills as they are now\nand the required items still empty; ``ETag`` for ``If-Match`` (``W/\"0\"`` before the first\nsave). ``disclosure.edit`` (FR-DISC-003, FR-DISC-004).",
+        "operationId": "get_disclosure_draft_api_v1_disclosure_draft_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisclosureDraftOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get Disclosure Draft",
+        "tags": [
+          "disclosure"
+        ]
+      },
+      "put": {
+        "description": "Save the whole draft (``disclosure.edit``, ``If-Match``). 422 per item: Aadhaar-like\nnumbers anywhere, phone-like numbers outside the two contact items, markup, https-only\nlinks, documents you cannot see or that cannot be published (a clean PDF of a circular,\npolicy or other school document); 412 when someone else saved in between (FR-DISC-004).",
+        "operationId": "put_disclosure_draft_api_v1_disclosure_draft_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisclosureDraftIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisclosureDraftOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Put Disclosure Draft",
+        "tags": [
+          "disclosure"
+        ]
+      }
+    },
+    "/api/v1/disclosure/format": {
+      "get": {
+        "description": "The Appendix IX format: sections and items in CBSE's order, how each is filled, its\nsources and ``verified`` (false until a CBSE school confirms it; D3). ``disclosure.edit``;\n404 ``module_hidden`` for schools without CBSE (FR-DISC-001).",
+        "operationId": "get_disclosure_format_api_v1_disclosure_format_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisclosureFormatOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get Disclosure Format",
+        "tags": [
+          "disclosure"
+        ]
+      }
+    },
+    "/api/v1/disclosure/link": {
+      "get": {
+        "description": "The page's public link (``{SOS_PUBLIC_BASE_URL}/d/{key}``), null before the first\npublish (``disclosure.edit``).",
+        "operationId": "get_disclosure_link_api_v1_disclosure_link_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get Disclosure Link",
+        "tags": [
+          "disclosure"
+        ]
+      }
+    },
+    "/api/v1/disclosure/link/rotate": {
+      "post": {
+        "description": "\"Change the link\": the old link stops working at once and a new one is issued\n(``disclosure.publish``, step-up; 409 ``not_published`` before the first publish;\nFR-DISC-008).",
+        "operationId": "rotate_disclosure_link_api_v1_disclosure_link_rotate_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Rotate Disclosure Link",
+        "tags": [
+          "disclosure"
+        ]
+      }
+    },
+    "/api/v1/disclosure/publish": {
+      "post": {
+        "description": "Publish the draft as a frozen snapshot that replaces the page (``disclosure.publish``,\nstep-up; ``Idempotency-Key``). Needs ``confirm_no_student_data: true``; the first publish\nissues the page's link. The HTML and PDF files follow from the worker (FR-DISC-005,\nFR-DISC-008).",
+        "operationId": "publish_disclosure_api_v1_disclosure_publish_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "confirmation_required, incomplete or a document problem"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Publish Disclosure",
+        "tags": [
+          "disclosure"
+        ]
+      }
+    },
+    "/api/v1/disclosure/snapshots": {
+      "get": {
+        "description": "Published history, newest first; ``live`` marks what the page shows now\n(``disclosure.edit``).",
+        "operationId": "list_disclosure_snapshots_api_v1_disclosure_snapshots_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SnapshotOut"
+                  },
+                  "title": "Response List Disclosure Snapshots Api V1 Disclosure Snapshots Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List Disclosure Snapshots",
+        "tags": [
+          "disclosure"
+        ]
+      }
+    },
+    "/api/v1/disclosure/snapshots/{snapshot_id}": {
+      "get": {
+        "description": "One publication exactly as it was shown, with its views per day (``disclosure.edit``).",
+        "operationId": "get_disclosure_snapshot_api_v1_disclosure_snapshots__snapshot_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "snapshot_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Snapshot Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get Disclosure Snapshot",
+        "tags": [
+          "disclosure"
+        ]
+      }
+    },
+    "/api/v1/disclosure/snapshots/{snapshot_id}/download-url": {
+      "get": {
+        "description": "A link (at most 5 minutes) to the published version as one HTML file for the school's\nwebsite or as an A4 PDF (``disclosure.edit``; audited). 409 ``files_not_ready`` /\n``files_failed`` (FR-DISC-011).",
+        "operationId": "get_disclosure_download_url_api_v1_disclosure_snapshots__snapshot_id__download_url_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "snapshot_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Snapshot Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": true,
+            "schema": {
+              "enum": [
+                "html",
+                "pdf"
+              ],
+              "title": "Format",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileLinkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get Disclosure Download Url",
+        "tags": [
+          "disclosure"
+        ]
+      }
+    },
+    "/api/v1/disclosure/snapshots/{snapshot_id}/withdraw": {
+      "post": {
+        "description": "Withdraw the live page with a reason (10-500 characters; ``disclosure.publish``,\nstep-up): the link then shows \"not found\" until someone publishes again. 409\n``snapshot_not_live`` for an older snapshot (FR-DISC-007).",
+        "operationId": "withdraw_disclosure_snapshot_api_v1_disclosure_snapshots__snapshot_id__withdraw_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "snapshot_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Snapshot Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WithdrawIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Withdraw Disclosure Snapshot",
+        "tags": [
+          "disclosure"
         ]
       }
     },
@@ -63662,6 +65125,117 @@
           }
         },
         "summary": "Verify Certificate",
+        "tags": [
+          "public"
+        ]
+      }
+    },
+    "/api/v1/public/disclosure/{key}": {
+      "get": {
+        "description": "The school's published Appendix IX page (ADR-0051; FR-DISC-009, FR-DISC-010): exactly\nthe fields of the live snapshot (school name, publication date, format version, sections\nand items with a value, a table, document numbers and titles, or a link). Counted per day,\nno visitor data. Called by the web app with its service token and no user token.",
+        "operationId": "get_public_disclosure_api_v1_public_disclosure__key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicDisclosureOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Unknown, changed, withdrawn or unpublished link (always the same body)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests or failed lookups from this address."
+          }
+        },
+        "summary": "Get Public Disclosure",
+        "tags": [
+          "public"
+        ]
+      }
+    },
+    "/api/v1/public/disclosure/{key}/documents/{n}": {
+      "get": {
+        "description": "A link (at most 5 minutes) to document ``n`` of the live page, only the version it\npublished; the web app answers 303 to it (FR-DISC-009).",
+        "operationId": "get_public_disclosure_document_api_v1_public_disclosure__key__documents__n__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "title": "Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "n",
+            "required": true,
+            "schema": {
+              "maximum": 200,
+              "minimum": 1,
+              "title": "N",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicDocumentLinkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Unknown, changed, withdrawn or unpublished link (always the same body)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests or failed lookups from this address."
+          }
+        },
+        "summary": "Get Public Disclosure Document",
         "tags": [
           "public"
         ]

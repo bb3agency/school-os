@@ -22,6 +22,8 @@ HandleKind = Literal[
     "parent_optin",
     "razorpay_route",
     "meta_waba",
+    # R3-1C (ADR-0051 amends ADR-0047 decision 1): the CBSE Appendix IX disclosure page.
+    "school_disclosure",
 ]
 ParentKind = Literal["parent_notice", "parent_receipt", "parent_dues", "parent_optin"]
 WebhookProvider = Literal["razorpay", "meta"]
@@ -56,6 +58,7 @@ class PublicConfig(_Model):
     purge_batch_size: int = Field(ge=1, le=100_000)
     parent_token_bytes: int = Field(ge=32, le=64)
     route_token_length: int = Field(ge=24, le=64)
+    disclosure_key_bytes: int = Field(ge=16, le=32)
     webhook_providers: dict[WebhookProvider, WebhookProviderConfig]
     replay_window_hours: int = Field(ge=1, le=24 * 30)
     pay_redirect_hosts: tuple[str, ...] = Field(min_length=1)

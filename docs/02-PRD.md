@@ -819,6 +819,8 @@ Stories of the 2026-27 plan, release R3 (docs/18 §3 R3, planned Apr-Jun 2027, b
 
 #### C29 · CBSE Appendix IX public disclosure (R3.2; ADR-0051)
 
+**As built (R3-1C, `wip/r3-disclosure`, migration `0065_disclosure`, 2026-10-21).** US-2901..US-2904 are built: `app/disclosure/` (format file `verified: false`), the staff screen `/settings/disclosure` (CBSE schools only) and the public page `{SOS_PUBLIC_BASE_URL}/d/{key}`; the HTML file and A4 PDF come from the `pdf` worker. Acceptance tests: `apps/api/tests/disclosure/`, `tests/public/test_surface_security.py`, web `features/disclosure/`, `server/public/disclosure.test.ts`.
+
 **US-2901** · As the principal of a CBSE school, I want the Appendix IX disclosure filled from what SchoolOS already holds so that I only type what is missing. [FR-DISC-001..004]
 - AC1: Given our boards include CBSE, the disclosure screen lists Appendix IX in CBSE's order; school details, sections, teacher-section ratio, staff counts by role and the fee structure (when fees are on) are filled from SchoolOS and marked "From SchoolOS"; the rest are fields to type, documents to choose, or a link.
 - AC2: The format says it is built from public sources and not yet confirmed with a CBSE school (D3).

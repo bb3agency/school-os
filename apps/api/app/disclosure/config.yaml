@@ -1,0 +1,12 @@
+# CBSE Appendix IX disclosure (ADR-0051; FR-DISC-005..011; docs/05 §13). Versioned configuration
+# shipped inside the package, read by app/disclosure/config.py (invariant 13).
+version: 1
+# Views are counted per day per snapshot, no visitor data, for this many days (docs/05 §13).
+views_keep_days: 90
+# Presigned links to the published files and documents (FR-DISC-009, FR-DISC-011; at most 5 min).
+download_url_ttl_s: 300
+# The HTML and PDF files sit under the school's exports/ prefix, which the bucket expires after 7
+# days (tag export-7d); after this many days a download makes them again (409 files_not_ready).
+files_keep_days: 6
+# Published history shown on the staff screen (newest first).
+history_limit: 100

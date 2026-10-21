@@ -347,6 +347,17 @@ permissions:
     description: Connect, test, rotate the webhook secret of, or disconnect the school's own Razorpay account (recent MFA sign-in)
     sensitivity: critical
     step_up: true
+
+  # --- R3-1C CBSE Appendix IX disclosure (ADR-0051; docs/07 §6.2; FR-DISC-*). Migration
+  # 0065_disclosure upserts these into core.permissions. School-wide only; CBSE schools only.
+  disclosure.edit:
+    description: Edit the CBSE Appendix IX disclosure draft, see what was published and download the published files
+    sensitivity: normal
+    step_up: false
+  disclosure.publish:
+    description: Publish the CBSE Appendix IX disclosure, withdraw it and change its public link (recent MFA sign-in)
+    sensitivity: critical
+    step_up: true
   # --- control plane (docs/07 §6.5, contract §5); never grantable to tenant roles ------------
   platform.tenants.read:
     description: See schools, their plan, status, deployment and usage (no student data)

@@ -1361,6 +1361,208 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/disclosure/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Disclosure Draft
+         * @description The draft (typed values, chosen documents) with the values SchoolOS fills as they are now
+         *     and the required items still empty; ``ETag`` for ``If-Match`` (``W/"0"`` before the first
+         *     save). ``disclosure.edit`` (FR-DISC-003, FR-DISC-004).
+         */
+        get: operations["get_disclosure_draft_api_v1_disclosure_draft_get"];
+        /**
+         * Put Disclosure Draft
+         * @description Save the whole draft (``disclosure.edit``, ``If-Match``). 422 per item: Aadhaar-like
+         *     numbers anywhere, phone-like numbers outside the two contact items, markup, https-only
+         *     links, documents you cannot see or that cannot be published (a clean PDF of a circular,
+         *     policy or other school document); 412 when someone else saved in between (FR-DISC-004).
+         */
+        put: operations["put_disclosure_draft_api_v1_disclosure_draft_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/disclosure/format": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Disclosure Format
+         * @description The Appendix IX format: sections and items in CBSE's order, how each is filled, its
+         *     sources and ``verified`` (false until a CBSE school confirms it; D3). ``disclosure.edit``;
+         *     404 ``module_hidden`` for schools without CBSE (FR-DISC-001).
+         */
+        get: operations["get_disclosure_format_api_v1_disclosure_format_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/disclosure/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Disclosure Link
+         * @description The page's public link (``{SOS_PUBLIC_BASE_URL}/d/{key}``), null before the first
+         *     publish (``disclosure.edit``).
+         */
+        get: operations["get_disclosure_link_api_v1_disclosure_link_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/disclosure/link/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate Disclosure Link
+         * @description "Change the link": the old link stops working at once and a new one is issued
+         *     (``disclosure.publish``, step-up; 409 ``not_published`` before the first publish;
+         *     FR-DISC-008).
+         */
+        post: operations["rotate_disclosure_link_api_v1_disclosure_link_rotate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/disclosure/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish Disclosure
+         * @description Publish the draft as a frozen snapshot that replaces the page (``disclosure.publish``,
+         *     step-up; ``Idempotency-Key``). Needs ``confirm_no_student_data: true``; the first publish
+         *     issues the page's link. The HTML and PDF files follow from the worker (FR-DISC-005,
+         *     FR-DISC-008).
+         */
+        post: operations["publish_disclosure_api_v1_disclosure_publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/disclosure/snapshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Disclosure Snapshots
+         * @description Published history, newest first; ``live`` marks what the page shows now
+         *     (``disclosure.edit``).
+         */
+        get: operations["list_disclosure_snapshots_api_v1_disclosure_snapshots_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/disclosure/snapshots/{snapshot_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Disclosure Snapshot
+         * @description One publication exactly as it was shown, with its views per day (``disclosure.edit``).
+         */
+        get: operations["get_disclosure_snapshot_api_v1_disclosure_snapshots__snapshot_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/disclosure/snapshots/{snapshot_id}/download-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Disclosure Download Url
+         * @description A link (at most 5 minutes) to the published version as one HTML file for the school's
+         *     website or as an A4 PDF (``disclosure.edit``; audited). 409 ``files_not_ready`` /
+         *     ``files_failed`` (FR-DISC-011).
+         */
+        get: operations["get_disclosure_download_url_api_v1_disclosure_snapshots__snapshot_id__download_url_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/disclosure/snapshots/{snapshot_id}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw Disclosure Snapshot
+         * @description Withdraw the live page with a reason (10-500 characters; ``disclosure.publish``,
+         *     step-up): the link then shows "not found" until someone publishes again. 409
+         *     ``snapshot_not_live`` for an older snapshot (FR-DISC-007).
+         */
+        post: operations["withdraw_disclosure_snapshot_api_v1_disclosure_snapshots__snapshot_id__withdraw_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents": {
         parameters: {
             query?: never;
@@ -7043,6 +7245,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/disclosure/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Public Disclosure
+         * @description The school's published Appendix IX page (ADR-0051; FR-DISC-009, FR-DISC-010): exactly
+         *     the fields of the live snapshot (school name, publication date, format version, sections
+         *     and items with a value, a table, document numbers and titles, or a link). Counted per day,
+         *     no visitor data. Called by the web app with its service token and no user token.
+         */
+        get: operations["get_public_disclosure_api_v1_public_disclosure__key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/disclosure/{key}/documents/{n}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Public Disclosure Document
+         * @description A link (at most 5 minutes) to document ``n`` of the live page, only the version it
+         *     published; the web app answers 303 to it (FR-DISC-009).
+         */
+        get: operations["get_public_disclosure_document_api_v1_public_disclosure__key__documents__n__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/links/current": {
         parameters: {
             query?: never;
@@ -12192,6 +12438,15 @@ export interface components {
             /** Target Version */
             target_version?: string | null;
         };
+        /**
+         * DerivedValueOut
+         * @description A value filled from SchoolOS records as it is now (school settings or derived).
+         */
+        DerivedValueOut: {
+            table: components["schemas"]["TableOut"] | null;
+            /** Value */
+            value: string | null;
+        };
         /** DeviceOut */
         DeviceOut: {
             /** Agent Version */
@@ -12250,6 +12505,74 @@ export interface components {
             other: string;
             /** Reference */
             reference: string;
+        };
+        /**
+         * DisclosureDraftIn
+         * @description The whole draft: typed values and chosen documents by item key (empty values clear).
+         */
+        DisclosureDraftIn: {
+            /** Documents */
+            documents?: {
+                [key: string]: string[];
+            };
+            /** Inputs */
+            inputs?: {
+                [key: string]: unknown;
+            };
+        };
+        /** DisclosureDraftOut */
+        DisclosureDraftOut: {
+            /** Documents */
+            documents: {
+                [key: string]: components["schemas"]["DraftDocumentOut"][];
+            };
+            /** Format Key */
+            format_key: string;
+            /** Format Version */
+            format_version: number;
+            /**
+             * From Schoolos
+             * @description School and derived items by item key, as they are now (not frozen).
+             */
+            from_schoolos: {
+                [key: string]: components["schemas"]["DerivedValueOut"];
+            };
+            /** Inputs */
+            inputs: {
+                [key: string]: unknown;
+            };
+            /**
+             * Missing
+             * @description Required items still empty (publishing refuses).
+             */
+            missing: string[];
+            /** Updated At */
+            updated_at: string | null;
+            /** Updated By Name */
+            updated_by_name: string | null;
+            /**
+             * Version
+             * @description 0 until the draft is first saved; send it in If-Match.
+             */
+            version: number;
+        };
+        /** DisclosureFormatOut */
+        DisclosureFormatOut: {
+            /** Key */
+            key: string;
+            /** Sections */
+            sections: components["schemas"]["FormatSectionOut"][];
+            /** Sources */
+            sources: components["schemas"]["FormatSourceOut"][];
+            /** Title */
+            title: string;
+            /**
+             * Verified
+             * @description false: built from public sources, not yet confirmed with a CBSE school (D3).
+             */
+            verified: boolean;
+            /** Version */
+            version: number;
         };
         /**
          * DocSheetCellOut
@@ -12502,6 +12825,24 @@ export interface components {
             language?: ("en" | "te" | "mixed") | null;
             /** Title */
             title?: string | null;
+        };
+        /** DraftDocumentOut */
+        DraftDocumentOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Publishable
+             * @description A clean PDF of a circular, policy or other school document (not C3).
+             */
+            publishable: boolean;
+            /**
+             * Title
+             * @description null when the document is gone or hidden from you.
+             */
+            title: string | null;
         };
         /**
          * DueLine
@@ -13341,6 +13682,20 @@ export interface components {
             /** Value */
             value: string;
         };
+        /** FileLinkOut */
+        FileLinkOut: {
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Filename */
+            filename: string;
+            /** Mime Type */
+            mime_type: string;
+            /** Url */
+            url: string;
+        };
         /** FindingOut */
         FindingOut: {
             /** Attribute Key */
@@ -13480,6 +13835,35 @@ export interface components {
             /** Version */
             version: string;
         };
+        /** FormatItemOut */
+        FormatItemOut: {
+            /** Contact */
+            contact: boolean;
+            /**
+             * Fill
+             * @enum {string}
+             */
+            fill: "school" | "derived" | "input" | "document" | "link";
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Max Length */
+            max_length: number | null;
+            /** Max Rows */
+            max_rows: number | null;
+            /** Max Value */
+            max_value: number | null;
+            /** Required */
+            required: boolean;
+            /**
+             * Takes Documents
+             * @description The item accepts school documents (PDFs).
+             */
+            takes_documents: boolean;
+            /** Type */
+            type: ("text" | "integer" | "number" | "yes_no" | "email" | "phone" | "results") | null;
+        };
         /** FormatLineOut */
         FormatLineOut: {
             /**
@@ -13495,6 +13879,15 @@ export interface components {
             label_te: string;
             /** Restricted */
             restricted: boolean;
+        };
+        /** FormatSectionOut */
+        FormatSectionOut: {
+            /** Items */
+            items: components["schemas"]["FormatItemOut"][];
+            /** Key */
+            key: string;
+            /** Title */
+            title: string;
         };
         /** FormatSourceOut */
         FormatSourceOut: {
@@ -14853,6 +15246,16 @@ export interface components {
              * Format: uuid
              */
             student_id: string;
+        };
+        /** LinkOut */
+        LinkOut: {
+            /** Created At */
+            created_at: string | null;
+            /**
+             * Url
+             * @description The public page link; null before the first publish.
+             */
+            url: string | null;
         };
         /** LoginEventOut */
         LoginEventOut: {
@@ -17815,6 +18218,45 @@ export interface components {
             /** Title En */
             title_en: string;
         };
+        /**
+         * PublicDisclosureOut
+         * @description The published disclosure page (the explicit allowlist; FR-DISC-009).
+         */
+        PublicDisclosureOut: {
+            /** Format Version */
+            format_version: number;
+            /**
+             * Published At
+             * Format: date-time
+             */
+            published_at: string;
+            /** School Name */
+            school_name: string;
+            /** Sections */
+            sections: components["schemas"]["PublicSectionOut"][];
+            /** Title */
+            title: string;
+        };
+        /** PublicDocumentLinkOut */
+        PublicDocumentLinkOut: {
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Url */
+            url: string;
+        };
+        /** PublicDocumentOut */
+        PublicDocumentOut: {
+            /**
+             * N
+             * @description Number of the document in GET .../documents/{n}.
+             */
+            n: number;
+            /** Title */
+            title: string;
+        };
         /** PublicDuplicate */
         PublicDuplicate: {
             /** Copy No */
@@ -17826,6 +18268,37 @@ export interface components {
             issued_on: string;
             /** Original Serial */
             original_serial: string;
+        };
+        /** PublicItemOut */
+        PublicItemOut: {
+            /** Documents */
+            documents?: components["schemas"]["PublicDocumentOut"][];
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Link */
+            link?: string | null;
+            table?: components["schemas"]["TableOut"] | null;
+            /** Value */
+            value?: string | null;
+        };
+        /** PublicSectionOut */
+        PublicSectionOut: {
+            /** Items */
+            items: components["schemas"]["PublicItemOut"][];
+            /** Key */
+            key: string;
+            /** Title */
+            title: string;
+        };
+        /** PublishIn */
+        PublishIn: {
+            /**
+             * Confirm No Student Data
+             * @description The publisher confirms the chosen documents contain no student's personal data (FR-DISC-005); false or missing answers 422 confirmation_required.
+             */
+            confirm_no_student_data: boolean;
         };
         /** ReadinessCounts */
         ReadinessCounts: {
@@ -19442,6 +19915,105 @@ export interface components {
              */
             student_id: string;
         };
+        /** SnapshotDetailOut */
+        SnapshotDetailOut: {
+            content: components["schemas"]["PublicDisclosureOut"];
+            /** Documents */
+            documents: number;
+            /** Format Key */
+            format_key: string;
+            /** Format Version */
+            format_version: number;
+            /**
+             * Html Status
+             * @enum {string}
+             */
+            html_status: "queued" | "ready" | "failed";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Live
+             * @description The page shows this snapshot now.
+             */
+            live: boolean;
+            /**
+             * Pdf Status
+             * @enum {string}
+             */
+            pdf_status: "queued" | "ready" | "failed";
+            /**
+             * Published At
+             * Format: date-time
+             */
+            published_at: string;
+            /** Published By Name */
+            published_by_name: string | null;
+            /** Views By Day */
+            views_by_day: {
+                [key: string]: number;
+            };
+            /**
+             * Views Total
+             * @description Views counted in the last 90 days (no visitor data).
+             */
+            views_total: number;
+            /** Withdraw Reason */
+            withdraw_reason: string | null;
+            /** Withdrawn At */
+            withdrawn_at: string | null;
+            /** Withdrawn By Name */
+            withdrawn_by_name: string | null;
+        };
+        /** SnapshotOut */
+        SnapshotOut: {
+            /** Documents */
+            documents: number;
+            /** Format Key */
+            format_key: string;
+            /** Format Version */
+            format_version: number;
+            /**
+             * Html Status
+             * @enum {string}
+             */
+            html_status: "queued" | "ready" | "failed";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Live
+             * @description The page shows this snapshot now.
+             */
+            live: boolean;
+            /**
+             * Pdf Status
+             * @enum {string}
+             */
+            pdf_status: "queued" | "ready" | "failed";
+            /**
+             * Published At
+             * Format: date-time
+             */
+            published_at: string;
+            /** Published By Name */
+            published_by_name: string | null;
+            /**
+             * Views Total
+             * @description Views counted in the last 90 days (no visitor data).
+             */
+            views_total: number;
+            /** Withdraw Reason */
+            withdraw_reason: string | null;
+            /** Withdrawn At */
+            withdrawn_at: string | null;
+            /** Withdrawn By Name */
+            withdrawn_by_name: string | null;
+        };
         /**
          * StaffMemberOut
          * @description One entry of the staff directory (e.g. choosing a class teacher): no contact details.
@@ -20128,6 +20700,13 @@ export interface components {
             sync_id: string;
             /** Updated */
             updated: number;
+        };
+        /** TableOut */
+        TableOut: {
+            /** Columns */
+            columns: string[];
+            /** Rows */
+            rows: string[][];
         };
         /** TaskCreate */
         TaskCreate: {
@@ -21606,6 +22185,11 @@ export interface components {
             secret: string;
             /** Url */
             url: string;
+        };
+        /** WithdrawIn */
+        WithdrawIn: {
+            /** Reason */
+            reason: string;
         };
         /** WriteResultOut */
         WriteResultOut: {
@@ -24701,6 +25285,399 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_ClassOut_"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_disclosure_draft_api_v1_disclosure_draft_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisclosureDraftOut"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    put_disclosure_draft_api_v1_disclosure_draft_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DisclosureDraftIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisclosureDraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_disclosure_format_api_v1_disclosure_format_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisclosureFormatOut"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_disclosure_link_api_v1_disclosure_link_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkOut"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    rotate_disclosure_link_api_v1_disclosure_link_rotate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkOut"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    publish_disclosure_api_v1_disclosure_publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnapshotOut"];
+                };
+            };
+            /** @description confirmation_required, incomplete or a document problem */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_disclosure_snapshots_api_v1_disclosure_snapshots_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnapshotOut"][];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_disclosure_snapshot_api_v1_disclosure_snapshots__snapshot_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                snapshot_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnapshotDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_disclosure_download_url_api_v1_disclosure_snapshots__snapshot_id__download_url_get: {
+        parameters: {
+            query: {
+                format: "html" | "pdf";
+            };
+            header?: never;
+            path: {
+                snapshot_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileLinkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    withdraw_disclosure_snapshot_api_v1_disclosure_snapshots__snapshot_id__withdraw_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                snapshot_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithdrawIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnapshotOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
             /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
@@ -38761,6 +39738,97 @@ export interface operations {
                 };
             };
             /** @description Too many lookups from this address. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_public_disclosure_api_v1_public_disclosure__key__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicDisclosureOut"];
+                };
+            };
+            /** @description Unknown, changed, withdrawn or unpublished link (always the same body). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests or failed lookups from this address. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_public_disclosure_document_api_v1_public_disclosure__key__documents__n__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                n: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicDocumentLinkOut"];
+                };
+            };
+            /** @description Unknown, changed, withdrawn or unpublished link (always the same body). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests or failed lookups from this address. */
             429: {
                 headers: {
                     [name: string]: unknown;

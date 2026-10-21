@@ -35,7 +35,7 @@ import httpx
 import pytest
 import yaml
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
 
 from app.core import ratelimit as rl
 from app.core.db import tenant_session
@@ -86,6 +86,9 @@ BODIES: dict[str, dict[str, Any] | None] = {
     "POST /api/v1/public/links/current/pay": {"instalments": [1]},
     "GET /api/v1/public/links/current/payment": None,
     "POST /api/v1/public/links/current/optin": {"language": "en"},
+    # R3-1C CBSE disclosure (ADR-0051; SEC-050): the key is in the path.
+    "GET /api/v1/public/disclosure/{key}": None,
+    "GET /api/v1/public/disclosure/{key}/documents/{n}": None,
 }
 
 
@@ -99,6 +102,10 @@ def _reset_budgets() -> None:
 
 def _call(client: TestClient, route: str, key: str, **kw: Any) -> httpx.Response:
     method, template = route.split(" ", 1)
+    if "{key}" in template:
+        path = template.replace("{key}", key).replace("{n}", "1")
+        disclosure: httpx.Response = P.public_call(client, method, path, **kw)
+        return disclosure
     if "{code}" in template:
         path = template.replace("{code}", key)
         response: httpx.Response = P.public_call(client, method, path, **kw)
@@ -114,6 +121,30 @@ def _is_cert(route: str) -> bool:
     return ROUTES[route] == ["cert_verify"]
 
 
+def _is_disclosure(route: str) -> bool:
+    return ROUTES[route] == ["school_disclosure"]
+
+
+def _unknown_for(route: str) -> Callable[[], str]:
+    if _is_cert(route):
+        return _new_code
+    if _is_disclosure(route):
+        return tokens.new_disclosure_key
+    return tokens.new_parent_token
+
+
+def _clear_disclosure_handles(school: Any) -> None:
+    """One live disclosure handle per school (partial unique index): revoke the open one."""
+    with tenant_session(school.tenant_id) as db:
+        for row in db.execute(
+            text(
+                "SELECT id FROM core.public_handles WHERE kind = 'school_disclosure' "
+                "AND revoked_at IS NULL"
+            )
+        ):
+            service.revoke(db, row.id, reason="manual", by_user=False)
+
+
 def _new_code() -> str:
     return "".join(secrets.choice(_CODE_ALPHABET) for _ in range(16))
 
@@ -126,6 +157,8 @@ def _live(school: Any, kind: str) -> str:
         issued = P.issue(school, "cert_verify", key=code, target_type="cert")
         assert issued.key is None
         return code
+    if kind == "school_disclosure":
+        _clear_disclosure_handles(school)
     key: str = P.issue(school, kind).key
     return key
 
@@ -135,6 +168,8 @@ def _revoked(school: Any, kind: str) -> str:
         code = _new_code()
         issued = P.issue(school, "cert_verify", key=code, target_type="cert")
     else:
+        if kind == "school_disclosure":
+            _clear_disclosure_handles(school)
         issued = P.issue(school, kind)
         code = issued.key
     with tenant_session(school.tenant_id) as db:
@@ -160,7 +195,7 @@ def suspended_school(world: Any, admin_engine: Engine) -> Iterator[Any]:
     """A school of its own with one live link of every parent kind, then suspended."""
     s = W.School(W.provision_school())
     s.people["owner"] = W.add_member(admin_engine, s.tenant_id, ["owner"])
-    s.keys = {kind: P.issue(s, kind).key for kind in PARENT_KINDS}
+    s.keys = {kind: P.issue(s, kind).key for kind in (*PARENT_KINDS, "school_disclosure")}
     P.set_tenant_status(admin_engine, s.tenant_id, "suspended")
     yield s
     P.set_tenant_status(admin_engine, s.tenant_id, "active")
@@ -170,7 +205,7 @@ def _dead_keys(route: str, world: Any, admin: Engine, suspended: Any) -> dict[st
     kinds = ROUTES[route]
     kind = kinds[0]
     keys: dict[str, str] = {
-        "unknown": _new_code() if _is_cert(route) else tokens.new_parent_token(),
+        "unknown": _unknown_for(route)(),
         "malformed": "not-a-key",
         "revoked": _revoked(world.a, kind),
     }
@@ -178,6 +213,12 @@ def _dead_keys(route: str, world: Any, admin: Engine, suspended: Any) -> dict[st
         keys["other_kind"] = _live(world.a, "parent_notice")
         keys["lowercase"] = _new_code().lower()
         return keys  # codes never expire and still open while a school is suspended
+    if _is_disclosure(route):
+        # Disclosure links never expire; a live link with nothing published is the same 404.
+        keys["other_kind"] = _live(world.a, "parent_notice")
+        keys["unpublished"] = _live(world.a, "school_disclosure")
+        keys["suspended_school"] = suspended.keys["school_disclosure"]
+        return keys
     keys["empty"] = ""
     keys["expired"] = _expired(admin, world.a, kind)
     others = [k for k in PARENT_KINDS if k not in kinds]
@@ -272,7 +313,7 @@ def test_FR_PUB_011_every_route_spends_the_failure_budget_and_then_refuses_live_
     route: str, world: Any, public_client: TestClient
 ) -> None:
     live = _live(world.a, ROUTES[route][0])
-    unknown: Callable[[], str] = _new_code if _is_cert(route) else tokens.new_parent_token
+    unknown: Callable[[], str] = _unknown_for(route)
     _reset_budgets()
     failures = rl.load_config().policies["public_lookup_fail"].quota // LOOKUP_FAILURE_COST
     codes = [_call(public_client, route, unknown()).status_code for _ in range(failures)]

@@ -891,6 +891,35 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             i=uuid.uuid4(),
             t=t,
         )
+        # --- CBSE disclosure (R3-1C, 0065_disclosure): a draft, a snapshot and its document --
+        snapshot = uuid.uuid4()
+        _run(
+            c,
+            "INSERT INTO ops.disclosure_drafts (id, tenant_id, format_key, format_version) "
+            "VALUES (:i, :t, 'cbse-appendix-ix', 1)",
+            i=uuid.uuid4(),
+            t=t,
+        )
+        _run(
+            c,
+            "INSERT INTO ops.disclosure_snapshots (id, tenant_id, format_key, format_version, "
+            "content, content_sha256, published_by) VALUES (:i, :t, 'cbse-appendix-ix', 1, "
+            "CAST('{}' AS jsonb), decode(repeat('ab', 32), 'hex'), :u)",
+            i=snapshot,
+            t=t,
+            u=u["user"],
+        )
+        _run(
+            c,
+            "INSERT INTO ops.disclosure_snapshot_documents (id, tenant_id, snapshot_id, n, "
+            "item_key, document_id, version_id, title) VALUES (:i, :t, :s, 1, 'fire_safety', "
+            ":d, :v, 'Synthetic fire certificate')",
+            i=uuid.uuid4(),
+            t=t,
+            s=snapshot,
+            d=ids["doc"],
+            v=ids["ver"],
+        )
         # --- student timeline and early warning (M5, 0035_student_insights) ---------------
         exam, flag = uuid.uuid4(), uuid.uuid4()
         _run(

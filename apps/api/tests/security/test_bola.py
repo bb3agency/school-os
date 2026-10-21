@@ -830,8 +830,38 @@ def _b_upi(w: Any, key: str) -> uuid.UUID:
     return value
 
 
+def _disclosure() -> ModuleType:
+    """tests/disclosure/security_support.py (R3-1C: CBSE on per call, snapshots of a school)."""
+    name = "sos_test_disclosure_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "disclosure" / "security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+def _b_snapshot(w: Any) -> uuid.UUID:
+    """A published disclosure snapshot of school B (R3-1C)."""
+    if "bola_snapshot" not in w.b.ids:
+        w.b.ids["bola_snapshot"] = _disclosure().insert_snapshot(
+            _ADMIN[0], w.b.tenant_id, w.b.people["owner"].user_id
+        )
+    value: uuid.UUID = w.b.ids["bola_snapshot"]
+    return value
+
+
 def _module_on(path: str, w: Any) -> contextlib.AbstractContextManager[None]:
-    """Tally routes need school A's connector flag; fee routes school A's fees switched on."""
+    """Tally routes need school A's connector flag; fee routes school A's fees switched on;
+    disclosure routes school A as a CBSE school (R3-1C)."""
+    if _disclosure().is_disclosure_path(path):
+        cbse: contextlib.AbstractContextManager[None] = _disclosure().cbse_on(
+            _ADMIN[0], w.a.tenant_id
+        )
+        return cbse
     if _fees().is_fee_path(path):
         on: contextlib.AbstractContextManager[None] = _fees().on(_ADMIN[0], w.a.tenant_id, path)
         return on
@@ -914,6 +944,8 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "recon_item_id": lambda w: _b_fee(w, "recon_item_id"),
     # R2-3G WhatsApp sending: a broadcast and one of its messages in school B.
     "broadcast_id": _b_broadcast,
+    # R3-1C: a disclosure snapshot of school B.
+    "snapshot_id": _b_snapshot,
     "message_id": _b_message,
 }
 
@@ -942,6 +974,7 @@ ID_ROUTES = _id_routes()
 
 BODIES.update(_fees().BOLA_BODIES)
 BODIES.update(_upi().BOLA_BODIES)
+BODIES.update(_disclosure().BOLA_BODIES)
 
 # Required query parameters of ID routes, so the request reaches the object lookup.
 QUERY: dict[tuple[str, str], dict[str, str]] = {
@@ -949,6 +982,7 @@ QUERY: dict[tuple[str, str], dict[str, str]] = {
     ("GET", "/api/v1/sections/{section_id}/attendance/month"): {"month": "2026-09"},
     ("GET", "/api/v1/imports/{import_id}/preset-mapping"): {"preset": "register-excel"},
     ("GET", "/api/v1/sections/{section_id}/join-slips"): {"categories": "notices"},
+    **_disclosure().BOLA_QUERY,
 }
 
 

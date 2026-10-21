@@ -202,6 +202,10 @@ EXPECTED_TABLES = {
     "messaging_settings",
     "messaging_optins",
     "messaging_messages",
+    # R3-1C (FR-DISC-012): the CBSE disclosure draft, snapshots and published documents.
+    "disclosure_drafts",
+    "disclosure_snapshots",
+    "disclosure_snapshot_documents",
     # R2-3G sending (0061_messaging_sends): broadcast counts and automatic-run history.
     "messaging_broadcasts",
     "messaging_send_runs",

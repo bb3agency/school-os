@@ -78,11 +78,13 @@ apps/api/app/
                  the school is always the merchant, SchoolOS never holds money)
   messaging/     WhatsApp parent messages via Meta Cloud API (schema msg; ADR-0043): connect, utility
                  template catalogue, guardian opt-ins, STOP, signed webhooks, delivery log
+  disclosure/    CBSE Appendix IX disclosure (R3-1C; ADR-0051): format file, draft, frozen snapshots,
+                 public handle kind school_disclosure, /public/disclosure/{key} routes, HTML/PDF files
   platform/      control plane: operators, school provisioning, plans, subscriptions, invoices,
                  payments (billing), usage, fleet + heartbeat, feature flags, announcements,
                  support tickets, platform audit (DB role sos_platform; routes /api/v1/platform/*)
   devtools/      synthetic data generator (make seed-synthetic; local/ci only)
-apps/api/migrations/  Alembic revisions 0001_baseline … 0064_portal_calendar (linear chain; `alembic heads` shows the current head)
+apps/api/migrations/  Alembic revisions 0001_baseline … 0065_disclosure (linear chain; `alembic heads` shows the current head)
 apps/api/tests/  tests per module (tests/<module>/) + cross-module suites (tests/security/, tests/migrations/, tests/api/, tests/deploy/)
 apps/api/openapi.json  committed OpenAPI document (make openapi; freshness test)
 apps/worker/     Celery entrypoint (sos_worker.celery_app; imports app.* tasks and beat schedules)
