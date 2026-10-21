@@ -2444,6 +2444,83 @@ def _upi() -> ModuleType:
 SPECS.update(_upi().matrix_specs())
 
 
+def _disclosure() -> ModuleType:
+    """tests/disclosure/security_support.py (R3-1C: CBSE on per call, snapshots of a school)."""
+    name = "sos_test_disclosure_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "disclosure" / "security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+# --- R3-1C CBSE disclosure (ADR-0051): school A is CBSE while the request is sent -------------
+
+_DISCLOSURE: dict[str, uuid.UUID] = {}
+
+
+def _disclosure_snapshot(w: Any, a: Engine, which: str) -> uuid.UUID:
+    """``live``: the newest snapshot of school A; ``old``: an older one (not withdrawable)."""
+    if not _DISCLOSURE:
+        owner = w.a.people["owner"].user_id
+        _DISCLOSURE["old"] = _disclosure().insert_snapshot(a, w.a.tenant_id, owner, days_ago=2)
+        _DISCLOSURE["live"] = _disclosure().insert_snapshot(a, w.a.tenant_id, owner)
+    return _DISCLOSURE[which]
+
+
+SPECS.update(
+    {
+        ("GET", "/api/v1/disclosure/format"): lambda w, r, a: (
+            "/api/v1/disclosure/format",
+            None,
+            {},
+        ),
+        ("GET", "/api/v1/disclosure/draft"): lambda w, r, a: ("/api/v1/disclosure/draft", None, {}),
+        ("PUT", "/api/v1/disclosure/draft"): lambda w, r, a: (
+            "/api/v1/disclosure/draft",
+            {"inputs": {}, "documents": {}},
+            _if_match(_disclosure().draft_version(a, w.a.tenant_id)),
+        ),
+        ("POST", "/api/v1/disclosure/publish"): lambda w, r, a: (
+            "/api/v1/disclosure/publish",
+            {"confirm_no_student_data": True},
+            {"Idempotency-Key": str(uuid.uuid4())},
+        ),
+        ("GET", "/api/v1/disclosure/snapshots"): lambda w, r, a: (
+            "/api/v1/disclosure/snapshots",
+            None,
+            {},
+        ),
+        ("GET", "/api/v1/disclosure/snapshots/{snapshot_id}"): lambda w, r, a: (
+            f"/api/v1/disclosure/snapshots/{_disclosure_snapshot(w, a, 'live')}",
+            None,
+            {},
+        ),
+        ("POST", "/api/v1/disclosure/snapshots/{snapshot_id}/withdraw"): lambda w, r, a: (
+            f"/api/v1/disclosure/snapshots/{_disclosure_snapshot(w, a, 'old')}/withdraw",
+            {"reason": "Synthetic withdrawal reason"},
+            {},
+        ),
+        ("GET", "/api/v1/disclosure/snapshots/{snapshot_id}/download-url"): lambda w, r, a: (
+            f"/api/v1/disclosure/snapshots/{_disclosure_snapshot(w, a, 'live')}"
+            "/download-url?format=pdf",
+            None,
+            {},
+        ),
+        ("GET", "/api/v1/disclosure/link"): lambda w, r, a: ("/api/v1/disclosure/link", None, {}),
+        ("POST", "/api/v1/disclosure/link/rotate"): lambda w, r, a: (
+            "/api/v1/disclosure/link/rotate",
+            None,
+            {},
+        ),
+    }
+)
+
+
 def _success(method: str, path: str) -> int:  # noqa: PLR0911 - one answer per route family
     creates = {
         "/api/v1/users",
@@ -2505,6 +2582,8 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911 - one answer per r
     }
     if method == "POST" and path in accepted:
         return 202
+    if (method, path) in _disclosure().MATRIX_STATUS:
+        return int(_disclosure().MATRIX_STATUS[(method, path)])
     if method == "POST" and path in _fees().MATRIX_CREATES | _upi().MATRIX_CREATES:
         return 201
     if (method, path) in _fees().ONLINE_REFUSED:
@@ -2539,6 +2618,11 @@ def _call(api: Any, w: Any, admin: Engine, role: str, key: tuple[str, str], **kw
     if _fees().is_fee_path(key[1]):
         # R2-1B: fees are on for school A only while the request is built and sent.
         with _fees().on(admin, w.a.tenant_id, key[1]):
+            path, body, headers = SPECS[key](w, role, admin)
+            return api.call(w.person(role), key[0], path, json=body, headers=headers, **kw)
+    if _disclosure().is_disclosure_path(key[1]):
+        # R3-1C: the disclosure is offered to CBSE schools only (FR-DISC-001).
+        with _disclosure().cbse_on(admin, w.a.tenant_id):
             path, body, headers = SPECS[key](w, role, admin)
             return api.call(w.person(role), key[0], path, json=body, headers=headers, **kw)
     path, body, headers = SPECS[key](w, role, admin)
