@@ -114,7 +114,7 @@ run "waf_rules" {
       one(one(one(r.action).block).custom_response).response_code == 429
       && one(one(one(one(r.action).block).custom_response).response_header).name == "Retry-After"
       if startswith(r.name, "rate-limit-")
-    ]) && length([for r in aws_wafv2_web_acl.this.rule : r if startswith(r.name, "rate-limit-")]) == 3
+    ]) && length([for r in aws_wafv2_web_acl.this.rule : r if startswith(r.name, "rate-limit-")]) == 6
     error_message = "Every WAF rate rule answers 429 with Retry-After (RFC 6585, RFC 9110)."
   }
 
@@ -136,6 +136,49 @@ run "waf_rules" {
     condition     = length(aws_wafv2_web_acl_logging_configuration.this.redacted_fields) == 4
     error_message = "WAF logs redact authorization, cookie and service-token headers and the query string (SEC-008)."
   }
+}
+
+# SEC-036 (docs/07 §11.2): the public surface has its own per-IP rate rules, scoped to the path
+# prefix, before the managed rule groups.
+run "public_surface_rate_rules" {
+  command = plan
+
+  assert {
+    condition = { for r in aws_wafv2_web_acl.this.rule :
+      r.name => {
+        prefix   = one(one(one(one(r.statement).rate_based_statement).scope_down_statement).byte_match_statement).search_string
+        position = one(one(one(one(r.statement).rate_based_statement).scope_down_statement).byte_match_statement).positional_constraint
+        limit    = one(one(r.statement).rate_based_statement).limit
+        key      = one(one(r.statement).rate_based_statement).aggregate_key_type
+      }
+      if contains(["rate-limit-public-link", "rate-limit-verify", "rate-limit-webhook"], r.name)
+      } == {
+      "rate-limit-public-link" = { prefix = "/p/", position = "STARTS_WITH", limit = 300, key = "IP" }
+      "rate-limit-verify"      = { prefix = "/v/", position = "STARTS_WITH", limit = 300, key = "IP" }
+      "rate-limit-webhook"     = { prefix = "/api/v1/webhooks/", position = "STARTS_WITH", limit = 2000, key = "IP" }
+    }
+    error_message = "Parent links (/p/), certificate verification (/v/) and webhooks (/api/v1/webhooks/) each have a per-IP rate rule (SEC-036)."
+  }
+
+  assert {
+    condition = max([
+      for r in aws_wafv2_web_acl.this.rule : r.priority if startswith(r.name, "rate-limit-")
+      ]...) < min([
+      for r in aws_wafv2_web_acl.this.rule : r.priority if startswith(r.name, "AWSManagedRules")
+    ]...) && length(distinct([for r in aws_wafv2_web_acl.this.rule : r.priority])) == length(aws_wafv2_web_acl.this.rule)
+    error_message = "Rate rules run before the managed rule groups and no two rules share a priority."
+  }
+}
+
+# A path limit above the general per-IP limit would never apply (rate-limit-ip blocks first).
+run "path_limit_above_general_limit_is_refused" {
+  command = plan
+
+  variables {
+    waf_webhook_rate_limit_per_5min = 5000
+  }
+
+  expect_failures = [var.waf_webhook_rate_limit_per_5min]
 }
 
 run "api_not_routed_by_default" {

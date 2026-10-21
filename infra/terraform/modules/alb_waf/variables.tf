@@ -122,6 +122,76 @@ variable "waf_machine_path_prefixes" {
   }
 }
 
+# Public surface rate rules (SEC-036). Each limit must stay at or below waf_rate_limit_per_5min:
+# rate-limit-ip counts the same requests and would block first, making a higher limit dead config.
+# Cross-variable validation needs Terraform >= 1.9 (versions.tf requires >= 1.11).
+
+variable "waf_public_link_rate_limit_per_5min" {
+  description = "Per-IP limit for the parent link pages (waf_public_link_path_prefix) in one evaluation window (SEC-036). A school's parents mostly use mobile data, so one address rarely carries many of them."
+  type        = number
+  default     = 300
+
+  validation {
+    condition     = var.waf_public_link_rate_limit_per_5min >= 10 && var.waf_public_link_rate_limit_per_5min <= var.waf_rate_limit_per_5min
+    error_message = "waf_public_link_rate_limit_per_5min must be at least 10 (WAF minimum) and at most waf_rate_limit_per_5min."
+  }
+}
+
+variable "waf_public_link_path_prefix" {
+  description = "URI prefix of the parent link pages (notice, receipt, dues, opt-in, and their /p/pay and /p/optin posts)."
+  type        = string
+  default     = "/p/"
+
+  validation {
+    condition     = startswith(var.waf_public_link_path_prefix, "/") && endswith(var.waf_public_link_path_prefix, "/") && lower(var.waf_public_link_path_prefix) == var.waf_public_link_path_prefix
+    error_message = "waf_public_link_path_prefix must start and end with / and be lower case (the rule lowercases the path)."
+  }
+}
+
+variable "waf_verify_rate_limit_per_5min" {
+  description = "Per-IP limit for the certificate verification pages (waf_verify_path_prefix) in one evaluation window (SEC-036)."
+  type        = number
+  default     = 300
+
+  validation {
+    condition     = var.waf_verify_rate_limit_per_5min >= 10 && var.waf_verify_rate_limit_per_5min <= var.waf_rate_limit_per_5min
+    error_message = "waf_verify_rate_limit_per_5min must be at least 10 (WAF minimum) and at most waf_rate_limit_per_5min."
+  }
+}
+
+variable "waf_verify_path_prefix" {
+  description = "URI prefix of the certificate verification pages (/v/check and /v/{code}, served on the verify host)."
+  type        = string
+  default     = "/v/"
+
+  validation {
+    condition     = startswith(var.waf_verify_path_prefix, "/") && endswith(var.waf_verify_path_prefix, "/") && lower(var.waf_verify_path_prefix) == var.waf_verify_path_prefix
+    error_message = "waf_verify_path_prefix must start and end with / and be lower case (the rule lowercases the path)."
+  }
+}
+
+variable "waf_webhook_rate_limit_per_5min" {
+  description = "Per-IP limit for provider webhooks (waf_webhook_path_prefix) in one evaluation window (SEC-036). Razorpay and Meta deliver every school's events from shared addresses, so keep it high; both providers retry after a 429."
+  type        = number
+  default     = 2000
+
+  validation {
+    condition     = var.waf_webhook_rate_limit_per_5min >= 10 && var.waf_webhook_rate_limit_per_5min <= var.waf_rate_limit_per_5min
+    error_message = "waf_webhook_rate_limit_per_5min must be at least 10 (WAF minimum) and at most waf_rate_limit_per_5min."
+  }
+}
+
+variable "waf_webhook_path_prefix" {
+  description = "URI prefix of the provider webhooks (Razorpay and Meta)."
+  type        = string
+  default     = "/api/v1/webhooks/"
+
+  validation {
+    condition     = startswith(var.waf_webhook_path_prefix, "/") && endswith(var.waf_webhook_path_prefix, "/") && lower(var.waf_webhook_path_prefix) == var.waf_webhook_path_prefix
+    error_message = "waf_webhook_path_prefix must start and end with / and be lower case (the rule lowercases the path)."
+  }
+}
+
 variable "waf_rate_window_sec" {
   description = "Evaluation window of the rate-based rules in seconds (WAF allows 60, 120, 300 or 600); also the Retry-After of their 429."
   type        = number
