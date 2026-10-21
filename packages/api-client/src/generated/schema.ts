@@ -10769,6 +10769,7 @@ export interface components {
             certificate_type: "transfer" | "bonafide" | "study" | "conduct";
             /** Class Label */
             class_label: string | null;
+            fee_note?: components["schemas"]["TcFeeNote"] | null;
             /** Fields */
             fields: components["schemas"]["PrintedField"][];
             /** Format Key */
@@ -19806,6 +19807,35 @@ export interface components {
             owner_membership_id?: string | null;
             /** Title */
             title?: string | null;
+        };
+        /**
+         * TcFeeNote
+         * @description The student's outstanding fees on the TC preview, for staff information only (FR-CERT-025,
+         *     US-2005; ADR-0042 decision 13; owner decision D16). Given only for a transfer certificate,
+         *     while fees are on and to a caller holding ``finance.read`` school-wide. It is never printed,
+         *     never stored on the certificate and never blocks issue or approval (FR-FEE-030).
+         */
+        TcFeeNote: {
+            /**
+             * Account Id
+             * Format: uuid
+             * @description The fee account, to open it on the fee screens.
+             */
+            account_id: string;
+            /**
+             * Balance
+             * @description Outstanding balance of the current year.
+             */
+            balance: string;
+            /** Last Payment On */
+            last_payment_on: string | null;
+            /** Oldest Due On */
+            oldest_due_on: string | null;
+            /**
+             * Overdue
+             * @description Part of the balance already overdue.
+             */
+            overdue: string;
         };
         /**
          * TemplateCreate

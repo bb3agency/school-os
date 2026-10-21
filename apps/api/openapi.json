@@ -4977,6 +4977,16 @@
             ],
             "title": "Class Label"
           },
+          "fee_note": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TcFeeNote"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "fields": {
             "items": {
               "$ref": "#/components/schemas/PrintedField"
@@ -30058,6 +30068,62 @@
           }
         },
         "title": "TaskUpdate",
+        "type": "object"
+      },
+      "TcFeeNote": {
+        "description": "The student's outstanding fees on the TC preview, for staff information only (FR-CERT-025,\nUS-2005; ADR-0042 decision 13; owner decision D16). Given only for a transfer certificate,\nwhile fees are on and to a caller holding ``finance.read`` school-wide. It is never printed,\nnever stored on the certificate and never blocks issue or approval (FR-FEE-030).",
+        "properties": {
+          "account_id": {
+            "description": "The fee account, to open it on the fee screens.",
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "balance": {
+            "description": "Outstanding balance of the current year.",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Balance",
+            "type": "string"
+          },
+          "last_payment_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Payment On"
+          },
+          "oldest_due_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Due On"
+          },
+          "overdue": {
+            "description": "Part of the balance already overdue.",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Overdue",
+            "type": "string"
+          }
+        },
+        "required": [
+          "balance",
+          "overdue",
+          "oldest_due_on",
+          "last_payment_on",
+          "account_id"
+        ],
+        "title": "TcFeeNote",
         "type": "object"
       },
       "TemplateCreate": {
