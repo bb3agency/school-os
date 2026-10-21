@@ -41,7 +41,7 @@ import json
 import secrets
 import uuid
 from collections import Counter
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Final
@@ -1067,6 +1067,19 @@ def get_guardian_optins(
     ensure_available()
     _reach_guardian(session, ctx, guardian_id, (READ, RECORD))
     return _optins_out(session, guardian_id)
+
+
+def optin_states(
+    session: Session, guardian_ids: Collection[uuid.UUID]
+) -> dict[uuid.UUID, list[CategoryStateOut]]:
+    """Current state per category of each guardian, read-only (the consent view of
+    ``app.privacy``, ADR-0049 decision 4). ``guardian_ids`` must come from the caller's own
+    scoped reads (guardians of a student it reached, holding ``message.read`` or
+    ``messaging.optin.record``). Empty when messaging is off on this host."""
+    if not available() or not guardian_ids:
+        return {}
+    current = repo.current_optins(session, guardian_ids)
+    return {gid: _category_states(session, gid, current) for gid in guardian_ids}
 
 
 def _insert_decision(
@@ -2408,6 +2421,7 @@ __all__ = [
     "list_templates",
     "live_tenant_ids",
     "office_phone",
+    "optin_states",
     "parent_optin_state",
     "process_inbox",
     "provision_templates",

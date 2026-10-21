@@ -316,12 +316,22 @@ class PrivacyCloseIn(_In):
     )
 
 
+class PrivacyConsentWithdrawalIn(_In):
+    """R3-1B (FR-DPDP-026, ADR-0049 decision 6): record the withdrawal a ``consent_withdrawal``
+    request asks for, on one optional purpose of the request's student."""
+
+    purpose_id: uuid.UUID
+    relationship: Literal["father", "mother", "guardian"]
+    decided_on: dt.date = Field(description="The date the family asked (on the request).")
+
+
 LetterQuery = LetterKey
 
 __all__ = [
     "Audience",
     "LetterQuery",
     "PrivacyCloseIn",
+    "PrivacyConsentWithdrawalIn",
     "PrivacyDownloadOut",
     "PrivacyErasureIn",
     "PrivacyErasurePlanOut",

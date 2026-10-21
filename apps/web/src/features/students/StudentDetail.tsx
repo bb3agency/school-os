@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/Table";
 import { Tabs } from "@/components/ui/Tabs";
 import { Value } from "@/components/ui/Value";
+import { StudentConsentsPanel } from "@/features/consents/StudentConsentsPanel";
 import { StudentInsights } from "@/features/insights/StudentInsights";
 import { GuardianOptinsCard } from "@/features/messaging/GuardianOptins";
 import { Link } from "@/i18n/navigation";
@@ -828,6 +829,16 @@ export function StudentDetailView({
             label: t("tabHistory"),
             panel: <ValuesHistory studentId={data.id} index={index} canReveal={canReveal} />,
           },
+          // R3-1B (US-2604, ADR-0049): the one consent view and recording a family's decision.
+          ...(permissions.has("consent.read") || permissions.has("consent.record")
+            ? [
+                {
+                  id: "consents",
+                  label: t("tabConsents"),
+                  panel: <StudentConsentsPanel studentId={data.id} />,
+                },
+              ]
+            : []),
           // M5 (US-1707): restricted, for the class teacher and the principal (FR-EW-011).
           ...(permissions.has(PERM.insightsRead) && permissions.has(PERM.readSensitive)
             ? [

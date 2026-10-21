@@ -266,3 +266,20 @@ def test_ADR_0020_scanner_detects_violations() -> None:
     assert "app.students" not in TENANT_SIDE_IMPORTS
     assert found.tenant_session_files == {"rogue.py"}
     assert found.sql_relations == {("rogue.py", "sis.students")}
+
+
+def test_ADR_0050_incident_records_never_reach_tenant_data() -> None:
+    """R3-1B: the incident module of the control plane (``incidents.py``) imports nothing from
+    the tenant side, opens no tenant session and names no tenant relation; schools pull their
+    notices through ``app.platform.service`` (break-glass pattern), never the other way."""
+    source = (PLATFORM_DIR / "incidents.py").read_text("utf-8")
+    found = _scan([("incidents.py", source)])
+    tenant_side = [m for m in found.imports if not m.startswith(FREE_PREFIXES)]
+    assert tenant_side == []
+    assert found.tenant_session_files == set()
+    assert found.sql_relations == set()
+    assert "tenant_session" not in source
+    # The school-side pull reads only these two functions of the control plane.
+    from app.platform import service
+
+    assert {"incident_notices_for_school", "record_incident_notice_pulled"} <= set(service.__all__)

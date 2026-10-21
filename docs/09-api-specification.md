@@ -736,6 +736,8 @@ Conventions as above and as the R2 section: `Idempotency-Key` on creating POSTs,
 
 #### Consents for optional purposes (R3.1; FR-DPDP-020..026)
 
+**Built (R3-1B, 2026-10-21).** As listed, with: `GET /consents/forms` and `POST /exports/consent-forms` take `student_id` or `section_id`, `only_unanswered` (sections only) and `language`; `GET /consent-purposes` returns `{data, suggestions}`; recording also answers 409 `purpose_inactive`; `GET /students/{id}/consent-view` returns `apaar`/`whatsapp` as null for readers of neither register. `POST /privacy/requests/{request_id}/consent-withdrawal` `{purpose_id, relationship, decided_on}` (`privacy.request.manage`; the service also needs `consent.record`, 403) records the withdrawal a `consent_withdrawal` request asks for and links both ways (409 `not_a_consent_withdrawal`, `not_verified`, `consent_not_given`, `request_closed`).
+
 | Method | Path | Guard |
 |---|---|---|
 | GET/POST | `/consent-purposes` · PATCH `/consent-purposes/{id}` (new `form_version` when answered) | read `consent.read`; write `tenant.settings.manage`ᴿ |
@@ -744,6 +746,8 @@ Conventions as above and as the R2 section: `Idempotency-Key` on creating POSTs,
 | GET | `/consents/summary?section_id=&purpose_id=` · `/consents/forms` (print, `student_id` or `section_id`, `status`?) · POST `/exports/consent-forms` → 202 | `consent.read` or `consent.record`; forms rate limit `render`, PDF `exports` + `student.read_basic` + recent MFA |
 
 #### Breach register and incidents (R3.1; FR-DPDP-030..038)
+
+**Built (R3-1B, 2026-10-21).** As listed, plus `GET /privacy/breaches/{id}/affected` (`privacy.breach.read`); `PATCH /privacy/breaches/{id}` answers 409 `breach_closed`, `duties_open`; `GET …/drafts/{draft}` returns `{draft, template_version, title, text}`; `PATCH /platform/incidents/{id}` requires `If-Match` and takes `notified_tenant_ids` (schools told by phone or e-mail); `POST …/schools` answers 409 `incident_confirmed` after the second confirmation; `POST …/confirm` also `no_schools` and the two-person codes `request_expired`, `requester_not_authorised`, `approver_not_eligible`.
 
 | Method | Path | Guard |
 |---|---|---|

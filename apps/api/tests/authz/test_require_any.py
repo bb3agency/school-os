@@ -219,6 +219,8 @@ def _any_of_guards() -> list[tuple[str, str, Any]]:
 
 CERT_READERS = ("certificate.read", ("certificate.issue", "certificate.approve"), False)
 APAAR_READERS = ("apaar.consent.read", ("apaar.consent.record",), False)
+# R3-1B (ADR-0049): consents for optional purposes, read and print by readers and recorders.
+CONSENT_READERS = ("consent.read", ("consent.record",), False)
 FEE_ALL = (
     "finance.read",
     "fee.collect",
@@ -239,7 +241,14 @@ UPI_READERS = ("fee.collect", ("fee.manage", "finance.read", "fee.reconcile"), F
 def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
     guards = _any_of_guards()
     # Print jobs (FR-DQ-047, FR-APC-007): their makers list and download their own exports.
-    printers = ("dq.readiness.read", "apaar.consent.read", "apaar.consent.record")
+    printers = (
+        "dq.readiness.read",
+        "apaar.consent.read",
+        "apaar.consent.record",
+        # R3-1B (FR-DPDP-023): consent forms for optional purposes.
+        "consent.read",
+        "consent.record",
+    )
     readers = (PORTAL, STUDENT_EXPORT, *printers, READ_ALL)
     expected = {
         ("GET", "/api/v1/change-requests"): (REQUEST, (APPROVE,), False),
@@ -257,6 +266,17 @@ def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
         ),
         # Consent forms as a PDF: the print views' permissions (step-up checked in the service).
         ("POST", "/api/v1/exports/apaar-consent-forms"): APAAR_READERS,
+        ("POST", "/api/v1/exports/consent-forms"): CONSENT_READERS,
+        # R3-1B consents (ADR-0049): a student's decisions, section counts and printed forms
+        # for readers and recorders; purposes also for settings managers. Scope in the service.
+        ("GET", "/api/v1/students/{student_id}/consents"): CONSENT_READERS,
+        ("GET", "/api/v1/consents/summary"): CONSENT_READERS,
+        ("GET", "/api/v1/consents/forms"): CONSENT_READERS,
+        ("GET", "/api/v1/consent-purposes"): (
+            "consent.read",
+            ("consent.record", "tenant.settings.manage"),
+            False,
+        ),
         # Staff directory (FR-TEN-010): the service requires a school-wide grant of either.
         ("GET", "/api/v1/staff"): ("tenant.structure.manage", ("user.manage",), False),
         # Certificates (US-1101..US-1105): the reader, the maker and the checker share the

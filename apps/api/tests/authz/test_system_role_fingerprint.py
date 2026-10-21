@@ -18,7 +18,8 @@ from app.authz.catalog import system_roles
 # R2-1C + R2-1B + R2-2D + R2-2E (fee.reconcile) + R2-3G (message.send) grants
 # + R3-1D (readiness.calendar.manage) + R3-1C (disclosure.edit, disclosure.publish)
 # + R3-1A (privacy.read, privacy.request.manage, privacy.request.decide)
-PINNED = "09d53869c5f32cbba1cda2f6e4cbc9b98365ece1aa9bcbb5c827015b2638df0d"
+# + R3-1B (consent.read, consent.record, privacy.breach.read, privacy.breach.manage)
+PINNED = "cda6967d3cfd4bea4b5c23f413858762aadd3847960a26135950325b82a8db7f"
 
 
 def fingerprint() -> str:

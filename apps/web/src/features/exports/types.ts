@@ -32,6 +32,8 @@ export type ExportScope = Schemas["ExportScopeIn"];
 /** Print jobs (FR-DQ-047, FR-APC-007): slips and consent forms printed to PDF by the worker. */
 export type ReadinessSlipsCreate = Schemas["ReadinessSlipsCreate"];
 export type ConsentFormsCreate = Schemas["ConsentFormsCreate"];
+/** Consent forms for the school's optional purposes (FR-DPDP-023, ADR-0049). */
+export type PurposeConsentFormsCreate = Schemas["PurposeConsentFormsCreate"];
 export type RequestedBy = NonNullable<ListQuery["requested_by"]>;
 
 type Exhaustive<T extends string, L extends readonly T[]> = [T] extends [L[number]] ? L : never;
@@ -51,6 +53,7 @@ const kinds = [
   "student_list",
   "readiness_slips",
   "apaar_consent_forms",
+  "consent_forms",
 ] as const satisfies readonly ExportKind[];
 export const EXPORT_KINDS: Exhaustive<ExportKind, typeof kinds> = kinds;
 

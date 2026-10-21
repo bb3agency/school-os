@@ -290,6 +290,8 @@ NON_UUID_PATH_PARAMS = {
     ("GET", "/api/v1/public/certificates/{code}", "code"),
     # R2-2D: the Razorpay webhook route value (ADR-0047 decision 3), bounded; the guard resolves.
     ("POST", "/api/v1/webhooks/razorpay/{route}", "route"),
+    # R3-1B: a breach draft's template key (family_notice or board_outline), bounded.
+    ("GET", "/api/v1/privacy/breaches/{breach_id}/drafts/{draft}", "draft"),
     # R3-1C: the disclosure link key (ADR-0051), bounded; the guard shape-checks and resolves it;
     # a published document's number (bounded int).
     ("GET", "/api/v1/public/disclosure/{key}", "key"),
@@ -365,6 +367,14 @@ RESPONSE_FIELD_ALLOWLIST = {
     "app.dq.schemas.FindingValue.attribute_key": "attribute catalog key",
     "app.dq.schemas.FindingOut.profile_key": "DQ profile code",
     "app.dq.schemas.ProfileOut.key": "DQ profile code",
+    # R3-1B (ADR-0049, ADR-0050): purpose codes and duty codes.
+    "app.privacy.consents_schemas.PurposeOut.key": "consent purpose code",
+    "app.privacy.consents_schemas.PurposeOut.suggested_key": "suggested purpose code",
+    "app.privacy.consents_schemas.PurposeStateOut.key": "consent purpose code",
+    "app.privacy.consents_schemas.PurposeSummaryOut.key": "consent purpose code",
+    "app.privacy.consents_schemas.PurposeSuggestionOut.key": "suggested purpose code",
+    "app.privacy.breach_schemas.DutyOut.key": "breach duty code",
+    "app.privacy.breach_schemas.NextDutyOut.key": "breach duty code",
     "app.dq.schemas.SummaryOut.profile_key": "DQ profile code",
     "app.dq.schemas.RunOut.profile_key": "DQ profile code",
     "app.dq.schemas.ReadinessProfileOut.key": "DQ profile code",
@@ -466,6 +476,14 @@ IDEMPOTENCY_EXEMPT = {
     "payment link for the same choice is returned again (reused), never a second one",
     ("POST", "/api/v1/public/links/current/optin"): "sets one value (the guardian's message "
     "language); repeating it changes nothing",
+    # R3-1B: one parent-notice draft per call is the point (the person approving keeps one);
+    # adding a school to an incident is an upsert keyed by the school.
+    ("POST", "/api/v1/privacy/requests/{request_id}/consent-withdrawal"): "a state change of "
+    "the consent register: a repeat answers 409 consent_not_given",
+    ("POST", "/api/v1/privacy/breaches/{breach_id}/notice-draft"): "each call makes a new "
+    "draft on purpose (the AI draft may be redone); nothing is sent",
+    ("POST", "/api/v1/platform/incidents/{incident_id}/schools"): "an upsert keyed by the "
+    "school; repeating it changes nothing",
     ("POST", "/api/v1/edge/tally/enrol"): "machine route; the one-time code is consumed",
     ("POST", "/api/v1/edge/tally/syncs"): "machine route; sync ids are unique per device",
     ("POST", "/api/v1/sections/{section_id}/attendance"): "an upsert keyed by student and day",

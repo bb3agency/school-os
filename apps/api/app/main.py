@@ -46,6 +46,8 @@ from app.platform.api import fleet_router
 from app.platform.api import router as platform_router
 from app.platform.tenant_api import router as platform_tenant_router
 from app.privacy.api import router as privacy_router
+from app.privacy.breach_api import router as breach_router
+from app.privacy.consents_api import router as consents_router
 from app.public.api import router as public_router
 from app.public.config import rules as public_rules
 from app.students.api import router as students_router
@@ -56,7 +58,7 @@ from app.tenancy.api import router as tenancy_router
 API_PREFIX = "/api/v1"
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None) -> FastAPI:  # noqa: PLR0915 - one line per router
     settings = settings or get_settings()
     setup_logging(settings)
     # Claude safety lock: staging/prod refuse to start while a models.yaml role uses Anthropic
@@ -98,6 +100,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(admin_router)
     app.include_router(certificates_router)
     app.include_router(apaar_router)
+    # R3-1B consents and breaches (ADR-0049, ADR-0050)
+    app.include_router(consents_router)
+    app.include_router(breach_router)
     app.include_router(knowledge_router)
     app.include_router(circulars_router)
     app.include_router(academics_router)

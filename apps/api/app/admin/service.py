@@ -114,6 +114,8 @@ from app.knowledge import service as knowledge
 from app.messaging import service as messaging
 from app.notifications import service as notifications
 from app.ops import service as ops
+from app.privacy import breach_service as breaches
+from app.privacy import consents_service as consents
 from app.privacy import service as privacy
 from app.students import service as students
 from app.tally import service as tally
@@ -580,6 +582,10 @@ def _collect(session: Session, snap: _Snapshot) -> tuple[list[RecordTable], dict
         # ADR-0034: each person's Ask memory items and switch (their own work context; the
         # query log and conversations are not in the archive, docs/05 §12).
         *knowledge.export_records(session),
+        # R3-1B (FR-DPDP-018): consent purposes and decisions; the breach register
+        # (descriptions and containment steps are ciphertext and left out).
+        *consents.export_records(session),
+        *breaches.export_records(session, include_sensitive=snap.include_sensitive),
         # R3-1A (FR-DPDP-018): notices, privacy requests, events and links; the requesters'
         # texts only with include_sensitive.
         *privacy.export_records(session, include_sensitive=snap.include_sensitive),

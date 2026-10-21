@@ -89,9 +89,7 @@ def test_FR_DPDP_017_every_tenant_table_is_in_exactly_one_class(admin_engine: En
         }
     classified = [t for c in cfg.record_classes().classes.values() for t in c.tables]
     assert len(classified) == len(set(classified))
-    # R3 waves built in parallel add their own classes at merge (R3-1B consents and breaches).
-    pending = {t for t in tables if t.startswith(("sis.consent", "ops.breach"))}
-    assert sorted(tables - set(classified) - pending) == []
+    assert sorted(tables - set(classified)) == []
     assert sorted(set(classified) - tables) == []
 
 

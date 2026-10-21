@@ -338,6 +338,10 @@ ACTOR: dict[tuple[str, str], str] = dict.fromkeys(
         ("GET", "/api/v1/students/{student_id}/timeline"),
         # ADR-0039: recording APAAR consent is not an owner permission (docs/07 §6.2).
         ("POST", "/api/v1/students/{student_id}/apaar-consent"),
+        # ADR-0049: recording consents for optional purposes is not an owner permission.
+        ("POST", "/api/v1/students/{student_id}/consents"),
+        # R3-1B: recording a withdrawal from a request also needs consent.record.
+        ("POST", "/api/v1/privacy/requests/{request_id}/consent-withdrawal"),
         # ADR-0043: recording WhatsApp opt-ins is not an owner permission (docs/07 §6.2).
         ("POST", "/api/v1/guardians/{guardian_id}/optins"),
         ("GET", "/api/v1/sections/{section_id}/join-slips"),
@@ -947,6 +951,9 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     # R3-1C: a disclosure snapshot of school B.
     "snapshot_id": _b_snapshot,
     "message_id": _b_message,
+    # R3-1B (ADR-0049, ADR-0050): a consent purpose and a breach record of school B.
+    "purpose_id": lambda w: _consents().b_purpose(_ADMIN[0], w),
+    "breach_id": lambda w: _consents().b_breach(_ADMIN[0], w),
 }
 
 
@@ -993,6 +1000,23 @@ def _privacy() -> ModuleType:
 
 
 BODIES.update(_privacy().BOLA_BODIES)
+
+
+def _consents() -> ModuleType:
+    """tests/privacy/r3b_security_support.py (R3-1B: a consent purpose and a breach of B)."""
+    name = "sos_test_r3b_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "privacy" / "r3b_security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+BODIES.update(_consents().BOLA_BODIES)
 PRIVACY_REQUESTS = "/api/v1/privacy/requests/{request_id}"
 
 
@@ -1019,6 +1043,8 @@ QUERY: dict[tuple[str, str], dict[str, str]] = {
 PLAIN_PARAMS: dict[str, str] = {
     "row_no": "2",
     "profile_key": "bseap-ssc-2027",
+    # R3-1B: the breach draft's template key (not an object id).
+    "draft": "family_notice",
     # R3-1A: a letter of a privacy request (closed catalog).
     "letter": "acknowledgement",
 }

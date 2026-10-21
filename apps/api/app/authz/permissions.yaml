@@ -363,6 +363,26 @@ permissions:
     description: Connect, test, rotate the webhook secret of, or disconnect the school's own Razorpay account (recent MFA sign-in)
     sensitivity: critical
     step_up: true
+  # --- R3-1B consents and breaches (ADR-0049, ADR-0050; docs/07 §6.2; FR-DPDP-020..038) ------
+  # Migration 0067_consents_breach upserts these into core.permissions. Breach permissions are
+  # school-wide only; consent.read follows apaar.consent.read (section-scoped for class teachers).
+  consent.read:
+    description: "See consents for the school's optional purposes, the consent view (with APAAR and WhatsApp opt-ins) and section counts, and print consent forms (class teachers: their sections)"
+    sensitivity: sensitive
+    step_up: false
+  consent.record:
+    description: Record a family's decision on an optional purpose with the signed form, and print consent forms
+    sensitivity: sensitive
+    step_up: false
+  privacy.breach.read:
+    description: See the school's breach register, its duties, clocks and drafts
+    sensitivity: sensitive
+    step_up: false
+  privacy.breach.manage:
+    description: Record and update breaches, their duties and affected people, and turn the family notice into a parent-notice draft
+    sensitivity: critical
+    step_up: true
+
 
   # --- R3-1C CBSE Appendix IX disclosure (ADR-0051; docs/07 §6.2; FR-DISC-*). Migration
   # 0065_disclosure upserts these into core.permissions. School-wide only; CBSE schools only.
@@ -479,4 +499,15 @@ permissions:
     description: See and verify the platform audit log
     sensitivity: sensitive
     step_up: false
+    is_platform: true
+  # R3-1B (ADR-0050; docs/07 §6.5): SchoolOS's own incident records (categories and counts only).
+  platform.incidents.read:
+    description: See SchoolOS incident records and their CERT-In and school-notice clocks
+    sensitivity: sensitive
+    step_up: false
+    is_platform: true
+  platform.incidents.manage:
+    description: Open and update incident records and mark affected schools (two operators confirm)
+    sensitivity: critical
+    step_up: true
     is_platform: true

@@ -25,7 +25,9 @@ Print jobs (R1; FR-DQ-047, FR-APC-007): ``POST /exports/readiness-slips`` and
 ``POST /exports/apaar-consent-forms`` freeze the students of one student or one section with
 the permissions and reach of the browser print views (``dq.readiness.read``;
 ``apaar.consent.read`` or ``apaar.consent.record``) plus ``student.read_basic`` and step-up;
-the worker (queue ``pdf``) asks ``app.dq`` / ``app.apaar`` for the page with the requester's
+R3-1B adds ``POST /exports/consent-forms`` (FR-DPDP-023: forms for optional purposes,
+``consent.read`` or ``consent.record``, built by ``app.privacy``). The worker (queue ``pdf``)
+asks ``app.dq`` / ``app.apaar`` / ``app.privacy`` for the page with the requester's
 current reach and prints it with :func:`app.core.pdf.render_document` (a parent-facing Telugu
 page gets the bundled font, owner decision D9). Files, downloads, retention and audit are the
 exports' own.
@@ -102,6 +104,7 @@ from app.exports.schemas import (
     ExportRequesterOut,
     ExportScopeIn,
     PrecheckCreate,
+    PurposeConsentFormsCreate,
     ReadinessSlipsCreate,
     RequestedBy,
     StudentListCreate,
@@ -120,6 +123,7 @@ from app.identity import service as identity
 from app.identity.principal import STEP_UP_MAX_AGE
 from app.notifications import service as notifications
 from app.ops import service as ops
+from app.privacy import consents_service as consents
 from app.students import service as students
 from app.tenancy import service as tenancy
 
@@ -140,8 +144,14 @@ CONSENT_READ: Final = "apaar.consent.read"
 CONSENT_RECORD: Final = "apaar.consent.record"
 SLIPS: Final = "readiness_slips"
 CONSENT_FORMS: Final = "apaar_consent_forms"
+# R3-1B (FR-DPDP-023): consent forms for the school's optional purposes.
+PURPOSE_READ: Final = "consent.read"
+PURPOSE_RECORD: Final = "consent.record"
+PURPOSE_FORMS: Final = "consent_forms"
+# Parent-facing forms keep the school's language (D9), whatever SOS_TELUGU_ENABLED says.
+PARENT_FORM_KINDS: Final = (CONSENT_FORMS, PURPOSE_FORMS)
 # Print jobs (R1): pages that also have a browser print view, printed to one PDF by the worker.
-PRINT_KINDS: Final = (SLIPS, CONSENT_FORMS)
+PRINT_KINDS: Final = (SLIPS, CONSENT_FORMS, PURPOSE_FORMS)
 PRINT_LAYOUT_VERSION: Final = 1
 
 KIND_OF_LAYOUT: Final = {"board": "board_precheck", "portal": "portal_precheck"}
@@ -151,11 +161,13 @@ PERMISSION_OF_KIND: Final = {
     "student_list": STUDENT_EXPORT,
     SLIPS: READINESS_READ,
     CONSENT_FORMS: CONSENT_READ,
+    PURPOSE_FORMS: PURPOSE_READ,
 }
 # Any one of these permits the kind (the consent forms' print views take read or record).
 PERMISSIONS_OF_KIND: Final[dict[str, tuple[str, ...]]] = {
     **{kind: (permission,) for kind, permission in PERMISSION_OF_KIND.items()},
     CONSENT_FORMS: (CONSENT_READ, CONSENT_RECORD),
+    PURPOSE_FORMS: (PURPOSE_READ, PURPOSE_RECORD),
 }
 # Every permission that lets someone make, see and download their own exports.
 OWN_EXPORT_PERMISSIONS: Final = (
@@ -163,6 +175,8 @@ OWN_EXPORT_PERMISSIONS: Final = (
     READINESS_READ,
     CONSENT_READ,
     CONSENT_RECORD,
+    PURPOSE_READ,
+    PURPOSE_RECORD,
 )
 
 # R3-1A module documents (ADR-0048): one PDF another module builds (the access report, a filled
@@ -416,7 +430,7 @@ def _create(
     details: Mapping[str, Any] | None = None,
 ) -> ExportOut:
     export_id = new_id()
-    if kind != CONSENT_FORMS:
+    if kind not in PARENT_FORM_KINDS:
         # ``te`` is accepted (backward compatible) but gives English while Telugu is hidden.
         # Consent forms are parent-facing: their language is the school's choice (D9).
         language = output_language(language)
@@ -699,6 +713,46 @@ def request_consent_forms(
     )
 
 
+def request_purpose_consent_forms(
+    session: Session, ctx: UserContext, data: PurposeConsentFormsCreate
+) -> ExportOut:
+    """``POST /exports/consent-forms`` (FR-DPDP-023): the consent forms for the school's optional
+    purposes of one student or one section (optionally only students with a purpose not answered
+    yet) as one A4 PDF, in the school's parent language (or ``language``). The same permissions
+    and reach as the print view (``consent.read`` or ``consent.record``; 404 outside; 409
+    ``no_forms`` / ``too_many_forms`` / ``no_purposes``), plus ``student.read_basic`` and step-up.
+    Never an Aadhaar number. Audit ``export.requested``."""
+    if not (ctx.has(PURPOSE_READ) or ctx.has(PURPOSE_RECORD)):
+        raise Forbidden("You cannot see the consent register.")
+    _need(ctx, STUDENT_READ, detail="You cannot see student records.")
+    _require_step_up(ctx)
+    if data.student_id is not None and data.only_unanswered:
+        raise _invalid("only_unanswered", "section_only")
+    language, ids = consents.form_targets(
+        session,
+        ctx,
+        student_id=data.student_id,
+        section_id=data.section_id,
+        only_unanswered=data.only_unanswered,
+        language=data.language,
+    )
+    _check_print_size(ids)
+    return _create(
+        session,
+        ctx,
+        kind=PURPOSE_FORMS,
+        formats=["pdf"],
+        language=language,
+        scope=_print_scope(data.student_id, data.section_id),
+        student_ids=ids,
+        layout_version=PRINT_LAYOUT_VERSION,
+        details={
+            "only_unanswered": data.only_unanswered,
+            "form_layout_version": consents.settings().form_layout_version,
+        },
+    )
+
+
 # --- reads ----------------------------------------------------------------------------------------
 
 
@@ -739,7 +793,7 @@ def _reach_of(row: Export) -> tuple[str, ...]:
     reach: list[str] = []
     if row.kind == SLIPS:
         reach.append(READINESS_READ)
-    elif row.kind not in ("student_list", CONSENT_FORMS):
+    elif row.kind not in ("student_list", *PARENT_FORM_KINDS):
         reach.append(DQ_READ)
     if row.include_sensitive:
         reach.append(SENSITIVE)
@@ -754,9 +808,9 @@ def _frozen_out_of_scope(session: Session, ctx: UserContext, row: Export) -> For
     if not frozen:
         return None
     reach: set[uuid.UUID] = set()
-    if row.kind == CONSENT_FORMS:
+    if row.kind in PARENT_FORM_KINDS:
         # The forms' print views take either consent permission, each with its own scope.
-        for permission in PERMISSIONS_OF_KIND[CONSENT_FORMS]:
+        for permission in PERMISSIONS_OF_KIND[row.kind]:
             if ctx.has(permission):
                 reach.update(
                     students.list_students_in_scope(session, ctx, permissions=(permission,))
@@ -898,6 +952,8 @@ def _stem(row: Export) -> str:
         return f"verification-slips-{row.profile_key}"
     if row.kind == CONSENT_FORMS:
         return "apaar-consent-forms"
+    if row.kind == PURPOSE_FORMS:
+        return "consent-forms"
     return f"precheck-{row.profile_key}" if row.profile_key else "students"
 
 
@@ -999,7 +1055,7 @@ class _Stop(Exception):
 
 
 def _snapshot_language(row: Export) -> Language:
-    if row.kind == CONSENT_FORMS and row.language == "te":
+    if row.kind in PARENT_FORM_KINDS and row.language == "te":
         return "te"
     return output_language(row.language)
 
@@ -1388,6 +1444,9 @@ def _build_print(
             session, ctx, snap.profile_key or "", ids, include_sensitive=snap.include_sensitive
         )
         filename = f"verification-slips-{snap.profile_key}.pdf"
+    elif snap.kind == PURPOSE_FORMS:
+        document, count = consents.forms_document(session, ctx, ids, language=snap.language)
+        filename = "consent-forms.pdf"
     else:
         document, count = apaar.forms_document(session, ctx, ids, language=snap.language)
         filename = "apaar-consent-forms.pdf"

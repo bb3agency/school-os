@@ -827,7 +827,8 @@
         "schools": "Schools and billing",
         "operations": "Operations",
         "access": "Access and audit"
-      }
+      },
+      "incidents": "Incidents"
     },
     "noStudentData": "Student records are never shown in the platform admin panel.",
     "dashboard": {
@@ -1773,6 +1774,127 @@
       "postalCode": "PIN code",
       "poReference": "PO reference (optional)",
       "address": "Address"
+    },
+    "incidents": {
+      "title": "Incidents",
+      "description": "SchoolOS security incidents that may touch school data, with the CERT-In clock and school notices.",
+      "noPermissionTitle": "You can't see incidents",
+      "noPermissionBody": "Ask a platform owner for the incident role if you handle security incidents.",
+      "open": "Open an incident",
+      "openTitle": "Open an incident record",
+      "openBody": "Write what kind of data and roughly how much. The record starts the CERT-In clock.",
+      "openConsequence": "The record can't be deleted. No school is told until two operators confirm the affected schools.",
+      "openedAt": "When SchoolOS noticed it",
+      "openedAtHint": "Date and time in IST. It can't be in the future.",
+      "severityLabel": "Severity",
+      "summaryLabel": "Summary",
+      "summaryHint": "Kinds of data and counts only, for example \"contact details of about 300 parents in 2 schools\". No names, phone or Aadhaar numbers or e-mail addresses: this record is outside the schools' protected data.",
+      "certInRequiredLabel": "This must be reported to CERT-In (within 6 hours)",
+      "colOpened": "Noticed",
+      "colSeverity": "Severity",
+      "colSummary": "Summary",
+      "colCertIn": "CERT-In",
+      "colSchools": "Schools told",
+      "colStatus": "Status",
+      "notifiedOf": "{notified} of {total} told",
+      "emptyTitle": "No incidents recorded",
+      "emptyBody": "When SchoolOS notices an incident that may touch school data, open a record here at once.",
+      "certInNotRequired": "Not required",
+      "certInReported": "Reported {when}",
+      "certInClock": "Report {clock}",
+      "severity": {
+        "P1": "P1 (critical)",
+        "P2": "P2 (high)",
+        "P3": "P3 (medium)",
+        "P4": "P4 (low)"
+      },
+      "status": {
+        "open": "Open",
+        "contained": "Contained",
+        "resolved": "Resolved",
+        "closed": "Closed"
+      },
+      "clock": {
+        "dueIn": "due in {hours} h",
+        "dueSoon": "due within the hour",
+        "overdueBy": "overdue by {hours} h"
+      },
+      "detailTitle": "Incident",
+      "detailHeading": "Incident noticed {when}",
+      "certInTitle": "CERT-In report",
+      "certInDescription": "Due 6 hours after SchoolOS noticed the incident.",
+      "changeStatus": "Change status",
+      "changeStatusTitle": "Change the status",
+      "changeStatusConsequence": "The change is kept in the platform audit log.",
+      "recordReport": "Record the CERT-In report",
+      "recordReportTitle": "Record the CERT-In report",
+      "recordReportBody": "When the report was sent to CERT-In.",
+      "reportedAt": "When it was reported",
+      "confirmTitle": "Confirm the affected schools",
+      "confirmDescription": "Two different operators confirm the list before any school is told.",
+      "confirmedAt": "Confirmed by two operators {when}",
+      "waitingBy": "Waiting for a second operator, by {when}",
+      "waiting": "Waiting for a second operator",
+      "youConfirmed": "You confirmed first. Another operator must confirm.",
+      "addSchoolsFirst": "Add the affected schools first.",
+      "notConfirmed": "Not confirmed yet.",
+      "confirm": "Confirm the schools",
+      "confirmSecond": "Confirm as second operator",
+      "confirmSecondTitle": "Confirm as the second operator",
+      "confirmBody": "{count, plural, one {# school is on the list.} other {# schools are on the list.}} Check each school, kinds of data and count.",
+      "twoPersonNote": "A different operator must give the second confirmation.",
+      "confirmConsequence": "Another operator must confirm too before any school is told.",
+      "confirmSecondConsequence": "The schools are told and their 24-hour notice clocks start.",
+      "colSchool": "School",
+      "colMode": "Hosting",
+      "modes": {
+        "shared": "Shared",
+        "dedicated": "Dedicated",
+        "other": "Other"
+      },
+      "colCategories": "Kinds of data",
+      "colPeople": "People (about)",
+      "colWindow": "When it happened",
+      "window": "{from} to {to}",
+      "windowUnknown": "Not known yet",
+      "colNotice": "School told",
+      "notifiedAt": "Told {when}",
+      "noticeClock": "Tell the school {clock}",
+      "noticeAfterConfirm": "After confirmation",
+      "colPulled": "Seen by the school",
+      "schoolsTitle": "Affected schools",
+      "schoolsEmptyTitle": "No schools added",
+      "schoolsEmptyBody": "Add each school whose data may be involved, with the kinds of data and a count.",
+      "addSchool": "Add a school",
+      "addSchoolTitle": "Add an affected school",
+      "addSchoolBody": "Kinds of data and an approximate count only.",
+      "addSchoolClears": "Adding a school clears the first confirmation: two operators confirm again.",
+      "approxPeople": "People affected (about)",
+      "approxPeopleHint": "Your best estimate, as a number.",
+      "windowFrom": "From (optional)",
+      "windowTo": "To (optional)",
+      "recordNotified": "Record schools told",
+      "recordNotifiedTitle": "Record schools told by phone or e-mail",
+      "recordNotifiedBody": "For dedicated hosts and any school told outside SchoolOS.",
+      "recordNotifiedConsequence": "The time is recorded as now and stops each school's notice clock.",
+      "errors": {
+        "no_schools": {
+          "title": "No schools to confirm",
+          "body": "Add the affected schools before confirming."
+        },
+        "incident_confirmed": {
+          "title": "Already confirmed",
+          "body": "Two operators confirmed the schools. Open a new incident for other schools."
+        },
+        "not_confirmed": {
+          "title": "Not confirmed yet",
+          "body": "Two operators must confirm the schools before they are recorded as told."
+        },
+        "cert_in_not_required": {
+          "title": "CERT-In is not required for this incident",
+          "body": "Tick that it must be reported before recording the report."
+        }
+      }
     }
   },
   "errors": {
@@ -1855,6 +1977,13 @@
       "filter_required": "Choose a student or a guardian first.",
       "before_current_decision": "This date is before the decision already recorded. Check the date on the form.",
       "invalid_number": "Enter a whole number.",
+      "before_noticed": "This can't be before the school noticed the breach.",
+      "pulled_automatically": "Notices from SchoolOS arrive by themselves.",
+      "aadhaar_full_number_rejected": "This looks like a full Aadhaar number. Remove it.",
+      "timezone_required": "Choose a date and time.",
+      "too_many": "Too many people listed: at most 5,000.",
+      "too_long": "This is too long. Shorten it.",
+      "unknown_suggestion": "Choose one of the suggestions shown.",
       "not_circular_task": "Only a task confirmed from a circular can confirm a portal date.",
       "unknown_profile": "Choose a readiness check from the list.",
       "response_required": "Write the answer before closing a complaint.",
@@ -2193,7 +2322,12 @@
     "penInvalid": "Enter the 11-digit PEN, for example 21345678901.",
     "penRequiredForTransfer": "A child from another school needs the PEN from the transfer certificate.",
     "invalidHeadCode": "Use up to 20 letters, digits, - or _, starting with a letter or digit, for example TUI.",
-    "invalidKeyId": "Enter the key id as Razorpay shows it: rzp_live_ or rzp_test_ and letters or digits."
+    "invalidKeyId": "Enter the key id as Razorpay shows it: rzp_live_ or rzp_test_ and letters or digits.",
+    "descriptionTooShort": "Write at least 10 characters.",
+    "purposeKey": "Use lowercase letters, digits and _, starting with a letter, 3 to 41 characters.",
+    "notInFuture": "This can't be in the future.",
+    "chooseCategories": "Tick at least one kind of data.",
+    "summaryPersonalData": "Write kinds of data and counts only: no phone, Aadhaar or other long numbers, and no e-mail addresses."
   },
   "support": {
     "piiWarningTitle": "Do not include student personal data",
@@ -2439,7 +2573,8 @@
       "tabTimeline": "Timeline",
       "apaarConsentLink": "APAAR consent",
       "metaClass": "Class",
-      "goTo": "Go to"
+      "goTo": "Go to",
+      "tabConsents": "Consents"
     },
     "record": {
       "open": "Record a value",
@@ -4021,7 +4156,8 @@
       "portal_precheck": "Portal pre-check",
       "student_list": "Student list",
       "readiness_slips": "Parent verification slips",
-      "apaar_consent_forms": "APAAR consent forms"
+      "apaar_consent_forms": "APAAR consent forms",
+      "consent_forms": "Consent forms"
     },
     "format": {
       "xlsx": "Excel (XLSX)",
@@ -9742,6 +9878,411 @@
       "account_closed": {
         "title": "The fee account is closed",
         "body": "Payment links are made only for open fee accounts."
+      }
+    }
+  },
+  "consents": {
+    "nav": "Consents",
+    "title": "Consents",
+    "description": "Families' answers on the school's optional purposes, by purpose and section.",
+    "noPermissionTitle": "You can't see consents",
+    "noPermissionBody": "Ask your principal or office admin if you need to record or follow up consents.",
+    "refusalTitle": "Not agreeing is a full answer",
+    "refusalBody": "These purposes are optional. Admission, studies and school services never depend on the answer. Anything not agreed is treated as no.",
+    "filtersTitle": "Choose what to show",
+    "section": "Section",
+    "allSections": "All sections",
+    "purpose": "Purpose",
+    "allPurposes": "All purposes",
+    "printForms": "Print forms",
+    "formsTitle": "Forms to send home",
+    "formsDescription": "One A4 page per student with every purpose in use, to agree or not agree.",
+    "printUnanswered": "Print forms not answered",
+    "pdfUnanswered": "Make PDF of forms not answered",
+    "pdfAll": "Make PDF of all forms",
+    "chooseSectionToPrint": "Choose a section above to print its forms.",
+    "summaryTitle": "Answers by purpose",
+    "noPurposesTitle": "No optional purposes yet",
+    "noPurposesBody": "Switch on the purposes your school asks families about, then print the forms.",
+    "noPurposesBodyReadOnly": "The school has not switched on any optional purpose. Ask your principal.",
+    "setUpPurposes": "Set up consent purposes",
+    "colTotal": "Students",
+    "colClass": "Class and section",
+    "colAgreed": "Agreed",
+    "agreedOf": "{given} of {total} agreed",
+    "bySection": "{count, plural, one {Show by section (# section)} other {Show by section (# sections)}}",
+    "bySectionCaption": "{purpose}: answers by section",
+    "noSectionsTitle": "No sections to show",
+    "noSectionsBody": "No students of the current year are in the sections you can see.",
+    "answers": {
+      "given": "Agreed",
+      "refused": "Did not agree",
+      "withdrawn": "Withdrawn",
+      "pending": "Form sent home",
+      "not_answered": "Not answered"
+    },
+    "purposes": {
+      "nav": "Consent purposes",
+      "title": "Consent purposes",
+      "description": "The optional things the school asks families to agree to, and the form they answer.",
+      "noPermissionTitle": "You can't see consent purposes",
+      "noPermissionBody": "Ask your principal or office admin if you need to see or change them.",
+      "readOnlyTitle": "You can see these, not change them",
+      "readOnlyBody": "Only the owner or principal can switch purposes on or change their text.",
+      "listTitle": "The school's purposes",
+      "suggestionsTitle": "Suggested purposes",
+      "suggestionsDescription": "Common optional purposes. Use the ones your school needs; you can change the text later.",
+      "inUse": "In use",
+      "notInUse": "Not in use",
+      "enable": "Use this purpose",
+      "colPurpose": "Purpose",
+      "colAbout": "What the form says",
+      "colVersion": "Form version",
+      "colAnswered": "Answers",
+      "colState": "State",
+      "colActions": "Actions",
+      "active": "In use",
+      "inactive": "Switched off",
+      "emptyTitle": "No purposes in use",
+      "emptyBody": "Use a suggested purpose above, or add the school's own with \"Add a purpose\".",
+      "emptyBodyReadOnly": "The school has not switched on any optional purpose yet.",
+      "add": "Add a purpose",
+      "addTitle": "Add the school's own purpose",
+      "addBody": "Say what is used, why, who receives it and for how long, in words a parent understands.",
+      "addConfirm": "Add the purpose",
+      "labelEn": "Name on the form",
+      "labelEnHint": "For example: Photos on the school website.",
+      "key": "Short code",
+      "keyHint": "Lowercase letters, digits and _, starting with a letter, for example website_photos. It can't be changed later.",
+      "descriptionLabel": "What, why, who receives it and for how long",
+      "descriptionHint": "Families read this on the form. 10 to 1,000 characters.",
+      "edit": "Edit",
+      "editTitle": "Edit the purpose",
+      "saveChanges": "Save changes",
+      "versionWarningTitle": "Families answered this form",
+      "versionWarning": "This makes version {next} of the form; earlier answers stay with version {current}.",
+      "switchOff": "Switch off",
+      "switchOn": "Switch on",
+      "switchOffTitle": "Switch off this purpose?",
+      "switchOnTitle": "Switch this purpose on again?",
+      "switchOffConsequence": "Families are no longer asked about it and it counts as not agreed. Answers already recorded stay in the register.",
+      "switchOnConsequence": "It is printed on the forms again. Earlier answers stay as they were recorded.",
+      "label_te": "Name in Telugu (optional)"
+    },
+    "student": {
+      "refusalNote": "Not agreeing is a full answer. Admission and studies never depend on it.",
+      "colPurpose": "Purpose",
+      "switchedOff": "Switched off: counts as not agreed",
+      "colAnswer": "Answer",
+      "colDecidedOn": "Date on the form",
+      "colFormVersion": "Form version",
+      "formVersion": "Version {version}",
+      "purposesTitle": "Optional purposes",
+      "purposesDescription": "The latest answer on each purpose the school asks about.",
+      "printForm": "Print the consent form",
+      "pdfForm": "Make PDF of the form",
+      "noPurposesTitle": "No optional purposes",
+      "noPurposesBody": "The school has not switched on any optional purpose.",
+      "apaarTitle": "APAAR ID",
+      "decidedOn": "Decided on {date}",
+      "apaarFormOnFile": "Signed form on file.",
+      "apaarNoForm": "No signed form on file.",
+      "apaarLink": "Open the APAAR consent",
+      "whatsappTitle": "WhatsApp messages",
+      "whatsappOff": "WhatsApp messages are not switched on for this school.",
+      "whatsappNoGuardians": "No guardian is on this student's record.",
+      "whatsappHint": "Change opt-ins on the Guardians tab.",
+      "colRecorded": "Recorded",
+      "colWho": "Who decided",
+      "colForm": "Signed form",
+      "formOnFile": "On file",
+      "noForm": "None",
+      "colRecordedBy": "Recorded by",
+      "colNote": "Note",
+      "historyTitle": "Decisions recorded",
+      "historyEmptyTitle": "No decisions recorded yet",
+      "historyEmptyBody": "Print the form, send it home, and record the family's answer when it comes back."
+    },
+    "record": {
+      "title": "Record a decision",
+      "description": "Each decision is added to the history; nothing earlier is changed. Upload the signed form when the family agrees.",
+      "purpose": "Purpose",
+      "currentAnswer": "Current answer:",
+      "decision": "Decision",
+      "decisions": {
+        "pending": "Form sent home",
+        "given": "Agreed",
+        "refused": "Did not agree",
+        "withdrawn": "Withdrawn"
+      },
+      "refuseNote": "This is a full answer. You may upload the signed form if the family returned it.",
+      "guardian": "Parent or guardian on the record",
+      "guardianHint": "Choose them if they signed, or pick the relationship below.",
+      "guardianNone": "Not on the record",
+      "relationship": "Relationship to the student",
+      "decidedOn": "Date on the form",
+      "formLanguage": "Language of the form",
+      "signedForm": "Signed form (PDF, JPG or PNG)",
+      "signedFormOptional": "Signed form, if returned (PDF, JPG or PNG)",
+      "signedFormHint": "Scan or photograph the whole form. Up to 25 MB.",
+      "formTitle": "Signed consent form",
+      "note": "Note (optional)",
+      "noteHint": "For example, who returned the form. Never type an Aadhaar number.",
+      "submit": "Save the decision",
+      "savedTitle": "Decision saved",
+      "savedBody": "It is now the current answer and is kept in the history.",
+      "step": {
+        "idle": "Ready",
+        "presign": "Preparing the upload…",
+        "send": "Uploading the signed form…",
+        "register": "Checking the file…",
+        "submit": "Saving the decision…"
+      }
+    },
+    "validation": {
+      "invalid": "Check this value and try again.",
+      "choosePurpose": "Choose the purpose.",
+      "chooseStatus": "Choose the family's decision.",
+      "chooseRelationship": "Choose who decided.",
+      "dateRequired": "Enter the date written on the form.",
+      "invalidDate": "Enter the date as {format}, for example {example}.",
+      "dateInFuture": "The date on the form can't be in the future.",
+      "noteTooLong": "Keep the note under 500 characters.",
+      "noAadhaar": "Don't type Aadhaar numbers here.",
+      "formRequired": "Upload the signed form. Agreement is recorded only with it.",
+      "fileRequired": "Choose the file of the signed form.",
+      "fileType": "Upload a PDF, JPG or PNG file.",
+      "fileTooLarge": "The file is larger than 25 MB. Scan it at a lower resolution.",
+      "fileEmpty": "The file is empty. Choose the scanned form again.",
+      "uploadFailed": "The upload didn't finish. Check the connection and try again."
+    },
+    "errors": {
+      "consent_not_given": {
+        "title": "The family had not agreed",
+        "body": "Only an agreement can be withdrawn. Record the family's decision instead."
+      },
+      "consent_already_decided": {
+        "title": "The family already decided",
+        "body": "Record their new decision (agreed or did not agree) instead of sending the form again."
+      },
+      "purpose_inactive": {
+        "title": "This purpose is switched off",
+        "body": "Switch it on under Consent purposes before recording answers on it."
+      },
+      "purpose_exists": {
+        "title": "The school already has this purpose",
+        "body": "Edit the purpose in the list instead, or use another short code."
+      },
+      "too_many_purposes": {
+        "title": "Too many purposes",
+        "body": "Switch off a purpose the school no longer uses before adding another."
+      },
+      "unknown_suggestion": {
+        "title": "This suggestion is no longer offered",
+        "body": "Reload the page and choose from the suggestions shown."
+      },
+      "no_forms": {
+        "title": "No forms to print",
+        "body": "No student matches. Choose another section, or print all forms."
+      },
+      "too_many_forms": {
+        "title": "Too many forms at once",
+        "body": "Print one section at a time, or only the forms not answered."
+      },
+      "no_purposes": {
+        "title": "No purposes in use",
+        "body": "Switch on at least one purpose under Consent purposes before printing forms."
+      }
+    }
+  },
+  "breaches": {
+    "nav": "Breach register",
+    "title": "Breach register",
+    "description": "Every personal-data breach, the three duties that follow it and the time left on each.",
+    "record": "Record a breach",
+    "noPermissionTitle": "You can't see the breach register",
+    "noPermissionBody": "The owner, principal and auditor can see it. Ask them if you need to.",
+    "colNoticed": "Noticed",
+    "colOrigin": "Recorded by",
+    "colCategories": "Kinds of data",
+    "colPeople": "People affected (about)",
+    "colNextDuty": "Next duty",
+    "colStatus": "Status",
+    "noDutyClosed": "Closed",
+    "noDutyLeft": "All duties recorded",
+    "processorAlertTitle": "{count, plural, one {SchoolOS reported a breach on its side} other {SchoolOS reported # breaches on its side}}",
+    "processorAlertBody": "Read what SchoolOS told you, decide what the school must do, and record each duty when it is done.",
+    "processorAlertLink": "Open the notice of {when}",
+    "emptyTitle": "No breaches recorded",
+    "emptyBody": "If personal data was lost, seen by someone who should not see it, or changed by mistake, record it here straight away: the clocks start from when you noticed it.",
+    "people": {
+      "children": "children",
+      "guardians": "guardians",
+      "staff": "staff"
+    },
+    "status": {
+      "open": "Open",
+      "contained": "Contained",
+      "closed": "Closed"
+    },
+    "origin": {
+      "school": "Our school",
+      "processor_notice": "From SchoolOS"
+    },
+    "categories": {
+      "identity": "Names and identity details",
+      "contact": "Contact details",
+      "aadhaar_partial": "Aadhaar last 4 digits",
+      "academic": "Marks and academic records",
+      "attendance": "Attendance",
+      "financial": "Fees and payments",
+      "documents": "Documents and certificates",
+      "insights": "Early-warning notes",
+      "staff": "Staff details",
+      "other": "Other"
+    },
+    "methods": {
+      "email": "E-mail",
+      "portal": "The Board's online portal",
+      "letter": "Letter",
+      "phone": "Phone",
+      "in_person": "In person",
+      "whatsapp": "WhatsApp",
+      "sos_notice": "SchoolOS parent notice",
+      "other": "Other"
+    },
+    "clock": {
+      "done": "{duty}: done {when}",
+      "noClock": "{duty}: as soon as possible",
+      "dueSoon": "{duty} due within the hour",
+      "dueIn": "{duty} due in {hours} h",
+      "overdueBy": "{duty} overdue by {hours} h"
+    },
+    "duties": {
+      "board_notice": {
+        "name": "Board notice",
+        "about": "Tell the Data Protection Board that a breach happened."
+      },
+      "board_report": {
+        "name": "Board report",
+        "about": "Send the Board the full report: what happened, what was done and who was told."
+      },
+      "people_notified": {
+        "name": "Families and staff told",
+        "about": "Tell each person affected, in plain words, what happened and what they can do."
+      }
+    },
+    "form": {
+      "title": "Record a breach",
+      "description": "Write what you know now. You can add to it later; the clocks start from when you noticed it.",
+      "notAllowedTitle": "You can't record breaches",
+      "notAllowedBody": "Only the owner or principal can record a breach. Tell them what happened straight away.",
+      "whenTitle": "When",
+      "noticedAt": "When the school noticed it",
+      "noticedAtHint": "Date and time in IST. It can't be in the future.",
+      "whatTitle": "What happened",
+      "descriptionLabel": "What happened",
+      "descriptionHint": "Not shown in any log. Write what happened, not people's names or Aadhaar numbers. 10 to 4,000 characters.",
+      "categoriesLabel": "Kinds of data involved",
+      "categoriesHint": "Tick every kind that may be involved.",
+      "countsLabel": "About how many people",
+      "countsHint": "Your best estimate. 0 if none.",
+      "approxChildren": "Children",
+      "approxGuardians": "Parents and guardians",
+      "approxStaff": "Staff",
+      "containmentLabel": "What the school has done to stop it (optional)",
+      "containmentHint": "For example: password changed, file taken down. Not shown in any log.",
+      "consequence": "The three duty clocks start from the time you noticed it. The record can't be deleted.",
+      "submit": "Record the breach"
+    },
+    "detail": {
+      "crumb": "Breach",
+      "title": "Breach noticed {when}",
+      "closedTitle": "Closed on {when}",
+      "closedReason": "Reason: {reason}",
+      "closedBody": "Every duty was recorded before it was closed.",
+      "processorTitle": "SchoolOS reported this breach",
+      "processorBody": "It happened on SchoolOS's side and may involve your school's data. Decide with your principal what the school must do.",
+      "processorSeverity": "Severity",
+      "processorPeople": "People (about)",
+      "processorOpened": "SchoolOS noticed it",
+      "processorWindow": "When it happened",
+      "window": "{from} to {to}",
+      "windowUnknown": "Not known yet",
+      "description": "What happened",
+      "descriptionHidden": "Hidden",
+      "categories": "Kinds of data",
+      "people": "People affected (about)",
+      "containment": "What was done to stop it",
+      "containmentNone": "Nothing recorded yet",
+      "affected": "People listed for individual notices",
+      "affectedCounts": "{students} students, {guardians} guardians, {staff} staff",
+      "recorded": "Recorded",
+      "factsTitle": "Facts",
+      "factsDescription": "Shown only here; never in a log or a notification.",
+      "dutiesTitle": "Duties and clocks",
+      "dutiesDescription": "Record each duty when it is done, with when and how.",
+      "dueAt": "Due {when}",
+      "doneHow": "How: {method}",
+      "defaultRule": "24 hours is a SchoolOS default until the Rules give a number.",
+      "template": "Use: {draft}",
+      "markDone": "Mark done",
+      "markDoneTitle": "Mark done: {duty}",
+      "markDoneConsequence": "The time and how are kept in the register and can't be changed later.",
+      "doneAt": "When it was done",
+      "method": "How",
+      "editFacts": "Edit facts",
+      "editFactsTitle": "Edit the facts",
+      "editFactsBody": "Add what you have learned. Earlier versions are kept in the audit log.",
+      "saveFacts": "Save the facts",
+      "statusLabel": "Status",
+      "statusHint": "Contained: it has stopped, though duties may still be open.",
+      "close": "Close the breach",
+      "closeTitle": "Close this breach?",
+      "closeOpenDuties": "Not recorded yet: {duties}. Say why the breach is closed without them.",
+      "closeAllDone": "All three duties are recorded.",
+      "closeConsequence": "A closed breach can't be changed. It stays in the register.",
+      "closeReason": "Why it is closed",
+      "closeReasonOptional": "Note (optional)",
+      "closeReasonHint": "10 to 500 characters. No names or Aadhaar numbers."
+    },
+    "drafts": {
+      "title": "Drafts",
+      "description": "Filled from this record and the school's privacy contact. Check every line before using one.",
+      "hide": "Hide the draft",
+      "family_notice": {
+        "name": "Family notice",
+        "show": "Show the family notice"
+      },
+      "board_outline": {
+        "name": "Board outline",
+        "show": "Show the Board outline"
+      },
+      "templateVersion": "Template {version}",
+      "notSent": "Nothing is sent from here.",
+      "copy": "Copy the text",
+      "print": "Print",
+      "copied": "Copied.",
+      "makeNotice": "Draft the family notice",
+      "makeNoticeTitle": "Make a parent notice draft?",
+      "makeNoticeBody": "The family notice becomes a draft in Notices, to complete, approve and send like any notice.",
+      "makeNoticeConsequence": "Nothing is sent. SchoolOS never sends a breach notice by itself.",
+      "noticeMadeTitle": "Notice draft made",
+      "noticeMadeBody": "Open it in Notices to complete it and send it for approval.",
+      "openNotice": "Open the notice draft"
+    },
+    "errors": {
+      "breach_closed": {
+        "title": "This breach is closed",
+        "body": "A closed breach can't be changed. Reload the page to see it as it is."
+      },
+      "duties_open": {
+        "title": "Some duties are not recorded",
+        "body": "Record every duty, or give the reason the breach is closed without them."
+      },
+      "pulled_automatically": {
+        "title": "SchoolOS notices arrive by themselves",
+        "body": "Record only breaches on the school's side here."
       }
     }
   },

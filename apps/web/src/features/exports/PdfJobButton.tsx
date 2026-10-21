@@ -7,12 +7,21 @@ import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button } from "@/components/ui/Button";
 import { newIdempotencyKey, unwrap, useBffClient } from "@/lib/bff/query";
 import { EXPORT_KEYS, startDownload, useExport } from "./data";
-import type { ConsentFormsCreate, Export, ReadinessSlipsCreate } from "./types";
+import type {
+  ConsentFormsCreate,
+  Export,
+  PurposeConsentFormsCreate,
+  ReadinessSlipsCreate,
+} from "./types";
 
-/** What to print: parent verification slips (FR-DQ-047) or APAAR consent forms (FR-APC-007). */
+/**
+ * What to print: parent verification slips (FR-DQ-047), APAAR consent forms (FR-APC-007) or the
+ * consent forms for the school's optional purposes (FR-DPDP-023).
+ */
 export type PdfJobRequest =
   | { kind: "readiness_slips"; body: ReadinessSlipsCreate }
-  | { kind: "apaar_consent_forms"; body: ConsentFormsCreate };
+  | { kind: "apaar_consent_forms"; body: ConsentFormsCreate }
+  | { kind: "consent_forms"; body: PurposeConsentFormsCreate };
 
 /**
  * The PDF of a print job: polls the export while the worker makes it, then offers the
@@ -128,9 +137,13 @@ export function PdfJobButton({
           ? await unwrap(
               api.POST("/api/v1/exports/readiness-slips", { headers, body: request.body }),
             )
-          : await unwrap(
-              api.POST("/api/v1/exports/apaar-consent-forms", { headers, body: request.body }),
-            );
+          : request.kind === "apaar_consent_forms"
+            ? await unwrap(
+                api.POST("/api/v1/exports/apaar-consent-forms", { headers, body: request.body }),
+              )
+            : await unwrap(
+                api.POST("/api/v1/exports/consent-forms", { headers, body: request.body }),
+              );
       setExportId(created.id);
       void queryClient.invalidateQueries({ queryKey: EXPORT_KEYS.all });
     } catch (failure) {

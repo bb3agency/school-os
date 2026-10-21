@@ -244,6 +244,12 @@ EXPECTED_TABLES = {
     "fees_reconciliation_items",
     # DL-07: restricted document files left out of an export without restricted details.
     "documents_withheld",
+    # R3-1B (0067_consents_breach, FR-DPDP-018): consents and the breach register (no texts).
+    "consent_purposes",
+    "consents",
+    "breach_records",
+    "breach_affected",
+    "breach_reminders",
 }
 
 

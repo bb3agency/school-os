@@ -441,6 +441,26 @@ templates:
     te:
       title: "తనిఖీ చేయాల్సిన ఆన్‌లైన్ చెల్లింపులు: {count}"
       body: "ఈ ఉదయం Razorpay చెల్లింపుల తనిఖీలో ఒక వ్యక్తి చూడాల్సిన {count, plural, one {# అంశం} other {# అంశాలు}} కనిపించాయి: రసీదు లేని చెల్లింపులు, తేడా ఉన్న మొత్తాలు, వాపసులు లేదా జమ కాని సెటిల్‌మెంట్లు. ఫీజులు > ఆన్‌లైన్ సరిపోలిక తెరవండి."
+  # --- R3-1B breach register (ADR-0050; FR-DPDP-032, FR-DPDP-035). To the holders of
+  # privacy.breach.manage (owner, principal). IDs and counts only.
+  privacy.breach.notice_received:
+    params: [breach_id]
+    resource_type: breach_record
+    en:
+      title: "Urgent: SchoolOS reports a security incident"
+      body: SchoolOS confirmed a security incident that affects your school's records. It is in your breach register with the kinds of data involved and the clocks for the Board and families. Open it now.
+    te:
+      title: "అత్యవసరం: SchoolOS ఒక భద్రతా సంఘటనను తెలియజేసింది"
+      body: మీ పాఠశాల రికార్డులపై ప్రభావం చూపే భద్రతా సంఘటనను SchoolOS నిర్ధారించింది. ప్రభావితమైన సమాచార రకాలు, బోర్డు మరియు కుటుంబాలకు తెలియజేయాల్సిన గడువులతో ఇది మీ ఉల్లంఘన రిజిస్టర్‌లో ఉంది. వెంటనే తెరవండి.
+  privacy.breach.reminder:
+    params: [breach_id, hours]
+    resource_type: breach_record
+    en:
+      title: Breach report to the Board not recorded yet
+      body: "It is {hours} hours since the school noticed a breach and the detailed report to the Data Protection Board is not recorded. It is due 72 hours after the breach was noticed. Open the breach register."
+    te:
+      title: బోర్డుకు ఉల్లంఘన నివేదిక ఇంకా నమోదు కాలేదు
+      body: "పాఠశాల ఒక ఉల్లంఘనను గమనించి {hours} గంటలు అయింది, డేటా ప్రొటెక్షన్ బోర్డుకు వివరమైన నివేదిక ఇంకా నమోదు కాలేదు. ఉల్లంఘన గమనించిన 72 గంటల్లోగా ఇవ్వాలి. ఉల్లంఘన రిజిస్టర్ తెరవండి."
 
   # R3-1D portal calendar (FR-RDY-006, FR-RDY-007; ADR-0053). Staff only, never parents (D45).
   # Params are a portal code and counts: the readiness of the event's linked profile across the

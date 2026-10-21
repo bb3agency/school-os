@@ -64,6 +64,10 @@ roles:
       fee.report: school_step_up
       # R2-2D online payments (ADR-0042 decision 6; docs/07 §6.2): the owner connects Razorpay
       payments.configure: school_step_up
+      # R3-1B consents and breaches (ADR-0049, ADR-0050; docs/07 §6.2)
+      consent.read: school
+      privacy.breach.read: school
+      privacy.breach.manage: school_step_up
       # R3-1C CBSE disclosure (ADR-0051; docs/07 §6.2)
       disclosure.edit: school
       disclosure.publish: school_step_up
@@ -149,6 +153,11 @@ roles:
       fee.report: school_step_up
       # R2-2E UPI and bank statements (ADR-0042 decision 9)
       fee.reconcile: school
+      # R3-1B consents and breaches (ADR-0049, ADR-0050; docs/07 §6.2)
+      consent.read: school
+      consent.record: school
+      privacy.breach.read: school
+      privacy.breach.manage: school_step_up
       # R3-1C CBSE disclosure (ADR-0051; docs/07 §6.2)
       disclosure.edit: school
       disclosure.publish: school_step_up
@@ -209,6 +218,9 @@ roles:
       # R2-1B fees (ADR-0042; docs/07 §6.2): school-wide only, never scoped (FR-FEE-024)
       fee.collect: school
       fee.concession.request: school
+      # R3-1B consents (ADR-0049; docs/07 §6.2)
+      consent.read: school
+      consent.record: school
       # R3-1C CBSE disclosure (ADR-0051; docs/07 §6.2)
       disclosure.edit: school
       # R3-1A privacy requests (ADR-0048; docs/07 §6.2)
@@ -245,6 +257,9 @@ roles:
       message.read: school
       # R2-1B fees (ADR-0042; docs/07 §6.2): school-wide only, never scoped (FR-FEE-024)
       fee.collect: school
+      # R3-1B consents (ADR-0049; docs/07 §6.2)
+      consent.read: school
+      consent.record: school
 
   accountant:
     name_en: Accountant
@@ -300,6 +315,8 @@ roles:
       marks.record: school
       marks.read: school
       apaar.consent.read: school
+      # R3-1B consents (ADR-0049; docs/07 §6.2)
+      consent.read: school
 
   class_teacher:
     name_en: Class teacher
@@ -326,6 +343,8 @@ roles:
       # R2-1C messaging (ADR-0043)
       messaging.optin.record: scoped
       message.read: scoped
+      # R3-1B consents (ADR-0049; docs/07 §6.2)
+      consent.read: scoped
 
   teacher:
     name_en: Teacher
@@ -357,6 +376,9 @@ roles:
       message.read: school
       # R2-1B fees (ADR-0042; docs/07 §6.2): school-wide only, never scoped (FR-FEE-024)
       fee.report: school_step_up
+      # R3-1B consents and breaches (ADR-0049, ADR-0050; docs/07 §6.2)
+      consent.read: school
+      privacy.breach.read: school
       # R3-1A privacy requests (ADR-0048; docs/07 §6.2)
       privacy.read: school
 

@@ -25,6 +25,7 @@ from app.privacy.config import LetterKey, TemplateKey
 from app.privacy.render import STYLE_CSP
 from app.privacy.schemas import (
     PrivacyCloseIn,
+    PrivacyConsentWithdrawalIn,
     PrivacyDownloadOut,
     PrivacyErasureIn,
     PrivacyErasurePlanOut,
@@ -234,6 +235,18 @@ def add_link(
     """Link a change request about the same student to a correction request (FR-DPDP-011;
     permission ``privacy.request.manage``)."""
     return service.add_link(db, ctx, request_id, body)
+
+
+@router.post("/privacy/requests/{request_id}/consent-withdrawal", response_model=PrivacyRequestOut)
+def withdraw_consent(
+    ctx: Manager, db: TenantDB, request_id: uuid.UUID, body: PrivacyConsentWithdrawalIn
+) -> PrivacyRequestOut:
+    """Record the withdrawal a consent withdrawal request asks for, on one optional purpose of
+    the request's student, and link both ways (R3-1B; FR-DPDP-026; permission
+    ``privacy.request.manage``, and ``consent.record`` in the service: 403 otherwise). Errors:
+    409 ``not_a_consent_withdrawal``, ``not_verified``, ``consent_not_given``,
+    ``request_closed``."""
+    return service.withdraw_consent(db, ctx, request_id, body)
 
 
 @router.get("/privacy/requests/{request_id}/erasure-plan", response_model=PrivacyErasurePlanOut)

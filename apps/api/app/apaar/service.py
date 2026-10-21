@@ -769,6 +769,15 @@ def refused_student_ids(
     )
 
 
+def current_decision(session: Session, student_id: uuid.UUID) -> ConsentEntryOut | None:
+    """The student's current APAAR decision (None: nothing recorded, i.e. pending), without the
+    recorder's name. For the read-only consent view (``app.privacy``, ADR-0049 decision 4): the
+    caller has already reached the student in its own scope and holds ``apaar.consent.read`` or
+    ``apaar.consent.record``. Changes nothing."""
+    row = repo.current(session, [student_id]).get(student_id)
+    return _entry_out(row, {}) if row is not None else None
+
+
 def export_records(session: Session) -> list[RecordTable]:
     """Worker only: the consent register and setting for the school's full data export
     (``app.admin``; the caller checked ``tenant.export_all`` and audits the export). Notes are
@@ -802,6 +811,7 @@ __all__ = [
     "ConsentAlreadyDecided",
     "ConsentNotGiven",
     "consent_statuses",
+    "current_decision",
     "export_records",
     "get_consent",
     "get_settings",

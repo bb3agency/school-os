@@ -1361,6 +1361,99 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/consent-purposes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Purposes
+         * @description The school's optional purposes (switched-off ones last) and the suggestions it may enable
+         *     (permission ``consent.read``, ``consent.record`` or ``tenant.settings.manage``).
+         */
+        get: operations["list_purposes_api_v1_consent_purposes_get"];
+        put?: never;
+        /**
+         * Create Purpose
+         * @description Enable a suggested purpose or add the school's own (permission
+         *     ``tenant.settings.manage``, MFA within 5 minutes). Errors: ``purpose_exists``,
+         *     ``too_many_purposes`` (409), ``unknown_suggestion`` (422). Accepts ``Idempotency-Key``.
+         */
+        post: operations["create_purpose_api_v1_consent_purposes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/consent-purposes/{purpose_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Purpose
+         * @description Edit a purpose's text or switch it on or off (``tenant.settings.manage``, step-up,
+         *     ``If-Match``). Changing the text of a purpose families answered makes the next
+         *     ``form_version``; earlier answers stay with their version.
+         */
+        patch: operations["update_purpose_api_v1_consent_purposes__purpose_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/consents/forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Print Forms
+         * @description Consent forms for one student or one section as print-ready A4 pages, one per student,
+         *     with "I agree" and "I do not agree" for every active purpose (permission ``consent.read`` or
+         *     ``consent.record``). Never prints an Aadhaar number. Errors: ``no_forms``,
+         *     ``too_many_forms``, ``no_purposes`` (409). The print is audited.
+         */
+        get: operations["print_forms_api_v1_consents_forms_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/consents/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Consent Summary
+         * @description Counts per active purpose and section of the current year (permission ``consent.read``
+         *     or ``consent.record``; class teachers: their sections). Counts only.
+         */
+        get: operations["consent_summary_api_v1_consents_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/disclosure/draft": {
         parameters: {
             query?: never;
@@ -2523,6 +2616,32 @@ export interface paths {
          *     ``Idempotency-Key``.
          */
         post: operations["create_consent_forms_export_api_v1_exports_apaar_consent_forms_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exports/consent-forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Purpose Consent Forms Export
+         * @description Print the consent forms for the school's optional purposes of one student or one section
+         *     to a PDF (FR-DPDP-023; the same forms as ``GET /consents/forms``). Permission
+         *     ``consent.read`` or ``consent.record`` in scope (404 outside it) and ``student.read_basic``,
+         *     with a recent sign-in with MFA (428). ``only_unanswered`` (sections only) prints only
+         *     students with a purpose not answered yet. The PDF is made in the background (202). Errors:
+         *     409 ``no_forms``, ``too_many_forms``, ``no_purposes``; 422 ``section_only``. Accepts
+         *     ``Idempotency-Key``.
+         */
+        post: operations["create_purpose_consent_forms_export_api_v1_exports_consent_forms_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6316,6 +6435,101 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/incidents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Incidents
+         * @description SchoolOS incident records, newest first, with the CERT-In clock (T0 + 6 h) and how many
+         *     affected schools were notified.
+         */
+        get: operations["list_incidents_api_v1_platform_incidents_get"];
+        put?: never;
+        /**
+         * Create Incident
+         * @description Open an incident record (step-up). The summary holds categories and counts only: a run of
+         *     6 or more digits or an e-mail address is refused (422). ``Idempotency-Key`` optional.
+         */
+        post: operations["create_incident_api_v1_platform_incidents_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/incidents/{incident_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Incident
+         * @description One incident with its affected schools and their school-notice clocks (confirmation +
+         *     24 h). ``ETag`` for ``If-Match`` on PATCH.
+         */
+        get: operations["get_incident_api_v1_platform_incidents__incident_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Incident
+         * @description Status, severity, summary, CERT-In report time, lead operator, and schools told by phone
+         *     or e-mail (dedicated hosts). ``If-Match`` required (400 ``if_match_required``, 412 stale).
+         */
+        patch: operations["update_incident_api_v1_platform_incidents__incident_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/platform/incidents/{incident_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Incident
+         * @description Two different operators confirm the affected schools (SEC-029) before any school is
+         *     notified. ``409 same_operator``, ``no_schools``, ``incident_confirmed``,
+         *     ``request_expired``, ``requester_not_authorised`` or ``approver_not_eligible``.
+         */
+        post: operations["confirm_incident_api_v1_platform_incidents__incident_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/incidents/{incident_id}/schools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Incident School
+         * @description Mark a school as affected: category codes, approximate number of people, window. Clears
+         *     a first confirmation; ``409 incident_confirmed`` after the second.
+         */
+        post: operations["add_incident_school_api_v1_platform_incidents__incident_id__schools_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/invoice-runs": {
         parameters: {
             query?: never;
@@ -7220,6 +7434,131 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/privacy/breaches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Breaches
+         * @description The school's breach register: open breaches first by their next duty's clock (time left
+         *     in hours), then closed ones (permission ``privacy.breach.read``).
+         */
+        get: operations["list_breaches_api_v1_privacy_breaches_get"];
+        put?: never;
+        /**
+         * Create Breach
+         * @description Record a breach: when it was noticed, what happened (encrypted, never logged), the kinds
+         *     of data and approximate numbers of children, guardians and staff (permission
+         *     ``privacy.breach.manage``, MFA within 5 minutes). Accepts ``Idempotency-Key``. Errors:
+         *     ``date_in_future``, ``pulled_automatically``, ``aadhaar_full_number_rejected`` (422).
+         */
+        post: operations["create_breach_api_v1_privacy_breaches_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/privacy/breaches/{breach_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Breach
+         * @description One breach with its texts, three duties and their clocks, and affected counts
+         *     (permission ``privacy.breach.read``). ``ETag`` for ``If-Match`` on PATCH.
+         */
+        get: operations["get_breach_api_v1_privacy_breaches__breach_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Breach
+         * @description Change facts or status, or record a duty as done with when and how (permission
+         *     ``privacy.breach.manage``, step-up, ``If-Match``). Errors: ``breach_closed``,
+         *     ``duties_open`` (409), stale ``If-Match`` (412).
+         */
+        patch: operations["update_breach_api_v1_privacy_breaches__breach_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/privacy/breaches/{breach_id}/affected": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Affected
+         * @description The affected students, guardians and staff (ids only; permission
+         *     ``privacy.breach.read``).
+         */
+        get: operations["get_affected_api_v1_privacy_breaches__breach_id__affected_get"];
+        /**
+         * Set Affected
+         * @description Replace the list of affected people, to prepare individual notices (ids of this school
+         *     only, at most 5,000; permission ``privacy.breach.manage``, step-up).
+         */
+        put: operations["set_affected_api_v1_privacy_breaches__breach_id__affected_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/privacy/breaches/{breach_id}/drafts/{draft}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Draft
+         * @description The family notice or the Board outline filled from the record and the school's privacy
+         *     contact (``[not set]`` where the school has not filled a value). Nothing is sent
+         *     (permission ``privacy.breach.read``).
+         */
+        get: operations["get_draft_api_v1_privacy_breaches__breach_id__drafts__draft__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/privacy/breaches/{breach_id}/notice-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Notice Draft
+         * @description Turn the family notice into a parent notice draft (M4), to be completed, approved and
+         *     sent like any notice; SchoolOS never sends a breach notice by itself (permission
+         *     ``privacy.breach.manage`` with step-up, and ``notice.draft``: 403 otherwise).
+         */
+        post: operations["create_notice_draft_api_v1_privacy_breaches__breach_id__notice_draft_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/privacy/files/{export_id}": {
         parameters: {
             query?: never;
@@ -7377,6 +7716,30 @@ export interface paths {
          *     change requests (409 ``changes_pending``).
          */
         post: operations["close_request_api_v1_privacy_requests__request_id__close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/privacy/requests/{request_id}/consent-withdrawal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw Consent
+         * @description Record the withdrawal a consent withdrawal request asks for, on one optional purpose of
+         *     the request's student, and link both ways (R3-1B; FR-DPDP-026; permission
+         *     ``privacy.request.manage``, and ``consent.record`` in the service: 403 otherwise). Errors:
+         *     409 ``not_a_consent_withdrawal``, ``not_verified``, ``consent_not_given``,
+         *     ``request_closed``.
+         */
+        post: operations["withdraw_consent_api_v1_privacy_requests__request_id__consent_withdrawal_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -8400,6 +8763,58 @@ export interface paths {
         get: operations["preview_certificate_api_v1_students__student_id__certificates_preview_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/consent-view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Consent View
+         * @description The one read-only consent view of a student: optional purposes, the APAAR decision and the
+         *     guardians' WhatsApp opt-ins, each from its own register (permission ``consent.read``; class
+         *     teachers: their sections). APAAR and WhatsApp parts are null for readers of neither.
+         */
+        get: operations["consent_view_api_v1_students__student_id__consent_view_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/consents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Student Consents
+         * @description Every purpose's current answer and history for one student (permission ``consent.read``
+         *     or ``consent.record``; class teachers: their sections). ``ETag`` is the number of decisions,
+         *     for ``If-Match`` on the next one.
+         */
+        get: operations["get_student_consents_api_v1_students__student_id__consents_get"];
+        put?: never;
+        /**
+         * Record Consent
+         * @description Record a family's decision on one purpose: ``given`` (with the signed form), ``refused``,
+         *     ``withdrawn`` (after a given consent) or ``pending`` (form sent home). Appended; nothing is
+         *     overwritten (permission ``consent.record``). Accepts ``Idempotency-Key`` and ``If-Match``.
+         *     Errors: ``consent_not_given`` / ``consent_already_decided`` / ``purpose_inactive`` (409),
+         *     stale ``If-Match`` (412), ``signed_form_required`` and other field errors (422).
+         */
+        post: operations["record_consent_api_v1_students__student_id__consents_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -9810,6 +10225,41 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** AffectedCountsOut */
+        AffectedCountsOut: {
+            /** Guardians */
+            guardians: number;
+            /** Staff */
+            staff: number;
+            /** Students */
+            students: number;
+        };
+        /**
+         * AffectedIn
+         * @description The full list of affected people (replaces the previous list; ids only).
+         */
+        AffectedIn: {
+            /** Guardian Ids */
+            guardian_ids?: string[];
+            /** Membership Ids */
+            membership_ids?: string[];
+            /** Student Ids */
+            student_ids?: string[];
+        };
+        /** AffectedOut */
+        AffectedOut: {
+            /**
+             * Breach Id
+             * Format: uuid
+             */
+            breach_id: string;
+            /** Guardian Ids */
+            guardian_ids: string[];
+            /** Membership Ids */
+            membership_ids: string[];
+            /** Student Ids */
+            student_ids: string[];
+        };
         /** AgentConfigOut */
         AgentConfigOut: {
             /**
@@ -10015,6 +10465,21 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** AnswerCounts */
+        AnswerCounts: {
+            /** Given */
+            given: number;
+            /** Not Answered */
+            not_answered: number;
+            /** Pending */
+            pending: number;
+            /** Refused */
+            refused: number;
+            /** Total */
+            total: number;
+            /** Withdrawn */
+            withdrawn: number;
+        };
         /** ApaarSettingsIn */
         ApaarSettingsIn: {
             /**
@@ -10038,6 +10503,23 @@ export interface components {
             form_language: ("en" | "te") | null;
             /** Version */
             version: number;
+        };
+        /**
+         * ApaarStateOut
+         * @description The APAAR register's current decision (read-only here; recorded on /apaar).
+         */
+        ApaarStateOut: {
+            /** Decided On */
+            decided_on: string | null;
+            /** Has Form */
+            has_form: boolean;
+            /** Recorded At */
+            recorded_at: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "given" | "refused" | "pending" | "withdrawn";
         };
         /**
          * MemberOut
@@ -10831,6 +11313,183 @@ export interface components {
             note: string;
             /** Required */
             required: boolean;
+        };
+        /**
+         * BreachCreate
+         * @description Record a breach (FR-DPDP-033). ``origin`` ``processor_notice`` is for a notice SchoolOS
+         *     gave by phone or e-mail on a dedicated host (FR-DPDP-038); on the shared platform those
+         *     arrive by themselves.
+         */
+        BreachCreate: {
+            /**
+             * Approx Children
+             * @default 0
+             */
+            approx_children: number;
+            /**
+             * Approx Guardians
+             * @default 0
+             */
+            approx_guardians: number;
+            /**
+             * Approx Staff
+             * @default 0
+             */
+            approx_staff: number;
+            /** Categories */
+            categories: ("identity" | "contact" | "aadhaar_partial" | "academic" | "attendance" | "financial" | "documents" | "insights" | "staff" | "other")[];
+            /**
+             * Containment
+             * @description Steps taken to contain it. Encrypted; never logged.
+             */
+            containment?: string | null;
+            /**
+             * Description
+             * @description What happened. Encrypted; never logged.
+             */
+            description: string;
+            /**
+             * Noticed At
+             * Format: date-time
+             * @description T0: when the school noticed it (not future).
+             */
+            noticed_at: string;
+            /**
+             * Origin
+             * @default school
+             * @enum {string}
+             */
+            origin: "school" | "processor_notice";
+        };
+        /** BreachDetailOut */
+        BreachDetailOut: {
+            affected: components["schemas"]["AffectedCountsOut"];
+            /** Approx Children */
+            approx_children: number;
+            /** Approx Guardians */
+            approx_guardians: number;
+            /** Approx Staff */
+            approx_staff: number;
+            /** Categories */
+            categories: string[];
+            /** Close Reason */
+            close_reason: string | null;
+            /** Closed At */
+            closed_at: string | null;
+            /** Containment */
+            containment: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description: string | null;
+            /** Duties */
+            duties: components["schemas"]["DutyOut"][];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            next_duty: components["schemas"]["NextDutyOut"] | null;
+            /**
+             * Noticed At
+             * Format: date-time
+             */
+            noticed_at: string;
+            /**
+             * Origin
+             * @enum {string}
+             */
+            origin: "school" | "processor_notice";
+            /** Platform Incident Id */
+            platform_incident_id: string | null;
+            processor_facts: components["schemas"]["ProcessorFactsOut"] | null;
+            /** Recorded By Name */
+            recorded_by_name: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "contained" | "closed";
+            /** Version */
+            version: number;
+        };
+        /** BreachOut */
+        BreachOut: {
+            /** Approx Children */
+            approx_children: number;
+            /** Approx Guardians */
+            approx_guardians: number;
+            /** Approx Staff */
+            approx_staff: number;
+            /** Categories */
+            categories: string[];
+            /** Closed At */
+            closed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Duties */
+            duties: components["schemas"]["DutyOut"][];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            next_duty: components["schemas"]["NextDutyOut"] | null;
+            /**
+             * Noticed At
+             * Format: date-time
+             */
+            noticed_at: string;
+            /**
+             * Origin
+             * @enum {string}
+             */
+            origin: "school" | "processor_notice";
+            /** Platform Incident Id */
+            platform_incident_id: string | null;
+            processor_facts: components["schemas"]["ProcessorFactsOut"] | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "contained" | "closed";
+            /** Version */
+            version: number;
+        };
+        /**
+         * BreachUpdate
+         * @description Change facts, status or record a duty as done (FR-DPDP-034). Closing needs all three
+         *     duties recorded or a ``close_reason``.
+         */
+        BreachUpdate: {
+            /** Approx Children */
+            approx_children?: number | null;
+            /** Approx Guardians */
+            approx_guardians?: number | null;
+            /** Approx Staff */
+            approx_staff?: number | null;
+            board_notice?: components["schemas"]["DutyIn"] | null;
+            board_report?: components["schemas"]["DutyIn"] | null;
+            /** Categories */
+            categories?: ("identity" | "contact" | "aadhaar_partial" | "academic" | "attendance" | "financial" | "documents" | "insights" | "staff" | "other")[] | null;
+            /**
+             * Close Reason
+             * @description Why the breach is closed with a duty not recorded.
+             */
+            close_reason?: string | null;
+            /** Containment */
+            containment?: string | null;
+            /** Description */
+            description?: string | null;
+            people_notified?: components["schemas"]["DutyIn"] | null;
+            /** Status */
+            status?: ("open" | "contained" | "closed") | null;
         };
         /** BreakGlassIn */
         BreakGlassIn: {
@@ -12462,6 +13121,24 @@ export interface components {
             sections: components["schemas"]["SectionSummaryOut"][];
             totals: components["schemas"]["StatusCounts"];
         };
+        /**
+         * ConsentViewOut
+         * @description The one read-only consent view of a student (FR-DPDP-025): optional purposes, the APAAR
+         *     decision and the guardians' WhatsApp opt-ins, each from its own register.
+         */
+        ConsentViewOut: {
+            /** @description Null when the reader cannot see the APAAR register (apaar.consent.read). */
+            apaar: components["schemas"]["ApaarStateOut"] | null;
+            /** Purposes */
+            purposes: components["schemas"]["PurposeStateOut"][];
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** @description Null when the reader cannot see opt-ins (message.read). */
+            whatsapp: components["schemas"]["WhatsappStateOut"] | null;
+        };
         /** ContentLine */
         ContentLine: {
             /** Key */
@@ -13245,6 +13922,24 @@ export interface components {
             title: string | null;
         };
         /**
+         * DraftOut
+         * @description A draft filled from the record and the school's privacy contact (FR-DPDP-036); unfilled
+         *     placeholders print ``[not set]``. Nothing is sent.
+         */
+        DraftOut: {
+            /**
+             * Draft
+             * @enum {string}
+             */
+            draft: "family_notice" | "board_outline";
+            /** Template Version */
+            template_version: string;
+            /** Text */
+            text: string;
+            /** Title */
+            title: string;
+        };
+        /**
          * DueLine
          * @description One (instalment, head) line of a fee account; ``head_id`` null = the late-fee line of that
          *     instalment. ``due`` = charged - concessions + late fee + adjustments - paid + refunded.
@@ -13351,6 +14046,43 @@ export interface components {
         DuplicateRequest: {
             /** Reason */
             reason: string;
+        };
+        /** DutyIn */
+        DutyIn: {
+            /**
+             * Done At
+             * Format: date-time
+             */
+            done_at: string;
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "email" | "portal" | "letter" | "phone" | "in_person" | "whatsapp" | "sos_notice" | "other";
+        };
+        /** DutyOut */
+        DutyOut: {
+            /**
+             * Default Rule
+             * @description True for the Board's initial notice: the 24 h limit is a SchoolOS default (to confirm), not a number in the Rules.
+             */
+            default_rule: boolean;
+            /** Done At */
+            done_at: string | null;
+            /**
+             * Due At
+             * @description When it is due (null: without delay, no fixed clock).
+             */
+            due_at: string | null;
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "board_notice" | "board_report" | "people_notified";
+            /** Method */
+            method: ("email" | "portal" | "letter" | "phone" | "in_person" | "whatsapp" | "sos_notice" | "other") | null;
+            /** Overdue */
+            overdue: boolean;
         };
         /**
          * EmbeddedSignupIn
@@ -13671,7 +14403,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "board_precheck" | "portal_precheck" | "student_list" | "readiness_slips" | "apaar_consent_forms";
+            kind: "board_precheck" | "portal_precheck" | "student_list" | "readiness_slips" | "apaar_consent_forms" | "consent_forms";
             /**
              * Language
              * @enum {string}
@@ -14411,6 +15143,20 @@ export interface components {
              */
             relationship: "father" | "mother" | "guardian";
         };
+        /** GuardianOptinsBrief */
+        GuardianOptinsBrief: {
+            /** Categories */
+            categories: components["schemas"]["OptinCategoryOut"][];
+            /** Full Name */
+            full_name: string | null;
+            /**
+             * Guardian Id
+             * Format: uuid
+             */
+            guardian_id: string;
+            /** Relationship */
+            relationship: string | null;
+        };
         /** GuardianOptinsOut */
         GuardianOptinsOut: {
             /** Categories */
@@ -14802,6 +15548,235 @@ export interface components {
              * @enum {string}
              */
             status: "uploaded" | "parsing" | "parsed" | "validating" | "validated" | "committing" | "committed" | "reverting" | "reverted" | "failed";
+        };
+        /** IncidentDetailOut */
+        IncidentDetailOut: {
+            /**
+             * Cert In Due At
+             * @description T0 + 6 h while CERT-In is required and not yet reported.
+             */
+            cert_in_due_at: string | null;
+            /** Cert In Reported At */
+            cert_in_reported_at: string | null;
+            /** Cert In Required */
+            cert_in_required: boolean;
+            /**
+             * Confirm By
+             * @description When the first confirmation expires without a second one.
+             */
+            confirm_by: string | null;
+            /** Confirmed At */
+            confirmed_at: string | null;
+            /** Confirmed By */
+            confirmed_by: string | null;
+            /** Created At */
+            created_at: string | null;
+            /**
+             * Created By
+             * Format: uuid
+             */
+            created_by: string;
+            /** First Confirmed At */
+            first_confirmed_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Lead Operator Id
+             * Format: uuid
+             */
+            lead_operator_id: string;
+            /**
+             * Opened At
+             * Format: date-time
+             */
+            opened_at: string;
+            /** Schools */
+            schools: components["schemas"]["IncidentSchoolOut"][];
+            /** Schools Count */
+            schools_count: number;
+            /** Schools Notified */
+            schools_notified: number;
+            /** Second Confirmed By */
+            second_confirmed_by: string | null;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "P1" | "P2" | "P3" | "P4";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "contained" | "resolved" | "closed";
+            /** Summary */
+            summary: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * IncidentIn
+         * @description Open an incident record. ``summary``: what kind of data and roughly how much (no names,
+         *     numbers, e-mail addresses or record text).
+         */
+        IncidentIn: {
+            /**
+             * Cert In Required
+             * @default false
+             */
+            cert_in_required: boolean;
+            /**
+             * Lead Operator Id
+             * @description Defaults to the operator opening the record.
+             */
+            lead_operator_id?: string | null;
+            /**
+             * Opened At
+             * Format: date-time
+             * @description T0: when SchoolOS noticed the incident.
+             */
+            opened_at: string;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "P1" | "P2" | "P3" | "P4";
+            /** Summary */
+            summary: string;
+        };
+        /** IncidentOut */
+        IncidentOut: {
+            /**
+             * Cert In Due At
+             * @description T0 + 6 h while CERT-In is required and not yet reported.
+             */
+            cert_in_due_at: string | null;
+            /** Cert In Reported At */
+            cert_in_reported_at: string | null;
+            /** Cert In Required */
+            cert_in_required: boolean;
+            /**
+             * Confirm By
+             * @description When the first confirmation expires without a second one.
+             */
+            confirm_by: string | null;
+            /** Confirmed At */
+            confirmed_at: string | null;
+            /** Confirmed By */
+            confirmed_by: string | null;
+            /** Created At */
+            created_at: string | null;
+            /**
+             * Created By
+             * Format: uuid
+             */
+            created_by: string;
+            /** First Confirmed At */
+            first_confirmed_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Lead Operator Id
+             * Format: uuid
+             */
+            lead_operator_id: string;
+            /**
+             * Opened At
+             * Format: date-time
+             */
+            opened_at: string;
+            /** Schools Count */
+            schools_count: number;
+            /** Schools Notified */
+            schools_notified: number;
+            /** Second Confirmed By */
+            second_confirmed_by: string | null;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "P1" | "P2" | "P3" | "P4";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "contained" | "resolved" | "closed";
+            /** Summary */
+            summary: string;
+            /** Version */
+            version: number;
+        };
+        /** IncidentPatch */
+        IncidentPatch: {
+            /** Cert In Reported At */
+            cert_in_reported_at?: string | null;
+            /** Cert In Required */
+            cert_in_required?: boolean | null;
+            /** Lead Operator Id */
+            lead_operator_id?: string | null;
+            /**
+             * Notified Tenant Ids
+             * @description Schools told by phone or e-mail (dedicated hosts have no pull): records when the school was notified.
+             */
+            notified_tenant_ids?: string[];
+            /** Severity */
+            severity?: ("P1" | "P2" | "P3" | "P4") | null;
+            /** Status */
+            status?: ("open" | "contained" | "resolved" | "closed") | null;
+            /** Summary */
+            summary?: string | null;
+        };
+        /** IncidentSchoolIn */
+        IncidentSchoolIn: {
+            /** Approx People */
+            approx_people: number;
+            /** Categories */
+            categories: ("identity" | "contact" | "aadhaar_partial" | "academic" | "attendance" | "financial" | "documents" | "insights" | "staff" | "other")[];
+            /**
+             * Tenant Id
+             * Format: uuid
+             */
+            tenant_id: string;
+            /** Window From */
+            window_from?: string | null;
+            /** Window To */
+            window_to?: string | null;
+        };
+        /** IncidentSchoolOut */
+        IncidentSchoolOut: {
+            /** Approx People */
+            approx_people: number;
+            /** Categories */
+            categories: string[];
+            /** Mode */
+            mode: string | null;
+            /**
+             * Notice Due At
+             * @description Confirmation + 24 h while the school has not been notified.
+             */
+            notice_due_at: string | null;
+            /** Pulled At */
+            pulled_at: string | null;
+            /** School Name */
+            school_name: string | null;
+            /** School Notified At */
+            school_notified_at: string | null;
+            /** Tenant Code */
+            tenant_code: string | null;
+            /**
+             * Tenant Id
+             * Format: uuid
+             */
+            tenant_id: string;
+            /** Window From */
+            window_from: string | null;
+            /** Window To */
+            window_to: string | null;
         };
         /** IndicatorsOut */
         IndicatorsOut: {
@@ -16374,6 +17349,21 @@ export interface components {
              */
             student_id: string;
         };
+        /** NextDutyOut */
+        NextDutyOut: {
+            /** Due At */
+            due_at: string | null;
+            /**
+             * Hours Left
+             * @description Whole hours until due (negative when overdue); null without a clock.
+             */
+            hours_left: number | null;
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "board_notice" | "board_report" | "people_notified";
+        };
         /** NoteIn */
         NoteIn: {
             /**
@@ -16454,6 +17444,19 @@ export interface components {
             mime_type: string;
             /** Url */
             url: string;
+        };
+        /**
+         * NoticeDraftOut
+         * @description The parent notice created in M4 (``source = staff_text``; approval needed).
+         */
+        NoticeDraftOut: {
+            /**
+             * Notice Id
+             * Format: uuid
+             */
+            notice_id: string;
+            /** Status */
+            status: string;
         };
         /** NoticeOut */
         NoticeOut: {
@@ -16732,6 +17735,15 @@ export interface components {
             /** Roles */
             roles: ("platform_owner" | "platform_engineer" | "support_agent" | "billing_admin" | "platform_viewer")[];
         };
+        /** OptinCategoryOut */
+        OptinCategoryOut: {
+            /** Category */
+            category: string;
+            /** Decided On */
+            decided_on: string | null;
+            /** Status */
+            status: string;
+        };
         /** OptinEntryOut */
         OptinEntryOut: {
             /**
@@ -16969,6 +17981,13 @@ export interface components {
             data: components["schemas"]["ImportSummary"][];
             /** Next Cursor */
             next_cursor: string | null;
+        };
+        /** Page[IncidentOut] */
+        Page_IncidentOut_: {
+            /** Data */
+            data: components["schemas"]["IncidentOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
         };
         /** Page[InsightFlagOut] */
         Page_InsightFlagOut_: {
@@ -18209,6 +19228,29 @@ export interface components {
             response_text?: string | null;
         };
         /**
+         * PrivacyConsentWithdrawalIn
+         * @description R3-1B (FR-DPDP-026, ADR-0049 decision 6): record the withdrawal a ``consent_withdrawal``
+         *     request asks for, on one optional purpose of the request's student.
+         */
+        PrivacyConsentWithdrawalIn: {
+            /**
+             * Decided On
+             * Format: date
+             * @description The date the family asked (on the request).
+             */
+            decided_on: string;
+            /**
+             * Purpose Id
+             * Format: uuid
+             */
+            purpose_id: string;
+            /**
+             * Relationship
+             * @enum {string}
+             */
+            relationship: "father" | "mother" | "guardian";
+        };
+        /**
          * PrivacyContact
          * @description The school's grievance and data-protection contact, printed on notices, letters and
          *     access reports and shown in the staff footer (PRV-011).
@@ -18789,6 +19831,22 @@ export interface components {
              */
             unfilled: string[];
         };
+        /**
+         * ProcessorFactsOut
+         * @description What SchoolOS reported (codes, counts and times only).
+         */
+        ProcessorFactsOut: {
+            /** Approx People */
+            approx_people?: number | null;
+            /** Opened At */
+            opened_at?: string | null;
+            /** Severity */
+            severity?: string | null;
+            /** Window From */
+            window_from?: string | null;
+            /** Window To */
+            window_to?: string | null;
+        };
         /** ProfileOut */
         ProfileOut: {
             /**
@@ -19288,6 +20346,277 @@ export interface components {
              * @description The publisher confirms the chosen documents contain no student's personal data (FR-DISC-005); false or missing answers 422 confirmation_required.
              */
             confirm_no_student_data: boolean;
+        };
+        /** PurposeConsentEntryOut */
+        PurposeConsentEntryOut: {
+            /** Decided On */
+            decided_on: string | null;
+            /** Evidence Document Id */
+            evidence_document_id: string | null;
+            /** Form Language */
+            form_language: ("en" | "te") | null;
+            /** Form Version */
+            form_version: number;
+            /** Guardian Id */
+            guardian_id: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Note */
+            note: string | null;
+            /** Privacy Request Id */
+            privacy_request_id: string | null;
+            /**
+             * Purpose Id
+             * Format: uuid
+             */
+            purpose_id: string;
+            /**
+             * Recorded At
+             * Format: date-time
+             */
+            recorded_at: string;
+            /**
+             * Recorded By
+             * Format: uuid
+             */
+            recorded_by: string;
+            /** Recorded By Name */
+            recorded_by_name: string | null;
+            /** Relationship */
+            relationship: ("father" | "mother" | "guardian") | null;
+            /** Seq */
+            seq: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "given" | "refused" | "pending" | "withdrawn";
+        };
+        /**
+         * PurposeConsentFormsCreate
+         * @description FR-DPDP-023: consent forms for the school's optional purposes as one PDF (the same forms
+         *     as ``GET /consents/forms``). ``only_unanswered`` (section only) prints only students with an
+         *     active purpose not answered yet; ``language`` is the school's parent language when left out.
+         */
+        PurposeConsentFormsCreate: {
+            /** Language */
+            language?: ("en" | "te") | null;
+            /**
+             * Only Unanswered
+             * @default false
+             */
+            only_unanswered: boolean;
+            /** Section Id */
+            section_id?: string | null;
+            /** Student Id */
+            student_id?: string | null;
+        };
+        /**
+         * PurposeConsentIn
+         * @description A family's decision on one purpose as written on the returned form (FR-DPDP-021).
+         *
+         *     ``given`` needs the signed form (``evidence_document_id``: a document uploaded with purpose
+         *     ``evidence``). Every decision but ``pending`` names who decided (``relationship``, and
+         *     ``guardian_id`` when that guardian is on the student's record) and the date on the form.
+         */
+        PurposeConsentIn: {
+            /** Decided On */
+            decided_on?: string | null;
+            /**
+             * Evidence Document Id
+             * @description The signed form, uploaded first as a document (evidence).
+             */
+            evidence_document_id?: string | null;
+            /** Form Language */
+            form_language?: ("en" | "te") | null;
+            /** Guardian Id */
+            guardian_id?: string | null;
+            /**
+             * Note
+             * @description Optional note (at most 500 characters; no Aadhaar numbers).
+             */
+            note?: string | null;
+            /**
+             * Purpose Id
+             * Format: uuid
+             */
+            purpose_id: string;
+            /** Relationship */
+            relationship?: ("father" | "mother" | "guardian") | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "given" | "refused" | "pending" | "withdrawn";
+        };
+        /**
+         * PurposeConsentSummaryOut
+         * @description Counts per active purpose and section of the current academic year, for the students the
+         *     caller may see (FR-DPDP-026). Counts only.
+         */
+        PurposeConsentSummaryOut: {
+            /** Purposes */
+            purposes: components["schemas"]["PurposeSummaryOut"][];
+        };
+        /**
+         * PurposeCreate
+         * @description Enable a suggested purpose (``suggested_key`` only; its text is copied and may be edited
+         *     later) or add the school's own (``key``, ``label_en``, ``description``; ``label_te``
+         *     optional).
+         */
+        PurposeCreate: {
+            /**
+             * Description
+             * @description What is used, why, who receives it and for how long (10-1000 characters).
+             */
+            description?: string | null;
+            /** Key */
+            key?: string | null;
+            /** Label En */
+            label_en?: string | null;
+            /** Label Te */
+            label_te?: string | null;
+            /** Suggested Key */
+            suggested_key?: string | null;
+        };
+        /** PurposeListOut */
+        PurposeListOut: {
+            /** Data */
+            data: components["schemas"]["PurposeOut"][];
+            /** Suggestions */
+            suggestions: components["schemas"]["PurposeSuggestionOut"][];
+        };
+        /** PurposeOut */
+        PurposeOut: {
+            /** Active */
+            active: boolean;
+            /**
+             * Answered
+             * @description Decisions recorded for this purpose (all versions).
+             */
+            answered: number;
+            /**
+             * Current Version Answered
+             * @description True when a decision refers to the current form_version: a text change will make a new version.
+             */
+            current_version_answered: boolean;
+            /** Description */
+            description: string;
+            /** Form Version */
+            form_version: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            /** Label En */
+            label_en: string;
+            /** Label Te */
+            label_te: string | null;
+            /** Suggested Key */
+            suggested_key: string | null;
+            /** Version */
+            version: number;
+        };
+        /** PurposeSectionCountsOut */
+        PurposeSectionCountsOut: {
+            /** Class Section */
+            class_section: string;
+            counts: components["schemas"]["AnswerCounts"];
+            /**
+             * Section Id
+             * Format: uuid
+             */
+            section_id: string;
+        };
+        /**
+         * PurposeStateOut
+         * @description One purpose for one student: the current answer and (in the register) the history.
+         */
+        PurposeStateOut: {
+            /** Active */
+            active: boolean;
+            /**
+             * Answer
+             * @enum {string}
+             */
+            answer: "given" | "refused" | "pending" | "withdrawn" | "not_answered";
+            current: components["schemas"]["PurposeConsentEntryOut"] | null;
+            /** Form Version */
+            form_version: number;
+            /** History */
+            history?: components["schemas"]["PurposeConsentEntryOut"][];
+            /** Key */
+            key: string;
+            /** Label En */
+            label_en: string;
+            /**
+             * Purpose Id
+             * Format: uuid
+             */
+            purpose_id: string;
+            /**
+             * State
+             * @description given only when the latest decision is given; anything else (no decision, pending, refused, withdrawn, purpose switched off) is not_given (FR-DPDP-024).
+             * @enum {string}
+             */
+            state: "given" | "not_given";
+        };
+        /** PurposeSuggestionOut */
+        PurposeSuggestionOut: {
+            /** Description */
+            description: string;
+            /**
+             * Enabled
+             * @description True when the school already has a purpose from it.
+             */
+            enabled: boolean;
+            /** Key */
+            key: string;
+            /** Label En */
+            label_en: string;
+            /** Label Te */
+            label_te: string | null;
+        };
+        /** PurposeSummaryOut */
+        PurposeSummaryOut: {
+            /** Key */
+            key: string;
+            /** Label En */
+            label_en: string;
+            /**
+             * Purpose Id
+             * Format: uuid
+             */
+            purpose_id: string;
+            /** Sections */
+            sections: components["schemas"]["PurposeSectionCountsOut"][];
+            totals: components["schemas"]["AnswerCounts"];
+        };
+        /**
+         * PurposeUpdate
+         * @description Edit the text or switch a purpose on or off. Changing the text of a purpose families have
+         *     answered makes a new ``form_version``; earlier answers stay with their version.
+         */
+        PurposeUpdate: {
+            /** Active */
+            active?: boolean | null;
+            /**
+             * Clear Label Te
+             * @default false
+             */
+            clear_label_te: boolean;
+            /** Description */
+            description?: string | null;
+            /** Label En */
+            label_en?: string | null;
+            /** Label Te */
+            label_te?: string | null;
         };
         /** ReadinessCounts */
         ReadinessCounts: {
@@ -21252,6 +22581,22 @@ export interface components {
             version: number;
         };
         /**
+         * StudentConsentsOut
+         * @description Every purpose of the school for one student. ``version`` is the number of decisions
+         *     recorded for the student (send it back as ``If-Match``).
+         */
+        StudentConsentsOut: {
+            /** Purposes */
+            purposes: components["schemas"]["PurposeStateOut"][];
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Version */
+            version: number;
+        };
+        /**
          * StudentCreate
          * @description New student with its first values (docs/09: source required per value).
          *
@@ -23187,6 +24532,19 @@ export interface components {
             secret: string;
             /** Url */
             url: string;
+        };
+        /**
+         * WhatsappStateOut
+         * @description The guardians' WhatsApp opt-ins (read-only here; recorded in the opt-in panel).
+         */
+        WhatsappStateOut: {
+            /**
+             * Available
+             * @description False when WhatsApp messaging is off on this host.
+             */
+            available: boolean;
+            /** Guardians */
+            guardians: components["schemas"]["GuardianOptinsBrief"][];
         };
         /** WithdrawIn */
         WithdrawIn: {
@@ -26304,6 +27662,227 @@ export interface operations {
             };
         };
     };
+    list_purposes_api_v1_consent_purposes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurposeListOut"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_purpose_api_v1_consent_purposes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PurposeCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurposeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_purpose_api_v1_consent_purposes__purpose_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                purpose_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PurposeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurposeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    print_forms_api_v1_consents_forms_get: {
+        parameters: {
+            query?: {
+                /** @description Language of the printed form; the school's parent language if left out. */
+                language?: ("en" | "te") | null;
+                /** @description Sections only: students with a purpose not answered yet. */
+                only_unanswered?: boolean;
+                section_id?: string | null;
+                student_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Print-ready A4 pages (one per student) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    consent_summary_api_v1_consents_summary_get: {
+        parameters: {
+            query?: {
+                purpose_id?: string | null;
+                section_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurposeConsentSummaryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     get_disclosure_draft_api_v1_disclosure_draft_get: {
         parameters: {
             query?: never;
@@ -28803,6 +30382,52 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ConsentFormsCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_purpose_consent_forms_export_api_v1_exports_consent_forms_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PurposeConsentFormsCreate"];
             };
         };
         responses: {
@@ -37928,6 +39553,285 @@ export interface operations {
             };
         };
     };
+    list_incidents_api_v1_platform_incidents_get: {
+        parameters: {
+            query?: {
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_IncidentOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_incident_api_v1_platform_incidents_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IncidentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncidentDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_incident_api_v1_platform_incidents__incident_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncidentDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_incident_api_v1_platform_incidents__incident_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string | null;
+            };
+            path: {
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IncidentPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncidentDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    confirm_incident_api_v1_platform_incidents__incident_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncidentDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    add_incident_school_api_v1_platform_incidents__incident_id__schools_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IncidentSchoolIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncidentDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     invoice_run_api_v1_platform_invoice_runs_post: {
         parameters: {
             query?: never;
@@ -40703,6 +42607,358 @@ export interface operations {
             };
         };
     };
+    list_breaches_api_v1_privacy_breaches_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BreachOut"][];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_breach_api_v1_privacy_breaches_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BreachCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BreachDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_breach_api_v1_privacy_breaches__breach_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                breach_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BreachDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_breach_api_v1_privacy_breaches__breach_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                breach_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BreachUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BreachDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_affected_api_v1_privacy_breaches__breach_id__affected_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                breach_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AffectedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    set_affected_api_v1_privacy_breaches__breach_id__affected_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                breach_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AffectedIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AffectedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_draft_api_v1_privacy_breaches__breach_id__drafts__draft__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                breach_id: string;
+                draft: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_notice_draft_api_v1_privacy_breaches__breach_id__notice_draft_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                breach_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoticeDraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     notice_pdf_state_api_v1_privacy_files__export_id__get: {
         parameters: {
             query?: never;
@@ -41053,6 +43309,54 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PrivacyCloseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrivacyRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    withdraw_consent_api_v1_privacy_requests__request_id__consent_withdrawal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrivacyConsentWithdrawalIn"];
             };
         };
         responses: {
@@ -43497,6 +45801,142 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CertificatePreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    consent_view_api_v1_students__student_id__consent_view_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentViewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_student_consents_api_v1_students__student_id__consents_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentConsentsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    record_consent_api_v1_students__student_id__consents_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PurposeConsentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentConsentsOut"];
                 };
             };
             /** @description Validation Error */

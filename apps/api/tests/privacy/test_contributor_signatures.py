@@ -15,6 +15,8 @@ from typing import Any
 import pytest
 import yaml
 
+from app.privacy.service import SERVICE_MODULES
+
 PRIVACY_DIR = Path(__file__).resolve().parents[2] / "app" / "privacy"
 # The privacy module's own contributor is built and tested with the privacy service.
 SKIP = {"privacy"}
@@ -36,7 +38,7 @@ def _params(fn: object) -> list[inspect.Parameter]:
 
 @pytest.mark.parametrize("module", sorted(CONTRIBUTORS))
 def test_FR_DPDP_008_contributor_exposes_subject_report(module: str) -> None:
-    service = importlib.import_module(f"app.{module}.service")
+    service = importlib.import_module(SERVICE_MODULES.get(module, f"app.{module}.service"))
     fn = getattr(service, "subject_report", None)
     assert fn is not None, f"app.{module}.service has no subject_report"
     assert [p.name for p in _params(fn)] == ["session", "subject"]
@@ -44,7 +46,7 @@ def test_FR_DPDP_008_contributor_exposes_subject_report(module: str) -> None:
 
 @pytest.mark.parametrize("module", sorted(CONTRIBUTORS))
 def test_FR_DPDP_012_eraser_exposed_iff_registered(module: str) -> None:
-    service = importlib.import_module(f"app.{module}.service")
+    service = importlib.import_module(SERVICE_MODULES.get(module, f"app.{module}.service"))
     fn = getattr(service, "erase_for_subject", None)
     if not CONTRIBUTORS[module].get("eraser", False):
         assert fn is None, f"app.{module}.service has erase_for_subject but eraser is false"

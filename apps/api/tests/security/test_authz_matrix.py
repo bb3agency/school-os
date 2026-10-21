@@ -945,6 +945,9 @@ _EXPORT_PERMISSIONS = (
     "dq.readiness.read",
     "apaar.consent.read",
     "apaar.consent.record",
+    # R3-1B (FR-DPDP-023): consent forms for optional purposes.
+    "consent.read",
+    "consent.record",
 )
 
 
@@ -2631,7 +2634,24 @@ SPECS.update(
 SPECS.update(_privacy().matrix_specs())
 
 
-def _success(method: str, path: str) -> int:  # noqa: PLR0911 - one answer per route family
+def _consents() -> ModuleType:
+    """tests/privacy/r3b_security_support.py (R3-1B consents and breaches of school A)."""
+    name = "sos_test_r3b_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "privacy" / "r3b_security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+SPECS.update(_consents().matrix_specs())
+
+
+def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one answer per route family
     creates = {
         "/api/v1/users",
         "/api/v1/academic-years",
@@ -2692,11 +2712,15 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911 - one answer per r
         # R2-1C: template provisioning and sync run in the worker.
         "/api/v1/messaging/templates/sync",
     }
-    if method == "POST" and path in accepted | _privacy().MATRIX_ACCEPTED:
+    if method == "POST" and path in accepted | _privacy().MATRIX_ACCEPTED | (
+        _consents().MATRIX_ACCEPTED
+    ):
         return 202
     if (method, path) in _disclosure().MATRIX_STATUS:
         return int(_disclosure().MATRIX_STATUS[(method, path)])
-    if method == "POST" and path in _privacy().MATRIX_CREATES:
+    if (method, path) in _consents().MATRIX_STATUS:
+        return int(_consents().MATRIX_STATUS[(method, path)])
+    if method == "POST" and path in _privacy().MATRIX_CREATES | _consents().MATRIX_CREATES:
         return 201
     if (method, path) in _privacy().MATRIX_STATUS:
         return int(_privacy().MATRIX_STATUS[(method, path)])
@@ -2775,6 +2799,9 @@ def test_SEC_003_role_route_matrix(
     )
     if needs_create:
         expected = 403
+    also = _consents().ALSO_NEEDS.get(key)
+    if also is not None and granted and also not in held:
+        expected = 403  # R3-1B: recording a withdrawal also needs consent.record (FR-DPDP-026)
     if key in REMINDER_ROUTES and granted and "finance.read" not in held:
         expected = 403  # R2-3J: the fees service checks finance.read (FR-MSG-025)
     if (

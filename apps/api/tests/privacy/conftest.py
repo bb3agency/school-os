@@ -31,6 +31,8 @@ def _load(name: str, path: Path) -> ModuleType:
 TESTS = Path(__file__).resolve().parents[1]
 EX = _load("sos_test_exports_objects", TESTS / "exports" / "objects.py")
 P = _load("sos_test_privacy_support", Path(__file__).with_name("support.py"))
+# R3-1B consents and breaches (ADR-0049, ADR-0050).
+CP = _load("sos_test_consent_support", Path(__file__).with_name("consent_support.py"))
 W = EX.W
 world = W.world
 api = W.api
@@ -44,3 +46,4 @@ def school(world: Any, admin_engine: Engine) -> Any:
 @pytest.fixture(autouse=True)
 def _installed() -> None:
     EX.install()
+    CP.SW.configure_keyring()

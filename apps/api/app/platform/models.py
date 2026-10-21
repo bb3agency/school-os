@@ -557,3 +557,42 @@ deletion_certificates = Table(
     Column("size_bytes", Integer, nullable=False),
     Column("issued_at", DateTime(timezone=True)),
 )
+
+# R3-1B (0067_consents_breach; ADR-0050): SchoolOS's incident records. Categories and counts
+# only; never student or staff data. The school side reads its notices through
+# app.platform.service (break-glass pull pattern).
+incidents = Table(
+    "incidents",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("opened_at", DateTime(timezone=True), nullable=False),
+    Column("severity", Text, nullable=False),
+    Column("status", Text, nullable=False),
+    Column("summary", Text, nullable=False),
+    Column("cert_in_required", Boolean, nullable=False),
+    Column("cert_in_reported_at", DateTime(timezone=True)),
+    Column("lead_operator_id", Uuid, nullable=False),
+    Column("created_by", Uuid, nullable=False),
+    Column("confirmed_by", Uuid),
+    Column("first_confirmed_at", DateTime(timezone=True)),
+    Column("second_confirmed_by", Uuid),
+    Column("confirmed_at", DateTime(timezone=True)),
+    Column("created_at", DateTime(timezone=True)),
+    Column("updated_at", DateTime(timezone=True)),
+    Column("version", Integer),
+)
+
+incident_schools = Table(
+    "incident_schools",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("incident_id", Uuid, nullable=False),
+    Column("tenant_id", Uuid, nullable=False),
+    Column("categories", ARRAY(Text), nullable=False),
+    Column("approx_people", Integer, nullable=False),
+    Column("window_from", DateTime(timezone=True)),
+    Column("window_to", DateTime(timezone=True)),
+    Column("school_notified_at", DateTime(timezone=True)),
+    Column("pulled_at", DateTime(timezone=True)),
+    Column("created_at", DateTime(timezone=True)),
+)

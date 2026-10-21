@@ -367,6 +367,40 @@ classes:
     erasure: refused_legal_obligation
     source: Recorded by the school office from the signed form
 
+  # --- R3-1B consents and breaches (ADR-0049, ADR-0050; 0067_consents_breach) ---------------
+  consents:
+    label: Consents for optional purposes
+    owner: privacy_consents
+    tables: [sis.consents]
+    classification: C2
+    docs_row: Consents (`sis.consents`)
+    retention: While the student is on roll, then as the student record
+    basis: Evidence of the family's decision on each optional purpose (given, refused or withdrawn); a withdrawal is a new entry.
+    erasure: refused_legal_obligation
+    source: Recorded by the school office from the signed form
+
+  consent_purposes:
+    label: The school's optional purposes
+    owner: privacy_consents
+    tables: [sis.consent_purposes]
+    classification: C1
+    docs_row: Consents (`sis.consents`)
+    retention: While the student is on roll, then as the student record
+    basis: The wording of each optional purpose and its form versions; nothing about one person.
+    erasure: no_personal_data
+    source: Set up by the school from SchoolOS suggestions
+
+  breach_records:
+    label: Breach register
+    owner: privacy_breach
+    tables: [ops.breach_records, ops.breach_affected, ops.breach_reminders]
+    classification: C2
+    docs_row: Breach records (
+    retention: 3 years after closing (SchoolOS default, **to confirm**)
+    basis: Evidence of what the school did about a breach and when it told the Board and families; affected people are ids only.
+    erasure: allowed_after_retention
+    source: Recorded by the school, or SchoolOS's notice of an incident
+
   public_links:
     label: Parent links and certificate check codes
     owner: public

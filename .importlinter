@@ -226,7 +226,30 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
-    app.privacy
+    # Every privacy module except breach_sync (and breach_tasks, which runs it): R3-1B's sanctioned
+    # bridge that pulls SchoolOS incident notices through app.platform.service (ADR-0050), like
+    # app.breakglass.
+    app.privacy.api
+    app.privacy.config
+    app.privacy.models
+    app.privacy.render
+    app.privacy.repository
+    app.privacy.schemas
+    app.privacy.service
+    app.privacy.tasks
+    app.privacy.consents_api
+    app.privacy.consents_service
+    app.privacy.consents_repository
+    app.privacy.consents_models
+    app.privacy.consents_schemas
+    app.privacy.consents_templates
+    app.privacy.consents_config
+    app.privacy.breach_api
+    app.privacy.breach_service
+    app.privacy.breach_repository
+    app.privacy.breach_models
+    app.privacy.breach_schemas
+    app.privacy.breach_config
 forbidden_modules =
     app.platform
 
@@ -1716,4 +1739,30 @@ source_modules =
 forbidden_modules =
     app.privacy.repository
     app.privacy.models
+    # R3-1B consents and breaches (ADR-0049, ADR-0050)
+    app.privacy.consents_repository
+    app.privacy.consents_models
+    app.privacy.breach_repository
+    app.privacy.breach_models
 allow_indirect_imports = True
+
+# R3-1B: consent and breach configuration and print templates stay pure (no database or web).
+[importlinter:contract:privacy-pure-library]
+name = privacy consent/breach config and templates stay pure (no DB, web or feature modules)
+type = forbidden
+source_modules =
+    app.privacy.consents_config
+    app.privacy.consents_templates
+    app.privacy.breach_config
+forbidden_modules =
+    sqlalchemy
+    fastapi
+    app.core.db
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.ops
+    app.students
+    app.documents

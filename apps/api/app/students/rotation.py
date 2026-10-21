@@ -117,6 +117,10 @@ CIPHERTEXT_COLUMNS: Final[tuple[tuple[str, str], ...]] = (
     # R2-2D (0059_payments_online): the Razorpay webhook inbox (app.fees.online registers its
     # re-encryption).
     ("fin.provider_events", "payload_ciphertext"),
+    # R3-1B (0067_consents_breach): breach descriptions and containment steps (app.privacy
+    # registers their re-encryption).
+    ("ops.breach_records", "description_ciphertext"),
+    ("ops.breach_records", "containment_ciphertext"),
     # R3-1A (0066_privacy_requests): request texts, notes, responses and nominee details
     # (app.privacy registers their re-encryption).
     ("ops.privacy_requests", "requester_name_ciphertext"),

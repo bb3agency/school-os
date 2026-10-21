@@ -13,7 +13,9 @@
 # nothing), the list documents intent and is checked against the record classes' owners.
 # `classes` are the record-class keys (record_classes.yaml) the module reports under.
 #
-# R3-1B adds `consents` and `breach` entries at merge; R3-2E adds `rte`.
+# R3-1B: `privacy_consents` (app/privacy/consents_service.py) and `privacy_breach`
+# (app/privacy/breach_service.py), the two purge owners of its files in the privacy
+# package; R3-2E adds `rte`.
 version: 1
 contributors:
   students:
@@ -99,6 +101,16 @@ contributors:
   privacy:
     subjects: [student, guardian, member]
     classes: [privacy_requests]
+    eraser: false
+  # R3-1B (ADR-0049): a student's decisions on the school's optional purposes.
+  privacy_consents:
+    subjects: [student]
+    classes: [consents]
+    eraser: false
+  # R3-1B (ADR-0050): breaches that list the person as affected (counts only, no texts).
+  privacy_breach:
+    subjects: [student, guardian, member]
+    classes: [breach_records]
     eraser: false
 no_personal_data:
   ops: Background job runs, the outbox and idempotency keys hold ids and counts only.

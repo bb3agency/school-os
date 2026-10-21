@@ -35,6 +35,7 @@ from app.messaging.tasks import beat_schedule as messaging_beat_schedule
 from app.notifications.tasks import beat_schedule as notifications_beat_schedule
 from app.ops.tasks import beat_schedule as ops_beat_schedule
 from app.platform.tasks import beat_schedule as platform_beat_schedule
+from app.privacy.breach_tasks import beat_schedule as breach_beat_schedule
 from app.privacy.tasks import beat_schedule as privacy_beat_schedule
 from app.public.tasks import beat_schedule as public_beat_schedule
 from app.tally.tasks import beat_schedule as tally_beat_schedule
@@ -63,6 +64,8 @@ import app.knowledge.service  # isort: skip
 import app.messaging.service  # isort: skip
 import app.notifications.service  # isort: skip
 import app.ops.service  # isort: skip
+import app.privacy.breach_service  # isort: skip
+import app.privacy.consents_service  # isort: skip
 import app.privacy.service  # isort: skip  (R3-1A: also registers the access-report builder)
 import app.public.service  # isort: skip
 import app.students.service  # isort: skip
@@ -100,6 +103,8 @@ TASK_MODULES: list[str] = [
     "app.fees.upi_tasks",
     # R2-2D online payments: webhook inbox, online refunds, link cancels, reconciliation.
     "app.fees.tasks_online",
+    # R3-1B breach register: SchoolOS notice pull and duty reminders (every minute).
+    "app.privacy.breach_tasks",
     # R3-1C CBSE disclosure (ADR-0051): the HTML file and A4 PDF of a snapshot (queue pdf).
     "app.disclosure.tasks",
     # R3-1A privacy requests: the daily due-date reminder.
@@ -233,6 +238,8 @@ def create_celery() -> Celery:
             **notifications_beat_schedule(),
             # FR-OPS-004: break-glass pull, expiry and outcome reporting (every minute).
             **breakglass_beat_schedule(),
+            # FR-DPDP-032, FR-DPDP-035: breach notice pull and 24 h / 60 h reminders (every minute).
+            **breach_beat_schedule(),
             # FR-DOC-007: purge expired upload intents and staging objects.
             **documents_beat_schedule(),
             # FR-IMP-007: raw import files deleted 90 days after commit.

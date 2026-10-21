@@ -70,11 +70,13 @@ from app.identity import service as identity
 from app.identity.principal import STEP_UP_MAX_AGE
 from app.notifications import service as notifications
 from app.privacy import config as cfg
+from app.privacy import consents_service as consents
 from app.privacy import render
 from app.privacy import repository as repo
 from app.privacy.models import PrivacyNotice, PrivacyRequest, PrivacyRequestEvent
 from app.privacy.schemas import (
     PrivacyCloseIn,
+    PrivacyConsentWithdrawalIn,
     PrivacyDownloadOut,
     PrivacyErasureIn,
     PrivacyErasurePlanOut,
@@ -1002,6 +1004,68 @@ def add_link(
     return _out(session, ctx, row)
 
 
+# --- consent withdrawals (R3-1B; FR-DPDP-026, ADR-0049 decision 6) ----------------------------
+
+# Re-exported for other modules: the only way to check an optional purpose (FR-DPDP-024), and
+# the withdrawal a consent_withdrawal request records.
+consent_state = consents.consent_state
+record_withdrawal_from_request = consents.record_withdrawal_from_request
+
+
+def withdraw_consent(
+    session: Session,
+    ctx: UserContext,
+    request_id: uuid.UUID,
+    data: PrivacyConsentWithdrawalIn,
+) -> PrivacyRequestOut:
+    """Record the withdrawal a ``consent_withdrawal`` request asks for (FR-DPDP-026;
+    ``privacy.request.manage`` and ``consent.record``, else 403). The decision is appended to
+    the consent register with the request's id, and the request links the decision: both ways.
+    409 ``not_a_consent_withdrawal``, ``not_verified``, ``request_closed``; the register's own
+    409 ``consent_not_given`` when the purpose was not given. Audit ``privacy.request.linked``."""
+    if not ctx.has(consents.RECORD):
+        raise Forbidden("You cannot record consent decisions.")
+    row = _load(session, ctx, request_id, lock=True)
+    _open(row)
+    if row.kind != "consent_withdrawal" or row.student_id is None:
+        raise Conflict(
+            "Only a consent withdrawal request about a student records a withdrawal.",
+            code="not_a_consent_withdrawal",
+        )
+    if row.verification_method is None:
+        raise NotVerified("Record how you checked who asked before acting on the request.")
+    out = consents.record_withdrawal_from_request(
+        session,
+        ctx,
+        row.student_id,
+        data.purpose_id,
+        privacy_request_id=row.id,
+        relationship=data.relationship,
+        decided_on=data.decided_on,
+    )
+    state = next(p for p in out.purposes if p.purpose_id == data.purpose_id)
+    if state.current is None:  # pragma: no cover - the decision was just recorded
+        raise NotFound("Consent decision not found")
+    consent_id = state.current.id
+    repo.add_link(session, row.id, "consent", consent_id, created_by=ctx.user_id)
+    _event(
+        session,
+        ctx,
+        row,
+        "consent_withdrawn",
+        {"consent_id": consent_id, "purpose_id": data.purpose_id},
+    )
+    if row.status == "received":
+        row = repo.update_request(session, row, {"status": "in_progress"})
+    _audit(
+        session,
+        "privacy.request.linked",
+        row.id,
+        {"link_kind": "consent", "target_id": consent_id},
+    )
+    return _out(session, ctx, row)
+
+
 # --- letters ----------------------------------------------------------------------------------
 
 
@@ -1081,6 +1145,13 @@ class _Contributor:
     eraser: SubjectEraser | None
 
 
+# R3-1B registers its two purge owners of the privacy package under their own services.
+SERVICE_MODULES: Final[dict[str, str]] = {
+    "privacy_consents": "app.privacy.consents_service",
+    "privacy_breach": "app.privacy.breach_service",
+}
+
+
 def contributors() -> list[_Contributor]:
     """Every registered contributor, resolved from ``subjects.yaml`` (fail closed: a listed
     module without its functions raises at first use; the registry test catches it in CI)."""
@@ -1089,7 +1160,7 @@ def contributors() -> list[_Contributor]:
         if module == "privacy":
             out.append(_Contributor(module, entry.classes, subject_report, None))
             continue
-        svc = importlib.import_module(f"app.{module}.service")
+        svc = importlib.import_module(SERVICE_MODULES.get(module, f"app.{module}.service"))
         report = cast(SubjectReporter, svc.subject_report)
         eraser = cast(SubjectEraser, svc.erase_for_subject) if entry.eraser else None
         out.append(_Contributor(module, entry.classes, report, eraser))
@@ -1592,9 +1663,11 @@ __all__ = [
     "DECIDE",
     "MANAGE",
     "READ",
+    "SERVICE_MODULES",
     "add_link",
     "build_report",
     "close_request",
+    "consent_state",
     "contributors",
     "create_request",
     "erasure_plan",
@@ -1608,10 +1681,12 @@ __all__ = [
     "preview_template",
     "record_classes",
     "record_notice",
+    "record_withdrawal_from_request",
     "release_report",
     "report_download",
     "request_notice_pdf",
     "search_requests",
     "subject_report",
     "update_request",
+    "withdraw_consent",
 ]

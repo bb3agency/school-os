@@ -1,0 +1,104 @@
+# Consents for optional purposes (R3-1B; ADR-0049; US-2701..US-2703; FR-DPDP-020..026; PRV-006).
+# Versioned configuration shipped inside the package. Read by app/privacy/consents_config.py.
+#
+# Not legal advice (docs/08 §4): an educational institution needs no parental consent for its
+# educational activities or the safety of enrolled children; anything outside those (a child's
+# photo on the school's website, a name in a public results list, sharing with an outside
+# organiser) needs the school to choose a lawful basis, often consent. These are SUGGESTIONS the
+# school enables, edits or replaces (tenant.settings.manage, step-up); the school's own text is
+# what parents sign.
+version: 1
+# Printed form layout version (audit events name it; change it whenever the form's fixed text
+# changes). A purpose's own text has its own form_version per school (sis.consent_purposes).
+form_layout_version: "2026-10-v1"
+# Notes on a decision: at most this many characters (no Aadhaar numbers; never logged).
+note_max_length: 500
+# The earliest date a form can carry.
+earliest_decision: 2026-04-01
+# One print of a section's forms covers at most this many students (one A4 page each).
+max_forms_per_print: 150
+# At most this many active purposes per school (one tick-box pair each on the form).
+max_active_purposes: 12
+
+suggestions:
+  photos_school_media:
+    label_en: Photos and videos on the school's website and social media
+    label_te: పాఠశాల వెబ్‌సైట్ మరియు సోషల్ మీడియాలో ఫోటోలు, వీడియోలు
+    description: >-
+      What: photos or short videos of your child at school events. Why: to share school life
+      with families and the public. Who receives it: anyone who visits the school's website or
+      social media pages. For how long: until you withdraw consent; the school removes the
+      photo from its own pages when you ask.
+  name_results_public:
+    label_en: Name and photo in public results or prize lists
+    label_te: బహిరంగ ఫలితాలు లేదా బహుమతి జాబితాలో పేరు మరియు ఫోటో
+    description: >-
+      What: your child's name, class, marks or rank and photo. Why: to recognise achievement in
+      notices, banners or the newspaper. Who receives it: anyone who sees the notice, banner or
+      paper. For how long: for the academic year in which the result is announced.
+  share_outside_organiser:
+    label_en: Sharing details with a named outside organiser
+    label_te: పేర్కొన్న బయటి నిర్వాహకులతో వివరాలు పంచుకోవడం
+    description: >-
+      What: your child's name, class and date of birth (and an emergency contact when needed).
+      Why: to register your child for a trip, competition or camp run by another organisation.
+      Who receives it: the organiser named on the event letter. For how long: until the event
+      ends and its results are announced.
+
+# Printed parent form, English and Telugu (the school's parent-form language; ADR-0044). The
+# purposes print from the school's own text (label_te when set, else label_en and description).
+form:
+  en:
+    title: Consent for optional uses of your child's information
+    subtitle: Each item below is optional. Tick one box for each item.
+    student_details: Student details
+    name: Name of the student
+    admission_no: Admission number
+    class_section: Class and section
+    voluntary: >-
+      Each item is your choice. You may say no to any of them. Your child's admission and
+      studies at this school do not depend on your answers.
+    withdraw: >-
+      You can withdraw a consent later by writing to the school. The school stops new uses from
+      that day; it will remove what it has published on its own pages when you ask.
+    agree: I agree
+    disagree: I do not agree
+    version: Form version
+    parent_name: Name of parent or guardian
+    relationship: Relationship
+    father: Father
+    mother: Mother
+    guardian: Guardian
+    signature: Signature
+    date: Date (DD/MM/YYYY)
+    office: For office use
+    received_on: Received on
+    recorded_by: Recorded by
+    footer: The school does not ask for or keep your child's Aadhaar number on this form.
+  te:
+    title: మీ పిల్లల సమాచారాన్ని ఐచ్ఛిక అవసరాలకు ఉపయోగించడానికి అనుమతి
+    subtitle: కింది ప్రతి అంశం ఐచ్ఛికం. ప్రతి అంశానికి ఒక పెట్టెలో టిక్ చేయండి.
+    student_details: విద్యార్థి వివరాలు
+    name: విద్యార్థి పేరు
+    admission_no: ప్రవేశ సంఖ్య
+    class_section: తరగతి మరియు సెక్షన్
+    voluntary: >-
+      ప్రతి అంశం మీ ఇష్టం. వాటిలో దేనికైనా మీరు కాదు అని చెప్పవచ్చు. మీ సమాధానాలపై మీ పిల్లల
+      ప్రవేశం మరియు చదువు ఆధారపడవు.
+    withdraw: >-
+      తరువాత పాఠశాలకు రాసి మీరు అనుమతిని ఉపసంహరించుకోవచ్చు. ఆ రోజు నుండి పాఠశాల కొత్తగా
+      ఉపయోగించడం ఆపివేస్తుంది; మీరు అడిగితే తన పేజీల్లో ప్రచురించినవి తొలగిస్తుంది.
+    agree: నేను అంగీకరిస్తున్నాను
+    disagree: నేను అంగీకరించడం లేదు
+    version: ఫారం వెర్షన్
+    parent_name: తల్లిదండ్రులు లేదా సంరక్షకుల పేరు
+    relationship: సంబంధం
+    father: తండ్రి
+    mother: తల్లి
+    guardian: సంరక్షకులు
+    signature: సంతకం
+    date: తేదీ (DD/MM/YYYY)
+    office: కార్యాలయ ఉపయోగం కోసం
+    received_on: అందిన తేదీ
+    recorded_by: నమోదు చేసినవారు
+    footer: ఈ ఫారంలో పాఠశాల మీ పిల్లల ఆధార్ సంఖ్యను అడగదు, ఉంచుకోదు.

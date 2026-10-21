@@ -30,6 +30,7 @@ from app.exports.schemas import (
     ExportProfileOut,
     FileFormat,
     PrecheckCreate,
+    PurposeConsentFormsCreate,
     ReadinessSlipsCreate,
     RequestedBy,
     StudentListCreate,
@@ -49,6 +50,11 @@ SlipsMaker = Annotated[UserContext, Depends(require(service.READINESS_READ))]
 FormsMaker = Annotated[
     UserContext,
     Depends(require_any(service.CONSENT_READ, service.CONSENT_RECORD)),
+]
+# R3-1B (FR-DPDP-023): consent forms for the school's optional purposes.
+PurposeFormsMaker = Annotated[
+    UserContext,
+    Depends(require_any(service.PURPOSE_READ, service.PURPOSE_RECORD)),
 ]
 Reader = Annotated[
     UserContext,
@@ -160,6 +166,26 @@ def create_consent_forms_export(
         db,
         body,
         lambda: service.request_consent_forms(db, ctx, body),
+        status_code=202,
+        headers=_headers,
+    )
+
+
+@router.post("/exports/consent-forms", response_model=ExportOut, status_code=202)
+def create_purpose_consent_forms_export(
+    ctx: PurposeFormsMaker, db: TenantDB, body: PurposeConsentFormsCreate, idem: IdempotencyDep
+) -> Response:
+    """Print the consent forms for the school's optional purposes of one student or one section
+    to a PDF (FR-DPDP-023; the same forms as ``GET /consents/forms``). Permission
+    ``consent.read`` or ``consent.record`` in scope (404 outside it) and ``student.read_basic``,
+    with a recent sign-in with MFA (428). ``only_unanswered`` (sections only) prints only
+    students with a purpose not answered yet. The PDF is made in the background (202). Errors:
+    409 ``no_forms``, ``too_many_forms``, ``no_purposes``; 422 ``section_only``. Accepts
+    ``Idempotency-Key``."""
+    return idem.run(
+        db,
+        body,
+        lambda: service.request_purpose_consent_forms(db, ctx, body),
         status_code=202,
         headers=_headers,
     )

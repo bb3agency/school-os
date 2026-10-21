@@ -1418,7 +1418,7 @@ A school's owner or principal (`tenant.settings.manage`, step-up) changes the pe
 | **Planned (R3, §16)** · Data-principal requests, grievances and their events (`ops.privacy_requests*`) | 3 years after closing (SchoolOS default, **to confirm**; docs/08 keeps logs and personal data at least 1 year) | Evidence that requests were answered; nominations end when withdrawn or the subject leaves |
 | Notice records (`ops.privacy_notices`) | Life of the school | Which notice version was issued when (PRV-001) |
 | Consents (`sis.consents`) and purposes | While the student is on roll, then as the student record | Evidence of consent (PRV-006); withdrawal is a new entry |
-| Breach records (`ops.breach_records`, `ops.breach_affected`) | 3 years after closing (SchoolOS default, **to confirm**) | Affected ids only; descriptions encrypted |
+| Breach records (`ops.breach_records`, `ops.breach_affected`, `ops.breach_reminders`) | 3 years after closing (SchoolOS default, **to confirm**) | Affected ids only; descriptions encrypted |
 | Access reports (`ops.exports` kind `subject_report`) | 24 hours after release | Rebuilt on request |
 | Staff memberships, roles and scopes (`core.memberships*`, `core.roles*`) | While the person works at the school; then deactivated and kept for the audit trail | Record class `staff_accounts` (R3-1A, `app/privacy/record_classes.yaml`) |
 | Documents and their versions (`kb.documents*`) | Until the school deletes them; evidence documents for the life of the linked value | Deleting a document erases its search index and versions (docs/08 §7) |
@@ -1597,12 +1597,16 @@ Access reports are exports of kind `subject_report` in `ops.exports` (existing t
 
 ### 16.2 Consents for optional purposes (`sis`; ADR-0049, FR-DPDP-020..026)
 
+**As built (R3-1B, `0067_consents_breach`).** As below, plus `created_at`/`updated_at` on purposes; the frozen-text trigger is `sis.tg_consent_purposes_frozen` (and `form_version` never goes down); decisions are append-only by grants (SELECT, INSERT) and trigger `consents_append_only` (DELETE only in the offboarding purge); `privacy_request_id` has no FK until R3-1A's `ops.privacy_requests` is merged. Offboarding owner `privacy_consents`.
+
 | Table | Class | Key columns and rules |
 |---|---|---|
 | `sis.consent_purposes` | C1 | `key` (unique per school, `^[a-z][a-z0-9_]{2,40}$`), `label_en`, `label_te` (nullable), `description` (≤ 1000), `form_version int`, `active`, `suggested_key` (from `app/privacy/consent_purposes.yaml`, nullable), `created_by`, `version`. A trigger refuses changing `label_*`/`description` once a consent references the current `form_version` (the service bumps the version instead) |
 | `sis.consents` | C2 | **Append-only.** As `sis.apaar_consents` (§5.9) plus `purpose_id` → `sis.consent_purposes`, `form_version`: `student_id`, `seq` (`UNIQUE (tenant_id, student_id, purpose_id, seq)`), `status` (`given`,`refused`,`pending`,`withdrawn`), `relationship`, `guardian_id` (`ON DELETE SET NULL (guardian_id)`), `decided_on`, `form_language`, `evidence_document_id` → `kb.documents` (required for `given`; the document cannot be deleted while it is evidence), `note` (≤ 500, never logged), `privacy_request_id` (nullable, the withdrawal request), `recorded_by`, `recorded_at` |
 
 ### 16.3 Breach register and incidents (`ops`, `platform`; ADR-0050, FR-DPDP-030..038)
+
+**As built (R3-1B, `0067_consents_breach`).** `ops.breach_records` also has `containment_ciphertext` (C3, encrypted like the description; both in `CIPHERTEXT_COLUMNS`), `processor_facts jsonb` (severity, approximate count, window of a SchoolOS notice; codes and counts only), `close_reason` (10-500, needed to close with a duty open), `created_at`/`updated_at`; method codes `email`, `portal`, `letter`, `phone`, `in_person`, `whatsapp`, `sos_notice`, `other`; `sos_app` may update only the facts, status and duty columns, never delete. `ops.breach_affected` rows are replaced as a whole (`sos_app` SELECT, INSERT, DELETE). `platform.incidents` also has `created_by` and `first_confirmed_at` (the first confirmation; `confirmed_at` is the second); `sos_platform` SELECT, INSERT, UPDATE on both incident tables, nothing for `sos_app`. Offboarding owner `privacy_breach`; the incident tables stay with SchoolOS (no personal data).
 
 | Table | Class | Key columns and rules |
 |---|---|---|

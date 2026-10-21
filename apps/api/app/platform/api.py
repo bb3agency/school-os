@@ -35,6 +35,7 @@ from app.platform import (
     dashboard,
     flags,
     fleet,
+    incidents,
     invoice_files,
     offboarding,
     operators,
@@ -1334,6 +1335,108 @@ def withdraw_breakglass(
     """Withdraw a request that is still waiting (audit 2026-10-05 A-13). It ends as
     ``revoked``; ``409 invalid_state`` once approved, denied or ended."""
     return breakglass.withdraw(_actor(ctx), request_id)
+
+
+# --- incidents (R3-1B; ADR-0050; FR-DPDP-030, FR-DPDP-031) -------------------------------------
+
+IncidentsRead = Depends(require_platform("platform.incidents.read"))
+IncidentsManage = Depends(require_platform("platform.incidents.manage"))
+
+
+@router.get("/incidents", response_model=Page[incidents.IncidentOut])
+def list_incidents(
+    *,
+    ctx: Annotated[Ctx, IncidentsRead],
+    limit: Limit = 50,
+    cursor: str | None = None,
+) -> Page[incidents.IncidentOut]:
+    """SchoolOS incident records, newest first, with the CERT-In clock (T0 + 6 h) and how many
+    affected schools were notified."""
+    items, nxt = incidents.list_incidents(limit=limit, cursor=cursor)
+    return Page[incidents.IncidentOut](data=items, next_cursor=nxt)
+
+
+@router.post("/incidents", response_model=incidents.IncidentDetailOut, status_code=201)
+def create_incident(
+    *,
+    request: Request,
+    response: Response,
+    data: incidents.IncidentIn,
+    ctx: Annotated[Ctx, IncidentsManage],
+    store: Store,
+    idempotency_key: IdemKey = None,
+) -> Any:
+    """Open an incident record (step-up). The summary holds categories and counts only: a run of
+    6 or more digits or an e-mail address is refused (422). ``Idempotency-Key`` optional."""
+
+    def run() -> tuple[uuid.UUID, BaseModel]:
+        out = incidents.create_incident(_actor(ctx), data)
+        return out.id, out
+
+    return _idempotent(
+        ctx=ctx,
+        request=request,
+        response=response,
+        store=store,
+        key=idempotency_key,
+        body=data,
+        run=run,
+        replay=incidents.get_incident,
+        resource_type="incident",
+        location=lambda i: f"/api/v1/platform/incidents/{i}",
+        required=False,
+    )
+
+
+@router.get("/incidents/{incident_id}", response_model=incidents.IncidentDetailOut)
+def get_incident(
+    *, incident_id: uuid.UUID, response: Response, ctx: Annotated[Ctx, IncidentsRead]
+) -> incidents.IncidentDetailOut:
+    """One incident with its affected schools and their school-notice clocks (confirmation +
+    24 h). ``ETag`` for ``If-Match`` on PATCH."""
+    out = incidents.get_incident(incident_id)
+    _etag(response, out.version)
+    return out
+
+
+@router.patch("/incidents/{incident_id}", response_model=incidents.IncidentDetailOut)
+def update_incident(
+    *,
+    incident_id: uuid.UUID,
+    data: incidents.IncidentPatch,
+    response: Response,
+    ctx: Annotated[Ctx, IncidentsManage],
+    if_match: IfMatch = None,
+) -> incidents.IncidentDetailOut:
+    """Status, severity, summary, CERT-In report time, lead operator, and schools told by phone
+    or e-mail (dedicated hosts). ``If-Match`` required (400 ``if_match_required``, 412 stale)."""
+    out = incidents.update_incident(
+        _actor(ctx), incident_id, data, expected_version=_version(if_match)
+    )
+    _etag(response, out.version)
+    return out
+
+
+@router.post("/incidents/{incident_id}/schools", response_model=incidents.IncidentDetailOut)
+def add_incident_school(
+    *,
+    incident_id: uuid.UUID,
+    data: incidents.IncidentSchoolIn,
+    ctx: Annotated[Ctx, IncidentsManage],
+) -> incidents.IncidentDetailOut:
+    """Mark a school as affected: category codes, approximate number of people, window. Clears
+    a first confirmation; ``409 incident_confirmed`` after the second."""
+    return incidents.add_school(_actor(ctx), incident_id, data)
+
+
+@router.post("/incidents/{incident_id}/confirm", response_model=incidents.IncidentDetailOut)
+def confirm_incident(
+    *, incident_id: uuid.UUID, ctx: Annotated[Ctx, IncidentsManage]
+) -> incidents.IncidentDetailOut:
+    """Two different operators confirm the affected schools (SEC-029) before any school is
+    notified. ``409 same_operator``, ``no_schools``, ``incident_confirmed``,
+    ``request_expired``, ``requester_not_authorised`` or ``approver_not_eligible``."""
+    return incidents.confirm(_actor(ctx), incident_id)
 
 
 # --- operators --------------------------------------------------------------------------------

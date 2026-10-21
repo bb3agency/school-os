@@ -18,6 +18,10 @@ Break-glass (school side, ``app.breakglass``; US-103, FR-OPS-004):
 ``breakglass_requests_for_school``,
 ``breakglass_request_for_school`` and ``record_breakglass_outcome`` (see ``platform.breakglass``).
 
+Breach notices (school side, ``app.privacy.breach_sync``; ADR-0050, FR-DPDP-032):
+``incident_notices_for_school`` and ``record_incident_notice_pulled`` (see
+``platform.incidents``; codes and counts only).
+
 Feature flags for tenant code: ``is_flag_enabled(key, tenant_id, session=tenant_session)``.
 
 Provisioning helpers for dev tooling: ``invite_school_owner(platform_session, ...)``.
@@ -31,8 +35,9 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.platform import announcements, billing, breakglass, flags, repository, support
+from app.platform import announcements, billing, breakglass, flags, incidents, repository, support
 from app.platform.breakglass import SchoolBreakGlassRequest
+from app.platform.incidents import SchoolIncidentNotice
 from app.platform.schemas import (
     AnnouncementBrief,
     SchoolAiBundle,
@@ -45,6 +50,7 @@ __all__ = [
     "AnnouncementBrief",
     "SchoolAiBundle",
     "SchoolBreakGlassRequest",
+    "SchoolIncidentNotice",
     "SchoolTicketMessageIn",
     "TicketCreateSchool",
     "TicketOut",
@@ -53,12 +59,14 @@ __all__ = [
     "breakglass_requests_for_school",
     "current_subscription",
     "get_tenant_ticket",
+    "incident_notices_for_school",
     "invite_school_owner",
     "is_flag_enabled",
     "list_tenant_tickets",
     "open_ticket_from_tenant",
     "record_breakglass_outcome",
     "record_breakglass_session_started",
+    "record_incident_notice_pulled",
     "reply_from_tenant",
     "school_ai_bundle",
 ]
@@ -182,3 +190,14 @@ def record_breakglass_session_started(
     return breakglass.record_session_started(
         tenant_id, request_id, grant_id=grant_id, session_ref=session_ref
     )
+
+
+def incident_notices_for_school(tenant_id: uuid.UUID) -> list[SchoolIncidentNotice]:
+    """Confirmed incident notices this school has not stored yet (pulled by the school side;
+    ADR-0050 decision 2). Categories, counts and times only; never personal data."""
+    return incidents.notices_for_school(tenant_id)
+
+
+def record_incident_notice_pulled(tenant_id: uuid.UUID, incident_id: uuid.UUID) -> bool:
+    """The school stored the notice in its breach register (idempotent; platform audit)."""
+    return incidents.mark_notice_pulled(tenant_id, incident_id)
