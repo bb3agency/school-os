@@ -1131,6 +1131,85 @@ def _cert_withdraw_code(w: Any, r: str, a: Engine) -> Request:
     )
 
 
+# --- R3-1D portal calendar (ADR-0053) ---------------------------------------------------------
+
+
+def _calendar_body(w: Any) -> dict[str, Any]:
+    return {
+        "academic_year_id": str(w.a.ids["year"]),
+        "opens_on": "2027-03-01",
+        "closes_on": "2027-03-02",
+        "source_kind": "other",
+    }
+
+
+def _calendar_own_event(w: Any, a: Engine) -> str:
+    """A fresh own event of school A (version 1), confirmed by its owner."""
+    key = f"school:matrix-{uuid.uuid4().hex[:8]}"
+    owner = w.person("owner")
+    with a.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO ops.portal_calendar_dates (id, tenant_id, academic_year_id, "
+                "event_key, label, opens_on, closes_on, source_kind, confirmed_by, "
+                "confirmed_by_membership) VALUES (:i, :t, :y, :k, 'Synthetic matrix event', "
+                "'2027-03-01', '2027-03-02', 'other', :u, :m)"
+            ),
+            {
+                "i": uuid.uuid4(),
+                "t": w.a.tenant_id,
+                "y": w.a.ids["year"],
+                "k": key,
+                "u": owner.user_id,
+                "m": owner.membership_id,
+            },
+        )
+    return key
+
+
+def _calendar_confirm(w: Any, r: str, a: Engine) -> Request:
+    return (
+        f"/api/v1/dq/calendar/{_calendar_own_event(w, a)}",
+        _calendar_body(w),
+        {"If-Match": 'W/"1"'},
+    )
+
+
+def _calendar_delete(w: Any, r: str, a: Engine) -> Request:
+    return (
+        f"/api/v1/dq/calendar/{_calendar_own_event(w, a)}?academic_year_id={w.a.ids['year']}",
+        None,
+        {"If-Match": 'W/"1"'},
+    )
+
+
+def _calendar_link(w: Any, r: str, a: Engine) -> Request:
+    """A task confirmed from a circular (it keeps its citation), linked to a fresh own event."""
+    task = uuid.uuid4()
+    owner = w.person("owner")
+    citation = '{"source": "sos://doc/' + str(uuid.uuid4()) + '/v1#p1", "quote": "synthetic"}'
+    with a.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO ops.tasks (id, tenant_id, title, owner_membership_id, due_on, source, "
+                "citation, created_by, created_by_membership) VALUES (:i, :t, 'Synthetic matrix "
+                "task', :m, '2027-03-02', 'circular', CAST(:c AS jsonb), :u, :m)"
+            ),
+            {
+                "i": task,
+                "t": w.a.tenant_id,
+                "m": owner.membership_id,
+                "c": citation,
+                "u": owner.user_id,
+            },
+        )
+    return (
+        f"/api/v1/tasks/{task}/portal-event",
+        {"event_key": _calendar_own_event(w, a), "academic_year_id": str(w.a.ids["year"])},
+        {},
+    )
+
+
 SPECS: dict[tuple[str, str], Builder] = {
     ("GET", "/api/v1/me"): lambda w, r, a: ("/api/v1/me", None, {}),
     ("GET", "/api/v1/me/schools"): lambda w, r, a: ("/api/v1/me/schools", None, {}),
@@ -1598,6 +1677,22 @@ SPECS: dict[tuple[str, str], Builder] = {
         None,
         {},
     ),
+    # R3-1D portal calendar (ADR-0053): read with dq.readiness.read, change with
+    # readiness.calendar.manage; each write works on its own fresh own event.
+    ("GET", "/api/v1/dq/calendar"): lambda w, r, a: ("/api/v1/dq/calendar", None, {}),
+    ("GET", "/api/v1/dq/calendar/assignees"): lambda w, r, a: (
+        "/api/v1/dq/calendar/assignees",
+        None,
+        {},
+    ),
+    ("PUT", "/api/v1/dq/calendar/{event_key}"): _calendar_confirm,
+    ("POST", "/api/v1/dq/calendar"): lambda w, r, a: (
+        "/api/v1/dq/calendar",
+        {**_calendar_body(w), "label": "Synthetic matrix event"},
+        {},
+    ),
+    ("DELETE", "/api/v1/dq/calendar/{event_key}"): _calendar_delete,
+    ("POST", "/api/v1/tasks/{task_id}/portal-event"): _calendar_link,
     # SchoolOS support only (ADR-0023): every school role is refused (support principals are
     # tested in tests/breakglass/test_support_signin.py).
     ("POST", "/api/v1/breakglass/support-session"): lambda w, r, a: (
@@ -2477,6 +2572,8 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911 - one answer per r
         "/api/v1/messaging/account/embedded-signup",
         "/api/v1/messaging/account/manual",
         "/api/v1/guardians/{guardian_id}/optins",
+        # R3-1D portal calendar (FR-RDY-005): the school's own event
+        "/api/v1/dq/calendar",
     }
     accepted = {
         "/api/v1/documents",
@@ -2530,6 +2627,7 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911 - one answer per r
         "/api/v1/students/{student_id}/guardians/{guardian_id}",
         "/api/v1/tally/parties/{party_id}/links/{student_id}",
         "/api/v1/messaging/account",
+        "/api/v1/dq/calendar/{event_key}",
     ):
         return 204
     return 201 if method == "POST" and path in creates else 200
@@ -2576,6 +2674,12 @@ def test_SEC_003_role_route_matrix(
         expected = 403
     if key in REMINDER_ROUTES and granted and "finance.read" not in held:
         expected = 403  # R2-3J: the fees service checks finance.read (FR-MSG-025)
+    if (
+        key == ("POST", "/api/v1/tasks/{task_id}/portal-event")
+        and granted
+        and "task.manage" not in held
+    ):
+        expected = 403  # R3-1D: the circulars service also checks task.manage (FR-RDY-010)
     assert res.status_code == expected, f"{role} {key}: {res.status_code} {res.text}"
     if needs_create:
         assert res.json()["code"] == "student_create_required"

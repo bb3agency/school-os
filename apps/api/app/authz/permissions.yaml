@@ -118,6 +118,11 @@ permissions:
     description: Run board and portal readiness checks
     sensitivity: normal
     step_up: false
+  # R3-1D portal calendar (ADR-0053; migration 0064_portal_calendar).
+  readiness.calendar.manage:
+    description: Confirm portal and board dates, add the school's own events and choose who owns the work
+    sensitivity: normal
+    step_up: false
 
   # --- documents and knowledge -------------------------------------------------------------
   document.upload:

@@ -1,8 +1,9 @@
-"""SQLAlchemy Core tables for data-quality runs and findings (DDL in migration 0013_dq)."""
+"""SQLAlchemy Core tables for data-quality runs and findings (DDL in migration 0013_dq) and the
+portal calendar (migration 0064_portal_calendar; ADR-0053)."""
 
 from __future__ import annotations
 
-from sqlalchemy import Column, DateTime, Integer, MetaData, Table, Text, Uuid
+from sqlalchemy import Column, Date, DateTime, Integer, MetaData, Table, Text, Uuid
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 
 metadata = MetaData(schema="sis")
@@ -69,3 +70,45 @@ dq_findings = Table(
 # (step-up) and stays unresolved until then: certificates and exports keep refusing.
 NEEDS_CONFIRMATION = "needs_confirmation"
 ACTIVE_STATUSES = ("open", "reopened", NEEDS_CONFIRMATION)
+
+
+# --- portal calendar (ops; migration 0064_portal_calendar, FR-RDY-004..008) ---------------------
+
+ops_metadata = MetaData(schema="ops")
+
+portal_calendar_dates = Table(
+    "portal_calendar_dates",
+    ops_metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("tenant_id", Uuid, nullable=False),
+    Column("academic_year_id", Uuid, nullable=False),
+    Column("event_key", Text, nullable=False),
+    Column("label", Text),
+    Column("opens_on", Date, nullable=False),
+    Column("closes_on", Date, nullable=False),
+    Column("profile_keys", ARRAY(Text), nullable=False),
+    Column("source_kind", Text, nullable=False),
+    Column("document_id", Uuid),
+    Column("owner_membership_id", Uuid),
+    Column("confirmed_by", Uuid, nullable=False),
+    Column("confirmed_by_membership", Uuid, nullable=False),
+    Column("confirmed_at", DateTime(timezone=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("version", Integer, nullable=False),
+)
+
+# Append-only: one row per (school, year, event, lead day) the reminder job has handled.
+portal_reminders = Table(
+    "portal_reminders",
+    ops_metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("tenant_id", Uuid, nullable=False),
+    Column("academic_year_id", Uuid, nullable=False),
+    Column("event_key", Text, nullable=False),
+    Column("lead_day", Integer, nullable=False),
+    Column("closes_on", Date, nullable=False),
+    Column("task_id", Uuid),
+    Column("notified", Integer, nullable=False),
+    Column("sent_at", DateTime(timezone=True), nullable=False),
+)

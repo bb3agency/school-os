@@ -282,6 +282,10 @@ NON_UUID_PATH_PARAMS = {
     ("GET", "/api/v1/dq/readiness/{profile_key}/students/{student_id}", "profile_key"),
     ("POST", "/api/v1/dq/readiness/{profile_key}/runs", "profile_key"),
     ("GET", "/api/v1/dq/readiness/{profile_key}/slips", "profile_key"),
+    # R3-1D: a portal calendar event key (ADR-0053), bounded and pattern-checked; it names a
+    # calendar file event or the school's own event, found only inside the caller's school.
+    ("PUT", "/api/v1/dq/calendar/{event_key}", "event_key"),
+    ("DELETE", "/api/v1/dq/calendar/{event_key}", "event_key"),
     # R2-1A: a certificate verification code (ADR-0045), bounded; the guard shape-checks it.
     ("GET", "/api/v1/public/certificates/{code}", "code"),
     # R2-2D: the Razorpay webhook route value (ADR-0047 decision 3), bounded; the guard resolves.
@@ -341,6 +345,11 @@ RESPONSE_FIELD_ALLOWLIST = {
     "app.dq.schemas.RunOut.profile_key": "DQ profile code",
     "app.dq.schemas.ReadinessProfileOut.key": "DQ profile code",
     "app.dq.schemas.ReadinessFieldOut.attribute_key": "attribute catalog key",
+    # R3-1D (ADR-0053): portal calendar event keys and readiness profile codes, not secrets.
+    "app.dq.schemas.PortalWindowOut.event_key": "portal calendar event code",
+    "app.dq.schemas.CalendarEventOut.event_key": "portal calendar event code",
+    "app.dq.schemas.CalendarReadinessOut.profile_key": "DQ profile code",
+    "app.circulars.schemas.TaskOut.portal_event_key": "portal calendar event code",
     "app.exports.schemas.ExportProfileOut.key": "export profile code",
     "app.exports.schemas.ExportOut.profile_key": "export profile code",
     "app.imports.schemas.Issue.message_key": "i18n message key",

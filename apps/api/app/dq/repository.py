@@ -31,6 +31,8 @@ from app.dq.rules import Severity
 
 F = m.dq_findings
 R = m.dq_runs
+PC = m.portal_calendar_dates
+PR = m.portal_reminders
 
 # Columns a re-run refreshes on an existing finding (executemany by id).
 REFRESH_COLUMNS = (
@@ -355,4 +357,64 @@ def export_record_tables(session: Session) -> list[RecordTable]:
     return [
         dump_table(session, R, name="dq_runs", order_by=("created_at", "id")),
         dump_table(session, F, name="dq_findings", order_by=("created_at", "id")),
+        # R3-1D portal calendar (FR-RDY-004..008): the school's confirmed dates, own events and
+        # the reminders sent (C1, no personal data).
+        dump_table(session, PC, name="portal_calendar_dates", order_by=("created_at", "id")),
+        dump_table(session, PR, name="portal_reminders", order_by=("sent_at", "id")),
     ]
+
+
+# --- portal calendar (ops; FR-RDY-004..008, ADR-0053) ---------------------------------------------
+
+
+def calendar_rows(session: Session, academic_year_ids: Collection[uuid.UUID]) -> list[RowMapping]:
+    """The school's confirmations and own events for these academic years."""
+    ids = list(academic_year_ids)
+    if not ids:
+        return []
+    stmt = select(PC).where(PC.c.academic_year_id.in_(ids)).order_by(PC.c.closes_on, PC.c.event_key)
+    return list(session.execute(stmt).mappings())
+
+
+def calendar_row(
+    session: Session, academic_year_id: uuid.UUID, event_key: str, *, lock: bool = False
+) -> RowMapping | None:
+    stmt = select(PC).where(PC.c.academic_year_id == academic_year_id, PC.c.event_key == event_key)
+    if lock:
+        stmt = stmt.with_for_update()
+    return session.execute(stmt).mappings().one_or_none()
+
+
+def insert_calendar_row(session: Session, values: Mapping[str, Any]) -> RowMapping:
+    stmt = PC.insert().values(tenant_id=current_tenant(session), **values).returning(*PC.c)
+    return session.execute(stmt).mappings().one()
+
+
+def update_calendar_row(
+    session: Session, row_id: uuid.UUID, values: Mapping[str, Any]
+) -> RowMapping:
+    stmt = (
+        update(PC)
+        .where(PC.c.id == row_id)
+        .values(**values, version=PC.c.version + 1)
+        .returning(*PC.c)
+    )
+    return session.execute(stmt).mappings().one()
+
+
+def delete_calendar_row(session: Session, row_id: uuid.UUID) -> None:
+    session.execute(PC.delete().where(PC.c.id == row_id))
+
+
+def sent_lead_days(session: Session, academic_year_id: uuid.UUID, event_key: str) -> set[int]:
+    stmt = select(PR.c.lead_day).where(
+        PR.c.academic_year_id == academic_year_id, PR.c.event_key == event_key
+    )
+    days: list[int] = list(session.execute(stmt).scalars())
+    return set(days)
+
+
+def insert_reminder(session: Session, values: Mapping[str, Any]) -> None:
+    """Append one reminder row; a second one for the same (year, event, lead day) raises the
+    unique violation ``portal_reminders_once`` (the caller rolls its savepoint back)."""
+    session.execute(PR.insert().values(**values))

@@ -54,7 +54,8 @@ apps/api/app/
   students/      students, guardians, per-source attribute values, canonical view
   imports/       Excel/CSV/Sheets import (spreadsheet onboarding, 24-hour revert)
   extraction/    register-photo extraction, verification queue (provider interface, Aadhaar masking)
-  dq/            data-quality rules engine, findings, name matching
+  dq/            data-quality rules engine, findings, name matching, portal calendar and staff
+                 readiness reminders (calendar.py, calendar_service.py, portal_tasks.py; ADR-0053)
   changes/       change requests (maker-checker) for identity fields
   documents/     upload, storage, versions, ACLs, virus scan hook
   knowledge/     ingestion, chunking, embeddings, retrieval, tools, prompts, gateway, evals
@@ -81,7 +82,7 @@ apps/api/app/
                  payments (billing), usage, fleet + heartbeat, feature flags, announcements,
                  support tickets, platform audit (DB role sos_platform; routes /api/v1/platform/*)
   devtools/      synthetic data generator (make seed-synthetic; local/ci only)
-apps/api/migrations/  Alembic revisions 0001_baseline … 0063_r2_closeout (linear chain; `alembic heads` shows the current head)
+apps/api/migrations/  Alembic revisions 0001_baseline … 0064_portal_calendar (linear chain; `alembic heads` shows the current head)
 apps/api/tests/  tests per module (tests/<module>/) + cross-module suites (tests/security/, tests/migrations/, tests/api/, tests/deploy/)
 apps/api/openapi.json  committed OpenAPI document (make openapi; freshness test)
 apps/worker/     Celery entrypoint (sos_worker.celery_app; imports app.* tasks and beat schedules)

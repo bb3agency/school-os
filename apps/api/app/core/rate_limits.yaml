@@ -206,6 +206,8 @@ routes:
   GET /api/v1/dq/readiness: [readiness_reads, readiness_school]
   GET /api/v1/dq/readiness/{profile_key}: [readiness_reads, readiness_school]
   GET /api/v1/dq/readiness/{profile_key}/students: [readiness_reads, readiness_school]
+  # R3-1D (FR-RDY-003): the portal calendar shows each event's readiness counts
+  GET /api/v1/dq/calendar: [readiness_reads, readiness_school]
   POST /api/v1/academic-years/{year_id}/promotions:preview: [heavy_jobs]
   # R2-3G: a broadcast preview reads every guardian of the chosen sections
   POST /api/v1/notices/{notice_id}/broadcasts/preview: [search]

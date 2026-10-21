@@ -36,7 +36,7 @@ from app.core.errors import Forbidden, NotFound, ValidationFailed
 from app.core.languages import telugu_enabled, telugu_text
 from app.core.logging import get_logger
 from app.core.pdf import PrintDocument
-from app.dq import checks, engine
+from app.dq import calendar_service, checks, engine
 from app.dq import readiness as rd
 from app.dq import repository as repo
 from app.dq import service as dq
@@ -368,6 +368,7 @@ def summary(
         totals=ReadinessCounts(**_counts(all_statuses)),
         sections=rows,
         last_run=dq._run_out(last) if visible and last is not None else None,
+        next_window=calendar_service.next_window(session, profile.key),
     )
 
 

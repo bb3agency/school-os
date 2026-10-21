@@ -28,6 +28,10 @@
 - Bad / costs: the shipped calendar is a guess until confirmed each year; a release per academic year updates the file.
 - Follow-up: each year's file is refreshed from circulars and confirmed by pilot schools; if a state publishes machine-readable dates, a later ADR may read them.
 
+## As built
+
+R3-1D, branch `wip/r3-portal-calendar`, migration `0064_portal_calendar`, 2026-10-21: as decided, with these refinements (docs/03 §3.30, docs/05 §16.6): an expected window is never shown as "open now"; a missed morning sends the missed step once; without an owner (or with one who left) the holders of `readiness.calendar.manage` are told and no task is made; the reminder counts are school-wide for the event's first linked profile with a readiness check; `GET /dq/calendar/assignees` lets calendar managers who do not hold `task.manage` choose owners. Decision 5: "Link to a portal window" on a circular task in the task list.
+
 ## Alternatives considered
 
 | Option | Why not chosen |

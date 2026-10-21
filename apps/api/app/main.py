@@ -22,6 +22,7 @@ from app.core.middleware import install_middleware
 from app.core.telemetry import setup_telemetry
 from app.documents.api import router as documents_router
 from app.dq.api import router as dq_router
+from app.dq.api import tasks_router as dq_tasks_router
 from app.exports.api import router as exports_router
 from app.extraction.api import router as extraction_router
 from app.fees import webhook as payments_webhook
@@ -82,6 +83,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(documents_router)
     app.include_router(imports_router)
     app.include_router(dq_router)
+    # R3-1D (FR-RDY-010): link a circular task to a portal calendar event.
+    app.include_router(dq_tasks_router)
     app.include_router(platform_tenant_router)
     app.include_router(notifications_router)
     app.include_router(invitations_router)

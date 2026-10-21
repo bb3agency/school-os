@@ -1637,6 +1637,88 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dq/calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Calendar
+         * @description The school's portal calendar for an academic year (default: the current one): UDISE+,
+         *     board registration and nominal-roll windows, APAAR drives and the school's own events that
+         *     concern this school (by its boards and classes), soonest closing first (permission
+         *     ``dq.readiness.read``). Each shows the dates in force: ``confirmed`` by a person at the
+         *     school, else the calendar file's unverified expectation ("Expected around ..."); its state
+         *     (``expected``, ``confirmed``, ``open``, ``closed``); the owner; and the readiness of its
+         *     linked profiles in your scope ("142 of 160 ready").
+         */
+        get: operations["get_calendar_api_v1_dq_calendar_get"];
+        put?: never;
+        /**
+         * Add Calendar Event
+         * @description Add the school's own event: a label in the school's words (no personal data), its dates,
+         *     the readiness profiles it concerns and an owner (permission ``readiness.calendar.manage``).
+         *     It gets reminders like the portal windows. Accepts ``Idempotency-Key``. Audited.
+         */
+        post: operations["add_calendar_event_api_v1_dq_calendar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dq/calendar/{event_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Confirm Calendar Event
+         * @description Confirm an event's opening and closing dates, where they came from (a circular, the
+         *     portal, a phone call; optionally the document) and who owns the work (permission
+         *     ``readiness.calendar.manage``). Confirmed dates win over the expected ones. The first
+         *     confirmation needs no ``If-Match``; changing one does (400 ``if_match_required``, 412 when
+         *     stale). An event that does not concern the school: 404. Audited.
+         */
+        put: operations["confirm_calendar_event_api_v1_dq_calendar__event_key__put"];
+        post?: never;
+        /**
+         * Remove Calendar Event
+         * @description Remove the school's own event, or undo a confirmation so the expected dates show again
+         *     (permission ``readiness.calendar.manage``; ``If-Match``). Reminders already sent stay in
+         *     the history. Audited.
+         */
+        delete: operations["remove_calendar_event_api_v1_dq_calendar__event_key__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dq/calendar/assignees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Calendar Assignees
+         * @description Active staff who can own a portal window (permission ``readiness.calendar.manage``).
+         */
+        get: operations["calendar_assignees_api_v1_dq_calendar_assignees_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/dq/findings": {
         parameters: {
             query?: never;
@@ -8391,6 +8473,30 @@ export interface paths {
         patch: operations["update_task_api_v1_tasks__task_id__patch"];
         trace?: never;
     };
+    "/api/v1/tasks/{task_id}/portal-event": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Link Task To Portal Event
+         * @description Link a task confirmed from a circular's deadline to a portal calendar event: the task's
+         *     due date becomes the event's confirmed closing date, from that circular (permission
+         *     ``readiness.calendar.manage`` and a school-wide ``task.manage``, else 403; a task you cannot
+         *     reach: 404; a task not from a circular: 422 ``not_circular_task``). A person's action, never
+         *     automatic. Accepts ``Idempotency-Key``. Audited.
+         */
+        post: operations["link_task_to_portal_event_api_v1_tasks__task_id__portal_event_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tasks/{task_id}/status": {
         parameters: {
             query?: never;
@@ -10316,6 +10422,203 @@ export interface components {
             };
             /** Sections */
             sections: components["schemas"]["SectionCountsOut"][];
+        };
+        /**
+         * CalendarAssigneeOut
+         * @description An active member who can own a portal window (names and role keys only).
+         */
+        CalendarAssigneeOut: {
+            /** Display Name */
+            display_name: string;
+            /**
+             * Membership Id
+             * Format: uuid
+             */
+            membership_id: string;
+            /** Roles */
+            roles: string[];
+        };
+        /**
+         * CalendarConfirmIn
+         * @description Confirmed dates of a calendar event, where they came from and who owns the work
+         *     (FR-RDY-004).
+         */
+        CalendarConfirmIn: {
+            /**
+             * Academic Year Id
+             * Format: uuid
+             */
+            academic_year_id: string;
+            /**
+             * Closes On
+             * Format: date
+             */
+            closes_on: string;
+            /** Document Id */
+            document_id?: string | null;
+            /**
+             * Opens On
+             * Format: date
+             */
+            opens_on: string;
+            /** Owner Membership Id */
+            owner_membership_id?: string | null;
+            /**
+             * Source Kind
+             * @enum {string}
+             */
+            source_kind: "circular" | "portal" | "phone" | "other";
+        };
+        /**
+         * CalendarEventIn
+         * @description The school's own event (FR-RDY-005): a label in the school's words (no personal data),
+         *     its dates, the readiness profiles it concerns and an owner.
+         */
+        CalendarEventIn: {
+            /**
+             * Academic Year Id
+             * Format: uuid
+             */
+            academic_year_id: string;
+            /**
+             * Closes On
+             * Format: date
+             */
+            closes_on: string;
+            /** Document Id */
+            document_id?: string | null;
+            /** Label */
+            label: string;
+            /**
+             * Opens On
+             * Format: date
+             */
+            opens_on: string;
+            /** Owner Membership Id */
+            owner_membership_id?: string | null;
+            /** Profile Keys */
+            profile_keys?: string[];
+            /**
+             * Source Kind
+             * @enum {string}
+             */
+            source_kind: "circular" | "portal" | "phone" | "other";
+        };
+        /**
+         * CalendarEventOut
+         * @description One event of the school's portal calendar (US-3101): the file's expectation or the
+         *     school's own event, the dates in force, who confirmed them and from where, the owner of
+         *     the work and the readiness of the linked profiles.
+         */
+        CalendarEventOut: {
+            /**
+             * Academic Year Id
+             * Format: uuid
+             */
+            academic_year_id: string;
+            /** Boards */
+            boards: string[];
+            /** Classes */
+            classes: string[];
+            /** Closes Approximate */
+            closes_approximate: boolean;
+            /**
+             * Closes On
+             * Format: date
+             */
+            closes_on: string;
+            /** Confirmed */
+            confirmed: boolean;
+            /** Confirmed At */
+            confirmed_at: string | null;
+            confirmed_by: components["schemas"]["CalendarMemberOut"] | null;
+            /** Days Left */
+            days_left: number;
+            /** Document Id */
+            document_id: string | null;
+            /** Event Key */
+            event_key: string;
+            expected: components["schemas"]["ExpectedWindowOut"] | null;
+            /** Label En */
+            label_en: string;
+            /** Label Te */
+            label_te: string;
+            /** Lead Days */
+            lead_days: number[];
+            /** Opens Approximate */
+            opens_approximate: boolean;
+            /**
+             * Opens On
+             * Format: date
+             */
+            opens_on: string;
+            /**
+             * Own
+             * @description An event the school added itself (FR-RDY-005).
+             */
+            own: boolean;
+            owner: components["schemas"]["CalendarMemberOut"] | null;
+            /**
+             * Portal
+             * @enum {string}
+             */
+            portal: "udise_plus" | "bseap" | "cbse" | "cisce" | "apaar" | "school";
+            /** Profile Keys */
+            profile_keys: string[];
+            /** Readiness */
+            readiness: components["schemas"]["CalendarReadinessOut"][];
+            /** Source Kind */
+            source_kind: ("circular" | "portal" | "phone" | "other") | null;
+            /** Sources */
+            sources: string[];
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "expected" | "confirmed" | "open" | "closed";
+            /** Verified */
+            verified: boolean;
+            /**
+             * Version
+             * @description ETag of the school's confirmation (send it as If-Match); null while the dates are only expected.
+             */
+            version: number | null;
+        };
+        /** CalendarMemberOut */
+        CalendarMemberOut: {
+            /** Display Name */
+            display_name: string | null;
+            /**
+             * Membership Id
+             * Format: uuid
+             */
+            membership_id: string;
+        };
+        /** CalendarOut */
+        CalendarOut: {
+            /**
+             * Academic Year Id
+             * Format: uuid
+             */
+            academic_year_id: string;
+            /** Academic Year Label */
+            academic_year_label: string;
+            /** Events */
+            events: components["schemas"]["CalendarEventOut"][];
+        };
+        /**
+         * CalendarReadinessOut
+         * @description Readiness counts of one linked profile in the reader's scope ("142 of 160 ready").
+         */
+        CalendarReadinessOut: {
+            /** Label En */
+            label_en: string;
+            /** Profile Key */
+            profile_key: string;
+            /** Ready */
+            ready: number;
+            /** Students */
+            students: number;
         };
         /** CancellationOut */
         CancellationOut: {
@@ -12538,6 +12841,26 @@ export interface components {
             name: string;
             /** Version */
             version: number;
+        };
+        /**
+         * ExpectedWindowOut
+         * @description The calendar file's expectation (never official; ``verified`` says so).
+         */
+        ExpectedWindowOut: {
+            /** Closes Approximate */
+            closes_approximate: boolean;
+            /**
+             * Closes On
+             * Format: date
+             */
+            closes_on: string;
+            /** Opens Approximate */
+            opens_approximate: boolean;
+            /**
+             * Opens On
+             * Format: date
+             */
+            opens_on: string;
         };
         /** ExplainIn */
         ExplainIn: {
@@ -16860,6 +17183,68 @@ export interface components {
             };
         };
         /**
+         * PortalTaskLinkIn
+         * @description Link a task confirmed from a circular to a calendar event (FR-RDY-010).
+         */
+        PortalTaskLinkIn: {
+            /**
+             * Academic Year Id
+             * @description The academic year of the event; default the current one.
+             */
+            academic_year_id?: string | null;
+            /** Event Key */
+            event_key: string;
+        };
+        /**
+         * PortalWindowOut
+         * @description The next portal window of a readiness profile (FR-RDY-009): the dates in force (confirmed
+         *     by the school, else the calendar file's unverified expectation) and its state.
+         */
+        PortalWindowOut: {
+            /**
+             * Academic Year Id
+             * Format: uuid
+             */
+            academic_year_id: string;
+            /** Closes Approximate */
+            closes_approximate: boolean;
+            /**
+             * Closes On
+             * Format: date
+             */
+            closes_on: string;
+            /** Confirmed */
+            confirmed: boolean;
+            /**
+             * Days Left
+             * @description Days until the window closes (0 on the closing day).
+             */
+            days_left: number;
+            /** Event Key */
+            event_key: string;
+            /** Label En */
+            label_en: string;
+            /** Label Te */
+            label_te: string;
+            /** Opens Approximate */
+            opens_approximate: boolean;
+            /**
+             * Opens On
+             * Format: date
+             */
+            opens_on: string;
+            /**
+             * Portal
+             * @enum {string}
+             */
+            portal: "udise_plus" | "bseap" | "cbse" | "cisce" | "apaar" | "school";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "expected" | "confirmed" | "open" | "closed";
+        };
+        /**
          * PrecheckCreate
          * @description US-501 AC4: a board or portal pre-check report.
          */
@@ -17639,6 +18024,8 @@ export interface components {
          */
         ReadinessSummaryOut: {
             last_run: components["schemas"]["RunOut"] | null;
+            /** @description The next window of this profile on the school's portal calendar that has not closed (FR-RDY-009); null when none is known. */
+            next_window?: components["schemas"]["PortalWindowOut"] | null;
             profile: components["schemas"]["ReadinessProfileOut"];
             /** Sections */
             sections: components["schemas"]["ReadinessSectionOut"][];
@@ -19796,10 +20183,15 @@ export interface components {
             overdue: boolean;
             owner: components["schemas"]["app__circulars__schemas__MemberOut"];
             /**
+             * Portal Event Key
+             * @description The portal calendar event of a portal task (source portal_calendar).
+             */
+            portal_event_key?: string | null;
+            /**
              * Source
              * @enum {string}
              */
-            source: "manual" | "circular";
+            source: "manual" | "circular" | "portal_calendar";
             /**
              * Status
              * @enum {string}
@@ -24962,6 +25354,223 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_calendar_api_v1_dq_calendar_get: {
+        parameters: {
+            query?: {
+                academic_year_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    add_calendar_event_api_v1_dq_calendar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarEventIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarEventOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    confirm_calendar_event_api_v1_dq_calendar__event_key__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Calendar event, e.g. bseap_ssc_2027_nominal_roll, or school:<slug> for the school's own event */
+                event_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarConfirmIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarEventOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    remove_calendar_event_api_v1_dq_calendar__event_key__delete: {
+        parameters: {
+            query: {
+                academic_year_id: string;
+            };
+            header?: never;
+            path: {
+                /** @description Calendar event, e.g. bseap_ssc_2027_nominal_roll, or school:<slug> for the school's own event */
+                event_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    calendar_assignees_api_v1_dq_calendar_assignees_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarAssigneeOut"][];
                 };
             };
             /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
@@ -41664,6 +42273,54 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    link_task_to_portal_event_api_v1_tasks__task_id__portal_event_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortalTaskLinkIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarEventOut"];
                 };
             };
             /** @description Validation Error */

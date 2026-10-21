@@ -826,6 +826,43 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             k=task,
             u=u["user"],
         )
+        # --- portal calendar (R3-1D, 0064_portal_calendar): a confirmation with a document and
+        # an owner, a portal task and its reminder (append-only; references ops.tasks) ----------
+        _run(
+            c,
+            "INSERT INTO ops.portal_calendar_dates (id, tenant_id, academic_year_id, event_key, "
+            "opens_on, closes_on, source_kind, document_id, owner_membership_id, confirmed_by, "
+            "confirmed_by_membership) VALUES (:i, :t, :y, 'bseap_ssc_2027_nominal_roll', "
+            "'2027-02-01', '2027-02-05', 'circular', :d, :m, :u, :m)",
+            i=uuid.uuid4(),
+            t=t,
+            y=ids["year1"],
+            d=ids["doc"],
+            m=ids["m1"],
+            u=u["user"],
+        )
+        portal_task = uuid.uuid4()
+        _run(
+            c,
+            "INSERT INTO ops.tasks (id, tenant_id, title, owner_membership_id, due_on, source, "
+            "portal_event_key, created_by, created_by_membership) VALUES (:i, :t, "
+            "'Synthetic portal task', :m, '2027-02-05', 'portal_calendar', "
+            "'bseap_ssc_2027_nominal_roll', :u, :m)",
+            i=portal_task,
+            t=t,
+            m=ids["m1"],
+            u=u["user"],
+        )
+        _run(
+            c,
+            "INSERT INTO ops.portal_reminders (id, tenant_id, academic_year_id, event_key, "
+            "lead_day, closes_on, task_id, notified) VALUES (:i, :t, :y, "
+            "'bseap_ssc_2027_nominal_roll', 14, '2027-02-05', :k, 1)",
+            i=uuid.uuid4(),
+            t=t,
+            y=ids["year1"],
+            k=portal_task,
+        )
         parent_notice = uuid.uuid4()
         _run(
             c,

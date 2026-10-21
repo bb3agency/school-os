@@ -861,6 +861,8 @@ Stories of the 2026-27 plan, release R3 (docs/18 §3 R3, planned Apr-Jun 2027, b
 **US-3104** · As staff, I want the next window shown on the readiness screens. [FR-RDY-009, FR-RDY-010]
 - AC1: Each readiness profile shows its next window and state (expected, confirmed, open now, closed); a confirmed circular deadline can be linked to an event.
 
+*As built (R3-1D, branch `wip/r3-portal-calendar`, migration `0064_portal_calendar`, 2026-10-21):* US-3101..US-3104 are built: `GET /dq/calendar`, confirm/add/remove with `readiness.calendar.manage`, the 07:30 IST reminder job (staff tasks and counts-only notifications, never parents; suspended schools get none, D31), `next_window` on readiness responses, web `/findings/calendar` and the readiness "Next window" line. A circular task is linked from the task list ("Link to a portal window"; `POST /tasks/{task_id}/portal-event`). Every shipped date stays `verified: false` (D3).
+
 ## 5. Data-quality rules catalog (initial)
 
 | Rule | Checks | Default severity | Explanation template (EN) |
