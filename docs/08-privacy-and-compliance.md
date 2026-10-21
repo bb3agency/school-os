@@ -5,9 +5,9 @@
 | Version | 0.4 · 2026-09-29 |
 | Laws/regimes | DPDP Act 2023 + DPDP Rules 2025 · IT Act 2000 / CERT-In Directions (Apr 2022) · UIDAI Aadhaar rules |
 | Related | 05-Data model §8–13, 07-Security, 11-Operations §7 (incident response), 16-Platform admin panel, ADR-0015, ADR-0016 |
-| Changes | 0.5 (2026-10-14): R2 planned rules for fees, payments, WhatsApp parent messages, parent link pages and certificate verification (§15, PRV-022..PRV-029); providers the school contracts directly (§1). 0.4: student insights (M5) purpose limits as built (§4), fixed retention for notes and closed flags (§7), DPIA inputs (§10), records of processing (§11). 0.3: circulars and parent notices privacy rules (§8). 0.2: data location for shared and dedicated tiers; payments provider listed as proposed (not active); platform, billing and support data (§14); records of processing and DPA clause updated. 0.1: baseline |
+| Changes | 0.6 (2026-10-21): R3 planned rules (§16, PRV-030..PRV-038): DPDP processor pack templates in `docs/legal/` (not legal advice, D30), notice records, data-principal requests and grievances, consents for optional purposes, breach handling, public disclosure without student data, RTE status as restricted data, open points to confirm (§16.4); ADR-0048..ADR-0053. 0.5 (2026-10-14): R2 planned rules for fees, payments, WhatsApp parent messages, parent link pages and certificate verification (§15, PRV-022..PRV-029); providers the school contracts directly (§1). 0.4: student insights (M5) purpose limits as built (§4), fixed retention for notes and closed flags (§7), DPIA inputs (§10), records of processing (§11). 0.3: circulars and parent notices privacy rules (§8). 0.2: data location for shared and dedicated tiers; payments provider listed as proposed (not active); platform, billing and support data (§14); records of processing and DPA clause updated. 0.1: baseline |
 
-> **Not legal advice.** This document records engineering and product commitments based on public sources checked in September 2026. The owner has no lawyer (decision D30, 2026-10-14): SchoolOS drafts the DPA, notices, terms and DPIA as templates (R3); a one-time professional review is recommended before the first paid school signs, and is not required for pilots on synthetic data.
+> **Not legal advice.** This document records engineering and product commitments based on public sources checked in September 2026. The owner has no lawyer (decision D30, 2026-10-14): SchoolOS drafts the DPA, notices, terms and DPIA as templates (R3; drafts in [`docs/legal/`](legal/README.md), §16); a one-time professional review is recommended before the first paid school signs, and is not required for pilots on synthetic data.
 
 ---
 
@@ -296,3 +296,50 @@ The sub-processor register (§1) lists them in a separate block **"Providers the
 - **Data-principal requests (PRV-010):** access reports include a guardian's opt-ins and messages (metadata) and a student's fee account; correction of financial records happens only through cancellation and re-issue (never edits); erasure of financial records is refused while the retention period runs (legal obligation), with the reason recorded.
 
 **Parent pages as built (R2-3H, 2026-10-18).** Each page shows only ADR-0046 decision 2: the dues page names the child by first name and class only; the receipt page shows what the printed receipt shows (name, class-section, admission number, amounts, mode); the opt-in page shows the categories and the language. No page shows a phone (except the school office's on the dues page), address, date of birth, Aadhaar data, other children or guardians. The parent's language choice is audited (`guardian.updated`, `via: parent_link`), and PDF opens are audited as downloads.
+
+## 16. DPDP processor pack, consents, breaches, disclosure, RTE and portal reminders (R3, planned)
+
+**Status: planned (R3, documented 2026-10-21), not built.** Decisions: ADR-0048 (templates, notice records, record classes, data-principal requests and grievances), ADR-0049 (consents for optional purposes), ADR-0050 (breach handling), ADR-0051 (CBSE Appendix IX disclosure), ADR-0052 (RTE register; designed, not scheduled while owner decision D10 stands), ADR-0053 (portal calendar reminders); lead decisions D36-D46 (docs/18 §8). **Not legal advice.** Nothing in this section adds a legal claim beyond §2, §3, §4 and §6; points this document does not settle are marked **(to confirm)** and listed in §16.4.
+
+### 16.1 How R3 completes the obligation mapping (§3)
+
+| Obligation (§3) | Before R3 | R3 adds |
+|---|---|---|
+| Notice (PRV-001) | Template promised | Parents' and staff notice templates (`docs/legal/`), filled from school settings; a record of each notice version issued, and a flag when a newer version exists (FR-DPDP-001..003) |
+| Lawful basis, consent (PRV-002, PRV-006) | APAAR consent register; WhatsApp opt-ins | A consent register for optional purposes with signed-form evidence and withdrawal; one view across APAAR, opt-ins and optional purposes (FR-DPDP-020..026) |
+| Breach notification (PRV-008, PRV-017) | Runbook in docs/11 §7 | SchoolOS incident record with CERT-In (6 h) and school-notice (24 h target) clocks; each school's breach register with the Board (initial, 72 h report) and family duties; templates (FR-DPDP-030..038; `docs/legal/breach-runbook.md`) |
+| Retention and erasure (PRV-009) | Retention defaults (§7, docs/05 §13), erasure chains for documents and insights | A catalogue of record classes with retention, basis and erasure rule; erasure only where lawful, planned per class and executed by each module (FR-DPDP-012..014, FR-DPDP-017) |
+| Data-principal rights (PRV-010) | Correction via change requests; full export for the owner | One register for access, correction, erasure, nomination, consent withdrawal and grievances with verification, a 7-day due date (NFR-PRV-004), maker-checker release and letters (FR-DPDP-005..016) |
+| Contact details (PRV-011) | Promised | `privacy_contact` setting printed on notices, letters, reports and the staff footer (FR-DPDP-004) |
+
+### 16.2 Rules
+
+| ID | Rule |
+|---|---|
+| PRV-030 | **Verify before releasing.** No access report, erasure, correction outcome or nomination is acted on until the school records how it verified the requester (in person with a document seen, the guardian's phone on record, or a staff member's own sign-in). For a child, the requester must be a parent or guardian linked to the child, or a nominee recorded for that guardian. |
+| PRV-031 | **Access reports are scoped and handed over by the school.** A report covers one subject and contains no other child's data, no Aadhaar number (as-printed fields and last 4 only as "held"), no secrets or hashes. It is released by a second person with step-up, downloadable for 24 hours and given to the requester by the school; SchoolOS sends it nowhere in R3. |
+| PRV-032 | **Erasure only where lawful.** The admission register and identity record, issued certificates, financial records within their 8-year period (D21; §15 PRV-024) and the audit log are not erased on request; the refusal and its reason go into the response letter. Everything erasable is erased by the owning module, derived AI data with its source (§7). |
+| PRV-033 | **Request texts stay private.** What the requester said, staff notes, responses, nominee details and breach descriptions are encrypted with the school's key, never logged, never in audit summaries, never sent to an AI provider. |
+| PRV-034 | **Grievances get a written answer.** A grievance is closed only with a response; the school's target is at most 7 days (NFR-PRV-004). The response tells the person they may complain to the Data Protection Board. The statutory grievance period is **(to confirm)**. |
+| PRV-035 | **Consent for optional purposes.** For purposes outside educational activities and child safety (§4), the school records consent per purpose and version with the signed form; no decision means "not given"; withdrawal is a new entry, effective for future use; the form offers refusal next to consent and says admission does not depend on it (ADR-0049). |
+| PRV-036 | **Breach handling.** SchoolOS's incident records hold categories and counts only; schools are told through their register and by phone, target 24 hours from confirmation; the school's register shows its Board and family duties with clocks; SchoolOS never sends a breach notice to families itself (ADR-0050). |
+| PRV-037 | **Public disclosure without student data.** The Appendix IX page shows only school-level facts and aggregates (counts below 10 as "fewer than 10"), published by a person as a frozen snapshot; adults named on it (principal, committee members) are typed by the school, which is responsible for telling them (ADR-0051; NFR-PRV-006). |
+| PRV-038 | **RTE status is restricted (when built).** Admission under Section 12(1)(c) reveals a family's economic or social category: C3, visible only to `rte.read` holders, never on certificates, registers, messages, parent pages or AI answers, never used for anything but the register and the state's reimbursement (ADR-0052; invariant 14). |
+
+Portal reminders (ADR-0053) process no personal data beyond staff members as task owners and counts of ready students; they never reach parents.
+
+### 16.3 Records of processing, DPIA and calendar (additions)
+
+- **Records of processing (§11):** rows for data-principal requests and grievances (basis: legal obligation; retention 3 years after closing, a SchoolOS default **(to confirm)**), consents for optional purposes (consent; while on roll), breach records (legal obligation; 3 years after closing **(to confirm)**), the disclosure page (the school's CBSE affiliation obligation; no student data), the RTE register when built (legal obligation under the RTE Act; admissions with the student record, claims 8 years).
+- **DPIA (§10):** the template is `docs/legal/dpia-template.md`; R3 inputs: verification of requesters, the access report's content, erasure limits, the public disclosure page, RTE status as sensitive data.
+- **Compliance calendar (§12):** before mid-May 2027 each school has recorded the notice version it issued, set its privacy contact, and run one test request end to end; the professional review of `docs/legal/` (D30) happens before the first paid school signs.
+
+### 16.4 Open points (to confirm with a professional reviewer)
+
+1. The exact commencement date of the day-to-day duties (13 or 14 May 2027, §2).
+2. Whether the Rules fix a period for answering grievances and other requests, beyond the 7-day target SchoolOS sets (NFR-PRV-004).
+3. Whether the Board's initial breach notice has a fixed time limit (SchoolOS shows it overdue after 24 hours as a default) and the Board's form and channel.
+4. Whether a school must itself report its own incidents to CERT-In.
+5. Retention of request, grievance and breach records (3 years after closing is a SchoolOS default).
+6. Whether publishing committee members' names on the Appendix IX page needs their consent (the school types them; SchoolOS advises asking).
+7. RTE: Andhra Pradesh's categories, documents, claim periods and amounts; whether the school is exempt (for example a minority institution).

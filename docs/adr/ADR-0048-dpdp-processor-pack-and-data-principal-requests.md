@@ -1,0 +1,52 @@
+# ADR-0048: DPDP processor pack: legal templates, record classes and one register for data-principal requests and grievances
+
+| Field | Value |
+|---|---|
+| Status | **Accepted (lead, 2026-10-21; owner may revisit)**. The owner asked the lead engineer not to put questions to him for R3; the lead decided and lists each choice in docs/18 §8 (D36-D39) |
+| Date | 2026-10-21 |
+| Deciders | Lead engineer (for the product owner, who may revisit) |
+| Amends / supersedes | none (builds on ADR-0010 maker-checker, ADR-0029 offboarding, ADR-0039 APAAR consent register; docs/08 §3 PRV-001, PRV-009, PRV-010, PRV-011; owner decision D30) |
+
+> **Not legal advice.** This ADR records engineering and product choices. What the DPDP Act 2023 and the DPDP Rules 2025 require is taken only from docs/08 (§2, §3, §6, §7), which itself is a summary of public sources checked in September 2026. Where docs/08 does not state a rule, this ADR says so and does not invent one.
+
+## Context
+
+- DPDP's day-to-day duties start in mid-May 2027 (docs/08 §2; sources cite 13 or 14 May 2027, to verify). The school is the **data fiduciary**, SchoolOS the **processor** (docs/08 §1). A school choosing software for 2027-28 is choosing its compliance partner (docs/18 §1.5).
+- docs/08 §3 lists what the school must do and what SchoolOS provides: notices (PRV-001), lawful basis (PRV-002), retention and erasure (PRV-009), data-principal rights (access, correction/completion/updating, erasure, grievance, nomination; PRV-010), published contact details (PRV-011). NFR-PRV-004 promises that schools can handle data-principal requests with SchoolOS's tools **within 7 days**.
+- The owner has no lawyer (D30): SchoolOS drafts the DPA, privacy notices, terms and DPIA as templates, clearly marked "not legal advice"; a one-time professional review is recommended before the first paid school signs and does not block pilots on synthetic data.
+- What exists today: correction of identity fields through change requests with evidence (ADR-0010); the owner's full data export (FR-ADM-001); retention settings for working data (FR-ADM-002); erasure chains for documents and insights notes (docs/08 §4, §7); the APAAR consent register (ADR-0039); WhatsApp opt-ins (ADR-0043). There is **no** per-student data report, no request or grievance log, no record of which notice a school issued, no catalogue of record classes with their retention and whether they may be erased.
+
+## Decision
+
+1. **Templates live in `docs/legal/` as versioned Markdown with `{{placeholders}}`.** The DPA, the parents' and staff privacy notices, SchoolOS's terms of service, the DPIA, the breach runbook and the data-principal response letters are drafted by SchoolOS (D30). Every file starts with the "Not legal advice" banner, a `template_version`, and the list of placeholders; each claim about the law cites docs/08 or is marked **(to confirm)**. The app ships only the **school-facing notice and letter templates** (`app/privacy/templates/*.yaml`, same text and version as the docs file, checked by a test), filled from the school's settings; the DPA, terms and DPIA are documents SchoolOS sends and signs outside the app.
+2. **Notice records (PRV-001).** A school records each notice it issues (`ops.privacy_notices`: template key and version, audience `parents`/`staff`, language, issued-on date, how it was issued, the final document). Nothing is sent to parents by SchoolOS for this; the school issues the notice (paper, its own WhatsApp groups, or the R2 notice flow through M4 if it chooses).
+3. **Privacy contact (PRV-011).** The school's grievance and data-protection contact (name or designation, office phone, e-mail) is a school setting `privacy_contact` (`tenant.settings.manage`ᴿ), printed on notices, access reports and response letters, and shown in the staff app footer.
+4. **Record classes (PRV-009).** One versioned catalogue `app/privacy/record_classes.yaml` lists every class of record SchoolOS keeps for a school (admission register and student identity, guardians, documents, certificates, financial records, attendance and marks, insights, messages and opt-ins, consents, Ask history, audit, working files ...): owning module, tables, classification, default retention (copied from docs/05 §13, never different; a test compares them), the retention basis in plain words, and `erasure`: `allowed`, `allowed_after_retention`, `refused_legal_obligation` or `refused_official_record`. It is shown read-only on the Data retention screen and in the DPIA template; it drives erasure decisions (5).
+5. **One register for requests and grievances (PRV-010, NFR-PRV-004).** `ops.privacy_requests` holds every request a data principal (a parent or guardian for a child, a staff member for themselves, or a nominee) makes to the school: `access`, `correction`, `erasure`, `nomination`, `consent_withdrawal`, `grievance`, `other`. Each has the subject (student, guardian or member), the requester and how the school **verified** them (in person with a document seen, matching the guardian's phone on record, staff sign-in; nothing else is accepted for release), a received date, a **due date = received + the school's target, default and maximum 7 days** (NFR-PRV-004), status, and an append-only event log (`ops.privacy_request_events`). Free text (the request in the requester's words, notes, the response) is encrypted with the school's key, never logged or audited. Grievances use the same register with `kind = grievance` and must end with a written response; the statutory response period for grievances is **not stated in docs/08 (to confirm)**, so SchoolOS tracks the school's 7-day target only.
+6. **Access reports are assembled from each module's service, released by a second person.** A module that holds data about a person registers a contributor (`subject_report(subject) -> sections`) in `app/privacy/subjects.yaml` (like the offboarding registry, fail closed: a module that owns tenant tables and is neither registered nor listed as `no_personal_data` fails a test). The report is a PDF (A4, English; Telugu only per ADR-0036/0044 rules for parent-facing documents) made by the `pdf` worker: what SchoolOS holds about the subject, per record class, with sources and dates; never Aadhaar numbers (as-printed fields only as "held, shown at the office"), never other children's data, restricted (C3) values included only for the subject's own record. **Release** needs `privacy.request.decide`ᴿ held by someone **other than** the person who logged the request (maker-checker, DB `CHECK`), then the file is downloadable for 24 hours to hand over or print. SchoolOS does not send it to the parent in R3.
+7. **Correction goes through existing paths.** A correction request links to the change requests (identity fields, ADR-0010) or normal edits it caused; the request closes when they are approved or refused. SchoolOS never edits a record because a request says so (invariant 6).
+8. **Erasure only where lawful, never automatic.** An erasure request lists, per record class (4), what can be erased and what is refused and why (`legal_obligation`, `official_record`, `retention_running` with the date it ends). On approval (`privacy.request.decide`ᴿ, maker-checker), the service calls each module's registered `erase_for_subject(subject, classes)` in one transaction where the module allows it; anything a module cannot erase by itself is listed as a manual step with its reason. Derived AI data follows its source (docs/08 §7). The admission register, issued certificates, financial records in their 8-year period (D21) and the audit log are never erased on request.
+9. **Nomination.** A nomination (an adult data principal naming someone to act for them, docs/08 §3) is recorded as a request of kind `nomination` with the nominee's name, relationship and contact (C3, encrypted); it can be withdrawn. For a child, the parent or guardian on record acts; nominations are for adult data principals (guardians, staff).
+10. **Audit and permissions.** Every step is audited in its transaction with ids, kinds, statuses and counts only (invariant 7). New permissions `privacy.read`, `privacy.request.manage`, `privacy.request.decide`ᴿ (docs/07 §6.8). Tables go in the existing schema `ops` (no new schema).
+
+## Consequences
+
+- Good: a school can show, per request, who asked, how they were verified, what was done and when, within the 7-day target; access reports are complete by construction (registry test) instead of by memory; erasure never removes official records by accident.
+- Good: the legal templates are reviewable files with versions; when the law or a professional review changes them, the version moves and schools see which version they issued.
+- Bad / costs: every module that holds personal data must add a contributor and, where it allows erasure, an eraser; the registry test makes forgetting one fail CI.
+- Bad / costs: drafting errors in the templates are a residual risk (D30); each template says so.
+- Follow-up: professional review of `docs/legal/` before the first paid school (D30); confirm the statutory grievance period and the commencement date against the notified Rules; consider sending access reports through a parent link page (ADR-0046) in a later release.
+
+## Alternatives considered
+
+| Option | Why not chosen |
+|---|---|
+| Separate tables for each right and for grievances | Same lifecycle (received, verified, due, decided, closed); one register gives one due-date view and one audit pattern |
+| Build the access report from the full data export | The export is the whole school, owner only; a subject report must be scoped to one person and readable by a parent |
+| Let the requester's verification be a checkbox | Releasing a child's data to the wrong adult is the main risk; the method and the second person are recorded |
+| Erase whatever the parent asks and let the school sort it out | Official registers and accounting records have legal retention; erasing them breaks other duties (docs/08 §3 PRV-009) |
+| Keep templates only inside the app | The DPA, terms and DPIA are signed outside the app; Markdown in the repo is reviewable and versioned with the code that implements it |
+
+## Related requirements
+
+FR-DPDP-001..018, NFR-PRV-004, NFR-PRV-006, NFR-PRV-007, SEC-049, PRV-030..PRV-034; docs/02 C26; docs/03 §3.27; docs/05 §16.1; docs/07 §6.8; docs/08 §16; docs/09 "R3 planned endpoints"; docs/17 §5.10; `docs/legal/`.

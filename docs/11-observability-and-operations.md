@@ -125,6 +125,7 @@ Delivery: phone push + SMS/email to the on-call (founder) for P1/P2; daily diges
    - **Affected schools (Data Fiduciaries) without undue delay**, target within 24 hours of confirmation, with facts they need for their own DPDP notices to parents and the Data Protection Board (Board: without delay + detailed report within 72 hours, per DPDP Rules).
    - Provide parent-notice templates (English; bilingual only while `SOS_TELUGU_ENABLED` is on, ADR-0036) and a facts package (nature, extent, timing, likely consequences, mitigation, what families can do, contact).
 5. **Eradicate & recover:** fix root cause, restore from clean backups if needed, rotate secrets/keys, verify audit chain.
+   - R3 (planned, ADR-0050): the incident is recorded in the operator console with these clocks, and each affected school's breach register receives the notice; step-by-step runbook and notification templates in [`docs/legal/breach-runbook.md`](legal/breach-runbook.md) (not legal advice).
 6. **Post-incident:** blameless postmortem within 5 working days (template `docs/templates/incident-postmortem.md`), action items tracked to closure, threat model updated.
 
 ### 7.3 Evidence preservation

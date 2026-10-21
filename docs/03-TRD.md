@@ -6,7 +6,7 @@
 | Scope | Core platform (M0–M2) + platform admin panel (C14) + interfaces for M3–M6 |
 | Related | 02-PRD (stories), 04-Architecture, 05-Data model, 06-RAG, 07-Security, 16-Platform admin panel |
 | Changes | 0.4: FR-CERT-001..014 and FR-REG-001..005 (§3.14, M3 certificates and registers), proposed from the roadmap scope (PO to confirm). 0.3: FR-IAM-013 (school picker, `/me/schools`, invitation acceptance) and FR-TEN-003 (keys, roles, owner invite and acceptance, ADR-0019) restated as built; FR-PLT-016 number format; M0 implementation status (§3.13). 0.2: FR-PLT-001..030 (§3.12); FR-IAM-010 role keys and platform roles; FR-TEN-010 permission; FR-TEN-011 moved to M1; FR-OPS-001 superseded; dedicated-tier NFRs (NFR-AVL-005, NFR-FLT-001..002); Valkey; interfaces and traceability updated. 0.1: baseline |
-| Changes | 0.7 (2026-10-21): R2 status moved from "planned" to "as built" (§3.18 status line; "As built" notes for FR-PUB-001..006 and 012, FR-LANG-001..006 and FR-KB-040..043); NFR-SEC-007 points to the penetration-test scope. 0.6 (2026-10-14): R2 planned requirements (§3.18-§3.25): FR-CERT-015..025, FR-FEE-001..030, FR-PAY-001..016, FR-MSG-001..024, FR-PUB-001..012, FR-LANG-001..006, FR-KB-040..045; NFR-PERF-008..011, NFR-AVL-007, NFR-SEC-007, NFR-PRV-005 (owner decisions D4-D9; ADR-0042..ADR-0047). 0.5: §3.15 student timeline and early warning (FR-ATT-001..005, FR-MRK-001..005, FR-EW-001..018; M5), proposed from the roadmap scope for the product owner to confirm; traceability row for BO-08. 0.4: §3.14 circulars, tasks and parent notices (FR-CIR-001..008, FR-TASK-001..008, FR-NOTICE-001..008; M4), proposed from the roadmap scope for the product owner to confirm; traceability row for BRD P4. 0.3: FR-IAM-013 (school picker, `/me/schools`, invitation acceptance) and FR-TEN-003 (keys, roles, owner invite and acceptance, ADR-0019) restated as built; FR-PLT-016 number format; M0 implementation status (§3.13). 0.2: FR-PLT-001..030 (§3.12); FR-IAM-010 role keys and platform roles; FR-TEN-010 permission; FR-TEN-011 moved to M1; FR-OPS-001 superseded; dedicated-tier NFRs (NFR-AVL-005, NFR-FLT-001..002); Valkey; interfaces and traceability updated. 0.1: baseline |
+| Changes | 0.8 (2026-10-21): R3 planned requirements (§3.26-§3.30): FR-DPDP-001..018, FR-DPDP-020..026, FR-DPDP-030..038, FR-DISC-001..012, FR-RTE-001..012 (designed, not scheduled while D10 stands), FR-RDY-001..010; NFR-PRV-006, NFR-PRV-007, NFR-SEC-008, NFR-PERF-012 (ADR-0048..ADR-0053; lead decisions D36-D46). 0.7 (2026-10-21): R2 status moved from "planned" to "as built" (§3.18 status line; "As built" notes for FR-PUB-001..006 and 012, FR-LANG-001..006 and FR-KB-040..043); NFR-SEC-007 points to the penetration-test scope. 0.6 (2026-10-14): R2 planned requirements (§3.18-§3.25): FR-CERT-015..025, FR-FEE-001..030, FR-PAY-001..016, FR-MSG-001..024, FR-PUB-001..012, FR-LANG-001..006, FR-KB-040..045; NFR-PERF-008..011, NFR-AVL-007, NFR-SEC-007, NFR-PRV-005 (owner decisions D4-D9; ADR-0042..ADR-0047). 0.5: §3.15 student timeline and early warning (FR-ATT-001..005, FR-MRK-001..005, FR-EW-001..018; M5), proposed from the roadmap scope for the product owner to confirm; traceability row for BO-08. 0.4: §3.14 circulars, tasks and parent notices (FR-CIR-001..008, FR-TASK-001..008, FR-NOTICE-001..008; M4), proposed from the roadmap scope for the product owner to confirm; traceability row for BRD P4. 0.3: FR-IAM-013 (school picker, `/me/schools`, invitation acceptance) and FR-TEN-003 (keys, roles, owner invite and acceptance, ADR-0019) restated as built; FR-PLT-016 number format; M0 implementation status (§3.13). 0.2: FR-PLT-001..030 (§3.12); FR-IAM-010 role keys and platform roles; FR-TEN-010 permission; FR-TEN-011 moved to M1; FR-OPS-001 superseded; dedicated-tier NFRs (NFR-AVL-005, NFR-FLT-001..002); Valkey; interfaces and traceability updated. 0.1: baseline |
 
 Normative keywords: **MUST / SHOULD / MAY** (RFC 2119). Every requirement has an ID and a verification method: **T** test · **I** inspection · **D** demonstration · **A** analysis.
 
@@ -603,6 +603,115 @@ Release R2 of the 2026-27 plan (docs/18 §3; owner decisions D4-D9 of 2026-10-10
 | FR-KB-045 | Live evaluation on Vertex AI and the ADR-0035 switches stay blocked by owner decision D2 (no cloud yet); R2 changes to knowledge MUST keep `make eval` hard gates green. | T |
 
 *As built (R2-2F, 2026-10-17; docs/06 §15, docs/14 R2-2F status):* FR-KB-040..043 are built (`GET /knowledge/usage`, search-only reasons, `GET /knowledge/resolve`, Playwright Ask journeys in `e2e/ask.spec.ts`). **FR-KB-044 is not built**: `get_fee_dues` still reads Tally only (`app/knowledge/tools/fees.py`), although the fee ledger (R2-1B) now exists. FR-KB-045 stays a standing constraint.
+### 3.26 R3 conventions (applies to §3.27-§3.30)
+
+Release R3 of the 2026-27 plan (docs/18 §3 R3; before DPDP's day-to-day duties in mid-May 2027, docs/08 §2). **Status: planned (documented 2026-10-21), not built.** Decisions: ADR-0048 (DPDP processor pack, requests, record classes), ADR-0049 (consents), ADR-0050 (breach), ADR-0051 (Appendix IX), ADR-0052 (RTE; designed, **not scheduled** while owner decision D10 stands), ADR-0053 (portal calendar); lead decisions D36-D46 (docs/18 §8; the owner may revisit). Stories: docs/02 C26-C31. **Not legal advice** (D30): requirements that touch the law cite docs/08 and mark open points "(to confirm)". New modules: `app/privacy` (requests, grievances, notices, record classes, consents, breach register, subject-report and erasure registries), `app/disclosure`, `app/rte` (gated); the portal calendar lives in `app/dq` (`calendar.py`, `config/portal_calendar.yaml`) and creates tasks through `circulars.service`; the control-plane incident record lives in `app/platform`. **No new schema** (D46): tenant tables in `ops` and `sis`, the incident tables in `platform`; **no new `SOS_*` setting** (configuration in versioned YAML, invariant 13). Every new tenant table follows invariant 1 (RLS ENABLE + FORCE, composite FKs, `offboarding_purge`), every route declares its guard (invariant 2; the one new public route `require_public_handle("school_disclosure")` and `public_routes.yaml`), every write that matters is audited in its transaction with ids, kinds, statuses and counts only (invariant 7), and request texts, notes, breach descriptions, nominee details and RTE references never reach logs or audit summaries (invariant 5). Planned permissions: docs/07 §6.8. ᴿ = step-up MFA within 5 minutes. Migrations from `0064` (docs/14 R3).
+
+### 3.27 DPDP processor pack (FR-DPDP) (R3.1; ADR-0048, ADR-0049, ADR-0050)
+
+**Templates, notices and contact (ADR-0048 decisions 1-3)**
+
+| ID | Requirement | V |
+|---|---|---|
+| FR-DPDP-001 | The legal templates MUST live in `docs/legal/` as versioned Markdown with a "Not legal advice" banner, a `template_version` and their placeholder list; the school-facing notice and letter templates MUST also ship in `app/privacy/templates/*.yaml` with the same text and version (a test compares them after stripping Markdown). | T |
+| FR-DPDP-002 | Holders of `privacy.read` MUST be able to preview the parents' and staff notices filled from school settings (name, letterhead address, `privacy_contact`) and download an A4 PDF (queue `pdf`, presigned ≤ 5 min); placeholders the school has not filled are shown as "[not set]" and block nothing. | T |
+| FR-DPDP-003 | Holders of `privacy.request.manage` MUST be able to record a notice issue (`template_key`, `template_version`, audience `parents`/`staff`, language, `issued_on` not in the future, channel `paper`/`school_whatsapp_group`/`sos_notice`/`email`/`other`, optional final document); records are append-only; the privacy page MUST flag when a newer template version exists than the last one issued for an audience. Audited `privacy.notice.issued`. | T |
+| FR-DPDP-004 | `core.tenants.settings.privacy_contact` (`name` 2-120, `phone` E.164 or Indian landline, `email`) MUST be set only with `tenant.settings.manage`ᴿ, audited with field names; printed on notices, letters and access reports and returned by `/me` for the staff footer. | T |
+
+**Data-principal requests and grievances (ADR-0048 decisions 5-9)**
+
+| ID | Requirement | V |
+|---|---|---|
+| FR-DPDP-005 | `ops.privacy_requests` MUST record `kind` (`access`, `correction`, `erasure`, `nomination`, `consent_withdrawal`, `grievance`, `other`), exactly one subject (student, guardian or membership; composite FKs), the requester's relationship, `verification_method` (`in_person_document`, `guardian_phone_on_record`, `staff_sign_in`; required before any decision), `received_on`, `due_on`, `status` (`received`, `in_progress`, `waiting_for_requester`, `decided`, `closed`, `withdrawn`), `logged_by`, `decided_by` (`CHECK decided_by <> logged_by`). Scope: requests about a student are visible only to members who may read that student (`student.read_basic` scope) and hold `privacy.read`; others 404. | T |
+| FR-DPDP-006 | `due_on` MUST be `received_on` + the school's target (`privacy_request_target_days`, 1-7, default 7; NFR-PRV-004); the list sorts overdue first; a daily job (07:00 IST) notifies holders of `privacy.request.manage` of requests due tomorrow or overdue (ids and counts only). | T |
+| FR-DPDP-007 | The requester's words, staff notes and the response text MUST be encrypted with the school's DEK (AAD `ops.privacy_requests\|<column>\|<id>`), never logged or audited; every status change is an append-only `ops.privacy_request_events` row; an acknowledgement letter (template §1) is printable at once. | T |
+| FR-DPDP-008 | Every module that owns tenant tables MUST either register a subject-report contributor and (where it allows erasure) an eraser in `app/privacy/subjects.yaml`, or be listed there as `no_personal_data` with a reason; a test MUST fail for any module in `app/tenancy/offboarding.yaml` `purge_order` that is in neither list (NFR-PRV-007). | T |
+| FR-DPDP-009 | The access report MUST contain, per record class, the subject's own data each contributor returns (through its `service.py`), its source and retention; MUST NOT contain other children's data, Aadhaar numbers (as-printed fields and last 4 only as "held"), secrets, hashes or other people's free text; C3 values of the subject's own record are included. It is an A4 PDF (`pdf` worker, English; a parent-language copy only per ADR-0044 once reviewed) stored as an export of kind `subject_report`, expiring after 24 hours. | T |
+| FR-DPDP-010 | Releasing an access report MUST require `privacy.request.decide`ᴿ by a member other than `logged_by` (403 `self_approval_forbidden`) and a recorded verification method; the download is audited `privacy.report.downloaded`; SchoolOS sends it nowhere. | T |
+| FR-DPDP-011 | A correction request MUST link to the change requests (`changes.service`) or audited edits it led to and close only when they are decided; SchoolOS MUST NOT change a record from the request itself (invariant 6). | T |
+| FR-DPDP-012 | For an erasure request, `GET …/erasure-plan` MUST list per record class `erasable`, `refused_legal_obligation`, `refused_official_record` or `retention_running` (with the end date), from `record_classes.yaml` and each eraser's dry run. | T |
+| FR-DPDP-013 | Approving an erasure (`privacy.request.decide`ᴿ, maker-checker) MUST call the registered erasers in one transaction where possible, derived AI data following its source (docs/08 §7), and record what was erased (counts per class) and what needs a manual step; audited `privacy.erasure.executed`. | T |
+| FR-DPDP-014 | The admission register and student identity, issued certificates, financial records within their 8-year period (D21) and the audit log MUST NOT be erasable on request (refusal reason recorded and printed in the letter). | T |
+| FR-DPDP-015 | A nomination MUST store the nominee's name, relationship and contact encrypted (C3), only for adult subjects (guardian or membership: 422 `nomination_adults_only` for a student), and be withdrawable as a new event. | T |
+| FR-DPDP-016 | A grievance MUST be closed only with a response text and `responded_on`; the response letter (template §7) is printable. The statutory grievance period is not stated in docs/08 **(to confirm)**; SchoolOS tracks the school's target only. | T |
+| FR-DPDP-017 | `app/privacy/record_classes.yaml` MUST list every record class with owner module, tables, classification, default retention, basis and erasure rule; a test MUST compare its retention with docs/05 §13 and its tables with the RLS catalog (every tenant table belongs to exactly one class); `GET /privacy/record-classes` serves it read-only. | T |
+| FR-DPDP-018 | The full data export (FR-ADM-001) MUST include `ops.privacy_requests`, events, notices, consents, breach records (ciphertext left out; free text included only with `include_sensitive`); offboarding purges them; retention per docs/05 §13 (requests and grievances 3 years after closing **(to confirm)**, notice records for the life of the school). | T |
+
+**Consents for optional purposes (ADR-0049)**
+
+| ID | Requirement | V |
+|---|---|---|
+| FR-DPDP-020 | `sis.consent_purposes` MUST hold the school's purposes (`key`, labels, description, `form_version`, `active`); suggestions come from `app/privacy/consent_purposes.yaml`; changes need `tenant.settings.manage`ᴿ; editing the text of a purpose that has decisions MUST create a new `form_version`. | T |
+| FR-DPDP-021 | `sis.consents` MUST be append-only with the rules of FR-APC-001/002 (statuses `given`, `refused`, `pending`, `withdrawn`; `given` only with the signed form as evidence, 422 `signed_form_required`; `withdrawn` only after `given`; no return to `pending`; `If-Match` on entries read; `Idempotency-Key`); recorded with `consent.record`. | T |
+| FR-DPDP-022 | Notes (≤ 500) refuse Aadhaar-like numbers; forms never print one; audited `consent.recorded` (ids, purpose key, status; never the note). | T |
+| FR-DPDP-023 | A4 consent forms per student and per section (optionally one state) MUST offer "I agree" and "I do not agree" side by side per purpose, say that admission and studies do not depend on the answer, and print in the parent language (FR-LANG-002); also as a server PDF (export kind `consent_forms`). | T |
+| FR-DPDP-024 | `privacy.service.consent_state(student_id, purpose_key)` MUST return `given` only when the latest entry is `given` for the purpose's current or an earlier still-active version; anything else is `not_given`. | T |
+| FR-DPDP-025 | The consent view (`consent.read`) MUST show per student the optional purposes, the APAAR decision (`apaar.service`) and the guardians' WhatsApp opt-ins (`messaging.service`, when messaging is on), each with source and date; it changes none of them. | T |
+| FR-DPDP-026 | Section counts per purpose MUST respect the reader's scope (class teachers: own sections); a `consent_withdrawal` request records the withdrawal here and links both ways. | T |
+
+**Breach handling (ADR-0050)**
+
+| ID | Requirement | V |
+|---|---|---|
+| FR-DPDP-030 | `platform.incidents` and `platform.incident_schools` MUST hold T0, severity, status, CERT-In fields, lead operator, and per school data-category codes, an approximate count, the window and `school_notified_at`; the summary MUST be refused when it contains a run of 6 or more digits, an e-mail address or more than 500 characters; no tenant data. Platform audit in the same transaction. | T |
+| FR-DPDP-031 | Marking schools as affected MUST need `platform.incidents.manage`ᴿ by two different operators (2P, as emergency break-glass); the operator console shows the CERT-In (T0 + 6 h) and school-notice (confirmation + 24 h) clocks. | T |
+| FR-DPDP-032 | The school-side worker MUST pull confirmed notices for its school every minute (shared deployment; pattern of `breakglass.sync_school`) into `ops.breach_records` with `origin = processor_notice`, idempotent per incident, and notify the owner and principal (`privacy.breach.notice_received`, urgent). | T |
+| FR-DPDP-033 | Holders of `privacy.breach.manage`ᴿ MUST be able to record a school breach (`noticed_at` not in the future, description encrypted, category codes, approximate counts of children, guardians and staff, containment steps) and optional affected ids (`ops.breach_affected`). | T |
+| FR-DPDP-034 | Each breach MUST carry three duties with clocks: Board initial notice (shown overdue after T0 + 24 h, a SchoolOS default marked as such), Board detailed report (T0 + 72 h), affected people notified; each records `done_at` and method; the list shows the next duty and time left in IST. | T |
+| FR-DPDP-035 | A job MUST remind the owner and principal at T0 + 24 h and T0 + 60 h while the detailed report is not recorded; idempotent. | T |
+| FR-DPDP-036 | Drafts (family notice, Board outline) MUST be filled from the record and `privacy_contact` using `docs/legal/breach-runbook.md` templates (app copy with the same version). | T |
+| FR-DPDP-037 | A family notice draft MAY be turned into an M4 parent notice (`circulars.service`, `source = staff_text`, needs approval); SchoolOS MUST NOT send any breach notice automatically. | T |
+| FR-DPDP-038 | Dedicated hosts (no control plane) MUST let the school record `origin = processor_notice` by hand; reading needs `privacy.breach.read`; breach records are kept 3 years after closing **(to confirm)**, exported and purged like other `ops` tables. | T |
+
+### 3.28 CBSE Appendix IX public disclosure (FR-DISC) (R3.2; ADR-0051)
+
+| ID | Requirement | V |
+|---|---|---|
+| FR-DISC-001 | The disclosure MUST be offered only to schools whose `boards` include `CBSE` (FR-TEN-020); others get `404 module_hidden`. Its format is `app/disclosure/formats/cbse-appendix-ix.yaml` (sections and items in CBSE's order, `source` URLs, `verified: false`, D3). | T |
+| FR-DISC-002 | Each item MUST declare its fill: `school` (school settings), `derived`, `input` (type, limits), `document` (one or more school documents), `link` (https only); unknown fills fail format validation at start-up. | T |
+| FR-DISC-003 | Derived items MUST be computed through other modules' services only: number of sections and classes (`tenancy.service`), teacher-section ratio and staff counts by role (`identity`/`authz` services; counts only), the fee structure per class from active fee plans when fees are on (`fees.service`, heads and annual amounts; no account data), the academic year's dates. | T |
+| FR-DISC-004 | The draft (`ops.disclosure_drafts`, one per school, `If-Match`) MUST be editable by `disclosure.edit`; inputs refuse Aadhaar-like numbers everywhere and phone-like numbers outside the two contact items; documents must be the school's documents the editor can read. | T |
+| FR-DISC-005 | Publishing (`disclosure.publish`ᴿ) MUST write an append-only `ops.disclosure_snapshots` row with the frozen content (derived values copied), `content_sha256`, document version ids, format key and version, `published_by`, `published_at`, and require `confirm_no_student_data: true` in the body (422 otherwise); audited `disclosure.published`. | T |
+| FR-DISC-006 | The format MUST contain no item naming or describing an individual child; result counts below 10 MUST be published as "fewer than 10" and the derived pass percentage omitted for them (NFR-PRV-006). | T |
+| FR-DISC-007 | A published snapshot MAY be withdrawn with a reason (10-500; `disclosure.publish`ᴿ); the public page then answers the uniform 404; audited `disclosure.withdrawn`. | T |
+| FR-DISC-008 | Publishing the first time MUST issue one `school_disclosure` public handle (22-character base64url key from 128 random bits; no expiry; one live per school); "Change the link" revokes it and issues a new one (`disclosure.publish`ᴿ). `core.public_handles.kind` CHECK gains `school_disclosure` (ADR-0051 amends ADR-0047 decision 1); the resolver is unchanged (active schools only). | T |
+| FR-DISC-009 | `GET /public/disclosure/{key}` (`require_public_handle("school_disclosure")`, listed in `public_routes.yaml`) MUST return the latest non-withdrawn snapshot as an explicit allowlist; `GET /public/disclosure/{key}/documents/{n}` MUST give a presigned URL (≤ 5 min) only for document versions in that snapshot. | T |
+| FR-DISC-010 | Public disclosure responses MUST carry the FR-PUB-010 headers (`no-referrer`, `private, no-store`, `noindex`, strict CSP) without a cookie exchange; limits `public_ip` and `public_lookup_fail`; unknown, revoked, withdrawn and suspended-school keys give the uniform 404; views counted per day per snapshot (no visitor data). | T |
+| FR-DISC-011 | Each snapshot MUST be downloadable by `disclosure.edit` as a self-contained HTML file (no scripts, no external requests except the hosted document links) and an A4 PDF (`pdf` queue). | T |
+| FR-DISC-012 | Drafts and snapshots MUST be in the full data export and the offboarding purge (handle purged with `public`); snapshots are kept for the life of the school (the record of what was published). | T |
+
+### 3.29 RTE 25% register (FR-RTE) (designed; not scheduled while owner decision D10 stands; ADR-0052)
+
+| ID | Requirement | V |
+|---|---|---|
+| FR-RTE-001 | The module MUST be hidden (`404 module_hidden`) unless the school setting `rte_applicable` is true (`tenant.settings.manage`ᴿ); state rules come from `app/rte/config/<state>.yaml` (`verified: false`, `source`; AP first). | T |
+| FR-RTE-002 | `sis.rte_admissions` MUST record per student and entry year the allotment reference (encrypted, C3), allotment date, category code from the state file, entry class, status (`allotted`, `admitted`, `declined`, `left`), admitted-on date; one admission per student (unique). | T |
+| FR-RTE-003 | `sis.rte_documents` MUST link existing documents with a document type from the state file and `verified_by`/`verified_at`; a document used as RTE evidence cannot be deleted (`document_in_use`). | T |
+| FR-RTE-004 | No Aadhaar number, income figure or caste certificate number MUST be stored in RTE tables; notes refuse Aadhaar-like numbers. | T |
+| FR-RTE-005 | RTE data MUST be readable only with `rte.read` (school-wide; never section-scoped); a student's RTE status MUST NOT appear in student lists, profiles or exports for anyone without it. | T |
+| FR-RTE-006 | RTE status MUST NOT be printed on certificates or registers, sent in messages, shown on parent pages or reachable by Ask (import-linter: `knowledge`, `messaging`, `public`, `certificates` must not import `rte`). | T |
+| FR-RTE-007 | `sis.rte_claims` MUST record academic year, period (from the state file), status (`draft`, `submitted`, `part_received`, `received`, `rejected`), portal reference, amounts claimed and received, submitted on/by; `rte.claim.manage`. | T |
+| FR-RTE-008 | Preparing a claim MUST add one `sis.rte_claim_lines` row per RTE child admitted and enrolled in the period, with the amount the state file defines and the eligibility facts it names (attendance percentage via `academics.service` when asked). | T |
+| FR-RTE-009 | Marking a claim submitted MUST freeze its lines (trigger); later corrections are a new claim. | T |
+| FR-RTE-010 | Received amounts MUST be recorded per claim and per line; the money goes to the school's bank and is never handled by SchoolOS. | T |
+| FR-RTE-011 | "Request RTE concession" MUST create a pending concession of type `rte` through `fees.service` (when fees are on) for normal maker-checker approval; nothing is approved automatically. | T |
+| FR-RTE-012 | Every write audited (ids, codes, counts); admissions follow the student record's retention, claims 8 years after the financial year (D21); full data export (C3 masked unless `include_sensitive`) and offboarding purge. | T |
+
+### 3.30 Portal calendar and readiness reminders (FR-RDY) (R3.3; ADR-0053)
+
+| ID | Requirement | V |
+|---|---|---|
+| FR-RDY-001 | `app/dq/config/portal_calendar.yaml` MUST list per academic year events with key, portal, label, readiness profile keys, boards and classes, `opens_on`/`closes_on` (each may be `approximate`), `source`, `verified: false`, `lead_days` (default `[30, 14, 7, 1]`); validated at start-up. | T |
+| FR-RDY-002 | An event MUST apply to a school when its boards and classes match the school's (FR-TEN-020/021) or the school added it. | T |
+| FR-RDY-003 | `GET /dq/calendar?academic_year_id=` (`dq.readiness.read`) MUST list applicable events with state `expected`, `confirmed`, `open`, `closed` and the dates in force. | T |
+| FR-RDY-004 | `ops.portal_calendar_dates` MUST record per school and event the confirmed dates, `source_kind` (`circular`, `portal`, `phone`, `other`), optional `document_id`, `confirmed_by`, `owner_membership_id`; set with `readiness.calendar.manage`, `If-Match`, audited `readiness.calendar.confirmed`. | T |
+| FR-RDY-005 | A school MAY add its own events (label, dates, profile keys, owner) with the same permission. | T |
+| FR-RDY-006 | A daily job (07:30 IST) MUST, at each lead day before `closes_on`, create or update one M4 task per event for its owner (`ops.tasks.source = portal_calendar`, `due_on = closes_on`, linked to the event) through `circulars.service`; without an owner it notifies holders of `readiness.calendar.manage`. | T |
+| FR-RDY-007 | Each reminder MUST send one in-app notification to the owner and holders of `dq.readiness.manage` with the readiness summary of the linked profiles as counts only; never to parents. | T |
+| FR-RDY-008 | Reminders MUST be idempotent per (school, event, year, lead day) (`ops.portal_reminders`, unique); reruns create nothing new. | T |
+| FR-RDY-009 | The readiness overview and profile pages MUST show the next window of the profile with its state. | T |
+| FR-RDY-010 | Confirming a task that came from a circular suggestion MAY link it to an event, recording the date as confirmed from that circular (a person's action). | T |
+
 ---
 
 ## 4. Non-functional requirements
@@ -618,6 +727,7 @@ Release R2 of the 2026-27 plan (docs/18 §3; owner decisions D4-D9 of 2026-10-10
 | NFR-SEC-005 | Critical vulnerabilities patched ≤ 7 days, high ≤ 30 days. |
 | NFR-SEC-006 | Independent penetration test before first paid go-live and annually. |
 | NFR-SEC-007 | (R2) The public surface (parent pages, verification, webhooks) MUST be covered by the penetration test before the first school uses it, including token guessing, enumeration, webhook forgery and replay (SEC-034..SEC-040). Scope and rules of engagement: `docs/security/pen-test-scope-r2.md`. |
+| NFR-SEC-008 | (R3, planned) The disclosure route (`/api/v1/public/disclosure/*`) MUST join the public-surface security suite and the penetration-test scope before the first CBSE school publishes (SEC-036, SEC-050). |
 
 ### 4.2 Privacy (NFR-PRV), summary; controls in 08
 
@@ -628,6 +738,8 @@ Release R2 of the 2026-27 plan (docs/18 §3; owner decisions D4-D9 of 2026-10-10
 | NFR-PRV-003 | Data minimization for LLM calls: only fields required by the question; no Aadhaar data ever. |
 | NFR-PRV-004 | Support data-principal requests (access, correction, erasure) via school admin tools within 7 days. |
 | NFR-PRV-005 | (R2) Data sent to the school's payment and messaging providers MUST be the minimum per message or link (ADR-0042 decision 8, ADR-0043 decision 11); never marketing, never fee-financing referrals (PRV-022..PRV-028). |
+| NFR-PRV-006 | (R3, planned) Public pages that describe a school (the Appendix IX disclosure, ADR-0051) MUST carry no student personal data: school-level facts and aggregates only, counts below 10 shown as "fewer than 10" (FR-DISC-006; PRV-037). |
+| NFR-PRV-007 | (R3, planned) Every module that holds personal data MUST contribute to the subject access report and declare whether it allows erasure, or be declared `no_personal_data`; a registry test fails otherwise (FR-DPDP-008; ADR-0048). NFR-PRV-004's 7 days is the maximum target a school can set (FR-DPDP-006). |
 
 ### 4.3 Performance (NFR-PERF)
 
@@ -644,6 +756,7 @@ Release R2 of the 2026-27 plan (docs/18 §3; owner decisions D4-D9 of 2026-10-10
 | NFR-PERF-009 | Webhook acknowledgement (R2: verify + store + 200) p95 | ≤ 1 s (providers retry slow answers) |
 | NFR-PERF-010 | Public parent and verification pages (R2): LCP on a mid-range Android phone over 3G | ≤ 3 s; page weight ≤ 150 KB without the Telugu font |
 | NFR-PERF-011 | WhatsApp sending (R2): a 2,000-recipient notice broadcast fully handed to Meta | ≤ 10 min, within Meta's throughput and the school's messaging limit |
+| NFR-PERF-012 | Subject access report (R3, planned): PDF ready for one student with 10 years of records | ≤ 60 s on the `pdf` queue |
 
 ### 4.4 Scalability (NFR-SCAL): capacity model
 
@@ -740,6 +853,7 @@ Release R2 of the 2026-27 plan (docs/18 §3; owner decisions D4-D9 of 2026-10-10
 | BO-04 faster certificates (M3) | FR-CERT-*, FR-REG-* |
 | BO-07 repeatable onboarding | FR-TEN-003, FR-IMP-002, FR-PLT-001..005, FR-PLT-020..026 |
 | BRD P5 parents queue at the counter (R2) | FR-FEE-*, FR-PAY-*, FR-MSG-*, FR-PUB-*, FR-LANG-*, FR-CERT-019..024, NFR-PERF-008..011 |
+| BO-05 trust (R3: compliance pack) | FR-DPDP-001..038, FR-DISC-001..012, FR-RTE-001..012 (gated), NFR-PRV-006, NFR-PRV-007, NFR-SEC-008 |
 | BO-05 trust (R2: money and messages) | FR-FEE-006..013, FR-PAY-007..009, FR-PAY-016, FR-MSG-008..011, FR-PUB-005..012, NFR-SEC-007, NFR-PRV-005 |
 
 ## 9. Verification approach
