@@ -244,6 +244,50 @@ def results_of(
     return [(r[0], r[1]) for r in rows]
 
 
+# --- data-principal access report (FR-DPDP-009) ---------------------------------------------------
+
+
+def attendance_by_month(session: Session, student_id: uuid.UUID) -> list[tuple[dt.date, str, int]]:
+    """(first day of the month, status, count) of one student's attendance, newest month
+    first."""
+    month = func.date_trunc("month", AttendanceMark.on_date).label("month")
+    rows = session.execute(
+        select(month, AttendanceMark.status, func.count().label("n"))
+        .where(AttendanceMark.student_id == student_id)
+        .group_by(month, AttendanceMark.status)
+        .order_by(month.desc(), AttendanceMark.status)
+    )
+    out: list[tuple[dt.date, str, int]] = []
+    for r in rows:
+        first: dt.date | dt.datetime = r.month
+        day = first.date() if isinstance(first, dt.datetime) else first
+        out.append((day, r.status, int(r.n)))
+    return out
+
+
+def marks_of_student(
+    session: Session, student_id: uuid.UUID, *, limit: int
+) -> tuple[list[tuple[ExamMark, Exam]], int]:
+    """At most ``limit`` marks of one student with their exam, latest exam first, and the full
+    count."""
+    total = int(
+        session.scalar(
+            select(func.count()).select_from(ExamMark).where(ExamMark.student_id == student_id)
+        )
+        or 0
+    )
+    if total == 0:
+        return [], 0
+    rows = session.execute(
+        select(ExamMark, Exam)
+        .join(Exam, (Exam.id == ExamMark.exam_id) & (Exam.tenant_id == ExamMark.tenant_id))
+        .where(ExamMark.student_id == student_id)
+        .order_by(Exam.held_on.desc(), Exam.name, Exam.id, ExamMark.subject)
+        .limit(limit)
+    )
+    return [(r[0], r[1]) for r in rows], total
+
+
 # --- full export (FR-ADM-001) ---------------------------------------------------------------------
 
 
@@ -266,6 +310,7 @@ def export_tables(session: Session) -> list[RecordTable]:
 
 
 __all__ = [
+    "attendance_by_month",
     "current_tenant_id",
     "exam_marks",
     "exam_name_taken",
@@ -274,6 +319,7 @@ __all__ = [
     "get_exam",
     "insert_exam",
     "list_exams",
+    "marks_of_student",
     "results_of",
     "section_marks",
     "student_marks",

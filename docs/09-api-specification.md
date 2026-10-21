@@ -716,6 +716,8 @@ Conventions as above and as the R2 section: `Idempotency-Key` on creating POSTs,
 
 #### Privacy: notices, requests, grievances, record classes (R3.1; FR-DPDP-001..018)
 
+**Built (R3-1A, 2026-10-21; `app/privacy/api.py`).** As in the table, plus: `GET /privacy/files/{export_id}` and `GET /privacy/files/{export_id}/download-url` (`privacy.read`; state and link of a notice PDF); the report state is returned inside the request detail (`report`), with `can_decide` and `logged_by_me` for the screen; schema names carry a `Privacy` prefix (`PrivacyRequestOut`, ...). Rate limits: search `search`, letters and previews `render`, PDFs `exports` + `render`, downloads `exports`. Errors as listed and `request_closed` (409), `response_required` (422), `changes_pending` (409), `report_not_ready` / `report_not_released` / `export_expired` (409), `staff_sign_in_staff_only` / `guardian_phone_guardians_only` (422).
+
 | Method | Path | Guard |
 |---|---|---|
 | GET | `/privacy/templates` (keys, versions, audiences, languages, placeholders and whether the school has filled them) · GET `/privacy/templates/{key}/preview` (HTML, filled) · POST `/privacy/templates/{key}/pdf` → 202 export | `privacy.read`; PDF rate limit `exports` |

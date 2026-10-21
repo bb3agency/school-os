@@ -354,6 +354,39 @@ class CertificateFormatChoice(BaseModel):
 # --- end R2-1A ----------------------------------------------------------------------------------
 
 
+# --- R3-1A privacy contact (ADR-0048 decision 3; FR-DPDP-004, FR-DPDP-006) ----------------------
+ContactName = Annotated[
+    str,
+    BeforeValidator(nfc),
+    StringConstraints(min_length=2, max_length=120, pattern=r"^[^\x00-\x1f\x7f<>]*$"),
+]
+# E.164 (+91...) or an Indian landline with its STD code (e.g. 0863-2345678).
+ContactPhone = Annotated[
+    str,
+    BeforeValidator(nfc),
+    StringConstraints(pattern=r"^(\+[1-9][0-9]{7,14}|0[1-9][0-9]{1,4}[- ]?[0-9]{5,8})$"),
+]
+ContactEmail = Annotated[
+    str,
+    BeforeValidator(nfc),
+    StringConstraints(max_length=254, pattern=r"^[^@\s<>]{1,64}@[^@\s<>]+\.[A-Za-z]{2,}$"),
+]
+
+
+class PrivacyContact(BaseModel):
+    """The school's grievance and data-protection contact, printed on notices, letters and
+    access reports and shown in the staff footer (PRV-011)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: ContactName = Field(description="A name or a designation such as 'The Principal'.")
+    phone: ContactPhone | None = None
+    email: ContactEmail | None = None
+
+
+# --- end R3-1A ----------------------------------------------------------------------------------
+
+
 class TenantSettings(BaseModel):
     """Validated school settings stored in ``core.tenants.settings`` (FR-TEN-012).
 
@@ -415,6 +448,18 @@ class TenantSettings(BaseModel):
         "also needs the platform flag ``fees.enabled``). In ``alongside`` mode this is how the "
         "owner turns fees on despite the ERP (ADR-0042 decision 12). Audited with its value.",
     )
+    # R3-1A (ADR-0048): privacy contact and the target for answering requests.
+    privacy_contact: PrivacyContact | None = Field(
+        default=None,
+        description="The school's privacy and grievance contact (FR-DPDP-004); audited with "
+        "field names only.",
+    )
+    privacy_request_target_days: int = Field(
+        default=7,
+        ge=1,
+        le=7,
+        description="Days the school gives itself to answer a privacy request (1-7; NFR-PRV-004).",
+    )
 
     @field_validator("languages")
     @classmethod
@@ -455,6 +500,9 @@ class TenantSettingsPatch(_In):
         description="Turn the fee ledger and receipts on or off for the school (FR-FEE-001). "
         "Recorded data is kept when it is turned off.",
     )
+    # R3-1A (ADR-0048). Both audited with field names only.
+    privacy_contact: PrivacyContact | None = None
+    privacy_request_target_days: int | None = Field(default=None, ge=1, le=7)
 
     @field_validator("languages")
     @classmethod

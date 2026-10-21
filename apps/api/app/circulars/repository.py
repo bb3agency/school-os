@@ -210,6 +210,19 @@ def list_tasks(
     return list(session.scalars(stmt.order_by(Task.due_on, Task.id).limit(limit)))
 
 
+def tasks_owned_by(
+    session: Session, membership_id: uuid.UUID, *, limit: int
+) -> tuple[list[Task], int]:
+    """Tasks assigned to ``membership_id``, newest first (at most ``limit``), and their total
+    number (data-principal access report, FR-DPDP-009)."""
+    mine = Task.owner_membership_id == membership_id
+    total = int(session.execute(select(func.count()).select_from(Task).where(mine)).scalar_one())
+    rows = session.scalars(
+        select(Task).where(mine).order_by(Task.created_at.desc(), Task.id.desc()).limit(limit)
+    )
+    return list(rows), total
+
+
 def tasks_to_remind(session: Session, *, until: dt.date) -> list[Task]:
     """Open or in-progress tasks due on or before ``until`` (reminders, FR-TASK-007)."""
     return list(

@@ -1356,6 +1356,62 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             l=upi["line"],
             m=ids["m1"],
         )
+        # --- R3-1A privacy requests (0066_privacy_requests; ADR-0048) -------------------------
+        pr = uuid.uuid4()
+        _run(
+            c,
+            "INSERT INTO ops.privacy_notices (id, tenant_id, template_key, template_version, "
+            "audience, issued_on, channel, document_id, recorded_by, recorded_by_membership) "
+            "VALUES (:i, :t, 'notice_parents', '0.1', 'parents', '2026-09-01', 'paper', "
+            ":d, :u, :m)",
+            i=uuid.uuid4(),
+            t=t,
+            d=ids["doc"],
+            u=u["user"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO ops.privacy_request_counters (id, tenant_id, year, last_no) "
+            "VALUES (:i, :t, 2026, 1)",
+            i=uuid.uuid4(),
+            t=t,
+        )
+        _run(
+            c,
+            "INSERT INTO ops.privacy_requests (id, tenant_id, reference, year, number, kind, "
+            "subject_kind, student_id, requester_relationship, received_on, due_on, "
+            "request_ciphertext, report_export_id, logged_by, logged_by_membership) VALUES "
+            "(:i, :t, 'PR-2026-0001', 2026, 1, 'access', 'student', :s, 'mother', "
+            "'2026-09-01', '2026-09-08', :x, :e, :u, :m)",
+            i=pr,
+            t=t,
+            s=ids["student"],
+            x=b"\x01synthetic",
+            e=ids["export"],
+            u=u["user"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO ops.privacy_request_events (id, tenant_id, request_id, seq, event, "
+            "actor_user_id, actor_membership_id) VALUES (:i, :t, :r, 1, 'logged', :u, :m)",
+            i=uuid.uuid4(),
+            t=t,
+            r=pr,
+            u=u["user"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO ops.privacy_request_links (id, tenant_id, request_id, link_kind, "
+            "target_id, created_by) VALUES (:i, :t, :r, 'export', :e, :u)",
+            i=uuid.uuid4(),
+            t=t,
+            r=pr,
+            e=ids["export"],
+            u=u["user"],
+        )
         # --- audit chain (retained by design; ADR-0029) -------------------------------------
         _run(
             c,

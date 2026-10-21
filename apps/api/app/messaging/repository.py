@@ -560,6 +560,82 @@ def set_optin_index(session: Session, optin_id: uuid.UUID, digest: bytes, versio
     )
 
 
+# --- data-principal requests (FR-DPDP-009, FR-DPDP-013) -------------------------------------
+
+
+def current_user_id(session: Session) -> uuid.UUID | None:
+    """The signed-in user of the session's transaction (``None`` for system work)."""
+    value: object = session.execute(text("SELECT core.current_user_id()")).scalar_one()
+    return None if value is None else uuid.UUID(str(value))
+
+
+def _about(guardian_id: uuid.UUID | None, student_id: uuid.UUID | None) -> Any:
+    if (guardian_id is None) == (student_id is None):
+        raise ValueError("name exactly one of guardian_id and student_id")
+    if guardian_id is not None:
+        return Message.guardian_id == guardian_id
+    return Message.student_id == student_id
+
+
+def messages_about(
+    session: Session,
+    *,
+    guardian_id: uuid.UUID | None = None,
+    student_id: uuid.UUID | None = None,
+    limit: int,
+) -> tuple[list[Message], int]:
+    """At most ``limit`` messages to a guardian (or about a student), newest first, and the
+    full count."""
+    where = _about(guardian_id, student_id)
+    total = int(session.scalar(select(func.count()).select_from(Message).where(where)) or 0)
+    if total == 0:
+        return [], 0
+    rows = session.scalars(
+        select(Message)
+        .where(where)
+        .order_by(Message.queued_at.desc(), Message.id.desc())
+        .limit(limit)
+    )
+    return list(rows), total
+
+
+def count_vars_about(
+    session: Session, *, guardian_id: uuid.UUID | None = None, student_id: uuid.UUID | None = None
+) -> int:
+    """Messages to a guardian (or about a student) that still hold encrypted variables."""
+    value = session.scalar(
+        select(func.count())
+        .select_from(Message)
+        .where(_about(guardian_id, student_id), Message.vars_ciphertext.is_not(None))
+    )
+    return int(value or 0)
+
+
+def erase_vars_about(
+    session: Session, *, guardian_id: uuid.UUID | None = None, student_id: uuid.UUID | None = None
+) -> int:
+    """Erase the encrypted variables of the messages to a guardian (or about a student), like
+    the 180-day retention job does. Returns how many rows changed."""
+    result = session.execute(
+        update(Message)
+        .where(_about(guardian_id, student_id), Message.vars_ciphertext.is_not(None))
+        .values(vars_ciphertext=None)
+        .execution_options(synchronize_session=False)
+    )
+    return int(result.rowcount or 0)  # type: ignore[attr-defined]
+
+
+def inbound_kind_counts(session: Session, phone_bidx: bytes) -> dict[str, int]:
+    """How many inbound messages of each kind came from one number (blind index)."""
+    rows = session.execute(
+        select(InboundEvent.kind, func.count().label("n"))
+        .where(InboundEvent.phone_bidx == phone_bidx)
+        .group_by(InboundEvent.kind)
+        .order_by(InboundEvent.kind)
+    )
+    return {r.kind: int(r.n) for r in rows}
+
+
 # --- full data export (FR-ADM-001) ------------------------------------------------------------
 
 
@@ -591,15 +667,19 @@ def export_tables(session: Session) -> list[RecordTable]:
 
 
 __all__ = [
+    "count_vars_about",
     "current_optins",
     "current_tenant_id",
+    "current_user_id",
     "ensure_template_rows",
     "erase_message_vars",
+    "erase_vars_about",
     "export_tables",
     "finish_event",
     "get_account",
     "get_message",
     "get_settings",
+    "inbound_kind_counts",
     "insert_account",
     "insert_inbound",
     "insert_join_code",
@@ -612,6 +692,7 @@ __all__ = [
     "mark_inbound",
     "mark_join_code_used",
     "message_by_provider_id",
+    "messages_about",
     "now",
     "open_handle_ids",
     "optin_history",

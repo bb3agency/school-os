@@ -1420,6 +1420,17 @@ A school's owner or principal (`tenant.settings.manage`, step-up) changes the pe
 | Consents (`sis.consents`) and purposes | While the student is on roll, then as the student record | Evidence of consent (PRV-006); withdrawal is a new entry |
 | Breach records (`ops.breach_records`, `ops.breach_affected`) | 3 years after closing (SchoolOS default, **to confirm**) | Affected ids only; descriptions encrypted |
 | Access reports (`ops.exports` kind `subject_report`) | 24 hours after release | Rebuilt on request |
+| Staff memberships, roles and scopes (`core.memberships*`, `core.roles*`) | While the person works at the school; then deactivated and kept for the audit trail | Record class `staff_accounts` (R3-1A, `app/privacy/record_classes.yaml`) |
+| Documents and their versions (`kb.documents*`) | Until the school deletes them; evidence documents for the life of the linked value | Deleting a document erases its search index and versions (docs/08 §7) |
+| Search index of documents (`kb.document_chunks`, `kb.embedding_cache`, `kb.verified_answers`) | As the source document (deleted with it) | Derived AI data follows its source |
+| AI metering ledger (`kb.llm_calls`) | Life of the school (ids, models and token counts only) | No question or answer text |
+| Issued certificates and their counters (`sis.certificates*`) | Life of the school (official record) | Never erased on request (FR-DPDP-014) |
+| Change requests (`sis.change_requests`) | Life of the student record (evidence of official changes) | |
+| Data-quality findings and runs (`sis.dq_*`) | As the student record (re-checked on every change) | |
+| APAAR consent register (`sis.apaar_consent*`) | While the student is on roll, then as the student record | Evidence of the parent's decision (ADR-0039) |
+| Support access grants (`ops.break_glass_grants`) | Life of the school (security record) | |
+| Job runs, outbox and idempotency keys (`ops.job_runs`, `ops.outbox`, `ops.idempotency_keys`) | Life of the school (ids and counts only); idempotency keys 24 hours | |
+| School structure, settings and keys (years, classes, sections, `core.tenant_keys`, field definitions, WhatsApp set-up) | Life of the school | No personal data; keys destroyed at offboarding (crypto-shredding) |
 | Disclosure snapshots (`ops.disclosure_snapshots`) | Life of the school | The record of what was published; view counts 90 days |
 | RTE admissions / claims (`sis.rte_*`; not scheduled) | Admissions: as the student record; claims and lines: 8 years after the financial year (D21) | |
 | Portal calendar dates and reminders (`ops.portal_*`) | 2 academic years | Configuration and idempotency, no personal data |
@@ -1576,6 +1587,13 @@ CREATE TABLE core.public_handles (
 | `ops.privacy_request_counters` | C1 | `(tenant_id, year)` → `last_no` (never down; receipt-counter pattern) |
 
 Access reports are exports of kind `subject_report` in `ops.exports` (existing table; `kind` CHECK widened), files under the school's `exports/` prefix, expiring after 24 hours (the bucket's `exports` rule is the backstop). Record classes, the subject-report registry and the templates are versioned files (`app/privacy/record_classes.yaml`, `subjects.yaml`, `templates/`), not tables. `core.tenants.settings` gains `privacy_contact` and `privacy_request_target_days` (JSON, no DDL).
+
+**As built (R3-1A, 2026-10-21, migration `0066_privacy_requests`).** The four tables and the notice table as above, with these refinements: `subject_kind` (`student`, `guardian`, `member`) records which subject a request has, so a guardian deleted later leaves the row valid with `guardian_id` NULL ("former guardian"); `requester_name_ciphertext` holds who asked (printed on letters); `verified_at`, `nomination_withdrawn_at`, `report_export_id`, `report_released_by`/`report_released_at` (`CHECK report_released_by <> logged_by`); notices, events, links and counters refuse UPDATE/DELETE by trigger outside the offboarding purge. `ops.exports.kind` also accepts `privacy_notice` (a filled notice as PDF); both module-document kinds allow zero or one frozen student and are reached only through the privacy routes (`/exports` neither lists nor serves them). Record classes may also be `no_personal_data` (configuration and bookkeeping; not shown on the erasure plan). Notes from the build review (lead decisions):
+
+- **Documents of a student.** `app.documents` finds the documents that another record ties to a student through a pinned allowlist (`STUDENT_DOCUMENT_LINKS` in `app/documents/repository.py`: `sis.apaar_consents`, `sis.attribute_values`, `sis.certificates`, `sis.change_requests`, `sis.extraction_items`), a read-only cross-module query made for the access report only, because the alternative (a hook per module) would spread the same three-column lookup over five modules. `tests/documents/test_student_document_links.py` compares it with every `(tenant_id, <col>)` foreign key to `kb.documents` on a table with `student_id`, so a new link table is added deliberately.
+- **Early-warning flags after erasure.** Attendance and marks stay as school records, so the daily rules job may raise a new flag for the student after an `early_warning` erasure; the erasure result says so as a step for the person who decided.
+- **Provider inboxes** (`fin.provider_events`, class `provider_inboxes`) have no subject report: their payloads carry no student reference, so they are not attributable to one person and are deleted by retention.
+- **WhatsApp opt-ins stay append-only**: erasure records an opt-out (STOP, `staff_recorded_stop`) and revokes the guardian's parent links; the opt-in history stays as consent evidence until the guardian record is deleted (the class's retention text).
 
 ### 16.2 Consents for optional purposes (`sis`; ADR-0049, FR-DPDP-020..026)
 

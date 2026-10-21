@@ -83,6 +83,7 @@ from app.certificates.schemas import (
     VerificationOut,
     VerificationReasonIn,
 )
+from app.certificates.subjects import certificate_ids_of_student, subject_report
 from app.changes import service as changes
 from app.core import purge as purging
 from app.core.config import get_settings
@@ -2670,6 +2671,7 @@ __all__ = [
     "admission_register_page",
     "approve",
     "cancel",
+    "certificate_ids_of_student",
     "check_register",
     "download_url",
     "export_records",
@@ -2688,6 +2690,7 @@ __all__ = [
     "request_duplicate",
     "retry_render",
     "settings",
+    "subject_report",
     "tenant_data_counts",
     "types_catalog",
     "verify_base_url",

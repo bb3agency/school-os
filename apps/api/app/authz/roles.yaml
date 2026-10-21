@@ -67,6 +67,10 @@ roles:
       # R3-1C CBSE disclosure (ADR-0051; docs/07 §6.2)
       disclosure.edit: school
       disclosure.publish: school_step_up
+      # R3-1A privacy requests (ADR-0048; docs/07 §6.2)
+      privacy.read: school
+      privacy.request.manage: school
+      privacy.request.decide: school_step_up
 
   principal:
     name_en: Principal
@@ -148,6 +152,10 @@ roles:
       # R3-1C CBSE disclosure (ADR-0051; docs/07 §6.2)
       disclosure.edit: school
       disclosure.publish: school_step_up
+      # R3-1A privacy requests (ADR-0048; docs/07 §6.2)
+      privacy.read: school
+      privacy.request.manage: school
+      privacy.request.decide: school_step_up
 
   office_admin:
     name_en: Office admin
@@ -203,6 +211,9 @@ roles:
       fee.concession.request: school
       # R3-1C CBSE disclosure (ADR-0051; docs/07 §6.2)
       disclosure.edit: school
+      # R3-1A privacy requests (ADR-0048; docs/07 §6.2)
+      privacy.read: school
+      privacy.request.manage: school
 
   office_staff:
     name_en: Office staff
@@ -346,6 +357,8 @@ roles:
       message.read: school
       # R2-1B fees (ADR-0042; docs/07 §6.2): school-wide only, never scoped (FR-FEE-024)
       fee.report: school_step_up
+      # R3-1A privacy requests (ADR-0048; docs/07 §6.2)
+      privacy.read: school
 
 # Break-glass support access (docs/07 §6.4, US-103, FR-OPS-004). NOT a system role: it is not
 # cloned at provisioning, not listed for assignment and never assignable by staff. It is created

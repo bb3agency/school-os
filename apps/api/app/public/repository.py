@@ -12,10 +12,10 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
-from collections.abc import Collection
+from collections.abc import Collection, Mapping
 from typing import Any
 
-from sqlalchemy import delete, func, select, text, update
+from sqlalchemy import ColumnElement, and_, delete, func, or_, select, text, update
 from sqlalchemy.orm import Session
 
 from app.public.models import PublicHandle
@@ -140,10 +140,77 @@ def purge_expired(session: Session, before: dt.datetime, limit: int) -> int:
     return int(getattr(result, "rowcount", 0) or 0)
 
 
+# --- data-principal report (R3-1A; FR-DPDP-009) ---------------------------------------------------
+
+
+def _subject_filter(
+    guardian_id: uuid.UUID | None, targets: Mapping[str, Collection[uuid.UUID]]
+) -> ColumnElement[bool] | None:
+    parts: list[ColumnElement[bool]] = []
+    if guardian_id is not None:
+        parts.append(PublicHandle.guardian_id == guardian_id)
+    for target_type, ids in targets.items():
+        if ids:
+            parts.append(
+                and_(
+                    PublicHandle.target_type == target_type,
+                    PublicHandle.target_id.in_(list(ids)),
+                )
+            )
+    return or_(*parts) if parts else None
+
+
+def handles_for_subject(
+    session: Session,
+    *,
+    kinds: Collection[str],
+    guardian_id: uuid.UUID | None,
+    targets: Mapping[str, Collection[uuid.UUID]],
+    limit: int,
+) -> tuple[list[PublicHandle], int]:
+    """Handles of ``kinds`` sent to ``guardian_id`` or pointing at one of ``targets``
+    (target_type -> ids), newest first (at most ``limit``), and how many there are."""
+    where = _subject_filter(guardian_id, targets)
+    if where is None or not kinds:
+        return [], 0
+    cond = and_(PublicHandle.kind.in_(list(kinds)), where)
+    rows = list(
+        session.scalars(
+            select(PublicHandle)
+            .where(cond)
+            .order_by(PublicHandle.created_at.desc(), PublicHandle.id.desc())
+            .limit(limit)
+        )
+    )
+    total = session.scalar(select(func.count()).select_from(PublicHandle).where(cond))
+    return rows, int(total or 0)
+
+
+def count_by_state(
+    session: Session, kind: str, target_type: str, target_ids: Collection[uuid.UUID]
+) -> tuple[int, int]:
+    """(live, withdrawn) handles of ``kind`` pointing at ``target_ids``."""
+    if not target_ids:
+        return 0, 0
+    row = session.execute(
+        select(
+            func.count().filter(PublicHandle.revoked_at.is_(None)),
+            func.count().filter(PublicHandle.revoked_at.is_not(None)),
+        ).where(
+            PublicHandle.kind == kind,
+            PublicHandle.target_type == target_type,
+            PublicHandle.target_id.in_(list(target_ids)),
+        )
+    ).one()
+    return int(row[0]), int(row[1])
+
+
 __all__ = [
+    "count_by_state",
     "count_view",
     "current_tenant_id",
     "get",
+    "handles_for_subject",
     "insert",
     "mark_revoked",
     "now",

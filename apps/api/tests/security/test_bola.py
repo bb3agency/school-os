@@ -961,10 +961,11 @@ def _id_routes() -> list[tuple[str, str]]:
         if str(rc.path).startswith(("/api/v1/public/", "/api/v1/webhooks/")):
             continue
         params = set(re.findall(r"{(\w+)}", str(rc.path)))
-        # A readiness profile key (ADR-0040) names configuration, not an object of the school;
-        # so does a portal calendar event key (ADR-0053): it is looked up only inside the
-        # caller's school (cross-school 404 in tests/dq/test_calendar_api.py).
-        if isinstance(rc.original_route, APIRoute) and params - {"profile_key", "event_key"}:
+        # A readiness profile key (ADR-0040) and a privacy notice template key (R3-1A) name
+        # configuration, not an object of the school; so does a portal calendar event key
+        # (ADR-0053): it is looked up only inside the caller's school (cross-school 404 in
+        # tests/dq/test_calendar_api.py).
+        if isinstance(rc.original_route, APIRoute) and params - {"profile_key", "event_key", "key"}:
             out.extend((m, str(rc.path)) for m in sorted(rc.methods or ()))
     return sorted(out)
 
@@ -975,6 +976,34 @@ ID_ROUTES = _id_routes()
 BODIES.update(_fees().BOLA_BODIES)
 BODIES.update(_upi().BOLA_BODIES)
 BODIES.update(_disclosure().BOLA_BODIES)
+
+
+def _privacy() -> ModuleType:
+    """tests/privacy/security_support.py (R3-1A: a privacy request of school B)."""
+    name = "sos_test_privacy_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "privacy" / "security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+BODIES.update(_privacy().BOLA_BODIES)
+PRIVACY_REQUESTS = "/api/v1/privacy/requests/{request_id}"
+
+
+def _b_id(template: str, w: Any) -> uuid.UUID:
+    """School B's object for ``template``: ``request_id`` is a privacy request on the privacy
+    routes (R3-1A) and a break-glass request elsewhere."""
+    if template.startswith(PRIVACY_REQUESTS):
+        value: uuid.UUID = _privacy().b_request(w)
+        return value
+    return PARAM_TO_B[_param(template)](w)
+
 
 # Required query parameters of ID routes, so the request reaches the object lookup.
 QUERY: dict[tuple[str, str], dict[str, str]] = {
@@ -987,7 +1016,12 @@ QUERY: dict[tuple[str, str], dict[str, str]] = {
 
 
 # Path parameters that are not object ids (a row number inside the object in the path).
-PLAIN_PARAMS: dict[str, str] = {"row_no": "2", "profile_key": "bseap-ssc-2027"}
+PLAIN_PARAMS: dict[str, str] = {
+    "row_no": "2",
+    "profile_key": "bseap-ssc-2027",
+    # R3-1A: a letter of a privacy request (closed catalog).
+    "letter": "acknowledgement",
+}
 
 
 def _fill(path: str, value: uuid.UUID) -> str:
@@ -1015,7 +1049,7 @@ def test_SEC_001_other_school_ids_are_404(
     world: Any, api: Any, admin_engine: Engine, key: tuple[str, str]
 ) -> None:
     method, template = key
-    b_id = PARAM_TO_B[_param(template)](world)
+    b_id = _b_id(template, world)
     before = W.audit_events(admin_engine, world.b.tenant_id)
     bodies = []
     for target in (b_id, uuid.uuid4()):

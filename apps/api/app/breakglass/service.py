@@ -55,6 +55,7 @@ from app.authz.http import Page, decode_cursor, encode_cursor
 from app.authz.resolver import register_support_grant_check
 from app.breakglass import repository as repo
 from app.breakglass.schemas import GrantOut, SupportSessionOut
+from app.breakglass.subjects import subject_report
 from app.core import purge as purging
 from app.core.config import DeploymentMode, get_settings
 from app.core.db import tenant_session
@@ -756,6 +757,7 @@ __all__ = [
     "report_outcomes",
     "revoke",
     "start_support_session",
+    "subject_report",
     "support_grant_active",
     "sweep_interval_seconds",
     "sweep_school",

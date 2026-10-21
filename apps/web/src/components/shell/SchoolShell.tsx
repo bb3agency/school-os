@@ -184,6 +184,24 @@ export function SchoolShell({
       ],
     },
     {
+      // R3-1A (ADR-0048; docs/17 §5.10): parents' privacy requests, complaints and notices.
+      id: "privacy",
+      items: [
+        {
+          href: "/privacy/requests",
+          label: t("privacy.nav.requests"),
+          permission: "privacy.read",
+          icon: "shieldCheck",
+        },
+        {
+          href: "/privacy/notices",
+          label: t("privacy.nav.notices"),
+          permission: "privacy.read",
+          icon: "file",
+        },
+      ],
+    },
+    {
       id: "ask",
       items: [
         {
@@ -343,6 +361,13 @@ export function SchoolShell({
           label: t("admin.nav.retention"),
           permission: "tenant.settings.manage",
           icon: "clock",
+        },
+        {
+          // FR-DPDP-004/006: the privacy contact, the request target and the record classes.
+          href: "/settings/privacy",
+          label: t("privacy.nav.settings"),
+          permission: ["tenant.settings.manage", "privacy.read"],
+          icon: "lock",
         },
         {
           // FR-ADM-001: the school's full data export (owner).

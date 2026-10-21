@@ -95,3 +95,32 @@ def mark_all_read(session: Session, membership_id: uuid.UUID) -> int:
 def purge_read_before(session: Session, before: dt.datetime) -> int:
     stmt = delete(n).where(n.c.read_at.is_not(None), n.c.read_at < before).returning(n.c.id)
     return len(session.execute(stmt).all())
+
+
+def counts_by_template(session: Session, membership_id: uuid.UUID) -> list[RowMapping]:
+    """Per template key: total, unread and latest time of the recipient's notifications, newest
+    kind first (data principal access report, FR-DPDP-009)."""
+    latest = func.max(n.c.created_at).label("latest")
+    stmt = (
+        select(
+            n.c.template_key,
+            func.count().label("total"),
+            func.count().filter(n.c.read_at.is_(None)).label("unread"),
+            latest,
+        )
+        .where(n.c.recipient_membership_id == membership_id)
+        .group_by(n.c.template_key)
+        .order_by(latest.desc(), n.c.template_key)
+    )
+    return list(session.execute(stmt).mappings())
+
+
+def count_for_recipient(session: Session, membership_id: uuid.UUID) -> int:
+    stmt = select(func.count()).select_from(n).where(n.c.recipient_membership_id == membership_id)
+    return int(session.execute(stmt).scalar_one())
+
+
+def delete_for_recipient(session: Session, membership_id: uuid.UUID) -> int:
+    """Delete every notification of the recipient in this school (erasure, FR-DPDP-013)."""
+    stmt = delete(n).where(n.c.recipient_membership_id == membership_id).returning(n.c.id)
+    return len(session.execute(stmt).all())

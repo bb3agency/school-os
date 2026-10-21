@@ -1,0 +1,436 @@
+# Record classes (R3-1A; ADR-0048 decision 4; FR-DPDP-017, PRV-009). Versioned configuration
+# read by app/privacy/catalog.py and served read-only by GET /privacy/record-classes.
+#
+# Every tenant table (a table with tenant_id in a tenant schema) belongs to exactly one class
+# (tests/privacy/test_registries.py compares `tables` with the RLS catalog), and each class's
+# `retention` is copied word for word from the docs/05 §13 row whose first cell contains
+# `docs_row` (the same test; never different).
+#
+# erasure:
+#   allowed                   erased on an approved erasure request by the owning module
+#   allowed_after_retention   kept until its retention ends, then deleted by the module's jobs
+#                             ("Kept until <date>" on the erasure plan)
+#   refused_legal_obligation  the law or the school's accounts need it ("Kept: required by law")
+#   refused_official_record   a permanent school record ("Kept: school record")
+#   no_personal_data          configuration or bookkeeping with nothing about one person
+#                             (not shown on the erasure plan)
+# classification: C0 public, C1 internal, C2 confidential, C3 restricted (docs/05 §2).
+version: 1
+classes:
+  student_identity:
+    label: Admission record and student details
+    owner: students
+    tables: [sis.students, sis.enrollments, sis.student_profiles, sis.attribute_values,
+             sis.promotion_runs, sis.promotion_items]
+    classification: C3
+    docs_row: Student records (active/left)
+    retention: Per school policy; admission-register-equivalent data kept long-term
+    basis: The admission register and the student's identity are permanent school records.
+    erasure: refused_official_record
+    source: Entered by the school office, imported from spreadsheets or checked against other sources
+
+  guardians:
+    label: Parents and guardians
+    owner: students
+    tables: [sis.guardians, sis.student_guardians]
+    classification: C2
+    docs_row: Student records (active/left)
+    retention: Per school policy; admission-register-equivalent data kept long-term
+    basis: Parents' names and contact details are part of the admission record; corrections go through a correction request.
+    erasure: refused_official_record
+    source: Given by the parent at admission or later
+
+  student_attribute_catalogue:
+    label: Student field definitions
+    owner: students
+    tables: [sis.attribute_definitions]
+    classification: C1
+    docs_row: School structure, settings and keys
+    retention: Life of the school
+    basis: Configuration of which details the school records; nothing about one person.
+    erasure: no_personal_data
+    source: SchoolOS defaults and the school's settings
+
+  school_structure:
+    label: Academic years, classes, sections and school keys
+    owner: tenancy
+    tables: [core.academic_years, core.classes, core.sections, core.tenant_keys]
+    classification: C1
+    docs_row: School structure, settings and keys
+    retention: Life of the school
+    basis: How the school is organised; nothing about one person.
+    erasure: no_personal_data
+    source: Set up by the school
+
+  staff_accounts:
+    label: Staff accounts, roles and access
+    owner: identity
+    tables: [core.memberships, core.membership_roles, core.membership_scopes, core.roles,
+             core.role_permissions]
+    classification: C2
+    docs_row: Staff memberships, roles and scopes
+    retention: While the person works at the school; then deactivated and kept for the audit trail
+    basis: Who may see which records; the audit trail refers to these accounts.
+    erasure: refused_legal_obligation
+    source: Invited and given roles by the school's owner or principal
+
+  documents:
+    label: Documents and files
+    owner: documents
+    tables: [kb.documents, kb.document_versions, kb.document_acl, kb.upload_intents]
+    classification: C2
+    docs_row: Documents and their versions
+    retention: Until the school deletes them; evidence documents for the life of the linked value
+    basis: Uploaded by staff; documents used as evidence for official records are kept with them.
+    erasure: allowed
+    source: Uploaded by school staff
+
+  document_index:
+    label: Search index of documents
+    owner: knowledge
+    tables: [kb.document_chunks, kb.embedding_cache, kb.verified_answers]
+    classification: C2
+    docs_row: Search index of documents
+    retention: As the source document (deleted with it)
+    basis: Derived from the school's documents so that staff can search them; follows the document.
+    erasure: allowed
+    source: Made by SchoolOS from the school's documents
+
+  ask_history:
+    label: Questions to "Ask the school" and their answers
+    owner: knowledge
+    tables: [kb.queries, kb.conversations, kb.user_memories, kb.user_memory_settings]
+    classification: C3
+    docs_row: (encrypted Q/A)
+    retention: 180 days
+    basis: The record of AI use; staff can delete their conversations and memory.
+    erasure: allowed
+    source: Typed by staff members
+
+  ai_metering:
+    label: AI usage counts
+    owner: knowledge
+    tables: [kb.llm_calls]
+    classification: C1
+    docs_row: AI metering ledger
+    retention: Life of the school (ids, models and token counts only)
+    basis: Billing and budget counts; no question or answer text.
+    erasure: no_personal_data
+    source: Recorded by SchoolOS
+
+  circulars_and_tasks:
+    label: Circulars, tasks and parent notices
+    owner: circulars
+    tables: [kb.circular_readings, kb.circular_suggestions, ops.parent_notices, ops.tasks]
+    classification: C1
+    docs_row: Tasks and parent notices
+    retention: Life of the school
+    basis: What the school told parents and which tasks staff were given.
+    erasure: refused_official_record
+    source: Written by school staff, drafted with SchoolOS
+
+  certificates:
+    label: Issued certificates
+    owner: certificates
+    tables: [sis.certificates, sis.certificate_counters, sis.certificate_verifications]
+    classification: C2
+    docs_row: Issued certificates and their counters
+    retention: Life of the school (official record)
+    basis: Transfer, bonafide, study and conduct certificates are permanent school records.
+    erasure: refused_official_record
+    source: Issued by the school
+
+  financial_records:
+    label: Fee accounts, receipts and payments
+    owner: fees
+    tables: [fin.fee_settings, fin.fee_heads, fin.fee_plans, fin.fee_plan_lines,
+             fin.fee_plan_instalments, fin.student_fee_accounts, fin.concessions,
+             fin.adjustments, fin.payment_connections, fin.payment_intents,
+             fin.receipt_counters, fin.receipts, fin.receipt_allocations,
+             fin.receipt_cancellations, fin.refunds, fin.ledger_entries, fin.day_closes,
+             fin.provider_payments, fin.reconciliation_runs, fin.reconciliation_items,
+             fin.upi_settings, fin.upi_confirmations]
+    classification: C2
+    docs_row: Receipts, refunds, cancellations, ledger entries
+    retention: 8 years after the end of the financial year (owner decision D21, 2026-10-14; a CA confirms when available)
+    basis: The school's accounts must be kept for 8 years.
+    erasure: refused_legal_obligation
+    source: Recorded by the school's fee counter or its payment provider
+
+  bank_statements:
+    label: Bank statement lines
+    owner: fees
+    tables: [fin.bank_statement_imports, fin.bank_statement_lines]
+    classification: C2
+    docs_row: Bank statement lines
+    retention: 8 years (amounts, dates, references); narration ciphertext erased after 90 days
+    basis: Part of the school's accounts; the bank's narration text is erased after 90 days.
+    erasure: refused_legal_obligation
+    source: Uploaded by the school from its bank
+
+  provider_inboxes:
+    label: Payment and WhatsApp provider messages
+    owner: fees
+    tables: [fin.provider_events]
+    classification: C3
+    docs_row: Provider webhook inboxes
+    retention: 90 days (payments) / 30 days (messaging) after processing
+    basis: Raw notices from the payment provider, kept briefly to settle disputes. Not attributable to one person (no student reference in the payload); deleted by retention.
+    erasure: allowed_after_retention
+    source: Sent by the school's payment provider
+
+  attendance_and_marks:
+    label: Attendance, exams and marks
+    owner: academics
+    tables: [sis.attendance_marks, sis.exams, sis.exam_marks]
+    classification: C2
+    docs_row: Attendance, exams and marks
+    retention: Life of the school (school records)
+    basis: Attendance registers and marks are school records.
+    erasure: refused_official_record
+    source: Recorded by teachers
+
+  behaviour_notes:
+    label: Behaviour notes
+    owner: insights
+    tables: [sis.behaviour_notes]
+    classification: C3
+    docs_row: Behaviour notes
+    retention: 365 days after the note's date
+    basis: Used only for the child's education and safety.
+    erasure: allowed
+    source: Written by teachers
+
+  early_warning:
+    label: Early-warning flags and actions
+    owner: insights
+    tables: [sis.insight_flags, sis.flag_actions, sis.insight_settings]
+    classification: C3
+    docs_row: Early-warning flags and their action logs
+    retention: "Open: until closed. Closed: 365 days after closing"
+    basis: Used only for the child's education and safety.
+    erasure: allowed
+    source: Raised by SchoolOS from attendance and marks, handled by teachers
+
+  change_requests:
+    label: Change requests for official details
+    owner: changes
+    tables: [sis.change_requests]
+    classification: C3
+    docs_row: Change requests (
+    retention: Life of the student record (evidence of official changes)
+    basis: The evidence that an official detail was changed, by whom and why.
+    erasure: refused_official_record
+    source: Asked for by school staff with a supporting document
+
+  data_quality:
+    label: Data-quality checks
+    owner: dq
+    tables: [sis.dq_findings, sis.dq_runs]
+    classification: C2
+    docs_row: Data-quality findings and runs
+    retention: As the student record (re-checked on every change)
+    basis: Checks of the official record against other sources; they follow the record.
+    erasure: refused_official_record
+    source: Made by SchoolOS
+
+  imports:
+    label: Spreadsheet imports
+    owner: imports
+    tables: [sis.import_batches, sis.import_rows, sis.import_cell_edits,
+             sis.import_mapping_templates]
+    classification: C2
+    docs_row: Import raw files
+    retention: 90 days after commit (school may set 7–90)
+    basis: Working copies of uploaded spreadsheets; deleted after the school's retention period.
+    erasure: allowed_after_retention
+    source: Uploaded by the school office
+
+  register_photos:
+    label: Register photos and what was read from them
+    owner: extraction
+    tables: [sis.extraction_batches, sis.extraction_pages, sis.extraction_items]
+    classification: C3
+    docs_row: Register photos used as evidence
+    retention: Life of the linked value
+    basis: Evidence for values copied from the admission register.
+    erasure: allowed_after_retention
+    source: Photographed by the school office
+
+  exports:
+    label: Exports and printed reports
+    owner: exports
+    tables: [ops.exports, ops.export_files]
+    classification: C2
+    docs_row: Exports
+    retention: 7 days (school may set 1–7)
+    basis: Files made on request; deleted after a few days.
+    erasure: allowed_after_retention
+    source: Made by SchoolOS when staff ask
+
+  whole_school_exports:
+    label: Full data exports and retention settings
+    owner: admin
+    tables: [ops.tenant_exports, ops.retention_settings]
+    classification: C1
+    docs_row: Full data export (
+    retention: 24 hours after it is ready
+    basis: Whole-school archives for the owner and the school's retention choices.
+    erasure: no_personal_data
+    source: Asked for by the school's owner
+
+  notifications:
+    label: In-app notifications
+    owner: notifications
+    tables: [ops.notifications]
+    classification: C1
+    docs_row: "`ops.notifications`"
+    retention: 90 days after being read (school may set 30–90)
+    basis: Reminders shown to staff in SchoolOS.
+    erasure: allowed
+    source: Made by SchoolOS
+
+  messages:
+    label: WhatsApp messages sent
+    owner: messaging
+    tables: [msg.messages, msg.send_runs, msg.broadcasts]
+    classification: C2
+    docs_row: Messages (
+    retention: 13 months; encrypted variables erased after 180 days
+    basis: Evidence of what the school sent and whether it was delivered.
+    erasure: allowed
+    source: Sent by the school through its WhatsApp number
+
+  message_optins:
+    label: WhatsApp opt-ins
+    owner: messaging
+    tables: [msg.optins]
+    classification: C2
+    docs_row: Opt-ins (
+    retention: While the guardian exists; then deleted with the guardian (the audit event keeps the fact for the audit retention)
+    basis: Evidence that the parent agreed to receive messages. Erasure records an opt-out (STOP) and revokes links; the history stays as consent evidence until the guardian record is deleted.
+    erasure: allowed
+    source: Given by the parent
+
+  message_inbound:
+    label: Replies received on WhatsApp
+    owner: messaging
+    tables: [msg.inbound_events, msg.provider_events]
+    classification: C2
+    docs_row: Inbound message kinds
+    retention: 90 days
+    basis: The kind and time of a reply (such as STOP); reply text is never stored.
+    erasure: allowed_after_retention
+    source: Sent by parents to the school's WhatsApp number
+
+  messaging_setup:
+    label: WhatsApp set-up
+    owner: messaging
+    tables: [msg.accounts, msg.settings, msg.templates, msg.join_codes]
+    classification: C1
+    docs_row: School structure, settings and keys
+    retention: Life of the school
+    basis: The school's WhatsApp number, templates and settings; nothing about one person.
+    erasure: no_personal_data
+    source: Set up by the school
+
+  apaar_consents:
+    label: APAAR consent decisions
+    owner: apaar
+    tables: [sis.apaar_consents, sis.apaar_consent_settings]
+    classification: C2
+    docs_row: APAAR consent register
+    retention: While the student is on roll, then as the student record
+    basis: Evidence of the parent's decision on APAAR (given, refused or withdrawn).
+    erasure: refused_legal_obligation
+    source: Recorded by the school office from the signed form
+
+  public_links:
+    label: Parent links and certificate check codes
+    owner: public
+    tables: [core.public_handles]
+    classification: C2
+    docs_row: Public handles (
+    retention: "Parent links: 30 days after expiry; certificate codes: life of the certificate; provider routes: until disconnected"
+    basis: Links the school sends to parents and codes printed on certificates.
+    erasure: allowed_after_retention
+    source: Made by SchoolOS when the school sends a link or issues a certificate
+
+  tally_ledgers:
+    label: Tally ledgers
+    owner: tally
+    tables: [ops.tally_parties, ops.tally_party_links, ops.tally_groups, ops.tally_devices,
+             ops.tally_enrolment_codes]
+    classification: C2
+    docs_row: Tally party ledgers and links
+    retention: "While the connector is on: the latest snapshot per ledger"
+    basis: A copy of the school's own accounts from Tally.
+    erasure: refused_legal_obligation
+    source: Read from the school's Tally
+
+  tally_syncs:
+    label: Tally sync records
+    owner: tally
+    tables: [ops.tally_syncs]
+    classification: C1
+    docs_row: Tally sync records
+    retention: 400 days
+    basis: Counts of what was synced; nothing about one person.
+    erasure: no_personal_data
+    source: Recorded by SchoolOS
+
+  support_access:
+    label: Support access to the school
+    owner: breakglass
+    tables: [ops.break_glass_grants]
+    classification: C1
+    docs_row: Support access grants
+    retention: Life of the school (security record)
+    basis: Who at SchoolOS was allowed into the school's data, when and why.
+    erasure: refused_legal_obligation
+    source: Approved by the school
+
+  jobs:
+    label: Background jobs
+    owner: ops
+    tables: [ops.job_runs, ops.outbox, ops.idempotency_keys]
+    classification: C1
+    docs_row: Job runs, outbox and idempotency keys
+    retention: Life of the school (ids and counts only); idempotency keys 24 hours
+    basis: Bookkeeping of SchoolOS's own work; nothing about one person.
+    erasure: no_personal_data
+    source: Recorded by SchoolOS
+
+  audit:
+    label: Audit log
+    owner: audit
+    tables: [audit.events, audit.chain_heads, audit.chain_verifications]
+    classification: C1
+    docs_row: Audit events
+    retention: ≥ 1 year online; archive 3 years (Object Lock)
+    basis: The law requires a security and accountability log; it holds ids, codes and counts only.
+    erasure: refused_legal_obligation
+    source: Recorded by SchoolOS
+
+  privacy_requests:
+    label: Privacy requests and complaints
+    owner: privacy
+    tables: [ops.privacy_requests, ops.privacy_request_events, ops.privacy_request_links,
+             ops.privacy_request_counters]
+    classification: C2
+    docs_row: Data-principal requests, grievances and their events
+    retention: 3 years after closing (SchoolOS default, **to confirm**; docs/08 keeps logs and personal data at least 1 year)
+    basis: Evidence that each request was answered on time.
+    erasure: refused_legal_obligation
+    source: Logged by the school office
+
+  privacy_notices:
+    label: Privacy notices issued
+    owner: privacy
+    tables: [ops.privacy_notices]
+    classification: C1
+    docs_row: Notice records (
+    retention: Life of the school
+    basis: Which notice version the school issued, when and how.
+    erasure: no_personal_data
+    source: Recorded by the school

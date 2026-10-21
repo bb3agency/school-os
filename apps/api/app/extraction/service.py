@@ -83,6 +83,7 @@ from app.extraction.schemas import (
     PageOut,
 )
 from app.extraction.settings import extraction_config
+from app.extraction.subjects import subject_report
 from app.notifications import service as notifications
 from app.ops import service as ops
 from app.students import service as students
@@ -1036,6 +1037,7 @@ __all__ = [
     "process_batch",
     "purge_tenant_data",
     "reject_item",
+    "subject_report",
     "tenant_data_counts",
 ]
 

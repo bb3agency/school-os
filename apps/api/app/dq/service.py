@@ -83,6 +83,7 @@ from app.dq.schemas import (
     SummaryOut,
     WaiveIn,
 )
+from app.dq.subjects import subject_report
 from app.identity.principal import STEP_UP_MAX_AGE
 from app.notifications import service as notifications
 from app.ops import service as ops
@@ -1353,6 +1354,7 @@ __all__ = [
     "rules_catalog",
     "run_checks",
     "run_for_event",
+    "subject_report",
     "summary",
     "tenant_data_counts",
     "unlink_change_request",

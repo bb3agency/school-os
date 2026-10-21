@@ -35,6 +35,7 @@ from app.messaging.tasks import beat_schedule as messaging_beat_schedule
 from app.notifications.tasks import beat_schedule as notifications_beat_schedule
 from app.ops.tasks import beat_schedule as ops_beat_schedule
 from app.platform.tasks import beat_schedule as platform_beat_schedule
+from app.privacy.tasks import beat_schedule as privacy_beat_schedule
 from app.public.tasks import beat_schedule as public_beat_schedule
 from app.tally.tasks import beat_schedule as tally_beat_schedule
 
@@ -62,6 +63,7 @@ import app.knowledge.service  # isort: skip
 import app.messaging.service  # isort: skip
 import app.notifications.service  # isort: skip
 import app.ops.service  # isort: skip
+import app.privacy.service  # isort: skip  (R3-1A: also registers the access-report builder)
 import app.public.service  # isort: skip
 import app.students.service  # isort: skip
 import app.tally.service  # noqa: F401  isort: skip
@@ -100,6 +102,8 @@ TASK_MODULES: list[str] = [
     "app.fees.tasks_online",
     # R3-1C CBSE disclosure (ADR-0051): the HTML file and A4 PDF of a snapshot (queue pdf).
     "app.disclosure.tasks",
+    # R3-1A privacy requests: the daily due-date reminder.
+    "app.privacy.tasks",
 ]
 
 
@@ -250,6 +254,8 @@ def create_celery() -> Celery:
             **insights_beat_schedule(),
             # FR-TALLY-009: silent Tally agents notified; old sync records deleted (30 min).
             **tally_beat_schedule(),
+            # FR-DPDP-006 (R3-1A): privacy requests due tomorrow or overdue, 07:00 IST.
+            **privacy_beat_schedule(),
             # FR-PUB-006: expired parent link handles deleted 30 days after expiry (daily).
             **public_beat_schedule(),
             # FR-MSG-006, FR-MSG-020, FR-MSG-021, FR-MSG-023: webhook inbox sweep (1 min),

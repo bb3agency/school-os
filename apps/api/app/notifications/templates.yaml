@@ -455,3 +455,14 @@ templates:
     te:
       title: "{portal, select, udise_plus {UDISE+} bseap {AP SSC బోర్డు} cbse {CBSE} cisce {CISCE} apaar {APAAR} other {పోర్టల్}} గడువు {days, plural, =0 {ఈరోజే} one {రేపు} other {# రోజుల్లో}} ముగుస్తుంది"
       body: "{students, plural, =0 {పోర్టల్ క్యాలెండర్‌లో తేదీలు, పని ఎవరిదో చూడండి.} other {# మంది విద్యార్థుల్లో {ready} మంది సిద్ధంగా ఉన్నారు. గడువు చూడటానికి, సిద్ధంగా లేనివాటిని సరిచేయడానికి పోర్టల్ క్యాలెండర్ తెరవండి.}}"
+  # --- R3-1A privacy requests (ADR-0048; FR-DPDP-006): the daily due-date reminder, counts only.
+  privacy.requests_due:
+    params: [due, overdue]
+    resource_type: privacy_request_list
+    en:
+      title: "Privacy requests to answer: {overdue, plural, =0 {none overdue} one {# overdue} other {# overdue}}"
+      body: "{due, plural, =0 {No request is due tomorrow.} one {# request is due tomorrow.} other {# requests are due tomorrow.}} {overdue, plural, =0 {} one {# request is past its due date.} other {# requests are past their due date.}} Open Privacy > Requests and complaints and answer them within the school's target."
+    te:
+      title: "సమాధానం ఇవ్వాల్సిన గోప్యత అభ్యర్థనలు: {overdue, plural, =0 {గడువు దాటినవి లేవు} one {# గడువు దాటింది} other {# గడువు దాటాయి}}"
+      body: "{due, plural, =0 {రేపు గడువు ఉన్న అభ్యర్థన లేదు.} one {# అభ్యర్థనకు రేపు గడువు.} other {# అభ్యర్థనలకు రేపు గడువు.}} {overdue, plural, =0 {} one {# అభ్యర్థన గడువు దాటింది.} other {# అభ్యర్థనలు గడువు దాటాయి.}} గోప్యత > అభ్యర్థనలు మరియు ఫిర్యాదులు తెరిచి పాఠశాల లక్ష్యంలోగా సమాధానం ఇవ్వండి."
+  # --- end R3-1A

@@ -641,6 +641,8 @@ Release R3 of the 2026-27 plan (docs/18 §3 R3; before DPDP's day-to-day duties 
 | FR-DPDP-017 | `app/privacy/record_classes.yaml` MUST list every record class with owner module, tables, classification, default retention, basis and erasure rule; a test MUST compare its retention with docs/05 §13 and its tables with the RLS catalog (every tenant table belongs to exactly one class); `GET /privacy/record-classes` serves it read-only. | T |
 | FR-DPDP-018 | The full data export (FR-ADM-001) MUST include `ops.privacy_requests`, events, notices, consents, breach records (ciphertext left out; free text included only with `include_sensitive`); offboarding purges them; retention per docs/05 §13 (requests and grievances 3 years after closing **(to confirm)**, notice records for the life of the school). | T |
 
+*As built (R3-1A, 2026-10-21; migration `0066_privacy_requests`):* FR-DPDP-001..018 are built in `app/privacy` (routes in docs/09 "Privacy", tests in `tests/privacy/` and `tests/<module>/test_subject_report.py`). Refinements: the notice PDF is an export of kind `privacy_notice` (`POST /privacy/templates/{key}/pdf`, state and link under `/privacy/files/{export_id}`); record classes may also be `no_personal_data` (configuration and bookkeeping, left off the erasure plan); the requester's name is stored encrypted for the letters; closing an access, erasure or grievance request is a decision (`privacy.request.decide`ᴿ, not the person who logged it), other kinds close with `privacy.request.manage`; `/me` returns `settings.privacy_contact` for the staff footer. FR-DPDP-018's consents and breach records arrive with R3-1B.
+
 **Consents for optional purposes (ADR-0049)**
 
 | ID | Requirement | V |

@@ -316,6 +316,7 @@ const TENANT = {
     current_erp_name: "",
     fees_enabled: false,
     parent_language: "en",
+    privacy_request_target_days: 7,
   },
   version: 7,
 } satisfies components["schemas"]["TenantOut"];

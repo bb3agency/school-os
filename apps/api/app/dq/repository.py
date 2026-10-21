@@ -418,3 +418,17 @@ def insert_reminder(session: Session, values: Mapping[str, Any]) -> None:
     """Append one reminder row; a second one for the same (year, event, lead day) raises the
     unique violation ``portal_reminders_once`` (the caller rolls its savepoint back)."""
     session.execute(PR.insert().values(**values))
+
+
+def subject_finding_counts(session: Session, student_id: uuid.UUID) -> list[RowMapping]:
+    """Findings about one student counted by rule, severity and status, with the latest check;
+    latest first (access report, FR-DPDP-009). A possible-duplicate pair stores one finding on
+    each student, so ``student_id`` alone counts each finding once."""
+    last = func.max(F.c.last_seen_at).label("last_seen_at")
+    stmt = (
+        select(F.c.rule_id, F.c.severity, F.c.status, func.count().label("n"), last)
+        .where(F.c.student_id == student_id)
+        .group_by(F.c.rule_id, F.c.severity, F.c.status)
+        .order_by(last.desc().nulls_last(), F.c.rule_id, F.c.status)
+    )
+    return list(session.execute(stmt).mappings())

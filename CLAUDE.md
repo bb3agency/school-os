@@ -71,6 +71,8 @@ apps/api/app/
                  guards for unauthenticated routes (require_public_handle, require_webhook_signature,
                  require_meta_verify_token; pinned in public/public_routes.yaml)
   notifications/ in-app notifications, bilingual templates
+  privacy/       DPDP requests and grievances, access reports, lawful erasure, notices, record classes,
+                 subject-report registry subjects.yaml (contributors: each module's service.subject_report)
   admin/         tenant admin, retention settings, data export
   ops/           tenant-side job runs, outbox, idempotency keys
   fees/          fee heads, plans, student accounts, append-only ledger, gap-free receipts, concessions,
@@ -84,7 +86,7 @@ apps/api/app/
                  payments (billing), usage, fleet + heartbeat, feature flags, announcements,
                  support tickets, platform audit (DB role sos_platform; routes /api/v1/platform/*)
   devtools/      synthetic data generator (make seed-synthetic; local/ci only)
-apps/api/migrations/  Alembic revisions 0001_baseline … 0065_disclosure (linear chain; `alembic heads` shows the current head)
+apps/api/migrations/  Alembic revisions 0001_baseline … 0066_privacy_requests (linear chain; `alembic heads` shows the current head)
 apps/api/tests/  tests per module (tests/<module>/) + cross-module suites (tests/security/, tests/migrations/, tests/api/, tests/deploy/)
 apps/api/openapi.json  committed OpenAPI document (make openapi; freshness test)
 apps/worker/     Celery entrypoint (sos_worker.celery_app; imports app.* tasks and beat schedules)

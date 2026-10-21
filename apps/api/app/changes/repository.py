@@ -171,3 +171,18 @@ def all_requests(session: Session) -> Sequence[ChangeRequest]:
     """Every change request of the current school, oldest first (FR-ADM-001 full export)."""
     stmt = select(ChangeRequest).order_by(ChangeRequest.requested_at, ChangeRequest.id)
     return session.scalars(stmt).all()
+
+
+def requests_about(
+    session: Session, student_ids: Collection[uuid.UUID], *, keys: Collection[str] | None = None
+) -> Sequence[ChangeRequest]:
+    """Requests of the given students (optionally only for ``keys``), newest first (data
+    principal access report, FR-DPDP-009)."""
+    ids = sorted(student_ids)
+    if not ids or (keys is not None and not keys):
+        return []
+    stmt = select(ChangeRequest).where(ChangeRequest.student_id.in_(ids))
+    if keys is not None:
+        stmt = stmt.where(ChangeRequest.attribute_key.in_(sorted(set(keys))))
+    stmt = stmt.order_by(ChangeRequest.requested_at.desc(), ChangeRequest.id.desc())
+    return session.scalars(stmt).all()

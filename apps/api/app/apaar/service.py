@@ -56,6 +56,7 @@ from app.apaar.schemas import (
     StatusCounts,
     StudentConsentOut,
 )
+from app.apaar.subjects import subject_report
 from app.audit import service as audit
 from app.authz.context import UserContext
 from app.authz.http import Page, decode_cursor, encode_cursor
@@ -810,6 +811,7 @@ __all__ = [
     "refused_student_ids",
     "section_forms",
     "student_form",
+    "subject_report",
     "summary",
     "tenant_data_counts",
     "update_settings",

@@ -1160,3 +1160,35 @@ def all_values(session: Session) -> list[AttributeValue]:
 
 def all_guardians(session: Session) -> list[Guardian]:
     return list(session.scalars(select(Guardian).order_by(Guardian.created_at, Guardian.id)))
+
+
+# --- data principal access report (R3-1A; FR-DPDP-009) ----------------------------------------
+
+
+def values_of_student(session: Session, student_id: uuid.UUID) -> list[AttributeValue]:
+    """Every recorded value of one student (history included), newest first."""
+    stmt = (
+        select(AttributeValue)
+        .where(AttributeValue.student_id == student_id)
+        .order_by(AttributeValue.recorded_at.desc(), AttributeValue.id.desc())
+    )
+    return list(session.scalars(stmt))
+
+
+def children_of_guardian(
+    session: Session, guardian_id: uuid.UUID
+) -> list[tuple[StudentGuardian, str | None]]:
+    """The guardian's links with each linked student's admission number only, newest first."""
+    rows = session.execute(
+        select(StudentGuardian, Student.admission_no)
+        .join(
+            Student,
+            and_(
+                Student.tenant_id == StudentGuardian.tenant_id,
+                Student.id == StudentGuardian.student_id,
+            ),
+        )
+        .where(StudentGuardian.guardian_id == guardian_id)
+        .order_by(StudentGuardian.created_at.desc(), StudentGuardian.student_id)
+    ).all()
+    return [(link, admission_no) for link, admission_no in rows]

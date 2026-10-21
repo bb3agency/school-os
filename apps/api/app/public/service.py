@@ -49,6 +49,7 @@ from app.public.config import (
     rules,
 )
 from app.public.models import PublicHandle
+from app.public.subjects import subject_report
 from app.tenancy import service as tenancy
 
 log = get_logger(__name__)
@@ -430,5 +431,6 @@ __all__ = [
     "revoke",
     "revoke_for_guardian",
     "revoke_for_target",
+    "subject_report",
     "tenant_data_counts",
 ]

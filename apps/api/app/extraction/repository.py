@@ -213,3 +213,29 @@ def review_item(
     if row is not None:
         session.refresh(row)
     return row
+
+
+def batches_for_student(
+    session: Session, student_id: uuid.UUID, *, limit: int
+) -> tuple[list[tuple[ExtractionBatch, int, dt.datetime | None]], int]:
+    """The batches with items linked to ``student_id`` (newest first, at most ``limit``), each
+    with the number of such items and the latest review time, and the total number of such
+    batches (FR-DPDP-009)."""
+    per_batch = (
+        select(
+            ExtractionItem.batch_id,
+            func.count().label("n"),
+            func.max(ExtractionItem.reviewed_at).label("reviewed"),
+        )
+        .where(ExtractionItem.student_id == student_id)
+        .group_by(ExtractionItem.batch_id)
+        .subquery()
+    )
+    total = int(session.execute(select(func.count()).select_from(per_batch)).scalar_one())
+    result = session.execute(
+        select(ExtractionBatch, per_batch.c.n, per_batch.c.reviewed)
+        .join(per_batch, per_batch.c.batch_id == ExtractionBatch.id)
+        .order_by(ExtractionBatch.created_at.desc(), ExtractionBatch.id.desc())
+        .limit(limit)
+    )
+    return [(b, int(n), reviewed) for b, n, reviewed in result], total

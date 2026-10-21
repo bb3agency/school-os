@@ -62,6 +62,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.privacy
 forbidden_modules =
     app.identity.repository
     app.identity.models
@@ -100,6 +101,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.privacy
 forbidden_modules =
     app.tenancy.repository
     app.tenancy.models
@@ -138,6 +140,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.privacy
 forbidden_modules =
     app.platform.repository
     app.platform.models
@@ -179,6 +182,7 @@ forbidden_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.privacy
 
 # The HTML -> PDF renderer (headless Chromium, bundled font, sandbox setting) is app.core.pdf,
 # a neutral building block. The control plane prints its invoices through it and never through
@@ -222,6 +226,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.privacy
 forbidden_modules =
     app.platform
 
@@ -258,6 +263,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.privacy
 forbidden_modules =
     app.ops.repository
     app.ops.models
@@ -296,6 +302,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.privacy
 forbidden_modules =
     app.dq.repository
     app.dq.models
@@ -334,6 +341,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.privacy
 forbidden_modules =
     app.students.repository
     app.students.models
@@ -372,6 +380,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.privacy
 forbidden_modules =
     app.documents.repository
     app.documents.models
@@ -410,6 +419,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.privacy
 forbidden_modules =
     app.notifications.repository
     app.notifications.models
@@ -448,6 +458,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.privacy
 forbidden_modules =
     app.breakglass.repository
     app.breakglass.models
@@ -514,6 +525,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.privacy
 forbidden_modules =
     app.imports.repository
     app.imports.models
@@ -577,6 +589,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.privacy
 forbidden_modules =
     app.changes.repository
     app.changes.models
@@ -615,6 +628,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.privacy
 forbidden_modules =
     app.extraction.repository
     app.extraction.models
@@ -652,6 +666,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.privacy
 forbidden_modules =
     app.exports.repository
     app.exports.models
@@ -711,6 +726,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.privacy
 forbidden_modules =
     app.admin.repository
     app.admin.models
@@ -751,6 +767,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.privacy
 forbidden_modules =
     app.admin
 
@@ -812,6 +829,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.privacy
 forbidden_modules =
     app.knowledge.gateway
     app.knowledge.embeddings
@@ -999,6 +1017,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.privacy
 forbidden_modules =
     app.circulars.repository
     app.circulars.models
@@ -1058,6 +1077,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.privacy
 forbidden_modules =
     app.certificates.repository
     app.certificates.models
@@ -1127,6 +1147,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.privacy
 forbidden_modules =
     app.academics.repository
     app.academics.models
@@ -1165,6 +1186,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.privacy
 forbidden_modules =
     app.insights.repository
     app.insights.models
@@ -1248,6 +1270,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.privacy
 forbidden_modules =
     app.tally.repository
     app.tally.models
@@ -1311,6 +1334,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.privacy
 forbidden_modules =
     app.apaar.repository
     app.apaar.models
@@ -1371,6 +1395,7 @@ source_modules =
     app.messaging
     app.disclosure
     app.fees
+    app.privacy
 forbidden_modules =
     app.public.repository
     app.public.models
@@ -1434,6 +1459,7 @@ source_modules =
     app.public
     app.fees
     app.disclosure
+    app.privacy
 forbidden_modules =
     app.messaging.repository
     app.messaging.models
@@ -1522,6 +1548,7 @@ source_modules =
     app.public
     app.messaging
     app.disclosure
+    app.privacy
 forbidden_modules =
     app.fees.repository
     app.fees.models
@@ -1623,6 +1650,7 @@ source_modules =
     app.public
     app.fees
     app.messaging
+    app.privacy
 forbidden_modules =
     app.disclosure.repository
     app.disclosure.models
@@ -1648,4 +1676,44 @@ forbidden_modules =
     app.fees
     app.documents
     app.public
+allow_indirect_imports = True
+
+# --- R3-1A privacy (ADR-0048) -----------------------------------------------------------------
+[importlinter:contract:privacy-internals]
+name = privacy: repository/models are private (use app.privacy.service)
+type = forbidden
+source_modules =
+    app.main
+    app.core
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.ops
+    app.devtools
+    app.dq
+    app.students
+    app.documents
+    app.notifications
+    app.breakglass
+    app.imports
+    app.changes
+    app.extraction
+    app.exports
+    app.knowledge
+    app.admin
+    app.circulars
+    app.certificates
+    app.apaar
+    app.academics
+    app.insights
+    app.tally
+    app.public
+    app.fees
+    app.messaging
+    app.disclosure
+forbidden_modules =
+    app.privacy.repository
+    app.privacy.models
 allow_indirect_imports = True

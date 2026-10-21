@@ -569,6 +569,22 @@ def list_roles_for_membership(session: Session, membership_id: uuid.UUID) -> lis
     )
 
 
+def membership_role_grants(
+    session: Session, membership_id: uuid.UUID
+) -> list[tuple[Role, dt.datetime]]:
+    """The member's roles with the time each was granted, newest grant first (access report)."""
+    rows = session.execute(
+        select(Role, MembershipRole.created_at)
+        .join(
+            MembershipRole,
+            and_(MembershipRole.tenant_id == Role.tenant_id, MembershipRole.role_id == Role.id),
+        )
+        .where(MembershipRole.membership_id == membership_id)
+        .order_by(MembershipRole.created_at.desc(), Role.key)
+    ).all()
+    return [(row[0], row[1]) for row in rows]
+
+
 def permission_keys_for_membership(session: Session, membership_id: uuid.UUID) -> set[str]:
     """Effective permission keys; empty unless the membership is active and unexpired."""
     stmt = (
