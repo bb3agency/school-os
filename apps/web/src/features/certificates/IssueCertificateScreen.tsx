@@ -22,6 +22,8 @@ import { SourceChip } from "@/features/findings/parts";
 import { Link, useRouter } from "@/i18n/navigation";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { useApiForm } from "@/lib/forms";
+import { formatDate, formatInr } from "@/lib/format";
+import type { Locale } from "@/i18n/routing";
 import { localLabel, useCertificateTypes, useInputLabel } from "./parts";
 import {
   CERT_KEYS,
@@ -129,6 +131,39 @@ function BlockerItem({
   return <li>{t(blocker.code)}</li>;
 }
 
+/**
+ * FR-CERT-025 (US-2005; D16; FR-FEE-030): the student's outstanding fees as a note for staff
+ * who hold `finance.read` (the API sends it only to them, only for a TC, only while fees are
+ * on). Information only: it is never printed and never stops issue or approval.
+ */
+function FeeNote({ note }: { note: NonNullable<CertificatePreview["fee_note"]> }) {
+  const t = useTranslations("certificates.issue.feeNote");
+  const locale = useLocale() as Locale;
+  const overdue = Number(note.overdue) > 0;
+  return (
+    <Alert tone="info" title={t("title")}>
+      <p>
+        {overdue
+          ? t("bodyOverdue", {
+              balance: formatInr(note.balance, locale) ?? "",
+              overdue: formatInr(note.overdue, locale) ?? "",
+              since: formatDate(note.oldest_due_on) ?? "",
+            })
+          : t("body", { balance: formatInr(note.balance, locale) ?? "" })}
+      </p>
+      <p className="mt-1">{t("notPrinted")}</p>
+      <p className="mt-1">
+        <Link
+          href={`/fees/accounts/${note.account_id}`}
+          className="font-semibold underline underline-offset-4"
+        >
+          {t("open")}
+        </Link>
+      </p>
+    </Alert>
+  );
+}
+
 function Preview({
   preview,
   studentId,
@@ -179,6 +214,7 @@ function Preview({
             })}
           </Alert>
         ) : null}
+        {preview.fee_note ? <FeeNote note={preview.fee_note} /> : null}
         <dl className="flex flex-wrap gap-2 text-sm">
           <div className="flex gap-1">
             <dt className="text-ink-muted">{t("classLabel")}</dt>

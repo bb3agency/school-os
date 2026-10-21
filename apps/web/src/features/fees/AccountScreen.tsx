@@ -1,6 +1,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
+import { useMemo } from "react";
 import * as z from "@/lib/zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { ButtonLink } from "@/components/ui/Button";
@@ -32,6 +33,9 @@ import {
   type DueLine,
 } from "./data";
 import { PaymentLinks } from "@/features/payments/PaymentLinks";
+import { FeeRemindersDialog, useCanSendFeeReminders } from "@/features/messaging/FeeReminders";
+import { MessageHistory } from "@/features/messaging/MessagesScreen";
+import { READ as MESSAGE_READ, type FeeReminderSelection } from "@/features/messaging/data";
 import {
   Amount,
   FeesGate,
@@ -493,6 +497,12 @@ export function AccountScreen({ accountId }: { accountId: string }) {
   const me = useStaffMe();
   const allowed = can([COLLECT, FINANCE_READ]);
   const account = useAccount(me !== undefined && allowed ? accountId : null);
+  // FR-MSG-027 / US-2108: this account's dues page on WhatsApp ("Pay online" on it).
+  const canSendLink = useCanSendFeeReminders() && can(FINANCE_READ);
+  const payLink = useMemo<FeeReminderSelection>(
+    () => ({ account_ids: [accountId], all_matching: false, kind: "payment_link" }),
+    [accountId],
+  );
   const header = (a: Account | null) => {
     const items: MoreItem[] = [];
     if (a && can(CONCESSION_REQUEST)) {
@@ -500,6 +510,19 @@ export function AccountScreen({ accountId }: { accountId: string }) {
         id: "concession",
         label: t("requestConcession"),
         dialog: (control) => <ConcessionDialog account={a} control={control} />,
+      });
+    }
+    if (a && canSendLink) {
+      items.push({
+        id: "send-payment-link",
+        label: t("sendPaymentLink"),
+        dialog: (control) => (
+          <FeeRemindersDialog
+            selection={control.open ? payLink : null}
+            open={control.open}
+            onOpenChange={control.onOpenChange}
+          />
+        ),
       });
     }
     if (a && can(MANAGE)) {
@@ -585,6 +608,20 @@ export function AccountScreen({ accountId }: { accountId: string }) {
               { id: "statement", label: t("tabStatement"), panel: <Statement accountId={a.id} /> },
               { id: "requests", label: t("tabRequests"), panel: <Requests account={a} /> },
               { id: "links", label: tp("tab"), panel: <PaymentLinks account={a} /> },
+              // FR-MSG-028: the messages about this student (metadata only, message.read).
+              ...(can(MESSAGE_READ)
+                ? [
+                    {
+                      id: "messages",
+                      label: t("tabMessages"),
+                      panel: (
+                        <div className="space-y-4">
+                          <MessageHistory studentId={a.student_id} tableId="fee-account-messages" />
+                        </div>
+                      ),
+                    },
+                  ]
+                : []),
             ]}
           />
         </div>

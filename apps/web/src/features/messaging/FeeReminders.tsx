@@ -17,6 +17,7 @@ import {
   SEND,
   isUnavailable,
   useMessagingSettings,
+  type FeeMessageKind,
   type FeeReminderPreview,
   type FeeReminderSelection,
   type FeeRemindersSent,
@@ -46,8 +47,16 @@ export function useCanSendFeeReminders(): boolean {
   return allowed && settings.status === "ready" && !isUnavailable(settings);
 }
 
-function Preview({ preview }: { preview: FeeReminderPreview }) {
+/** The strings that differ between a reminder and a payment link (FR-MSG-025, FR-MSG-027). */
+function useKindText(kind: FeeMessageKind) {
+  const reminder = useTranslations("messaging.feeReminders");
+  const link = useTranslations("messaging.paymentLinks");
+  return kind === "payment_link" ? link : reminder;
+}
+
+function Preview({ preview, kind }: { preview: FeeReminderPreview; kind: FeeMessageKind }) {
   const t = useTranslations("messaging.feeReminders");
+  const tk = useKindText(kind);
   const ts = useTranslations("messaging.send");
   const tr = useTranslations("messaging.log.reasons");
   const locale = useLocale() as Locale;
@@ -56,7 +65,7 @@ function Preview({ preview }: { preview: FeeReminderPreview }) {
   const guardians = GUARDIAN_REASONS.filter((code) => (preview.skipped_guardians[code] ?? 0) > 0);
   const blocked = preview.blocked_reason;
   return (
-    <section aria-label={t("previewLabel")} className="space-y-4">
+    <section aria-label={tk("previewLabel")} className="space-y-4">
       <dl className="grid gap-3 sm:grid-cols-3">
         <div>
           <dt className="text-sm text-ink-muted">{t("recipients")}</dt>
@@ -97,14 +106,21 @@ function Preview({ preview }: { preview: FeeReminderPreview }) {
           <ul className="space-y-1 text-sm text-ink">
             {guardians.map((code) => (
               <li key={code} className="flex justify-between gap-4">
-                <span>{code === "already_sent" ? t("alreadySent") : tr(code)}</span>
+                <span>{code === "already_sent" ? tk("alreadySent") : tr(code)}</span>
                 <span className="num">{count(preview.skipped_guardians[code] ?? 0)}</span>
               </li>
             ))}
           </ul>
         </div>
       ) : null}
-      {blocked ? (
+      {blocked === "payments_not_connected" ? (
+        <Alert tone="warning" title={ts("blockedTitle")}>
+          {t("paymentsNotConnected")}{" "}
+          <Link href="/settings/payments" className="underline underline-offset-4">
+            {t("openPayments")}
+          </Link>
+        </Alert>
+      ) : blocked ? (
         <Alert tone="warning" title={ts("blockedTitle")}>
           {tr.has(blocked as "no_optin") ? tr(blocked as "no_optin") : ts("blockedOther")}{" "}
           <Link href="/settings/whatsapp" className="underline underline-offset-4">
@@ -112,15 +128,17 @@ function Preview({ preview }: { preview: FeeReminderPreview }) {
           </Link>
         </Alert>
       ) : preview.recipients === 0 ? (
-        <p className="text-sm text-ink-muted">{t("nobody")}</p>
+        <p className="text-sm text-ink-muted">{tk("nobody")}</p>
       ) : null}
     </section>
   );
 }
 
 /**
- * "Send reminder" from the dues list (FR-MSG-025; docs/17 §5.8): opened for the rows chosen on
- * the visible page, or for everyone matching the list's filter. It asks the API who would get a
+ * "Send reminder" and "Send payment link" from the dues list (FR-MSG-025, FR-MSG-027; docs/17
+ * §5.8): opened for one row, the rows chosen on the visible page, or for everyone matching the
+ * list's filter; `selection.kind` says which. A payment link is the same fee message whose dues
+ * page offers "Pay online"; it needs online payments connected. It asks the API who would get a
  * reminder (no state is kept on the server), shows the counts, who is left out and why and the
  * estimated Meta cost, then sends with the consequence line. One Idempotency-Key per dialog.
  */
@@ -134,6 +152,8 @@ export function FeeRemindersDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const t = useTranslations("messaging.feeReminders");
+  const kind: FeeMessageKind = selection?.kind ?? "reminder";
+  const tk = useKindText(kind);
   const api = useBffClient("staff");
   // The answer belongs to the selection it was asked for (each opening passes a new one).
   const [answer, setAnswer] = useState<{
@@ -168,13 +188,13 @@ export function FeeRemindersDialog({
     <ActionDialog
       open={open}
       onOpenChange={onOpenChange}
-      title={t("title")}
+      title={tk("title")}
       description={
-        selection?.all_matching ? t("descriptionAll") : t("descriptionRows", { count: chosen })
+        selection?.all_matching ? tk("descriptionAll") : tk("descriptionRows", { count: chosen })
       }
-      confirmLabel={t("confirm", { count: preview?.recipients ?? 0 })}
+      confirmLabel={tk("confirm", { count: preview?.recipients ?? 0 })}
       confirmDisabled={!sendable}
-      consequence={sendable ? t("consequence") : undefined}
+      consequence={sendable ? tk("consequence") : undefined}
       schema={NO_FIELDS}
       errorNamespace="messaging"
       submit={(_, idempotencyKey) => {
@@ -189,7 +209,7 @@ export function FeeRemindersDialog({
       renderResult={(result: FeeRemindersSent, close) => (
         <>
           <Alert tone="success" live>
-            {t("queued", { count: result.queued })}
+            {tk("queued", { count: result.queued })}
           </Alert>
           <div className="flex justify-end">
             <Button onClick={close}>{t("done")}</Button>
@@ -201,7 +221,7 @@ export function FeeRemindersDialog({
         <>
           <ApiErrorAlert error={error} namespace="messaging" />
           {preview ? (
-            <Preview preview={preview} />
+            <Preview preview={preview} kind={kind} />
           ) : error === undefined ? (
             <p role="status" className="text-sm text-ink-muted">
               {t("checking")}

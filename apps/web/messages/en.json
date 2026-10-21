@@ -6715,6 +6715,13 @@
         "type": "Choose the certificate",
         "check": "Check what it prints",
         "details": "Fill the details and issue"
+      },
+      "feeNote": {
+        "title": "Fees outstanding (for your information)",
+        "body": "{balance} is outstanding on this student's fee account.",
+        "bodyOverdue": "{balance} is outstanding on this student's fee account; {overdue} of it is overdue since {since}.",
+        "notPrinted": "This is never printed on the TC and does not stop it being issued or approved. You may remind the parent.",
+        "open": "Open the fee account"
       }
     },
     "registers": {
@@ -8350,7 +8357,8 @@
         "purpose": "Message",
         "language": "Language",
         "phone": "Mobile",
-        "status": "Status"
+        "status": "Status",
+        "link": "Parent link"
       },
       "purposes": {
         "optin_confirm": "Joining confirmation",
@@ -8510,6 +8518,10 @@
       "already_queued": {
         "title": "Already sent",
         "body": "This receipt was already sent to every guardian who agreed."
+      },
+      "payments_not_connected": {
+        "title": "Online payments are not connected",
+        "body": "Connect online payments in payment settings first, then send payment links."
       }
     },
     "historyTitle": "Message history",
@@ -8625,7 +8637,9 @@
       "confirm": "{count, plural, one {Send # reminder} other {Send # reminders}}",
       "nobody": "Nobody chosen can get a reminder now.",
       "queued": "{count, plural, =0 {Nothing new was queued: everyone was reminded already.} one {# reminder is queued. It goes out outside quiet hours.} other {# reminders are queued. They go out outside quiet hours.}}",
-      "done": "Done"
+      "done": "Done",
+      "paymentsNotConnected": "Online payments are not connected, so parents could not pay from the page.",
+      "openPayments": "Open payment settings"
     },
     "receipt": {
       "label": "WhatsApp",
@@ -8640,6 +8654,28 @@
       "noOptin": "No guardian agreed to fee messages on WhatsApp.",
       "cancelled": "Cancelled receipts are not sent on WhatsApp.",
       "blocked": "WhatsApp cannot send messages now. Check WhatsApp settings."
+    },
+    "paymentLinks": {
+      "title": "Send payment links on WhatsApp",
+      "descriptionRows": "{count, plural, one {# student chosen.} other {# students chosen.}} Each guardian who agreed to fee messages gets the amount overdue and a link to the dues page, where they can pay online.",
+      "descriptionAll": "Everyone in this list. Each guardian who agreed to fee messages gets the amount overdue and a link to the dues page, where they can pay online.",
+      "previewLabel": "Who will get a payment link",
+      "alreadySent": "Already sent a payment link today",
+      "consequence": "Messages go out from the school's WhatsApp number outside quiet hours and cannot be called back. A guardian gets at most one payment link a day for each student. The school receives the money directly.",
+      "confirm": "{count, plural, one {Send # payment link} other {Send # payment links}}",
+      "nobody": "Nobody chosen can get a payment link now.",
+      "queued": "{count, plural, =0 {Nothing new was queued: everyone got a payment link today already.} one {# payment link is queued. It goes out outside quiet hours.} other {# payment links are queued. They go out outside quiet hours.}}"
+    },
+    "revokeLink": {
+      "open": "Stop link",
+      "rowLabel": "Stop the link of the {purpose} sent {when}",
+      "title": "Stop this parent link?",
+      "description": "{purpose} sent {when}.",
+      "consequence": "The page this message opens stops working for the parent at once. This cannot be undone; send a new message if the parent needs the page again.",
+      "confirm": "Stop link",
+      "revoked": "The link no longer works.",
+      "alreadyStopped": "The link had already stopped working. Nothing changed.",
+      "done": "Done"
     }
   },
   "fees": {
@@ -8925,7 +8961,9 @@
       "reasonCode": "Why",
       "concessionsTitle": "Concessions",
       "adjustmentsTitle": "Adjustments",
-      "none": "None yet."
+      "none": "None yet.",
+      "sendPaymentLink": "Send payment link on WhatsApp",
+      "tabMessages": "Messages"
     },
     "approvals": {
       "title": "Fee approvals",
@@ -9017,14 +9055,18 @@
         "oldest": "Oldest due date",
         "lastPayment": "Last payment",
         "overdue": "Overdue",
-        "overdueInr": "Overdue (₹)"
+        "overdueInr": "Overdue (₹)",
+        "actions": "Actions"
       },
       "filterLabel": "Filter dues",
       "totalsLabel": "Totals of overdue fees",
       "noResultsTitle": "No student in this class has an overdue fee",
       "selectRow": "Select {name}",
       "sendReminder": "Send reminder",
-      "remindAll": "Send reminders to everyone in this list"
+      "remindAll": "Send reminders to everyone in this list",
+      "sendPaymentLink": "Send payment link",
+      "paymentLinkAll": "Send payment links to everyone in this list",
+      "rowActions": "Actions for {name}"
     },
     "setup": {
       "title": "Fee setup",

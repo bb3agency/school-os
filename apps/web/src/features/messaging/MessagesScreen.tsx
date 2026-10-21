@@ -2,8 +2,10 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { DataTableV2, type ColumnV2 } from "@/components/console/DataTableV2";
+import { ActionDialog } from "@/components/ui/ActionDialog";
+import { Alert } from "@/components/ui/Alert";
 import { Pill, type PillVariant } from "@/components/ui/Badge";
 import { Button, ButtonLink, buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -18,6 +20,7 @@ import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
 import { formatDateTime } from "@/lib/format";
 import type { Loadable } from "@/lib/loadable";
+import * as z from "@/lib/zod";
 import {
   CATEGORIES,
   KEYS,
@@ -25,12 +28,14 @@ import {
   MESSAGE_STATUSES,
   READ,
   RECORD,
+  SEND,
   isUnavailable,
   sectionSlipsHref,
   type Category,
   type Message,
   type MessagePurpose,
   type MessageStatus,
+  type RevokeLinkOut,
 } from "./data";
 import { AutomaticCard, BroadcastsCard } from "./BroadcastScreens";
 import { MessagingGate } from "./WhatsAppSettingsScreen";
@@ -43,6 +48,8 @@ const STATUS_PILL: Record<MessageStatus, PillVariant> = {
   failed: "negative",
   skipped: "sample",
 };
+
+const NO_FIELDS = z.object({});
 
 function StatusCell({ message }: { message: Message }) {
   const t = useTranslations("messaging.log");
@@ -66,21 +73,86 @@ function StatusCell({ message }: { message: Message }) {
   );
 }
 
+const LINK_LIVE: readonly MessageStatus[] = ["sent", "delivered", "read"];
+
+/**
+ * "Stop the link" for one message that carried a parent link (ADR-0046 decision 5, FR-PUB-007;
+ * `message.send`): the page the message opens stops working at once for the parent. The API
+ * audits it and answers `revoked: false` when the link had already stopped.
+ */
+function RevokeLinkDialog({
+  message,
+  onOpenChange,
+}: {
+  message: Message | null;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const t = useTranslations("messaging.revokeLink");
+  const tl = useTranslations("messaging.log");
+  const api = useBffClient("staff");
+  return (
+    <ActionDialog
+      open={message !== null}
+      onOpenChange={onOpenChange}
+      title={t("title")}
+      description={
+        message
+          ? t("description", {
+              purpose: tl(`purposes.${message.purpose}`),
+              when: formatDateTime(message.queued_at) ?? "",
+            })
+          : undefined
+      }
+      confirmLabel={t("confirm")}
+      confirmVariant="danger"
+      consequence={t("consequence")}
+      schema={NO_FIELDS}
+      errorNamespace="messaging"
+      invalidate={[KEYS.all]}
+      submit={() => {
+        if (!message) throw new Error("no message");
+        return unwrap(
+          api.POST("/api/v1/messages/{message_id}/revoke-link", {
+            params: { path: { message_id: message.id } },
+          }),
+        );
+      }}
+      renderResult={(result: RevokeLinkOut, close) => (
+        <>
+          <Alert tone="success" live>
+            {result.revoked ? t("revoked") : t("alreadyStopped")}
+          </Alert>
+          <div className="flex justify-end">
+            <Button onClick={close}>{t("done")}</Button>
+          </div>
+        </>
+      )}
+    />
+  );
+}
+
 /**
  * Message history and delivery log (US-2208; FR-MSG-016, FR-MSG-017): newest first, filtered by
- * purpose and status (and by student or guardian when opened from their page); a phone shows
- * only as its last four digits; failure and skip reasons in words; the search is a POST body
- * (no personal data in URLs).
+ * purpose and status (and by student or guardian when shown on their page, e.g. the fee
+ * account's Messages tab); a phone shows only as its last four digits; failure and skip
+ * reasons in words; the search is a POST body (no personal data in URLs). Holders of
+ * `message.send` can stop the parent link a sent message carried. `before` renders above the
+ * history once WhatsApp is known to be offered here.
  */
-export function MessagesScreen({
+export function MessageHistory({
   studentId,
   guardianId,
+  tableId = "messages",
+  before,
 }: {
   studentId?: string | undefined;
   guardianId?: string | undefined;
+  tableId?: string;
+  before?: ReactNode;
 }) {
   const t = useTranslations("messaging");
   const tl = useTranslations("messaging.log");
+  const tr = useTranslations("messaging.revokeLink");
   const can = useStaffCan();
   const me = useStaffMe();
   const api = useBffClient("staff");
@@ -89,8 +161,10 @@ export function MessagesScreen({
   const [purpose, setPurpose] = useState<MessagePurpose | "">("");
   const [status, setStatus] = useState<MessageStatus | "">("");
   const [cursor, setCursor] = useState<string | null>(null);
+  const [revoking, setRevoking] = useState<Message | null>(null);
   const filter = JSON.stringify({ purpose, status, studentId, guardianId, cursor });
   const allowed = can(READ);
+  const canRevoke = can(SEND);
   const page = useApiQuery(
     KEYS.messages(filter),
     () =>
@@ -167,8 +241,113 @@ export function MessagesScreen({
       header: tl("columns.status"),
       cell: (item) => <StatusCell message={item} />,
     },
+    ...(canRevoke
+      ? [
+          {
+            key: "link",
+            name: tl("columns.link"),
+            header: tl("columns.link"),
+            cell: (item: Message) =>
+              item.has_link && LINK_LIVE.includes(item.status) ? (
+                <span className="relative z-[1]">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setRevoking(item)}
+                    aria-label={tr("rowLabel", {
+                      purpose: tl(`purposes.${item.purpose}`),
+                      when: formatDateTime(item.queued_at) ?? "",
+                    })}
+                  >
+                    {tr("open")}
+                  </Button>
+                </span>
+              ) : null,
+          } satisfies ColumnV2<Message>,
+        ]
+      : []),
   ];
 
+  if (isUnavailable(page)) {
+    // 404 module_unavailable: WhatsApp is not offered here; say so, not "could not load".
+    return <MessagingGate data={page}>{() => null}</MessagingGate>;
+  }
+  return (
+    <>
+      {before}
+      <h2 className="text-lg font-semibold text-ink">{t("historyTitle")}</h2>
+      <DataTableV2
+        id={tableId}
+        caption={t("logTitle")}
+        captionHidden
+        columns={columns}
+        state={rows}
+        rowKey={(item) => item.id}
+        stacked
+        toolbar={
+          <div role="search" aria-labelledby={filtersId} className="flex flex-wrap items-end gap-3">
+            <span id={filtersId} className="sr-only">
+              {tl("filtersLabel")}
+            </span>
+            <SelectField
+              label={tl("purpose")}
+              value={purpose}
+              onChange={(event) => choosePurpose(event.target.value as MessagePurpose | "")}
+              placeholder={tl("all")}
+              options={MESSAGE_PURPOSES.map((p) => ({ value: p, label: tl(`purposes.${p}`) }))}
+            />
+            <SelectField
+              label={tl("status")}
+              value={status}
+              onChange={(event) => chooseStatus(event.target.value as MessageStatus | "")}
+              placeholder={tl("all")}
+              options={MESSAGE_STATUSES.map((s) => ({ value: s, label: tl(`statuses.${s}`) }))}
+            />
+          </div>
+        }
+        chips={chips}
+        onRemoveChip={(id) => (id === "purpose" ? choosePurpose("") : chooseStatus(""))}
+        onClearFilters={() => {
+          setCursor(null);
+          setPurpose("");
+          setStatus("");
+        }}
+        emptyTitle={tl("emptyTitle")}
+        emptyBody={tl("emptyBody")}
+        noResultsTitle={tl("noResultsTitle")}
+        onRetry={() => void queryClient.invalidateQueries({ queryKey: KEYS.messages(filter) })}
+        footer={
+          nextCursor ? (
+            <Button variant="secondary" size="sm" onClick={() => setCursor(nextCursor)}>
+              {tl("more")}
+            </Button>
+          ) : undefined
+        }
+      />
+      {canRevoke ? (
+        <RevokeLinkDialog
+          message={revoking}
+          onOpenChange={(open) => {
+            if (!open) setRevoking(null);
+          }}
+        />
+      ) : null}
+    </>
+  );
+}
+
+/** The delivery log page (/messages): sending cards, then the message history. */
+export function MessagesScreen({
+  studentId,
+  guardianId,
+}: {
+  studentId?: string | undefined;
+  guardianId?: string | undefined;
+}) {
+  const t = useTranslations("messaging");
+  const can = useStaffCan();
+  const me = useStaffMe();
+  const allowed = can(READ);
   return (
     <div className="space-y-5">
       <PageHeader
@@ -184,71 +363,19 @@ export function MessagesScreen({
       />
       {me !== undefined && !allowed ? (
         <EmptyState icon="lock" title={t("noAccessTitle")} body={t("noAccessBody")} />
-      ) : isUnavailable(page) ? (
-        // 404 module_unavailable: WhatsApp is not offered here; say so, not "could not load".
-        <MessagingGate data={page}>{() => null}</MessagingGate>
       ) : (
-        <>
-          {!studentId && !guardianId ? (
-            <>
-              <BroadcastsCard />
-              <AutomaticCard />
-            </>
-          ) : null}
-          <h2 className="text-lg font-semibold text-ink">{t("historyTitle")}</h2>
-          <DataTableV2
-            id="messages"
-            caption={t("logTitle")}
-            captionHidden
-            columns={columns}
-            state={rows}
-            rowKey={(item) => item.id}
-            stacked
-            toolbar={
-              <div
-                role="search"
-                aria-labelledby={filtersId}
-                className="flex flex-wrap items-end gap-3"
-              >
-                <span id={filtersId} className="sr-only">
-                  {tl("filtersLabel")}
-                </span>
-                <SelectField
-                  label={tl("purpose")}
-                  value={purpose}
-                  onChange={(event) => choosePurpose(event.target.value as MessagePurpose | "")}
-                  placeholder={tl("all")}
-                  options={MESSAGE_PURPOSES.map((p) => ({ value: p, label: tl(`purposes.${p}`) }))}
-                />
-                <SelectField
-                  label={tl("status")}
-                  value={status}
-                  onChange={(event) => chooseStatus(event.target.value as MessageStatus | "")}
-                  placeholder={tl("all")}
-                  options={MESSAGE_STATUSES.map((s) => ({ value: s, label: tl(`statuses.${s}`) }))}
-                />
-              </div>
-            }
-            chips={chips}
-            onRemoveChip={(id) => (id === "purpose" ? choosePurpose("") : chooseStatus(""))}
-            onClearFilters={() => {
-              setCursor(null);
-              setPurpose("");
-              setStatus("");
-            }}
-            emptyTitle={tl("emptyTitle")}
-            emptyBody={tl("emptyBody")}
-            noResultsTitle={tl("noResultsTitle")}
-            onRetry={() => void queryClient.invalidateQueries({ queryKey: KEYS.messages(filter) })}
-            footer={
-              nextCursor ? (
-                <Button variant="secondary" size="sm" onClick={() => setCursor(nextCursor)}>
-                  {tl("more")}
-                </Button>
-              ) : undefined
-            }
-          />
-        </>
+        <MessageHistory
+          studentId={studentId}
+          guardianId={guardianId}
+          before={
+            !studentId && !guardianId ? (
+              <>
+                <BroadcastsCard />
+                <AutomaticCard />
+              </>
+            ) : null
+          }
+        />
       )}
     </div>
   );

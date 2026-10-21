@@ -240,7 +240,7 @@ describe("Send reminder from the dues list (FR-MSG-025)", () => {
     expect(within(dialog).getByText("₹0.14")).toBeInTheDocument();
     expect(
       JSON.parse(stub.callsTo("POST /bff/api/v1/fees/reminders/preview")[0]?.body ?? "{}"),
-    ).toEqual({ account_ids: [ACCOUNT_A], all_matching: false });
+    ).toEqual({ account_ids: [ACCOUNT_A], all_matching: false, kind: "reminder" });
     const confirm = within(dialog).getByRole("button", { name: "Send 1 reminder" });
     expect(confirm).toHaveAccessibleDescription(en.messaging.feeReminders.consequence);
     await userEvent.click(confirm);
@@ -253,6 +253,7 @@ describe("Send reminder from the dues list (FR-MSG-025)", () => {
     expect(JSON.parse(sent[0]?.body ?? "{}")).toEqual({
       account_ids: [ACCOUNT_A],
       all_matching: false,
+      kind: "reminder",
       preview_token: reminderPreview().preview_token,
     });
   });
