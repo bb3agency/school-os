@@ -5,7 +5,7 @@
 | Version | 0.7 · 2026-09-29 |
 | DB | PostgreSQL 16+ (pgvector, pg_trgm, citext, pgcrypto) |
 | Related | 04-Architecture §8, 06-RAG, 07-Security §7, 08-Privacy §7, 16-Platform admin panel §7, ADR-0013 |
-| Changes | 0.8 (2026-10-14): planned R2 tables (§15: schemas `fin` and `msg`, fee ledger and receipts, online payments, messaging, certificate verification, `core.public_handles` and `core.resolve_public_handle`) and R2 retention rows (§13); ADR-0042..ADR-0047. 0.7: attendance, exams, marks, behaviour notes, early-warning flags, action log and rule settings (§5.8, `0035_student_insights`, FR-ATT-*, FR-MRK-*, FR-EW-*); retention rows for M5 data (§13). 0.6: circulars, tasks and parent notices (§6.3, `0034_circulars`, FR-CIR-*, FR-TASK-*, FR-NOTICE-*); retention rows for notice files, readings, tasks and notices (§13). 0.5: admin console tables `ops.tenant_exports` and `ops.retention_settings` and the full export archive (§7.3, `0031_admin`, FR-ADM-001/002); retention settings per school (§13). 0.4: year-end promotions `sis.promotion_runs` and `sis.promotion_items` (§5.1.1, `0022_promotions`, FR-TEN-011); enrolment corrections and guardian unlink as built (§5.1). 0.3: matches migrations 0001–0007: exact roles and grants (§3.1), `context_free_session` (§3.2), `definer_access` table list and allowlist keys (§3.3), eleven definer functions with grantees and the create-as-`sos_definer` pattern (§3.4), core DDL from `0003` incl. `is_platform` permissions (§4), audit DDL/partitions from `0002` and ops DDL from `0006` (§7). 0.2: database roles incl. `sos_platform` and `sos_definer` (NOBYPASSRLS) with per-table `definer_access` policies (§3); `set_config` tenant context; allowlisted definer functions; composite tenant foreign keys applied to all DDL; audit `seq`, `chain_heads.last_seq`, RFC 8785 canonical JSON, genesis hash, TRUNCATE trigger, RLS on partitions (§7); `ops.job_runs.tenant_id NOT NULL`; `ops.idempotency_keys`; `ops.feature_flags` moved to `platform.feature_flags`; schema `platform` (DDL in 16 §7); classification and retention for platform data. 0.1: baseline |
+| Changes | 0.9 (2026-10-21): planned R3 tables (§16: privacy requests and grievances, notice records, consents for optional purposes, breach register, platform incidents, disclosure drafts and snapshots, RTE register (not scheduled), portal calendar; `core.public_handles` kind `school_disclosure`, `ops.tasks` source `portal_calendar`) and R3 retention rows (§13); ADR-0048..ADR-0053. 0.8 (2026-10-14): planned R2 tables (§15: schemas `fin` and `msg`, fee ledger and receipts, online payments, messaging, certificate verification, `core.public_handles` and `core.resolve_public_handle`) and R2 retention rows (§13); ADR-0042..ADR-0047. 0.7: attendance, exams, marks, behaviour notes, early-warning flags, action log and rule settings (§5.8, `0035_student_insights`, FR-ATT-*, FR-MRK-*, FR-EW-*); retention rows for M5 data (§13). 0.6: circulars, tasks and parent notices (§6.3, `0034_circulars`, FR-CIR-*, FR-TASK-*, FR-NOTICE-*); retention rows for notice files, readings, tasks and notices (§13). 0.5: admin console tables `ops.tenant_exports` and `ops.retention_settings` and the full export archive (§7.3, `0031_admin`, FR-ADM-001/002); retention settings per school (§13). 0.4: year-end promotions `sis.promotion_runs` and `sis.promotion_items` (§5.1.1, `0022_promotions`, FR-TEN-011); enrolment corrections and guardian unlink as built (§5.1). 0.3: matches migrations 0001–0007: exact roles and grants (§3.1), `context_free_session` (§3.2), `definer_access` table list and allowlist keys (§3.3), eleven definer functions with grantees and the create-as-`sos_definer` pattern (§3.4), core DDL from `0003` incl. `is_platform` permissions (§4), audit DDL/partitions from `0002` and ops DDL from `0006` (§7). 0.2: database roles incl. `sos_platform` and `sos_definer` (NOBYPASSRLS) with per-table `definer_access` policies (§3); `set_config` tenant context; allowlisted definer functions; composite tenant foreign keys applied to all DDL; audit `seq`, `chain_heads.last_seq`, RFC 8785 canonical JSON, genesis hash, TRUNCATE trigger, RLS on partitions (§7); `ops.job_runs.tenant_id NOT NULL`; `ops.idempotency_keys`; `ops.feature_flags` moved to `platform.feature_flags`; schema `platform` (DDL in 16 §7); classification and retention for platform data. 0.1: baseline |
 
 ---
 
@@ -1415,6 +1415,15 @@ A school's owner or principal (`tenant.settings.manage`, step-up) changes the pe
 | Opt-ins (`msg.optins`) | While the guardian exists; then deleted with the guardian (the audit event keeps the fact for the audit retention) | Evidence of consent (WhatsApp policy, DPDP) |
 | Inbound message kinds (`msg.inbound_events`) | 90 days | Kind and time only; inbound text is never stored |
 | Public handles (`core.public_handles`) | Parent links: 30 days after expiry; certificate codes: life of the certificate; provider routes: until disconnected | Daily `public.purge_handles` |
+| **Planned (R3, §16)** · Data-principal requests, grievances and their events (`ops.privacy_requests*`) | 3 years after closing (SchoolOS default, **to confirm**; docs/08 keeps logs and personal data at least 1 year) | Evidence that requests were answered; nominations end when withdrawn or the subject leaves |
+| Notice records (`ops.privacy_notices`) | Life of the school | Which notice version was issued when (PRV-001) |
+| Consents (`sis.consents`) and purposes | While the student is on roll, then as the student record | Evidence of consent (PRV-006); withdrawal is a new entry |
+| Breach records (`ops.breach_records`, `ops.breach_affected`) | 3 years after closing (SchoolOS default, **to confirm**) | Affected ids only; descriptions encrypted |
+| Access reports (`ops.exports` kind `subject_report`) | 24 hours after release | Rebuilt on request |
+| Disclosure snapshots (`ops.disclosure_snapshots`) | Life of the school | The record of what was published; view counts 90 days |
+| RTE admissions / claims (`sis.rte_*`; not scheduled) | Admissions: as the student record; claims and lines: 8 years after the financial year (D21) | |
+| Portal calendar dates and reminders (`ops.portal_*`) | 2 academic years | Configuration and idempotency, no personal data |
+| Platform incidents (`platform.incidents*`) | 3 years after closing | SchoolOS's own records, no personal data (ADR-0050) |
 
 
 ## 14. Migration guidelines
@@ -1546,3 +1555,72 @@ CREATE TABLE core.public_handles (
 - Message rows, opt-ins and join codes are **C2**; guardian phone stays **C3**.
 - Secrets (`*_ciphertext` in connections and accounts), key hashes and raw provider payloads never leave in the full data export, never reach `sos_readonly`, never appear in audit or logs.
 - Offboarding `purge_order`: `messaging` and `fees` before `students`; `public` handles before `tenancy` keys. Disconnecting providers at the provider (revoke tokens, delete webhooks) is part of the offboarding checklist (docs/16 §5.5) before the purge.
+
+
+## 16. Planned (R3): privacy requests, consents, breaches, disclosure, RTE, portal calendar
+
+**Status: planned (R3, documented 2026-10-21), not built.** Decisions: ADR-0048 (requests, notices, record classes), ADR-0049 (consents), ADR-0050 (breach), ADR-0051 (disclosure; amends ADR-0047), ADR-0052 (RTE; designed, **not scheduled** while owner decision D10 stands), ADR-0053 (portal calendar). Requirements: docs/03 §3.26-§3.30. Column lists are the design; migrations may refine names, and each subsection moves to "as built" when its migration lands.
+
+**Rules for every tenant table below**: as §15 (UUIDv7 `id`, `tenant_id` first, `UNIQUE (tenant_id, id)`, RLS ENABLE + FORCE with `tenant_isolation`, composite FKs, the restrictive `offboarding_purge` policy with `SELECT, DELETE` for `sos_purger`, no `definer_access`, nothing for `sos_platform`, `version` on mutable rows, append-only tables with SELECT and INSERT only for `sos_app` and a trigger refusing UPDATE/DELETE outside the offboarding purge). Encrypted columns use the school's DEK with AAD `<schema>.<table>|<column>|<id>` and are listed in `app.students.rotation.CIPHERTEXT_COLUMNS` (re-encrypted on DEK rotation). **No new schema** (lead decision D46): tables go in `ops` (school operations and compliance records) and `sis` (records about students); the control-plane incident tables go in `platform`.
+
+**Migrations (numbers re-chained at merge as in R1/R2; `0063` is R2-4's):** `0064_privacy_requests` (wave R3-1A: §16.1), `0065_consents_breach` (R3-1B: §16.2, §16.3, the platform incident tables), `0066_disclosure` (R3-1C: §16.4 and the `core.public_handles.kind` CHECK), `0067_portal_calendar` (R3-1D: §16.6 and the `ops.tasks.source` CHECK), `0068_rte_register` (R3-2E, only if the owner reopens D10: §16.5). Each ships its permissions (docs/07 §6.8) and needs the system-role sync after migrating (ADR-0022).
+
+### 16.1 Notices, requests and grievances (`ops`; ADR-0048, FR-DPDP-001..018)
+
+| Table | Class | Key columns and rules |
+|---|---|---|
+| `ops.privacy_notices` | C1 | **Append-only.** `template_key` (`notice_parents`, `notice_staff`), `template_version`, `audience` (`parents`,`staff`), `language` (`en`,`te`), `issued_on` (≤ today), `channel` CHECK (`paper`,`school_whatsapp_group`,`sos_notice`,`email`,`other`), `document_id` → `kb.documents` (nullable), `recorded_by`, `recorded_at` |
+| `ops.privacy_requests` | C2 (C3 columns encrypted) | `reference` (`PR-2027-0001`, per school and calendar year, gap-free counter as receipts), `kind` CHECK (`access`,`correction`,`erasure`,`nomination`,`consent_withdrawal`,`grievance`,`other`), subject: exactly one of `student_id` → `sis.students`, `guardian_id` → `sis.guardians` (`ON DELETE SET NULL (guardian_id)` with `subject_label` kept as "former guardian"), `membership_id` → `core.memberships` (CHECK `num_nonnulls(...) = 1` while open), `requester_relationship` (`self`,`father`,`mother`,`guardian`,`nominee`,`other`), `verification_method` CHECK (`in_person_document`,`guardian_phone_on_record`,`staff_sign_in`; nullable until verified; required for `decided`), `received_on`, `due_on` (CHECK `due_on <= received_on + 7`), `status` CHECK (`received`,`in_progress`,`waiting_for_requester`,`decided`,`closed`,`withdrawn`), `request_ciphertext` (the requester's words), `notes_ciphertext`, `response_ciphertext`, `responded_on`, `nominee_ciphertext` (name, relationship, contact; nomination only), `logged_by`, `decided_by` (CHECK `decided_by IS NULL OR decided_by <> logged_by`), `decided_at`, `closed_at`, `version`. Indexes `(tenant_id, status, due_on)`, `(tenant_id, student_id)`. No DELETE for `sos_app` |
+| `ops.privacy_request_events` | C2 | **Append-only.** `request_id`, `seq`, `event` (`logged`,`verified`,`status_changed`,`report_built`,`report_released`,`report_downloaded`,`change_request_linked`,`erasure_planned`,`erasure_executed`,`consent_withdrawn`,`nomination_withdrawn`,`responded`,`closed`), `detail jsonb` (ids, codes and counts only; validated like audit summaries), `actor_membership_id`, `at` |
+| `ops.privacy_request_links` | C1 | `request_id`, `link_kind` (`change_request`,`consent`,`export`), `target_id`; unique per (request, kind, target) |
+| `ops.privacy_request_counters` | C1 | `(tenant_id, year)` → `last_no` (never down; receipt-counter pattern) |
+
+Access reports are exports of kind `subject_report` in `ops.exports` (existing table; `kind` CHECK widened), files under the school's `exports/` prefix, expiring after 24 hours (the bucket's `exports` rule is the backstop). Record classes, the subject-report registry and the templates are versioned files (`app/privacy/record_classes.yaml`, `subjects.yaml`, `templates/`), not tables. `core.tenants.settings` gains `privacy_contact` and `privacy_request_target_days` (JSON, no DDL).
+
+### 16.2 Consents for optional purposes (`sis`; ADR-0049, FR-DPDP-020..026)
+
+| Table | Class | Key columns and rules |
+|---|---|---|
+| `sis.consent_purposes` | C1 | `key` (unique per school, `^[a-z][a-z0-9_]{2,40}$`), `label_en`, `label_te` (nullable), `description` (≤ 1000), `form_version int`, `active`, `suggested_key` (from `app/privacy/consent_purposes.yaml`, nullable), `created_by`, `version`. A trigger refuses changing `label_*`/`description` once a consent references the current `form_version` (the service bumps the version instead) |
+| `sis.consents` | C2 | **Append-only.** As `sis.apaar_consents` (§5.9) plus `purpose_id` → `sis.consent_purposes`, `form_version`: `student_id`, `seq` (`UNIQUE (tenant_id, student_id, purpose_id, seq)`), `status` (`given`,`refused`,`pending`,`withdrawn`), `relationship`, `guardian_id` (`ON DELETE SET NULL (guardian_id)`), `decided_on`, `form_language`, `evidence_document_id` → `kb.documents` (required for `given`; the document cannot be deleted while it is evidence), `note` (≤ 500, never logged), `privacy_request_id` (nullable, the withdrawal request), `recorded_by`, `recorded_at` |
+
+### 16.3 Breach register and incidents (`ops`, `platform`; ADR-0050, FR-DPDP-030..038)
+
+| Table | Class | Key columns and rules |
+|---|---|---|
+| `ops.breach_records` | C2 (description encrypted) | `origin` (`school`,`processor_notice`), `platform_incident_id uuid` (no FK: another schema; unique per school when set), `noticed_at`, `description_ciphertext`, `categories text[]` (codes: `identity`,`contact`,`aadhaar_partial`,`academic`,`attendance`,`financial`,`documents`,`insights`,`staff`,`other`), `approx_children`, `approx_guardians`, `approx_staff` (≥ 0), `status` (`open`,`contained`,`closed`), `board_notice_done_at` + `board_notice_method`, `board_report_done_at` + `board_report_method`, `people_notified_at` + `people_notified_method`, `closed_at`, `recorded_by`, `version`. Deadlines are computed (`noticed_at` + 24 h / 72 h), not stored |
+| `ops.breach_affected` | C2 | `breach_id`, exactly one of `student_id`, `guardian_id`, `membership_id`; unique per breach and subject |
+| `ops.breach_reminders` | C1 | `(breach_id, reminder)` unique (`board_24h`, `report_60h`): idempotency of FR-DPDP-035 |
+| `platform.incidents` | C1 (no personal data) | `opened_at` (T0), `severity` (`P1`..`P4`), `status` (`open`,`contained`,`resolved`,`closed`), `summary` (≤ 500; CHECK refuses 6+ digit runs and `@`), `cert_in_required bool`, `cert_in_reported_at`, `lead_operator_id`, `confirmed_by`/`confirmed_at`, `second_confirmed_by` (CHECK ≠ `confirmed_by`), `version`. Platform schema, `sos_platform` only |
+| `platform.incident_schools` | C1 | `incident_id`, `tenant_id` (a reference, not RLS: platform table), `categories text[]`, `approx_people`, `window_from`, `window_to`, `school_notified_at`, `pulled_at` (set when the school's worker has stored it). Read by the school-side pull through the platform service (ADR-0020 pattern; `tests/platform/test_boundaries.py` updated) |
+
+### 16.4 Disclosure (`ops`, `core`; ADR-0051, FR-DISC-001..012)
+
+| Table | Class | Key columns and rules |
+|---|---|---|
+| `ops.disclosure_drafts` | C1 | One per school: `format_key`, `format_version`, `inputs jsonb` (item key → value; validated against the format), `documents jsonb` (item key → `[document_id]`), `updated_by`, `version` |
+| `ops.disclosure_snapshots` | C0 once published | **Append-only** except the withdrawal columns: `format_key`, `format_version`, `content jsonb` (everything shown, derived values copied), `content_sha256`, `document_versions jsonb` (item → `[version_id]`; composite FKs through a child table `ops.disclosure_snapshot_documents` so the versions cannot be deleted while published), `published_by`, `published_at`, `withdrawn_at`/`withdrawn_by`/`withdraw_reason` (all or none), `views_by_day jsonb` (date → count, last 90 days), `pdf_status`, `html_status` |
+| `core.public_handles` | — | `kind` CHECK gains `school_disclosure` (target type `school_disclosure`, target id = the school's draft id; never expires; one live per school, partial unique index) |
+
+### 16.5 RTE register (`sis`; ADR-0052, FR-RTE-001..012; designed, not scheduled)
+
+| Table | Class | Key columns and rules |
+|---|---|---|
+| `sis.rte_admissions` | C3 | `student_id` (unique), `entry_academic_year_id`, `entry_class_id`, `category_code` (from the state file), `allotment_ref_ciphertext`, `allotted_on`, `status` (`allotted`,`admitted`,`declined`,`left`), `admitted_on`, `left_on`, `state_rules_key`/`version`, `recorded_by`, `version` |
+| `sis.rte_documents` | C3 | `rte_admission_id`, `document_id` → `kb.documents` (cannot be deleted while linked), `document_type` (state file), `verified_by`, `verified_at` |
+| `sis.rte_claims` | C2 | `academic_year_id`, `period_key`, `status` (`draft`,`submitted`,`part_received`,`received`,`rejected`), `portal_reference`, `claimed_total`, `received_total`, `submitted_on`, `submitted_by`, `version`; unique per (year, period) while not `rejected` |
+| `sis.rte_claim_lines` | C3 | `claim_id`, `rte_admission_id`, `amount_claimed`, `eligibility jsonb` (facts the state file names, e.g. attendance percentage), `amount_received`; frozen once the claim is `submitted` (trigger), except `amount_received` |
+
+### 16.6 Portal calendar (`ops`; ADR-0053, FR-RDY-001..010)
+
+| Table | Class | Key columns and rules |
+|---|---|---|
+| `ops.portal_calendar_dates` | C1 | `event_key` (from the calendar file, or `school:<slug>` for the school's own), `academic_year_id`, `label` (own events only), `opens_on`, `closes_on` (CHECK ≥ `opens_on`), `profile_keys text[]`, `source_kind` (`circular`,`portal`,`phone`,`other`), `document_id` (nullable), `owner_membership_id`, `confirmed_by`, `confirmed_at`, `version`; unique per (school, year, event_key) |
+| `ops.portal_reminders` | C1 | **Append-only.** `event_key`, `academic_year_id`, `lead_day`, `task_id` → `ops.tasks`, `sent_at`; unique per (school, year, event, lead day) |
+| `ops.tasks` | — | `source` CHECK gains `portal_calendar`; new nullable `portal_event_key` (set exactly when `source = portal_calendar`) |
+
+### 16.7 Classification, export and offboarding
+
+- Privacy requests, their events, consents and breach records are **C2**; request texts, nominee details, breach descriptions and RTE references are **C3 (encrypted)**; RTE admissions and claim lines are **C3** because they reveal a family's economic or social category (ADR-0052).
+- The disclosure snapshot is **C0 once published** (public by the school's decision); the draft is C1. Neither holds student personal data (FR-DISC-006).
+- Full data export: every table above (ciphertext columns left out unless `include_sensitive`); offboarding `purge_order`: `privacy` and `disclosure` before `public` and `students`, `rte` before `students` (its concession requests are `fees` rows, purged earlier), the calendar with `circulars` (tasks). The platform incident tables are SchoolOS's own records (docs/08 §14) and stay after offboarding without personal data.
