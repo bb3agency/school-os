@@ -156,6 +156,7 @@ _BLOCK_TEXT: Final = {
     "receipt_cancelled": "This receipt is cancelled. Cancelled receipts are not sent.",
     "no_opted_in_guardian": "No guardian of this student agreed to get fee messages.",
     "already_queued": "This receipt was already sent to every guardian who agreed.",
+    "payments_not_connected": "Connect online payments in payment settings first.",
 }
 
 
@@ -944,6 +945,7 @@ def send_receipt_whatsapp(
 @dataclass
 class _ReminderPlan:
     day: dt.date
+    kind: str = "reminder"
     accounts: int = 0
     items: list[tuple[fees.ReminderAccount, uuid.UUID]] = field(default_factory=list)
     skipped_accounts: Counter[str] = field(default_factory=Counter)
@@ -952,7 +954,7 @@ class _ReminderPlan:
     def token(self) -> str:
         """A digest of who gets a reminder, for how much, and who is left out (the preview the
         person saw); the confirmation recomputes it."""
-        parts = [self.day.isoformat()]
+        parts = [self.day.isoformat(), self.kind]
         parts += sorted(f"{a.account_id}:{g}:{a.overdue}" for a, g in self.items)
         parts += [f"a.{k}={v}" for k, v in sorted(self.skipped_accounts.items())]
         parts += [f"g.{k}={v}" for k, v in sorted(self.skipped_guardians.items())]
@@ -968,8 +970,19 @@ class _ReminderPlan:
         }
 
 
-def _reminder_dedupe(day: dt.date) -> str:
-    return f"manual:{day.isoformat()}"
+def _reminder_dedupe(day: dt.date, kind: str = "reminder") -> str:
+    """``manual:<IST date>`` for a reminder, ``paylink:<IST date>`` for a payment link: each at
+    most once a day per account and guardian, independently of the other."""
+    return f"{'paylink' if kind == 'payment_link' else 'manual'}:{day.isoformat()}"
+
+
+def _fee_block(session: Session, kind: str) -> str | None:
+    """Why the fee message cannot be sent now; a payment link also needs online payments
+    connected (FR-MSG-027: the dues page's "Pay online", FR-PAY-005)."""
+    blocked = messaging.account_block(session, "fee_reminder")
+    if blocked is None and kind == "payment_link" and not fees.payments_connected(session):
+        return "payments_not_connected"
+    return blocked
 
 
 def _guardian_reason(
@@ -998,7 +1011,7 @@ def _reminder_plan(
     )
     if len(picked) > load_config().broadcasts.max_reminder_accounts:
         raise ValidationFailed([_error("account_ids", "too_many")])
-    plan = _ReminderPlan(day=messaging.ist_today(session), accounts=len(picked))
+    plan = _ReminderPlan(day=messaging.ist_today(session), kind=data.kind, accounts=len(picked))
     due: list[fees.ReminderAccount] = []
     for account in picked:
         if account.overdue <= 0 or account.oldest_due_on is None:
@@ -1014,7 +1027,9 @@ def _reminder_plan(
         by_student[brief.student_id][brief.guardian_id] = brief.has_phone
     names = students.first_names(session, student_ids)
     current = mrepo.current_optins(session, sorted({b.guardian_id for b in briefs}))
-    already = repo.reminded(session, [a.account_id for a in due], _reminder_dedupe(plan.day))
+    already = repo.reminded(
+        session, [a.account_id for a in due], _reminder_dedupe(plan.day, plan.kind)
+    )
     for account in due:
         guardians = by_student.get(account.student_id, {})
         if not guardians or account.student_id not in names:
@@ -1052,7 +1067,7 @@ def preview_fee_reminders(
         estimated_cost_inr=_cost(len(plan.items)),
         utility_rate_inr=str(cfg.utility_rate_inr),
         gst_percent=str(cfg.gst_percent),
-        blocked_reason=messaging.account_block(session, "fee_reminder"),
+        blocked_reason=_fee_block(session, data.kind),
         **plan.counts(),
     )
 
@@ -1070,12 +1085,12 @@ def confirm_fee_reminders(
     (counts) and ``messaging.message.queued`` per message."""
     messaging.ensure_available()
     plan = _reminder_plan(session, ctx, data)  # checks finance.read first (403)
-    blocked = messaging.account_block(session, "fee_reminder")
+    blocked = _fee_block(session, data.kind)
     if blocked is not None:
         raise SendingBlocked(blocked)
     if plan.token() != data.preview_token:
         raise PreviewStale("Who would get a reminder has changed. Preview again.")
-    dedupe = _reminder_dedupe(plan.day)
+    dedupe = _reminder_dedupe(plan.day, data.kind)
     names = students.first_names(session, sorted({a.student_id for a, _ in plan.items}))
     school = tenancy.school_display_name(session)
     queued = 0
@@ -1101,7 +1116,11 @@ def confirm_fee_reminders(
     counts = plan.counts()
     messaging.record_audit(
         session,
-        action="messaging.fee_reminders.sent",
+        action=(
+            "messaging.payment_links.sent"
+            if data.kind == "payment_link"
+            else "messaging.fee_reminders.sent"
+        ),
         resource_type="fee_reminders",
         resource_id=None,
         summary={

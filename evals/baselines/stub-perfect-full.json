@@ -1,6 +1,6 @@
 {
   "adapter": "stub-perfect",
-  "dataset_sha256": "d047b52e4519790fc1e2a9458eea305a04dcdc50a54320cac10acd87ac6acffc",
+  "dataset_sha256": "81d2cbeef5053e3b5609a5de07be908f3613466e1d55f44aabe35570b5a6e09c",
   "metrics": {
     "authorised_recall_at_10": 1.0,
     "authorised_recall_at_10_critical": 1.0,
@@ -40,7 +40,7 @@
     "fee_citation_validity": 1.0,
     "fee_figure_accuracy": 1.0,
     "fee_guessed_link_count": 0,
-    "fee_items": 22,
+    "fee_items": 31,
     "fee_leakage_count": 0,
     "fee_refusal_correctness": 1.0,
     "followup_language_match": 1.0,

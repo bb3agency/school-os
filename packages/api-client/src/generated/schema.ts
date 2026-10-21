@@ -3518,7 +3518,9 @@ export interface paths {
          * Send Fee Reminders
          * @description Send the previewed fee reminders (FR-MSG-025; ``message.send`` and ``finance.read``;
          *     ``Idempotency-Key``): one per account and opted-in guardian, at most once a day, sent
-         *     outside quiet hours within the daily cap. Errors: 409 ``preview_stale`` (preview again),
+         *     outside quiet hours within the daily cap; a payment link (``kind: payment_link``,
+         *     FR-MSG-027) once a day apart from reminders. Errors: 409 ``preview_stale`` (preview again),
+         *     ``payments_not_connected`` (payment links only),
          *     ``messaging_not_connected``, ``messaging_paused``, ``template_not_approved``,
          *     ``template_paused``, ``messaging_currency_not_inr``. Audited.
          */
@@ -3543,7 +3545,10 @@ export interface paths {
          * @description Before sending fee reminders from the dues list: accounts chosen, messages to queue,
          *     accounts and guardians left out by reason, and the estimated Meta cost incl. GST
          *     (FR-MSG-025; ``message.send`` and ``finance.read``, school-wide). Choose rows
-         *     (``account_ids``) or ``all_matching`` the dues list's filter. Nothing is sent. Errors: 403
+         *     (``account_ids``) or ``all_matching`` the dues list's filter; ``kind: payment_link`` is
+         *     "Send payment link" (FR-MSG-027: the same message, whose dues page offers "Pay online";
+         *     ``blocked_reason`` ``payments_not_connected`` without online payments). Nothing is sent.
+         *     Errors: 403
          *     without ``finance.read``; 404 an account that is not one of this year's (or fees off); 422
          *     the selection, ``account_ids`` ``too_many``.
          */
@@ -8619,7 +8624,9 @@ export interface paths {
          * @description Meta's events for every connected school. The signature (app secret over the raw body)
          *     was checked by the guard; each entry is routed by its WABA id to one school, its events are
          *     stored (encrypted, deduplicated) and the worker applies them. A replayed delivery and events
-         *     of unknown or disconnected accounts are acknowledged without effect.
+         *     of unknown or disconnected accounts are acknowledged without effect. A suspended school's
+         *     account: only parents' STOP replies are recorded (silently, nothing is sent); everything
+         *     else is acknowledged without effect (owner decisions D31, D35).
          */
         post: operations["meta_webhook_api_v1_webhooks_meta_post"];
         delete?: never;
@@ -10769,6 +10776,7 @@ export interface components {
             certificate_type: "transfer" | "bonafide" | "study" | "conduct";
             /** Class Label */
             class_label: string | null;
+            fee_note?: components["schemas"]["TcFeeNote"] | null;
             /** Fields */
             fields: components["schemas"]["PrintedField"][];
             /** Format Key */
@@ -12831,7 +12839,7 @@ export interface components {
             accounts_reminded: number;
             /**
              * Blocked Reason
-             * @description Why nothing can be sent now (messaging_not_connected, messaging_paused, template_not_approved, template_paused, messaging_currency_not_inr); null when it can.
+             * @description Why nothing can be sent now (messaging_not_connected, messaging_paused, template_not_approved, template_paused, messaging_currency_not_inr; for a payment link also payments_not_connected); null when it can.
              */
             blocked_reason: string | null;
             /**
@@ -12885,6 +12893,13 @@ export interface components {
             all_matching: boolean;
             /** Class Id */
             class_id?: string | null;
+            /**
+             * Kind
+             * @description ``reminder`` (FR-MSG-025) or ``payment_link`` ("Send payment link", FR-MSG-027): the same fee message, whose dues page offers "Pay online"; needs online payments connected (``payments_not_connected``) and is sent at most once a day per account and guardian, apart from reminders.
+             * @default reminder
+             * @enum {string}
+             */
+            kind: "reminder" | "payment_link";
             /** Preview Token */
             preview_token: string;
             /** Section Id */
@@ -12906,6 +12921,13 @@ export interface components {
             all_matching: boolean;
             /** Class Id */
             class_id?: string | null;
+            /**
+             * Kind
+             * @description ``reminder`` (FR-MSG-025) or ``payment_link`` ("Send payment link", FR-MSG-027): the same fee message, whose dues page offers "Pay online"; needs online payments connected (``payments_not_connected``) and is sent at most once a day per account and guardian, apart from reminders.
+             * @default reminder
+             * @enum {string}
+             */
+            kind: "reminder" | "payment_link";
             /** Section Id */
             section_id?: string | null;
         };
@@ -19806,6 +19828,35 @@ export interface components {
             owner_membership_id?: string | null;
             /** Title */
             title?: string | null;
+        };
+        /**
+         * TcFeeNote
+         * @description The student's outstanding fees on the TC preview, for staff information only (FR-CERT-025,
+         *     US-2005; ADR-0042 decision 13; owner decision D16). Given only for a transfer certificate,
+         *     while fees are on and to a caller holding ``finance.read`` school-wide. It is never printed,
+         *     never stored on the certificate and never blocks issue or approval (FR-FEE-030).
+         */
+        TcFeeNote: {
+            /**
+             * Account Id
+             * Format: uuid
+             * @description The fee account, to open it on the fee screens.
+             */
+            account_id: string;
+            /**
+             * Balance
+             * @description Outstanding balance of the current year.
+             */
+            balance: string;
+            /** Last Payment On */
+            last_payment_on: string | null;
+            /** Oldest Due On */
+            oldest_due_on: string | null;
+            /**
+             * Overdue
+             * @description Part of the balance already overdue.
+             */
+            overdue: string;
         };
         /**
          * TemplateCreate

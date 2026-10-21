@@ -4977,6 +4977,16 @@
             ],
             "title": "Class Label"
           },
+          "fee_note": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TcFeeNote"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "fields": {
             "items": {
               "$ref": "#/components/schemas/PrintedField"
@@ -10604,7 +10614,7 @@
                 "type": "null"
               }
             ],
-            "description": "Why nothing can be sent now (messaging_not_connected, messaging_paused, template_not_approved, template_paused, messaging_currency_not_inr); null when it can.",
+            "description": "Why nothing can be sent now (messaging_not_connected, messaging_paused, template_not_approved, template_paused, messaging_currency_not_inr; for a payment link also payments_not_connected); null when it can.",
             "title": "Blocked Reason"
           },
           "estimated_cost_inr": {
@@ -10705,6 +10715,16 @@
             ],
             "title": "Class Id"
           },
+          "kind": {
+            "default": "reminder",
+            "description": "``reminder`` (FR-MSG-025) or ``payment_link`` (\"Send payment link\", FR-MSG-027): the same fee message, whose dues page offers \"Pay online\"; needs online payments connected (``payments_not_connected``) and is sent at most once a day per account and guardian, apart from reminders.",
+            "enum": [
+              "reminder",
+              "payment_link"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
           "section_id": {
             "anyOf": [
               {
@@ -10758,6 +10778,16 @@
               }
             ],
             "title": "Class Id"
+          },
+          "kind": {
+            "default": "reminder",
+            "description": "``reminder`` (FR-MSG-025) or ``payment_link`` (\"Send payment link\", FR-MSG-027): the same fee message, whose dues page offers \"Pay online\"; needs online payments connected (``payments_not_connected``) and is sent at most once a day per account and guardian, apart from reminders.",
+            "enum": [
+              "reminder",
+              "payment_link"
+            ],
+            "title": "Kind",
+            "type": "string"
           },
           "preview_token": {
             "maxLength": 80,
@@ -30060,6 +30090,62 @@
         "title": "TaskUpdate",
         "type": "object"
       },
+      "TcFeeNote": {
+        "description": "The student's outstanding fees on the TC preview, for staff information only (FR-CERT-025,\nUS-2005; ADR-0042 decision 13; owner decision D16). Given only for a transfer certificate,\nwhile fees are on and to a caller holding ``finance.read`` school-wide. It is never printed,\nnever stored on the certificate and never blocks issue or approval (FR-FEE-030).",
+        "properties": {
+          "account_id": {
+            "description": "The fee account, to open it on the fee screens.",
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "balance": {
+            "description": "Outstanding balance of the current year.",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Balance",
+            "type": "string"
+          },
+          "last_payment_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Payment On"
+          },
+          "oldest_due_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Due On"
+          },
+          "overdue": {
+            "description": "Part of the balance already overdue.",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Overdue",
+            "type": "string"
+          }
+        },
+        "required": [
+          "balance",
+          "overdue",
+          "oldest_due_on",
+          "last_payment_on",
+          "account_id"
+        ],
+        "title": "TcFeeNote",
+        "type": "object"
+      },
       "TemplateCreate": {
         "additionalProperties": false,
         "description": "Save the mapping of an import as a reusable template (matched by the file's headers).",
@@ -48215,7 +48301,7 @@
     },
     "/api/v1/fees/reminders": {
       "post": {
-        "description": "Send the previewed fee reminders (FR-MSG-025; ``message.send`` and ``finance.read``;\n``Idempotency-Key``): one per account and opted-in guardian, at most once a day, sent\noutside quiet hours within the daily cap. Errors: 409 ``preview_stale`` (preview again),\n``messaging_not_connected``, ``messaging_paused``, ``template_not_approved``,\n``template_paused``, ``messaging_currency_not_inr``. Audited.",
+        "description": "Send the previewed fee reminders (FR-MSG-025; ``message.send`` and ``finance.read``;\n``Idempotency-Key``): one per account and opted-in guardian, at most once a day, sent\noutside quiet hours within the daily cap; a payment link (``kind: payment_link``,\nFR-MSG-027) once a day apart from reminders. Errors: 409 ``preview_stale`` (preview again),\n``payments_not_connected`` (payment links only),\n``messaging_not_connected``, ``messaging_paused``, ``template_not_approved``,\n``template_paused``, ``messaging_currency_not_inr``. Audited.",
         "operationId": "send_fee_reminders_api_v1_fees_reminders_post",
         "requestBody": {
           "content": {
@@ -48284,7 +48370,7 @@
     },
     "/api/v1/fees/reminders/preview": {
       "post": {
-        "description": "Before sending fee reminders from the dues list: accounts chosen, messages to queue,\naccounts and guardians left out by reason, and the estimated Meta cost incl. GST\n(FR-MSG-025; ``message.send`` and ``finance.read``, school-wide). Choose rows\n(``account_ids``) or ``all_matching`` the dues list's filter. Nothing is sent. Errors: 403\nwithout ``finance.read``; 404 an account that is not one of this year's (or fees off); 422\nthe selection, ``account_ids`` ``too_many``.",
+        "description": "Before sending fee reminders from the dues list: accounts chosen, messages to queue,\naccounts and guardians left out by reason, and the estimated Meta cost incl. GST\n(FR-MSG-025; ``message.send`` and ``finance.read``, school-wide). Choose rows\n(``account_ids``) or ``all_matching`` the dues list's filter; ``kind: payment_link`` is\n\"Send payment link\" (FR-MSG-027: the same message, whose dues page offers \"Pay online\";\n``blocked_reason`` ``payments_not_connected`` without online payments). Nothing is sent.\nErrors: 403\nwithout ``finance.read``; 404 an account that is not one of this year's (or fees off); 422\nthe selection, ``account_ids`` ``too_many``.",
         "operationId": "preview_fee_reminders_api_v1_fees_reminders_preview_post",
         "requestBody": {
           "content": {
@@ -69393,7 +69479,7 @@
         ]
       },
       "post": {
-        "description": "Meta's events for every connected school. The signature (app secret over the raw body)\nwas checked by the guard; each entry is routed by its WABA id to one school, its events are\nstored (encrypted, deduplicated) and the worker applies them. A replayed delivery and events\nof unknown or disconnected accounts are acknowledged without effect.",
+        "description": "Meta's events for every connected school. The signature (app secret over the raw body)\nwas checked by the guard; each entry is routed by its WABA id to one school, its events are\nstored (encrypted, deduplicated) and the worker applies them. A replayed delivery and events\nof unknown or disconnected accounts are acknowledged without effect. A suspended school's\naccount: only parents' STOP replies are recorded (silently, nothing is sent); everything\nelse is acknowledged without effect (owner decisions D31, D35).",
         "operationId": "meta_webhook_api_v1_webhooks_meta_post",
         "responses": {
           "200": {

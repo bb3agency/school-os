@@ -1,6 +1,6 @@
 # Public edge (TB1): ALB with TLS 1.2+/1.3 (ACM), HTTP->HTTPS redirect, access logs, and WAFv2 with AWS
-# managed rule groups + per-IP rate rules (SEC-022). Only the web/BFF is routed; the API is internal,
-# except the HMAC-authenticated fleet heartbeat endpoint when expose_fleet_heartbeat = true.
+# managed rule groups + per-IP rate rules (SEC-022; public surface SEC-036). Only the web/BFF is
+# routed; the API is internal, except the HMAC-authenticated fleet heartbeat endpoint when expose_fleet_heartbeat = true.
 
 # --- Certificate ------------------------------------------------------------------
 
@@ -239,6 +239,18 @@ locals {
     { name = "AWSManagedRulesSQLiRuleSet", priority = 40, count_rules = [] },
     { name = "AWSManagedRulesLinuxRuleSet", priority = 50, count_rules = [] },
   ]
+
+  # Public surface (SEC-036, docs/07 §11.2): one per-IP rate rule per path group, before the managed
+  # groups. The app adds its own per-IP and per-handle limits behind these (public_lookup_fail,
+  # cert_verify_ip, webhook_route). Webhooks come from Razorpay's and Meta's shared egress addresses,
+  # which carry every school's deliveries, so their limit is higher; a 429 only delays them (both
+  # providers retry). Every limit here is at most waf_rate_limit_per_5min (see variables.tf).
+  path_rate_rules = [
+    # name, priority, limit, URI prefix
+    { name = "rate-limit-public-link", priority = 6, limit = var.waf_public_link_rate_limit_per_5min, prefix = var.waf_public_link_path_prefix },
+    { name = "rate-limit-verify", priority = 7, limit = var.waf_verify_rate_limit_per_5min, prefix = var.waf_verify_path_prefix },
+    { name = "rate-limit-webhook", priority = 8, limit = var.waf_webhook_rate_limit_per_5min, prefix = var.waf_webhook_path_prefix },
+  ]
 }
 
 resource "aws_wafv2_web_acl" "this" {
@@ -446,6 +458,58 @@ resource "aws_wafv2_web_acl" "this" {
       cloudwatch_metrics_enabled = true
       metric_name                = "${var.name}-block-oversized-non-json-body"
       sampled_requests_enabled   = true
+    }
+  }
+
+  # Parent link pages (/p/), certificate verification pages (/v/, on the verify host) and provider
+  # webhooks (/api/v1/webhooks/): per-IP rate rules answering 429 like the ones above (SEC-036).
+  dynamic "rule" {
+    for_each = local.path_rate_rules
+    content {
+      name     = rule.value.name
+      priority = rule.value.priority
+
+      # 429 problem+json with Retry-After (RFC 6585, RFC 9110), like the app's own limits (P2-07).
+      action {
+        block {
+          custom_response {
+            response_code            = 429
+            custom_response_body_key = "rate_limited"
+            response_header {
+              name  = "Retry-After"
+              value = tostring(var.waf_rate_window_sec)
+            }
+          }
+        }
+      }
+
+      statement {
+        rate_based_statement {
+          limit                 = rule.value.limit
+          aggregate_key_type    = "IP"
+          evaluation_window_sec = var.waf_rate_window_sec
+
+          scope_down_statement {
+            byte_match_statement {
+              search_string         = rule.value.prefix
+              positional_constraint = "STARTS_WITH"
+              field_to_match {
+                uri_path {}
+              }
+              text_transformation {
+                priority = 0
+                type     = "LOWERCASE"
+              }
+            }
+          }
+        }
+      }
+
+      visibility_config {
+        cloudwatch_metrics_enabled = true
+        metric_name                = "${var.name}-${rule.value.name}"
+        sampled_requests_enabled   = true
+      }
     }
   }
 

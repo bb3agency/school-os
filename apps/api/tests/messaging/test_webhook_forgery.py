@@ -29,6 +29,7 @@ from app.messaging import service
 from app.messaging.providers.fake import STATE
 from app.messaging.webhook import signature
 from app.public import guards
+from app.public import service as public
 
 pytestmark = pytest.mark.db
 M = sys.modules["sos_test_messaging_support"]
@@ -202,3 +203,77 @@ def test_D31_a_suspended_schools_waba_stores_nothing(
     service.process_inbox(world.a.tenant_id)
     assert _events(admin_engine, wamid) == 0
     assert _state(admin_engine, message_id) == before
+
+
+def test_D35_a_suspended_school_records_stop_silently_and_drops_everything_else(
+    world: Any, api: Any, admin_engine: Engine, fake_state: Any
+) -> None:
+    """Owner decision D35 (ADR-0043 / ADR-0047 follow-up; FR-MSG-010): while suspended, a
+    parent's STOP is recorded at once (opt-outs, links revoked) but nothing is sent, not even
+    the confirmation, and not after reactivation either; statuses, JOIN and other messages are
+    dropped as before (D31)."""
+    message_id, waba, wamid, _ = _sent(world, api)
+    before = _state(admin_engine, message_id)
+    _, guardian, mobile = M.guardian(world.a)
+    assert mobile is not None
+    assert M.opt_in(api, world.person("office_staff"), guardian, "notices").status_code == 201
+    with tenant_session(world.a.tenant_id) as db:
+        link = public.issue_handle(
+            db,
+            kind="parent_notice",
+            target_type="notice",
+            target_id=uuid.uuid4(),
+            guardian_id=guardian,
+        )
+    sent_before = len(STATE.sent)
+    stop = M.inbound(waba, "91" + mobile, text_body="STOP")
+    _set_status(admin_engine, world.a.tenant_id, "suspended")
+    try:
+        for payload in (
+            stop,
+            M.inbound(waba, "91" + mobile, text_body="When is the exam?"),
+            M.inbound(waba, "91" + mobile, text_body="JOIN 4F7K2Q"),
+            M.status(waba, wamid, "read"),
+        ):
+            assert M.post(api.client, payload).status_code == 200
+        # Meta retries the same STOP (a new delivery, same message): recorded once.
+        retry = json.loads(json.dumps(stop))
+        retry["entry"][0]["changes"][0]["value"]["metadata"]["display_phone_number"] = "91900"
+        assert M.post(api.client, retry).status_code == 200
+        service.process_inbox(world.a.tenant_id)
+    finally:
+        _set_status(admin_engine, world.a.tenant_id, "active")
+    stops = M.rows(
+        admin_engine,
+        "SELECT category, status FROM msg.optins WHERE guardian_id = :g "
+        "AND method = 'whatsapp_stop'",
+        g=guardian,
+    )
+    assert sorted(r["category"] for r in stops) == ["attendance", "fees", "notices"]
+    assert all(r["status"] == "opted_out" for r in stops)
+    handle = M.rows(
+        admin_engine,
+        "SELECT revoked_reason FROM core.public_handles WHERE id = :i",
+        i=link.handle_id,
+    )
+    assert handle == [{"revoked_reason": "opted_out"}]
+    inbound = M.rows(
+        admin_engine,
+        "SELECT kind, replied, outcome FROM msg.inbound_events WHERE tenant_id = :t "
+        "AND outcome = 'stopped_while_suspended'",
+        t=world.a.tenant_id,
+    )
+    assert inbound == [{"kind": "stop", "replied": False, "outcome": "stopped_while_suspended"}]
+    # Nothing else was stored: the status update is not applied, now or after reactivation.
+    assert _events(admin_engine, wamid) == 0
+    service.process_inbox(world.a.tenant_id)
+    assert _state(admin_engine, message_id) == before
+    # Nothing was sent or queued: no confirmation, no auto-reply.
+    assert len(STATE.sent) == sent_before
+    queued = M.rows(
+        admin_engine,
+        "SELECT count(*) AS n FROM msg.messages WHERE guardian_id = :g "
+        "AND purpose = 'optin_stopped'",
+        g=guardian,
+    )
+    assert queued == [{"n": 0}]

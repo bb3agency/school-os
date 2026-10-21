@@ -51,3 +51,7 @@ Built as decided in migration `0055_public_handles` and `app/public/` (the numbe
 ## Owner decision (2026-10-18): STOP from parents of suspended schools
 
 Wave R2-1C proposed amending decision 2 so that `meta_waba` handles of suspended schools resolve and a parent's STOP is applied during the suspension. The owner declined: **decision 2 stands**. A suspended school's webhooks get the uniform answer, Meta retries delivery for up to 7 days, and an opt-out sent during the suspension is applied only when the school is reactivated within that window (docs/18 §8 D31). SchoolOS sends nothing to parents of a suspended school in any case.
+
+## Lead decision (2026-10-21): STOP recorded while suspended (D35)
+
+D35 amends the owner decision above for one case. `core.resolve_public_handle` now also resolves `meta_waba` handles while the school is `suspended` (migration `0063_r2_closeout`; same signature, owner `sos_definer` and `sos_app`-only grant; an offboarding or deleted school still resolves nothing), so the Meta webhook can reach a suspended school. The messaging service then records **only** inbound STOP replies, silently, and drops every other event; nothing is sent (ADR-0043 follow-up 2026-10-21). Receipts and certificate codes keep resolving while suspended as before; parent notice, dues and opt-in links still do not.

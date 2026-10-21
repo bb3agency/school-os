@@ -34,6 +34,7 @@ from app.core.records import RecordTable
 from app.fees import _common as c
 from app.fees import (
     approvals,
+    ask,
     ledger,
     online,
     parent_pages,
@@ -155,6 +156,15 @@ erase_statement_narrations = statements.erase_old_narrations
 
 
 # --- data contract for other modules (R2-2F Ask, R2-3G sending, R2-3H parent pages) -------------
+
+# R2-4: Ask's get_fee_dues on the fee ledger (FR-KB-044, US-2112): finance.read school-wide,
+# 404 module_hidden while fees are off; amounts and display fields only.
+AskStudentFees = ask.AskStudentFees
+AskSchoolFees = ask.AskSchoolFees
+AskClassFees = ask.AskClassFees
+AskInstalment = ask.AskInstalment
+ask_student_fees = ask.student_fees
+ask_school_fees = ask.school_fees
 
 
 def enabled(session: Session, tenant_id: uuid.UUID) -> bool:
@@ -482,6 +492,10 @@ __all__ = [
     "RENDER_EVENT",
     "RENDER_TASK",
     "REPORT",
+    "AskClassFees",
+    "AskInstalment",
+    "AskSchoolFees",
+    "AskStudentFees",
     "DayClosed",
     "ModuleHidden",
     "ParentDues",
@@ -494,6 +508,8 @@ __all__ = [
     "ReminderDue",
     "SelfApprovalForbidden",
     "account_summary",
+    "ask_school_fees",
+    "ask_student_fees",
     "create_payment_intent",
     "dues_for_student",
     "enabled",

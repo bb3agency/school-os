@@ -297,6 +297,11 @@ class PerfectStub(_ConversationOracle):
         """The answer key: the exact figure from the linked ledgers, or no figure at all."""
         if case.expect_refusal or case.expected_total is None:
             return FeeResult(text=REFUSALS[case.locale])
+        if case.fees_on:
+            lines = [f"Fee balance from the fee ledger: {inr(case.expected_total)}."]
+            if case.student is None:
+                lines += [f"Class {k}: {inr(v)}." for k, v in case.class_totals().items()]
+            return self._fee_answer(case, lines)
         return self._fee_answer(
             case, [f"Fee due from Tally: {inr(case.expected_total)} (linked ledgers only)."]
         )

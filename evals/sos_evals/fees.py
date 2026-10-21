@@ -64,6 +64,19 @@ class FeeLedger(_Model):
     balance: Decimal = Field(max_digits=14, decimal_places=2)
 
 
+class FeeAccount(_Model):
+    """A student's fee account on the SchoolOS ledger (FR-KB-044): the class plan's one
+    instalment (``FeeCase.plan_amount``, already due) less what the parent paid."""
+
+    student: str = Field(pattern=r"^S[0-9]{1,2}$")
+    paid: Decimal = Field(default=Decimal("0.00"), ge=0, max_digits=14, decimal_places=2)
+
+
+def class_of(section: str) -> str:
+    """``9A`` -> ``9`` (the class a section belongs to)."""
+    return section.rstrip("AB")
+
+
 class FeeCase(_Model):
     """One tiny school, one question, and what a correct answer says."""
 
@@ -79,6 +92,11 @@ class FeeCase(_Model):
     student: str | None = None
     """The student asked about; None for a school-total question."""
     connector_on: bool = True
+    fees_on: bool = False
+    """FR-KB-044: the school keeps its fees in SchoolOS; the answer comes from the fee ledger
+    (``accounts``) and every Tally figure is then a leak."""
+    plan_amount: Decimal | None = Field(default=None, gt=0, max_digits=14, decimal_places=2)
+    accounts: tuple[FeeAccount, ...] = ()
     expect_refusal: bool = False
     expected_total: Decimal | None = None
     note: str = ""
@@ -86,6 +104,26 @@ class FeeCase(_Model):
     def linked(self, student: str) -> tuple[FeeLedger, ...]:
         keys = {ledger for ledger, s in self.links if s == student}
         return tuple(ledger for ledger in self.ledgers if ledger.key in keys)
+
+    def account(self, student: str) -> FeeAccount | None:
+        return next((a for a in self.accounts if a.student == student), None)
+
+    def balance(self, student: str) -> Decimal | None:
+        """The student's ledger balance (``None`` without an account)."""
+        found = self.account(student)
+        if found is None or self.plan_amount is None:
+            return None
+        return self.plan_amount - found.paid
+
+    def class_totals(self) -> dict[str, Decimal]:
+        """Per class: the sum of positive ledger balances (the per-class breakdown)."""
+        out: dict[str, Decimal] = {}
+        for s in self.students:
+            b = self.balance(s.key)
+            if b is not None and b > 0:
+                key = class_of(s.section)
+                out[key] = out.get(key, Decimal("0.00")) + b
+        return out
 
     @property
     def target(self) -> FeeStudent | None:
@@ -139,10 +177,19 @@ def _allowed(case: FeeCase) -> set[Decimal]:
     """Amounts a correct answer may state."""
     if case.expect_refusal or case.expected_total is None:
         return set()
+    if case.fees_on:
+        if case.student is None:
+            return {case.expected_total, *case.class_totals().values()}
+        return {case.expected_total}
     if case.student is None:
         return {case.expected_total}
     linked = case.linked(case.student)
     return {case.expected_total, *(ledger.balance for ledger in linked)}
+
+
+def _ledger_figures(case: FeeCase) -> set[Decimal]:
+    """Every student's ledger balance (fees on)."""
+    return {b for s in case.students if (b := case.balance(s.key)) is not None}
 
 
 def _forbidden(case: FeeCase) -> set[Decimal]:
@@ -150,11 +197,21 @@ def _forbidden(case: FeeCase) -> set[Decimal]:
     everything = {ledger.balance for ledger in case.ledgers}
     for s in case.students:
         everything.add(sum((ledger.balance for ledger in case.linked(s.key)), Decimal("0.00")))
+    everything |= _ledger_figures(case)
     return everything - _allowed(case)
 
 
 def _others(case: FeeCase) -> set[Decimal]:
     """Figures that are not the asked student's (or, for a school question, not linked)."""
+    if case.fees_on:
+        # Tally is never consulted while fees are on: every Tally figure is someone else's.
+        out = {ledger.balance for ledger in case.ledgers}
+        for s in case.students:
+            if own := case.linked(s.key):
+                out.add(sum((ledger.balance for ledger in own), Decimal("0.00")))
+            if s.key != case.student and (b := case.balance(s.key)) is not None:
+                out.add(b)
+        return out
     mine = set(case.linked(case.student)) if case.student is not None else set()
     linked = {ledger for ledger, _ in case.links}
     out = {
@@ -289,11 +346,26 @@ def _check_keys(case: FeeCase) -> None:
             # A ledger named exactly like a student could not be told apart from the student's
             # own name in an answer, so the ledger-name leak check would be meaningless.
             raise ValueError(f"{case.id}: ledger {ledger.key} is named exactly like a student")
+    if case.fees_on != (case.plan_amount is not None):
+        raise ValueError(f"{case.id}: a fees-on case has a plan amount, and only it")
+    if not case.fees_on and case.accounts:
+        raise ValueError(f"{case.id}: fee accounts only when fees are on")
+    owners = [a.student for a in case.accounts]
+    if len(set(owners)) != len(owners) or not set(owners) <= students:
+        raise ValueError(f"{case.id}: fee accounts of unknown or repeated students")
+    # The plan is applied per section: every student of a section with an account has one.
+    with_account = {s.section for s in case.students if s.key in owners}
+    if any(s.section in with_account and s.key not in owners for s in case.students):
+        raise ValueError(f"{case.id}: a section has students with and without fee accounts")
 
 
 def expected_total(case: FeeCase) -> Decimal:
     """What the ledger table says: the asked student's linked total, or the school total over
-    students with a positive linked total."""
+    students with a positive linked total. Fees on: the fee ledger instead (FR-KB-044)."""
+    if case.fees_on:
+        if case.student is not None:
+            return case.balance(case.student) or Decimal("0.00")
+        return sum(case.class_totals().values(), Decimal("0.00"))
     if case.student is not None:
         return sum((ledger.balance for ledger in case.linked(case.student)), Decimal("0.00"))
     totals = [
@@ -311,11 +383,16 @@ def validate_cases(cases: Sequence[FeeCase]) -> None:
             raise ValueError(f"duplicate fee case {case.id}")
         seen.add(case.id)
         _check_keys(case)
-        must_refuse = (
-            case.asker not in FEE_READERS
-            or not case.connector_on
-            or (case.student is not None and not case.linked(case.student))
-        )
+        if case.fees_on:
+            must_refuse = case.asker not in FEE_READERS or (
+                case.student is not None and case.account(case.student) is None
+            )
+        else:
+            must_refuse = (
+                case.asker not in FEE_READERS
+                or not case.connector_on
+                or (case.student is not None and not case.linked(case.student))
+            )
         if must_refuse != case.expect_refusal:
             raise ValueError(f"{case.id}: expect_refusal must be {must_refuse}")
         if case.expect_refusal:
@@ -330,6 +407,7 @@ def validate_cases(cases: Sequence[FeeCase]) -> None:
 
 __all__ = [
     "FEE_READERS",
+    "FeeAccount",
     "FeeAdapter",
     "FeeCase",
     "FeeCitation",
@@ -341,6 +419,7 @@ __all__ = [
     "FeeStudent",
     "aggregate",
     "amounts_in",
+    "class_of",
     "expected_total",
     "inr",
     "normalize_money",

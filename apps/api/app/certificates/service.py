@@ -79,6 +79,7 @@ from app.certificates.schemas import (
     PublicCertificateOut,
     PublicDuplicate,
     ReasonIn,
+    TcFeeNote,
     VerificationOut,
     VerificationReasonIn,
 )
@@ -102,6 +103,7 @@ from app.core.records import RecordTable
 from app.core.redaction import contains_full_aadhaar
 from app.documents import service as documents
 from app.dq import service as dq
+from app.fees import service as fees
 from app.identity import service as identity
 from app.identity.principal import STEP_UP_MAX_AGE
 from app.notifications import service as notifications
@@ -925,7 +927,34 @@ def preview(
     permission ``certificate.issue``; 404 outside scope). Nothing is written or audited."""
     if not _in_reach(_reach(session, ctx, [ISSUE]), student_id):
         raise NotFound("Student not found")
-    return _preview_out(_record(session, ctx, student_id, certificate_type), ctx)
+    out = _preview_out(_record(session, ctx, student_id, certificate_type), ctx)
+    if certificate_type == "transfer":
+        out = out.model_copy(update={"fee_note": _fee_note(session, ctx, student_id)})
+    return out
+
+
+FINANCE_READ: Final = "finance.read"
+
+
+def _fee_note(session: Session, ctx: UserContext, student_id: uuid.UUID) -> TcFeeNote | None:
+    """FR-CERT-025 (US-2005; ADR-0042 decision 13; D16): the outstanding balance as a note for
+    a caller holding ``finance.read`` school-wide while fees are on; ``None`` otherwise or
+    without a fee account. Information only: it never enters ``fields``, ``blockers`` or the
+    frozen content, so it is never printed and never stops issue or approval (FR-FEE-030)."""
+    if not (ctx.has(FINANCE_READ) and ctx.scope_for(FINANCE_READ).school_wide):
+        return None
+    if not fees.enabled(session, ctx.tenant_id):
+        return None
+    found = fees.account_summary(session, [student_id]).get(student_id)
+    if found is None or found.balance <= 0:
+        return None
+    return TcFeeNote(
+        balance=found.balance,
+        overdue=found.overdue,
+        oldest_due_on=found.oldest_due_on,
+        last_payment_on=found.last_payment_on,
+        account_id=found.account_id,
+    )
 
 
 # --- inputs --------------------------------------------------------------------------------------
