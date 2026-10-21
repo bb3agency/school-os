@@ -479,6 +479,10 @@ Every LLM role runs on Google Gemini through Vertex AI in `asia-south1` (ADR-003
 
 **Local development:** the fake providers need no network; `scripts/dev.py` sets `SOS_PUBLIC_BASE_URL=http://localhost:3000` under `next dev` (http allowed only locally, like `FILES_ORIGIN`) and the web serves the `(public)` group on `/p` and `/v` of the same origin locally only. Razorpay and Meta sandbox testing uses Razorpay test mode and Meta's test numbers in staging, never real parent numbers (invariant 11).
 
+### 11.3 R3 planned settings and infrastructure (none new)
+
+**Status: planned (R3; ADR-0048..ADR-0053; lead decision D46).** R3 adds **no `SOS_*` setting**: targets, clocks, lead days, formats and catalogues are versioned YAML inside the package (`app/privacy/*.yaml`, `app/disclosure/formats/`, `app/rte/config/`, `app/dq/config/portal_calendar.yaml`; invariant 13). The disclosure page is served on the existing parent origin (`SOS_PUBLIC_BASE_URL`; a dedicated host's public host) under `/d/`; the WAF rate rule planned for `/p/` and `/v/` (SEC-036) covers `/d/` as well. New worker schedules (beat): `privacy.due_reminders` (07:00 IST), `privacy.pull_processor_notices` (every minute, shared deployment only), `privacy.breach_reminders` (every 15 minutes), `dq.portal_reminders` (07:30 IST). Access reports and consent-form PDFs use the existing `pdf` queue and the school's `exports/` prefix.
+
 ## 12. Cost management
 
 - AWS Budgets with alerts at 50/80/100% per account; anomaly detection on.

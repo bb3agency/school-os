@@ -89,6 +89,13 @@ Each release is a set of user stories that ships whole (tests, authz/BOLA, audit
 3. **RTE 25% register:** lottery reference, documents, reimbursement claim tracking.
 4. **Readiness reminders** tied to the portal calendar (UDISE+ freeze, SSC window, CBSE registration).
 
+**R3 as designed (2026-10-21; lead decisions D36-D46, the owner may revisit).** Item 1 is ADR-0048 (templates in [`docs/legal/`](legal/README.md), notice records, one register for data-principal requests and grievances with a 7-day due date, access reports released by a second person, erasure only where lawful by record class), ADR-0049 (a consent register for optional purposes beside APAAR and WhatsApp opt-ins) and ADR-0050 (SchoolOS incident records and each school's breach register with the CERT-In, Board and family clocks). Item 2 is ADR-0051 (a published, frozen snapshot at an opaque link on the parent origin plus an HTML/PDF file for the school's website; no student data). Item 3 is ADR-0052, **designed but not scheduled** because D10 left the RTE register out of this year (D43). Item 4 is ADR-0053 (an unverified portal calendar the school confirms; staff tasks and in-app reminders with readiness counts). Stories: docs/02 C26-C31; requirements: docs/03 §3.26-§3.30; **build waves, test plan and definition of done: docs/14 "R3"**.
+
+| Wave | Agents in parallel | Content |
+|---|---|---|
+| R3-1 | 4 | A privacy requests, notices, record classes, access reports and erasure · B consents and breach handling · C CBSE disclosure · D portal calendar |
+| R3-2 | 1 (+1 if D10 is reopened) | F hardening · E RTE register only if the owner reopens D10 |
+
 ### R4 · Commercial and growth (alongside R1-R3)
 
 - Plan catalogue revisited against research pricing (Q6): today ₹15,000 one-time + ₹4,999/month (ADR-0038) is about ₹120/student/year at 500 students but ₹200 at 300 students. Possible entry tier "Records & Readiness" sold beside an existing ERP.
@@ -167,12 +174,28 @@ The same pattern as waves 1-6: small waves of agents on `wip/*` branches, each s
 
 D12-D30 were given on 2026-10-14 by accepting every proposed answer to the R2 questions (docs/14 "Owner decisions on the R2 questions"). Nothing is open.
 
+**Lead decisions on R3 (2026-10-21).** The owner asked the lead engineer not to put questions to him; the lead decided these and the owner may revisit any of them (details and reasons: docs/14 "Lead decisions on R3", ADR-0048..ADR-0053).
+
+| # | Question | Lead decision | Effect on the plan |
+|---|---|---|---|
+| D36 | Legal templates | Versioned Markdown with placeholders in `docs/legal/`, "not legal advice", open points "(to confirm)"; the app ships the school-facing notices and letters with the same version | ADR-0048 |
+| D37 | Data-principal requests and grievances | One register, recorded verification, due at most 7 days after receipt, encrypted texts; records kept 3 years after closing (default, to confirm) | ADR-0048; FR-DPDP-005..007 |
+| D38 | Access reports | Released by a second person with step-up, handed over by the school; SchoolOS sends nothing | ADR-0048; PRV-031 |
+| D39 | Erasure | Only where the record-class catalogue allows; official registers, certificates, 8-year financial records and audit refused with the reason | ADR-0048; PRV-032 |
+| D40 | Consents | Separate register for optional purposes plus one view with APAAR and WhatsApp opt-ins | ADR-0049 |
+| D41 | Breaches | Control-plane incidents (no personal data, 2P) pulled into each school's breach register with clocks; templates, never automatic sending | ADR-0050 |
+| D42 | Appendix IX page | Frozen snapshot at an opaque `school_disclosure` link on the parent origin plus an HTML/PDF file; CBSE only; no student data | ADR-0051 (amends ADR-0047) |
+| D43 | RTE register | Designed, not scheduled while D10 stands | ADR-0052; docs/14 R3-2E |
+| D44 | RTE status | C3, `rte.read` only, never in prints, messages, parent pages or Ask; concession only requested | ADR-0052 |
+| D45 | Portal reminders | Unverified calendar confirmed by the school; staff tasks and in-app reminders at 30/14/7/1 days with readiness counts; nothing to parents | ADR-0053 |
+| D46 | Schemas and settings | No new schema, no new `SOS_*` setting, migrations from `0064` | docs/05 §16 |
+
 ### Resulting release scope
 
 - **R0 (code side only):** fix the stale roadmap status; keep CI workflows passing locally; nothing that spends cloud money.
 - **R1:** BSEAP SSC Class 9/10 readiness (diff, fix-owner, parent verification slip, class dashboard); UDISE+ 2026-27 profile with PEN and transfer-in-by-PEN guard; APAAR consent register and failure list; CBSE registration profile (Class 9/11, LOC 10/12, APAAR mandatory); CISCE registration profile refreshed to current norms; import template library and "alongside your current ERP" mode.
 - **R2:** AP TC format and public certificate verification; fee ledger, receipts, UPI QR/UTR matching, Razorpay payment links; WhatsApp utility templates via Meta Cloud API with opt-in, parent language per school, mobile web landing pages; Ask-the-school finish-up (the conversation screens were already built; see §2).
-- **R3:** DPDP processor pack; CBSE Appendix IX page; portal-calendar readiness reminders.
+- **R3:** DPDP processor pack; CBSE Appendix IX page; portal-calendar readiness reminders. (The RTE register is designed as ADR-0052 but stays out of the build while D10 stands; D43.)
 
 ## 9. Progress
 
@@ -183,4 +206,4 @@ D12-D30 were given on 2026-10-14 by accepting every proposed answer to the R2 qu
 | R2-3G | **Built 2026-10-18** (`wip/r2-messaging-sends`, `0061_messaging_sends`): WhatsApp notice broadcasts with preview and cost, absence alerts, fee reminders, receipt messages, quiet hours, daily cap, retries, delivery reports; nothing sent while suspended (D31); not built: bulk reminders and payment links from the dues list, "Send on WhatsApp" at the counter, the reminder-offset editor, link revocation on notice withdrawal (wave R2-3J) |
 | R2-3H | **Built 2026-10-18** (`wip/r2-parent-pages`, no migration): parent notice, receipt, dues and opt-in pages on the parent origin, the receipt and notice PDF, "Pay online" through the school's Razorpay link with a return page, the UPI QR on the dues page, the parent's message language on the opt-in page; explicit field allowlists and the uniform 404 (docs/14 R2-3H status) |
 | R2-3I | **Built 2026-10-21** (`wip/r2-hardening`, no migration): public-surface and webhook security suites, log redaction for credentials and identifiers, Playwright journeys for the counter and the parent pages, the R2 docs moved to "as built", the penetration-test scope (docs/14 R2-3I status) |
-| R3 | Not started |
+| R3 | **Documented 2026-10-21** (`wip/r3-docs`): ADR-0048 DPDP processor pack and data-principal requests, ADR-0049 consents for optional purposes, ADR-0050 breach handling, ADR-0051 CBSE Appendix IX disclosure (amends ADR-0047), ADR-0052 RTE register (designed, not scheduled while D10 stands), ADR-0053 portal calendar (all accepted by the lead, D36-D46); legal templates in `docs/legal/` (not legal advice, D30); PRD C26-C31 (US-2601..US-3104); TRD §3.26-§3.30 (FR-DPDP, FR-DISC, FR-RTE, FR-RDY; NFR-PRV-006/007, NFR-SEC-008, NFR-PERF-012); data model docs/05 §16; security docs/07 §6.8, §11.3, SEC-049..052; privacy docs/08 §16, PRV-030..038; API docs/09 R3 endpoints; settings docs/10 §11.3 (none new); screens docs/17 §5.10; build waves R3-1A..D, R3-2E (gated), R3-2F, migrations `0064`-`0068`, test plan and definition of done in docs/14 R3. Not built. |
