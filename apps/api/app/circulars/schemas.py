@@ -15,7 +15,8 @@ from app.core.textnorm import nfc
 ReadingStatus = Literal["not_read", "queued", "running", "ready", "needs_review"]
 SuggestionStatus = Literal["suggested", "confirmed", "dismissed"]
 TaskStatus = Literal["open", "in_progress", "done", "cancelled"]
-TaskSource = Literal["manual", "circular"]
+# portal_calendar: made by the portal reminder job (R3-1D, FR-RDY-006; ADR-0053).
+TaskSource = Literal["manual", "circular", "portal_calendar"]
 TaskView = Literal["mine", "all"]
 DueWindow = Literal["overdue", "week", "later"]
 NoticeStatus = Literal["drafting", "draft", "draft_failed", "approved", "withdrawn"]
@@ -157,6 +158,10 @@ class TaskOut(_Out):
     status: TaskStatus
     overdue: bool
     source: TaskSource
+    portal_event_key: str | None = Field(
+        default=None,
+        description="The portal calendar event of a portal task (source portal_calendar).",
+    )
     document_id: uuid.UUID | None
     citation: CitationOut | None = Field(
         description="Where the task comes from; hidden when you cannot see that circular."

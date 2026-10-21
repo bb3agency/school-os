@@ -39,6 +39,9 @@ REQUIRED = {
     "insights.flag_overdue",
 }
 NUMERIC = {
+    # R3-1A privacy.requests_due
+    "due",
+    "overdue",
     "blockers",
     "warnings",
     "valid_rows",

@@ -15,8 +15,8 @@ DELETE for ``sos_purger``; ADR-0013, ADR-0029):
   ``pending``, ``withdrawn``), the rules of ``sis.apaar_consents`` (``seq`` per student and
   purpose, ``given`` only with the signed form, a decision names who decided and the date on the
   form). ``privacy_request_id`` names the withdrawal request of the privacy register (R3-1A,
-  ``ops.privacy_requests``); its composite FK is added when that table exists (lead re-chains
-  the waves at merge). ``sos_app`` has SELECT and INSERT only; a trigger refuses UPDATE and
+  ``ops.privacy_requests``; composite FK ``consents_privacy_request_fk``: the table is new, so
+  no existing row can violate it). ``sos_app`` has SELECT and INSERT only; a trigger refuses UPDATE and
   DELETE outside the offboarding purge.
 - ``ops.breach_records``: the school's breach register, ``origin`` ``school`` or
   ``processor_notice`` (pulled from ``platform.incident_schools``; ``platform_incident_id`` is a
@@ -40,8 +40,9 @@ decision 1):
   the window, when the school was notified and when its worker pulled the notice.
 
 Also: ``ops.exports.kind`` gains ``consent_forms`` (print job: no profile, no columns, PDF only;
-FR-DPDP-023), and the permission catalog gets ``consent.read``, ``consent.record``,
-``privacy.breach.read``, ``privacy.breach.manage`` (step-up), ``platform.incidents.read`` and
+FR-DPDP-023), next to 0066's ``subject_report`` and ``privacy_notice`` (``exports_students_count``
+already treats it like every other print job), and the permission catalog gets
+``consent.read``, ``consent.record``, ``privacy.breach.read``, ``privacy.breach.manage`` (step-up), ``platform.incidents.read`` and
 ``platform.incidents.manage`` (step-up, two operators). Role grants of existing schools change
 only with the post-migration system-role sync (ADR-0022).
 
@@ -50,7 +51,7 @@ incident records), deletes the consent-form print jobs and restores the export C
 removes the catalog keys no role holds.
 
 Revision ID: 0067_consents_breach
-Revises: 0062_messaging_finish
+Revises: 0066_privacy_requests
 Create Date: 2026-10-21
 """
 
@@ -60,7 +61,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "0067_consents_breach"
-down_revision = "0062_messaging_finish"
+down_revision = "0066_privacy_requests"
 branch_labels = None
 depends_on = None
 
@@ -133,6 +134,8 @@ CREATE TABLE sis.consents (
   CONSTRAINT consents_recorded_by_fk FOREIGN KEY (recorded_by) REFERENCES core.users (id),
   CONSTRAINT consents_membership_fk FOREIGN KEY (tenant_id, recorded_by_membership)
     REFERENCES core.memberships (tenant_id, id),
+  CONSTRAINT consents_privacy_request_fk FOREIGN KEY (tenant_id, privacy_request_id)
+    REFERENCES ops.privacy_requests (tenant_id, id),
   CONSTRAINT consents_status_check CHECK (status IN ('given','refused','pending','withdrawn')),
   CONSTRAINT consents_relationship_check
     CHECK (relationship IS NULL OR relationship IN ('father','mother','guardian')),
@@ -150,6 +153,8 @@ CREATE INDEX consents_evidence_idx ON sis.consents (tenant_id, evidence_document
   WHERE evidence_document_id IS NOT NULL;
 CREATE INDEX consents_guardian_idx ON sis.consents (tenant_id, guardian_id)
   WHERE guardian_id IS NOT NULL;
+CREATE INDEX consents_privacy_request_idx ON sis.consents (tenant_id, privacy_request_id)
+  WHERE privacy_request_id IS NOT NULL;
 
 CREATE FUNCTION sis.tg_consents_append_only() RETURNS trigger
 LANGUAGE plpgsql AS $$
@@ -374,36 +379,40 @@ EXPORTS_UP = r"""
 ALTER TABLE ops.exports DROP CONSTRAINT exports_kind_check;
 ALTER TABLE ops.exports ADD CONSTRAINT exports_kind_check CHECK (kind IN (
   'board_precheck','portal_precheck','student_list','readiness_slips','apaar_consent_forms',
-  'consent_forms'));
+  'subject_report','privacy_notice','consent_forms'));
 ALTER TABLE ops.exports DROP CONSTRAINT exports_kind_shape;
 ALTER TABLE ops.exports ADD CONSTRAINT exports_kind_shape CHECK (
   (kind = 'student_list' AND profile_key IS NULL AND profile_version IS NULL
      AND columns IS NOT NULL AND cardinality(columns) BETWEEN 1 AND 60)
   OR (kind IN ('board_precheck','portal_precheck','readiness_slips')
      AND profile_key IS NOT NULL AND profile_version IS NOT NULL AND columns IS NULL)
-  OR (kind IN ('apaar_consent_forms','consent_forms')
+  OR (kind IN ('apaar_consent_forms','subject_report','privacy_notice','consent_forms')
      AND profile_key IS NULL AND profile_version IS NULL AND columns IS NULL));
 ALTER TABLE ops.exports DROP CONSTRAINT exports_print_formats;
 ALTER TABLE ops.exports ADD CONSTRAINT exports_print_formats CHECK (
-  kind NOT IN ('readiness_slips','apaar_consent_forms','consent_forms')
+  kind NOT IN ('readiness_slips','apaar_consent_forms','subject_report','privacy_notice',
+               'consent_forms')
   OR formats = ARRAY['pdf']::text[]);
 """
 
+# Exactly 0066_privacy_requests' definitions.
 EXPORTS_DOWN = r"""
 ALTER TABLE ops.exports DROP CONSTRAINT exports_print_formats;
 ALTER TABLE ops.exports ADD CONSTRAINT exports_print_formats CHECK (
-  kind NOT IN ('readiness_slips','apaar_consent_forms') OR formats = ARRAY['pdf']::text[]);
+  kind NOT IN ('readiness_slips','apaar_consent_forms','subject_report','privacy_notice')
+  OR formats = ARRAY['pdf']::text[]);
 ALTER TABLE ops.exports DROP CONSTRAINT exports_kind_shape;
 ALTER TABLE ops.exports ADD CONSTRAINT exports_kind_shape CHECK (
   (kind = 'student_list' AND profile_key IS NULL AND profile_version IS NULL
      AND columns IS NOT NULL AND cardinality(columns) BETWEEN 1 AND 60)
   OR (kind IN ('board_precheck','portal_precheck','readiness_slips')
      AND profile_key IS NOT NULL AND profile_version IS NOT NULL AND columns IS NULL)
-  OR (kind = 'apaar_consent_forms'
+  OR (kind IN ('apaar_consent_forms','subject_report','privacy_notice')
      AND profile_key IS NULL AND profile_version IS NULL AND columns IS NULL));
 ALTER TABLE ops.exports DROP CONSTRAINT exports_kind_check;
 ALTER TABLE ops.exports ADD CONSTRAINT exports_kind_check CHECK (kind IN (
-  'board_precheck','portal_precheck','student_list','readiness_slips','apaar_consent_forms'));
+  'board_precheck','portal_precheck','student_list','readiness_slips','apaar_consent_forms',
+  'subject_report','privacy_notice'));
 """
 
 # The owner lifts FORCE for the one DELETE (print-job rows of every school); FORCE is restored

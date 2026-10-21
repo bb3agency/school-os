@@ -29,9 +29,10 @@ answers NFR-SEC-007 and prepares SEC-025.
   live merchant or a real parent's phone.
 - `SOS_PUBLIC_BASE_URL`, `SOS_VERIFY_BASE_URL` (API) and `PUBLIC_BASE_URL`, `VERIFY_BASE_URL` (web)
   set to staging hosts, separate from the staff host (D29).
-- Known gap to confirm or close first: the WAF has rate rules for `/bff/auth/` and the machine
-  paths (`/api/v1/fleet/`, `/api/v1/edge/`) but none yet for `/p/`, `/v/` or `/api/v1/webhooks/`
-  (`infra/terraform/modules/alb_waf`; SEC-036). The application limits below apply either way.
+- The WAF has per-IP rate rules for `/bff/auth/`, the machine paths (`/api/v1/fleet/`,
+  `/api/v1/edge/`) and, since R2-4, `/p/`, `/v/` and `/api/v1/webhooks/`
+  (`infra/terraform/modules/alb_waf`; SEC-036); confirm they are applied on staging. The
+  application limits below apply either way.
 
 ## 2. In scope
 

@@ -68,6 +68,13 @@ roles:
       consent.read: school
       privacy.breach.read: school
       privacy.breach.manage: school_step_up
+      # R3-1C CBSE disclosure (ADR-0051; docs/07 §6.2)
+      disclosure.edit: school
+      disclosure.publish: school_step_up
+      # R3-1A privacy requests (ADR-0048; docs/07 §6.2)
+      privacy.read: school
+      privacy.request.manage: school
+      privacy.request.decide: school_step_up
 
   principal:
     name_en: Principal
@@ -99,6 +106,7 @@ roles:
       dq.findings.waive: school_step_up
       dq.readiness.read: school
       dq.readiness.manage: school
+      readiness.calendar.manage: school  # R3-1D (ADR-0053)
       document.upload: school
       document.read: school
       document.manage_acl: school
@@ -150,6 +158,13 @@ roles:
       consent.record: school
       privacy.breach.read: school
       privacy.breach.manage: school_step_up
+      # R3-1C CBSE disclosure (ADR-0051; docs/07 §6.2)
+      disclosure.edit: school
+      disclosure.publish: school_step_up
+      # R3-1A privacy requests (ADR-0048; docs/07 §6.2)
+      privacy.read: school
+      privacy.request.manage: school
+      privacy.request.decide: school_step_up
 
   office_admin:
     name_en: Office admin
@@ -176,6 +191,7 @@ roles:
       dq.findings.waive: school_step_up
       dq.readiness.read: school
       dq.readiness.manage: school
+      readiness.calendar.manage: school  # R3-1D (ADR-0053)
       document.upload: school
       document.read: school
       document.manage_acl: school
@@ -205,6 +221,11 @@ roles:
       # R3-1B consents (ADR-0049; docs/07 §6.2)
       consent.read: school
       consent.record: school
+      # R3-1C CBSE disclosure (ADR-0051; docs/07 §6.2)
+      disclosure.edit: school
+      # R3-1A privacy requests (ADR-0048; docs/07 §6.2)
+      privacy.read: school
+      privacy.request.manage: school
 
   office_staff:
     name_en: Office staff
@@ -283,6 +304,7 @@ roles:
       dq.findings.resolve: school
       dq.readiness.read: school
       dq.readiness.manage: school
+      readiness.calendar.manage: school  # R3-1D (ADR-0053)
       document.upload: school
       document.read: school
       kb.ask: school
@@ -357,6 +379,8 @@ roles:
       # R3-1B consents and breaches (ADR-0049, ADR-0050; docs/07 §6.2)
       consent.read: school
       privacy.breach.read: school
+      # R3-1A privacy requests (ADR-0048; docs/07 §6.2)
+      privacy.read: school
 
 # Break-glass support access (docs/07 §6.4, US-103, FR-OPS-004). NOT a system role: it is not
 # cloned at provisioning, not listed for assignment and never assignable by staff. It is created

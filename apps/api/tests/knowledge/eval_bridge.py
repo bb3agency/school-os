@@ -661,6 +661,7 @@ class AppFakeAdapter:
                     is_current=True,
                 ),
             )
+            school.ids["year"] = year.id
             for number, sections in ACADEMIC_STRUCTURE.items():
                 code = CLASS_CODES[number]
                 klass = tenancy.create_class(
@@ -1238,7 +1239,90 @@ class AppFakeAdapter:
                 owner.user_id,
             )
         tally.set_flag(self._admin, school.tenant_id, enabled=case.connector_on)
+        if case.fees_on:
+            self._fee_ledger(school, case, ids)
         return school, ids
+
+    def _fee_ledger(self, school: Any, case: Any, ids: dict[str, uuid.UUID]) -> None:
+        """FR-KB-044: fees on for the school; one GST-exempt head, a plan per class with one
+        instalment of ``plan_amount`` already due, applied to the sections of the students with
+        an account, and a cash receipt for each ``paid`` (all through ``fees.service``)."""
+        from app.core.db import tenant_session
+        from app.fees import service as fees
+        from app.fees.schemas import (
+            FeePlanCreate,
+            HeadCreate,
+            InstalmentIn,
+            PlanApplyIn,
+            PlanLineIn,
+            ReceiptCreate,
+        )
+        from sos_evals.fees import class_of
+
+        support = _load("sos_test_fees_support", TESTS / "fees" / "support.py")
+        support.install()
+        support.enable(self._admin, school.tenant_id)
+        owner = school.people["owner"]
+        accountant = support.ctx(school, owner, "accountant")
+        cashier = support.ctx(school, owner, "office_staff")
+
+        def call(c: Any, fn: Any, *args: Any) -> Any:
+            with tenant_session(school.tenant_id, owner.user_id) as db:
+                return fn(db, c, *args)
+
+        head = call(
+            accountant,
+            fees.create_head,
+            HeadCreate(code="TUI", name="Tuition fee", kind="tuition", gst_exempt=True),
+        ).id
+        due_on = max(dt.date(2026, 6, 1), support.today() - dt.timedelta(days=30))
+        sections: dict[str, set[str]] = {}
+        for s in case.students:
+            if case.account(s.key) is not None:
+                sections.setdefault(class_of(s.section), set()).add(s.section)
+        for number, labels in sorted(sections.items()):
+            plan = call(
+                accountant,
+                fees.create_plan,
+                FeePlanCreate(
+                    academic_year_id=school.ids["year"],
+                    class_id=school.ids[f"class:{number}"],
+                    name=f"Class {number} 2026-27",
+                    lines=[PlanLineIn(head_id=head, annual_amount=case.plan_amount)],
+                    instalments=[
+                        InstalmentIn(
+                            instalment_no=1,
+                            label="Annual fee",
+                            due_on=due_on,
+                            amounts={head: case.plan_amount},
+                        )
+                    ],
+                ),
+            )
+            with tenant_session(school.tenant_id, owner.user_id) as db:
+                plan = fees.activate_plan(db, accountant, plan.id, expected_version=plan.version)
+            call(
+                accountant,
+                fees.apply_plan,
+                plan.id,
+                PlanApplyIn(
+                    section_ids=[school.ids[f"section:{label}"] for label in sorted(labels)],
+                    include_past_instalments=True,
+                ),
+            )
+        for account in case.accounts:
+            if account.paid <= 0:
+                continue
+            with tenant_session(school.tenant_id) as db:
+                account_id: uuid.UUID = db.execute(
+                    text("SELECT id FROM fin.student_fee_accounts WHERE student_id = :s"),
+                    {"s": ids[account.student]},
+                ).scalar_one()
+            call(
+                cashier,
+                fees.issue_receipt,
+                ReceiptCreate(account_id=account_id, amount=account.paid, mode="cash"),
+            )
 
     def ask_fees(self, case: Any) -> Any:
         """One fee case through ``knowledge.service`` (see the module docstring)."""

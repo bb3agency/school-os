@@ -9,6 +9,9 @@ purge_order:
   # references core.public_handles (certificates reference only students, documents and the
   # academic structure, all purged later).
   - certificates
+  # R3-1C (ADR-0051): disclosure rows reference public handles (the draft's link), documents and
+  # their versions (published versions), so they go before public and documents.
+  - disclosure
   # R2-1C (ADR-0043): messaging rows reference public handles, guardians and students, so they
   # go first.
   - messaging
@@ -19,16 +22,21 @@ purge_order:
   # members; breach records reference students, guardians and members (docs/05 §16.7).
   - privacy_consents
   - privacy_breach
+  # R3-1A (ADR-0048): the privacy register references students, guardians, members, documents
+  # and exports, so it goes before all of them (docs/05 §16.7).
+  - privacy
   # R2-0 (ADR-0047): public handles next (they reference guardians and the school's keys'
   # tenant), before students (docs/05 §15.6).
   - public
   - tally
+  # R3-1D (ADR-0053): ops.portal_reminders (dq) references ops.tasks (circulars), so dq goes
+  # before circulars; nothing between them references dq's tables.
+  - dq
   - circulars
   - insights
   - academics
   - knowledge
   - extraction
-  - dq
   - changes
   - apaar
   - students

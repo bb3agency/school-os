@@ -1,0 +1,229 @@
+# Portal and board calendar: the windows in which schools submit or correct data on government
+# and board portals (FR-RDY-001, US-3101, ADR-0053). Loaded and validated by
+# app.dq.calendar.load_calendar() when the API starts.
+#
+# Owner decision D3 (2026-10-10) and lead decision D45 (2026-10-21): every date below is an
+# EXPECTATION built from public, mostly secondary sources (listed per event) and the dates of
+# earlier years. None of them is official and none is verified (`verified: false`). Schools see
+# them as "Expected around ..." until a person at the school confirms the real dates
+# (ops.portal_calendar_dates); a confirmed date always wins over this file.
+#
+# A release per academic year refreshes this file from circulars and pilot schools' confirmations.
+# Dates move every year and differ by state; do not tighten an `approximate` date without a
+# source that says so.
+#
+# Per event:
+#   key           unique in the whole file, ^[a-z][a-z0-9_]{2,63}$ (stored on tasks and reminders)
+#   portal        udise_plus | bseap | cbse | cisce | apaar (the notification names the portal)
+#   label_en/te   what the school calls the window (te shown only with SOS_TELUGU_ENABLED)
+#   profile_keys  readiness or pre-check profiles it concerns (app/dq/config/profiles); the
+#                 reminder carries the readiness counts of those that have a readiness check
+#   boards        the boards it applies to (empty: every school, a portal such as UDISE+)
+#   classes       the classes it applies to (empty: every class)
+#   opens_on, closes_on (YYYY-MM-DD) with opens_approximate / closes_approximate
+#   lead_days     reminders this many days before the window closes (default below)
+#   source        public pages the expectation came from
+#   verified      false until an official document confirms the dates (D3)
+version: 1
+default_lead_days: [30, 14, 7, 1]
+
+portals:
+  udise_plus: {en: "UDISE+", te: "UDISE+"}
+  bseap: {en: "AP SSC board (BSEAP)", te: "AP SSC బోర్డు (BSEAP)"}
+  cbse: {en: "CBSE", te: "CBSE"}
+  cisce: {en: "CISCE", te: "CISCE"}
+  apaar: {en: "APAAR", te: "APAAR"}
+
+years:
+  # Academic year 2026-27 (the school's academic year starting in 2026).
+  "2026-27":
+    - key: udise_plus_2026_freeze
+      portal: udise_plus
+      label_en: UDISE+ 2026-27 student data closes (freeze)
+      label_te: UDISE+ 2026-27 విద్యార్థి వివరాల గడువు (ఫ్రీజ్)
+      profile_keys: [udise-plus, apaar]
+      boards: []
+      classes: []
+      opens_on: 2026-09-01
+      opens_approximate: true
+      closes_on: 2026-11-30
+      closes_approximate: true
+      source:
+        - https://educationforallinindia.com/udise-2026-27-answers-to-the-questions-parents-teachers-and-school-heads-are-actually-asking/
+        - https://circin.ai/blog/udise-plus-2026-27-deadline-apaar-guide
+      verified: false
+
+    - key: apaar_2026_generation_drive
+      portal: apaar
+      label_en: APAAR ID generation drive 2026-27
+      label_te: APAAR ID తయారీ కార్యక్రమం 2026-27
+      profile_keys: [apaar]
+      boards: []
+      classes: []
+      opens_on: 2026-07-01
+      opens_approximate: true
+      closes_on: 2026-12-31
+      closes_approximate: true
+      source:
+        - https://apaar.education.gov.in/
+        - https://circin.ai/blog/udise-plus-2026-27-deadline-apaar-guide
+      verified: false
+
+    - key: cbse_registration_2027
+      portal: cbse
+      label_en: CBSE registration, Class IX and XI (2026-27)
+      label_te: CBSE నమోదు, IX మరియు XI తరగతులు (2026-27)
+      profile_keys: [cbse-registration-2027]
+      boards: [CBSE]
+      classes: [IX, XI]
+      opens_on: 2026-09-01
+      opens_approximate: true
+      closes_on: 2026-10-31
+      closes_approximate: true
+      source:
+        - https://www.cbse.gov.in/cbsenew/cbse.html
+        - https://news.careers360.com/cbse-board-exams-apaar-id-class-9-11-loc-registration-2026-27-two-level-10-maths-social-science-2028/amp
+      verified: false
+
+    - key: cbse_loc_2027
+      portal: cbse
+      label_en: CBSE list of candidates (LOC), Class X and XII, 2027 exams
+      label_te: CBSE అభ్యర్థుల జాబితా (LOC), X మరియు XII తరగతులు, 2027 పరీక్షలు
+      profile_keys: [cbse-loc-2027]
+      boards: [CBSE]
+      classes: [X, XII]
+      opens_on: 2026-09-01
+      opens_approximate: true
+      closes_on: 2026-10-31
+      closes_approximate: true
+      source:
+        - https://www.cbse.gov.in/cbsenew/cbse.html
+        - https://www.freepressjournal.in/education/cbse-board-exams-2026-last-chance-to-submit-data-of-class-9-11-students-today-details-here
+      verified: false
+
+    - key: cisce_registration_2027
+      portal: cisce
+      label_en: CISCE ICSE and ISC candidate registration 2026-27
+      label_te: CISCE ICSE మరియు ISC అభ్యర్థుల నమోదు 2026-27
+      profile_keys: [cisce-registration-2027]
+      boards: [CISCE]
+      classes: [IX, X, XI, XII]
+      opens_on: 2026-10-01
+      opens_approximate: true
+      closes_on: 2026-11-30
+      closes_approximate: true
+      source:
+        - https://www.freepressjournal.in/education/cisce-icse-isc-exams-2027-28-registration-begins-on-careers-portal-check-details-here
+        - https://www.careerindia.com/news/cisce-icse-isc-2027-2028-registration-begins-check-dates-063637.html
+      verified: false
+
+    # For March 2026 the board took the nominal roll from UDISE+ with a three-day correction
+    # window; the next one is expected in February 2027 (docs/18 §1.3).
+    - key: bseap_ssc_2027_nominal_roll
+      portal: bseap
+      label_en: AP SSC March 2027 nominal roll corrections
+      label_te: AP SSC మార్చి 2027 నామినల్ రోల్ సవరణలు
+      profile_keys: [bseap-ssc-2027]
+      boards: [BSEAP]
+      classes: [X]
+      opens_on: 2027-02-01
+      opens_approximate: true
+      closes_on: 2027-02-05
+      closes_approximate: true
+      source:
+        - https://www.tlm4all.com/2026/02/ap-ssc-pe--2026-nominal-rolls-correction.html
+        - https://teachernews.in/submission-nominal-rolls-for-ssc-public/
+      verified: false
+
+  # Academic year 2027-28. The board profiles for the 2028 examinations do not exist yet, so
+  # those events name no profile (no readiness counts) until a release adds them.
+  "2027-28":
+    - key: udise_plus_2027_freeze
+      portal: udise_plus
+      label_en: UDISE+ 2027-28 student data closes (freeze)
+      label_te: UDISE+ 2027-28 విద్యార్థి వివరాల గడువు (ఫ్రీజ్)
+      profile_keys: [apaar]
+      boards: []
+      classes: []
+      opens_on: 2027-09-01
+      opens_approximate: true
+      closes_on: 2027-11-30
+      closes_approximate: true
+      source:
+        - https://educationforallinindia.com/udise-2026-27-answers-to-the-questions-parents-teachers-and-school-heads-are-actually-asking/
+      verified: false
+
+    - key: apaar_2027_generation_drive
+      portal: apaar
+      label_en: APAAR ID generation drive 2027-28
+      label_te: APAAR ID తయారీ కార్యక్రమం 2027-28
+      profile_keys: [apaar]
+      boards: []
+      classes: []
+      opens_on: 2027-07-01
+      opens_approximate: true
+      closes_on: 2027-12-31
+      closes_approximate: true
+      source:
+        - https://apaar.education.gov.in/
+      verified: false
+
+    - key: cbse_registration_2028
+      portal: cbse
+      label_en: CBSE registration, Class IX and XI (2027-28)
+      label_te: CBSE నమోదు, IX మరియు XI తరగతులు (2027-28)
+      profile_keys: []
+      boards: [CBSE]
+      classes: [IX, XI]
+      opens_on: 2027-09-01
+      opens_approximate: true
+      closes_on: 2027-10-31
+      closes_approximate: true
+      source:
+        - https://www.cbse.gov.in/cbsenew/cbse.html
+      verified: false
+
+    - key: cbse_loc_2028
+      portal: cbse
+      label_en: CBSE list of candidates (LOC), Class X and XII, 2028 exams
+      label_te: CBSE అభ్యర్థుల జాబితా (LOC), X మరియు XII తరగతులు, 2028 పరీక్షలు
+      profile_keys: []
+      boards: [CBSE]
+      classes: [X, XII]
+      opens_on: 2027-09-01
+      opens_approximate: true
+      closes_on: 2027-10-31
+      closes_approximate: true
+      source:
+        - https://www.cbse.gov.in/cbsenew/cbse.html
+      verified: false
+
+    - key: cisce_registration_2028
+      portal: cisce
+      label_en: CISCE ICSE and ISC candidate registration 2027-28
+      label_te: CISCE ICSE మరియు ISC అభ్యర్థుల నమోదు 2027-28
+      profile_keys: []
+      boards: [CISCE]
+      classes: [IX, X, XI, XII]
+      opens_on: 2027-10-01
+      opens_approximate: true
+      closes_on: 2027-11-30
+      closes_approximate: true
+      source:
+        - https://www.careerindia.com/news/cisce-icse-isc-2027-2028-registration-begins-check-dates-063637.html
+      verified: false
+
+    - key: bseap_ssc_2028_nominal_roll
+      portal: bseap
+      label_en: AP SSC March 2028 nominal roll corrections
+      label_te: AP SSC మార్చి 2028 నామినల్ రోల్ సవరణలు
+      profile_keys: []
+      boards: [BSEAP]
+      classes: [X]
+      opens_on: 2028-02-01
+      opens_approximate: true
+      closes_on: 2028-02-05
+      closes_approximate: true
+      source:
+        - https://www.tlm4all.com/2026/02/ap-ssc-pe--2026-nominal-rolls-correction.html
+      verified: false

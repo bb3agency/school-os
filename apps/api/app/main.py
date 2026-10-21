@@ -20,8 +20,11 @@ from app.core.health import router as health_router
 from app.core.logging import setup_logging
 from app.core.middleware import install_middleware
 from app.core.telemetry import setup_telemetry
+from app.disclosure.api import public_router as disclosure_public_router
+from app.disclosure.api import router as disclosure_router
 from app.documents.api import router as documents_router
 from app.dq.api import router as dq_router
+from app.dq.api import tasks_router as dq_tasks_router
 from app.exports.api import router as exports_router
 from app.extraction.api import router as extraction_router
 from app.fees import webhook as payments_webhook
@@ -42,6 +45,7 @@ from app.notifications.api import router as notifications_router
 from app.platform.api import fleet_router
 from app.platform.api import router as platform_router
 from app.platform.tenant_api import router as platform_tenant_router
+from app.privacy.api import router as privacy_router
 from app.privacy.breach_api import router as breach_router
 from app.privacy.consents_api import router as consents_router
 from app.public.api import router as public_router
@@ -54,7 +58,7 @@ from app.tenancy.api import router as tenancy_router
 API_PREFIX = "/api/v1"
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None) -> FastAPI:  # noqa: PLR0915 - one line per router
     settings = settings or get_settings()
     setup_logging(settings)
     # Claude safety lock: staging/prod refuse to start while a models.yaml role uses Anthropic
@@ -84,6 +88,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(documents_router)
     app.include_router(imports_router)
     app.include_router(dq_router)
+    # R3-1D (FR-RDY-010): link a circular task to a portal calendar event.
+    app.include_router(dq_tasks_router)
     app.include_router(platform_tenant_router)
     app.include_router(notifications_router)
     app.include_router(invitations_router)
@@ -101,6 +107,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(circulars_router)
     app.include_router(academics_router)
     app.include_router(insights_router)
+    # R3-1A privacy requests, notices and record classes (ADR-0048).
+    app.include_router(privacy_router)
     # R2-1B fees (ADR-0042): every route answers 404 module_hidden while fees are off.
     app.include_router(fees_router)
     # R2-2E UPI and bank statements (ADR-0042 decision 9).
@@ -124,6 +132,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     messaging_webhook.install()
     # R2-1A: certificate verification by code (ADR-0045), pinned in public_routes.yaml.
     app.include_router(certificates_public_router)
+    # R3-1C CBSE Appendix IX disclosure (ADR-0051): staff routes answer 404 module_hidden
+    # outside CBSE schools; the public page routes are pinned in public_routes.yaml.
+    app.include_router(disclosure_router)
+    app.include_router(disclosure_public_router)
     # Control plane + fleet heartbeat: shared deployment only (ADR-0017); 404 on dedicated hosts.
     if settings.deployment_mode is DeploymentMode.SHARED:
         app.include_router(platform_router)

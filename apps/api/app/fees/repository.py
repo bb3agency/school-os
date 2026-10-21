@@ -821,6 +821,61 @@ def export_tables(session: Session) -> list[RecordTable]:
     return out
 
 
+# --- data-principal report (R3-1A; FR-DPDP-009) ---------------------------------------------------
+
+
+def receipts_of_accounts(
+    session: Session, account_ids: Collection[uuid.UUID], *, limit: int
+) -> tuple[list[Receipt], int]:
+    """The receipts of ``account_ids``, newest first (at most ``limit``), and how many there are."""
+    if not account_ids:
+        return [], 0
+    where = Receipt.account_id.in_(list(account_ids))
+    rows = list(
+        session.scalars(
+            select(Receipt)
+            .where(where)
+            .order_by(Receipt.issued_at.desc(), Receipt.id.desc())
+            .limit(limit)
+        )
+    )
+    total = session.scalar(select(func.count()).select_from(Receipt).where(where))
+    return rows, int(total or 0)
+
+
+def receipt_ids_of_accounts(
+    session: Session, account_ids: Collection[uuid.UUID]
+) -> list[uuid.UUID]:
+    if not account_ids:
+        return []
+    stmt = select(Receipt.id).where(Receipt.account_id.in_(list(account_ids)))
+    return list(session.scalars(stmt))
+
+
+def concessions_of_accounts(
+    session: Session, account_ids: Collection[uuid.UUID]
+) -> list[Concession]:
+    if not account_ids:
+        return []
+    stmt = (
+        select(Concession)
+        .where(Concession.account_id.in_(list(account_ids)))
+        .order_by(Concession.requested_at.desc(), Concession.id.desc())
+    )
+    return list(session.scalars(stmt))
+
+
+def refunds_of_accounts(session: Session, account_ids: Collection[uuid.UUID]) -> list[Refund]:
+    if not account_ids:
+        return []
+    stmt = (
+        select(Refund)
+        .where(Refund.account_id.in_(list(account_ids)))
+        .order_by(Refund.requested_at.desc(), Refund.id.desc())
+    )
+    return list(session.scalars(stmt))
+
+
 def ids(rows: Iterable[Any]) -> list[uuid.UUID]:
     return [r.id for r in rows]
 
@@ -840,6 +895,7 @@ __all__ = [
     "cancellations_of",
     "cancellations_on",
     "concessions_of",
+    "concessions_of_accounts",
     "count_heads",
     "count_pending_for_account",
     "current_tenant_id",
@@ -883,9 +939,12 @@ __all__ = [
     "plan_instalments",
     "plan_lines",
     "plans_by_id",
+    "receipt_ids_of_accounts",
     "receipts_by_id",
+    "receipts_of_accounts",
     "receipts_on",
     "refunds_of",
+    "refunds_of_accounts",
     "refunds_on",
     "replace_instalments",
     "replace_lines",

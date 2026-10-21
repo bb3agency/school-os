@@ -101,6 +101,7 @@ from app.core.errors import (
 from app.core.ids import new_id
 from app.core.logging import get_context, get_logger
 from app.core.records import RecordTable
+from app.disclosure import service as disclosure
 from app.documents import service as documents
 from app.documents.service import ObjectStore, ObjectWriter
 from app.dq import service as dq
@@ -115,6 +116,7 @@ from app.notifications import service as notifications
 from app.ops import service as ops
 from app.privacy import breach_service as breaches
 from app.privacy import consents_service as consents
+from app.privacy import service as privacy
 from app.students import service as students
 from app.tally import service as tally
 from app.tenancy import service as tenancy
@@ -575,6 +577,8 @@ def _collect(session: Session, snap: _Snapshot) -> tuple[list[RecordTable], dict
         *messaging.export_records(session),
         # R2-1B (FR-FEE-027): fee heads, plans, accounts, ledger, receipts and requests.
         *fees.export_records(session),
+        # R3-1C (FR-DISC-012): the disclosure draft, snapshots and published document versions.
+        *disclosure.export_records(session),
         # ADR-0034: each person's Ask memory items and switch (their own work context; the
         # query log and conversations are not in the archive, docs/05 §12).
         *knowledge.export_records(session),
@@ -582,6 +586,9 @@ def _collect(session: Session, snap: _Snapshot) -> tuple[list[RecordTable], dict
         # (descriptions and containment steps are ciphertext and left out).
         *consents.export_records(session),
         *breaches.export_records(session, include_sensitive=snap.include_sensitive),
+        # R3-1A (FR-DPDP-018): notices, privacy requests, events and links; the requesters'
+        # texts only with include_sensitive.
+        *privacy.export_records(session, include_sensitive=snap.include_sensitive),
         repo.retention_record_table(session),
     ]
     names = [t.name for t in tables]

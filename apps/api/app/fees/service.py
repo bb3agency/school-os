@@ -34,6 +34,7 @@ from app.core.records import RecordTable
 from app.fees import _common as c
 from app.fees import (
     approvals,
+    ask,
     ledger,
     online,
     parent_pages,
@@ -68,6 +69,7 @@ from app.fees.money import ZERO
 from app.fees.online_schemas import PaymentLinkInfo
 from app.fees.receipts import MESSAGE_EVENT, RENDER_EVENT, RENDER_TASK
 from app.fees.schemas import DueLine, FeeAccountSummary, InstalmentDue, StudentDues
+from app.fees.subjects import fee_targets_of_student, subject_report
 from app.tenancy import service as tenancy
 
 # --- routes' operations (re-exported for app.fees.api) --------------------------------------------
@@ -156,6 +158,15 @@ erase_statement_narrations = statements.erase_old_narrations
 
 # --- data contract for other modules (R2-2F Ask, R2-3G sending, R2-3H parent pages) -------------
 
+# R2-4: Ask's get_fee_dues on the fee ledger (FR-KB-044, US-2112): finance.read school-wide,
+# 404 module_hidden while fees are off; amounts and display fields only.
+AskStudentFees = ask.AskStudentFees
+AskSchoolFees = ask.AskSchoolFees
+AskClassFees = ask.AskClassFees
+AskInstalment = ask.AskInstalment
+ask_student_fees = ask.student_fees
+ask_school_fees = ask.school_fees
+
 
 def enabled(session: Session, tenant_id: uuid.UUID) -> bool:
     """Whether fees are on for the school of ``session`` (flag and school setting)."""
@@ -193,6 +204,47 @@ def account_summary(
         )
         for a in accounts
     }
+
+
+@dataclass(frozen=True, slots=True)
+class FeeStructureHead:
+    name: str
+    annual_amount: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class FeeStructureRow:
+    """One class's general fee plan (no category) as published: heads and annual amounts."""
+
+    class_id: uuid.UUID
+    heads: tuple[FeeStructureHead, ...]
+    annual_total: Decimal
+
+
+def fee_structure(session: Session, academic_year_id: uuid.UUID) -> list[FeeStructureRow]:
+    """The school's fee structure for a year (R3-1C CBSE disclosure, ADR-0051; FR-DISC-003):
+    the active general plan (no category) of each class, its heads and annual amounts. Plans
+    only: no account, student or payment data. No permission check: the caller
+    (``disclosure.edit``) decides; callers check :func:`enabled` first."""
+    plans = [
+        p
+        for p in repo.list_plans(session, academic_year_id=academic_year_id, status="active")
+        if p.category_code is None
+    ]
+    lines = repo.plan_lines(session, [p.id for p in plans])
+    heads = repo.heads_by_id(session)
+    by_plan: dict[uuid.UUID, list[FeeStructureHead]] = {}
+    for line in lines:
+        head = heads.get(line.head_id)
+        by_plan.setdefault(line.plan_id, []).append(
+            FeeStructureHead(name=head.name if head else "", annual_amount=line.annual_amount)
+        )
+    out: list[FeeStructureRow] = []
+    for plan in plans:
+        items = tuple(by_plan.get(plan.id, ()))
+        total = sum((h.annual_amount for h in items), ZERO)
+        out.append(FeeStructureRow(class_id=plan.class_id, heads=items, annual_total=total))
+    return out
 
 
 def dues_for_student(
@@ -482,7 +534,13 @@ __all__ = [
     "RENDER_EVENT",
     "RENDER_TASK",
     "REPORT",
+    "AskClassFees",
+    "AskInstalment",
+    "AskSchoolFees",
+    "AskStudentFees",
     "DayClosed",
+    "FeeStructureHead",
+    "FeeStructureRow",
     "ModuleHidden",
     "ParentDues",
     "ParentPayment",
@@ -494,10 +552,14 @@ __all__ = [
     "ReminderDue",
     "SelfApprovalForbidden",
     "account_summary",
+    "ask_school_fees",
+    "ask_student_fees",
     "create_payment_intent",
     "dues_for_student",
     "enabled",
     "export_records",
+    "fee_structure",
+    "fee_targets_of_student",
     "parent_account_student",
     "parent_dues",
     "parent_pay",
@@ -512,6 +574,7 @@ __all__ = [
     "receipt_message_event",
     "reminder_accounts",
     "reminder_dues",
+    "subject_report",
     "tenant_data_counts",
     "upi_payee",
 ]

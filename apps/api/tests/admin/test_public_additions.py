@@ -104,6 +104,8 @@ def test_FR_ADM_001_other_modules_export_their_tables_without_ciphertext(
         "change_requests",
         "dq_runs",
         "dq_findings",
+        "portal_calendar_dates",
+        "portal_reminders",
         "import_batches",
         "import_mapping_templates",
         "documents",

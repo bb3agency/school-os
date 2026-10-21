@@ -129,6 +129,30 @@ def affected(session: Session, breach_id: uuid.UUID) -> list[BreachAffected]:
     )
 
 
+def breaches_affecting(
+    session: Session,
+    *,
+    student_id: uuid.UUID | None = None,
+    guardian_id: uuid.UUID | None = None,
+    membership_id: uuid.UUID | None = None,
+) -> list[BreachRecord]:
+    """Breaches whose affected list names the subject, newest first (access report)."""
+    cond = (
+        BreachAffected.student_id == student_id
+        if student_id is not None
+        else BreachAffected.guardian_id == guardian_id
+        if guardian_id is not None
+        else BreachAffected.membership_id == membership_id
+    )
+    stmt = (
+        select(BreachRecord)
+        .join(BreachAffected, BreachAffected.breach_id == BreachRecord.id)
+        .where(cond)
+        .order_by(BreachRecord.noticed_at.desc(), BreachRecord.id.desc())
+    )
+    return list(session.scalars(stmt))
+
+
 def affected_counts(
     session: Session, breach_ids: Collection[uuid.UUID]
 ) -> dict[uuid.UUID, tuple[int, int, int]]:

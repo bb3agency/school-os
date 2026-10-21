@@ -23,6 +23,7 @@ import { useSectionOptions } from "@/features/findings/data";
 import { isRunFinished, RunProgress } from "@/features/findings/RunChecks";
 import type { DqRun } from "@/features/findings/types";
 import { PdfJobButton } from "@/features/exports/PdfJobButton";
+import { NextWindow } from "@/features/portal-calendar/NextWindow";
 import { Link, useRouter } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
 import { unwrap, useBffClient } from "@/lib/bff/query";
@@ -337,6 +338,8 @@ export function ReadinessScreen({
       {tabs.length > 0 ? (
         <TabNav label={t("profilePicker")} items={tabs} activeId={profileKey} />
       ) : null}
+
+      {data?.next_window ? <NextWindow window={data.next_window} /> : null}
 
       {data && !data.profile.verified ? (
         <Alert tone="warning" title={t("unverifiedTitle")}>

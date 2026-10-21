@@ -83,11 +83,12 @@ tools:
   # tally.connector.enabled flag is on and the caller holds finance.read school-wide.
   get_fee_dues:
     description: >-
-      Fee dues synced from the school's Tally accounts, for ONE student the user can access (pass
-      the ID from find_students) or, without a student, the school totals. Uses only Tally
-      ledgers a staff member has linked to the student; when none is linked, say SchoolOS has no
-      fee figure for the student and never guess from names. Quote amounts exactly as given,
-      with the Tally as-of date.
+      Fee dues for ONE student the user can access (pass the ID from find_students) or, without
+      a student, the school totals (with a per-class breakdown when the school keeps its fees in
+      SchoolOS). The figures come from the SchoolOS fee ledger when the school keeps its fees
+      here, otherwise from Tally ledgers a staff member has linked to the student. When the
+      result says there is no fee figure for the student, say so and never guess from names.
+      Quote amounts exactly as given, with the as-of date.
     permission: finance.read
   # ADR-0034 (amending ADR-0008): the caller's OWN earlier Ask conversations in this school (never
   # another person's, never deleted ones), decrypted in memory and scored by words; no index.

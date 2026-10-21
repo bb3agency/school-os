@@ -2,7 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import * as z from "@/lib/zod";
 import { DataTableV2, type ColumnV2 } from "@/components/console";
 import { ActionDialog } from "@/components/ui/ActionDialog";
@@ -427,14 +427,15 @@ export function DuesScreen() {
   const api = useBffClient("staff");
   const queryClient = useQueryClient();
   const [classId, setClassId] = useState("");
-  // FR-MSG-025: reminders for the rows chosen on the visible page, or everyone in the list.
+  // FR-MSG-025 / FR-MSG-027: reminders and payment links for one row, the rows chosen on the
+  // visible page, or everyone in the list.
   const canRemind = useCanSendFeeReminders();
   const [remind, setRemind] = useState<FeeReminderSelection | null>(null);
   const [remindOpen, setRemindOpen] = useState(false);
-  const openReminders = (selection: FeeReminderSelection) => {
+  const openReminders = useCallback((selection: FeeReminderSelection) => {
     setRemind(selection);
     setRemindOpen(true);
-  };
+  }, []);
   const classes = useApiQuery(
     ["staff", "fees", "classes"],
     () => unwrap(api.GET("/api/v1/classes", { params: { query: { limit: 200 } } })),
@@ -507,8 +508,45 @@ export function DuesScreen() {
         numeric: true,
         cell: (row) => <Amount value={row.overdue} />,
       },
+      ...(canRemind
+        ? [
+            {
+              key: "actions",
+              name: t("columns.actions"),
+              header: <span className="sr-only">{t("columns.actions")}</span>,
+              hideable: false,
+              cell: (row: DuesRow) => {
+                const name = row.display_name ?? t("noName");
+                const one = (kind: "reminder" | "payment_link") =>
+                  openReminders({ account_ids: [row.account_id], all_matching: false, kind });
+                return (
+                  <span className="relative z-[1] flex justify-end">
+                    <Menu
+                      label={t("rowActions", { name })}
+                      align="end"
+                      entries={[
+                        {
+                          id: "remind",
+                          label: t("sendReminder"),
+                          icon: "megaphone",
+                          onSelect: () => one("reminder"),
+                        },
+                        {
+                          id: "pay-link",
+                          label: t("sendPaymentLink"),
+                          icon: "creditCard",
+                          onSelect: () => one("payment_link"),
+                        },
+                      ]}
+                    />
+                  </span>
+                );
+              },
+            } satisfies ColumnV2<DuesRow>,
+          ]
+        : []),
     ],
-    [t],
+    [t, canRemind, openReminders],
   );
   const moreEntries: MenuEntry[] = [];
   if (allowed && can(REPORT)) {
@@ -526,7 +564,22 @@ export function DuesScreen() {
       label: t("remindAll"),
       icon: "megaphone",
       onSelect: () =>
-        openReminders(classId ? { all_matching: true, class_id: classId } : { all_matching: true }),
+        openReminders(
+          classId
+            ? { all_matching: true, class_id: classId, kind: "reminder" }
+            : { all_matching: true, kind: "reminder" },
+        ),
+    });
+    moreEntries.push({
+      id: "pay-link-all",
+      label: t("paymentLinkAll"),
+      icon: "creditCard",
+      onSelect: () =>
+        openReminders({
+          all_matching: true,
+          kind: "payment_link",
+          ...(classId ? { class_id: classId } : {}),
+        }),
     });
   }
   const header = (
@@ -630,18 +683,34 @@ export function DuesScreen() {
                     rowLabel: (row: DuesRow) =>
                       t("selectRow", { name: row.display_name ?? t("noName") }),
                     actions: (selected: readonly DuesRow[]) => (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() =>
-                          openReminders({
-                            account_ids: selected.map((row) => row.account_id),
-                            all_matching: false,
-                          })
-                        }
-                      >
-                        {t("sendReminder")}
-                      </Button>
+                      <>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() =>
+                            openReminders({
+                              account_ids: selected.map((row) => row.account_id),
+                              all_matching: false,
+                              kind: "reminder",
+                            })
+                          }
+                        >
+                          {t("sendReminder")}
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() =>
+                            openReminders({
+                              account_ids: selected.map((row) => row.account_id),
+                              all_matching: false,
+                              kind: "payment_link",
+                            })
+                          }
+                        >
+                          {t("sendPaymentLink")}
+                        </Button>
+                      </>
                     ),
                   },
                 }

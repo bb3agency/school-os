@@ -45,7 +45,11 @@ def _case(  # noqa: PLR0917 - one positional row per case reads best in the tabl
     connector_on: bool = True,
     refuse: bool = False,
     note: str = "",
+    plan: str | None = None,
+    accounts: dict[str, str] | None = None,
 ) -> FeeCase:
+    """``plan`` (the class plan's one instalment, already due) and ``accounts`` (student key ->
+    amount paid) make a fees-on case answered from the SchoolOS fee ledger (FR-KB-044)."""
     draft = FeeCase.model_validate(
         {
             "id": f"fee-{case_id}",
@@ -57,6 +61,9 @@ def _case(  # noqa: PLR0917 - one positional row per case reads best in the tabl
             "links": links,
             "student": student,
             "connector_on": connector_on,
+            "fees_on": plan is not None,
+            "plan_amount": plan,
+            "accounts": [{"student": k, "paid": v} for k, v in (accounts or {}).items()],
             "expect_refusal": refuse,
             "note": note,
         }
@@ -330,9 +337,131 @@ CASES: tuple[FeeCase, ...] = (
         [("L1", "S1")],
         refuse=True,
     ),
+    # --- fees on: the SchoolOS fee ledger, Tally never consulted (FR-KB-044, US-2112) -----------
+    _case(
+        "en-ledger-partial",
+        "en",
+        "How much fee does student AB-2026-0101 still owe?",
+        "accountant",
+        [SAI, LATHA],
+        [_l("L1", "Kondaveeti Venkata Sai 9A", "15000.00")],
+        [("L1", "S1")],
+        plan="12000.00",
+        accounts={"S1": "4500.00", "S2": "0.00"},
+        note="part paid on the ledger; the linked Tally ledger's 15,000.00 must not appear",
+    ),
+    _case(
+        "en-ledger-connector-off",
+        "en",
+        "What are the pending fee dues of AB-2026-0201?",
+        "principal",
+        [RAVI, DEVI],
+        [_l("L1", "Ravi Teja 10A", "11000.00")],
+        [],
+        connector_on=False,
+        plan="9500.00",
+        accounts={"S1": "0.00", "S2": "9500.00"},
+        note="with fees on the tool is offered whatever the Tally connector flag",
+    ),
+    _case(
+        "en-ledger-paid-up",
+        "en",
+        "Has AB-2026-0202 paid all fees?",
+        "owner",
+        [RAVI, DEVI],
+        [_l("L1", "Ravi Teja 10A", "11000.00")],
+        [],
+        student="S2",
+        plan="9500.00",
+        accounts={"S1": "0.00", "S2": "9500.00"},
+        note="fully paid: the ledger balance is 0.00",
+    ),
+    _case(
+        "en-ledger-summary",
+        "en",
+        "How much fee is due from each class?",
+        "owner",
+        [
+            SAI,
+            _s("S2", "Pallavi Hema Latha", 102),
+            _s("S3", "Surampalli Ravi Teja", 201, "10A"),
+            _s("S4", "Gollapudi Sai Kiran", 301, "10A"),
+        ],
+        [_l("L1", "Kondaveeti Family", "20000.00")],
+        [("L1", "S1")],
+        student=None,
+        plan="10000.00",
+        accounts={"S1": "2500.00", "S2": "0.00", "S3": "4000.00", "S4": "1000.00"},
+        note="school and per-class totals from the ledger; no single student's figure",
+    ),
+    _case(
+        "en-ledger-no-account",
+        "en",
+        "How much fee is pending for AB-2026-0301?",
+        "accountant",
+        [SAI, _s("S2", "Gollapudi Sai Kiran", 301, "10B")],
+        [_l("L1", "Gollapudi Sai Kiran 10B", "9800.00")],
+        [("L1", "S2")],
+        student="S2",
+        plan="12000.00",
+        accounts={"S1": "0.00"},
+        refuse=True,
+        note="no fee account on the ledger: no figure, even though Tally has a linked ledger",
+    ),
+    _case(
+        "en-ledger-office-admin",
+        "en",
+        "Tell me the pending fee of AB-2026-0101.",
+        "office_admin",
+        [SAI],
+        [_l("L1", "Kondaveeti Venkata Sai 9A", "15000.00")],
+        [("L1", "S1")],
+        plan="12000.00",
+        accounts={"S1": "1000.00"},
+        refuse=True,
+        note="office admins hold no finance.read, fees on or off",
+    ),
+    _case(
+        "en-ledger-class-teacher",
+        "en",
+        "What are the fee dues of AB-2026-0101 in my class?",
+        "class_teacher",
+        [SAI],
+        [_l("L1", "Kondaveeti Venkata Sai 9A", "15000.00")],
+        [("L1", "S1")],
+        plan="12000.00",
+        accounts={"S1": "1000.00"},
+        refuse=True,
+        note="class teachers see the student but not the fees",
+    ),
+    _case(
+        "te-ledger",
+        "te",
+        "AB-2026-0201 విద్యార్థి ఫీజు బకాయి ఎంత?",
+        "accountant",
+        [RAVI, DEVI],
+        [_l("L1", "Ravi Teja 10A", "12000.00")],
+        [("L1", "S1")],
+        plan="8000.00",
+        accounts={"S1": "3000.00", "S2": "0.00"},
+    ),
+    _case(
+        "mixed-ledger",
+        "mixed",
+        "AB-2026-0301 fees entha pending undi?",
+        "principal",
+        [KIRAN],
+        [_l("L1", "Gollapudi Sai Kiran 10B", "9800.00")],
+        [("L1", "S1")],
+        plan="15000.00",
+        accounts={"S1": "7250.50"},
+    ),
 )
-"""22 cases: 12 answerable (9 about one student, 3 school totals) and 10 that must get no
-figure (4 without a link, 5 without finance.read, 1 with the connector off)."""
+"""31 cases. Tally (fees off): 22 cases, 12 answerable (9 about one student, 3 school totals)
+and 10 that must get no figure (4 without a link, 5 without finance.read, 1 with the connector
+off). Fee ledger (fees on, FR-KB-044): 9 cases, 6 answerable (5 about one student, 1 school and
+per-class totals) and 3 that must get no figure (1 without a fee account, 2 without
+finance.read)."""
 
 TOTAL = sum((c.expected_total or Decimal("0.00") for c in CASES), Decimal("0.00"))
 """Sum of every expected figure (a quick drift check in the tests)."""

@@ -617,6 +617,42 @@ describe("issue a certificate (US-1101, US-1102, FR-CERT-002)", () => {
     expect(stub.callsTo(`POST /bff/api/v1/students/${STUDENT}/certificates`)).toHaveLength(0);
   });
 
+  it("shows the fee note for information only, outside the printed lines (FR-CERT-025)", async () => {
+    stub.routes["GET /bff/api/v1/me"] = () => Response.json(me([ISSUE, "finance.read"]));
+    stub.routes[`GET /bff/api/v1/students/${STUDENT}/certificates/preview`] = () =>
+      Response.json(
+        preview({
+          certificate_type: "transfer",
+          requires_approval: true,
+          fee_note: {
+            balance: "8500.00",
+            overdue: "3000.00",
+            oldest_due_on: "2026-09-21",
+            last_payment_on: "2026-10-01",
+            account_id: "0192f3a4-0000-7000-8000-00000000f001",
+          },
+        }),
+      );
+    renderWithIntl(<IssueCertificateScreen studentId={STUDENT} initialType="transfer" />);
+    const note = await screen.findByText(
+      "₹8,500.00 is outstanding on this student's fee account; ₹3,000.00 of it is overdue since 21/09/2026.",
+    );
+    expect(note).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "This is never printed on the TC and does not stop it being issued or approved. You may remind the parent.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open the fee account" })).toHaveAttribute(
+      "href",
+      "/fees/accounts/0192f3a4-0000-7000-8000-00000000f001",
+    );
+    // Never one of the lines the TC prints, and issuing stays possible.
+    const lines = screen.getByRole("table");
+    expect(within(lines).queryByText(/8,500/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Send for approval" })).toBeEnabled();
+  });
+
   it("shows why the API refused (409 certificate_blocked)", async () => {
     stub.routes["GET /bff/api/v1/me"] = () => Response.json(me([ISSUE]));
     stub.routes[`GET /bff/api/v1/students/${STUDENT}/certificates/preview`] = () =>

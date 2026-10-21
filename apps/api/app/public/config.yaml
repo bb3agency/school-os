@@ -23,6 +23,9 @@ purge_batch_size: 1000
 parent_token_bytes: 32
 # Razorpay webhook route values: random, used in the webhook URL (ADR-0047 decision 3).
 route_token_length: 24
+# R3-1C (ADR-0051, FR-DISC-008): the school's disclosure link key, 16 random bytes (128 bits)
+# written base64url without padding (22 characters); never expires, revocable ("Change the link").
+disclosure_key_bytes: 16
 
 # Webhook providers the signature guard knows (docs/09 §4 "Webhooks"; SEC-034). The verifiers
 # themselves are registered by the waves that connect the providers (R2-1C Meta, R2-2D Razorpay);

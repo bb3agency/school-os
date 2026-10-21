@@ -42,8 +42,12 @@ export type SendRun = S["SendRunOut"];
 export type FeeReminderSelection = S["FeeReminderSelectionIn"];
 export type FeeReminderPreview = S["FeeReminderPreviewOut"];
 export type FeeRemindersSent = S["FeeRemindersOut"];
+/** R2-4 (FR-MSG-027): "Send payment link" is the same dialog with kind payment_link. */
+export type FeeMessageKind = NonNullable<FeeReminderSelection["kind"]>;
 /** R2-3J (FR-MSG-026): "Send on WhatsApp" for one receipt. */
 export type ReceiptWhatsApp = S["ReceiptWhatsAppOut"];
+/** R2-4: "Stop the link" of one sent message (ADR-0046 decision 5). */
+export type RevokeLinkOut = S["RevokeLinkOut"];
 
 export const MESSAGE_STATUSES: readonly MessageStatus[] = [
   "queued",

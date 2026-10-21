@@ -82,7 +82,7 @@ from app.core.errors import Conflict, Forbidden, NotFound, StepUpRequired, Valid
 from app.core.ids import new_id
 from app.core.languages import output_language, telugu_text
 from app.core.logging import get_context, get_logger
-from app.core.pdf import PdfRenderer, get_renderer, render_document
+from app.core.pdf import PdfRenderer, PrintDocument, get_renderer, render_document
 from app.documents import service as documents
 from app.dq import service as dq
 from app.exports import repository as repo
@@ -109,6 +109,7 @@ from app.exports.schemas import (
     RequestedBy,
     StudentListCreate,
 )
+from app.exports.subjects import subject_report  # R3-1A contributor (FR-DPDP-008)
 from app.exports.tables import (
     CSV_MIME,
     PDF_MIME,
@@ -177,6 +178,13 @@ OWN_EXPORT_PERMISSIONS: Final = (
     PURPOSE_READ,
     PURPOSE_RECORD,
 )
+
+# R3-1A module documents (ADR-0048): one PDF another module builds (the access report, a filled
+# privacy notice). Requested, listed and downloaded only through the owning module's routes,
+# which check its own permissions; never listed or downloadable under /exports.
+SUBJECT_REPORT: Final = "subject_report"
+PRIVACY_NOTICE: Final = "privacy_notice"
+MODULE_KINDS: Final = (SUBJECT_REPORT, PRIVACY_NOTICE)
 
 GENERATE_EVENT: Final = "export.requested"
 RENDER_EVENT: Final = "export.render_requested"
@@ -879,9 +887,12 @@ def _visible(
     session: Session, ctx: UserContext, export_id: uuid.UUID, *, others: Collection[str]
 ) -> Export:
     """The caller's own export, or someone else's when the caller holds one of ``others``
-    (404 otherwise, and for other schools' or unknown ids: existence is never revealed)."""
+    (404 otherwise, and for other schools' or unknown ids: existence is never revealed).
+    Module documents (access reports, notices) are reached only through their module."""
     row = repo.get_export(session, export_id)
-    if row is None or not (_own(ctx, row) or any(ctx.has(p) for p in others)):
+    if row is None or row.kind in MODULE_KINDS:
+        raise _not_found()
+    if not (_own(ctx, row) or any(ctx.has(p) for p in others)):
         raise _not_found()
     return row
 
@@ -917,6 +928,7 @@ def list_exports(
         None if requested_by == "all" else ctx.membership_id,
         after=_after(cursor),
         limit=limit + 1,
+        exclude_kinds=MODULE_KINDS,
     )
     page = rows[:limit]
     next_cursor = None
@@ -1100,6 +1112,9 @@ class _Built:
     students: int
     findings: int = 0
     blockers: int = 0
+    # Module documents may be kept for less than the school's export retention (the access
+    # report: 24 hours, FR-DPDP-009).
+    keep: dt.timedelta | None = None
 
 
 def _permission_problem(ctx: UserContext, snap: _Snapshot) -> str | None:
@@ -1510,6 +1525,8 @@ def run_export(
         )
         snap = _Snapshot.of(row)
     ctx = member_context(tenant_id, snap.requested_by, snap.membership_id)
+    if snap.kind in MODULE_KINDS:
+        return _run_module_document(tenant_id, snap, ctx, renderer)
     problem = _permission_problem(ctx, snap)
     if problem is not None:
         _fail(tenant_id, export_id, problem)
@@ -1552,14 +1569,16 @@ def _complete(tenant_id: uuid.UUID, snap: _Snapshot, built: _Built) -> str:
             )
         repo.insert_files(session, rows)
         now = repo.now(session)
-        keep = _retention_days(session)
+        keep = dt.timedelta(days=_retention_days(session))
+        if built.keep is not None:
+            keep = min(keep, built.keep)
         repo.update_export(
             session,
             snap.id,
             {
                 "status": "ready",
                 "finished_at": now,
-                "expires_at": now + dt.timedelta(days=keep),
+                "expires_at": now + keep,
             },
         )
         counts = {
@@ -1582,6 +1601,16 @@ def _complete(tenant_id: uuid.UUID, snap: _Snapshot, built: _Built) -> str:
             },
             actor_id=snap.requested_by,
         )
+        if snap.kind in MODULE_KINDS:
+            # The owning module's screen shows the state; /exports does not list these.
+            log.info(
+                "exports.completed",
+                resource_type="export",
+                resource_id=snap.id,
+                count=built.students,
+                action=snap.kind,
+            )
+            return "ready"
         notifications.notify(
             session,
             tenant_id=tenant_id,
@@ -1599,6 +1628,233 @@ def _complete(tenant_id: uuid.UUID, snap: _Snapshot, built: _Built) -> str:
         action=snap.kind,
     )
     return "ready"
+
+
+# --- module documents (R3-1A; ADR-0048) -----------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class ModuleDocument:
+    """What a module's builder returns: the finished, escaped page, the file name and how long
+    the file may be kept (``None``: the school's export retention)."""
+
+    document: PrintDocument
+    filename: str
+    keep: dt.timedelta | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ModuleDocumentState:
+    """The state of a module document for the owning module's screen (no file links)."""
+
+    id: uuid.UUID
+    kind: str
+    status: str
+    error_code: str | None
+    created_at: dt.datetime
+    finished_at: dt.datetime | None
+    expires_at: dt.datetime | None
+    files_deleted: bool
+
+
+ModuleBuilder = Callable[[Session, UserContext, Mapping[str, Any]], ModuleDocument]
+
+
+@dataclass(frozen=True, slots=True)
+class _ModuleKind:
+    permissions: tuple[str, ...]
+    builder: ModuleBuilder
+
+
+_MODULE_BUILDERS: dict[str, _ModuleKind] = {}
+
+
+def register_module_document(
+    kind: str, *, permissions: Sequence[str], builder: ModuleBuilder
+) -> None:
+    """Called once at import by the owning module (``app.privacy``): ``builder`` makes the page
+    in the worker with the requester's current context; ``permissions`` (any one) must still be
+    held when it runs, or the document fails ``permission_revoked``."""
+    if kind not in MODULE_KINDS:
+        raise ValueError(f"unknown module document kind {kind!r}")
+    _MODULE_BUILDERS[kind] = _ModuleKind(tuple(permissions), builder)
+
+
+def request_module_document(
+    session: Session,
+    ctx: UserContext,
+    *,
+    kind: str,
+    scope: Mapping[str, Any],
+    student_ids: Sequence[uuid.UUID] = (),
+    details: Mapping[str, Any] | None = None,
+) -> ModuleDocumentState:
+    """Queue one PDF for the owning module (which has checked its own permissions, reach and
+    step-up). ``scope`` is what the builder needs (ids and keys only); ``student_ids`` freezes
+    the student the document is about, if any. Audit ``export.requested`` in this
+    transaction."""
+    if kind not in _MODULE_BUILDERS:
+        raise ValueError(f"no builder registered for {kind!r}")
+    export_id = new_id()
+    job = ops.start_job(
+        session,
+        task_name=RENDER_TASK,
+        idempotency_key=f"{RENDER_TASK}:{export_id}",
+        created_by=ctx.user_id,
+    )
+    row = repo.insert_export(
+        session,
+        id=export_id,
+        tenant_id=ctx.tenant_id,
+        kind=kind,
+        profile_key=None,
+        profile_version=None,
+        layout_version=PRINT_LAYOUT_VERSION,
+        formats=["pdf"],
+        language="en",
+        scope=dict(scope),
+        columns=None,
+        include_sensitive=False,
+        student_ids=list(student_ids),
+        student_count=len(student_ids),
+        status="queued",
+        job_id=job.id,
+        requested_by=ctx.user_id,
+        requested_by_membership=ctx.membership_id,
+    )
+    _audit(
+        session,
+        "export.requested",
+        export_id,
+        {
+            "kind": kind,
+            "formats": ["pdf"],
+            "students": len(student_ids),
+            "student_ids_digest": student_ids_digest(student_ids),
+            **(details or {}),
+        },
+    )
+    ops.enqueue_event(
+        session,
+        RENDER_EVENT,
+        {
+            "export_id": export_id,
+            "job_id": job.id,
+            "user_id": ctx.user_id,
+            "membership_id": ctx.membership_id,
+        },
+    )
+    log.info("exports.requested", resource_type="export", resource_id=export_id, action=kind)
+    return _module_state(row)
+
+
+def _module_state(row: Export) -> ModuleDocumentState:
+    return ModuleDocumentState(
+        id=row.id,
+        kind=row.kind,
+        status=row.status,
+        error_code=row.error_code,
+        created_at=row.created_at,
+        finished_at=row.finished_at,
+        expires_at=row.expires_at,
+        files_deleted=row.files_deleted_at is not None,
+    )
+
+
+def module_document_state(
+    session: Session, export_id: uuid.UUID, *, kind: str
+) -> ModuleDocumentState | None:
+    """The state of one module document of ``kind`` (``None`` when unknown or another kind).
+    The owning module has checked the caller's access to the record it belongs to."""
+    row = repo.get_export(session, export_id)
+    if row is None or row.kind != kind:
+        return None
+    return _module_state(row)
+
+
+def module_document_download_url(
+    session: Session,
+    export_id: uuid.UUID,
+    *,
+    kind: str,
+    filename_stem: str,
+    summary: Mapping[str, Any] | None = None,
+) -> ExportDownloadOut:
+    """A presigned GET (<= 5 minutes, attachment) for a ready module document. The owning
+    module has checked who may download it (and step-up). Audit ``export.downloaded``."""
+    row = repo.get_export(session, export_id)
+    if row is None or row.kind != kind:
+        raise _not_found()
+    now = repo.now(session)
+    if (
+        row.status == "expired"
+        or row.files_deleted_at is not None
+        or (row.status == "ready" and row.expires_at is not None and row.expires_at <= now)
+    ):
+        raise Conflict("This file was deleted. Make it again.", code="export_expired")
+    if row.status == "failed":
+        raise Conflict("This file could not be made. Try again.", code="export_failed")
+    if row.status != "ready":
+        raise Conflict("The file is not ready yet. Try again shortly.", code="export_not_ready")
+    files = repo.files_of(session, [row.id]).get(row.id, [])
+    if not files:
+        raise NotFound("This export has no file")
+    file = files[0]
+    local = now.astimezone(IST).strftime("%Y%m%d")
+    filename = f"schoolos-{filename_stem}-{local}-{str(row.id)[:8]}.{file.format}"
+    url, expires_at = documents.export_download_url(
+        session,
+        row.id,
+        file.object_key,
+        content_type=file.content_type,
+        filename=filename,
+        ttl_s=load_config().download_url_ttl_s,
+    )
+    _audit(
+        session,
+        "export.downloaded",
+        row.id,
+        {"kind": row.kind, "format": file.format, "file_id": file.id, **(summary or {})},
+    )
+    log.info("exports.downloaded", resource_type="export", resource_id=row.id, action=row.kind)
+    return ExportDownloadOut(
+        url=url,
+        expires_at=expires_at,
+        format=file.format,
+        content_type=file.content_type,
+        filename=filename,
+    )
+
+
+def _run_module_document(
+    tenant_id: uuid.UUID,
+    snap: _Snapshot,
+    ctx: UserContext,
+    renderer: PdfRenderer | None,
+) -> str:
+    entry = _MODULE_BUILDERS.get(snap.kind)
+    if entry is None:
+        _fail(tenant_id, snap.id, "worker_error")
+        return "failed"
+    if not any(ctx.has(p) for p in entry.permissions):
+        _fail(tenant_id, snap.id, "permission_revoked")
+        return "failed"
+    try:
+        with _worker_session(tenant_id, snap.requested_by) as session:
+            made = entry.builder(session, ctx, snap.scope)
+    except _Stop as stop:
+        _fail(tenant_id, snap.id, stop.code)
+        return "failed"
+    except NotFound:
+        _fail(tenant_id, snap.id, "not_found")
+        return "failed"
+    blob = render_document(made.document, renderer or get_renderer())
+    built = _Built(
+        files=(_File("pdf", made.filename, blob),),
+        students=len(snap.student_ids),
+        keep=made.keep,
+    )
+    return _complete(tenant_id, snap, built)
 
 
 # --- retention ------------------------------------------------------------------------------------
@@ -1662,25 +1918,35 @@ __all__ = [
     "EXPORT_PERMISSIONS",
     "GENERATE_EVENT",
     "GENERATE_TASK",
+    "MODULE_KINDS",
     "PORTAL",
+    "PRIVACY_NOTICE",
     "PURGE_TASK",
     "READ_ALL",
     "RENDER_EVENT",
     "RENDER_TASK",
     "RETENTION_CATEGORY",
     "STUDENT_EXPORT",
+    "SUBJECT_REPORT",
+    "ModuleDocument",
+    "ModuleDocumentState",
     "abandon",
     "download_url",
     "get_export",
     "list_exports",
     "list_profiles",
     "member_context",
+    "module_document_download_url",
+    "module_document_state",
     "purge_expired",
     "purge_tenant_data",
+    "register_module_document",
+    "request_module_document",
     "request_precheck",
     "request_student_list",
     "run_export",
     "student_ids_digest",
+    "subject_report",
     "tenant_data_counts",
 ]
 

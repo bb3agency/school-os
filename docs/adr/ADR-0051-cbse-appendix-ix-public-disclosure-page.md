@@ -31,6 +31,14 @@
 - Bad / costs: a new public route and handle kind to keep in the public-surface security suite and the penetration-test scope; the format is unverified until a CBSE school confirms it (D3).
 - Follow-up: a CBSE school confirms the format; state-board disclosure duties, if any, are out of scope.
 
+## Implementation notes (R3-1C, 2026-10-21)
+
+- The two public routes are in `app/disclosure/api.py` (`public_router`), the pattern of certificate verification, so `app.public` never imports `app.disclosure`.
+- The raw 22-character key is kept on the draft (`ops.disclosure_drafts.link_key`) so staff can copy the link again; the link is meant to be published on the school's website. Only its SHA-256 is in `core.public_handles`.
+- The live page is the latest snapshot unless it was withdrawn; only the live snapshot can be withdrawn (409 `snapshot_not_live`).
+- A document version a snapshot published cannot be deleted (documents delete guard `document_published`); the version must be a clean PDF of a circular, policy or other school document, never C3.
+- A school that removes CBSE from its boards stops showing the page (uniform 404).
+
 ## Alternatives considered
 
 | Option | Why not chosen |

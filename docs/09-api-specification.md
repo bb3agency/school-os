@@ -666,6 +666,8 @@ As built (R2-1A): `GET /certificates/types` gives the transfer certificate in th
 
 **Built in R2-3J (2026-10-21; `app/messaging/sends/api.py`, `app/circulars/api.py`):** `POST /fees/reminders/preview` (`{account_ids}` or `{all_matching: true, section_id?, class_id?}`; `message.send` and `finance.read`; → `FeeReminderPreviewOut`: `preview_token`, `accounts`, `accounts_reminded`, `guardians`, `recipients`, `skipped_accounts`, `skipped_guardians`, `estimated_cost_inr`, rate and GST, `blocked_reason`; `Cache-Control: no-store`; 403, 404 an account not of this year, 422 selection / `too_many`), `POST /fees/reminders` (same body plus `preview_token`, `Idempotency-Key`, 202 `FeeRemindersOut`; 409 `preview_stale` and the blocking reasons), `GET /fees/receipts/{receipt_id}/whatsapp` and `POST` (`Idempotency-Key`, 202) → `ReceiptWhatsAppOut` (`can_send`, `blocked_reason`, `opted_in_guardians`, `messages` with status and reasons; `fee.collect` or `message.send`; 404; 409 `receipt_cancelled`, `no_opted_in_guardian`, `already_queued` and the account's reasons), `POST /notices/{notice_id}/withdraw` (`{reason}`, `If-Match`, `notice.approve` → `NoticeOut` with `status: withdrawn`, `withdrawn_by`, `withdrawn_at`, `withdraw_reason`; 409 `notice_not_approved`, `notice_withdrawn`; 412; 422). `PUT /fees/settings` refuses a repeated reminder day (422).
 
+**Built in R2-4 (2026-10-21):** `POST /fees/reminders/preview` and `POST /fees/reminders` take `kind` (`reminder`, the default, or `payment_link`: "Send payment link", FR-MSG-027; the same fee message, whose dues page offers "Pay online"; `blocked_reason` / 409 `payments_not_connected` without online payments; dedupe `paylink:<IST date>`; audit `messaging.payment_links.sent`). `GET /students/{student_id}/certificates/preview` returns `fee_note` (`TcFeeNote`: `balance`, `overdue`, `oldest_due_on`, `last_payment_on`, `account_id`) for a transfer certificate while fees are on and the caller holds `finance.read` school-wide, otherwise `null` (FR-CERT-025; never printed, never a blocker). The Meta webhook records a suspended school's STOP replies only (D35); its answers are unchanged.
+
 #### Parent language (R2.3; FR-LANG-*)
 
 | Method | Path | Guard |
@@ -714,6 +716,8 @@ Conventions as above and as the R2 section: `Idempotency-Key` on creating POSTs,
 
 #### Privacy: notices, requests, grievances, record classes (R3.1; FR-DPDP-001..018)
 
+**Built (R3-1A, 2026-10-21; `app/privacy/api.py`).** As in the table, plus: `GET /privacy/files/{export_id}` and `GET /privacy/files/{export_id}/download-url` (`privacy.read`; state and link of a notice PDF); the report state is returned inside the request detail (`report`), with `can_decide` and `logged_by_me` for the screen; schema names carry a `Privacy` prefix (`PrivacyRequestOut`, ...). Rate limits: search `search`, letters and previews `render`, PDFs `exports` + `render`, downloads `exports`. Errors as listed and `request_closed` (409), `response_required` (422), `changes_pending` (409), `report_not_ready` / `report_not_released` / `export_expired` (409), `staff_sign_in_staff_only` / `guardian_phone_guardians_only` (422).
+
 | Method | Path | Guard |
 |---|---|---|
 | GET | `/privacy/templates` (keys, versions, audiences, languages, placeholders and whether the school has filled them) · GET `/privacy/templates/{key}/preview` (HTML, filled) · POST `/privacy/templates/{key}/pdf` → 202 export | `privacy.read`; PDF rate limit `exports` |
@@ -732,7 +736,7 @@ Conventions as above and as the R2 section: `Idempotency-Key` on creating POSTs,
 
 #### Consents for optional purposes (R3.1; FR-DPDP-020..026)
 
-**Built (R3-1B, 2026-10-21).** As listed, with: `GET /consents/forms` and `POST /exports/consent-forms` take `student_id` or `section_id`, `only_unanswered` (sections only) and `language`; `GET /consent-purposes` returns `{data, suggestions}`; recording also answers 409 `purpose_inactive`; `GET /students/{id}/consent-view` returns `apaar`/`whatsapp` as null for readers of neither register.
+**Built (R3-1B, 2026-10-21).** As listed, with: `GET /consents/forms` and `POST /exports/consent-forms` take `student_id` or `section_id`, `only_unanswered` (sections only) and `language`; `GET /consent-purposes` returns `{data, suggestions}`; recording also answers 409 `purpose_inactive`; `GET /students/{id}/consent-view` returns `apaar`/`whatsapp` as null for readers of neither register. `POST /privacy/requests/{request_id}/consent-withdrawal` `{purpose_id, relationship, decided_on}` (`privacy.request.manage`; the service also needs `consent.record`, 403) records the withdrawal a `consent_withdrawal` request asks for and links both ways (409 `not_a_consent_withdrawal`, `not_verified`, `consent_not_given`, `request_closed`).
 
 | Method | Path | Guard |
 |---|---|---|
@@ -755,6 +759,8 @@ Conventions as above and as the R2 section: `Idempotency-Key` on creating POSTs,
 
 #### Disclosure (R3.2; FR-DISC-001..012)
 
+**As built (R3-1C, `wip/r3-disclosure`, migration `0065_disclosure`, 2026-10-21).** All routes below are built. Errors: 404 `module_hidden` (no CBSE), 412 on a stale `If-Match` (`W/"0"` before the first save), 422 per item (`inputs.<key>` / `documents.<key>`: `aadhaar_not_allowed`, `phone_not_allowed`, `markup_not_allowed`, `https_only`, `document_not_found`, `document_not_publishable`, ...), 422 `confirmation_required` / `incomplete`, 409 `snapshot_not_live`, `not_published`, `files_not_ready`, `files_failed`. The public routes answer `Cache-Control: private, no-store` and `X-Robots-Tag: noindex, nofollow`.
+
 | Method | Path | Guard |
 |---|---|---|
 | GET | `/disclosure/format` (sections, items, fills, `verified`, sources) · GET `/disclosure/draft` (inputs, documents, derived values as of now, `ETag`) · PUT `/disclosure/draft` | read and write `disclosure.edit` (`If-Match`); 422 per item |
@@ -771,6 +777,8 @@ Conventions as above and as the R2 section: `Idempotency-Key` on creating POSTs,
 | GET/POST | `/rte/claims` · GET/PATCH `/rte/claims/{id}` · POST `/rte/claims/{id}/prepare` · `/submit` · PUT `/rte/claims/{id}/received` | read `rte.read`; write `rte.claim.manage` |
 
 #### Portal calendar (R3.3; FR-RDY-001..010)
+
+**Built** (R3-1D, branch `wip/r3-portal-calendar`, migration `0064_portal_calendar`, 2026-10-21): the four routes below plus `GET /dq/calendar/assignees` (`readiness.calendar.manage`; active staff who can own a window). `PUT` needs no `If-Match` for the first confirmation and `If-Match` for any change (400 `if_match_required`, 412 `version_mismatch`); `DELETE` takes `?academic_year_id=` and `If-Match`; `POST /tasks/{task_id}/portal-event` answers 422 `not_circular_task` for a manual or portal task and 403 without a school-wide `task.manage`. `GET /dq/readiness` and `GET /dq/readiness/{profile_key}` carry `next_window` (`PortalWindowOut` or null). `GET /dq/calendar` has the readiness read budgets (`readiness_reads`, `readiness_school`). `TaskOut` carries `portal_event_key`.
 
 | Method | Path | Guard |
 |---|---|---|

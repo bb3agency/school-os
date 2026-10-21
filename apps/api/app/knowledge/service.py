@@ -171,6 +171,7 @@ from app.knowledge.schemas import (
     VerifiedAnswerReviewIn,
     VerifiedCitationOut,
 )
+from app.knowledge.subjects import erase_for_subject, subject_report
 from app.knowledge.tools.access import acl_keys
 from app.knowledge.tools.registry import offered
 from app.knowledge.visibility import SourceVisibility
@@ -2061,6 +2062,7 @@ __all__ = [
     "circular_passages",
     "circulars_config",
     "draft_notice",
+    "erase_for_subject",
     "export_records",
     "get_service",
     "has_personal_numbers",
@@ -2071,6 +2073,7 @@ __all__ = [
     "read_circular",
     "reencrypt_queries",
     "settle_spend",
+    "subject_report",
     "summarise_conversation",
     "tenant_data_counts",
 ]

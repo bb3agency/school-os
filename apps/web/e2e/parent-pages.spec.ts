@@ -17,15 +17,16 @@ import { API_PORT } from "./support/stand-in";
  * horizontal scroll, no WCAG 2.2 AA axe violations. Owner decision D32: the opt-in page has NO
  * "STOP" prompt and no opt-out button.
  *
- * The parent pages are served only on PUBLIC_BASE_URL (src/lib/public-surface.ts). Locally it
- * may be the staff origin itself (plain http on a loopback host), so:
+ * The parent pages are served only on PUBLIC_BASE_URL (src/lib/public-surface.ts). The tests are
+ * tagged @parent and run in their own project, `chromium-parent`, against a separate `next start`
+ * from the same build whose PUBLIC_BASE_URL is its own origin (playwright.config.ts, port
+ * E2E_PUBLIC_PORT, default E2E_PORT + 4); the staff origin is not changed. So:
  *
  * 1. Stand-in (synthetic, no database; the default way to run this file):
  *
- *      E2E_STAND_IN=1 PUBLIC_BASE_URL=http://localhost:3000 npx playwright test parent-pages
+ *      E2E_STAND_IN=1 npx playwright test parent-pages
  *
- *    `PUBLIC_BASE_URL` reaches the `next start` that playwright.config.ts launches (Playwright
- *    passes its own environment to the web server). The canned API (e2e/support/r2-api.ts)
+ *    (also part of `make e2e` with E2E_STAND_IN=1). The canned API (e2e/support/r2-api.ts)
  *    answers `/api/v1/public/links/*` for three fixed synthetic tokens (PARENT_TOKENS) and hands
  *    out an https://rzp.io page for "Pay online", which this spec answers itself.
  *
@@ -152,10 +153,10 @@ async function checkParentPage(page: Page, kicker: string, label: string) {
   await expectNoHorizontalOverflow(page, label);
 }
 
-test.describe.serial("parent link pages on a 375px phone (FR-PUB-010, ADR-0046)", () => {
+test.describe.serial("parent link pages on a 375px phone (FR-PUB-010, ADR-0046) @parent", () => {
   test.skip(
     !PUBLIC_BASE,
-    "set PUBLIC_BASE_URL (or E2E_PUBLIC_BASE_URL) to the public origin, e.g. http://localhost:3000",
+    "no public origin: playwright.config.ts starts one locally, or set E2E_PUBLIC_BASE_URL",
   );
   test.use({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
 

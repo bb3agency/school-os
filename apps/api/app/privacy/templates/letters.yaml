@@ -1,0 +1,57 @@
+# App copy of docs/legal/data-principal-response-templates.md (R3-1A; FR-DPDP-001).
+# Same text and version as the docs file (tests/privacy/test_templates.py compares them).
+# Not legal advice (D30).
+template_version: '0.1'
+source: docs/legal/data-principal-response-templates.md
+placeholders:
+- school_short_name
+- privacy_contact_name
+- privacy_contact_phone
+- privacy_contact_email
+- request_reference
+- received_on
+- due_on
+- subject_name
+- requester_name
+- decision_lines
+- refusal_lines
+- next_steps
+- decided_on
+- nominee_name
+- nominee_relationship
+- purpose_label
+letters:
+  acknowledgement:
+    title: Acknowledgement (every request and grievance)
+    body: |
+      Dear {{requester_name}},
+
+      We received your request about {{subject_name}} on {{received_on}} (reference {{request_reference}}). We will answer by {{due_on}}. If we need anything more from you to confirm who you are, we will tell you.
+
+      {{privacy_contact_name}}, {{school_short_name}} · {{privacy_contact_phone}} · {{privacy_contact_email}}
+  access:
+    title: 'Access: your report is ready'
+    body: |
+      The attached report lists the information {{school_short_name}} holds about {{subject_name}} in SchoolOS, where it came from and how long we keep it. Aadhaar numbers are never stored; only the last 4 digits and the details as printed on the card are kept, and these are shown at the office. Please keep this report safe.
+  correction:
+    title: Correction
+    body: |
+      We checked your request against the documents you gave us. {{decision_lines}} Changes to official records such as the admission register need a supporting document and a second staff member's approval; where we could not change something, we have said why. {{next_steps}}
+  erasure:
+    title: Erasure
+    body: |
+      We have erased: {{decision_lines}}
+
+      We could not erase: {{refusal_lines}} (for example, the admission register and issued certificates are permanent school records, and fee records must be kept for 8 years for the school's accounts). We will delete them when the law no longer requires us to keep them.
+  nomination:
+    title: Nomination
+    body: |
+      We have recorded that {{nominee_name}} ({{nominee_relationship}}) may act for you if you are unable to. You can change or withdraw this at any time by contacting us.
+  consent_withdrawn:
+    title: Consent withdrawn
+    body: |
+      We have recorded that you withdrew your consent for {{purpose_label}} on {{decided_on}}. We will not use your child's information for this from now on. Anything already published before today will be taken down where we can; tell us if you see it.
+  grievance:
+    title: Grievance response
+    body: |
+      Thank you for raising this with us on {{received_on}}. What we found: {{decision_lines}} What we have done: {{next_steps}} If you are not satisfied with this answer, you may complain to the Data Protection Board of India.

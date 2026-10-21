@@ -1134,6 +1134,85 @@ def _cert_withdraw_code(w: Any, r: str, a: Engine) -> Request:
     )
 
 
+# --- R3-1D portal calendar (ADR-0053) ---------------------------------------------------------
+
+
+def _calendar_body(w: Any) -> dict[str, Any]:
+    return {
+        "academic_year_id": str(w.a.ids["year"]),
+        "opens_on": "2027-03-01",
+        "closes_on": "2027-03-02",
+        "source_kind": "other",
+    }
+
+
+def _calendar_own_event(w: Any, a: Engine) -> str:
+    """A fresh own event of school A (version 1), confirmed by its owner."""
+    key = f"school:matrix-{uuid.uuid4().hex[:8]}"
+    owner = w.person("owner")
+    with a.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO ops.portal_calendar_dates (id, tenant_id, academic_year_id, "
+                "event_key, label, opens_on, closes_on, source_kind, confirmed_by, "
+                "confirmed_by_membership) VALUES (:i, :t, :y, :k, 'Synthetic matrix event', "
+                "'2027-03-01', '2027-03-02', 'other', :u, :m)"
+            ),
+            {
+                "i": uuid.uuid4(),
+                "t": w.a.tenant_id,
+                "y": w.a.ids["year"],
+                "k": key,
+                "u": owner.user_id,
+                "m": owner.membership_id,
+            },
+        )
+    return key
+
+
+def _calendar_confirm(w: Any, r: str, a: Engine) -> Request:
+    return (
+        f"/api/v1/dq/calendar/{_calendar_own_event(w, a)}",
+        _calendar_body(w),
+        {"If-Match": 'W/"1"'},
+    )
+
+
+def _calendar_delete(w: Any, r: str, a: Engine) -> Request:
+    return (
+        f"/api/v1/dq/calendar/{_calendar_own_event(w, a)}?academic_year_id={w.a.ids['year']}",
+        None,
+        {"If-Match": 'W/"1"'},
+    )
+
+
+def _calendar_link(w: Any, r: str, a: Engine) -> Request:
+    """A task confirmed from a circular (it keeps its citation), linked to a fresh own event."""
+    task = uuid.uuid4()
+    owner = w.person("owner")
+    citation = '{"source": "sos://doc/' + str(uuid.uuid4()) + '/v1#p1", "quote": "synthetic"}'
+    with a.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO ops.tasks (id, tenant_id, title, owner_membership_id, due_on, source, "
+                "citation, created_by, created_by_membership) VALUES (:i, :t, 'Synthetic matrix "
+                "task', :m, '2027-03-02', 'circular', CAST(:c AS jsonb), :u, :m)"
+            ),
+            {
+                "i": task,
+                "t": w.a.tenant_id,
+                "m": owner.membership_id,
+                "c": citation,
+                "u": owner.user_id,
+            },
+        )
+    return (
+        f"/api/v1/tasks/{task}/portal-event",
+        {"event_key": _calendar_own_event(w, a), "academic_year_id": str(w.a.ids["year"])},
+        {},
+    )
+
+
 SPECS: dict[tuple[str, str], Builder] = {
     ("GET", "/api/v1/me"): lambda w, r, a: ("/api/v1/me", None, {}),
     ("GET", "/api/v1/me/schools"): lambda w, r, a: ("/api/v1/me/schools", None, {}),
@@ -1601,6 +1680,22 @@ SPECS: dict[tuple[str, str], Builder] = {
         None,
         {},
     ),
+    # R3-1D portal calendar (ADR-0053): read with dq.readiness.read, change with
+    # readiness.calendar.manage; each write works on its own fresh own event.
+    ("GET", "/api/v1/dq/calendar"): lambda w, r, a: ("/api/v1/dq/calendar", None, {}),
+    ("GET", "/api/v1/dq/calendar/assignees"): lambda w, r, a: (
+        "/api/v1/dq/calendar/assignees",
+        None,
+        {},
+    ),
+    ("PUT", "/api/v1/dq/calendar/{event_key}"): _calendar_confirm,
+    ("POST", "/api/v1/dq/calendar"): lambda w, r, a: (
+        "/api/v1/dq/calendar",
+        {**_calendar_body(w), "label": "Synthetic matrix event"},
+        {},
+    ),
+    ("DELETE", "/api/v1/dq/calendar/{event_key}"): _calendar_delete,
+    ("POST", "/api/v1/tasks/{task_id}/portal-event"): _calendar_link,
     # SchoolOS support only (ADR-0023): every school role is refused (support principals are
     # tested in tests/breakglass/test_support_signin.py).
     ("POST", "/api/v1/breakglass/support-session"): lambda w, r, a: (
@@ -2447,8 +2542,22 @@ def _upi() -> ModuleType:
 SPECS.update(_upi().matrix_specs())
 
 
+def _disclosure() -> ModuleType:
+    """tests/disclosure/security_support.py (R3-1C: CBSE on per call, snapshots of a school)."""
+    name = "sos_test_disclosure_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "disclosure" / "security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
 def _privacy() -> ModuleType:
-    """tests/privacy/security_support.py (R3-1B consents and breaches of school A)."""
+    """tests/privacy/security_support.py (R3-1A privacy requests, notices, reports)."""
     name = "sos_test_privacy_security_support"
     if name not in sys.modules:
         path = Path(__file__).resolve().parents[1] / "privacy" / "security_support.py"
@@ -2461,10 +2570,88 @@ def _privacy() -> ModuleType:
     return sys.modules[name]
 
 
+# --- R3-1C CBSE disclosure (ADR-0051): school A is CBSE while the request is sent -------------
+
+_DISCLOSURE: dict[str, uuid.UUID] = {}
+
+
+def _disclosure_snapshot(w: Any, a: Engine, which: str) -> uuid.UUID:
+    """``live``: the newest snapshot of school A; ``old``: an older one (not withdrawable)."""
+    if not _DISCLOSURE:
+        owner = w.a.people["owner"].user_id
+        _DISCLOSURE["old"] = _disclosure().insert_snapshot(a, w.a.tenant_id, owner, days_ago=2)
+        _DISCLOSURE["live"] = _disclosure().insert_snapshot(a, w.a.tenant_id, owner)
+    return _DISCLOSURE[which]
+
+
+SPECS.update(
+    {
+        ("GET", "/api/v1/disclosure/format"): lambda w, r, a: (
+            "/api/v1/disclosure/format",
+            None,
+            {},
+        ),
+        ("GET", "/api/v1/disclosure/draft"): lambda w, r, a: ("/api/v1/disclosure/draft", None, {}),
+        ("PUT", "/api/v1/disclosure/draft"): lambda w, r, a: (
+            "/api/v1/disclosure/draft",
+            {"inputs": {}, "documents": {}},
+            _if_match(_disclosure().draft_version(a, w.a.tenant_id)),
+        ),
+        ("POST", "/api/v1/disclosure/publish"): lambda w, r, a: (
+            "/api/v1/disclosure/publish",
+            {"confirm_no_student_data": True},
+            {"Idempotency-Key": str(uuid.uuid4())},
+        ),
+        ("GET", "/api/v1/disclosure/snapshots"): lambda w, r, a: (
+            "/api/v1/disclosure/snapshots",
+            None,
+            {},
+        ),
+        ("GET", "/api/v1/disclosure/snapshots/{snapshot_id}"): lambda w, r, a: (
+            f"/api/v1/disclosure/snapshots/{_disclosure_snapshot(w, a, 'live')}",
+            None,
+            {},
+        ),
+        ("POST", "/api/v1/disclosure/snapshots/{snapshot_id}/withdraw"): lambda w, r, a: (
+            f"/api/v1/disclosure/snapshots/{_disclosure_snapshot(w, a, 'old')}/withdraw",
+            {"reason": "Synthetic withdrawal reason"},
+            {},
+        ),
+        ("GET", "/api/v1/disclosure/snapshots/{snapshot_id}/download-url"): lambda w, r, a: (
+            f"/api/v1/disclosure/snapshots/{_disclosure_snapshot(w, a, 'live')}"
+            "/download-url?format=pdf",
+            None,
+            {},
+        ),
+        ("GET", "/api/v1/disclosure/link"): lambda w, r, a: ("/api/v1/disclosure/link", None, {}),
+        ("POST", "/api/v1/disclosure/link/rotate"): lambda w, r, a: (
+            "/api/v1/disclosure/link/rotate",
+            None,
+            {},
+        ),
+    }
+)
 SPECS.update(_privacy().matrix_specs())
 
 
-def _success(method: str, path: str) -> int:  # noqa: PLR0911 - one answer per route family
+def _consents() -> ModuleType:
+    """tests/privacy/r3b_security_support.py (R3-1B consents and breaches of school A)."""
+    name = "sos_test_r3b_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "privacy" / "r3b_security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+SPECS.update(_consents().matrix_specs())
+
+
+def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one answer per route family
     creates = {
         "/api/v1/users",
         "/api/v1/academic-years",
@@ -2497,6 +2684,8 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911 - one answer per r
         "/api/v1/messaging/account/embedded-signup",
         "/api/v1/messaging/account/manual",
         "/api/v1/guardians/{guardian_id}/optins",
+        # R3-1D portal calendar (FR-RDY-005): the school's own event
+        "/api/v1/dq/calendar",
     }
     accepted = {
         "/api/v1/documents",
@@ -2523,11 +2712,19 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911 - one answer per r
         # R2-1C: template provisioning and sync run in the worker.
         "/api/v1/messaging/templates/sync",
     }
-    if method == "POST" and (path in accepted or path in _privacy().MATRIX_ACCEPTED):
-        return 202
-    if method == "POST" and path in (
-        _fees().MATRIX_CREATES | _upi().MATRIX_CREATES | _privacy().MATRIX_CREATES
+    if method == "POST" and path in accepted | _privacy().MATRIX_ACCEPTED | (
+        _consents().MATRIX_ACCEPTED
     ):
+        return 202
+    if (method, path) in _disclosure().MATRIX_STATUS:
+        return int(_disclosure().MATRIX_STATUS[(method, path)])
+    if (method, path) in _consents().MATRIX_STATUS:
+        return int(_consents().MATRIX_STATUS[(method, path)])
+    if method == "POST" and path in _privacy().MATRIX_CREATES | _consents().MATRIX_CREATES:
+        return 201
+    if (method, path) in _privacy().MATRIX_STATUS:
+        return int(_privacy().MATRIX_STATUS[(method, path)])
+    if method == "POST" and path in _fees().MATRIX_CREATES | _upi().MATRIX_CREATES:
         return 201
     if (method, path) in _fees().ONLINE_REFUSED:
         return 409  # guard passed; no Razorpay partner application in tests (R2-2D)
@@ -2552,6 +2749,7 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911 - one answer per r
         "/api/v1/students/{student_id}/guardians/{guardian_id}",
         "/api/v1/tally/parties/{party_id}/links/{student_id}",
         "/api/v1/messaging/account",
+        "/api/v1/dq/calendar/{event_key}",
     ):
         return 204
     return 201 if method == "POST" and path in creates else 200
@@ -2561,6 +2759,11 @@ def _call(api: Any, w: Any, admin: Engine, role: str, key: tuple[str, str], **kw
     if _fees().is_fee_path(key[1]):
         # R2-1B: fees are on for school A only while the request is built and sent.
         with _fees().on(admin, w.a.tenant_id, key[1]):
+            path, body, headers = SPECS[key](w, role, admin)
+            return api.call(w.person(role), key[0], path, json=body, headers=headers, **kw)
+    if _disclosure().is_disclosure_path(key[1]):
+        # R3-1C: the disclosure is offered to CBSE schools only (FR-DISC-001).
+        with _disclosure().cbse_on(admin, w.a.tenant_id):
             path, body, headers = SPECS[key](w, role, admin)
             return api.call(w.person(role), key[0], path, json=body, headers=headers, **kw)
     path, body, headers = SPECS[key](w, role, admin)
@@ -2596,8 +2799,17 @@ def test_SEC_003_role_route_matrix(
     )
     if needs_create:
         expected = 403
+    also = _consents().ALSO_NEEDS.get(key)
+    if also is not None and granted and also not in held:
+        expected = 403  # R3-1B: recording a withdrawal also needs consent.record (FR-DPDP-026)
     if key in REMINDER_ROUTES and granted and "finance.read" not in held:
         expected = 403  # R2-3J: the fees service checks finance.read (FR-MSG-025)
+    if (
+        key == ("POST", "/api/v1/tasks/{task_id}/portal-event")
+        and granted
+        and "task.manage" not in held
+    ):
+        expected = 403  # R3-1D: the circulars service also checks task.manage (FR-RDY-010)
     assert res.status_code == expected, f"{role} {key}: {res.status_code} {res.text}"
     if needs_create:
         assert res.json()["code"] == "student_create_required"

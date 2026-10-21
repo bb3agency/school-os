@@ -329,7 +329,9 @@ def meta_webhook(delivery: MetaDelivery) -> Response:
     """Meta's events for every connected school. The signature (app secret over the raw body)
     was checked by the guard; each entry is routed by its WABA id to one school, its events are
     stored (encrypted, deduplicated) and the worker applies them. A replayed delivery and events
-    of unknown or disconnected accounts are acknowledged without effect."""
+    of unknown or disconnected accounts are acknowledged without effect. A suspended school's
+    account: only parents' STOP replies are recorded (silently, nothing is sent); everything
+    else is acknowledged without effect (owner decisions D31, D35)."""
     service.ensure_available()
     if delivery.duplicate:
         return Response(status_code=200)

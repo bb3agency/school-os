@@ -73,6 +73,7 @@ from app.circulars.schemas import (
     TaskUpdate,
     TaskView,
 )
+from app.circulars.subjects import subject_report
 from app.core import pdf
 from app.core import purge as purging
 from app.core.db import tenant_session
@@ -865,6 +866,7 @@ def _task_out(
         status=task.status,
         overdue=task.status in ACTIVE and task.due_on < today_ist(),
         source=task.source,
+        portal_event_key=task.portal_event_key,
         document_id=task.document_id,
         citation=_citation(task.citation) if shows_source and task.citation else None,
         created_by=_member(names, task.created_by_membership),
@@ -1143,6 +1145,115 @@ def send_reminders(session: Session, *, today: dt.date | None = None) -> int:
             dedupe_key=key,
         )
     return sent
+
+
+# --- portal calendar tasks (R3-1D; FR-RDY-006, FR-RDY-010; ADR-0053) ------------------------------
+
+PORTAL_SOURCE: Final = "portal_calendar"
+
+
+@dataclass(frozen=True, slots=True)
+class PortalTaskRef:
+    """What the portal calendar needs to know about a task it links (FR-RDY-010)."""
+
+    task_id: uuid.UUID
+    source: str
+    document_id: uuid.UUID | None
+    due_on: dt.date
+    owner_membership_id: uuid.UUID
+
+
+def upsert_portal_task(
+    session: Session,
+    *,
+    event_key: str,
+    title: str,
+    due_on: dt.date,
+    owner_membership_id: uuid.UUID,
+    created_by: uuid.UUID,
+    created_by_membership: uuid.UUID,
+) -> uuid.UUID:
+    """The one task of a portal calendar event (``app.dq.calendar_service``, daily job;
+    FR-RDY-006): an open or in-progress task of the event is kept, with its due date and owner
+    moved to the dates and owner in force; a task already done for the same closing date is
+    left alone; otherwise a new task is created (``source = portal_calendar``, due on the
+    closing date). ``created_by``: the person who confirmed the event's dates. Audited as the
+    system (``task.created`` / ``task.updated`` / ``task.assigned``); the caller notifies."""
+    tasks = repo.portal_tasks(session, event_key)
+    active = next((t for t in tasks if t.status in ACTIVE), None)
+    if active is not None:
+        values: dict[str, Any] = {}
+        if active.due_on != due_on:
+            values["due_on"] = due_on
+        if active.owner_membership_id != owner_membership_id:
+            values["owner_membership_id"] = owner_membership_id
+        if values:
+            task = repo.update_task(session, active.id, values)
+            _audit(
+                session,
+                "task.updated",
+                "task",
+                task.id,
+                {"fields": sorted(values), "source": PORTAL_SOURCE},
+                system=True,
+            )
+            if "owner_membership_id" in values:
+                _audit(
+                    session,
+                    "task.assigned",
+                    "task",
+                    task.id,
+                    {"owner_membership_id": task.owner_membership_id},
+                    system=True,
+                )
+        return active.id
+    done = next((t for t in tasks if t.status == "done" and t.due_on == due_on), None)
+    if done is not None:
+        return done.id
+    task = repo.insert_task(
+        session,
+        {
+            "id": new_id(),
+            "title": _cut(title, rules().tasks.max_title_chars),
+            "details": None,
+            "owner_membership_id": owner_membership_id,
+            "due_on": due_on,
+            "status": "open",
+            "source": PORTAL_SOURCE,
+            "portal_event_key": event_key,
+            "document_id": None,
+            "created_by": created_by,
+            "created_by_membership": created_by_membership,
+        },
+    )
+    _audit(
+        session,
+        "task.created",
+        "task",
+        task.id,
+        {
+            "source": PORTAL_SOURCE,
+            "document_id": None,
+            "owner_membership_id": task.owner_membership_id,
+        },
+        system=True,
+    )
+    return task.id
+
+
+def task_for_portal_link(session: Session, ctx: UserContext, task_id: uuid.UUID) -> PortalTaskRef:
+    """A task the caller may change (school-wide ``task.manage``, else 403; a task they cannot
+    reach: 404), for linking it to a portal calendar event (FR-RDY-010)."""
+    if not _school_grant(ctx, TASK_MANAGE):
+        raise Forbidden()
+    task = _visible_task(session, ctx, task_id)
+    return PortalTaskRef(
+        task_id=task.id,
+        source=task.source,
+        document_id=task.document_id,
+        due_on=task.due_on,
+        owner_membership_id=task.owner_membership_id,
+    )
 
 
 # --- parent notices -------------------------------------------------------------------------------
@@ -1938,6 +2049,7 @@ __all__ = [
     "DRAFT_TASK",
     "NOTICE_APPROVE",
     "NOTICE_DRAFT",
+    "PORTAL_SOURCE",
     "READ",
     "READ_EVENT",
     "READ_TASK",
@@ -1949,6 +2061,7 @@ __all__ = [
     "TASK_READ",
     "NoticeForSending",
     "ParentNoticeView",
+    "PortalTaskRef",
     "abandon_draft",
     "abandon_reading",
     "abandon_render",
@@ -1981,9 +2094,12 @@ __all__ = [
     "run_reading",
     "send_reminders",
     "set_task_status",
+    "subject_report",
+    "task_for_portal_link",
     "tenant_data_counts",
     "today_ist",
     "update_notice",
     "update_task",
+    "upsert_portal_task",
     "withdraw_notice",
 ]

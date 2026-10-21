@@ -19,14 +19,24 @@ from pydantic import StringConstraints
 
 from app.authz.context import UserContext
 from app.authz.dependencies import TenantDB, require
-from app.authz.http import Cursor, IdempotencyDep, Limit, Page, etag, if_match_version
+from app.authz.http import Cursor, IdempotencyDep, IfMatch, Limit, Page, etag, if_match_version
+from app.authz.http import OptionalIfMatch as HttpOptionalIfMatch
+from app.dq import calendar_service as calendar
+from app.dq import portal_tasks
 from app.dq import readiness_service as readiness
 from app.dq import service as dq
 from app.dq.schemas import (
+    EVENT_KEY_PATTERN,
     PROFILE_PATTERN,
+    CalendarAssigneeOut,
+    CalendarConfirmIn,
+    CalendarEventIn,
+    CalendarEventOut,
+    CalendarOut,
     FindingFilters,
     FindingOut,
     FindingStatus,
+    PortalTaskLinkIn,
     ProfileOut,
     ReadinessOverviewOut,
     ReadinessRunIn,
@@ -356,4 +366,113 @@ def readiness_slips(
     name = f"verification-slips-{profile_key}.html"
     return HTMLResponse(
         page, headers={**_SLIP_HEADERS, "Content-Disposition": f'inline; filename="{name}"'}
+    )
+
+
+# --- portal calendar (US-3101..US-3104, FR-RDY-001..010, ADR-0053) -----------------------------
+
+CalendarReader = Annotated[UserContext, Depends(require(calendar.READ))]
+CalendarManager = Annotated[UserContext, Depends(require(calendar.MANAGE))]
+EventKey = Annotated[
+    str,
+    Path(
+        pattern=EVENT_KEY_PATTERN,
+        max_length=64,
+        description="Calendar event, e.g. bseap_ssc_2027_nominal_roll, or school:<slug> for the "
+        "school's own event",
+    ),
+]
+
+
+@router.get("/calendar", response_model=CalendarOut)
+def get_calendar(
+    ctx: CalendarReader, db: TenantDB, academic_year_id: uuid.UUID | None = None
+) -> CalendarOut:
+    """The school's portal calendar for an academic year (default: the current one): UDISE+,
+    board registration and nominal-roll windows, APAAR drives and the school's own events that
+    concern this school (by its boards and classes), soonest closing first (permission
+    ``dq.readiness.read``). Each shows the dates in force: ``confirmed`` by a person at the
+    school, else the calendar file's unverified expectation ("Expected around ..."); its state
+    (``expected``, ``confirmed``, ``open``, ``closed``); the owner; and the readiness of its
+    linked profiles in your scope ("142 of 160 ready")."""
+    return calendar.list_calendar(db, ctx, academic_year_id)
+
+
+@router.get("/calendar/assignees", response_model=list[CalendarAssigneeOut])
+def calendar_assignees(ctx: CalendarManager, db: TenantDB) -> list[CalendarAssigneeOut]:
+    """Active staff who can own a portal window (permission ``readiness.calendar.manage``)."""
+    return calendar.assignees(db)
+
+
+@router.put("/calendar/{event_key}", response_model=CalendarEventOut)
+def confirm_calendar_event(
+    *,
+    ctx: CalendarManager,
+    db: TenantDB,
+    event_key: EventKey,
+    body: CalendarConfirmIn,
+    version: HttpOptionalIfMatch,
+    response: Response,
+) -> CalendarEventOut:
+    """Confirm an event's opening and closing dates, where they came from (a circular, the
+    portal, a phone call; optionally the document) and who owns the work (permission
+    ``readiness.calendar.manage``). Confirmed dates win over the expected ones. The first
+    confirmation needs no ``If-Match``; changing one does (400 ``if_match_required``, 412 when
+    stale). An event that does not concern the school: 404. Audited."""
+    out = calendar.confirm(db, ctx, event_key, body, expected_version=version)
+    if out.version is not None:
+        response.headers["ETag"] = etag(out.version)
+    return out
+
+
+@router.post("/calendar", response_model=CalendarEventOut, status_code=201)
+def add_calendar_event(
+    ctx: CalendarManager, db: TenantDB, body: CalendarEventIn, idem: IdempotencyDep
+) -> Response:
+    """Add the school's own event: a label in the school's words (no personal data), its dates,
+    the readiness profiles it concerns and an owner (permission ``readiness.calendar.manage``).
+    It gets reminders like the portal windows. Accepts ``Idempotency-Key``. Audited."""
+    return idem.run(
+        db,
+        body,
+        lambda: calendar.add_event(db, ctx, body),
+        status_code=201,
+        headers=lambda r: {"ETag": etag(r.version)} if r.version is not None else {},
+    )
+
+
+@router.delete("/calendar/{event_key}", status_code=204)
+def remove_calendar_event(
+    *,
+    ctx: CalendarManager,
+    db: TenantDB,
+    event_key: EventKey,
+    academic_year_id: uuid.UUID,
+    version: IfMatch,
+) -> Response:
+    """Remove the school's own event, or undo a confirmation so the expected dates show again
+    (permission ``readiness.calendar.manage``; ``If-Match``). Reminders already sent stay in
+    the history. Audited."""
+    calendar.remove(db, ctx, event_key, academic_year_id, expected_version=version)
+    return Response(status_code=204)
+
+
+tasks_router = APIRouter(prefix="/api/v1/tasks", tags=["data-quality"])
+
+
+@tasks_router.post("/{task_id}/portal-event", response_model=CalendarEventOut)
+def link_task_to_portal_event(
+    ctx: CalendarManager,
+    db: TenantDB,
+    task_id: uuid.UUID,
+    body: PortalTaskLinkIn,
+    idem: IdempotencyDep,
+) -> Response:
+    """Link a task confirmed from a circular's deadline to a portal calendar event: the task's
+    due date becomes the event's confirmed closing date, from that circular (permission
+    ``readiness.calendar.manage`` and a school-wide ``task.manage``, else 403; a task you cannot
+    reach: 404; a task not from a circular: 422 ``not_circular_task``). A person's action, never
+    automatic. Accepts ``Idempotency-Key``. Audited."""
+    return idem.run(
+        db, body, lambda: portal_tasks.link_task(db, ctx, task_id, body), status_code=200
     )

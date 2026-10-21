@@ -15,7 +15,7 @@ from app.core.redaction import verhoeff_check_digit
 from app.privacy import consents_service
 
 pytestmark = pytest.mark.db
-P = sys.modules["sos_test_privacy_support"]
+P = sys.modules["sos_test_consent_support"]
 W = sys.modules["sos_test_api_world"]
 BASE = "/api/v1/students/{}/consents"
 
@@ -176,7 +176,7 @@ def test_FR_DPDP_021_given_needs_the_signed_form_and_history_is_append_only(
         for e in _events(admin_engine, world.a.tenant_id, "consent.recorded")
         if e["resource_id"] == sid and e["summary"]["status"] == "given"
     ]
-    assert event["summary"]["purpose_key"] == P.SHARED_KEY
+    assert event["summary"]["purpose_id"] == str(pid)
     assert event["summary"]["has_form"] is True
 
 
@@ -406,3 +406,68 @@ def test_FR_DPDP_023_forms_pdf_is_an_export_with_step_up(
         ).status_code
         == 403
     )
+
+
+# --- withdrawal through a data-principal request (FR-DPDP-026, ADR-0049 decision 6) ----------
+
+
+def test_FR_DPDP_026_withdrawal_request_records_and_links_both_ways(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    rq = sys.modules["sos_test_privacy_support"]
+    principal, admin = world.person("principal"), world.person("office_admin")
+    pid = P.shared_purpose(api, world.a, admin_engine)
+    sid = P.student(world.a)
+    doc = P.signed_form(admin_engine, world.a, admin)
+    assert P.record(api, admin, sid, P.given(pid, doc)).status_code == 201
+    request = rq.logged(api, admin, rq.body("consent_withdrawal", student_id=sid))
+    path = f"/api/v1/privacy/requests/{request['id']}/consent-withdrawal"
+    body = {"purpose_id": str(pid), "relationship": "mother", "decided_on": "2026-10-01"}
+    owner = api.call(world.person("owner"), "POST", path, json=body)
+    assert owner.status_code == 403, "the owner cannot record consent decisions"
+    res = api.call(principal, "POST", path, json=body)
+    assert res.status_code == 200, res.text
+    out = res.json()
+    (link,) = [x for x in out["links"] if x["link_kind"] == "consent"]
+    assert "consent_withdrawn" in [e["event"] for e in out["events"]]
+    rows = P.consent_rows(admin_engine, sid)
+    assert rows[-1]["status"] == "withdrawn"
+    assert str(rows[-1]["privacy_request_id"]) == request["id"]
+    assert str(rows[-1]["id"]) == link["target_id"]
+    again = api.call(principal, "POST", path, json=body)
+    assert again.status_code == 409
+    assert again.json()["code"] == "consent_not_given"
+    access = rq.logged(api, admin, rq.body("access", student_id=sid))
+    wrong = api.call(
+        principal, "POST", f"/api/v1/privacy/requests/{access['id']}/consent-withdrawal", json=body
+    )
+    assert wrong.status_code == 409
+    assert wrong.json()["code"] == "not_a_consent_withdrawal"
+
+
+def test_FR_DPDP_009_access_report_lists_consents_and_breaches(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    from app.core.subjects import Subject
+    from app.privacy import breach_service, consents_service
+
+    staff = world.person("office_staff")
+    pid = P.shared_purpose(api, world.a, admin_engine)
+    sid = P.student(world.a)
+    assert P.record(api, staff, sid, P.refused(pid, note="Private office note")).status_code == 201
+    breach = P.create_breach(api, world.person("owner"))
+    res = api.call(
+        world.person("owner"),
+        "PUT",
+        f"/api/v1/privacy/breaches/{breach['id']}/affected",
+        json={"student_ids": [str(sid)]},
+    )
+    assert res.status_code == 200, res.text
+    with tenant_session(world.a.tenant_id) as db:
+        (consents,) = consents_service.subject_report(db, Subject("student", sid))
+        (breaches,) = breach_service.subject_report(db, Subject("student", sid))
+    assert consents.class_key == "consents"
+    assert "Refused" in consents.rows[0]
+    assert "Private office note" not in str(consents.rows)
+    assert breaches.class_key == "breach_records"
+    assert P.DESCRIPTION not in str(breaches.rows)

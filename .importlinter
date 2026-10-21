@@ -61,6 +61,7 @@ source_modules =
     app.public
     app.fees
     app.messaging
+    app.disclosure
     app.privacy
 forbidden_modules =
     app.identity.repository
@@ -99,6 +100,7 @@ source_modules =
     app.public
     app.fees
     app.messaging
+    app.disclosure
     app.privacy
 forbidden_modules =
     app.tenancy.repository
@@ -137,6 +139,7 @@ source_modules =
     app.public
     app.fees
     app.messaging
+    app.disclosure
     app.privacy
 forbidden_modules =
     app.platform.repository
@@ -178,6 +181,8 @@ forbidden_modules =
     app.public
     app.fees
     app.messaging
+    app.disclosure
+    app.privacy
 
 # The HTML -> PDF renderer (headless Chromium, bundled font, sandbox setting) is app.core.pdf,
 # a neutral building block. The control plane prints its invoices through it and never through
@@ -220,8 +225,18 @@ source_modules =
     app.public
     app.fees
     app.messaging
-    # R3-1B: every privacy module except breach_sync (and breach_tasks, which runs it), the
-    # sanctioned bridge that pulls SchoolOS incident notices through app.platform.service.
+    app.disclosure
+    # Every privacy module except breach_sync (and breach_tasks, which runs it): R3-1B's sanctioned
+    # bridge that pulls SchoolOS incident notices through app.platform.service (ADR-0050), like
+    # app.breakglass.
+    app.privacy.api
+    app.privacy.config
+    app.privacy.models
+    app.privacy.render
+    app.privacy.repository
+    app.privacy.schemas
+    app.privacy.service
+    app.privacy.tasks
     app.privacy.consents_api
     app.privacy.consents_service
     app.privacy.consents_repository
@@ -270,6 +285,7 @@ source_modules =
     app.public
     app.fees
     app.messaging
+    app.disclosure
     app.privacy
 forbidden_modules =
     app.ops.repository
@@ -308,6 +324,7 @@ source_modules =
     app.public
     app.fees
     app.messaging
+    app.disclosure
     app.privacy
 forbidden_modules =
     app.dq.repository
@@ -346,6 +363,7 @@ source_modules =
     app.public
     app.fees
     app.messaging
+    app.disclosure
     app.privacy
 forbidden_modules =
     app.students.repository
@@ -384,6 +402,7 @@ source_modules =
     app.public
     app.fees
     app.messaging
+    app.disclosure
     app.privacy
 forbidden_modules =
     app.documents.repository
@@ -422,6 +441,7 @@ source_modules =
     app.public
     app.fees
     app.messaging
+    app.disclosure
     app.privacy
 forbidden_modules =
     app.notifications.repository
@@ -460,6 +480,7 @@ source_modules =
     app.public
     app.fees
     app.messaging
+    app.disclosure
     app.privacy
 forbidden_modules =
     app.breakglass.repository
@@ -470,7 +491,7 @@ allow_indirect_imports = True
 # pure (no database, web or tenant modules), so the engine, imports and exports can reuse them
 # anywhere (FR-DQ-003). The engine, service, repository, tasks and routes use the database.
 [importlinter:contract:dq-pure-library]
-name = dq library modules (matching, rules, explanations, checks, masking, profiles, readiness, slip) stay pure
+name = dq library modules (matching, rules, explanations, checks, masking, profiles, readiness, slip, calendar) stay pure
 type = forbidden
 source_modules =
     app.dq.matching
@@ -481,6 +502,8 @@ source_modules =
     app.dq.profiles
     app.dq.readiness
     app.dq.slip
+    # R3-1D portal calendar file, windows and lead days (ADR-0053)
+    app.dq.calendar
 forbidden_modules =
     sqlalchemy
     fastapi
@@ -524,6 +547,7 @@ source_modules =
     app.public
     app.fees
     app.messaging
+    app.disclosure
     app.privacy
 forbidden_modules =
     app.imports.repository
@@ -587,6 +611,7 @@ source_modules =
     app.public
     app.fees
     app.messaging
+    app.disclosure
     app.privacy
 forbidden_modules =
     app.changes.repository
@@ -625,6 +650,7 @@ source_modules =
     app.public
     app.fees
     app.messaging
+    app.disclosure
     app.privacy
 forbidden_modules =
     app.extraction.repository
@@ -662,6 +688,7 @@ source_modules =
     app.public
     app.fees
     app.messaging
+    app.disclosure
     app.privacy
 forbidden_modules =
     app.exports.repository
@@ -721,6 +748,7 @@ source_modules =
     app.public
     app.fees
     app.messaging
+    app.disclosure
     app.privacy
 forbidden_modules =
     app.admin.repository
@@ -761,6 +789,8 @@ source_modules =
     app.public
     app.fees
     app.messaging
+    app.disclosure
+    app.privacy
 forbidden_modules =
     app.admin
 
@@ -821,6 +851,7 @@ source_modules =
     app.public
     app.fees
     app.messaging
+    app.disclosure
     app.privacy
 forbidden_modules =
     app.knowledge.gateway
@@ -1008,6 +1039,7 @@ source_modules =
     app.public
     app.fees
     app.messaging
+    app.disclosure
     app.privacy
 forbidden_modules =
     app.circulars.repository
@@ -1067,6 +1099,7 @@ source_modules =
     app.public
     app.fees
     app.messaging
+    app.disclosure
     app.privacy
 forbidden_modules =
     app.certificates.repository
@@ -1136,6 +1169,7 @@ source_modules =
     app.public
     app.fees
     app.messaging
+    app.disclosure
     app.privacy
 forbidden_modules =
     app.academics.repository
@@ -1174,6 +1208,7 @@ source_modules =
     app.public
     app.fees
     app.messaging
+    app.disclosure
     app.privacy
 forbidden_modules =
     app.insights.repository
@@ -1257,6 +1292,7 @@ source_modules =
     app.public
     app.fees
     app.messaging
+    app.disclosure
     app.privacy
 forbidden_modules =
     app.tally.repository
@@ -1320,6 +1356,7 @@ source_modules =
     app.public
     app.fees
     app.messaging
+    app.disclosure
     app.privacy
 forbidden_modules =
     app.apaar.repository
@@ -1379,6 +1416,7 @@ source_modules =
     app.insights
     app.tally
     app.messaging
+    app.disclosure
     app.fees
     app.privacy
 forbidden_modules =
@@ -1443,6 +1481,7 @@ source_modules =
     app.tally
     app.public
     app.fees
+    app.disclosure
     app.privacy
 forbidden_modules =
     app.messaging.repository
@@ -1531,6 +1570,7 @@ source_modules =
     app.tally
     app.public
     app.messaging
+    app.disclosure
     app.privacy
 forbidden_modules =
     app.fees.repository
@@ -1597,14 +1637,11 @@ forbidden_modules =
     requests
 allow_indirect_imports = True
 
-# --- R3-1B consents and breaches (ADR-0049, ADR-0050) --------------------------------------
-# app.privacy (R3-1A requests and notices, R3-1B consents and the breach register) keeps its
-# tables private: other modules call consents_service / breach_service (R3-1A adds service.py).
-# In tenant-side-without-control-plane only app.privacy.breach_sync (and breach_tasks) may
-# import the control plane: like app.breakglass it pulls SchoolOS incident notices through
-# app.platform.service (ADR-0050 decision 2).
-[importlinter:contract:privacy-internals]
-name = privacy: repositories/models are private (use the privacy services)
+# --- 9. CBSE Appendix IX disclosure (R3-1C; ADR-0051) ----------------------------------------
+# Other modules use only app.disclosure.service.
+
+[importlinter:contract:disclosure-internals]
+name = disclosure: repository/models are private (use app.disclosure.service)
 type = forbidden
 source_modules =
     app.main
@@ -1634,18 +1671,84 @@ source_modules =
     app.insights
     app.tally
     app.public
-    app.messaging
     app.fees
+    app.messaging
+    app.privacy
 forbidden_modules =
+    app.disclosure.repository
+    app.disclosure.models
+allow_indirect_imports = True
+
+# The disclosure's format, value checks and page template stay pure (no DB, web or feature
+# modules besides core.redaction).
+[importlinter:contract:disclosure-pure-library]
+name = disclosure formats/values/templates/config modules stay pure (no DB, web or feature modules)
+type = forbidden
+source_modules =
+    app.disclosure.formats
+    app.disclosure.values
+    app.disclosure.templates
+    app.disclosure.config
+forbidden_modules =
+    sqlalchemy
+    fastapi
+    app.disclosure.service
+    app.disclosure.repository
+    app.tenancy
+    app.identity
+    app.fees
+    app.documents
+    app.public
+allow_indirect_imports = True
+
+# --- R3-1A privacy (ADR-0048) -----------------------------------------------------------------
+[importlinter:contract:privacy-internals]
+name = privacy: repository/models are private (use app.privacy.service)
+type = forbidden
+source_modules =
+    app.main
+    app.core
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.ops
+    app.devtools
+    app.dq
+    app.students
+    app.documents
+    app.notifications
+    app.breakglass
+    app.imports
+    app.changes
+    app.extraction
+    app.exports
+    app.knowledge
+    app.admin
+    app.circulars
+    app.certificates
+    app.apaar
+    app.academics
+    app.insights
+    app.tally
+    app.public
+    app.fees
+    app.messaging
+    app.disclosure
+forbidden_modules =
+    app.privacy.repository
+    app.privacy.models
+    # R3-1B consents and breaches (ADR-0049, ADR-0050)
     app.privacy.consents_repository
     app.privacy.consents_models
     app.privacy.breach_repository
     app.privacy.breach_models
 allow_indirect_imports = True
 
-# Consent and breach configuration and print templates stay pure (no database or web).
+# R3-1B: consent and breach configuration and print templates stay pure (no database or web).
 [importlinter:contract:privacy-pure-library]
-name = privacy config/templates stay pure (no DB, web or feature modules)
+name = privacy consent/breach config and templates stay pure (no DB, web or feature modules)
 type = forbidden
 source_modules =
     app.privacy.consents_config

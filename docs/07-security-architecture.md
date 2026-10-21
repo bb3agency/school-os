@@ -198,6 +198,7 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | dq.findings.waive | — | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — |
 | dq.readiness.read (board and portal readiness, parent verification slips; Aadhaar-as-printed values on them only with student.read_sensitive; ADR-0040) | ✓ | ✓ | ✓ | ✓ | — | ✓ | S | — | ✓ |
 | dq.readiness.manage (run readiness checks that store DQ-030 findings) | — | ✓ | ✓ | ✓ | — | ✓ | — | — | — |
+| readiness.calendar.manage (R3-1D: confirm portal dates, add the school's own events, choose owners; linking a circular task also needs task.manage; ADR-0053) | — | ✓ | ✓ | — | — | ✓ | — | — | — |
 | document.upload (new versions and metadata edits only of documents the caller uploaded, unless they also hold document.manage_acl; AA-10) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | S | — | — |
 | document.read | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | S | S | ✓ |
 | document.manage_acl (also gates document delete) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
@@ -252,6 +253,11 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | consent.record (R3-1B: record a family's decision with the signed form, print forms; ADR-0049) | — | ✓ | ✓ | ✓ | — | — | — | — | — |
 | privacy.breach.read (R3-1B: the school's breach register, duties, clocks and drafts; ADR-0050) | ✓ | ✓ | — | — | — | — | — | — | ✓ |
 | privacy.breach.manage (R3-1B: record and update breaches, duties, affected people, the parent-notice draft) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
+| disclosure.edit (R3-1C: edit the CBSE Appendix IX draft, see the published history, download the published files; CBSE schools only; ADR-0051) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
+| disclosure.publish (R3-1C: publish the disclosure, withdraw it, change its public link; ADR-0051) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
+| privacy.read (R3-1A: requests and grievances list and detail within the reader's student reach, notice records, record classes) | ✓ | ✓ | ✓ | — | — | — | — | — | ✓ |
+| privacy.request.manage (R3-1A: log requests and grievances, record verification, link change requests, build access reports, record notice issues, write responses) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
+| privacy.request.decide (R3-1A: release an access report, approve an erasure, close an access, erasure or grievance request; maker-checker against the person who logged it) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
 
 `auditor_readonly` memberships are time-bound (default 14 days) and read-only.
 
@@ -358,11 +364,10 @@ Unchanged keys used by R2: `certificate.approve`ᴿ (add or withdraw a verificat
 
 **Status: planned (R3; ADR-0048..ADR-0053; lead decisions D36-D46).** Each R3 wave adds its keys to `app/authz/permissions.yaml`, `roles.yaml` and the §6.2 matrix in the same change (the catalog test compares §6.2 with `roles.yaml` exactly, so the keys move there only when built), and the release runs the system-role sync (ADR-0022). Same legend as §6.2. Privacy, breach, disclosure and RTE permissions are school-wide only; `consent.read` follows `apaar.consent.read` (section-scoped for class teachers).
 
+**R3-1A (built 2026-10-21, migration `0066_privacy_requests`):** `privacy.read`, `privacy.request.manage` and `privacy.request.decide`ᴿ moved to the §6.2 matrix, `permissions.yaml` and `roles.yaml`. Reads apply the reader's `student.read_basic` reach (a request about a student outside it, or about a guardian of none of the reader's students, is 404; requests about staff members are visible to every `privacy.read` holder). Closing an access, erasure or grievance request, releasing a report and erasing need `privacy.request.decide` with step-up by someone other than the person who logged the request (service and DB `CHECK`); other kinds close with `privacy.request.manage`. Release note: run the system-role sync after migrating.
+
 | Permission | owner | principal | office_admin | office_staff | accountant | exam_coord | class_teacher | teacher | auditor_ro |
 |---|---|---|---|---|---|---|---|---|---|
-| privacy.read (R3-1A: requests and grievances list and detail within the reader's student reach, notice records, record classes, consent purposes) | ✓ | ✓ | ✓ | — | — | — | — | — | ✓ |
-| privacy.request.manage (R3-1A: log requests and grievances, record verification, link change requests, build access reports, record notice issues, write responses) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
-| privacy.request.decide (R3-1A: release an access report, approve or refuse an erasure, close a grievance; maker-checker against the person who logged it) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
 | disclosure.edit (R3-1C: edit the Appendix IX draft, download published files; ADR-0051) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
 | disclosure.publish (R3-1C: publish, withdraw, change the link) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
 | readiness.calendar.manage (R3-1D: confirm portal dates, add school events, choose owners; ADR-0053) | — | ✓ | ✓ | — | — | ✓ | — | — | — |
@@ -370,11 +375,13 @@ Unchanged keys used by R2: `certificate.approve`ᴿ (add or withdraw a verificat
 | rte.manage (R3-2E: record RTE admissions and documents, request the RTE concession) | — | ✓ | ✓ | — | — | — | — | — | — |
 | rte.claim.manage (R3-2E: prepare, submit and record reimbursement claims) | — | ✓ | ✓ | — | ✓ | — | — | — | — |
 
+`disclosure.edit` and `disclosure.publish`ᴿ are **built** (R3-1C, migration `0065_disclosure`) and live in §6.2.
+
 Unchanged keys used by R3: `tenant.settings.manage`ᴿ (privacy contact, request target, consent purposes, `rte_applicable`), `student.read_basic` (the reach of request lists), `dq.readiness.read` (calendar), `task.read` (portal tasks), `fee.concession.request` is **not** needed for "Request RTE concession" (the RTE module asks `fees.service` with the caller's `rte.manage`; the approval still needs `fee.concession.approve`ᴿ).
 
 **Built by R3-1B (2026-10-21, migration `0067_consents_breach`):** `consent.read`, `consent.record`, `privacy.breach.read`, `privacy.breach.manage`ᴿ are in the catalog, `roles.yaml` and the §6.2 matrix; `platform.incidents.read` (platform_owner, platform_engineer, support_agent, platform_viewer) and `platform.incidents.manage` ᴿ 2P (platform_owner, platform_engineer; marking schools affected needs two different operators) are in §6.5 and `app/platform/roles.yaml`.
 
-**Public guard (R3-1C):** `require_public_handle("school_disclosure")` on `GET /api/v1/public/disclosure/{key}` and `…/documents/{n}`, listed in `app/public/public_routes.yaml` (§11.3).
+**Public guard (R3-1C, built):** `require_public_handle("school_disclosure", key="path", param="key")` on `GET /api/v1/public/disclosure/{key}` and `…/documents/{n}`, listed in `app/public/public_routes.yaml` (§11.3).
 
 ## 7. Tenant isolation (four layers)
 
@@ -466,7 +473,7 @@ Therefore: **No personal data in URLs.** Names (student, parent, staff), phone n
 
 ### 11.1 Anti-automation and failed sign-in monitoring (ASVS 2.2.1, 11.1.4; audit 2026-10-05 P2-07)
 
-- **Edge (shared tier):** WAF rate-based rules per IP: all traffic, `/bff/auth/*`, and the machine paths (`/api/v1/fleet/`, `/api/v1/edge/`); they answer 429 with `Retry-After`. Dedicated hosts have no WAF and Caddy has no built-in rate limiter (only the third-party `caddy-ratelimit` plugin), so they rely on the application limits below.
+- **Edge (shared tier):** WAF rate-based rules per IP: all traffic, `/bff/auth/*`, the machine paths (`/api/v1/fleet/`, `/api/v1/edge/`) and, since R2-4, the public surface (`/p/` and `/v/` 300 per 5 minutes, `/api/v1/webhooks/` 2,000 per 5 minutes because Razorpay and Meta send every school's events from shared addresses; variables in docs/10 §5); they answer 429 with `Retry-After`. Dedicated hosts have no WAF and Caddy has no built-in rate limiter (only the third-party `caddy-ratelimit` plugin), so they rely on the application limits below.
 - **BFF:** per-IP limit on sign-in, step-up and support starts and callbacks; refused callbacks count per IP with exponential backoff; Valkey down falls back to a per-process limiter.
 - **API:** per IP (before authentication), per person, per school, per operator and per route, weighted for writes; credential and sign-in paths fail closed (09 §2.7). The client IP comes from `X-Forwarded-For` only from `SOS_TRUSTED_PROXIES`.
 - **Soft lockout, not hard lockout:** failures are counted per IP and per person + IP, never per account alone, with an exponential delay capped at 15 minutes, so an attacker cannot lock a victim out (ASVS 2.2.1). Cognito's own lockout still applies to passwords typed into its managed login; Cognito threat protection (PLUS tier) and a WAF on the user pools remain an owner decision (P2-07).
@@ -507,7 +514,9 @@ R2 adds the first internet-facing routes that take no staff session: parent link
 
 Tests (planned 2026-10-14, `apps/api/tests/security/`; built across R2-0..R2-3H and the R2-3I hardening suites, docs/14 R2-3I status): route enumeration with the new guards and allowlist; uniform 404 shape and timing band for unknown/expired/revoked handles; rate-limit behaviour; signature tests (valid, invalid, wrong school's secret, rotated secret, replayed event id, oversized body); resolver catalog and isolation tests; no token in any log line (log capture test); public responses are field allowlists (snapshot tests).
 
-### 11.3 Public disclosure page (R3, planned; ADR-0051)
+### 11.3 Public disclosure page (R3; ADR-0051; built R3-1C)
+
+**As built (R3-1C, `wip/r3-disclosure`, migration `0065_disclosure`, 2026-10-21).** The two routes live in `app/disclosure/api.py` (`public_router`, like certificate verification) and are in `tests/public/test_surface_security.py` (uniform 404 for unknown, malformed, revoked, other-kind, unpublished and suspended-school keys; failure budget; service token only; headers). The snapshot allowlist, small-count suppression, withdrawn and suspended cases are in `tests/disclosure/test_api.py`. The penetration-test scope entry (NFR-SEC-008) is R3-2F's.
 
 The Appendix IX page adds one read-only public route family on the parent origin (TB12): `GET /api/v1/public/disclosure/{key}` and `/documents/{n}`, through the BFF with the service token and no user token, guarded by `require_public_handle("school_disclosure")`.
 
@@ -604,7 +613,7 @@ Tests (planned): the route in the public-surface suite (`tests/public/test_surfa
 | SEC-030 | Dedicated host hardening baseline (§13), patching SLAs, off-host encrypted backups, restore test before go-live | Before first dedicated-tier school |
 | SEC-034 | (R2; Meta built in R2-1C, Razorpay built in R2-2D 2026-10-18, §11.2) Webhook authentication: per-school Razorpay secrets and the Meta app secret, HMAC-SHA256 over the raw body in constant time, body limits, event-id dedupe, store-before-acknowledge, provider re-fetch before money is recorded; signature and replay tests | R2 wave 1-2 |
 | SEC-035 | (R2; built for Meta in R2-1C and Razorpay in R2-2D: `fin.payment_connections`, refresh, rotation and revocation jobs) Per-school provider secrets (Razorpay OAuth tokens or keys, webhook secrets, Meta business token, number PIN) wrapped bound to their row; never returned, exported or logged; refresh, rotation and revocation jobs; platform secrets in Secrets Manager | R2 wave 1-2 |
-| SEC-036 | (R2; built in R2-0, R2-1A and R2-3H, hardening suite R2-3I 2026-10-21; open: WAF rate rules on `/p/` and `/v/` are not in `infra/terraform/modules/alb_waf` yet, and the penetration test, scope in [`docs/security/pen-test-scope-r2.md`](security/pen-test-scope-r2.md)) Public surface: separate origin, strict CSP, no staff cookies, BFF service token, uniform 404, `no-referrer`, `no-store`, `noindex`, per-IP and per-handle rate limits, WAF rules on `/p/` and `/v/`; penetration test before first use (NFR-SEC-007) | R2 wave 0-3 |
+| SEC-036 | (R2; built in R2-0, R2-1A and R2-3H, hardening suite R2-3I 2026-10-21, WAF rate rules on `/p/`, `/v/` and `/api/v1/webhooks/` in `infra/terraform/modules/alb_waf` R2-4 2026-10-21 (not yet applied or validated with Terraform); open: the penetration test, scope in [`docs/security/pen-test-scope-r2.md`](security/pen-test-scope-r2.md)) Public surface: separate origin, strict CSP, no staff cookies, BFF service token, uniform 404, `no-referrer`, `no-store`, `noindex`, per-IP and per-handle rate limits, WAF rules on `/p/` and `/v/`; penetration test before first use (NFR-SEC-007) | R2 wave 0-3 |
 | SEC-037 | (R2; built in R2-0, R2-3G and R2-3H; open: revocation on notice withdrawal) Parent link tokens: 256-bit random, SHA-256 only stored, per guardian, expiry, automatic and manual revocation, exchange-and-redirect to a cookie, minimal content | R2 wave 0, 3 |
 | SEC-038 | (R2; built in R2-1B, 2026-10-18, with online refunds in R2-2D) Financial integrity: append-only ledger, frozen receipts, gap-free receipt and refund series, maker-checker with DB `CHECK` on concessions, adjustments, cancellations and refunds, step-up on approvals, daily collection report per collector | R2 wave 1 |
 | SEC-039 | (R2; foundation built in R2-0, 2026-10-17) Public handle resolver `core.resolve_public_handle` pinned in the definer allowlist, two return columns, `definer_access` only on `core.public_handles` and `core.tenants` (ADR-0047) | R2 wave 0 |
@@ -616,6 +625,6 @@ Tests (planned): the route in the public-surface suite (`tests/public/test_surfa
 | SEC-045 | Print views mask C3 values unless `include_sensitive` is asked for, with `student.read_sensitive` and step-up, like exports (parent verification slips; audit 2026-10-17) | R1 |
 | SEC-047 | Print templates never show the typed APAAR ID through the Aadhaar mask (guard test; the exports carry it unmasked as `TypedDigits12`, ADR-0037; audit 2026-10-17) | R1 |
 | SEC-049 | (R3, planned; ADR-0048) Data-principal requests: verification method recorded before any decision; access-report release and erasure by a second person with step-up (DB `CHECK` `decided_by <> logged_by`); report scoped to one subject; request texts encrypted and never logged; registry test that every module contributes (NFR-PRV-007) | R3 wave 1 |
-| SEC-050 | (R3, planned; ADR-0051) Public disclosure: frozen snapshots only, field allowlist, no student items, counts below 10 suppressed, opaque handle, uniform 404, `noindex`, rate limits; route in the public-surface suite and the penetration-test scope (§11.3, NFR-SEC-008) | R3 wave 1 |
+| SEC-050 | (R3; ADR-0051; **built R3-1C**, pen-test scope in R3-2F) Public disclosure: frozen snapshots only, field allowlist, no student items, counts below 10 suppressed, opaque handle, uniform 404, `noindex`, rate limits; route in the public-surface suite and the penetration-test scope (§11.3, NFR-SEC-008) | R3 wave 1 |
 | SEC-051 | (R3, planned; ADR-0052; not scheduled while D10 stands) RTE register as C3: `rte.read` only, never section-scoped, allotment references encrypted, no Aadhaar or income values, import-linter contracts keeping it out of Ask, messages, public pages and certificates | R3 wave 2 (gated) |
 | SEC-052 | (R3, planned; ADR-0050) Breach handling: control-plane incident records without personal data (validated summary, category codes, counts), two-operator confirmation, pull to schools as break-glass (no control-plane write to tenant tables), breach descriptions encrypted, clocks and reminders tested | R3 wave 1 |

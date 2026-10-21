@@ -93,6 +93,8 @@ class Task(Base):
     completed_by: Mapped[uuid.UUID | None]
     completed_at: Mapped[dt.datetime | None]
     cancelled_at: Mapped[dt.datetime | None]
+    # 0064_portal_calendar (R3-1D, FR-RDY-006): the calendar event of a portal task.
+    portal_event_key: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
     updated_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
     version: Mapped[int] = mapped_column(Integer, server_default=text("1"))

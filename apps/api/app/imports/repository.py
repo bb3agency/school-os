@@ -231,6 +231,27 @@ def mark_rows_reverted(session: Session, batch_id: uuid.UUID) -> None:
     )
 
 
+def batches_for_student(
+    session: Session, student_id: uuid.UUID, *, limit: int
+) -> tuple[list[tuple[ImportBatch, int]], int]:
+    """The batches whose rows name ``student_id`` (newest first, at most ``limit``) with the
+    number of such rows in each, and the total number of such batches (FR-DPDP-009)."""
+    per_batch = (
+        select(ImportRow.batch_id, func.count().label("n"))
+        .where(ImportRow.student_id == student_id)
+        .group_by(ImportRow.batch_id)
+        .subquery()
+    )
+    total = int(session.execute(select(func.count()).select_from(per_batch)).scalar_one())
+    result = session.execute(
+        select(ImportBatch, per_batch.c.n)
+        .join(per_batch, per_batch.c.batch_id == ImportBatch.id)
+        .order_by(ImportBatch.created_at.desc(), ImportBatch.id.desc())
+        .limit(limit)
+    )
+    return [(b, int(n)) for b, n in result], total
+
+
 # --- staged cell edits (FR-IMP-008) ---------------------------------------------------------------
 
 

@@ -339,8 +339,36 @@ def export_tables(session: Session) -> list[RecordTable]:
     ]
 
 
+def certificates_of_student(
+    session: Session, student_id: uuid.UUID, *, limit: int
+) -> tuple[list[tuple[Certificate, int]], int]:
+    """One student's certificates, newest request first, each with its total public check count
+    (all codes), and how many the student has in all (data-principal report, FR-DPDP-009)."""
+    checks = (
+        select(func.coalesce(func.sum(V.check_count), 0))
+        .where(V.certificate_id == Certificate.id)
+        .correlate(Certificate)
+        .scalar_subquery()
+    )
+    stmt = (
+        select(Certificate, checks)
+        .where(Certificate.student_id == student_id)
+        .order_by(Certificate.requested_at.desc(), Certificate.id.desc())
+        .limit(limit)
+    )
+    rows = [(c, int(n)) for c, n in session.execute(stmt).tuples()]
+    total = session.scalar(select(func.count()).select_from(C).where(C.c.student_id == student_id))
+    return rows, int(total or 0)
+
+
+def certificate_ids_of_student(session: Session, student_id: uuid.UUID) -> list[uuid.UUID]:
+    return list(session.scalars(select(C.c.id).where(C.c.student_id == student_id)))
+
+
 __all__ = [
     "allocate_serial",
+    "certificate_ids_of_student",
+    "certificates_of_student",
     "count_check",
     "current_tenant_id",
     "export_tables",

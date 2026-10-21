@@ -58,9 +58,13 @@ def list_exports(
     *,
     after: tuple[dt.datetime, uuid.UUID] | None,
     limit: int,
+    exclude_kinds: Sequence[str] = (),
 ) -> list[Export]:
-    """This school's exports, newest first; only ``membership_id``'s unless it is ``None``."""
+    """This school's exports, newest first; only ``membership_id``'s unless it is ``None``.
+    ``exclude_kinds``: kinds listed elsewhere (R3-1A module documents such as access reports)."""
     stmt = select(Export)
+    if exclude_kinds:
+        stmt = stmt.where(Export.kind.not_in(list(exclude_kinds)))
     if membership_id is not None:
         stmt = stmt.where(Export.requested_by_membership == membership_id)
     if after is not None:

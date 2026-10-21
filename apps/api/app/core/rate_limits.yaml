@@ -208,6 +208,8 @@ routes:
   GET /api/v1/dq/readiness: [readiness_reads, readiness_school]
   GET /api/v1/dq/readiness/{profile_key}: [readiness_reads, readiness_school]
   GET /api/v1/dq/readiness/{profile_key}/students: [readiness_reads, readiness_school]
+  # R3-1D (FR-RDY-003): the portal calendar shows each event's readiness counts
+  GET /api/v1/dq/calendar: [readiness_reads, readiness_school]
   POST /api/v1/academic-years/{year_id}/promotions:preview: [heavy_jobs]
   # R2-3G: a broadcast preview reads every guardian of the chosen sections
   POST /api/v1/notices/{notice_id}/broadcasts/preview: [search]
@@ -237,6 +239,16 @@ routes:
   POST /api/v1/messages/search: [search]
   POST /api/v1/messaging/join-slips: [render]
   GET /api/v1/sections/{section_id}/join-slips: [render]
+  # --- R3-1A privacy requests (ADR-0048): request search, letters and notices as print views,
+  # access reports and notice PDFs as exports
+  POST /api/v1/privacy/requests/search: [search]
+  GET /api/v1/privacy/requests/{request_id}/letters/{letter}: [render]
+  GET /api/v1/privacy/templates/{key}/preview: [render]
+  POST /api/v1/privacy/templates/{key}/pdf: [exports, render]
+  POST /api/v1/privacy/requests/{request_id}/report: [exports, render]
+  GET /api/v1/privacy/requests/{request_id}/report/download-url: [exports]
+  GET /api/v1/privacy/files/{export_id}/download-url: [exports]
+  # --- end R3-1A
   # break-glass (generous)
   POST /api/v1/breakglass/support-session: [emergency]
   POST /api/v1/breakglass/grants/{grant_id}/revoke: [emergency]

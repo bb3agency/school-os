@@ -44,6 +44,7 @@ const TENANT: TenantProfile = {
     current_erp_name: "",
     fees_enabled: false,
     parent_language: "en",
+    privacy_request_target_days: 7,
   },
   modules_hidden: [],
   version: 7,

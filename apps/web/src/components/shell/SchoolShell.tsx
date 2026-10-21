@@ -25,6 +25,8 @@ export interface SchoolFeatures {
   messaging?: boolean;
   /** R2-1B fee ledger and receipts (`fees.enabled` plus the school's own switch, FR-FEE-001). */
   fees?: boolean;
+  /** R3-1C CBSE Appendix IX disclosure (ADR-0051): schools whose boards include CBSE only. */
+  disclosure?: boolean;
 }
 
 interface SchoolNavSection {
@@ -161,6 +163,13 @@ export function SchoolShell({
           icon: "checkCircle",
         },
         {
+          // R3-1D (US-3101, ADR-0053): portal and board windows with reminders to staff.
+          href: "/findings/calendar",
+          label: t("portalCalendar.nav"),
+          permission: "dq.readiness.read",
+          icon: "calendar",
+        },
+        {
           href: "/change-requests",
           label: t("changeRequests.nav"),
           permission: ["student.identity_change.request", "student.identity_change.approve"],
@@ -177,6 +186,24 @@ export function SchoolShell({
           href: "/exports",
           label: t("exports.nav"),
           permission: ["export.board", "export.portal", "student.export", "export.read_all"],
+          icon: "file",
+        },
+      ],
+    },
+    {
+      // R3-1A (ADR-0048; docs/17 §5.10): parents' privacy requests, complaints and notices.
+      id: "privacy",
+      items: [
+        {
+          href: "/privacy/requests",
+          label: t("privacy.nav.requests"),
+          permission: "privacy.read",
+          icon: "shieldCheck",
+        },
+        {
+          href: "/privacy/notices",
+          label: t("privacy.nav.notices"),
+          permission: "privacy.read",
           icon: "file",
         },
       ],
@@ -362,6 +389,13 @@ export function SchoolShell({
           icon: "clock",
         },
         {
+          // FR-DPDP-004/006: the privacy contact, the request target and the record classes.
+          href: "/settings/privacy",
+          label: t("privacy.nav.settings"),
+          permission: ["tenant.settings.manage", "privacy.read"],
+          icon: "lock",
+        },
+        {
           // FR-ADM-001: the school's full data export (owner).
           href: "/settings/data-export",
           label: t("admin.nav.dataExport"),
@@ -399,6 +433,14 @@ export function SchoolShell({
           permission: ["payments.configure", "finance.read"],
           feature: "fees",
           icon: "creditCard",
+        },
+        {
+          // R3-1C (US-2901, ADR-0051): the CBSE Appendix IX disclosure, CBSE schools only.
+          href: "/settings/disclosure",
+          label: t("disclosure.nav"),
+          permission: "disclosure.edit",
+          feature: "disclosure",
+          icon: "file",
         },
         {
           // R2-1C (US-2201, ADR-0043): the school's own WhatsApp number and its settings.

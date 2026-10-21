@@ -159,6 +159,9 @@ EXPECTED_TABLES = {
     "change_requests",
     "dq_runs",
     "dq_findings",
+    # R3-1D (0064_portal_calendar, ADR-0053): confirmed portal dates and reminders sent.
+    "portal_calendar_dates",
+    "portal_reminders",
     "import_batches",
     "import_mapping_templates",
     "documents",
@@ -199,9 +202,18 @@ EXPECTED_TABLES = {
     "messaging_settings",
     "messaging_optins",
     "messaging_messages",
+    # R3-1C (FR-DISC-012): the CBSE disclosure draft, snapshots and published documents.
+    "disclosure_drafts",
+    "disclosure_snapshots",
+    "disclosure_snapshot_documents",
     # R2-3G sending (0061_messaging_sends): broadcast counts and automatic-run history.
     "messaging_broadcasts",
     "messaging_send_runs",
+    # R3-1A privacy (0066_privacy_requests, FR-DPDP-018): texts only with include_sensitive.
+    "privacy_notices",
+    "privacy_requests",
+    "privacy_request_events",
+    "privacy_request_links",
     "retention_settings",
     # R2-1B fees (0058_fees_core, FR-FEE-027): every fin table, empty ones too.
     "fees_fee_settings",

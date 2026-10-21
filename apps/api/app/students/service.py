@@ -130,6 +130,7 @@ from app.students.schemas import (
     ValueRecorded,
 )
 from app.students.search import parse_query, search_config, translit_key
+from app.students.subjects import subject_report as subject_report  # noqa: PLC0414 - re-export
 from app.tenancy import service as tenancy
 
 READ: Final = "student.read_basic"

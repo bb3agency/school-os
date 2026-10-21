@@ -22,6 +22,7 @@ from app.core.config import get_settings
 from app.core.logging import bind_task_context, clear_context, reset_context, setup_logging
 from app.core.telemetry import setup_telemetry
 from app.documents.tasks import beat_schedule as documents_beat_schedule
+from app.dq.tasks import beat_schedule as dq_beat_schedule
 from app.exports.tasks import beat_schedule as exports_beat_schedule
 from app.fees.tasks import beat_schedule as fees_beat_schedule
 from app.fees.upi_tasks import beat_schedule as fees_upi_beat_schedule
@@ -35,6 +36,7 @@ from app.notifications.tasks import beat_schedule as notifications_beat_schedule
 from app.ops.tasks import beat_schedule as ops_beat_schedule
 from app.platform.tasks import beat_schedule as platform_beat_schedule
 from app.privacy.breach_tasks import beat_schedule as breach_beat_schedule
+from app.privacy.tasks import beat_schedule as privacy_beat_schedule
 from app.public.tasks import beat_schedule as public_beat_schedule
 from app.tally.tasks import beat_schedule as tally_beat_schedule
 
@@ -51,6 +53,7 @@ import app.breakglass.service  # isort: skip
 import app.changes.service  # isort: skip
 import app.circulars.service  # isort: skip
 import app.documents.service  # isort: skip
+import app.disclosure.service  # isort: skip
 import app.dq.service  # isort: skip
 import app.exports.service  # isort: skip
 import app.extraction.service  # isort: skip
@@ -63,6 +66,7 @@ import app.notifications.service  # isort: skip
 import app.ops.service  # isort: skip
 import app.privacy.breach_service  # isort: skip
 import app.privacy.consents_service  # isort: skip
+import app.privacy.service  # isort: skip  (R3-1A: also registers the access-report builder)
 import app.public.service  # isort: skip
 import app.students.service  # isort: skip
 import app.tally.service  # noqa: F401  isort: skip
@@ -101,6 +105,10 @@ TASK_MODULES: list[str] = [
     "app.fees.tasks_online",
     # R3-1B breach register: SchoolOS notice pull and duty reminders (every minute).
     "app.privacy.breach_tasks",
+    # R3-1C CBSE disclosure (ADR-0051): the HTML file and A4 PDF of a snapshot (queue pdf).
+    "app.disclosure.tasks",
+    # R3-1A privacy requests: the daily due-date reminder.
+    "app.privacy.tasks",
 ]
 
 
@@ -146,6 +154,8 @@ def create_celery() -> Celery:
             "imports.commit": {"queue": "ingest"},
             "imports.purge_raw_files": {"queue": "maintenance"},
             # FR-DQ-002: data-quality runs (outbox consumers and queued runs) on queue "dq".
+            # R3-1D (FR-RDY-006): the daily portal calendar reminders are database work only.
+            "dq.send_portal_reminders": {"queue": "maintenance"},
             "dq.*": {"queue": "dq"},
             # US-402: register-photo extraction runs on the ocr queue.
             "extraction.*": {"queue": "ocr"},
@@ -196,6 +206,8 @@ def create_celery() -> Celery:
             # FR-NOTICE-003: parent notices are drafted in the background, next to the reading.
             "circulars.draft_notice": {"queue": "ingest"},
             "circulars.render_notice": {"queue": "pdf"},
+            # R3-1C (FR-DISC-011): the disclosure's HTML file and A4 PDF on the Chromium workers.
+            "disclosure.render_files": {"queue": "pdf"},
             "circulars.send_task_reminders": {"queue": "maintenance"},
             # M5 (FR-EW-005..006, FR-EW-017): the early-warning rules after attendance and
             # marks writes (outbox consumer) and daily, overdue reminders and the retention
@@ -240,6 +252,8 @@ def create_celery() -> Celery:
             **admin_beat_schedule(),
             # FR-TASK-007: task due-soon and overdue reminders (daily, 07:10 IST).
             **circulars_beat_schedule(),
+            # FR-RDY-006 (R3-1D): portal calendar reminders to staff (daily, 07:30 IST).
+            **dq_beat_schedule(),
             # docs/05 §13: Ask-the-school questions and answers deleted after 180 days (daily).
             **knowledge_beat_schedule(),
             # FR-EW-005, FR-EW-006, FR-EW-017: early-warning rules (17:40 IST), overdue flag
@@ -247,6 +261,8 @@ def create_celery() -> Celery:
             **insights_beat_schedule(),
             # FR-TALLY-009: silent Tally agents notified; old sync records deleted (30 min).
             **tally_beat_schedule(),
+            # FR-DPDP-006 (R3-1A): privacy requests due tomorrow or overdue, 07:00 IST.
+            **privacy_beat_schedule(),
             # FR-PUB-006: expired parent link handles deleted 30 days after expiry (daily).
             **public_beat_schedule(),
             # FR-MSG-006, FR-MSG-020, FR-MSG-021, FR-MSG-023: webhook inbox sweep (1 min),

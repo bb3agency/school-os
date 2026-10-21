@@ -282,12 +282,25 @@ NON_UUID_PATH_PARAMS = {
     ("GET", "/api/v1/dq/readiness/{profile_key}/students/{student_id}", "profile_key"),
     ("POST", "/api/v1/dq/readiness/{profile_key}/runs", "profile_key"),
     ("GET", "/api/v1/dq/readiness/{profile_key}/slips", "profile_key"),
+    # R3-1D: a portal calendar event key (ADR-0053), bounded and pattern-checked; it names a
+    # calendar file event or the school's own event, found only inside the caller's school.
+    ("PUT", "/api/v1/dq/calendar/{event_key}", "event_key"),
+    ("DELETE", "/api/v1/dq/calendar/{event_key}", "event_key"),
     # R2-1A: a certificate verification code (ADR-0045), bounded; the guard shape-checks it.
     ("GET", "/api/v1/public/certificates/{code}", "code"),
     # R2-2D: the Razorpay webhook route value (ADR-0047 decision 3), bounded; the guard resolves.
     ("POST", "/api/v1/webhooks/razorpay/{route}", "route"),
     # R3-1B: a breach draft's template key (family_notice or board_outline), bounded.
     ("GET", "/api/v1/privacy/breaches/{breach_id}/drafts/{draft}", "draft"),
+    # R3-1C: the disclosure link key (ADR-0051), bounded; the guard shape-checks and resolves it;
+    # a published document's number (bounded int).
+    ("GET", "/api/v1/public/disclosure/{key}", "key"),
+    ("GET", "/api/v1/public/disclosure/{key}/documents/{n}", "key"),
+    ("GET", "/api/v1/public/disclosure/{key}/documents/{n}", "n"),
+    # R3-1A: notice template keys and letter keys are closed Literal enums (ADR-0048).
+    ("GET", "/api/v1/privacy/templates/{key}/preview", "key"),
+    ("POST", "/api/v1/privacy/templates/{key}/pdf", "key"),
+    ("GET", "/api/v1/privacy/requests/{request_id}/letters/{letter}", "letter"),
 }
 
 
@@ -320,6 +333,12 @@ _SECRET_NAME = re.compile(
 
 # Response fields whose names look like secrets, with the reason they may be returned.
 RESPONSE_FIELD_ALLOWLIST = {
+    # R3-1A privacy (ADR-0048): template, record-class and letter catalog keys.
+    "app.privacy.schemas.PrivacyErasurePlanRowOut.class_key": "record class code",
+    "app.privacy.schemas.PrivacyErasureResultRowOut.class_key": "record class code",
+    "app.privacy.schemas.PrivacyRecordClassOut.key": "record class code",
+    "app.privacy.schemas.PrivacyTemplateOut.key": "notice template code",
+    "app.privacy.schemas.PrivacyNoticeOut.template_key": "notice template code",
     # Catalog and code keys, not credentials.
     "app.admin.schemas.RetentionCategoryOut.key": "retention category code",
     "app.students.schemas.AttributeOut.key": "attribute catalog key",
@@ -336,6 +355,15 @@ RESPONSE_FIELD_ALLOWLIST = {
     "app.certificates.schemas.CertificatePreview.format_key": "TC format code",
     "app.certificates.schemas.CertificateOut.format_key": "TC format code",
     "app.dq.schemas.FindingOut.attribute_key": "attribute catalog key",
+    # R3-1C (ADR-0051): disclosure format, section and item codes.
+    "app.disclosure.schemas.DisclosureFormatOut.key": "disclosure format code",
+    "app.disclosure.schemas.FormatSectionOut.key": "disclosure section code",
+    "app.disclosure.schemas.FormatItemOut.key": "disclosure item code",
+    "app.disclosure.schemas.PublicSectionOut.key": "disclosure section code",
+    "app.disclosure.schemas.PublicItemOut.key": "disclosure item code",
+    "app.disclosure.schemas.DisclosureDraftOut.format_key": "disclosure format code",
+    "app.disclosure.schemas.SnapshotOut.format_key": "disclosure format code",
+    "app.disclosure.schemas.SnapshotDetailOut.format_key": "disclosure format code",
     "app.dq.schemas.FindingValue.attribute_key": "attribute catalog key",
     "app.dq.schemas.FindingOut.profile_key": "DQ profile code",
     "app.dq.schemas.ProfileOut.key": "DQ profile code",
@@ -351,6 +379,11 @@ RESPONSE_FIELD_ALLOWLIST = {
     "app.dq.schemas.RunOut.profile_key": "DQ profile code",
     "app.dq.schemas.ReadinessProfileOut.key": "DQ profile code",
     "app.dq.schemas.ReadinessFieldOut.attribute_key": "attribute catalog key",
+    # R3-1D (ADR-0053): portal calendar event keys and readiness profile codes, not secrets.
+    "app.dq.schemas.PortalWindowOut.event_key": "portal calendar event code",
+    "app.dq.schemas.CalendarEventOut.event_key": "portal calendar event code",
+    "app.dq.schemas.CalendarReadinessOut.profile_key": "DQ profile code",
+    "app.circulars.schemas.TaskOut.portal_event_key": "portal calendar event code",
     "app.exports.schemas.ExportProfileOut.key": "export profile code",
     "app.exports.schemas.ExportOut.profile_key": "export profile code",
     "app.imports.schemas.Issue.message_key": "i18n message key",
@@ -422,7 +455,20 @@ ACTION_SEGMENTS = {
 
 # Creating POSTs that do not take Idempotency-Key, with the reason.
 IDEMPOTENCY_EXEMPT = {
+    ("POST", "/api/v1/disclosure/link/rotate"): "a state change (step-up, audited): a repeat "
+    "only issues another link and revokes the previous one",
     ("POST", "/api/v1/fleet/heartbeat"): "machine route; nonce and timestamp make it replay-safe",
+    # R3-1A privacy (ADR-0048).
+    ("POST", "/api/v1/privacy/templates/{key}/pdf"): "makes a short-lived file of a public "
+    "template; a repeat makes another copy and changes no record",
+    ("POST", "/api/v1/privacy/requests/{request_id}/report"): "rebuilds the request's access "
+    "report; a repeat replaces the unreleased file (a released one must be released again)",
+    ("POST", "/api/v1/privacy/requests/{request_id}/links"): "insert-only, unique per request, "
+    "kind and target; a repeat changes nothing",
+    ("POST", "/api/v1/privacy/requests/{request_id}/erasure"): "a decision on a locked request: "
+    "a repeat answers 409 erasure_already_decided",
+    ("POST", "/api/v1/privacy/requests/{request_id}/report/release"): "a state transition: a "
+    "repeat answers 409 report_already_released",
     ("POST", "/api/v1/public/links/exchange"): "a read: checks a parent link token, stores "
     "nothing (ADR-0046; no member, so no per-person replay store)",
     # R2-3H parent pages (ADR-0046 decision 9, ADR-0044 decision 4).
@@ -432,6 +478,8 @@ IDEMPOTENCY_EXEMPT = {
     "language); repeating it changes nothing",
     # R3-1B: one parent-notice draft per call is the point (the person approving keeps one);
     # adding a school to an incident is an upsert keyed by the school.
+    ("POST", "/api/v1/privacy/requests/{request_id}/consent-withdrawal"): "a state change of "
+    "the consent register: a repeat answers 409 consent_not_given",
     ("POST", "/api/v1/privacy/breaches/{breach_id}/notice-draft"): "each call makes a new "
     "draft on purpose (the AI draft may be redone); nothing is sent",
     ("POST", "/api/v1/platform/incidents/{incident_id}/schools"): "an upsert keyed by the "

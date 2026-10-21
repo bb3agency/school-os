@@ -47,6 +47,10 @@
 | Erase whatever the parent asks and let the school sort it out | Official registers and accounting records have legal retention; erasing them breaks other duties (docs/08 §3 PRV-009) |
 | Keep templates only inside the app | The DPA, terms and DPIA are signed outside the app; Markdown in the repo is reviewable and versioned with the code that implements it |
 
+## Implementation note (R3-1A, 2026-10-21)
+
+Built in `app/privacy` with migration `0066_privacy_requests`. Decision 6's registry is a YAML file read by the privacy service, which calls each contributor's `service.subject_report` / `service.erase_for_subject` by name (protocol types in `app/core/subjects.py`, so no module imports `app.privacy`); the access report and the filled notice PDF are "module documents" of `app.exports` (kinds `subject_report`, `privacy_notice`) that only the privacy routes request and serve. Decision 4's catalogue gained the rule `no_personal_data` for configuration and bookkeeping classes. Build-review choices (guardian contacts shown as Yes/No in a child's report, opt-ins kept append-only, early-warning re-flag note, pinned document links) are in docs/05 §16.1 and docs/08 §16.
+
 ## Related requirements
 
 FR-DPDP-001..018, NFR-PRV-004, NFR-PRV-006, NFR-PRV-007, SEC-049, PRV-030..PRV-034; docs/02 C26; docs/03 §3.27; docs/05 §16.1; docs/07 §6.8; docs/08 §16; docs/09 "R3 planned endpoints"; docs/17 §5.10; `docs/legal/`.

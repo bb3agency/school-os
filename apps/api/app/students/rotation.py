@@ -121,6 +121,13 @@ CIPHERTEXT_COLUMNS: Final[tuple[tuple[str, str], ...]] = (
     # registers their re-encryption).
     ("ops.breach_records", "description_ciphertext"),
     ("ops.breach_records", "containment_ciphertext"),
+    # R3-1A (0066_privacy_requests): request texts, notes, responses and nominee details
+    # (app.privacy registers their re-encryption).
+    ("ops.privacy_requests", "requester_name_ciphertext"),
+    ("ops.privacy_requests", "request_ciphertext"),
+    ("ops.privacy_requests", "notes_ciphertext"),
+    ("ops.privacy_requests", "response_ciphertext"),
+    ("ops.privacy_requests", "nominee_ciphertext"),
 )
 
 # Ciphertext-looking columns that are NOT under a tenant DEK, with the reason.

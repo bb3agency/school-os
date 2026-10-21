@@ -54,3 +54,11 @@ routes:
     guard: public_handle
     kinds: [parent_optin]
   # --- end R2-3H ------------------------------------------------------------------------------
+  # --- R3-1C CBSE Appendix IX disclosure page (ADR-0051 amends ADR-0047 decision 1) ----------
+  GET /api/v1/public/disclosure/{key}:
+    guard: public_handle
+    kinds: [school_disclosure]
+  GET /api/v1/public/disclosure/{key}/documents/{n}:
+    guard: public_handle
+    kinds: [school_disclosure]
+  # --- end R3-1C ------------------------------------------------------------------------------

@@ -1983,7 +1983,12 @@
       "timezone_required": "Choose a date and time.",
       "too_many": "Too many people listed: at most 5,000.",
       "too_long": "This is too long. Shorten it.",
-      "unknown_suggestion": "Choose one of the suggestions shown."
+      "unknown_suggestion": "Choose one of the suggestions shown.",
+      "not_circular_task": "Only a task confirmed from a circular can confirm a portal date.",
+      "unknown_profile": "Choose a readiness check from the list.",
+      "response_required": "Write the answer before closing a complaint.",
+      "audience_mismatch": "This notice is for a different audience. Choose the matching notice.",
+      "unknown_version": "This version does not exist. Use the version printed on the notice."
     },
     "api": {
       "generic": {
@@ -6852,6 +6857,13 @@
         "type": "Choose the certificate",
         "check": "Check what it prints",
         "details": "Fill the details and issue"
+      },
+      "feeNote": {
+        "title": "Fees outstanding (for your information)",
+        "body": "{balance} is outstanding on this student's fee account.",
+        "bodyOverdue": "{balance} is outstanding on this student's fee account; {overdue} of it is overdue since {since}.",
+        "notPrinted": "This is never printed on the TC and does not stop it being issued or approved. You may remind the parent.",
+        "open": "Open the fee account"
       }
     },
     "registers": {
@@ -8245,6 +8257,20 @@
       "footer": "Certificate check by SchoolOS for the school that issued it.",
       "masthead": "SchoolOS",
       "kicker": "Certificate check for receiving schools, offices and employers"
+    },
+    "disclosure": {
+      "meta": "Mandatory public disclosure",
+      "metaSchool": "{school}: mandatory public disclosure",
+      "masthead": "Mandatory public disclosure",
+      "kicker": "Mandatory public disclosure (CBSE Appendix IX)",
+      "title": "Mandatory public disclosure (CBSE Appendix IX)",
+      "published": "Published by {school} on {date}.",
+      "prepared": "Prepared with SchoolOS.",
+      "openPdf": "Open the PDF",
+      "notProvided": "Not provided",
+      "notFoundTitle": "Page not found",
+      "notFoundBody": "This disclosure link is not in use. Ask the school for its current link, or open the disclosure from the school's own website.",
+      "busyBody": "The page could not be loaded just now. Try again in a minute."
     }
   },
   "messaging": {
@@ -8487,7 +8513,8 @@
         "purpose": "Message",
         "language": "Language",
         "phone": "Mobile",
-        "status": "Status"
+        "status": "Status",
+        "link": "Parent link"
       },
       "purposes": {
         "optin_confirm": "Joining confirmation",
@@ -8647,6 +8674,10 @@
       "already_queued": {
         "title": "Already sent",
         "body": "This receipt was already sent to every guardian who agreed."
+      },
+      "payments_not_connected": {
+        "title": "Online payments are not connected",
+        "body": "Connect online payments in payment settings first, then send payment links."
       }
     },
     "historyTitle": "Message history",
@@ -8762,7 +8793,9 @@
       "confirm": "{count, plural, one {Send # reminder} other {Send # reminders}}",
       "nobody": "Nobody chosen can get a reminder now.",
       "queued": "{count, plural, =0 {Nothing new was queued: everyone was reminded already.} one {# reminder is queued. It goes out outside quiet hours.} other {# reminders are queued. They go out outside quiet hours.}}",
-      "done": "Done"
+      "done": "Done",
+      "paymentsNotConnected": "Online payments are not connected, so parents could not pay from the page.",
+      "openPayments": "Open payment settings"
     },
     "receipt": {
       "label": "WhatsApp",
@@ -8777,6 +8810,28 @@
       "noOptin": "No guardian agreed to fee messages on WhatsApp.",
       "cancelled": "Cancelled receipts are not sent on WhatsApp.",
       "blocked": "WhatsApp cannot send messages now. Check WhatsApp settings."
+    },
+    "paymentLinks": {
+      "title": "Send payment links on WhatsApp",
+      "descriptionRows": "{count, plural, one {# student chosen.} other {# students chosen.}} Each guardian who agreed to fee messages gets the amount overdue and a link to the dues page, where they can pay online.",
+      "descriptionAll": "Everyone in this list. Each guardian who agreed to fee messages gets the amount overdue and a link to the dues page, where they can pay online.",
+      "previewLabel": "Who will get a payment link",
+      "alreadySent": "Already sent a payment link today",
+      "consequence": "Messages go out from the school's WhatsApp number outside quiet hours and cannot be called back. A guardian gets at most one payment link a day for each student. The school receives the money directly.",
+      "confirm": "{count, plural, one {Send # payment link} other {Send # payment links}}",
+      "nobody": "Nobody chosen can get a payment link now.",
+      "queued": "{count, plural, =0 {Nothing new was queued: everyone got a payment link today already.} one {# payment link is queued. It goes out outside quiet hours.} other {# payment links are queued. They go out outside quiet hours.}}"
+    },
+    "revokeLink": {
+      "open": "Stop link",
+      "rowLabel": "Stop the link of the {purpose} sent {when}",
+      "title": "Stop this parent link?",
+      "description": "{purpose} sent {when}.",
+      "consequence": "The page this message opens stops working for the parent at once. This cannot be undone; send a new message if the parent needs the page again.",
+      "confirm": "Stop link",
+      "revoked": "The link no longer works.",
+      "alreadyStopped": "The link had already stopped working. Nothing changed.",
+      "done": "Done"
     }
   },
   "fees": {
@@ -9062,7 +9117,9 @@
       "reasonCode": "Why",
       "concessionsTitle": "Concessions",
       "adjustmentsTitle": "Adjustments",
-      "none": "None yet."
+      "none": "None yet.",
+      "sendPaymentLink": "Send payment link on WhatsApp",
+      "tabMessages": "Messages"
     },
     "approvals": {
       "title": "Fee approvals",
@@ -9154,14 +9211,18 @@
         "oldest": "Oldest due date",
         "lastPayment": "Last payment",
         "overdue": "Overdue",
-        "overdueInr": "Overdue (₹)"
+        "overdueInr": "Overdue (₹)",
+        "actions": "Actions"
       },
       "filterLabel": "Filter dues",
       "totalsLabel": "Totals of overdue fees",
       "noResultsTitle": "No student in this class has an overdue fee",
       "selectRow": "Select {name}",
       "sendReminder": "Send reminder",
-      "remindAll": "Send reminders to everyone in this list"
+      "remindAll": "Send reminders to everyone in this list",
+      "sendPaymentLink": "Send payment link",
+      "paymentLinkAll": "Send payment links to everyone in this list",
+      "rowActions": "Actions for {name}"
     },
     "setup": {
       "title": "Fee setup",
@@ -10222,6 +10283,680 @@
       "pulled_automatically": {
         "title": "SchoolOS notices arrive by themselves",
         "body": "Record only breaches on the school's side here."
+      }
+    }
+  },
+  "portalCalendar": {
+    "nav": "Portal calendar",
+    "title": "Portal calendar",
+    "description": "UDISE+, board registration and nominal-roll windows and APAAR drives for your school, with who owns the work and how many students are ready.",
+    "descriptionYear": "Academic year {year}: UDISE+, board registration and nominal-roll windows and APAAR drives for your school, with who owns the work and how many students are ready.",
+    "unverifiedTitle": "Expected dates are not official",
+    "unverifiedBody": "Dates marked “Expected around” come from public notices and earlier years. Confirm each date when the circular or the portal shows it; confirmed dates are used for reminders.",
+    "tableCaption": "Portal and board windows",
+    "colEvent": "Window",
+    "colWindow": "Dates",
+    "colOwner": "Owner",
+    "colState": "State",
+    "colReadiness": "Students ready",
+    "ownEvent": "Our own event",
+    "noOwner": "Nobody yet",
+    "formerStaff": "Former staff member",
+    "noReadiness": "No readiness check",
+    "expectedAround": "Expected around {range}",
+    "confirmedRange": "Confirmed: {from} – {to}",
+    "closesIn": "{days, plural, =0 {Closes today} one {Closes tomorrow} other {Closes in # days}}",
+    "nextWindow": "Next window: {event}.",
+    "openCalendar": "Portal calendar",
+    "emptyTitle": "No portal windows for this year",
+    "emptyBody": "None of the shipped windows concern your school's boards and classes. Add your own event if a circular names a date.",
+    "state": {
+      "expected": "Expected",
+      "confirmed": "Confirmed",
+      "open": "Open now",
+      "closed": "Closed"
+    },
+    "portal": {
+      "udise_plus": "UDISE+",
+      "bseap": "AP SSC board (BSEAP)",
+      "cbse": "CBSE",
+      "cisce": "CISCE",
+      "apaar": "APAAR",
+      "school": "Our own event"
+    },
+    "dialog": {
+      "opensOn": "Opens on",
+      "closesOn": "Closes on",
+      "dateHint": "Type the date as {format}, for example {example}.",
+      "dateInvalid": "Type a date as {format}, for example {example}.",
+      "closesInvalid": "Type a date as {format} that is on or after the opening date.",
+      "source": "Where the date came from",
+      "sourceHint": "So others can check it later.",
+      "sourceKind": {
+        "circular": "A circular",
+        "portal": "The portal screen",
+        "phone": "A phone call",
+        "other": "Somewhere else"
+      },
+      "document": "Circular or document",
+      "documentHint": "Optional. Pick the circular that gives the date.",
+      "noDocument": "No document",
+      "keptDocument": "The document already linked",
+      "owner": "Who owns the work",
+      "ownerHint": "They get a task and reminders 30, 14, 7 and 1 days before the window closes.",
+      "nobody": "Nobody yet",
+      "formerStaff": "Former staff member",
+      "label": "Event name",
+      "labelHint": "In your own words, for example “Mandal UDISE+ review meeting”. No names of students or parents."
+    },
+    "confirm": {
+      "open": "Confirm dates",
+      "change": "Change dates",
+      "title": "Confirm the dates",
+      "description": "{event}: type the dates the circular or the portal gives.",
+      "save": "Save dates",
+      "consequence": "Reminders and the owner's task follow these dates from tomorrow morning."
+    },
+    "add": {
+      "open": "Add our own event",
+      "title": "Add our own event",
+      "description": "A date your school must meet that is not in the list, such as a mandal meeting or a district deadline.",
+      "save": "Add event"
+    },
+    "remove": {
+      "openOwn": "Remove",
+      "openConfirmed": "Undo confirmation",
+      "titleOwn": "Remove this event?",
+      "titleConfirmed": "Undo the confirmed dates?",
+      "confirmOwn": "Remove event",
+      "confirmConfirmed": "Undo confirmation",
+      "consequenceOwn": "No more reminders will be sent for it. Reminders already sent stay in the history.",
+      "consequenceConfirmed": "The expected dates show again and nobody owns the work until you confirm again."
+    },
+    "errors": {
+      "version_mismatch": {
+        "title": "Changed meanwhile",
+        "body": "Someone else changed these dates. The page shows the latest; try again."
+      },
+      "if_match_required": {
+        "title": "Reload first",
+        "body": "These dates were confirmed meanwhile. Reload the page and try again."
+      },
+      "not_found": {
+        "title": "Not on your calendar",
+        "body": "This window does not concern your school, or it was removed. Reload the page."
+      },
+      "conflict": {
+        "title": "Try again",
+        "body": "An event with this name was just added. Save it again."
+      }
+    },
+    "link": {
+      "open": "Link to a portal window",
+      "title": "Link to a portal window",
+      "description": "The task is due on {date}. Choose the portal window this circular's deadline is for.",
+      "event": "Portal window",
+      "choose": "Choose a window",
+      "save": "Link and confirm the date",
+      "consequence": "The window's closing date becomes the task's due date, confirmed from this circular."
+    }
+  },
+  "disclosure": {
+    "nav": "CBSE disclosure",
+    "title": "CBSE disclosure (Appendix IX)",
+    "description": "The mandatory public disclosure for CBSE schools. SchoolOS fills what it already holds; you type the rest, choose documents and publish when you decide.",
+    "notAllowedTitle": "Only the owner, principal and office admin can see this",
+    "notAllowedBody": "Ask your owner or principal if you need to change the school's CBSE disclosure.",
+    "hiddenTitle": "Only for CBSE schools",
+    "hiddenBody": "The Appendix IX disclosure is offered when the school's boards include CBSE. The owner or principal can change the boards in school settings.",
+    "unverifiedTitle": "Format not yet confirmed with a CBSE school",
+    "unverifiedBody": "This list follows public summaries of CBSE's Appendix IX. Check it against the affiliation bye-laws before you rely on it.",
+    "fromSchoolOs": "From SchoolOS",
+    "fromSettingsHint": "From school settings. Change it there.",
+    "fromRecordsHint": "Counted from SchoolOS records now. Publishing copies today's value.",
+    "notRecorded": "Not recorded in SchoolOS",
+    "tableLabel": "Values from SchoolOS",
+    "documentsAlso": "Documents for this item (optional)",
+    "contactHint": "Shown on the public page. Phone numbers are allowed only here and in the e-mail item.",
+    "linkHint": "An https link, for example to a video of the school.",
+    "plainText": "Plain text. Do not include phone numbers, Aadhaar numbers or any student's details.",
+    "notAnswered": "Not answered",
+    "yes": "Yes",
+    "no": "No",
+    "required": "(required)",
+    "save": "Save draft",
+    "saved": "Draft saved. Nothing is public until someone publishes it.",
+    "staleTitle": "Someone else saved the draft",
+    "staleBody": "Reload the page to see their changes, then make yours again.",
+    "lastSaved": "Draft last saved {when} by {who}",
+    "neverSaved": "The draft has not been saved yet.",
+    "itemErrors": {
+      "aadhaar_not_allowed": "Remove the Aadhaar-like number. Aadhaar numbers are never published.",
+      "phone_not_allowed": "Remove the phone number. Phone numbers belong only in the contact items.",
+      "markup_not_allowed": "Remove the < and > characters. Type plain text.",
+      "https_only": "Enter a link that starts with https://.",
+      "invalid_email": "Enter an e-mail address such as office@school.in.",
+      "invalid_phone": "Enter phone numbers with digits, spaces, + or -.",
+      "too_long": "This is too long. Shorten it.",
+      "out_of_range": "Enter a number within the allowed range.",
+      "required": "Fill this in before publishing.",
+      "document_not_publishable": "This document cannot be published: choose a PDF of a circular, policy or other school document that has passed the virus check.",
+      "document_not_found": "This document is not one of the school's documents you can see.",
+      "invalid_year": "Write the year as 2025-26.",
+      "passed_more_than_appeared": "Passed cannot be more than appeared.",
+      "duplicate_row": "Each year and class can appear once.",
+      "too_precise": "Use at most two decimal places.",
+      "invalid": "Check this value."
+    },
+    "results": {
+      "hint": "Numbers only, no names. Counts below 10 are published as \"fewer than 10\".",
+      "year": "Year",
+      "class": "Class",
+      "classes": {
+        "X": "Class X",
+        "XII": "Class XII"
+      },
+      "appeared": "Appeared",
+      "passed": "Passed",
+      "add": "Add a year",
+      "remove": "Remove"
+    },
+    "documents": {
+      "none": "No document chosen.",
+      "chosen": "Chosen document",
+      "notReady": "Cannot be published",
+      "remove": "Remove",
+      "add": "Add a document",
+      "addButton": "Add",
+      "choose": "Choose a document",
+      "loading": "Loading documents",
+      "hint": "PDFs of circulars, policies or other school documents. Upload new ones in Documents first."
+    },
+    "publish": {
+      "open": "Publish",
+      "again": "Publish again",
+      "title": "Publish the disclosure",
+      "description": "The page will show the draft as it is now, with {documents, plural, =0 {no documents} one {# document} other {# documents}}.",
+      "missingTitle": "Required items are empty",
+      "missingBody": "{count, plural, one {# required item is} other {# required items are}} still empty. Fill them in and save the draft first.",
+      "whatPublic1": "The school details, staff counts and fee structure as SchoolOS holds them today.",
+      "whatPublic2": "Everything typed in the draft and {documents, plural, =0 {no documents} one {# document} other {# documents}}.",
+      "whatPublic3": "Board result counts below 10 shown as \"fewer than 10\".",
+      "checkbox": "These documents contain no student's personal data.",
+      "checkboxRequired": "Tick the box to confirm before publishing.",
+      "confirm": "Publish",
+      "consequence": "Anyone with the link can see this page. Changes to records will not show until you publish again."
+    },
+    "published": {
+      "title": "Public page",
+      "liveSince": "Published on {date}. Put this link on the school's website.",
+      "notLive": "Not public now. Publish to show the page again at this link.",
+      "copy": "Copy link",
+      "copied": "Copied",
+      "linkHint": "The page is not listed by search engines. Anyone with the link can open it.",
+      "download": "Download for our website:",
+      "html": "HTML file",
+      "pdf": "PDF (A4)",
+      "working": "Preparing",
+      "rotate": "Change the link",
+      "rotateTitle": "Change the link",
+      "rotateBody": "A new link replaces the current one.",
+      "rotateConsequence": "The old link stops working at once. Update the school's website with the new link.",
+      "withdraw": "Withdraw",
+      "withdrawTitle": "Withdraw the public page",
+      "withdrawBody": "The link will show \"not found\" until someone publishes again.",
+      "withdrawConsequence": "Anyone opening the link will see \"not found\". The published record is kept.",
+      "reason": "Why are you withdrawing it?",
+      "reasonHint": "10 to 500 characters. Kept with the published history."
+    },
+    "history": {
+      "title": "Published history",
+      "description": "Every publication is kept exactly as it was shown.",
+      "published": "Published",
+      "by": "By",
+      "state": "State",
+      "documents": "Documents",
+      "views": "Views (90 days)",
+      "live": "Live",
+      "withdrawn": "Withdrawn",
+      "replaced": "Replaced",
+      "formerStaff": "Former staff member"
+    }
+  },
+  "privacy": {
+    "nav": {
+      "requests": "Requests and complaints",
+      "notices": "Notices",
+      "settings": "Privacy contact"
+    },
+    "status": {
+      "received": "Received",
+      "in_progress": "In progress",
+      "waiting_for_requester": "Waiting for them",
+      "decided": "Decided",
+      "closed": "Closed",
+      "withdrawn": "Withdrawn"
+    },
+    "due": {
+      "overdue": "Overdue by {count, plural, one {# day} other {# days}}",
+      "today": "Due today",
+      "left": "{count, plural, one {# day left} other {# days left}}"
+    },
+    "pdf": {
+      "make": "Make the PDF",
+      "making": "Making the PDF. This takes a minute.",
+      "download": "Download PDF",
+      "failed": "The PDF could not be made.",
+      "expired": "The PDF has expired.",
+      "again": "Make it again"
+    },
+    "kinds": {
+      "access": {
+        "label": "What the school holds",
+        "hint": "They want to know what the school holds about them or their child."
+      },
+      "correction": {
+        "label": "Correct a record",
+        "hint": "Something in the records is wrong. The correction goes through a change request."
+      },
+      "erasure": {
+        "label": "Erase records",
+        "hint": "They want records erased. School records and records the law requires are kept."
+      },
+      "nomination": {
+        "label": "Name a nominee",
+        "hint": "They name someone to act for them if they cannot."
+      },
+      "consent_withdrawal": {
+        "label": "Withdraw consent",
+        "hint": "They take back a consent they gave earlier."
+      },
+      "grievance": {
+        "label": "Complaint",
+        "hint": "They are unhappy with how the school handled their data. It needs a written answer."
+      },
+      "other": {
+        "label": "Something else",
+        "hint": "Any other question about their data."
+      }
+    },
+    "requests": {
+      "title": "Requests and complaints",
+      "description": "What parents, students and staff asked about their data, and when each answer is due.",
+      "logRequest": "Log a request",
+      "noPermissionTitle": "You cannot see privacy requests",
+      "noPermissionBody": "Ask the principal or the school owner if you need to work on them.",
+      "colReference": "Reference",
+      "colKind": "Kind",
+      "colAbout": "About",
+      "colReceived": "Received",
+      "colDue": "Due",
+      "colStatus": "Status",
+      "tabsLabel": "Which requests",
+      "tabs": {
+        "open": "Open",
+        "overdue": "Overdue",
+        "closed": "Closed"
+      },
+      "filterKind": "Kind",
+      "allKinds": "All kinds",
+      "empty": {
+        "open": {
+          "title": "No open requests",
+          "body": "When a parent asks what the school holds, log it here so it is answered within 7 days."
+        },
+        "overdue": {
+          "title": "Nothing overdue",
+          "body": "Every open request is still within its due date."
+        },
+        "closed": {
+          "title": "No closed requests yet",
+          "body": "Requests appear here once they are answered and closed."
+        }
+      },
+      "showMore": "Show more requests"
+    },
+    "new": {
+      "title": "Log a request",
+      "description": "Write down what was asked, by whom and when. The due date is counted from the day it was received.",
+      "noPermissionTitle": "You cannot log privacy requests",
+      "noPermissionBody": "Ask the office admin, the principal or the school owner to log it.",
+      "savedTitle": "Request {reference} logged",
+      "savedBody": "Print the acknowledgement and hand it to the person who asked.",
+      "printAcknowledgement": "Print acknowledgement",
+      "openRequest": "Open the request",
+      "logAnother": "Log another request",
+      "kind": "What they asked for",
+      "relationship": "Who asked",
+      "requesterName": "Their name (optional)",
+      "requesterNameHint": "Printed on the letters.",
+      "receivedOn": "Received on",
+      "requestText": "What they asked",
+      "requestTextHint": "In their words. Not shown in any log. Never write an Aadhaar number.",
+      "nomineeName": "Nominee's name",
+      "nomineeRelationship": "Nominee's relationship",
+      "nomineeContact": "Nominee's phone or address",
+      "verification": "How you checked who they are",
+      "verificationHint": "Needed before anyone decides. You can leave it for now and record it later.",
+      "submit": "Log the request",
+      "subject": {
+        "legend": "Who it is about",
+        "kindLegend": "The request is about",
+        "kinds": {
+          "student": "A student",
+          "guardian": "A parent or guardian",
+          "member": "A staff member"
+        },
+        "change": "Choose someone else",
+        "guardianFirst": "Find the student first, then choose the parent or guardian.",
+        "guardian": "Parent or guardian",
+        "staffNotAllowed": "You cannot see the staff list. Ask the principal to log a request about a staff member.",
+        "member": "Staff member",
+        "noName": "No name on record",
+        "searchLabel": "Find the student",
+        "searchHint": "Type at least 2 letters of the name or the admission number.",
+        "searching": "Searching…",
+        "noMatches": "No student matches. Check the spelling or try the admission number.",
+        "matches": "Matching students"
+      }
+    },
+    "relationships": {
+      "self": "The person themselves",
+      "father": "Father",
+      "mother": "Mother",
+      "guardian": "Guardian",
+      "nominee": "Nominee",
+      "other": "Someone else"
+    },
+    "verification": {
+      "in_person_document": "Saw an identity document in person",
+      "guardian_phone_on_record": "Called the phone number on record",
+      "staff_sign_in": "Staff member signed in to SchoolOS",
+      "notChecked": "Not checked yet"
+    },
+    "validation": {
+      "invalid": "Check this field.",
+      "tooLong": "This is too long. Shorten it.",
+      "chooseKind": "Choose what they asked for.",
+      "chooseSubject": "Choose who the request is about.",
+      "chooseRelationship": "Choose who asked.",
+      "dateRequired": "Enter the date it was received.",
+      "invalidDate": "Enter a real date as {format}, for example {example}.",
+      "dateInFuture": "The date cannot be after today.",
+      "noAadhaar": "Remove the Aadhaar number. SchoolOS never stores one.",
+      "nomineeRequired": "Enter the nominee's name."
+    },
+    "detail": {
+      "title": "Privacy request",
+      "newTab": "opens in a new tab",
+      "printAcknowledgement": "Print acknowledgement",
+      "printAnswer": "Print answer",
+      "timelineTitle": "What happened",
+      "requestTitle": "The request",
+      "about": "About",
+      "askedBy": "Asked by",
+      "received": "Received",
+      "due": "Due",
+      "loggedBy": "Logged by",
+      "checkedHow": "How we checked who asked",
+      "whatTheyAsked": "What they asked",
+      "answer": "Our answer",
+      "noEvents": "Nothing recorded yet.",
+      "someone": "Someone at the school",
+      "someoneElse": {
+        "release": "Someone else must release it. You logged this request.",
+        "erase": "Someone else must erase the records. You logged this request.",
+        "close": "Someone else must close it. You logged this request."
+      },
+      "decideRole": "The principal or the school owner decides this."
+    },
+    "events": {
+      "logged": "Request logged",
+      "verified": "Identity checked",
+      "notes_changed": "Notes changed",
+      "responded": "Answer written",
+      "nomination_withdrawn": "Nomination withdrawn",
+      "status_changed": "Status changed",
+      "change_request_linked": "Change request linked",
+      "report_built": "Report made",
+      "report_released": "Report released",
+      "report_downloaded": "Report downloaded",
+      "erasure_executed": "Records erased",
+      "closed": "Request closed",
+      "other": "Updated"
+    },
+    "access": {
+      "title": "Access report",
+      "description": "A report of what the school holds about the person in SchoolOS.",
+      "notBuilt": "The report has not been made yet.",
+      "building": "Making the report. This page updates when it is ready.",
+      "failed": "The report could not be made. Make it again.",
+      "expired": "The report has expired. Make it again.",
+      "released": "Released on {date}.",
+      "until": "Can be downloaded until {date}.",
+      "ready": "The report is ready. Check it, then release it.",
+      "verifyFirst": "Record how you checked who asked before the report is released.",
+      "build": "Build the report",
+      "buildAgain": "Build it again",
+      "release": "Release the report",
+      "releaseTitle": "Release the access report?",
+      "releaseBody": "Check the report first. Only release it to the person who asked, or their parent or guardian.",
+      "releaseConsequence": "The report will be ready to download for 24 hours. Hand it to the parent yourself.",
+      "download": "Download the report"
+    },
+    "correction": {
+      "title": "Corrections",
+      "description": "Records are corrected through change requests, with evidence and a second person's approval.",
+      "none": "No change request is linked yet.",
+      "changeRequest": "Change request",
+      "open": "Open a change request",
+      "studentsOnly": "Change requests are for student records. Correct other records in their own screens.",
+      "link": "Link a change request",
+      "linkTitle": "Link a change request",
+      "linkBody": "Choose the change request that answers this request. It can be closed once the change request is decided.",
+      "pick": "Change request",
+      "status": {
+        "pending": "Waiting for approval",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "expired": "Expired",
+        "cancelled": "Cancelled",
+        "unknown": "Unknown"
+      }
+    },
+    "erasure": {
+      "title": "Erasure plan",
+      "description": "What can be erased for this person, and what the school must keep and why.",
+      "colTick": "Erase",
+      "tick": "Erase {label}",
+      "colRecord": "Kind of record",
+      "colOutcome": "Outcome",
+      "colCount": "Records",
+      "colReason": "Why",
+      "doneTitle": "Records erased",
+      "manualSteps": "Still to do by hand",
+      "emptyTitle": "No records found",
+      "emptyBody": "SchoolOS holds no records for this person that the plan covers.",
+      "erase": "Erase the ticked records",
+      "eraseTitle": "Erase these records?",
+      "eraseBody": "Only the ticked kinds of record are erased. Everything the school must keep stays.",
+      "consequence": "{count, plural, one {# record} other {# records}} in {kinds, plural, one {# kind of record} other {# kinds of record}} will be erased for good. This cannot be undone.",
+      "tickFirst": "Tick the kinds of record to erase.",
+      "outcome": {
+        "erasable": "Can be erased",
+        "refused_official_record": "Kept: school record",
+        "refused_legal_obligation": "Kept: required by law",
+        "retention_running": "Kept for now",
+        "until": "Kept until {date}"
+      }
+    },
+    "nomination": {
+      "title": "Nominee",
+      "name": "Name",
+      "relationship": "Relationship",
+      "contact": "Phone or address",
+      "none": "No nominee recorded.",
+      "withdrawn": "Withdrawn on {date}.",
+      "withdraw": "Withdraw the nomination",
+      "withdrawTitle": "Withdraw this nomination?",
+      "withdrawConsequence": "The nominee can no longer act for this person."
+    },
+    "work": {
+      "title": "Notes and checks",
+      "description": "Notes stay inside SchoolOS. They are never printed or logged.",
+      "status": "Where it stands",
+      "verification": "How you checked who asked",
+      "verificationHint": "Needed before anyone decides.",
+      "notes": "Notes",
+      "notesHint": "What you did and what is left. Never write an Aadhaar number.",
+      "reload": "Load the latest",
+      "saved": "Saved",
+      "discard": "Discard changes",
+      "save": "Save"
+    },
+    "close": {
+      "title": "Close the request",
+      "answerTitle": "Answer the complaint",
+      "description": "Close it once the person has their answer.",
+      "closeWithAnswer": "Close with this answer",
+      "close": "Close the request",
+      "closeTitle": "Close this request?",
+      "answerBody": "Write the answer the school gives. It is printed on the answer letter.",
+      "closeBody": "You can add the answer the school gave. It is printed on the answer letter.",
+      "consequence": "The request is closed and cannot be opened again.",
+      "answer": "Answer",
+      "answerOptional": "Answer (optional)",
+      "answerHint": "Plain words. Never write an Aadhaar number."
+    },
+    "notices": {
+      "title": "Notices",
+      "description": "The privacy notices for parents and staff, and when the school gave them out.",
+      "notLegalAdvice": "These templates are a starting point, not legal advice. The school decides what it sends.",
+      "record": "Record that we issued it",
+      "noPermissionTitle": "You cannot see privacy notices",
+      "noPermissionBody": "Ask the principal or the school owner if you need them.",
+      "templatesTitle": "Templates",
+      "colNotice": "Notice",
+      "colVersion": "Version",
+      "colLastIssued": "Last issued",
+      "colActions": "Open",
+      "preview": "Preview",
+      "newTab": "opens in a new tab",
+      "noTemplatesTitle": "No templates",
+      "noTemplatesBody": "The notice templates could not be found. Contact SchoolOS support.",
+      "newerTitle": "A newer notice is available",
+      "newerBody": "Give out the new version: {notices}.",
+      "unfilledTitle": "Some details are not filled in",
+      "unfilledBody": "The notices show [not set] where the school's details are missing. Set the privacy contact and the school profile first.",
+      "historyTitle": "When we issued them",
+      "historyEmptyTitle": "No notice recorded yet",
+      "historyEmptyBody": "After you give out a notice, record it here with the date and how.",
+      "colIssuedOn": "Issued on",
+      "colAudience": "For",
+      "colLanguage": "Language",
+      "colChannel": "How",
+      "colRecordedBy": "Recorded by",
+      "recordTitle": "Record that we issued a notice",
+      "recordBody": "Write down which notice the school gave out, when and how.",
+      "recordConfirm": "Record it",
+      "fieldNotice": "Notice",
+      "fieldVersion": "Version",
+      "fieldVersionHint": "The version printed at the foot of the notice.",
+      "fieldLanguage": "Language",
+      "fieldIssuedOn": "Issued on",
+      "fieldChannel": "How it was given out"
+    },
+    "audience": {
+      "parents": "Notice for parents",
+      "staff": "Notice for staff"
+    },
+    "channels": {
+      "paper": "On paper",
+      "school_whatsapp_group": "School WhatsApp group",
+      "sos_notice": "SchoolOS notice",
+      "email": "E-mail",
+      "other": "Some other way"
+    },
+    "settings": {
+      "title": "Privacy contact",
+      "description": "Who parents and staff contact about their data, and how many days the school takes to answer.",
+      "contactTitle": "Contact and target",
+      "contactDescription": "Printed on notices, letters and access reports, and shown at the foot of every page.",
+      "readOnly": "Only the principal or the school owner can change these.",
+      "name": "Name or designation",
+      "nameHint": "For example, The Principal.",
+      "phone": "Phone",
+      "phoneOptional": "Phone (optional)",
+      "email": "E-mail",
+      "emailOptional": "E-mail (optional)",
+      "targetDays": "Days to answer a request",
+      "targetHint": "Between {min} and {max} days.",
+      "days": "{count, plural, one {# day} other {# days}}",
+      "reload": "Load the latest",
+      "saved": "Saved",
+      "discard": "Discard changes",
+      "save": "Save"
+    },
+    "recordClasses": {
+      "title": "What the school keeps",
+      "matches": "This matches the",
+      "retentionLink": "Data retention screen.",
+      "colKind": "Kind of record",
+      "colKept": "Kept for",
+      "colWhy": "Why",
+      "colErase": "Can it be erased?",
+      "emptyTitle": "No record classes",
+      "erasure": {
+        "allowed": "Yes, on request",
+        "allowed_after_retention": "Yes, after the keeping period",
+        "refused_legal_obligation": "No: required by law",
+        "refused_official_record": "No: school record",
+        "no_personal_data": "No personal data"
+      }
+    },
+    "footer": {
+      "label": "Privacy and complaints:"
+    },
+    "errors": {
+      "self_approval_forbidden": {
+        "title": "Someone else must decide",
+        "body": "You logged this request, so another owner or principal must release, erase or close it."
+      },
+      "not_verified": {
+        "title": "Check who asked first",
+        "body": "Record how you checked who asked under Notes and checks, then try again."
+      },
+      "report_not_ready": {
+        "title": "The report is not ready",
+        "body": "Build the report and wait until it is ready, then release it."
+      },
+      "report_not_released": {
+        "title": "The report is not released",
+        "body": "Release the report before downloading it."
+      },
+      "export_expired": {
+        "title": "The report has expired",
+        "body": "It was released more than 24 hours ago. Build it again."
+      },
+      "changes_pending": {
+        "title": "Change requests are still open",
+        "body": "Wait until the linked change requests are approved or rejected, then close this request."
+      },
+      "class_not_erasable": {
+        "title": "Some records cannot be erased",
+        "body": "Untick the records the school must keep and try again."
+      },
+      "class_not_owned": {
+        "title": "The report could not include everything",
+        "body": "Build the report again. If it keeps failing, contact SchoolOS support."
+      },
+      "request_closed": {
+        "title": "This request is closed",
+        "body": "Closed requests cannot be changed. Log a new request if they ask again."
+      },
+      "no_subject": {
+        "title": "The person is no longer on record",
+        "body": "The person this request is about is no longer in SchoolOS. Close the request with an answer."
       }
     }
   }

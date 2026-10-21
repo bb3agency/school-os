@@ -62,7 +62,19 @@ const LINKS: Record<string, (id: string) => string> = {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/**
+ * Screens for notifications about a list rather than one record: they carry no resource id
+ * (counts only, e.g. the daily privacy reminder) and always open the same screen.
+ */
+const LIST_LINKS: Record<string, string> = {
+  // R3-1A (FR-DPDP-006): the daily "privacy requests to answer" reminder.
+  privacy_request_list: "/privacy/requests",
+};
+
 export function notificationHref(item: Pick<Notification, "resource_type" | "resource_id">) {
+  if (item.resource_type && item.resource_type in LIST_LINKS) {
+    return LIST_LINKS[item.resource_type] ?? null;
+  }
   if (!item.resource_type || !item.resource_id || !UUID.test(item.resource_id)) return null;
   const link = LINKS[item.resource_type];
   return link ? link(item.resource_id) : null;

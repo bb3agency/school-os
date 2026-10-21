@@ -57,6 +57,7 @@ from app.identity.schemas import (
     MembershipAccess,
     MeOut,
     PermissionOut,
+    PrivacyContactOut,
     RoleAccess,
     RoleOut,
     SchoolChoiceOut,
@@ -68,6 +69,7 @@ from app.identity.schemas import (
     UserOut,
     UserUpdateIn,
 )
+from app.identity.subjects import subject_report as subject_report  # noqa: PLC0414 - re-export
 from app.tenancy import service as tenancy
 
 OWNER_ROLE = "owner"
@@ -586,6 +588,15 @@ def me(session: Session, ctx: UserContext, *, tenant_ids: Sequence[uuid.UUID]) -
             idle_timeout_minutes=settings.idle_timeout_minutes,
             date_format=settings.date_format,
             languages=list(settings.languages),
+            privacy_contact=(
+                PrivacyContactOut(
+                    name=settings.privacy_contact.name,
+                    phone=settings.privacy_contact.phone,
+                    email=settings.privacy_contact.email,
+                )
+                if settings.privacy_contact is not None
+                else None
+            ),
         ),
     )
 
@@ -642,6 +653,14 @@ def members_for_users(
     something (e.g. who uploaded a document). Unknown ids are left out. No permission check and
     no contact details: callers show them only next to records the caller may already see."""
     return repo.members_by_user(session, sorted(set(user_ids)))
+
+
+def user_id_for_membership(session: Session, membership_id: uuid.UUID) -> uuid.UUID | None:
+    """The user (account) id behind a membership of this school, or ``None`` when the
+    membership is not this school's (RLS). For modules whose rows are keyed by user id that
+    report on or erase a staff member's data (R3-1A, FR-DPDP-009). No permission check."""
+    membership = repo.get_membership(session, membership_id)
+    return membership.user_id if membership is not None else None
 
 
 def get_user(session: Session, user_id: uuid.UUID) -> UserOut:

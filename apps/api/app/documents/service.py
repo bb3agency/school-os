@@ -123,6 +123,7 @@ from app.documents.storage import (
     tenant_prefix,
     upload_key,
 )
+from app.documents.subjects import erase_for_subject, subject_report
 from app.identity import service as identity
 from app.identity.principal import STEP_UP_MAX_AGE
 from app.notifications import service as notifications
@@ -1570,6 +1571,62 @@ def is_own_upload(session: Session, ctx: UserContext, document_id: uuid.UUID) ->
     return doc is not None and doc.created_by == ctx.user_id
 
 
+# --- R3-1C disclosure (ADR-0051; FR-DISC-004, FR-DISC-005, FR-DISC-009) -------------------------
+
+PUBLISHABLE_PURPOSES: Final = frozenset({"circular", "policy", "other"})
+"""Purposes a school may publish on its CBSE disclosure page: its own uploaded papers, never
+evidence scans, register scans, import files or generated certificates and receipts."""
+
+
+@dataclass(frozen=True, slots=True)
+class PublishableVersion:
+    """The version of a document that a disclosure publishes (scanned clean, a PDF)."""
+
+    document_id: uuid.UUID
+    version_id: uuid.UUID
+    title: str
+
+
+def publishable_version(session: Session, document_id: uuid.UUID) -> PublishableVersion | None:
+    """The latest clean PDF version of an active, non-restricted school document that the
+    disclosure may publish, or ``None`` (wrong purpose, C3, archived, not a PDF, not scanned
+    yet). No caller scope: ``app.disclosure`` checked :func:`is_visible` for the editor."""
+    doc = repo.get_document(session, document_id)
+    if (
+        doc is None
+        or doc.status != "active"
+        or doc.purpose not in PUBLISHABLE_PURPOSES
+        or doc.sensitivity == "C3"
+    ):
+        return None
+    version = repo.latest_version_with_status(session, doc.id, tuple(_EVIDENCE_CLEAN))
+    if version is None or version.mime_type != filetypes.PDF.mime:
+        return None
+    return PublishableVersion(document_id=doc.id, version_id=version.id, title=doc.title)
+
+
+def published_version_url(
+    session: Session,
+    document_id: uuid.UUID,
+    version_id: uuid.UUID,
+    *,
+    filename: str,
+    ttl_s: int,
+    store: ObjectStore | None = None,
+) -> tuple[str, dt.datetime] | None:
+    """A presigned GET (at most 5 minutes, attachment) for one exact version that a published
+    disclosure recorded, or ``None`` when that version is no longer clean (quarantined after
+    publishing). The caller (``app.disclosure``'s public route) resolved the school's handle and
+    checked the version belongs to the live snapshot."""
+    version = repo.get_version(session, document_id, version_id=version_id)
+    if version is None or version.status not in _EVIDENCE_CLEAN:
+        return None
+    ttl = min(ttl_s, get_settings().documents_download_url_ttl_s)
+    return (store or get_object_store()).presigned_get(
+        key=version.object_key, content_type=version.mime_type, filename=filename, expires_s=ttl
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class StoredObject:
     """Location and facts of one stored version, for workers (imports, extraction)."""
@@ -2704,6 +2761,7 @@ __all__ = [
     "OBJECT_DISCARD_EVENT",
     "OBJECT_DISCARD_TASK",
     "OWNER_ONLY_CODE",
+    "PUBLISHABLE_PURPOSES",
     "QUARANTINE_HOOKS",
     "READY_HOOKS",
     "RETENTION_REASONS",
@@ -2715,6 +2773,7 @@ __all__ = [
     "FileTooLarge",
     "ObjectStore",
     "ObjectWriter",
+    "PublishableVersion",
     "SheetFile",
     "StoredObject",
     "UnsupportedFileType",
@@ -2730,6 +2789,7 @@ __all__ = [
     "discard_unused_object",
     "discard_version",
     "document_object",
+    "erase_for_subject",
     "evidence_exists",
     "evidence_state",
     "evidence_version",
@@ -2747,6 +2807,8 @@ __all__ = [
     "list_documents",
     "mark_scan_failed",
     "open_tenant_export",
+    "publishable_version",
+    "published_version_url",
     "purge_document_objects",
     "purge_expired_uploads",
     "purge_tenant_data",
@@ -2761,6 +2823,7 @@ __all__ = [
     "store_export_file",
     "store_generated_document",
     "store_page_image",
+    "subject_report",
     "sweep_discarded_objects",
     "tenant_data_counts",
     "tenant_export_download_url",

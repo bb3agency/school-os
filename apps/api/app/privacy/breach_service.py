@@ -76,6 +76,7 @@ from app.privacy.breach_schemas import (
     NoticeDraftOut,
     ProcessorFactsOut,
 )
+from app.privacy.breach_subjects import subject_report
 from app.students import crypto
 from app.students import rotation as key_rotation
 from app.tenancy import service as tenancy
@@ -751,6 +752,7 @@ __all__ = [
     "send_reminders",
     "set_affected",
     "store_processor_notice",
+    "subject_report",
     "sweep_interval_seconds",
     "tenant_data_counts",
     "update_breach",

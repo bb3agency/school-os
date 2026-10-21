@@ -1,0 +1,119 @@
+# Subject-report and erasure registry (R3-1A; ADR-0048 decisions 6 and 8; FR-DPDP-008,
+# NFR-PRV-007). Read by app/privacy/registry.py.
+#
+# Every module in app/tenancy/offboarding.yaml `purge_order` is either a contributor or listed
+# under no_personal_data with a reason (tests/privacy/test_registries.py; fail closed).
+#
+# A contributor exposes in its own app/<module>/service.py (protocol: app/core/subjects.py):
+#   subject_report(session, subject) -> list[ReportSection]
+#   erase_for_subject(session, subject, class_keys, *, dry_run) -> list[ErasureOutcome]
+#     (only when `eraser: true`; the module's record classes must allow erasure)
+# `subjects` lists the subject kinds the module may hold data about (student, guardian,
+# member); the privacy service calls the contributor for every kind (it returns [] when it holds
+# nothing), the list documents intent and is checked against the record classes' owners.
+# `classes` are the record-class keys (record_classes.yaml) the module reports under.
+#
+# R3-1B: `privacy_consents` (app/privacy/consents_service.py) and `privacy_breach`
+# (app/privacy/breach_service.py), the two purge owners of its files in the privacy
+# package; R3-2E adds `rte`.
+version: 1
+contributors:
+  students:
+    subjects: [student, guardian]
+    classes: [student_identity, guardians]
+    eraser: false
+  apaar:
+    subjects: [student]
+    classes: [apaar_consents]
+    eraser: false
+  documents:
+    subjects: [student, member]
+    classes: [documents]
+    eraser: true
+  certificates:
+    subjects: [student]
+    classes: [certificates]
+    eraser: false
+  fees:
+    subjects: [student, guardian]
+    classes: [financial_records, bank_statements, provider_inboxes]
+    eraser: false
+  messaging:
+    subjects: [student, guardian]
+    classes: [messages, message_optins, message_inbound]
+    eraser: true
+  academics:
+    subjects: [student]
+    classes: [attendance_and_marks]
+    eraser: false
+  insights:
+    subjects: [student]
+    classes: [behaviour_notes, early_warning]
+    eraser: true
+  knowledge:
+    subjects: [member]
+    classes: [ask_history]
+    eraser: true
+  changes:
+    subjects: [student, guardian]
+    classes: [change_requests]
+    eraser: false
+  identity:
+    subjects: [member]
+    classes: [staff_accounts]
+    eraser: false
+  dq:
+    subjects: [student]
+    classes: [data_quality]
+    eraser: false
+  imports:
+    subjects: [student]
+    classes: [imports]
+    eraser: false
+  extraction:
+    subjects: [student]
+    classes: [register_photos]
+    eraser: false
+  exports:
+    subjects: [student, member]
+    classes: [exports]
+    eraser: false
+  notifications:
+    subjects: [member]
+    classes: [notifications]
+    eraser: true
+  public:
+    subjects: [student, guardian]
+    classes: [public_links]
+    eraser: false
+  circulars:
+    subjects: [member]
+    classes: [circulars_and_tasks]
+    eraser: false
+  tally:
+    subjects: [student]
+    classes: [tally_ledgers]
+    eraser: false
+  breakglass:
+    subjects: [member]
+    classes: [support_access]
+    eraser: false
+  privacy:
+    subjects: [student, guardian, member]
+    classes: [privacy_requests]
+    eraser: false
+  # R3-1B (ADR-0049): a student's decisions on the school's optional purposes.
+  privacy_consents:
+    subjects: [student]
+    classes: [consents]
+    eraser: false
+  # R3-1B (ADR-0050): breaches that list the person as affected (counts only, no texts).
+  privacy_breach:
+    subjects: [student, guardian, member]
+    classes: [breach_records]
+    eraser: false
+no_personal_data:
+  disclosure: The school's CBSE Appendix IX page (drafts, published snapshots and their documents); no student data (ADR-0051).
+  ops: Background job runs, the outbox and idempotency keys hold ids and counts only.
+  admin: Whole-school archives asked for by the owner and the school's retention settings; nothing about one person.
+  tenancy: The school's structure (years, classes, sections) and its encryption keys; nothing about one person.

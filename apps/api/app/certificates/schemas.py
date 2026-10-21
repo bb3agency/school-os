@@ -11,6 +11,7 @@ from __future__ import annotations
 import datetime as dt
 import unicodedata
 import uuid
+from decimal import Decimal
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
@@ -171,6 +172,23 @@ class PreviewWarning(_Out):
     attribute_key: str
 
 
+class TcFeeNote(_Out):
+    """The student's outstanding fees on the TC preview, for staff information only (FR-CERT-025,
+    US-2005; ADR-0042 decision 13; owner decision D16). Given only for a transfer certificate,
+    while fees are on and to a caller holding ``finance.read`` school-wide. It is never printed,
+    never stored on the certificate and never blocks issue or approval (FR-FEE-030)."""
+
+    balance: Decimal = Field(
+        max_digits=14, decimal_places=2, description="Outstanding balance of the current year."
+    )
+    overdue: Decimal = Field(
+        max_digits=14, decimal_places=2, description="Part of the balance already overdue."
+    )
+    oldest_due_on: dt.date | None
+    last_payment_on: dt.date | None
+    account_id: uuid.UUID = Field(description="The fee account, to open it on the fee screens.")
+
+
 class CertificatePreview(_Out):
     student_id: uuid.UUID
     certificate_type: CertificateType
@@ -184,6 +202,8 @@ class CertificatePreview(_Out):
     # Transfer certificates: the format the TC would be prepared in (FR-CERT-015).
     format_key: str | None = None
     format_version: int | None = None
+    # FR-CERT-025: information for finance readers only; never printed, never a blocker.
+    fee_note: TcFeeNote | None = None
 
 
 # --- certificates --------------------------------------------------------------------------------

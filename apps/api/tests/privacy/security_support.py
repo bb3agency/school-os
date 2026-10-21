@@ -1,9 +1,17 @@
-"""Security-suite helpers for consents and breaches (R3-1B; loaded by path from
-tests/security/test_authz_matrix.py and test_bola.py). Synthetic data only; objects are written
-with the admin engine so builders need no API client."""
+"""Privacy routes for the security suites (authorization matrix, BOLA): request builders for
+school A and a privacy request of school B, made through the real services (R3-1A; ADR-0048;
+synthetic data only). Loaded by path from ``tests/security/test_authz_matrix.py`` and
+``tests/security/test_bola.py``.
+
+Maker-checker routes (release, erasure) act on requests logged by the office admin, so the
+deciding roles (owner, principal) reach the service's success path; reports are made by the
+worker with the fake renderer.
+"""
 
 from __future__ import annotations
 
+import dataclasses
+import datetime as dt
 import importlib.util
 import sys
 import uuid
@@ -12,12 +20,13 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
-from sqlalchemy import Engine, text
+from sqlalchemy import Engine
 
-TESTS = Path(__file__).resolve().parents[1]
+from app.core.db import tenant_session
+from app.privacy import service as privacy
+from app.privacy.schemas import PrivacyRequestCreate, PrivacySubjectIn
 
-Request = tuple[str, dict[str, Any] | None, dict[str, str]]
-Builder = Callable[[Any, str, Engine], Request]
+_HERE = Path(__file__).resolve()
 
 
 def _load(name: str, path: Path) -> ModuleType:
@@ -31,198 +40,175 @@ def _load(name: str, path: Path) -> ModuleType:
     return sys.modules[name]
 
 
-SW = _load("sos_test_student_world", TESTS / "students" / "student_world.py")
+EX = _load("sos_test_exports_objects", _HERE.parents[1] / "exports" / "objects.py")
+SW = EX.SW
 
-SHARED_KEY = "matrix_photos"
+Request = tuple[str, dict[str, Any] | None, dict[str, str]]
+Builder = Callable[[Any, str, Engine], Request]
+BASE = "/api/v1/privacy/requests"
+_B: dict[uuid.UUID, uuid.UUID] = {}
 
 
-def purpose(
-    admin: Engine, school: Any, *, key: str | None = None, active: bool = True
+def _ctx(school: Any, role: str) -> Any:
+    base = SW.ctx_for(school.tenant_id, school.people[role], role)
+    return dataclasses.replace(base, auth_time=dt.datetime.now(dt.UTC))
+
+
+def log_request(
+    school: Any, kind: str = "access", *, verified: bool = True, role: str = "office_admin"
 ) -> uuid.UUID:
-    """A purpose of ``school`` (version 1). ``key=None``: a fresh one; the shared key is created
-    once and switched on again on every call."""
-    pid = uuid.uuid4()
-    with admin.begin() as c:
-        if key is not None:
-            found = c.execute(
-                text("SELECT id FROM sis.consent_purposes WHERE tenant_id = :t AND key = :k"),
-                {"t": school.tenant_id, "k": key},
-            ).scalar_one_or_none()
-            if found is not None:
-                c.execute(
-                    text("UPDATE sis.consent_purposes SET active = :a WHERE id = :i"),
-                    {"a": active, "i": found},
-                )
-                value: uuid.UUID = found
-                return value
-        c.execute(
-            text(
-                "INSERT INTO sis.consent_purposes (id, tenant_id, key, label_en, description, "
-                "active, created_by) VALUES (:i, :t, :k, 'Photos on the school website', "
-                "'What: photos at events. Why: school news. Who: the public. How long: a year.', "
-                ":a, :u)"
-            ),
-            {
-                "i": pid,
-                "t": school.tenant_id,
-                "k": key or f"m_{uuid.uuid4().hex[:12]}",
-                "a": active,
-                "u": school.people["owner"].user_id,
-            },
-        )
-    return pid
+    """A request about the school's shared 9A student, logged by ``role``."""
+    EX.install()
+    student = _student(school)
+    data = PrivacyRequestCreate(
+        kind=kind,
+        subject=PrivacySubjectIn(student_id=student),
+        requester_relationship="mother",
+        request_text="Synthetic matrix request",
+        verification_method="in_person_document" if verified else None,
+    )
+    who = school.people[role]
+    with tenant_session(school.tenant_id, who.user_id) as db:
+        out = privacy.create_request(db, _ctx(school, role), data)
+    return out.id
 
 
-def breach(admin: Engine, school: Any) -> uuid.UUID:
-    """An open school breach of ``school`` (no texts), version 1."""
-    bid = uuid.uuid4()
-    with admin.begin() as c:
-        c.execute(
-            text(
-                "INSERT INTO ops.breach_records (id, tenant_id, origin, noticed_at, categories, "
-                "approx_children, recorded_by) VALUES (:i, :t, 'school', now() - interval "
-                "'2 hours', ARRAY['identity'], 3, :u)"
-            ),
-            {"i": bid, "t": school.tenant_id, "u": school.people["owner"].user_id},
-        )
-    return bid
-
-
-def _student(w: Any, role: str) -> uuid.UUID:
-    ids = SW.ensure_students(w)
-    value: uuid.UUID = ids["s10a"] if role == "teacher" else ids["s9a"]
+def _student(school: Any) -> uuid.UUID:
+    key = "privacy_matrix_student"
+    if key not in school.ids:
+        school.ids[key] = EX.student(school, name="Synthetica Privacy Matrix")
+    value: uuid.UUID = school.ids[key]
     return value
 
 
-def _deactivate_others(admin: Engine, school: Any) -> None:
-    with admin.begin() as c:
-        c.execute(
-            text(
-                "UPDATE sis.consent_purposes SET active = false WHERE tenant_id = :t AND key <> :k"
-            ),
-            {"t": school.tenant_id, "k": SHARED_KEY},
-        )
+def ready_report(school: Any, *, released: bool = False) -> uuid.UUID:
+    rid = log_request(school)
+    admin = school.people["office_admin"]
+    with tenant_session(school.tenant_id, admin.user_id) as db:
+        out = privacy.build_report(db, _ctx(school, "office_admin"), rid)
+    assert out.report is not None
+    assert EX.run(school, out.report.export_id) == "ready"
+    if released:
+        principal = school.people["principal"]
+        with tenant_session(school.tenant_id, principal.user_id) as db:
+            privacy.release_report(db, _ctx(school, "principal"), rid)
+    return rid
+
+
+def notice_file(school: Any) -> uuid.UUID:
+    EX.install()
+    admin = school.people["office_admin"]
+    with tenant_session(school.tenant_id, admin.user_id) as db:
+        out = privacy.request_notice_pdf(db, _ctx(school, "office_admin"), "notice_staff")
+    assert EX.run(school, out.export_id) == "ready"
+    return out.export_id
+
+
+def b_request(w: Any) -> uuid.UUID:
+    """A privacy request of school B (one per session)."""
+    if w.b.tenant_id not in _B:
+        _B[w.b.tenant_id] = log_request(w.b, "erasure", role="owner")
+    return _B[w.b.tenant_id]
+
+
+def _g(path: Callable[[Any], str]) -> Builder:
+    return lambda w, r, a: (path(w), None, {})
 
 
 def matrix_specs() -> dict[tuple[str, str], Builder]:
-    """One builder per consent and breach route (school A)."""
-
-    def shared(w: Any, a: Engine) -> uuid.UUID:
-        return purpose(a, w.a, key=SHARED_KEY)
-
-    def create_purpose(w: Any, r: str, a: Engine) -> Request:
-        _deactivate_others(a, w.a)
-        body = {
-            "key": f"m_{uuid.uuid4().hex[:12]}",
-            "label_en": "Name in the magazine",
-            "description": "Your child's name in the school magazine for one year.",
-        }
-        return "/api/v1/consent-purposes", body, {}
-
-    def patch_purpose(w: Any, r: str, a: Engine) -> Request:
-        pid = purpose(a, w.a, active=False)
-        return f"/api/v1/consent-purposes/{pid}", {"active": False}, {"If-Match": 'W/"1"'}
-
-    def record(w: Any, r: str, a: Engine) -> Request:
-        body = {
-            "purpose_id": str(shared(w, a)),
-            "status": "refused",
-            "relationship": "father",
-            "decided_on": "2026-07-15",
-        }
-        return f"/api/v1/students/{_student(w, r)}/consents", body, {}
-
-    def forms(w: Any, r: str, a: Engine) -> Request:
-        shared(w, a)
-        return f"/api/v1/consents/forms?student_id={_student(w, r)}", None, {}
-
-    def forms_pdf(w: Any, r: str, a: Engine) -> Request:
-        shared(w, a)
-        return "/api/v1/exports/consent-forms", {"student_id": str(_student(w, r))}, {}
-
-    def student(suffix: str) -> Builder:
-        return lambda w, r, a: (f"/api/v1/students/{_student(w, r)}{suffix}", None, {})
-
-    def on_breach(
-        suffix: str, body: dict[str, Any] | None = None, *, if_match: bool = False
-    ) -> Builder:
-        def build(w: Any, r: str, a: Engine) -> Request:
-            headers = {"If-Match": 'W/"1"'} if if_match else {}
-            return f"/api/v1/privacy/breaches/{breach(a, w.a)}{suffix}", body, headers
-
-        return build
-
-    breach_body = {
-        "noticed_at": "2026-10-20T08:00:00+05:30",
-        "description": "A class list was sent to the wrong parents' group.",
-        "categories": ["contact"],
-        "approx_guardians": 40,
-    }
+    """One builder per privacy route (school A)."""
+    today = dt.datetime.now(dt.UTC).date().isoformat()
     return {
-        ("GET", "/api/v1/consent-purposes"): lambda w, r, a: ("/api/v1/consent-purposes", None, {}),
-        ("POST", "/api/v1/consent-purposes"): create_purpose,
-        ("PATCH", "/api/v1/consent-purposes/{purpose_id}"): patch_purpose,
-        ("GET", "/api/v1/students/{student_id}/consents"): student("/consents"),
-        ("POST", "/api/v1/students/{student_id}/consents"): record,
-        ("GET", "/api/v1/students/{student_id}/consent-view"): student("/consent-view"),
-        ("GET", "/api/v1/consents/summary"): lambda w, r, a: ("/api/v1/consents/summary", None, {}),
-        ("GET", "/api/v1/consents/forms"): forms,
-        ("POST", "/api/v1/exports/consent-forms"): forms_pdf,
-        ("GET", "/api/v1/privacy/breaches"): lambda w, r, a: ("/api/v1/privacy/breaches", None, {}),
-        ("POST", "/api/v1/privacy/breaches"): lambda w, r, a: (
-            "/api/v1/privacy/breaches",
-            breach_body,
+        ("GET", "/api/v1/privacy/templates"): _g(lambda w: "/api/v1/privacy/templates"),
+        ("GET", "/api/v1/privacy/templates/{key}/preview"): _g(
+            lambda w: "/api/v1/privacy/templates/notice_parents/preview"
+        ),
+        ("POST", "/api/v1/privacy/templates/{key}/pdf"): _g(
+            lambda w: "/api/v1/privacy/templates/notice_staff/pdf"
+        ),
+        ("GET", "/api/v1/privacy/files/{export_id}"): _g(
+            lambda w: f"/api/v1/privacy/files/{notice_file(w.a)}"
+        ),
+        ("GET", "/api/v1/privacy/files/{export_id}/download-url"): _g(
+            lambda w: f"/api/v1/privacy/files/{notice_file(w.a)}/download-url"
+        ),
+        ("GET", "/api/v1/privacy/notices"): _g(lambda w: "/api/v1/privacy/notices"),
+        ("POST", "/api/v1/privacy/notices"): lambda w, r, a: (
+            "/api/v1/privacy/notices",
+            {
+                "template_key": "notice_parents",
+                "template_version": "0.1",
+                "audience": "parents",
+                "issued_on": today,
+                "channel": "paper",
+            },
             {},
         ),
-        ("GET", "/api/v1/privacy/breaches/{breach_id}"): on_breach(""),
-        ("PATCH", "/api/v1/privacy/breaches/{breach_id}"): on_breach(
-            "", {"approx_staff": 2}, if_match=True
+        ("GET", "/api/v1/privacy/record-classes"): _g(lambda w: "/api/v1/privacy/record-classes"),
+        ("POST", f"{BASE}/search"): lambda w, r, a: (f"{BASE}/search", {}, {}),
+        ("POST", BASE): lambda w, r, a: (
+            BASE,
+            {
+                "kind": "other",
+                "subject": {"student_id": str(_student(w.a))},
+                "requester_relationship": "father",
+            },
+            {},
         ),
-        ("GET", "/api/v1/privacy/breaches/{breach_id}/affected"): on_breach("/affected"),
-        ("PUT", "/api/v1/privacy/breaches/{breach_id}/affected"): on_breach(
-            "/affected", {"student_ids": []}
+        ("GET", f"{BASE}/{{request_id}}"): _g(lambda w: f"{BASE}/{log_request(w.a)}"),
+        ("PATCH", f"{BASE}/{{request_id}}"): lambda w, r, a: (
+            f"{BASE}/{log_request(w.a)}",
+            {"notes": "Synthetic matrix note"},
+            {"If-Match": 'W/"1"'},
         ),
-        ("GET", "/api/v1/privacy/breaches/{breach_id}/drafts/{draft}"): on_breach(
-            "/drafts/board_outline"
+        ("GET", f"{BASE}/{{request_id}}/letters/{{letter}}"): _g(
+            lambda w: f"{BASE}/{log_request(w.a)}/letters/acknowledgement"
         ),
-        ("POST", "/api/v1/privacy/breaches/{breach_id}/notice-draft"): on_breach("/notice-draft"),
+        ("POST", f"{BASE}/{{request_id}}/report"): _g(
+            lambda w: f"{BASE}/{log_request(w.a)}/report"
+        ),
+        ("POST", f"{BASE}/{{request_id}}/report/release"): _g(
+            lambda w: f"{BASE}/{ready_report(w.a)}/report/release"
+        ),
+        ("GET", f"{BASE}/{{request_id}}/report/download-url"): _g(
+            lambda w: f"{BASE}/{ready_report(w.a, released=True)}/report/download-url"
+        ),
+        ("POST", f"{BASE}/{{request_id}}/links"): lambda w, r, a: (
+            f"{BASE}/{log_request(w.a, 'correction')}/links",
+            {"kind": "change_request", "target_id": str(uuid.uuid4())},
+            {},
+        ),
+        ("GET", f"{BASE}/{{request_id}}/erasure-plan"): _g(
+            lambda w: f"{BASE}/{log_request(w.a, 'erasure')}/erasure-plan"
+        ),
+        ("POST", f"{BASE}/{{request_id}}/erasure"): lambda w, r, a: (
+            f"{BASE}/{log_request(w.a, 'erasure')}/erasure",
+            {"class_keys": ["behaviour_notes"]},
+            {},
+        ),
+        ("POST", f"{BASE}/{{request_id}}/close"): lambda w, r, a: (
+            f"{BASE}/{log_request(w.a, 'other')}/close",
+            {},
+            {},
+        ),
     }
 
 
-MATRIX_CREATES = frozenset(
-    {
-        "/api/v1/consent-purposes",
-        "/api/v1/students/{student_id}/consents",
-        "/api/v1/privacy/breaches",
-        "/api/v1/privacy/breaches/{breach_id}/notice-draft",
-    }
+MATRIX_CREATES = frozenset({BASE, "/api/v1/privacy/notices"})
+MATRIX_ACCEPTED = frozenset(
+    {"/api/v1/privacy/templates/{key}/pdf", f"{BASE}/{{request_id}}/report"}
 )
-MATRIX_ACCEPTED = frozenset({"/api/v1/exports/consent-forms"})
+# Guard passed; the service answers: no such change request to link (422).
+MATRIX_STATUS: dict[tuple[str, str], int] = {("POST", f"{BASE}/{{request_id}}/links"): 422}
 
-# BOLA (tests/security/test_bola.py): school B's objects and minimal bodies.
 BOLA_BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
-    ("POST", "/api/v1/students/{student_id}/consents"): {
-        "purpose_id": "0192f3a4-0000-7000-8000-000000000b01",
-        "status": "refused",
-        "relationship": "father",
-        "decided_on": "2026-07-01",
+    ("PATCH", f"{BASE}/{{request_id}}"): {"notes": "Synthetic"},
+    ("POST", f"{BASE}/{{request_id}}/report"): None,
+    ("POST", f"{BASE}/{{request_id}}/report/release"): None,
+    ("POST", f"{BASE}/{{request_id}}/links"): {
+        "kind": "change_request",
+        "target_id": "00000000-0000-4000-8000-000000000001",
     },
-    ("PATCH", "/api/v1/consent-purposes/{purpose_id}"): {"active": False},
-    ("PATCH", "/api/v1/privacy/breaches/{breach_id}"): {"approx_staff": 1},
-    ("PUT", "/api/v1/privacy/breaches/{breach_id}/affected"): {"student_ids": []},
-    ("POST", "/api/v1/privacy/breaches/{breach_id}/notice-draft"): None,
+    ("POST", f"{BASE}/{{request_id}}/erasure"): {"class_keys": ["behaviour_notes"]},
+    ("POST", f"{BASE}/{{request_id}}/close"): {},
 }
-
-
-def b_purpose(admin: Engine, w: Any) -> uuid.UUID:
-    if "bola_purpose" not in w.b.ids:
-        w.b.ids["bola_purpose"] = purpose(admin, w.b, active=False)
-    value: uuid.UUID = w.b.ids["bola_purpose"]
-    return value
-
-
-def b_breach(admin: Engine, w: Any) -> uuid.UUID:
-    if "bola_breach" not in w.b.ids:
-        w.b.ids["bola_breach"] = breach(admin, w.b)
-    value: uuid.UUID = w.b.ids["bola_breach"]
-    return value

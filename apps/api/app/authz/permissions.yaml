@@ -118,6 +118,11 @@ permissions:
     description: Run board and portal readiness checks
     sensitivity: normal
     step_up: false
+  # R3-1D portal calendar (ADR-0053; migration 0064_portal_calendar).
+  readiness.calendar.manage:
+    description: Confirm portal and board dates, add the school's own events and choose who owns the work
+    sensitivity: normal
+    step_up: false
 
   # --- documents and knowledge -------------------------------------------------------------
   document.upload:
@@ -296,6 +301,22 @@ permissions:
     sensitivity: sensitive
     step_up: false
 
+  # --- R3-1A privacy requests (ADR-0048, US-2601..US-2609, FR-DPDP-001..018) -----------------
+  # Migration 0066_privacy_requests upserts these into core.permissions. School-wide only.
+  privacy.read:
+    description: See privacy requests and complaints about people you may see, the notices the school issued and the record classes
+    sensitivity: sensitive
+    step_up: false
+  privacy.request.manage:
+    description: Log privacy requests and complaints, record how the requester was checked, link change requests, build access reports, record notices and write answers
+    sensitivity: sensitive
+    step_up: false
+  privacy.request.decide:
+    description: Release an access report, approve an erasure or close a complaint (not for requests you logged yourself)
+    sensitivity: sensitive
+    step_up: true
+  # --- end R3-1A
+
   # --- R2-1B fees (ADR-0042; docs/07 §6.2; FR-FEE-*). Migration 0058_fees_core upserts these
   # into core.permissions. School-wide only: a class teacher sees no fee data (FR-FEE-024).
   fee.collect:
@@ -362,6 +383,17 @@ permissions:
     sensitivity: critical
     step_up: true
 
+
+  # --- R3-1C CBSE Appendix IX disclosure (ADR-0051; docs/07 §6.2; FR-DISC-*). Migration
+  # 0065_disclosure upserts these into core.permissions. School-wide only; CBSE schools only.
+  disclosure.edit:
+    description: Edit the CBSE Appendix IX disclosure draft, see what was published and download the published files
+    sensitivity: normal
+    step_up: false
+  disclosure.publish:
+    description: Publish the CBSE Appendix IX disclosure, withdraw it and change its public link (recent MFA sign-in)
+    sensitivity: critical
+    step_up: true
   # --- control plane (docs/07 §6.5, contract §5); never grantable to tenant roles ------------
   platform.tenants.read:
     description: See schools, their plan, status, deployment and usage (no student data)

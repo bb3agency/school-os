@@ -1,9 +1,8 @@
-"""Fixtures for consent and breach register tests (R3-1B; synthetic data only; ADR-0049,
-ADR-0050).
+"""Fixtures for privacy request tests (synthetic data only; ADR-0048).
 
-Uses the shared synthetic world (tests/api/world.py): school A with one member per role (class
-teacher scoped to 9A, teacher to class X) and school B for cross-tenant ids. Students are created
-through the real student service (tests/students/student_world.py).
+``world`` (tests/api/world.py): school A with one member per role and school B for cross-school
+ids; ``school``: a separate synthetic school for tests that count rows or change settings. The
+in-memory object store, the keyring and the fake PDF renderer come from tests/exports/objects.py.
 """
 
 from __future__ import annotations
@@ -12,8 +11,10 @@ import importlib.util
 import sys
 from pathlib import Path
 from types import ModuleType
+from typing import Any
 
 import pytest
+from sqlalchemy import Engine
 
 
 def _load(name: str, path: Path) -> ModuleType:
@@ -28,14 +29,21 @@ def _load(name: str, path: Path) -> ModuleType:
 
 
 TESTS = Path(__file__).resolve().parents[1]
-SW = _load("sos_test_student_world", TESTS / "students" / "student_world.py")
-D = _load("sos_test_documents_support", TESTS / "documents" / "support.py")
+EX = _load("sos_test_exports_objects", TESTS / "exports" / "objects.py")
 P = _load("sos_test_privacy_support", Path(__file__).with_name("support.py"))
-W = SW.W
+# R3-1B consents and breaches (ADR-0049, ADR-0050).
+CP = _load("sos_test_consent_support", Path(__file__).with_name("consent_support.py"))
+W = EX.W
 world = W.world
 api = W.api
 
 
+@pytest.fixture(scope="session")
+def school(world: Any, admin_engine: Engine) -> Any:
+    return EX.build_school(admin_engine)
+
+
 @pytest.fixture(autouse=True)
-def _keyring() -> None:
-    SW.configure_keyring()
+def _installed() -> None:
+    EX.install()
+    CP.SW.configure_keyring()

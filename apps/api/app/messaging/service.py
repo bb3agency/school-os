@@ -103,6 +103,7 @@ from app.messaging.schemas import (
     SectionOptinSummaryOut,
 )
 from app.messaging.sends import repository as sends_repo
+from app.messaging.subjects import erase_for_subject, subject_report
 from app.messaging.webhook import ParsedEvent
 from app.notifications import service as notifications
 from app.ops import service as ops
@@ -1729,7 +1730,9 @@ def store_events(
 ) -> int:
     """Store one school's verified events in its inbox (encrypted, deduplicated by key) and wake
     the worker (FR-MSG-020). The handle and the account are re-read under RLS; events for a
-    disconnected account or another WABA are dropped. Returns how many were new."""
+    disconnected account or another WABA are dropped. While the school is suspended only STOP
+    replies are recorded, silently, and everything else is dropped (D35,
+    :func:`_record_suspended_stops`). Returns how many were new."""
     if not events:
         return 0
     with tenant_session(tenant_id) as session:
@@ -1742,6 +1745,8 @@ def store_events(
         ):
             log.warning("messaging.webhook.no_account", tenant_id=tenant_id, outcome="dropped")
             return 0
+        if tenancy.get_tenant(session).status == "suspended":
+            return _record_suspended_stops(session, tenant_id, account, events)
         stored = 0
         for event in events:
             event_id = new_id()
@@ -1766,6 +1771,72 @@ def store_events(
         if stored:
             ops.enqueue_event(session, INBOX_EVENT, {"count": stored})
         return stored
+
+
+def _record_suspended_stops(
+    session: Session, tenant_id: uuid.UUID, account: Account, events: Sequence[ParsedEvent]
+) -> int:
+    """Owner decision D35 (ADR-0043 / ADR-0047 follow-up): while the school is suspended (D31)
+    only a parent's STOP is recorded, at once and silently: the opt-out decisions and the link
+    revocation of :func:`_stop`, an inbound row (``stopped_while_suspended``, not replied) and
+    the provider event (for deduplication, already ``processed``). Nothing is queued or sent,
+    no auto-reply, no confirmation (D32: no STOP prompt anywhere). Delivery statuses, template
+    and account updates, JOIN and other messages are dropped as before (D31; Meta retries are
+    acknowledged). Returns how many STOP replies were new."""
+    recorded = dropped = 0
+    for event in events:
+        if event.event_type != "inbound_message" or event.payload.get("kind") != "stop":
+            dropped += 1
+            continue
+        event_id = new_id()
+        blob, _ = crypto.encrypt_value(
+            session,
+            json.dumps(event.payload, ensure_ascii=False, sort_keys=True),
+            table=EVENTS_TABLE,
+            column="payload_ciphertext",
+            row_id=event_id,
+        )
+        inserted = repo.insert_provider_event(
+            session,
+            id=event_id,
+            provider=PROVIDER,
+            account_id=account.id,
+            event_key=event.event_key,
+            event_type=event.event_type,
+            event_at=event.event_at,
+            payload_ciphertext=blob,
+        )
+        if inserted is None:
+            continue  # a STOP Meta delivered before
+        outcome = "ignored"
+        mobile = rules.mobile_from_wa_id(event.payload.get("wa_id"))
+        if mobile is not None:
+            index = students.phone_index(session, mobile)
+            guardian_ids = students.guardian_ids_by_phone(session, mobile)
+            inbound = repo.insert_inbound(
+                session,
+                id=new_id(),
+                phone_bidx=index.digest,
+                phone_key_version=index.key_version,
+                kind="stop",
+                received_at=repo.now(session),
+            )
+            if guardian_ids:
+                _stop(session, guardian_ids, _today(session))
+                result = "stopped_while_suspended"
+            else:
+                result = "unknown_number"
+            repo.mark_inbound(session, inbound.id, replied=False, outcome=result)
+            outcome = "processed"
+        repo.finish_event(session, inserted, status=outcome, attempts=1, error_code=None)
+        recorded += 1
+    log.info(
+        "messaging.webhook.suspended",
+        tenant_id=tenant_id,
+        count=recorded,
+        outcome=f"stops_recorded:{recorded},dropped:{dropped}",
+    )
+    return recorded
 
 
 # --- inbox processing (worker) ----------------------------------------------------------------
@@ -2341,6 +2412,7 @@ __all__ = [
     "deliver",
     "disconnect",
     "ensure_available",
+    "erase_for_subject",
     "export_records",
     "get_account",
     "get_guardian_optins",
@@ -2362,6 +2434,7 @@ __all__ = [
     "search_messages",
     "section_summary",
     "store_events",
+    "subject_report",
     "sync_account",
     "sync_templates",
     "tenant_data_counts",

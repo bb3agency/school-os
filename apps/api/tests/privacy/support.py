@@ -1,9 +1,8 @@
-"""Helpers for consent and breach register tests (synthetic data only). Loaded by path from
-tests/privacy and the security suites (authz matrix, BOLA)."""
+"""Helpers for privacy request tests (synthetic data only). Loaded by path from tests/privacy
+and the security suites."""
 
 from __future__ import annotations
 
-import datetime as dt
 import importlib.util
 import sys
 import uuid
@@ -13,7 +12,12 @@ from typing import Any
 
 from sqlalchemy import Engine, text
 
+from app.core.db import tenant_session
+from app.students import service as students
+from app.students.schemas import GuardianCreate
+
 TESTS = Path(__file__).resolve().parents[1]
+BASE = "/api/v1/privacy/requests"
 
 
 def _load(name: str, path: Path) -> ModuleType:
@@ -27,161 +31,74 @@ def _load(name: str, path: Path) -> ModuleType:
     return sys.modules[name]
 
 
-SW = _load("sos_test_student_world", TESTS / "students" / "student_world.py")
-D = _load("sos_test_documents_support", TESTS / "documents" / "support.py")
-
-DECIDED_ON = "2026-07-15"
-SHARED_KEY = "photos_school_media"
-DESCRIPTION = "A class register of 9A was left on a bus and has not been found yet."
+EX = _load("sos_test_exports_objects", TESTS / "exports" / "objects.py")
+SW = EX.SW
 
 
 def student(school: Any, *, section_key: str = "section_9a", name: str | None = None) -> uuid.UUID:
-    """A fresh synthetic student enrolled in ``section_key`` (current year)."""
-    value: uuid.UUID = SW.create(
-        school,
-        name=name or f"Synthetica Consent {uuid.uuid4().hex[:6]}",
-        section_key=section_key,
-        admission_no=f"CP/{uuid.uuid4().hex[:8]}",
-    )
-    return value
+    sid: uuid.UUID = EX.student(school, section_key=section_key, name=name)
+    return sid
 
 
-def signed_form(admin: Engine, school: Any, uploader: Any) -> uuid.UUID:
-    """An uploaded signed form: an evidence document (C3 scan) with a ready version."""
-    doc: uuid.UUID = D.make_document(
-        admin,
-        school.tenant_id,
-        uploader.user_id,
-        purpose="evidence",
-        doc_type="form",
-        sensitivity="C3",
-    )
-    return doc
-
-
-def shared_purpose(api: Any, school: Any, admin: Engine) -> uuid.UUID:
-    """The school's shared optional purpose (enabled from the suggestion once; switched on again
-    if a test switched it off)."""
-    key = f"purpose:{SHARED_KEY}"
-    if key not in school.ids:
-        res = api.call(
-            school.people["owner"],
-            "POST",
-            "/api/v1/consent-purposes",
-            json={"suggested_key": SHARED_KEY},
+def guardian(school: Any, student_id: uuid.UUID, name: str = "Synthetica Guardian") -> uuid.UUID:
+    with tenant_session(school.tenant_id, school.people["owner"].user_id) as db:
+        out = students.add_guardian(
+            db,
+            SW.admin_ctx(school),
+            student_id,
+            GuardianCreate(relationship="mother", full_name=name, is_primary=True),
         )
-        assert res.status_code in (201, 409), res.text
-        with admin.connect() as c:
-            school.ids[key] = c.execute(
-                text("SELECT id FROM sis.consent_purposes WHERE tenant_id = :t AND key = :k"),
-                {"t": school.tenant_id, "k": SHARED_KEY},
-            ).scalar_one()
-    with admin.begin() as c:
-        c.execute(
-            text("UPDATE sis.consent_purposes SET active = true WHERE id = :i"),
-            {"i": school.ids[key]},
-        )
-    value: uuid.UUID = school.ids[key]
-    return value
+    return out.id
 
 
-def deactivate_all(admin: Engine, tenant_id: uuid.UUID) -> None:
-    """Switch every purpose of the school off (keeps the active-purpose limit in reach)."""
-    with admin.begin() as c:
-        c.execute(
-            text("UPDATE sis.consent_purposes SET active = false WHERE tenant_id = :t"),
-            {"t": tenant_id},
-        )
-
-
-def own_purpose(api: Any, school: Any, admin: Engine, **extra: Any) -> dict[str, Any]:
-    """A fresh school-defined purpose (the others are switched off first)."""
-    deactivate_all(admin, school.tenant_id)
-    body = {
-        "key": f"own_{uuid.uuid4().hex[:10]}",
-        "label_en": "Name in the school magazine",
-        "description": "Your child's name and class in the printed school magazine, for one year.",
+def body(
+    kind: str = "access",
+    *,
+    student_id: uuid.UUID | None = None,
+    guardian_id: uuid.UUID | None = None,
+    membership_id: uuid.UUID | None = None,
+    verification: str | None = "in_person_document",
+    text_: str = "Please tell me what you hold about my child.",
+    **extra: Any,
+) -> dict[str, Any]:
+    subject: dict[str, str] = {}
+    if student_id is not None:
+        subject["student_id"] = str(student_id)
+    if guardian_id is not None:
+        subject["guardian_id"] = str(guardian_id)
+    if membership_id is not None:
+        subject["membership_id"] = str(membership_id)
+    out: dict[str, Any] = {
+        "kind": kind,
+        "subject": subject,
+        "requester_relationship": "mother",
+        "requester_name": "Synthetica Requester",
+        "request_text": text_,
         **extra,
     }
-    res = api.call(school.people["owner"], "POST", "/api/v1/consent-purposes", json=body)
+    if verification is not None:
+        out["verification_method"] = verification
+    return out
+
+
+def log(api: Any, who: Any, data: dict[str, Any], **kw: Any) -> Any:
+    return api.call(who, "POST", BASE, json=data, **kw)
+
+
+def logged(api: Any, who: Any, data: dict[str, Any], **kw: Any) -> dict[str, Any]:
+    res = log(api, who, data, **kw)
     assert res.status_code == 201, res.text
     out: dict[str, Any] = res.json()
     return out
 
 
-def given(purpose_id: uuid.UUID, doc: uuid.UUID, **extra: Any) -> dict[str, Any]:
-    return {
-        "purpose_id": str(purpose_id),
-        "status": "given",
-        "relationship": "mother",
-        "decided_on": DECIDED_ON,
-        "form_language": "en",
-        "evidence_document_id": str(doc),
-        **extra,
-    }
-
-
-def refused(purpose_id: uuid.UUID, **extra: Any) -> dict[str, Any]:
-    return {
-        "purpose_id": str(purpose_id),
-        "status": "refused",
-        "relationship": "father",
-        "decided_on": DECIDED_ON,
-        **extra,
-    }
-
-
-def record(api: Any, who: Any, student_id: uuid.UUID, body: dict[str, Any], **kw: Any) -> Any:
-    return api.call(who, "POST", f"/api/v1/students/{student_id}/consents", json=body, **kw)
-
-
-def consent_rows(admin: Engine, student_id: uuid.UUID) -> list[dict[str, Any]]:
+def request_row(admin: Engine, request_id: uuid.UUID | str) -> dict[str, Any]:
     with admin.connect() as c:
-        return [
-            dict(r._mapping)
-            for r in c.execute(
-                text("SELECT * FROM sis.consents WHERE student_id = :s ORDER BY seq"),
-                {"s": student_id},
-            )
-        ]
+        row = c.execute(
+            text("SELECT * FROM ops.privacy_requests WHERE id = :i"), {"i": request_id}
+        ).one()
+    return dict(row._mapping)
 
 
-# --- breaches -------------------------------------------------------------------------------
-
-
-def noticed(hours_ago: float = 2) -> str:
-    return (dt.datetime.now(dt.UTC) - dt.timedelta(hours=hours_ago)).isoformat()
-
-
-def breach_body(**extra: Any) -> dict[str, Any]:
-    return {
-        "noticed_at": noticed(),
-        "description": DESCRIPTION,
-        "categories": ["identity", "attendance"],
-        "approx_children": 42,
-        "approx_guardians": 0,
-        "approx_staff": 1,
-        **extra,
-    }
-
-
-def create_breach(api: Any, who: Any, **extra: Any) -> dict[str, Any]:
-    res = api.call(who, "POST", "/api/v1/privacy/breaches", json=breach_body(**extra))
-    assert res.status_code == 201, res.text
-    out: dict[str, Any] = res.json()
-    return out
-
-
-def breach_row(admin: Engine, breach_id: Any) -> dict[str, Any]:
-    with admin.connect() as c:
-        return dict(
-            c.execute(text("SELECT * FROM ops.breach_records WHERE id = :i"), {"i": breach_id})
-            .one()
-            ._mapping
-        )
-
-
-def matrix_breach(api: Any, school: Any) -> uuid.UUID:
-    """A fresh open breach of school A recorded by its owner (authz matrix and BOLA)."""
-    out = create_breach(api, school.people["owner"])
-    return uuid.UUID(out["id"])
+def run_report(school: Any, export_id: str) -> str:
+    return str(EX.run(school, uuid.UUID(export_id)))

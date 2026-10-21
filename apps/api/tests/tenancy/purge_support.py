@@ -878,6 +878,43 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             k=task,
             u=u["user"],
         )
+        # --- portal calendar (R3-1D, 0064_portal_calendar): a confirmation with a document and
+        # an owner, a portal task and its reminder (append-only; references ops.tasks) ----------
+        _run(
+            c,
+            "INSERT INTO ops.portal_calendar_dates (id, tenant_id, academic_year_id, event_key, "
+            "opens_on, closes_on, source_kind, document_id, owner_membership_id, confirmed_by, "
+            "confirmed_by_membership) VALUES (:i, :t, :y, 'bseap_ssc_2027_nominal_roll', "
+            "'2027-02-01', '2027-02-05', 'circular', :d, :m, :u, :m)",
+            i=uuid.uuid4(),
+            t=t,
+            y=ids["year1"],
+            d=ids["doc"],
+            m=ids["m1"],
+            u=u["user"],
+        )
+        portal_task = uuid.uuid4()
+        _run(
+            c,
+            "INSERT INTO ops.tasks (id, tenant_id, title, owner_membership_id, due_on, source, "
+            "portal_event_key, created_by, created_by_membership) VALUES (:i, :t, "
+            "'Synthetic portal task', :m, '2027-02-05', 'portal_calendar', "
+            "'bseap_ssc_2027_nominal_roll', :u, :m)",
+            i=portal_task,
+            t=t,
+            m=ids["m1"],
+            u=u["user"],
+        )
+        _run(
+            c,
+            "INSERT INTO ops.portal_reminders (id, tenant_id, academic_year_id, event_key, "
+            "lead_day, closes_on, task_id, notified) VALUES (:i, :t, :y, "
+            "'bseap_ssc_2027_nominal_roll', 14, '2027-02-05', :k, 1)",
+            i=uuid.uuid4(),
+            t=t,
+            y=ids["year1"],
+            k=portal_task,
+        )
         parent_notice = uuid.uuid4()
         _run(
             c,
@@ -905,6 +942,35 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             "(:i, :t, 'absence_alerts', current_date)",
             i=uuid.uuid4(),
             t=t,
+        )
+        # --- CBSE disclosure (R3-1C, 0065_disclosure): a draft, a snapshot and its document --
+        snapshot = uuid.uuid4()
+        _run(
+            c,
+            "INSERT INTO ops.disclosure_drafts (id, tenant_id, format_key, format_version) "
+            "VALUES (:i, :t, 'cbse-appendix-ix', 1)",
+            i=uuid.uuid4(),
+            t=t,
+        )
+        _run(
+            c,
+            "INSERT INTO ops.disclosure_snapshots (id, tenant_id, format_key, format_version, "
+            "content, content_sha256, published_by) VALUES (:i, :t, 'cbse-appendix-ix', 1, "
+            "CAST('{}' AS jsonb), decode(repeat('ab', 32), 'hex'), :u)",
+            i=snapshot,
+            t=t,
+            u=u["user"],
+        )
+        _run(
+            c,
+            "INSERT INTO ops.disclosure_snapshot_documents (id, tenant_id, snapshot_id, n, "
+            "item_key, document_id, version_id, title) VALUES (:i, :t, :s, 1, 'fire_safety', "
+            ":d, :v, 'Synthetic fire certificate')",
+            i=uuid.uuid4(),
+            t=t,
+            s=snapshot,
+            d=ids["doc"],
+            v=ids["ver"],
         )
         # --- student timeline and early warning (M5, 0035_student_insights) ---------------
         exam, flag = uuid.uuid4(), uuid.uuid4()
@@ -1341,6 +1407,62 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             r=upi["rcpt"],
             l=upi["line"],
             m=ids["m1"],
+        )
+        # --- R3-1A privacy requests (0066_privacy_requests; ADR-0048) -------------------------
+        pr = uuid.uuid4()
+        _run(
+            c,
+            "INSERT INTO ops.privacy_notices (id, tenant_id, template_key, template_version, "
+            "audience, issued_on, channel, document_id, recorded_by, recorded_by_membership) "
+            "VALUES (:i, :t, 'notice_parents', '0.1', 'parents', '2026-09-01', 'paper', "
+            ":d, :u, :m)",
+            i=uuid.uuid4(),
+            t=t,
+            d=ids["doc"],
+            u=u["user"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO ops.privacy_request_counters (id, tenant_id, year, last_no) "
+            "VALUES (:i, :t, 2026, 1)",
+            i=uuid.uuid4(),
+            t=t,
+        )
+        _run(
+            c,
+            "INSERT INTO ops.privacy_requests (id, tenant_id, reference, year, number, kind, "
+            "subject_kind, student_id, requester_relationship, received_on, due_on, "
+            "request_ciphertext, report_export_id, logged_by, logged_by_membership) VALUES "
+            "(:i, :t, 'PR-2026-0001', 2026, 1, 'access', 'student', :s, 'mother', "
+            "'2026-09-01', '2026-09-08', :x, :e, :u, :m)",
+            i=pr,
+            t=t,
+            s=ids["student"],
+            x=b"\x01synthetic",
+            e=ids["export"],
+            u=u["user"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO ops.privacy_request_events (id, tenant_id, request_id, seq, event, "
+            "actor_user_id, actor_membership_id) VALUES (:i, :t, :r, 1, 'logged', :u, :m)",
+            i=uuid.uuid4(),
+            t=t,
+            r=pr,
+            u=u["user"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO ops.privacy_request_links (id, tenant_id, request_id, link_kind, "
+            "target_id, created_by) VALUES (:i, :t, :r, 'export', :e, :u)",
+            i=uuid.uuid4(),
+            t=t,
+            r=pr,
+            e=ids["export"],
+            u=u["user"],
         )
         # --- audit chain (retained by design; ADR-0029) -------------------------------------
         _run(

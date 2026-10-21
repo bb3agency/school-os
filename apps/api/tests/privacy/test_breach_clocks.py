@@ -16,7 +16,7 @@ from app.platform import service as control_plane
 from app.privacy import breach_service, breach_sync
 
 pytestmark = pytest.mark.db
-P = sys.modules["sos_test_privacy_support"]
+P = sys.modules["sos_test_consent_support"]
 W = sys.modules["sos_test_api_world"]
 
 

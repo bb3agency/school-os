@@ -78,6 +78,7 @@ from app.privacy.consents_schemas import (
     StudentConsentsOut,
     WhatsappStateOut,
 )
+from app.privacy.consents_subjects import subject_report
 from app.students import service as students
 from app.tenancy import service as tenancy
 
@@ -223,7 +224,7 @@ def _check_active_limit(session: Session) -> None:
 def create_purpose(session: Session, ctx: UserContext, data: PurposeCreate) -> PurposeOut:
     """Enable a suggested purpose or add the school's own (``tenant.settings.manage``, step-up;
     FR-DPDP-020). 409 ``purpose_exists`` for a key already used, ``too_many_purposes`` above the
-    limit; 422 ``unknown_suggestion``. Audit ``consent.purpose.created`` (key and version)."""
+    limit; 422 ``unknown_suggestion``. Audit ``consent.purpose.created`` (suggestion, version)."""
     if data.suggested_key is not None:
         suggestion = settings().suggestions.get(data.suggested_key)
         if suggestion is None:
@@ -261,7 +262,6 @@ def create_purpose(session: Session, ctx: UserContext, data: PurposeCreate) -> P
         resource_type="consent_purpose",
         resource_id=row.id,
         summary={
-            "key": row.key,
             "suggested_key": row.suggested_key,
             "form_version": row.form_version,
         },
@@ -313,7 +313,6 @@ def update_purpose(
         resource_type="consent_purpose",
         resource_id=row.id,
         summary={
-            "key": row.key,
             "fields": sorted(values),
             "form_version": row.form_version,
             "previous_form_version": previous_version,
@@ -498,7 +497,7 @@ def record_consent(
     ``purpose_inactive`` (a new ``given`` or ``pending`` on a purpose switched off); 422 per field
     (``signed_form_required``, ``relationship`` / ``decided_on`` missing, ``not_found``,
     ``date_in_future``, ``before_current_decision``, ``aadhaar_full_number_rejected``). Audit
-    ``consent.recorded`` (ids, purpose key, statuses; never the note)."""
+    ``consent.recorded`` (ids and statuses; never the note, nor the purpose key)."""
     _reach_student(session, ctx, student_id, (RECORD,))
     students.lock_student_for_change(session, ctx, student_id)
     purpose = _active_purpose(session, data.purpose_id)
@@ -548,7 +547,6 @@ def record_consent(
         summary={
             "consent_id": row.id,
             "purpose_id": purpose.id,
-            "purpose_key": purpose.key,
             "form_version": row.form_version,
             "seq": row.seq,
             "status": row.status,
@@ -985,6 +983,7 @@ __all__ = [
     "record_withdrawal_from_request",
     "settings",
     "student_decisions",
+    "subject_report",
     "summary",
     "tenant_data_counts",
     "update_purpose",

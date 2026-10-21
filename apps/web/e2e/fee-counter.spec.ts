@@ -118,7 +118,15 @@ test.describe.serial("fee counter: keyboard only at 1366×768 (US-2102, FR-FEE-0
     );
     await page.keyboard.press("Enter");
     const request = await posted;
-    expect(request.postDataJSON()).toMatchObject({
+    // Chromium does not always expose a fetch body to Playwright (postData null): then read
+    // what the canned API received through the BFF.
+    await expect(page.getByRole("heading", { name: "Receipt saved" })).toBeVisible();
+    const sentBody: unknown =
+      request.postDataJSON() ??
+      (await (
+        await page.request.get(`http://localhost:${API_PORT}/__e2e/r2/receipt-request`)
+      ).json());
+    expect(sentBody).toMatchObject({
       account_id: R2_IDS.account,
       amount: "7600.00",
       mode: "cash",

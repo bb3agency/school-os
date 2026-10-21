@@ -16,7 +16,7 @@ from app.core.db import tenant_session
 from app.core.redaction import verhoeff_check_digit
 
 pytestmark = pytest.mark.db
-P = sys.modules["sos_test_privacy_support"]
+P = sys.modules["sos_test_consent_support"]
 W = sys.modules["sos_test_api_world"]
 BASE = "/api/v1/privacy/breaches"
 

@@ -384,6 +384,18 @@ def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
             ("finance.read",),
             False,
         ),
+        # R3-1A (ADR-0048): the service checks which permission the request's kind needs
+        # (decide with step-up and maker-checker for access, erasure and grievances).
+        ("GET", "/api/v1/privacy/requests/{request_id}/report/download-url"): (
+            "privacy.request.manage",
+            ("privacy.request.decide",),
+            False,
+        ),
+        ("POST", "/api/v1/privacy/requests/{request_id}/close"): (
+            "privacy.request.manage",
+            ("privacy.request.decide",),
+            False,
+        ),
     }
     assert {
         (m, p): (g.sos_permission, g.sos_any_of, g.sos_step_up) for m, p, g in guards

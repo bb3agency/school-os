@@ -84,6 +84,28 @@ def list_page(
     return list(session.execute(stmt).mappings())
 
 
+def list_for_member(
+    session: Session, membership_id: uuid.UUID, *, limit: int
+) -> tuple[list[RowMapping], int]:
+    """Grants that ``membership_id`` approved, denied or revoked, or that were held through it
+    (a support membership), newest first (at most ``limit``), and their total number
+    (data-principal access report, FR-DPDP-009)."""
+    involved = or_(
+        g.c.approved_by_membership == membership_id,
+        g.c.denied_by_membership == membership_id,
+        g.c.revoked_by_membership == membership_id,
+        g.c.membership_id == membership_id,
+    )
+    total = int(session.execute(select(func.count()).select_from(g).where(involved)).scalar_one())
+    stmt = (
+        select(g)
+        .where(involved)
+        .order_by(func.coalesce(g.c.requested_at, g.c.created_at).desc(), g.c.id.desc())
+        .limit(limit)
+    )
+    return list(session.execute(stmt).mappings()), total
+
+
 def list_due(session: Session, now: dt.datetime) -> list[RowMapping]:
     """Approved/active grants whose window has passed (locked for the expiry job)."""
     stmt = (

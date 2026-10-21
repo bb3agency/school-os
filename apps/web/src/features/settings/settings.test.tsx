@@ -36,6 +36,7 @@ const SETTINGS = {
   current_erp_name: "",
   fees_enabled: false,
   parent_language: "en" as const,
+  privacy_request_target_days: 7,
 };
 const TENANT = {
   id: "0192f3a4-0000-7000-8000-000000000001",
