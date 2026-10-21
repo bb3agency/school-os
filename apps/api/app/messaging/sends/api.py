@@ -158,7 +158,10 @@ def preview_fee_reminders(
     """Before sending fee reminders from the dues list: accounts chosen, messages to queue,
     accounts and guardians left out by reason, and the estimated Meta cost incl. GST
     (FR-MSG-025; ``message.send`` and ``finance.read``, school-wide). Choose rows
-    (``account_ids``) or ``all_matching`` the dues list's filter. Nothing is sent. Errors: 403
+    (``account_ids``) or ``all_matching`` the dues list's filter; ``kind: payment_link`` is
+    "Send payment link" (FR-MSG-027: the same message, whose dues page offers "Pay online";
+    ``blocked_reason`` ``payments_not_connected`` without online payments). Nothing is sent.
+    Errors: 403
     without ``finance.read``; 404 an account that is not one of this year's (or fees off); 422
     the selection, ``account_ids`` ``too_many``."""
     response.headers["Cache-Control"] = "no-store"
@@ -176,7 +179,9 @@ def send_fee_reminders(
 ) -> Response:
     """Send the previewed fee reminders (FR-MSG-025; ``message.send`` and ``finance.read``;
     ``Idempotency-Key``): one per account and opted-in guardian, at most once a day, sent
-    outside quiet hours within the daily cap. Errors: 409 ``preview_stale`` (preview again),
+    outside quiet hours within the daily cap; a payment link (``kind: payment_link``,
+    FR-MSG-027) once a day apart from reminders. Errors: 409 ``preview_stale`` (preview again),
+    ``payments_not_connected`` (payment links only),
     ``messaging_not_connected``, ``messaging_paused``, ``template_not_approved``,
     ``template_paused``, ``messaging_currency_not_inr``. Audited."""
     return idem.run(db, body, lambda: service.confirm_fee_reminders(db, ctx, body), status_code=202)

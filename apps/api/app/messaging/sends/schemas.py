@@ -22,6 +22,7 @@ from pydantic import (
 
 BroadcastStatus = Literal["previewed", "sending", "done"]
 RunJob = Literal["absence_alerts", "fee_reminders"]
+FeeMessageKind = Literal["reminder", "payment_link"]
 
 
 def _nfc(value: Any) -> Any:
@@ -166,6 +167,13 @@ class FeeReminderSelectionIn(_In):
     all_matching: bool = False
     section_id: uuid.UUID | None = None
     class_id: uuid.UUID | None = None
+    kind: FeeMessageKind = Field(
+        default="reminder",
+        description='``reminder`` (FR-MSG-025) or ``payment_link`` ("Send payment link", '
+        'FR-MSG-027): the same fee message, whose dues page offers "Pay online"; needs online '
+        "payments connected (``payments_not_connected``) and is sent at most once a day per "
+        "account and guardian, apart from reminders.",
+    )
 
     @model_validator(mode="after")
     def _one_selection(self) -> FeeReminderSelectionIn:
@@ -203,7 +211,8 @@ class FeeReminderPreviewOut(_Out):
     gst_percent: str
     blocked_reason: str | None = Field(
         description="Why nothing can be sent now (messaging_not_connected, messaging_paused, "
-        "template_not_approved, template_paused, messaging_currency_not_inr); null when it can."
+        "template_not_approved, template_paused, messaging_currency_not_inr; for a payment link "
+        "also payments_not_connected); null when it can."
     )
 
 
