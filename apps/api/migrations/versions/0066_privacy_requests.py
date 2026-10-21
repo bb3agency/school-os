@@ -32,7 +32,7 @@ Expand-only (invariant 12). Downgrade drops the four tables (lossy: the request 
 notice records), deletes ``subject_report`` and ``privacy_notice`` exports of every school and restores the 0054 export
 checks, and removes the catalog keys no role holds.
 
-Revision ID: 0065_privacy_requests
+Revision ID: 0066_privacy_requests
 Revises: 0062_messaging_finish
 Create Date: 2026-10-21
 """
@@ -42,8 +42,9 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0065_privacy_requests"
-# R3 waves were written against 0062; the lead re-chains (0063 -> 0064_portal_calendar -> 0065) at merge.
+revision = "0066_privacy_requests"
+# R3 waves were written against 0062; the lead re-chains them at merge
+# (0063 -> 0064_portal_calendar -> 0065_disclosure -> 0066_privacy_requests).
 down_revision = "0062_messaging_finish"
 branch_labels = None
 depends_on = None

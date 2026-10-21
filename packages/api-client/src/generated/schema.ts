@@ -39549,6 +39549,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description Letter key. */
                 letter: "acknowledgement" | "access" | "correction" | "erasure" | "nomination" | "consent_withdrawn" | "grievance";
                 request_id: string;
             };
@@ -39853,6 +39854,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description Notice template key. */
                 key: "notice_parents" | "notice_staff";
             };
             cookie?: never;
@@ -39897,6 +39899,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description Notice template key. */
                 key: "notice_parents" | "notice_staff";
             };
             cookie?: never;

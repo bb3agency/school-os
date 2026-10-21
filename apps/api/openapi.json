@@ -65091,10 +65091,12 @@
             }
           },
           {
+            "description": "Letter key.",
             "in": "path",
             "name": "letter",
             "required": true,
             "schema": {
+              "description": "Letter key.",
               "enum": [
                 "acknowledgement",
                 "access",
@@ -65104,6 +65106,7 @@
                 "consent_withdrawn",
                 "grievance"
               ],
+              "maxLength": 40,
               "title": "Letter",
               "type": "string"
             }
@@ -65499,14 +65502,17 @@
         "operationId": "notice_pdf_api_v1_privacy_templates__key__pdf_post",
         "parameters": [
           {
+            "description": "Notice template key.",
             "in": "path",
             "name": "key",
             "required": true,
             "schema": {
+              "description": "Notice template key.",
               "enum": [
                 "notice_parents",
                 "notice_staff"
               ],
+              "maxLength": 40,
               "title": "Key",
               "type": "string"
             }
@@ -65570,14 +65576,17 @@
         "operationId": "preview_template_api_v1_privacy_templates__key__preview_get",
         "parameters": [
           {
+            "description": "Notice template key.",
             "in": "path",
             "name": "key",
             "required": true,
             "schema": {
+              "description": "Notice template key.",
               "enum": [
                 "notice_parents",
                 "notice_staff"
               ],
+              "maxLength": 40,
               "title": "Key",
               "type": "string"
             }

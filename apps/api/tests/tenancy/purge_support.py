@@ -1290,13 +1290,14 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             l=upi["line"],
             m=ids["m1"],
         )
-        # --- R3-1A privacy requests (0065_privacy_requests; ADR-0048) -------------------------
+        # --- R3-1A privacy requests (0066_privacy_requests; ADR-0048) -------------------------
         pr = uuid.uuid4()
         _run(
             c,
             "INSERT INTO ops.privacy_notices (id, tenant_id, template_key, template_version, "
             "audience, issued_on, channel, document_id, recorded_by, recorded_by_membership) "
-            "VALUES (:i, :t, 'notice_parents', '0.1', 'parents', '2026-09-01', 'paper', :d, :u, :m)",
+            "VALUES (:i, :t, 'notice_parents', '0.1', 'parents', '2026-09-01', 'paper', "
+            ":d, :u, :m)",
             i=uuid.uuid4(),
             t=t,
             d=ids["doc"],

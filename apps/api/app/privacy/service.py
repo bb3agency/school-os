@@ -1232,6 +1232,8 @@ def release_report(session: Session, ctx: UserContext, request_id: uuid.UUID) ->
     state = _report_state(session, row)
     if state is None or state.status != "ready":
         raise Conflict("Build the report and wait until it is ready.", code="report_not_ready")
+    if row.report_released_at is not None:
+        raise Conflict("This report was already released.", code="report_already_released")
     now = repo.now(session)
     with _db_errors():
         row = repo.update_request(
@@ -1350,6 +1352,8 @@ def execute_erasure(
     _open(row)
     if row.kind != "erasure":
         raise _invalid("kind", "not_an_erasure_request")
+    if row.decided_by is not None:
+        raise Conflict("This erasure was already decided.", code="erasure_already_decided")
     if row.verification_method is None:
         raise NotVerified()
     subject = _subject(row)

@@ -14,7 +14,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Path, Response
 from fastapi.responses import HTMLResponse
 
 from app.authz.context import UserContext
@@ -44,6 +44,8 @@ from app.privacy.schemas import (
 
 router = APIRouter(prefix="/api/v1", tags=["privacy"])
 
+KeyParam = Annotated[TemplateKey, Path(max_length=40, description="Notice template key.")]
+LetterParam = Annotated[LetterKey, Path(max_length=40, description="Letter key.")]
 Reader = Annotated[UserContext, Depends(require(service.READ))]
 Manager = Annotated[UserContext, Depends(require(service.MANAGE))]
 Decider = Annotated[UserContext, Depends(require(service.DECIDE, scope="school", step_up=True))]
@@ -81,14 +83,14 @@ def list_templates(ctx: Reader, db: TenantDB) -> list[PrivacyTemplateOut]:
 
 
 @router.get("/privacy/templates/{key}/preview", response_class=HTMLResponse, responses=_PAGE)
-def preview_template(ctx: Reader, db: TenantDB, key: TemplateKey) -> HTMLResponse:
+def preview_template(ctx: Reader, db: TenantDB, key: KeyParam) -> HTMLResponse:
     """The notice filled from the school's settings as an A4 page; unfilled placeholders print
     "[not set]" (FR-DPDP-002; permission ``privacy.read``). Not legal advice."""
     return _html(service.preview_template(db, key), f"privacy-{key}.html")
 
 
 @router.post("/privacy/templates/{key}/pdf", response_model=PrivacyModuleFileOut, status_code=202)
-def notice_pdf(ctx: Reader, db: TenantDB, key: TemplateKey) -> PrivacyModuleFileOut:
+def notice_pdf(ctx: Reader, db: TenantDB, key: KeyParam) -> PrivacyModuleFileOut:
     """Make the filled notice into an A4 PDF in the background (FR-DPDP-002; permission
     ``privacy.read``). Poll ``GET /privacy/files/{export_id}``."""
     return service.request_notice_pdf(db, ctx, key)
@@ -192,7 +194,7 @@ def update_request(
     response_class=HTMLResponse,
     responses=_PAGE,
 )
-def letter(ctx: Reader, db: TenantDB, request_id: uuid.UUID, letter: LetterKey) -> HTMLResponse:
+def letter(ctx: Reader, db: TenantDB, request_id: uuid.UUID, letter: LetterParam) -> HTMLResponse:
     """A response letter (acknowledgement, access, correction, erasure, nomination, consent
     withdrawn, grievance) as an A4 page to print and hand over (permission ``privacy.read``).
     Audited."""

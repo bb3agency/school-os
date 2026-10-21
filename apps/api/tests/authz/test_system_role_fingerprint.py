@@ -16,7 +16,7 @@ import json
 from app.authz.catalog import system_roles
 
 # R2-1C + R2-1B + R2-2D + R2-2E (fee.reconcile) + R2-3G (message.send) grants
-PINNED = "90b4e54f5e572ed6737f07482fb7f54261e628f14535f0bc6a8c948c9bdcf71b"
+PINNED = "c07e79b59b245b495ed7e7777bbac49ee1a13c6cafb6cb4f9a4a5057156c1377"  # R3-1A privacy.*
 
 
 def fingerprint() -> str:

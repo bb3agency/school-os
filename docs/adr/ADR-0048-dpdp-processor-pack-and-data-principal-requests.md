@@ -49,7 +49,7 @@
 
 ## Implementation note (R3-1A, 2026-10-21)
 
-Built in `app/privacy` with migration `0065_privacy_requests`. Decision 6's registry is a YAML file read by the privacy service, which calls each contributor's `service.subject_report` / `service.erase_for_subject` by name (protocol types in `app/core/subjects.py`, so no module imports `app.privacy`); the access report and the filled notice PDF are "module documents" of `app.exports` (kinds `subject_report`, `privacy_notice`) that only the privacy routes request and serve. Decision 4's catalogue gained the rule `no_personal_data` for configuration and bookkeeping classes. Build-review choices (guardian contacts shown as Yes/No in a child's report, opt-ins kept append-only, early-warning re-flag note, pinned document links) are in docs/05 §16.1 and docs/08 §16.
+Built in `app/privacy` with migration `0066_privacy_requests`. Decision 6's registry is a YAML file read by the privacy service, which calls each contributor's `service.subject_report` / `service.erase_for_subject` by name (protocol types in `app/core/subjects.py`, so no module imports `app.privacy`); the access report and the filled notice PDF are "module documents" of `app.exports` (kinds `subject_report`, `privacy_notice`) that only the privacy routes request and serve. Decision 4's catalogue gained the rule `no_personal_data` for configuration and bookkeeping classes. Build-review choices (guardian contacts shown as Yes/No in a child's report, opt-ins kept append-only, early-warning re-flag note, pinned document links) are in docs/05 §16.1 and docs/08 §16.
 
 ## Related requirements
 

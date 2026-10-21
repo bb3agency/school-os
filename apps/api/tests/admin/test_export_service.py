@@ -202,7 +202,7 @@ EXPECTED_TABLES = {
     # R2-3G sending (0061_messaging_sends): broadcast counts and automatic-run history.
     "messaging_broadcasts",
     "messaging_send_runs",
-    # R3-1A privacy (0065_privacy_requests, FR-DPDP-018): texts only with include_sensitive.
+    # R3-1A privacy (0066_privacy_requests, FR-DPDP-018): texts only with include_sensitive.
     "privacy_notices",
     "privacy_requests",
     "privacy_request_events",

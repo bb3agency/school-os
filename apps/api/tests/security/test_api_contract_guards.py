@@ -286,6 +286,10 @@ NON_UUID_PATH_PARAMS = {
     ("GET", "/api/v1/public/certificates/{code}", "code"),
     # R2-2D: the Razorpay webhook route value (ADR-0047 decision 3), bounded; the guard resolves.
     ("POST", "/api/v1/webhooks/razorpay/{route}", "route"),
+    # R3-1A: notice template keys and letter keys are closed Literal enums (ADR-0048).
+    ("GET", "/api/v1/privacy/templates/{key}/preview", "key"),
+    ("POST", "/api/v1/privacy/templates/{key}/pdf", "key"),
+    ("GET", "/api/v1/privacy/requests/{request_id}/letters/{letter}", "letter"),
 }
 
 
@@ -318,6 +322,12 @@ _SECRET_NAME = re.compile(
 
 # Response fields whose names look like secrets, with the reason they may be returned.
 RESPONSE_FIELD_ALLOWLIST = {
+    # R3-1A privacy (ADR-0048): template, record-class and letter catalog keys.
+    "app.privacy.schemas.PrivacyErasurePlanRowOut.class_key": "record class code",
+    "app.privacy.schemas.PrivacyErasureResultRowOut.class_key": "record class code",
+    "app.privacy.schemas.PrivacyRecordClassOut.key": "record class code",
+    "app.privacy.schemas.PrivacyTemplateOut.key": "notice template code",
+    "app.privacy.schemas.PrivacyNoticeOut.template_key": "notice template code",
     # Catalog and code keys, not credentials.
     "app.admin.schemas.RetentionCategoryOut.key": "retention category code",
     "app.students.schemas.AttributeOut.key": "attribute catalog key",
@@ -413,6 +423,17 @@ ACTION_SEGMENTS = {
 # Creating POSTs that do not take Idempotency-Key, with the reason.
 IDEMPOTENCY_EXEMPT = {
     ("POST", "/api/v1/fleet/heartbeat"): "machine route; nonce and timestamp make it replay-safe",
+    # R3-1A privacy (ADR-0048).
+    ("POST", "/api/v1/privacy/templates/{key}/pdf"): "makes a short-lived file of a public "
+    "template; a repeat makes another copy and changes no record",
+    ("POST", "/api/v1/privacy/requests/{request_id}/report"): "rebuilds the request's access "
+    "report; a repeat replaces the unreleased file (a released one must be released again)",
+    ("POST", "/api/v1/privacy/requests/{request_id}/links"): "insert-only, unique per request, "
+    "kind and target; a repeat changes nothing",
+    ("POST", "/api/v1/privacy/requests/{request_id}/erasure"): "a decision on a locked request: "
+    "a repeat answers 409 erasure_already_decided",
+    ("POST", "/api/v1/privacy/requests/{request_id}/report/release"): "a state transition: a "
+    "repeat answers 409 report_already_released",
     ("POST", "/api/v1/public/links/exchange"): "a read: checks a parent link token, stores "
     "nothing (ADR-0046; no member, so no per-person replay store)",
     # R2-3H parent pages (ADR-0046 decision 9, ADR-0044 decision 4).
