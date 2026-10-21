@@ -66,6 +66,15 @@ Sending is built in `app/messaging/sends/` and migration `0061_messaging_sends` 
 
 Parent messages are utility messages only (notices, attendance alerts, fee reminders and receipts), never promotional. So parent pages and templates carry no "reply STOP" prompt and no opt-out button, and no web opt-out method is added. Inbound STOP handling (decision 7) stays as built, because Meta's WhatsApp Business policy requires a business to respect any request to stop messages, whatever the category; a parent who stopped messages sees "You asked the school to stop these messages" on the opt-in page. D31 (nothing processed or sent while a school is suspended) is unchanged.
 
+## Follow-up (2026-10-21, wave R2-4 close-out; decisions D33-D35)
+
+Lead decisions recorded in docs/18 §8 (the owner asked not to be asked):
+
+- **D33 (who sends fee messages in bulk).** The role matrix is unchanged: bulk fee reminders and "Send payment link" from the dues list need `message.send` **and** `finance.read` school-wide, so by default only principals send them; accountants and office admins do not get `message.send` for fee messages. A school can give its accountant both permissions through a custom role.
+- **D34 (automatic switches).** The "Fee reminders" and "Fee receipts" switches govern the automatic messages only; a reminder, payment link or receipt a person sends still goes (as built in R2-3J: the sender skips `purpose_off` only for messages without `created_by`).
+- **D35 (STOP while suspended; amends D31 and decision 7's suspended case).** While a school is suspended, an inbound STOP is recorded at once and silently: the opt-out decisions (`whatsapp_stop`), the guardian's links revoked, an inbound row with outcome `stopped_while_suspended` and no reply, the provider event stored as `processed` for deduplication. No confirmation is queued or sent then or after reactivation. Delivery statuses, JOIN, other replies and template or account events of a suspended school are still dropped (D31), and nothing is ever sent while suspended. D32 stands: no STOP prompt or opt-out button. Built in `messaging.service.store_events` (`_record_suspended_stops`) with ADR-0047's resolver change in migration `0063_r2_closeout`.
+- **"Send payment link" (FR-MSG-027).** It reuses the fee reminder template and path (`kind: payment_link` on `/fees/reminders/preview` and `/fees/reminders`): the message opens the parent dues page, whose "Pay online" makes the Razorpay link (ADR-0042, FR-PAY-005). No new Meta template or message purpose; it needs the school's online payments connected and has its own once-a-day dedupe (`paylink:<IST date>`).
+
 ## Related requirements
 
 FR-MSG-001..024 (docs/03 §3.21), FR-PUB-001..012, SEC-034, SEC-035, SEC-039, PRV-025..028; US-2201..US-2210 (docs/02 C22). Docs: 01 §7.3, 02 §9, 05 §15.3, 07 §3 TB11, §4 T28-T35, 08 §15, 09 §4 "Messaging", "Webhooks", 10 §11.2, 14 R2, 17 §5.8.

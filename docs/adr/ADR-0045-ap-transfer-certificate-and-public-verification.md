@@ -59,3 +59,7 @@ Built as decided in migration `0056_certificate_verifications` and `app/certific
 - **Format versions.** A pending TC prepared on a format version that changed before approval is refused (`409 certificate_format_changed`); the issued certificate stores `format_key`, `format_version` and its frozen content.
 - **Purge order.** `certificates` purges before `public` (the verification table references the handle).
 - **Open:** the fee note on the TC preview (FR-CERT-025) waits for `fees.service` (wave R2-1B); Playwright for `/v` waits for the hardening wave (R2-3I) with the public stand-in; the AP layout is unconfirmed until a pilot school compares it with its TC book (D3).
+
+## Follow-up (2026-10-21, wave R2-4)
+
+FR-CERT-025 is built: `GET /students/{id}/certificates/preview` for a transfer certificate carries `fee_note` (balance, overdue amount, oldest due date, last payment date, fee account id) when fees are on and the caller holds `finance.read` school-wide. It is shown on the issue screen as an information note with a link to the fee account; it never enters the printed fields, the blockers, `can_issue` or the frozen content (FR-FEE-030, D16; `tests/certificates/test_tc_fee_note.py`).

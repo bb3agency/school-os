@@ -124,3 +124,9 @@ FR-FEE-001..030, FR-PAY-001..016 (docs/03 §3.19-3.20), SEC-034..038, PRV-022..0
 - Razorpay webhooks, validate and test (signature, `x-razorpay-event-id`, ordering): https://razorpay.com/docs/webhooks/validate-test/
 - Razorpay UPI charges (MDR vs platform fee): https://razorpay.com/blog/upi-charges-explained-mdr-vs-platform-fees/
 - Research notes: docs/research/2026-10-market/notes/parent_comms_fees.md §4-§6
+
+## Follow-up (2026-10-21, wave R2-4)
+
+- Decision 13 (never withhold a TC for dues): the TC preview's information note is built (FR-CERT-025, ADR-0045 follow-up).
+- Ask the school reads the fee ledger through `fees.service.ask_student_fees` / `ask_school_fees` while fees are on (FR-KB-044; `finance.read` school-wide only; Tally not consulted).
+- "Send payment link" from the dues list and the fee account sends the parent dues page, whose "Pay online" creates the link through the parent page's path (FR-PAY-005; FR-MSG-027; ADR-0043 follow-up). Who may send is unchanged (D33).
