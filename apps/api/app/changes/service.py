@@ -49,6 +49,7 @@ from app.changes import memo as memo_page
 from app.changes import repository as repo
 from app.changes.models import ChangeRequest
 from app.changes.schemas import ApproveIn, ChangeRequestCreate, ChangeRequestOut, RejectIn
+from app.changes.subjects import subject_report
 from app.core import purge as purging
 from app.core.errors import (
     Conflict,
@@ -1022,6 +1023,7 @@ __all__ = [
     "reject",
     "request_student",
     "settings",
+    "subject_report",
     "submit",
     "tenant_data_counts",
 ]

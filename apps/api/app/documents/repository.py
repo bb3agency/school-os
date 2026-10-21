@@ -17,6 +17,7 @@ from typing import Any
 from sqlalchemy import (
     ColumnElement,
     and_,
+    column,
     delete,
     exists,
     false,
@@ -24,8 +25,10 @@ from sqlalchemy import (
     insert,
     or_,
     select,
+    table,
     text,
     true,
+    union,
     update,
 )
 from sqlalchemy.exc import DBAPIError
@@ -468,3 +471,66 @@ def ready_versions(session: Session) -> list[tuple[DocumentVersion, Document]]:
         .order_by(DocumentVersion.document_id, DocumentVersion.version_no)
     )
     return [(row[0], row[1]) for row in session.execute(stmt).all()]
+
+
+# --- data principal requests (R3-1A; FR-DPDP-009, FR-DPDP-013) ------------------------------
+
+# Tables that tie a document to a student: (relation, document column, student column). A
+# pinned, versioned allowlist (lead decision, R3-1A review: no runtime catalog discovery);
+# tests/documents/test_student_document_links.py fails when a (tenant_id, <col>) foreign key to
+# kb.documents on a table with student_id is missing here, so a new link table is added
+# deliberately. This is a read-only cross-module query for the access report (docs/05 §16.1).
+STUDENT_DOCUMENT_LINKS: tuple[tuple[str, str, str], ...] = (
+    ("sis.apaar_consents", "evidence_document_id", "student_id"),
+    ("sis.attribute_values", "evidence_document_id", "student_id"),
+    ("sis.certificates", "document_id", "student_id"),
+    ("sis.change_requests", "evidence_document_id", "student_id"),
+    ("sis.extraction_items", "document_id", "student_id"),
+)
+
+
+def _student_document_ids(student_id: uuid.UUID, links: Sequence[tuple[str, str, str]]) -> Any:
+    """``SELECT document_id ... UNION ...`` over the pinned link tables (fixed identifiers,
+    quoted by SQLAlchemy; the student id is a bound parameter)."""
+    selects = []
+    for relation, doc_column, student_column in links:
+        schema, name = relation.split(".")
+        tbl = table(name, column(doc_column), column(student_column), schema=schema)
+        doc_col = tbl.c[doc_column]
+        selects.append(
+            select(doc_col.label("document_id")).where(
+                tbl.c[student_column] == student_id, doc_col.is_not(None)
+            )
+        )
+    return union(*selects).subquery()
+
+
+def student_documents(
+    session: Session, student_id: uuid.UUID, *, limit: int
+) -> tuple[list[Document], int]:
+    """Documents of this school linked to ``student_id`` by another record, newest first (at
+    most ``limit``), and how many there are in all."""
+    if not STUDENT_DOCUMENT_LINKS:
+        return [], 0
+    linked = _student_document_ids(student_id, STUDENT_DOCUMENT_LINKS)
+    where = Document.id.in_(select(linked.c.document_id))
+    total = int(
+        session.execute(select(func.count()).select_from(Document).where(where)).scalar_one()
+    )
+    if total == 0 or limit <= 0:
+        return [], total
+    rows = session.scalars(
+        select(Document)
+        .where(where)
+        .order_by(Document.created_at.desc(), Document.id.desc())
+        .limit(limit)
+    )
+    return list(rows), total
+
+
+def uploads_by(session: Session, user_id: uuid.UUID) -> tuple[int, dt.datetime | None]:
+    """How many documents of this school ``user_id`` uploaded, and when the latest was."""
+    row = session.execute(
+        select(func.count(), func.max(Document.created_at)).where(Document.created_by == user_id)
+    ).one()
+    return int(row[0]), row[1]

@@ -87,6 +87,7 @@ from app.tally.schemas import (
     SyncIn,
     SyncOut,
 )
+from app.tally.subjects import subject_report
 from app.tenancy import service as tenancy
 
 log = get_logger(__name__)
@@ -1111,6 +1112,7 @@ __all__ = [
     "select_groups",
     "status",
     "student_fee_dues",
+    "subject_report",
     "tenant_data_counts",
     "unlink_party",
 ]

@@ -284,6 +284,19 @@ class SessionSettingsOut(_Out):
     idle_timeout_minutes: int = Field(description="Sign out after this many idle minutes (5-30).")
     date_format: Literal["DD/MM/YYYY", "DD-MM-YYYY", "YYYY-MM-DD"]
     languages: list[Language] = Field(description="Languages the school uses, first is default.")
+    privacy_contact: PrivacyContactOut | None = Field(
+        default=None,
+        description="The school's privacy and grievance contact for the staff footer "
+        "(FR-DPDP-004); null until the school sets it.",
+    )
+
+
+class PrivacyContactOut(_Out):
+    """The school's privacy contact as shown in the staff footer (R3-1A; PRV-011)."""
+
+    name: str
+    phone: str | None = None
+    email: str | None = None
 
 
 class MeOut(_Out):

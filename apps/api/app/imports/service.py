@@ -113,6 +113,7 @@ from app.imports.sheet import (
     read_sheet,
     with_edits,
 )
+from app.imports.subjects import subject_report
 from app.imports.validation import (
     AADHAAR_CODE,
     AADHAAR_MESSAGE_KEY,
@@ -2117,6 +2118,7 @@ __all__ = [
     "run_parse",
     "run_validate",
     "set_mapping",
+    "subject_report",
     "tenant_data_counts",
 ]
 

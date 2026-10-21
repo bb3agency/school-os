@@ -73,6 +73,7 @@ from app.circulars.schemas import (
     TaskUpdate,
     TaskView,
 )
+from app.circulars.subjects import subject_report
 from app.core import pdf
 from app.core import purge as purging
 from app.core.db import tenant_session
@@ -1981,6 +1982,7 @@ __all__ = [
     "run_reading",
     "send_reminders",
     "set_task_status",
+    "subject_report",
     "tenant_data_counts",
     "today_ist",
     "update_notice",

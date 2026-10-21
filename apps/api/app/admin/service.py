@@ -113,6 +113,7 @@ from app.knowledge import service as knowledge
 from app.messaging import service as messaging
 from app.notifications import service as notifications
 from app.ops import service as ops
+from app.privacy import service as privacy
 from app.students import service as students
 from app.tally import service as tally
 from app.tenancy import service as tenancy
@@ -576,6 +577,9 @@ def _collect(session: Session, snap: _Snapshot) -> tuple[list[RecordTable], dict
         # ADR-0034: each person's Ask memory items and switch (their own work context; the
         # query log and conversations are not in the archive, docs/05 §12).
         *knowledge.export_records(session),
+        # R3-1A (FR-DPDP-018): notices, privacy requests, events and links; the requesters'
+        # texts only with include_sensitive.
+        *privacy.export_records(session, include_sensitive=snap.include_sensitive),
         repo.retention_record_table(session),
     ]
     names = [t.name for t in tables]

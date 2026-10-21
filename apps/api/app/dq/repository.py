@@ -356,3 +356,17 @@ def export_record_tables(session: Session) -> list[RecordTable]:
         dump_table(session, R, name="dq_runs", order_by=("created_at", "id")),
         dump_table(session, F, name="dq_findings", order_by=("created_at", "id")),
     ]
+
+
+def subject_finding_counts(session: Session, student_id: uuid.UUID) -> list[RowMapping]:
+    """Findings about one student counted by rule, severity and status, with the latest check;
+    latest first (access report, FR-DPDP-009). A possible-duplicate pair stores one finding on
+    each student, so ``student_id`` alone counts each finding once."""
+    last = func.max(F.c.last_seen_at).label("last_seen_at")
+    stmt = (
+        select(F.c.rule_id, F.c.severity, F.c.status, func.count().label("n"), last)
+        .where(F.c.student_id == student_id)
+        .group_by(F.c.rule_id, F.c.severity, F.c.status)
+        .order_by(last.desc().nulls_last(), F.c.rule_id, F.c.status)
+    )
+    return list(session.execute(stmt).mappings())

@@ -1216,3 +1216,100 @@ def export_memory_settings(session: Session) -> list[UserMemorySettings]:
 def _rowcount(result: object) -> int:
     count = getattr(result, "rowcount", None)
     return int(count) if isinstance(count, int) and count >= 0 else 0
+
+
+# --- data principal requests (R3-1A; FR-DPDP-009, FR-DPDP-013) ------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class AskHistoryCounts:
+    """Rows of one user's Ask history in this school (``conversations``: not removed from the
+    history; ``removed_conversations``: removed, kept until their questions are purged)."""
+
+    queries: int
+    conversations: int
+    removed_conversations: int
+    memories: int
+    memory_settings: int
+
+    @property
+    def total(self) -> int:
+        return (
+            self.queries
+            + self.conversations
+            + self.removed_conversations
+            + self.memories
+            + self.memory_settings
+        )
+
+
+def _count(session: Session, stmt: Any) -> int:
+    return int(session.execute(stmt).scalar_one())
+
+
+def ask_history_counts(session: Session, user_id: uuid.UUID) -> AskHistoryCounts:
+    return AskHistoryCounts(
+        queries=_count(
+            session, select(func.count()).select_from(Query).where(Query.user_id == user_id)
+        ),
+        conversations=_count(
+            session,
+            select(func.count())
+            .select_from(Conversation)
+            .where(Conversation.user_id == user_id, Conversation.deleted_at.is_(None)),
+        ),
+        removed_conversations=_count(
+            session,
+            select(func.count())
+            .select_from(Conversation)
+            .where(Conversation.user_id == user_id, Conversation.deleted_at.is_not(None)),
+        ),
+        memories=_count(
+            session,
+            select(func.count()).select_from(UserMemory).where(UserMemory.user_id == user_id),
+        ),
+        memory_settings=_count(
+            session,
+            select(func.count())
+            .select_from(UserMemorySettings)
+            .where(UserMemorySettings.user_id == user_id),
+        ),
+    )
+
+
+def conversations_of(session: Session, user_id: uuid.UUID, limit: int) -> list[Conversation]:
+    """``user_id``'s conversations not removed from the history, newest first."""
+    return list(
+        session.execute(
+            select(Conversation)
+            .where(Conversation.user_id == user_id, Conversation.deleted_at.is_(None))
+            .order_by(Conversation.created_at.desc(), Conversation.id.desc())
+            .limit(limit)
+        ).scalars()
+    )
+
+
+def delete_ask_history_of(session: Session, user_id: uuid.UUID) -> AskHistoryCounts:
+    """Delete every question, conversation, memory item and memory setting of ``user_id`` in
+    this school (erasure on request). Memory items first (their links to questions and
+    conversations would be set NULL anyway), then questions (other questions that pointed at
+    them as revision, supersession or answer-cache source keep only a NULL), then
+    conversations."""
+    before = ask_history_counts(session, user_id)
+    tenant = current_tenant_id(session)
+    memories = delete_memory_data_of(session, [user_id])
+    queries = _rowcount(
+        session.execute(delete(Query).where(Query.tenant_id == tenant, Query.user_id == user_id))
+    )
+    session.execute(
+        delete(Conversation).where(
+            Conversation.tenant_id == tenant, Conversation.user_id == user_id
+        )
+    )
+    return AskHistoryCounts(
+        queries=queries,
+        conversations=before.conversations,
+        removed_conversations=before.removed_conversations,
+        memories=memories,
+        memory_settings=before.memory_settings,
+    )

@@ -248,6 +248,9 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | fee.report (R2-1B: download the day book and dues lists, bulk personal financial data) | ✓ᴿ | ✓ᴿ | — | — | ✓ᴿ | — | — | — | ✓ᴿ |
 | fee.reconcile (R2-2E: import bank statements, confirm UPI receipts seen in the bank, work through UPI exceptions; school-wide only) | — | ✓ | — | — | ✓ | — | — | — | — |
 | payments.configure (R2-2D: connect, test, rotate the webhook secret of, or disconnect the school's own Razorpay account; ADR-0042) | ✓ᴿ | — | — | — | — | — | — | — | — |
+| privacy.read (R3-1A: requests and grievances list and detail within the reader's student reach, notice records, record classes) | ✓ | ✓ | ✓ | — | — | — | — | — | ✓ |
+| privacy.request.manage (R3-1A: log requests and grievances, record verification, link change requests, build access reports, record notice issues, write responses) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
+| privacy.request.decide (R3-1A: release an access report, approve an erasure, close an access, erasure or grievance request; maker-checker against the person who logged it) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
 
 `auditor_readonly` memberships are time-bound (default 14 days) and read-only.
 
@@ -352,11 +355,10 @@ Unchanged keys used by R2: `certificate.approve`ᴿ (add or withdraw a verificat
 
 **Status: planned (R3; ADR-0048..ADR-0053; lead decisions D36-D46).** Each R3 wave adds its keys to `app/authz/permissions.yaml`, `roles.yaml` and the §6.2 matrix in the same change (the catalog test compares §6.2 with `roles.yaml` exactly, so the keys move there only when built), and the release runs the system-role sync (ADR-0022). Same legend as §6.2. Privacy, breach, disclosure and RTE permissions are school-wide only; `consent.read` follows `apaar.consent.read` (section-scoped for class teachers).
 
+**R3-1A (built 2026-10-21, migration `0064_privacy_requests`):** `privacy.read`, `privacy.request.manage` and `privacy.request.decide`ᴿ moved to the §6.2 matrix, `permissions.yaml` and `roles.yaml`. Reads apply the reader's `student.read_basic` reach (a request about a student outside it, or about a guardian of none of the reader's students, is 404; requests about staff members are visible to every `privacy.read` holder). Closing an access, erasure or grievance request, releasing a report and erasing need `privacy.request.decide` with step-up by someone other than the person who logged the request (service and DB `CHECK`); other kinds close with `privacy.request.manage`. Release note: run the system-role sync after migrating.
+
 | Permission | owner | principal | office_admin | office_staff | accountant | exam_coord | class_teacher | teacher | auditor_ro |
 |---|---|---|---|---|---|---|---|---|---|
-| privacy.read (R3-1A: requests and grievances list and detail within the reader's student reach, notice records, record classes, consent purposes) | ✓ | ✓ | ✓ | — | — | — | — | — | ✓ |
-| privacy.request.manage (R3-1A: log requests and grievances, record verification, link change requests, build access reports, record notice issues, write responses) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
-| privacy.request.decide (R3-1A: release an access report, approve or refuse an erasure, close a grievance; maker-checker against the person who logged it) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
 | consent.read (R3-1B: optional-purpose consents and the consent view; ADR-0049) | ✓ | ✓ | ✓ | ✓ | — | ✓ | S | — | ✓ |
 | consent.record (R3-1B: record a decision with the signed form, print forms) | — | ✓ | ✓ | ✓ | — | — | — | — | — |
 | privacy.breach.read (R3-1B: the school's breach register; ADR-0050) | ✓ | ✓ | — | — | — | — | — | — | ✓ |

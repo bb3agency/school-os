@@ -49,6 +49,7 @@ from app.identity.schemas import UserOut
 from app.notifications import email, templates
 from app.notifications import repository as repo
 from app.notifications.schemas import InvitationEmailOut, NotificationOut
+from app.notifications.subjects import erase_for_subject, subject_report
 from app.ops import service as ops
 from app.tenancy import service as tenancy
 
@@ -447,6 +448,7 @@ __all__ = [
     "PermissionSelector",
     "Recipients",
     "SummaryError",
+    "erase_for_subject",
     "list_for_me",
     "mark_all_read",
     "mark_read",
@@ -457,6 +459,7 @@ __all__ = [
     "request_email",
     "resend_invitation_email",
     "send_requested_email",
+    "subject_report",
     "tenant_data_counts",
     "unread_count",
 ]

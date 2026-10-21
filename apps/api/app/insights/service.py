@@ -102,6 +102,7 @@ from app.insights.schemas import (
     TimelineItem,
     TimelineOut,
 )
+from app.insights.subjects import erase_for_subject, subject_report
 from app.notifications import service as notifications
 from app.ops import service as ops
 from app.students import rotation as key_rotation
@@ -1475,6 +1476,7 @@ __all__ = [
     "assign_flag",
     "close_flag",
     "erase_flag",
+    "erase_for_subject",
     "erase_note",
     "evaluate",
     "export_records",
@@ -1489,6 +1491,7 @@ __all__ = [
     "queue_evaluation",
     "raise_flag",
     "send_reminders",
+    "subject_report",
     "summary",
     "tenant_data_counts",
     "timeline",

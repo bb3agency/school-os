@@ -64,6 +64,7 @@ from app.academics.schemas import (
     SheetIssueOut,
     WriteResultOut,
 )
+from app.academics.subjects import subject_report
 from app.audit import service as audit
 from app.authz.context import UserContext
 from app.authz.scope import ensure_section_visible
@@ -860,6 +861,7 @@ __all__ = [
     "record_attendance",
     "record_marks",
     "section_marks",
+    "subject_report",
     "tenant_data_counts",
     "today_ist",
 ]

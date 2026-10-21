@@ -103,6 +103,7 @@ from app.messaging.schemas import (
     SectionOptinSummaryOut,
 )
 from app.messaging.sends import repository as sends_repo
+from app.messaging.subjects import erase_for_subject, subject_report
 from app.messaging.webhook import ParsedEvent
 from app.notifications import service as notifications
 from app.ops import service as ops
@@ -2328,6 +2329,7 @@ __all__ = [
     "deliver",
     "disconnect",
     "ensure_available",
+    "erase_for_subject",
     "export_records",
     "get_account",
     "get_guardian_optins",
@@ -2348,6 +2350,7 @@ __all__ = [
     "search_messages",
     "section_summary",
     "store_events",
+    "subject_report",
     "sync_account",
     "sync_templates",
     "tenant_data_counts",

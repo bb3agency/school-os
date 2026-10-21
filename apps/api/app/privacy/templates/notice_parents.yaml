@@ -1,0 +1,65 @@
+# App copy of docs/legal/privacy-notice-parents-template.md (R3-1A; FR-DPDP-001, ADR-0048 decision 1).
+# Same text and version as the docs file (tests/privacy/test_templates.py compares
+# them). Not legal advice (D30). Change the docs file first, then this copy.
+key: notice_parents
+template_version: '0.1'
+audience: parents
+source: docs/legal/privacy-notice-parents-template.md
+placeholders:
+- school_legal_name
+- school_short_name
+- school_address
+- privacy_contact_name
+- privacy_contact_phone
+- privacy_contact_email
+- effective_date
+- template_version
+- optional_sections
+body_markdown: |
+  ## How {{school_short_name}} uses information about your child and your family
+
+  **{{school_legal_name}}**, {{school_address}}. Effective {{effective_date}} (notice version {{template_version}}).
+
+  ### What we keep and why
+
+  | What | Why |
+  |---|---|
+  | Your child's name, date of birth, gender, admission number, class and section, photo where we take one | To admit and teach your child, keep the admission register and issue certificates |
+  | Your child's UDISE+ PEN and APAAR ID | Government portals and board registration need them. APAAR is your choice: we ask for your signed consent and you may refuse (it does not affect admission or studies) |
+  | The last 4 digits of your child's Aadhaar and the name, date of birth and gender **as printed** on it | To check that our records match before board and portal submissions. **We never store the full Aadhaar number.** |
+  | Attendance and marks | Education and your child's safety |
+  | Your name, relationship, phone number and address | To contact you about your child |
+  | Fee accounts and receipts *(if the school collects fees through SchoolOS)* | To run the school's fees. Kept 8 years for the school's accounts |
+  | Consents you give for optional uses (for example photos on the school website) | Only for the use you agreed to; you can withdraw at any time |
+
+  We use this information only for the school's educational activities and your child's safety, and for what the law requires. We do not sell it, advertise to you or your child, or use it for marketing.
+
+  ### Who helps us
+
+  We use **SchoolOS**, a school records service, under a data processing agreement. SchoolOS stores the information in India and may use AI, through Google Cloud in Mumbai, to help our staff find answers in the school's own records; AI answers show where they came from and a staff member always decides what to do. {{optional_sections}}
+
+  *If the school sends WhatsApp messages:* we send notices, absence alerts, fee reminders and receipts from the school's own WhatsApp number only if you agree, for each kind of message. Reply STOP at any time to stop. Messages may contain a link that works for a limited time; anyone with the link can see that page, so please do not forward it.
+
+  *If the school accepts online payments:* payments go to the school's own account with its payment provider; SchoolOS never receives your money.
+
+  *If certificates carry a check code:* anyone holding your child's certificate can check online that it is genuine; the check shows only what the certificate itself prints.
+
+  ### How long we keep it
+
+  Admission registers and certificates are permanent school records. Fee records are kept 8 years. Other information is kept only as long as it is needed; working files are deleted within days or weeks. Ask us for the full list.
+
+  ### Your rights
+
+  You can ask us to:
+
+  - show you what we hold about your child or you;
+  - correct or complete it (changes to official records need a document, such as a birth certificate);
+  - erase information we no longer need, where the law lets us (official registers and accounts cannot be erased);
+  - name someone to act for you if you cannot;
+  - withdraw any consent you gave.
+
+  You can also complain to us. We aim to answer within **7 days**. If you are not satisfied, you may complain to the Data Protection Board of India.
+
+  ### Contact
+
+  {{privacy_contact_name}}, {{school_short_name}} · Phone {{privacy_contact_phone}} · E-mail {{privacy_contact_email}}

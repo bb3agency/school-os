@@ -68,6 +68,7 @@ from app.fees.money import ZERO
 from app.fees.online_schemas import PaymentLinkInfo
 from app.fees.receipts import MESSAGE_EVENT, RENDER_EVENT, RENDER_TASK
 from app.fees.schemas import DueLine, FeeAccountSummary, InstalmentDue, StudentDues
+from app.fees.subjects import fee_targets_of_student, subject_report
 from app.tenancy import service as tenancy
 
 # --- routes' operations (re-exported for app.fees.api) --------------------------------------------
@@ -498,6 +499,7 @@ __all__ = [
     "dues_for_student",
     "enabled",
     "export_records",
+    "fee_targets_of_student",
     "parent_account_student",
     "parent_dues",
     "parent_pay",
@@ -512,6 +514,7 @@ __all__ = [
     "receipt_message_event",
     "reminder_accounts",
     "reminder_dues",
+    "subject_report",
     "tenant_data_counts",
     "upi_payee",
 ]

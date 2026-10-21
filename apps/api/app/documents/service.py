@@ -123,6 +123,7 @@ from app.documents.storage import (
     tenant_prefix,
     upload_key,
 )
+from app.documents.subjects import erase_for_subject, subject_report
 from app.identity import service as identity
 from app.identity.principal import STEP_UP_MAX_AGE
 from app.notifications import service as notifications
@@ -2730,6 +2731,7 @@ __all__ = [
     "discard_unused_object",
     "discard_version",
     "document_object",
+    "erase_for_subject",
     "evidence_exists",
     "evidence_state",
     "evidence_version",
@@ -2761,6 +2763,7 @@ __all__ = [
     "store_export_file",
     "store_generated_document",
     "store_page_image",
+    "subject_report",
     "sweep_discarded_objects",
     "tenant_data_counts",
     "tenant_export_download_url",

@@ -547,4 +547,22 @@ def not_found(what: str = "Not found") -> NotFound:
     return NotFound(what)
 
 
-__all__ = ["translate_db_error"]
+def count_lines_matched_to_accounts(session: Session, account_ids: Collection[uuid.UUID]) -> int:
+    """Bank statement lines CONFIRMED against a receipt of ``account_ids`` (data-principal
+    report, FR-DPDP-009: a count only, never the narration). A proposed match may belong to
+    another payer, so it is not the student's data until a person confirms it."""
+    if not account_ids:
+        return 0
+    receipts = select(Receipt.id).where(Receipt.account_id.in_(list(account_ids)))
+    total = session.scalar(
+        select(func.count())
+        .select_from(BankStatementLine)
+        .where(
+            BankStatementLine.receipt_id.in_(receipts),
+            BankStatementLine.match_status == "confirmed",
+        )
+    )
+    return int(total or 0)
+
+
+__all__ = ["count_lines_matched_to_accounts", "translate_db_error"]

@@ -1420,6 +1420,17 @@ A school's owner or principal (`tenant.settings.manage`, step-up) changes the pe
 | Consents (`sis.consents`) and purposes | While the student is on roll, then as the student record | Evidence of consent (PRV-006); withdrawal is a new entry |
 | Breach records (`ops.breach_records`, `ops.breach_affected`) | 3 years after closing (SchoolOS default, **to confirm**) | Affected ids only; descriptions encrypted |
 | Access reports (`ops.exports` kind `subject_report`) | 24 hours after release | Rebuilt on request |
+| Staff memberships, roles and scopes (`core.memberships*`, `core.roles*`) | While the person works at the school; then deactivated and kept for the audit trail | Record class `staff_accounts` (R3-1A, `app/privacy/record_classes.yaml`) |
+| Documents and their versions (`kb.documents*`) | Until the school deletes them; evidence documents for the life of the linked value | Deleting a document erases its search index and versions (docs/08 §7) |
+| Search index of documents (`kb.document_chunks`, `kb.embedding_cache`, `kb.verified_answers`) | As the source document (deleted with it) | Derived AI data follows its source |
+| AI metering ledger (`kb.llm_calls`) | Life of the school (ids, models and token counts only) | No question or answer text |
+| Issued certificates and their counters (`sis.certificates*`) | Life of the school (official record) | Never erased on request (FR-DPDP-014) |
+| Change requests (`sis.change_requests`) | Life of the student record (evidence of official changes) | |
+| Data-quality findings and runs (`sis.dq_*`) | As the student record (re-checked on every change) | |
+| APAAR consent register (`sis.apaar_consent*`) | While the student is on roll, then as the student record | Evidence of the parent's decision (ADR-0039) |
+| Support access grants (`ops.break_glass_grants`) | Life of the school (security record) | |
+| Job runs, outbox and idempotency keys (`ops.job_runs`, `ops.outbox`, `ops.idempotency_keys`) | Life of the school (ids and counts only); idempotency keys 24 hours | |
+| School structure, settings and keys (years, classes, sections, `core.tenant_keys`, field definitions, WhatsApp set-up) | Life of the school | No personal data; keys destroyed at offboarding (crypto-shredding) |
 | Disclosure snapshots (`ops.disclosure_snapshots`) | Life of the school | The record of what was published; view counts 90 days |
 | RTE admissions / claims (`sis.rte_*`; not scheduled) | Admissions: as the student record; claims and lines: 8 years after the financial year (D21) | |
 | Portal calendar dates and reminders (`ops.portal_*`) | 2 academic years | Configuration and idempotency, no personal data |
