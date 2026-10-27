@@ -15,11 +15,14 @@ from sqlalchemy import text
 from app.authz.context import Scopes, UserContext
 from app.breakglass import service
 from app.core.db import platform_session, tenant_session
+from app.core.ids import new_id
 
 
 def pending_grant(tenant_id: uuid.UUID) -> uuid.UUID:
     """A fresh request from a fresh operator, pulled into the school (status requested)."""
-    op, request_id = uuid.uuid4(), uuid.uuid4()
+    # UUIDv7 like every entity id (05 §1): the control plane lists requests newest first by
+    # id, so a random v4 id would sort ahead of every real request and push them off page 1.
+    op, request_id = uuid.uuid4(), new_id()
     with platform_session() as s:
         s.execute(
             text(
