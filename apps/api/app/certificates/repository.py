@@ -356,7 +356,7 @@ def certificates_of_student(
         .order_by(Certificate.requested_at.desc(), Certificate.id.desc())
         .limit(limit)
     )
-    rows = [(c, int(n)) for c, n in session.execute(stmt).tuples()]
+    rows = [(c, int(n)) for c, n in session.execute(stmt)]
     total = session.scalar(select(func.count()).select_from(C).where(C.c.student_id == student_id))
     return rows, int(total or 0)
 

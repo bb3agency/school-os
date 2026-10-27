@@ -12,6 +12,7 @@ from collections.abc import Collection, Mapping, Sequence
 from typing import Any
 
 from sqlalchemy import and_, func, or_, select, text, update
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -65,7 +66,7 @@ def latest_readings(
             select(CircularReading)
             .where(CircularReading.document_id.in_(list(document_ids)))
             .order_by(CircularReading.document_id, CircularReading.version_no.desc())
-            .distinct(CircularReading.document_id)
+            .ext(distinct_on(CircularReading.document_id))
         )
         .scalars()
         .all()

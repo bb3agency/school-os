@@ -151,10 +151,12 @@ def test_SEC_029_emergency_breakglass_needs_two_different_operators(
     assert (same.status_code, same.json()["code"]) == (409, "same_operator")
     two = api.call("POST", f"/break-glass-requests/{rid}/emergency-confirm", second)
     assert two.json()["status"] == "approved"
-    listed = api.call("GET", "/break-glass-requests", make_operator("platform_viewer")).json()[
-        "data"
-    ]
-    assert any(r["id"] == rid for r in listed)
+    # Filter by school: the unfiltered list is shared by every test using this database and
+    # pages at 50, so a long run can push this request off the first page.
+    listed = api.call(
+        "GET", "/break-glass-requests", make_operator("platform_viewer"), params={"tenant_id": tid}
+    ).json()["data"]
+    assert [r["id"] for r in listed] == [rid]
     too_long = api.call(
         "POST",
         "/break-glass-requests",
