@@ -25,8 +25,8 @@ from app.documents.tasks import beat_schedule as documents_beat_schedule
 from app.dq.tasks import beat_schedule as dq_beat_schedule
 from app.exports.tasks import beat_schedule as exports_beat_schedule
 from app.fees.tasks import beat_schedule as fees_beat_schedule
-from app.fees.upi_tasks import beat_schedule as fees_upi_beat_schedule
 from app.fees.tasks_online import beat_schedule as payments_beat_schedule
+from app.fees.upi_tasks import beat_schedule as fees_upi_beat_schedule
 from app.imports.tasks import beat_schedule as imports_beat_schedule
 from app.insights.tasks import beat_schedule as insights_beat_schedule
 from app.knowledge.service import check_provider_agreements
