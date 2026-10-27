@@ -115,7 +115,9 @@ export function NotificationBell() {
           }),
         );
         failures.current = 0;
-        return result.count;
+        // A body without a count (an old API or a proxy page) shows no badge rather than
+        // failing the query: TanStack Query rejects undefined data.
+        return typeof result.count === "number" ? result.count : 0;
       } catch (error) {
         failures.current += 1;
         throw error;

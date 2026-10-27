@@ -91,7 +91,7 @@ export function PageHeader({
           </h1>
           {badge}
         </div>
-        {description ? <p className="text-ink-muted">{description}</p> : null}
+        {description ? <div className="text-ink-muted">{description}</div> : null}
       </div>
       {actions ? (
         <div className="flex max-w-full min-w-0 flex-wrap items-center gap-2" data-print="hide">
