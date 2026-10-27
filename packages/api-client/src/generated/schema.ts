@@ -7694,6 +7694,7 @@ export interface paths {
          * Update Request
          * @description Change the status, notes, verification or response, or withdraw a nomination
          *     (permission ``privacy.request.manage``; ``If-Match``). Errors: ``request_closed`` (409),
+         *     ``request_decided`` (409, a decided request can only be closed),
          *     stale ``If-Match`` (412).
          */
         patch: operations["update_request_api_v1_privacy_requests__request_id__patch"];

@@ -71557,7 +71557,7 @@
         ]
       },
       "patch": {
-        "description": "Change the status, notes, verification or response, or withdraw a nomination\n(permission ``privacy.request.manage``; ``If-Match``). Errors: ``request_closed`` (409),\nstale ``If-Match`` (412).",
+        "description": "Change the status, notes, verification or response, or withdraw a nomination\n(permission ``privacy.request.manage``; ``If-Match``). Errors: ``request_closed`` (409),\n``request_decided`` (409, a decided request can only be closed),\nstale ``If-Match`` (412).",
         "operationId": "update_request_api_v1_privacy_requests__request_id__patch",
         "parameters": [
           {

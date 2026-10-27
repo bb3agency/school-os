@@ -184,6 +184,7 @@ def update_request(
 ) -> PrivacyRequestOut:
     """Change the status, notes, verification or response, or withdraw a nomination
     (permission ``privacy.request.manage``; ``If-Match``). Errors: ``request_closed`` (409),
+    ``request_decided`` (409, a decided request can only be closed),
     stale ``If-Match`` (412)."""
     out = service.update_request(db, ctx, request_id, body, expected_version=version)
     response.headers["ETag"] = etag(out.version)
