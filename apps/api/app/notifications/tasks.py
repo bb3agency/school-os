@@ -31,12 +31,18 @@ EMAIL_MAX_RETRIES = 6
 def purge_all() -> dict[str, int]:
     with context_free_session() as session:
         tenant_ids = tenancy.list_tenant_ids(session, TENANT_STATUSES)
-    purged = 0
+    purged = failed = 0
     for tenant_id in tenant_ids:
-        with tenant_session(tenant_id) as session:
-            purged += service.purge_read(session)
-    log.info("notifications.purged", count=purged)
-    return {"tenants": len(tenant_ids), "purged": purged}
+        try:
+            with tenant_session(tenant_id) as session:
+                purged += service.purge_read(session)
+        except Exception as exc:  # database: this school only (rolled back), retried next run
+            failed += 1
+            log.warning(
+                "notifications.purge_failed", tenant_id=tenant_id, error_type=type(exc).__name__
+            )
+    log.info("notifications.purged", count=purged, failed=failed)
+    return {"tenants": len(tenant_ids), "purged": purged, "failed": failed}
 
 
 @shared_task(name="notifications.purge_read", acks_late=True)

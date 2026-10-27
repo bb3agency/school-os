@@ -165,20 +165,36 @@ def discard_unused_object(
 def sweep_discarded_objects() -> dict[str, int]:
     with context_free_session() as s:
         tenant_ids = tenancy.list_tenant_ids(s, None)
-    total = 0
+    total = failed = 0
     for tenant_id in tenant_ids:
-        total += service.sweep_discarded_objects(tenant_id)
-    return {"discarded": total}
+        try:
+            total += service.sweep_discarded_objects(tenant_id)
+        except Exception as exc:  # storage or database: this school only, retried next run
+            failed += 1
+            log.warning(
+                "documents.sweep_discarded_failed",
+                tenant_id=tenant_id,
+                error_type=type(exc).__name__,
+            )
+    return {"discarded": total, "failed": failed}
 
 
 @shared_task(name="documents.purge_expired_uploads", queue="maintenance", acks_late=True)
 def purge_expired_uploads() -> dict[str, int]:
     with context_free_session() as s:
         tenant_ids = tenancy.list_tenant_ids(s, None)
-    total = 0
+    total = failed = 0
     for tenant_id in tenant_ids:
-        total += service.purge_expired_uploads(tenant_id)
-    return {"purged": total}
+        try:
+            total += service.purge_expired_uploads(tenant_id)
+        except Exception as exc:  # storage or database: this school only, retried next run
+            failed += 1
+            log.warning(
+                "documents.purge_uploads_failed",
+                tenant_id=tenant_id,
+                error_type=type(exc).__name__,
+            )
+    return {"purged": total, "failed": failed}
 
 
 def beat_schedule() -> dict[str, dict[str, Any]]:

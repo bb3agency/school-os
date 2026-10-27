@@ -120,11 +120,19 @@ def commit(tenant_id: str, event_id: str, payload: dict[str, Any]) -> str:
 def purge_all() -> dict[str, int]:
     with context_free_session() as session:
         tenant_ids = tenancy.list_tenant_ids(session, TENANT_STATUSES)
-    purged = 0
+    purged = failed = 0
     for tenant_id in tenant_ids:
-        purged += service.purge_raw_files(tenant_id)
-    log.info("imports.raw_files.purge_done", count=purged)
-    return {"tenants": len(tenant_ids), "purged": purged}
+        try:
+            purged += service.purge_raw_files(tenant_id)
+        except Exception as exc:  # storage or database: this school only, retried next run
+            failed += 1
+            log.warning(
+                "imports.raw_files.purge_failed",
+                tenant_id=tenant_id,
+                error_type=type(exc).__name__,
+            )
+    log.info("imports.raw_files.purge_done", count=purged, failed=failed)
+    return {"tenants": len(tenant_ids), "purged": purged, "failed": failed}
 
 
 @shared_task(name=service.PURGE_TASK, queue="maintenance", acks_late=True)
