@@ -521,3 +521,39 @@ def test_FR_DPDP_006_daily_job_notifies_managers_with_counts_once(school: Any, a
         second = service.notify_due(db)
     assert first >= 1
     assert second == 0
+
+
+@pytest.mark.parametrize("status", ["in_progress", "waiting_for_requester", "withdrawn"])
+def test_FR_DPDP_013_decided_request_cannot_be_reopened_or_withdrawn(
+    school: Any, api: Any, status: str
+) -> None:
+    out = P.logged(
+        api, school.people["office_admin"], P.body("erasure", student_id=P.student(school))
+    )
+    erased = api.call(
+        school.people["principal"],
+        "POST",
+        f"{BASE}/{out['id']}/erasure",
+        json={"class_keys": ["behaviour_notes"]},
+    )
+    assert erased.status_code == 200, erased.text
+    current = api.call(school.people["office_admin"], "GET", f"{BASE}/{out['id']}")
+    assert current.json()["status"] == "decided"
+    res = api.call(
+        school.people["office_admin"],
+        "PATCH",
+        f"{BASE}/{out['id']}",
+        json={"status": status},
+        headers={"If-Match": current.headers["ETag"]},
+    )
+    assert res.status_code == 409, res.text
+    assert res.json()["code"] == "request_decided"
+    notes = api.call(
+        school.people["office_admin"],
+        "PATCH",
+        f"{BASE}/{out['id']}",
+        json={"notes": "Told the parent by phone"},
+        headers={"If-Match": current.headers["ETag"]},
+    )
+    assert notes.status_code == 200, notes.text
+    assert notes.json()["status"] == "decided"

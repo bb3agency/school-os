@@ -952,6 +952,12 @@ def update_request(  # noqa: PLR0912 - one branch per optional field of the PATC
             values["nomination_withdrawn_at"] = repo.now(session)
             changed.append("nomination_withdrawn")
     if data.status is not None and data.status != row.status:
+        if row.status == "decided":
+            # A released report or an executed erasure cannot be reopened or withdrawn: the
+            # decision stands and the request can only be closed (FR-DPDP-010, FR-DPDP-013).
+            raise Conflict(
+                "This request was already decided. Close it instead.", code="request_decided"
+            )
         values["status"] = data.status
         if data.status == "withdrawn":
             values["closed_at"] = repo.now(session)
