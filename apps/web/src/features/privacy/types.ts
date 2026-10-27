@@ -1,4 +1,4 @@
-import type { components } from "@schoolos/api-client";
+import type { components, paths } from "@schoolos/api-client";
 
 /**
  * Privacy requests and complaints, notices and the school's privacy contact (R3-1A;
@@ -29,14 +29,9 @@ export type VerificationMethod = NonNullable<PrivacyRequest["verification_method
 export type ErasureOutcome = ErasurePlanRow["outcome"];
 export type TemplateKey = PrivacyTemplate["key"];
 export type NoticeChannel = PrivacyNoticeIn["channel"];
+/** The letter keys of `GET /privacy/requests/{request_id}/letters/{letter}` (generated). */
 export type Letter =
-  | "acknowledgement"
-  | "access"
-  | "correction"
-  | "erasure"
-  | "nomination"
-  | "consent_withdrawn"
-  | "grievance";
+  paths["/api/v1/privacy/requests/{request_id}/letters/{letter}"]["get"]["parameters"]["path"]["letter"];
 export type RecordErasure = RecordClass["erasure"];
 
 type Exhaustive<T extends string, L extends readonly T[]> = [T] extends [L[number]] ? L : never;
