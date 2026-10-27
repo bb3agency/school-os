@@ -11,6 +11,7 @@ import pytest
 from sqlalchemy import text
 
 from app.core.db import platform_session
+from app.core.redaction import contains_full_aadhaar
 from app.platform import incidents
 
 from .conftest import Api, MakeOperator, letters
@@ -239,3 +240,30 @@ def test_FR_DPDP_030_readers_and_writers(api: Api, make_operator: MakeOperator) 
     assert iid in {i["id"] for i in listed}
     (opened,) = _events("incident.opened", iid)
     assert "exposed" not in str(opened["summary"]), "the summary text is not audited"
+
+
+def test_FR_DPDP_030_naive_times_are_refused_not_a_server_error(
+    api: Api, make_operator: MakeOperator
+) -> None:
+    op = make_operator("platform_owner")
+    naive = (dt.datetime.now(dt.UTC) - dt.timedelta(hours=1)).replace(tzinfo=None).isoformat()
+    res = api.call("POST", "/incidents", op, json=_body(opened_at=naive))
+    assert res.status_code == 422, res.text
+    iid = _open(api, op)["id"]
+    patch = api.call(
+        "PATCH",
+        f"/incidents/{iid}",
+        op,
+        json={"cert_in_reported_at": naive},
+        headers=api.if_match(f"/incidents/{iid}", op),
+    )
+    assert patch.status_code == 422, patch.text
+
+
+def test_FR_DPDP_030_spaced_aadhaar_in_summary_is_refused() -> None:
+    number = next(
+        f"{n:012d}" for n in range(234123412340, 234123412350) if contains_full_aadhaar(f"{n:012d}")
+    )
+    spaced = f"{number[:4]} {number[4:8]} {number[8:]}"
+    with pytest.raises(ValueError, match="long numbers"):
+        incidents.check_summary(f"Card {spaced} of one child was exposed")
