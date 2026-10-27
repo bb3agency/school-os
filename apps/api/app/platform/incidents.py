@@ -26,12 +26,20 @@ import re
 import uuid
 from typing import Any, Final, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 from sqlalchemy import func, select
 
 from app.core.db import platform_session
 from app.core.errors import Conflict, NotFound, PreconditionFailed, ValidationFailed
 from app.core.ids import new_id
+from app.core.redaction import contains_full_aadhaar
 from app.platform import models as m
 from app.platform import repository as repo
 from app.platform import two_person
@@ -70,7 +78,7 @@ Category = Literal[
 def check_summary(value: str) -> str:
     """Categories and counts only (FR-DPDP-030): no 6+ digit runs, no e-mail addresses."""
     text = " ".join(value.split())
-    if _DIGIT_RUN.search(text) or _EMAIL.search(text):
+    if _DIGIT_RUN.search(text) or _EMAIL.search(text) or contains_full_aadhaar(text):
         raise ValueError(
             "Write categories and counts only: no phone, Aadhaar or other long numbers and no "
             "e-mail addresses."
@@ -90,7 +98,7 @@ class IncidentIn(_In):
     """Open an incident record. ``summary``: what kind of data and roughly how much (no names,
     numbers, e-mail addresses or record text)."""
 
-    opened_at: dt.datetime = Field(description="T0: when SchoolOS noticed the incident.")
+    opened_at: AwareDatetime = Field(description="T0: when SchoolOS noticed the incident.")
     severity: Severity
     summary: str = Field(min_length=10, max_length=500)
     cert_in_required: bool = False
@@ -109,7 +117,7 @@ class IncidentPatch(_In):
     status: IncidentStatus | None = None
     summary: str | None = Field(default=None, min_length=10, max_length=500)
     cert_in_required: bool | None = None
-    cert_in_reported_at: dt.datetime | None = None
+    cert_in_reported_at: AwareDatetime | None = None
     lead_operator_id: uuid.UUID | None = None
     notified_tenant_ids: list[uuid.UUID] = Field(
         default_factory=list,
@@ -128,8 +136,8 @@ class IncidentSchoolIn(_In):
     tenant_id: uuid.UUID
     categories: list[Category] = Field(min_length=1, max_length=10)
     approx_people: int = Field(ge=0, le=10_000_000)
-    window_from: dt.datetime | None = None
-    window_to: dt.datetime | None = None
+    window_from: AwareDatetime | None = None
+    window_to: AwareDatetime | None = None
 
     @model_validator(mode="after")
     def _window(self) -> IncidentSchoolIn:
