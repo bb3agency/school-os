@@ -143,3 +143,46 @@ run "alarm_topic_accepts_only_this_account" {
     error_message = "Every service statement on the alarm topic pins aws:SourceAccount (confused deputy)."
   }
 }
+
+# D49 part 2 (FR-DPDP-031, SEC-052; incident drill 2026-11-01 gap 2): the 5-minute control-plane
+# job logs platform.incident.clock_due_soon / clock_overdue once per incident, clock and stage; any
+# such line alarms to the alarm topic (overdue is P1).
+run "incident_clock_alarms_are_fed_by_the_worker_logs" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for key, event in {
+        incident_clock_due_soon = "platform.incident.clock_due_soon"
+        incident_clock_overdue  = "platform.incident.clock_overdue"
+      } :
+      aws_cloudwatch_log_metric_filter.security[key].log_group_name == var.worker_log_group_name
+      && aws_cloudwatch_log_metric_filter.security[key].pattern == "{ $.event = \"${event}\" }"
+      && aws_cloudwatch_log_metric_filter.security[key].metric_transformation[0].name == aws_cloudwatch_metric_alarm.security[key].metric_name
+      && aws_cloudwatch_log_metric_filter.security[key].metric_transformation[0].namespace == aws_cloudwatch_metric_alarm.security[key].namespace
+    ])
+    error_message = "Each incident clock alarm must read the metric its worker log line produces (D49)."
+  }
+
+  assert {
+    condition = (
+      aws_cloudwatch_metric_alarm.security["incident_clock_overdue"].threshold == 1
+      && aws_cloudwatch_metric_alarm.security["incident_clock_overdue"].comparison_operator == "GreaterThanOrEqualToThreshold"
+      && aws_cloudwatch_metric_alarm.security["incident_clock_overdue"].statistic == "Sum"
+      && aws_cloudwatch_metric_alarm.security["incident_clock_due_soon"].threshold == 1
+    )
+    error_message = "Any overdue or due-soon incident clock line must alarm (D49, SEC-052)."
+  }
+
+  assert {
+    condition = length(setsubtract(toset([
+      "sos-test-incident-clock-due-soon", "sos-test-incident-clock-overdue",
+    ]), toset(output.alarm_names))) == 0
+    error_message = "Missing an incident clock alarm (D49)."
+  }
+
+  assert {
+    condition     = aws_cloudwatch_metric_alarm.security["incident_clock_overdue"].namespace != var.custom_metric_namespace
+    error_message = "Incident clock metrics live in the security namespace no task role may write."
+  }
+}
