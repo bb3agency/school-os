@@ -7568,6 +7568,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/usage/ai-quota-alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ai Quota Alerts
+         * @description Schools that used 80 % or 100 % of their AI answer bundle's included answers in a
+         *     calendar month (default: this month, IST), one row per school with its highest alert
+         *     (ADR-0038 follow-up, docs/16 §19 Q16). Recorded once per school, month and threshold by the
+         *     usage collector. Alert only: nothing is switched off. Counts only.
+         */
+        get: operations["ai_quota_alerts_api_v1_platform_usage_ai_quota_alerts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/privacy/breaches": {
         parameters: {
             query?: never;
@@ -10463,6 +10486,39 @@ export interface components {
             status: "published" | "retired";
             /** Version */
             version: number;
+        };
+        /**
+         * AiQuotaAlertOut
+         * @description A school crossed 80 % or 100 % of its AI answer bundle's included answers in a calendar
+         *     month (ADR-0038 follow-up, docs/16 §19 Q16). Counts only: the answers counted when the
+         *     crossing was recorded and the bundle's included answers; never a question or a person.
+         *     Recorded once per school, month and threshold by the usage collector.
+         */
+        AiQuotaAlertOut: {
+            /** Answers Used */
+            answers_used: number;
+            /**
+             * Crossed At
+             * Format: date-time
+             */
+            crossed_at: string;
+            /** Included Answers */
+            included_answers: number;
+            /**
+             * Month Start
+             * Format: date
+             */
+            month_start: string;
+            /**
+             * Tenant Id
+             * Format: uuid
+             */
+            tenant_id: string;
+            /**
+             * Threshold
+             * @enum {integer}
+             */
+            threshold: 80 | 100;
         };
         /** AllocationIn */
         AllocationIn: {
@@ -22066,6 +22122,8 @@ export interface components {
             overage_so_far_inr?: string | null;
             /** Price Inr */
             price_inr: string;
+            /** Quota Alert */
+            quota_alert?: (80 | 100) | null;
         };
         /**
          * SchoolChoiceOut
@@ -43162,6 +43220,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UsageDailyOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ai_quota_alerts_api_v1_platform_usage_ai_quota_alerts_get: {
+        parameters: {
+            query?: {
+                month?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiQuotaAlertOut"][];
                 };
             };
             /** @description Validation Error */

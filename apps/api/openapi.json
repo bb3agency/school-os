@@ -1156,6 +1156,52 @@
         "title": "AiBundleOut",
         "type": "object"
       },
+      "AiQuotaAlertOut": {
+        "description": "A school crossed 80 % or 100 % of its AI answer bundle's included answers in a calendar\nmonth (ADR-0038 follow-up, docs/16 \u00a719 Q16). Counts only: the answers counted when the\ncrossing was recorded and the bundle's included answers; never a question or a person.\nRecorded once per school, month and threshold by the usage collector.",
+        "properties": {
+          "answers_used": {
+            "title": "Answers Used",
+            "type": "integer"
+          },
+          "crossed_at": {
+            "format": "date-time",
+            "title": "Crossed At",
+            "type": "string"
+          },
+          "included_answers": {
+            "title": "Included Answers",
+            "type": "integer"
+          },
+          "month_start": {
+            "format": "date",
+            "title": "Month Start",
+            "type": "string"
+          },
+          "tenant_id": {
+            "format": "uuid",
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "threshold": {
+            "enum": [
+              80,
+              100
+            ],
+            "title": "Threshold",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "threshold",
+          "month_start",
+          "answers_used",
+          "included_answers",
+          "crossed_at"
+        ],
+        "title": "AiQuotaAlertOut",
+        "type": "object"
+      },
       "AllocationIn": {
         "additionalProperties": false,
         "properties": {
@@ -32833,6 +32879,21 @@
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Price Inr",
             "type": "string"
+          },
+          "quota_alert": {
+            "anyOf": [
+              {
+                "enum": [
+                  80,
+                  100
+                ],
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quota Alert"
           }
         },
         "required": [
@@ -71329,6 +71390,85 @@
           }
         },
         "summary": "All Usage",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/usage/ai-quota-alerts": {
+      "get": {
+        "description": "Schools that used 80 % or 100 % of their AI answer bundle's included answers in a\ncalendar month (default: this month, IST), one row per school with its highest alert\n(ADR-0038 follow-up, docs/16 \u00a719 Q16). Recorded once per school, month and threshold by the\nusage collector. Alert only: nothing is switched off. Counts only.",
+        "operationId": "ai_quota_alerts_api_v1_platform_usage_ai_quota_alerts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "month",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Month"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AiQuotaAlertOut"
+                  },
+                  "title": "Response Ai Quota Alerts Api V1 Platform Usage Ai Quota Alerts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Ai Quota Alerts",
         "tags": [
           "platform"
         ]

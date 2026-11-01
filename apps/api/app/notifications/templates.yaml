@@ -495,3 +495,15 @@ templates:
       title: "సమాధానం ఇవ్వాల్సిన గోప్యత అభ్యర్థనలు: {overdue, plural, =0 {గడువు దాటినవి లేవు} one {# గడువు దాటింది} other {# గడువు దాటాయి}}"
       body: "{due, plural, =0 {రేపు గడువు ఉన్న అభ్యర్థన లేదు.} one {# అభ్యర్థనకు రేపు గడువు.} other {# అభ్యర్థనలకు రేపు గడువు.}} {overdue, plural, =0 {} one {# అభ్యర్థన గడువు దాటింది.} other {# అభ్యర్థనలు గడువు దాటాయి.}} గోప్యత > అభ్యర్థనలు మరియు ఫిర్యాదులు తెరిచి పాఠశాల లక్ష్యంలోగా సమాధానం ఇవ్వండి."
   # --- end R3-1A
+  # --- AI answer quota alerts (ADR-0038 follow-up, docs/16 §19 Q16): pulled from the control plane
+  # by app.notifications.quota_sync for the owner and the principal, once per month and level.
+  # Params: the level code and the bundle's included answers (a count). Alert only: Ask keeps
+  # answering above the quota; extra answers are billed on the next invoice.
+  billing.ai_answers_quota:
+    params: [level, included]
+    en:
+      title: "{level, select, used_up {All of this month's AI answers are used} other {80% of this month's AI answers are used}}"
+      body: "{level, select, used_up {Your school has used all {included} answers included in its AI answer bundle this month. Ask keeps answering; each extra answer is billed on your next invoice at your bundle's price per extra answer. Open Settings > Plan and billing to see the count.} other {Your school has used 80% of the {included} answers included in its AI answer bundle this month. Extra answers are billed on your next invoice. Open Settings > Plan and billing to see the count.}}"
+    te:
+      title: "{level, select, used_up {ఈ నెల AI సమాధానాలన్నీ వాడేశారు} other {ఈ నెల AI సమాధానాల్లో 80% వాడారు}}"
+      body: "{level, select, used_up {మీ పాఠశాల AI సమాధానాల బండిల్‌లో ఈ నెలకు ఉన్న {included} సమాధానాలన్నీ వాడేసింది. Ask సమాధానాలు ఇస్తూనే ఉంటుంది; ప్రతి అదనపు సమాధానానికి మీ బండిల్ ధర ప్రకారం తదుపరి ఇన్‌వాయిస్‌లో ఛార్జ్ ఉంటుంది. లెక్క చూడటానికి సెట్టింగ్‌లు > ప్లాన్ మరియు బిల్లింగ్ తెరవండి.} other {మీ పాఠశాల AI సమాధానాల బండిల్‌లో ఈ నెలకు ఉన్న {included} సమాధానాల్లో 80% వాడింది. అదనపు సమాధానాలకు తదుపరి ఇన్‌వాయిస్‌లో ఛార్జ్ ఉంటుంది. లెక్క చూడటానికి సెట్టింగ్‌లు > ప్లాన్ మరియు బిల్లింగ్ తెరవండి.}}"

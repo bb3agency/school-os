@@ -419,6 +419,33 @@ describe("Plan and billing (FR-PLT-030)", () => {
       ).toBeInTheDocument();
     });
 
+    it("quota alerts: 80% and all included answers used (ADR-0038 follow-up, Q16)", async () => {
+      serve({ ...base, ai_bundle: { ...bundle, answers_used: 820, quota_alert: 80 } });
+      const near = renderWithIntl(<BillingScreen />);
+      let card = (await screen.findByRole("heading", { name: ai.title })).closest("section");
+      expect(
+        within(card as HTMLElement).getByText("80% of this month's answers used"),
+      ).toBeInTheDocument();
+      near.unmount();
+      serve({
+        ...base,
+        ai_bundle: {
+          ...bundle,
+          answers_used: 1010,
+          extra_answers: 10,
+          overage_so_far_inr: "15.00",
+          quota_alert: 100,
+        },
+      });
+      renderWithIntl(<BillingScreen />);
+      card = (await screen.findByRole("heading", { name: ai.title })).closest("section");
+      const scope = within(card as HTMLElement);
+      expect(
+        scope.getByText("All included answers used; extra answers are ₹1.50 each"),
+      ).toBeInTheDocument();
+      expect(scope.queryByText("80% of this month's answers used")).toBeNull();
+    });
+
     it("before the bundle counts: no meter, says when counting starts", async () => {
       serve({
         ...base,

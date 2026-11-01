@@ -7,6 +7,14 @@ audit log, its Ask questions and billable AI answers from ``kb.queries`` (ADR-00
 active students, active documents and stored bytes (audit 2026-10-17 L-09).
 Dedicated tier: the heartbeat carries the same counts. Limits never block school work in M0;
 crossing 80% / 100% is recorded once per metric per billing period and audited.
+
+AI answer quota alerts (ADR-0038 follow-up, docs/16 §19 Q16): after each collection (and each
+heartbeat) the month's billable answers are compared with the bundle's included answers; the
+first crossing of 80 % and of 100 % in a calendar month is recorded in ``usage_threshold_events``
+(metric ``ai_answers``, ``period_start`` = the month) and audited
+``usage.ai_quota_threshold_crossed``.
+Alert only: nothing is switched off. Operators read the crossings (``ai_quota_alerts``); the
+school side pulls its own (``ai_quota_alert``) into in-app notifications.
 """
 
 from __future__ import annotations
@@ -16,7 +24,7 @@ import uuid
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 from app.core.db import platform_session, tenant_session
 from app.core.logging import get_logger
@@ -24,10 +32,12 @@ from app.platform import billing
 from app.platform import models as m
 from app.platform import repository as repo
 from app.platform.common import IST, SYSTEM, audit_platform, billing_cfg, config, today_ist
-from app.platform.schemas import HbUsage, UsageDailyOut
+from app.platform.schemas import AiQuotaAlertOut, HbUsage, UsageDailyOut
 from app.tenancy import service as tenancy
 
 log = get_logger(__name__)
+
+AI_QUOTA_METRIC = billing.AI_QUOTA_METRIC
 
 # metric -> (usage_daily column or aggregate, plan limit key, scale applied to the usage value)
 LIMIT_METRICS: dict[str, tuple[str, str, Decimal]] = {
@@ -134,6 +144,7 @@ def collect_tenant(tenant_id: uuid.UUID, day: dt.date) -> dict[str, Any]:
     with platform_session() as s:
         repo.upsert_usage(s, values)
         check_thresholds(s, tenant_id)
+        check_ai_quota(s, tenant_id, day)
     return values
 
 
@@ -184,6 +195,7 @@ def ingest_heartbeat(session: Any, tenant_id: uuid.UUID, usage: HbUsage) -> None
         },
     )
     check_thresholds(session, tenant_id)
+    check_ai_quota(session, tenant_id, usage.date)
 
 
 def check_thresholds(session: Any, tenant_id: uuid.UUID) -> list[tuple[str, int]]:
@@ -241,6 +253,95 @@ def check_thresholds(session: Any, tenant_id: uuid.UUID) -> list[tuple[str, int]
                     count=int(threshold),
                 )
     return crossed
+
+
+def check_ai_quota(session: Any, tenant_id: uuid.UUID, day: dt.date) -> list[int]:
+    """Record the first 80 % / 100 % crossing of the bundle's included answers in ``day``'s
+    calendar month (once per school, month and threshold; safe to re-run). Returns the new
+    thresholds. Nothing without a bundle, or while the month does not count against it yet."""
+    month = day.replace(day=1)
+    sub = repo.live_subscription(session, tenant_id)
+    if sub is None or sub["ai_bundle_id"] is None:
+        return []
+    if sub["ai_bundle_from"] is None or sub["ai_bundle_from"] > month:
+        return []
+    bundle = repo.get(session, m.ai_bundles, sub["ai_bundle_id"])
+    included = int(bundle["included_answers"]) if bundle else 0
+    if included <= 0:
+        return []
+    used = repo.ai_answers_between(session, tenant_id, month, billing.next_month(month))
+    crossed: list[int] = []
+    for threshold in config()["ai_answers"]["quota_alert_thresholds"]:
+        if used * 100 < int(threshold) * included:
+            continue
+        if repo.record_threshold(
+            session,
+            {
+                "tenant_id": tenant_id,
+                "metric": AI_QUOTA_METRIC,
+                "threshold": int(threshold),
+                "period_start": month,
+                "usage_value": Decimal(used),
+                "limit_value": Decimal(included),
+            },
+        ):
+            crossed.append(int(threshold))
+            audit_platform(
+                session,
+                SYSTEM,
+                "usage.ai_quota_threshold_crossed",
+                "tenant",
+                tenant_id,
+                {"metric": AI_QUOTA_METRIC, "threshold": int(threshold), "month": str(month)},
+                tenant_id=tenant_id,
+            )
+            log.warning(
+                "platform.usage.ai_quota_threshold_crossed",
+                tenant_id=str(tenant_id),
+                count=int(threshold),
+            )
+    return crossed
+
+
+def _quota_rows(session: Any, month: dt.date, tenant_id: uuid.UUID | None) -> list[Any]:
+    t = m.usage_threshold_events
+    stmt = select(t).where(t.c.metric == AI_QUOTA_METRIC, t.c.period_start == month)
+    if tenant_id is not None:
+        stmt = stmt.where(t.c.tenant_id == tenant_id)
+    return list(session.execute(stmt.order_by(t.c.tenant_id, t.c.threshold)).mappings())
+
+
+def _highest(rows: list[Any]) -> dict[uuid.UUID, AiQuotaAlertOut]:
+    out: dict[uuid.UUID, AiQuotaAlertOut] = {}
+    for r in rows:  # ordered by threshold: the last one per school is the highest
+        out[r["tenant_id"]] = AiQuotaAlertOut(
+            tenant_id=r["tenant_id"],
+            threshold=int(r["threshold"]),
+            month_start=r["period_start"],
+            answers_used=int(r["usage_value"]),
+            included_answers=int(r["limit_value"]),
+            crossed_at=r["crossed_at"],
+        )
+    return out
+
+
+def ai_quota_alerts(month: dt.date | None = None) -> list[AiQuotaAlertOut]:
+    """Operators: every school's highest AI answer quota alert in ``month`` (default: this
+    calendar month, IST). Counts only, platform tables only."""
+    start = (month or today_ist()).replace(day=1)
+    with platform_session() as s:
+        return list(_highest(_quota_rows(s, start, None)).values())
+
+
+def ai_quota_alert(
+    tenant_id: uuid.UUID, *, today: dt.date | None = None, session: Any = None
+) -> AiQuotaAlertOut | None:
+    """One school's highest AI answer quota alert this calendar month (IST), or ``None``."""
+    month = (today or today_ist()).replace(day=1)
+    if session is not None:
+        return _highest(_quota_rows(session, month, tenant_id)).get(tenant_id)
+    with platform_session() as s:
+        return _highest(_quota_rows(s, month, tenant_id)).get(tenant_id)
 
 
 def usage_for(tenant_id: uuid.UUID | None, start: dt.date, end: dt.date) -> list[UsageDailyOut]:

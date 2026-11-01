@@ -156,6 +156,7 @@ def test_FR_PLT_030_school_sees_its_ai_bundle_and_this_months_answers(
         "answers_counted_to": month.isoformat(),
         "extra_answers": 0,
         "overage_so_far_inr": "0.00",
+        "quota_alert": None,
     }
 
 

@@ -33,6 +33,11 @@ billing:
 # 'answered' row and counts (docs/16 §19 Q15). Schools never see tokens.
 ai_answers:
   billable_statuses: [answered]
+  # Quota alerts (ADR-0038 follow-up, docs/16 §19 Q16): the usage collector records the first
+  # crossing of each percentage of a bundle's included answers once per school per calendar month
+  # (platform.usage_threshold_events, metric ai_answers; the DB allows 80 and 100 only). Alert
+  # only: nothing is switched off at 100 % (extra answers are billed in arrears, ADR-0038 §3).
+  quota_alert_thresholds: [80, 100]
 # Public pricing page (/pricing; ADR-0038, docs/18 R4): the published starting prices it shows,
 # in INR before GST. A display copy of the catalogue for the marketing site only, NEVER used to
 # price anything: invoices read platform.plans and platform.ai_bundles (frozen, versioned rows).
