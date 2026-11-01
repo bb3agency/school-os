@@ -5,7 +5,7 @@
 | Version | 0.2 · 2026-09-26 |
 | Telemetry | OpenTelemetry SDKs → collector → CloudWatch Logs/Metrics + X-Ray (swap-able for Grafana stack) |
 | Related | 07-Security §15, 08-Privacy §6, 10-Infrastructure, 16-Platform admin panel §12, §17 |
-| Changes | 0.2: fleet and billing metrics (§3), control-plane SLOs (§5), heartbeat, backup, billing and privilege-separation alerts (§6), runbooks R10–R12 (§8), support tickets in the admin panel (§9), fleet monitoring (§11) and control-plane monitoring (§12). 0.1: baseline |
+| Changes | 0.3 (2026-11-01, R3-2G as built; D49): incident clock alerts due soon / overdue (§6) and runbook R13 (§8); §7.2 step 5 points at the built incident console. 0.2: fleet and billing metrics (§3), control-plane SLOs (§5), heartbeat, backup, billing and privilege-separation alerts (§6), runbooks R10–R12 (§8), support tickets in the admin panel (§9), fleet monitoring (§11) and control-plane monitoring (§12). 0.1: baseline |
 
 ---
 
@@ -97,6 +97,8 @@ Error budget policy: if a month's budget is exhausted, freeze feature work and p
 | Heartbeat signature failures | > 5 rejected per deployment per hour | P2 security | R5 |
 | Platform privilege violation | Any `permission denied` on tenant tables from `sos_platform` | **P1 security** | R5 |
 | Platform audit chain broken | verification failure | **P1 security** | R5 |
+| Incident clock due soon | `platform.incident.clock_due_soon`: a SchoolOS incident's CERT-In clock (T0 + 6 h) or a school-notice clock (confirmation + 24 h) has ≤ 120 min left; alarm `<prefix>-incident-clock-due-soon` (D49) | P2 security | R13 |
+| Incident clock overdue | `platform.incident.clock_overdue`: that deadline has passed; alarm `<prefix>-incident-clock-overdue` (D49) | **P1 security** | R13 |
 | Invoice run failed | job `failed`/`dead` | P2 | R12 |
 | Invoices overdue / trials ending | daily digest | Info | — |
 | Usage limit crossed | first 80% / 100% per metric per period | Info | — |
@@ -125,7 +127,7 @@ Delivery: phone push + SMS/email to the on-call (founder) for P1/P2; daily diges
    - **Affected schools (Data Fiduciaries) without undue delay**, target within 24 hours of confirmation, with facts they need for their own DPDP notices to parents and the Data Protection Board (Board: without delay + detailed report within 72 hours, per DPDP Rules).
    - Provide parent-notice templates (English; bilingual only while `SOS_TELUGU_ENABLED` is on, ADR-0036) and a facts package (nature, extent, timing, likely consequences, mitigation, what families can do, contact).
 5. **Eradicate & recover:** fix root cause, restore from clean backups if needed, rotate secrets/keys, verify audit chain.
-   - R3 (planned, ADR-0050): the incident is recorded in the operator console with these clocks, and each affected school's breach register receives the notice; step-by-step runbook and notification templates in [`docs/legal/breach-runbook.md`](legal/breach-runbook.md) (not legal advice).
+   - R3 (built, ADR-0050, ADR-0054; D49 in R3-2G): the incident is recorded in the operator console with these clocks (alerted when due soon or overdue, R13; closing is refused while CERT-In or a school is still owed a notice), and each affected school's breach register receives the notice; step-by-step runbook and notification templates in [`docs/legal/breach-runbook.md`](legal/breach-runbook.md) (not legal advice).
 6. **Post-incident:** blameless postmortem within 5 working days (template `docs/templates/incident-postmortem.md`), action items tracked to closure, threat model updated.
 
 ### 7.3 Evidence preservation
@@ -147,6 +149,7 @@ Snapshot affected resources, export relevant logs to the log-archive account, pr
 | R10 | Provision a dedicated host | Follow 16 §13: panel record → Terraform `dedicated_host` → secrets → host bootstrap → identity client → DNS/TLS → backups + restore test → first heartbeat → owner invite |
 | R11 | Dedicated host unreachable, degraded or backups stale | Check last heartbeat payload → SSM into host (logged) → container and disk health → restart via pipeline → if the host is lost: rebuild with Terraform and restore from WAL-G (RTO ≤ 8 h) → verify audit chain → notify the school |
 | R12 | Invoice run failed | Read `platform.job_runs` error → fix data (e.g., missing billing account) → rerun `POST /platform/invoice-runs` (idempotent) → confirm one draft per subscription |
+| R13 | Incident clock due soon / overdue (D49; `app/platform/incident_alerts.py`) | Find the incident id, the clock (`cert_in` or `school_notice`), minutes left and, for a school clock, the school's `tenant_id` in the worker log line `platform.incident.clock_due_soon` / `.clock_overdue` (no names or counts in it) → open the incident in the operator console (`/platform/incidents/{id}`) → `cert_in`: report to CERT-In now and record `cert_in_reported_at` (or record that it is not reportable); `school_notice`: check the school's pull (shared tier) or phone/e-mail the school and record it (`notified_tenant_ids`) → **overdue is P1**: follow R5 and record why it was late in the postmortem → the platform audit event `incident.clock_alert` (`clock`, `stage`, `minutes_left`) records each alert, once per incident × clock × school × stage; recording the missing fact stops further alerts |
 
 ## 9. Support model (schools)
 
