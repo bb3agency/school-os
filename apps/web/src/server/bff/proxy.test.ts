@@ -199,6 +199,46 @@ describe("BFF proxy /bff/api/v1/* (SEC-004)", () => {
       await expect(response.json()).resolves.toEqual({ echoed: { name: "Class 6" } });
       expect(h.apiCalls[0]?.headers.get("idempotency-key")).toBe("k-1");
     });
+
+    it.each([
+      ["a foreign Origin", { origin: "https://evil.example" }],
+      ["Sec-Fetch-Site cross-site", { "sec-fetch-site": "cross-site" }],
+      ["Sec-Fetch-Site same-site", { "sec-fetch-site": "same-site" }],
+    ])(
+      "SEC-004: %s is refused even with the right token, and never reaches the API",
+      async (_label, extra) => {
+        await h.signIn("staff", clerk);
+        const token = await h.csrf();
+        h.apiCalls.length = 0;
+        const response = await call("/bff/api/v1/classes", {
+          method: "POST",
+          body: "{}",
+          headers: { "x-csrf-token": token, "content-type": "application/json", ...extra },
+        });
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject({ code: "csrf_failed" });
+        expect(h.apiCalls).toHaveLength(0);
+      },
+    );
+
+    it("SEC-004: the app's own Origin with Sec-Fetch-Site same-origin and the token passes", async () => {
+      await h.signIn("staff", clerk);
+      const token = await h.csrf();
+      h.apiCalls.length = 0;
+      h.setApi(() => json({ ok: true }, 201));
+      const response = await call("/bff/api/v1/classes", {
+        method: "POST",
+        body: "{}",
+        headers: {
+          "x-csrf-token": token,
+          "content-type": "application/json",
+          origin: h.base,
+          "sec-fetch-site": "same-origin",
+        },
+      });
+      expect(response.status).toBe(201);
+      expect(h.apiCalls).toHaveLength(1);
+    });
   });
 
   it("caps request bodies at 1 MiB", async () => {
