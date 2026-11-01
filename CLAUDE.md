@@ -71,12 +71,12 @@ apps/api/app/
                  guards for unauthenticated routes (require_public_handle, require_webhook_signature,
                  require_meta_verify_token; pinned in public/public_routes.yaml)
   notifications/ in-app notifications, bilingual templates
-  privacy/       DPDP requests and grievances, access reports, lawful erasure, notices, record classes,
-                 subject-report registry subjects.yaml (contributors: each module's service.subject_report)
+  privacy/       DPDP pack (ADR-0048..0050): requests and grievances, access reports, lawful erasure, notices,
+                 record classes, subject-report registry subjects.yaml (contributors: each module's
+                 service.subject_report); consents for optional purposes (consents_*); the breach register
+                 and the pull of SchoolOS incident notices (breach_*, breach_sync)
   admin/         tenant admin, retention settings, data export
   ops/           tenant-side job runs, outbox, idempotency keys
-  privacy/       R3 DPDP pack: consents for optional purposes (consents_*), the breach register and the
-                 pull of SchoolOS incident notices (breach_*, breach_sync; ADR-0049, ADR-0050)
   fees/          fee heads, plans, student accounts, append-only ledger, gap-free receipts, concessions,
                  cancellations and refunds (maker-checker), late fees, reports, day close (schema fin; ADR-0042;
                  the school is always the merchant, SchoolOS never holds money)
@@ -86,7 +86,8 @@ apps/api/app/
                  public handle kind school_disclosure, /public/disclosure/{key} routes, HTML/PDF files
   platform/      control plane: operators, school provisioning, plans, subscriptions, invoices,
                  payments (billing), usage, fleet + heartbeat, feature flags, announcements,
-                 support tickets, platform audit (DB role sos_platform; routes /api/v1/platform/*)
+                 support tickets, SchoolOS incidents (incidents.py; ADR-0050), platform audit (DB role
+                 sos_platform; routes /api/v1/platform/*)
   devtools/      synthetic data generator (make seed-synthetic; local/ci only)
 apps/api/migrations/  Alembic revisions 0001_baseline … 0067_consents_breach (linear chain; `alembic heads` shows the current head)
 apps/api/tests/  tests per module (tests/<module>/) + cross-module suites (tests/security/, tests/migrations/, tests/api/, tests/deploy/)
