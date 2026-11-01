@@ -523,7 +523,7 @@ class _Stack:
             db = conftest.TestDatabase(external, url.host or "localhost", url.port or 5432)
             conftest.run_bootstrap_with_local_psql(external)
         else:
-            from testcontainers.postgres import PostgresContainer
+            from testcontainers.community.postgres import PostgresContainer
 
             container = PostgresContainer(
                 conftest.PG_IMAGE,
