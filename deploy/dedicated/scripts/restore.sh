@@ -117,11 +117,12 @@ info "restoring into scratch database $db"
 restore_into "$db"
 restore_s=$((SECONDS - started))
 
-tables="$(psql_db "$db" -At -c "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind IN ('r','p') AND n.nspname IN ('core','sis','kb','audit','ops','platform')")"
-rows="$(psql_db "$db" -At -c "SELECT coalesce(sum(n_live_tup),0) FROM pg_stat_user_tables WHERE schemaname IN ('core','sis','kb','audit','ops','platform')")"
+tables="$(psql_db "$db" -At -c "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind IN ('r','p') AND n.nspname IN ('core','sis','kb','audit','ops','fin','msg','platform')")"
+rows="$(psql_db "$db" -At -c "SELECT coalesce(sum(n_live_tup),0) FROM pg_stat_user_tables WHERE schemaname IN ('core','sis','kb','audit','ops','fin','msg','platform')")"
 info "restored $tables tables, ~$rows rows"
 
-# Audit chain verification with the application code (runs as sos_app; the module owns the logic).
+# Audit chain verification with the application code (school chains as sos_app, the platform chain
+# as sos_platform, BOTH on the restored copy, not the live database; the module owns the logic).
 set -a
 # shellcheck source=/dev/null
 . "$SOS_SECRETS_ENV"
@@ -129,6 +130,7 @@ set +a
 audit_result=ok
 if ! sos_compose run --rm --no-deps \
   -e "SOS_DATABASE_URL=postgresql+psycopg://sos_app:${SOS_APP_DB_PASSWORD}@db:5432/$db" \
+  -e "SOS_PLATFORM_DATABASE_URL=postgresql+psycopg://sos_platform:${SOS_PLATFORM_DB_PASSWORD}@db:5432/$db" \
   api python -m app.audit.verify_all; then
   audit_result=failed
   warn "audit chain verification FAILED on the restored copy"
