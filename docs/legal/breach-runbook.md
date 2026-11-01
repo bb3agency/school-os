@@ -31,7 +31,7 @@ All times in IST in the product; logs in UTC with synchronised clocks (PRV-019).
 5. **Notify each school** (target 24 hours from confirmation): on the shared tier the school's breach register pulls the notice automatically once the second operator has confirmed the list (within about a minute; the school's owner and principal get an urgent in-app notification), and the console records when each school received it; also phone the owner or principal. Dedicated hosts: phone and e-mail plus a critical announcement; the school records it by hand. Use template A.
 6. **Support the school** with facts for its own notices; answer its questions within the day.
 7. **Eradicate, recover, report**: fix, restore, rotate, verify the audit chain; a remediation report to each affected school; postmortem within 5 working days.
-8. **Close**: once an incident is `closed` its fields are locked (the console refuses edits with 409). Reopening it is a recorded action that needs a second operator's confirmation and is written to the platform audit (lead decision D48, 2026-11-01; being implemented in R3-2F).
+8. **Close**: once an incident is `closed` its fields are locked (the console refuses edits with 409). Reopening it is a recorded action: one operator asks with a reason (categories and counts only), a different operator confirms within the two-person window, and each step is written to the platform audit (lead decision D48, 2026-11-01; ADR-0054; built in R3-2F).
 
 ## 3. School steps (fiduciary)
 
