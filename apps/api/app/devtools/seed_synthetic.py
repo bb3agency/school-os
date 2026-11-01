@@ -5,14 +5,17 @@ Usage::
 
     python -m app.devtools.seed_synthetic [--tenants N] [--seed S] [--dataset-version v1]
                                           [--code-prefix synth] [--profile none|small|full]
-                                          [--students N] [--no-documents] [--out-dir DIR]
+                                          [--students N] [--no-documents] [--no-fees-messaging]
+                                          [--out-dir DIR]
 
 ``--profile``: ``none`` seeds schools and staff only (the default of the bare CLI, so
 ``scripts/dev.py`` stays fast; ``make seed-synthetic`` passes ``full``); ``small`` adds 400
 students per school, ``full`` 2,000 (``--students`` overrides the number), each with guardians,
 enrolments and per-source values with mismatches injected at documented rates
 (:mod:`app.devtools.students`), plus rendered register pages and circulars stored through the
-documents service (``--no-documents`` skips them). For each school a manifest of the injected
+documents service (``--no-documents`` skips them), and fee ledger plus WhatsApp messaging rows
+(:mod:`app.devtools.finance_seeder`; ``--no-fees-messaging`` skips them; messaging only where
+``SOS_MESSAGING_ENABLED`` makes it available). For each school a manifest of the injected
 mismatches and the expected findings (admission numbers and rule IDs only) is written to
 ``<out-dir>/manifest-<code>.json`` (default ``.data/synthetic``, git-ignored).
 
@@ -88,6 +91,11 @@ def _parser() -> argparse.ArgumentParser:
         "--no-documents",
         action="store_true",
         help="do not store register-page images and circulars",
+    )
+    p.add_argument(
+        "--no-fees-messaging",
+        action="store_true",
+        help="do not add fee ledger and WhatsApp messaging rows (added with students by default)",
     )
     p.add_argument(
         "--out-dir",
@@ -170,6 +178,7 @@ def main(
             ),
             documents=not args.no_documents,
             uploader=uploader or student_seeder.http_uploader,
+            fees_messaging=not args.no_fees_messaging,
         )
     log = get_logger("app.devtools.seed_synthetic")
     admin_engine: Engine | None = None
