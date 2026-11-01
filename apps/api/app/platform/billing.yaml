@@ -181,3 +181,9 @@ offboarding:
       footer:
         en: "Counts only. This certificate contains no student or staff personal data."
         te: "సంఖ్యలు మాత్రమే. ఈ పత్రంలో విద్యార్థుల లేదా సిబ్బంది వ్యక్తిగత డేటా లేదు."
+# Incident deadline alerts for operators (R3-2G; lead decision D49 part 2; ADR-0050; FR-DPDP-031,
+# SEC-052). Every 5 minutes the control plane logs platform.incident.clock_due_soon this long
+# before a CERT-In clock (T0 + 6 h) or a school-notice clock (confirmation + 24 h) runs out, and
+# platform.incident.clock_overdue once it has; CloudWatch alarms on both (docs/11).
+incident_alerts:
+  due_soon_minutes: 120
