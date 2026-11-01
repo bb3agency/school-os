@@ -396,6 +396,27 @@ describe("Plan and billing (FR-PLT-030)", () => {
       expect(scope.getByText("412 of 1,000", { selector: "span" })).toBeInTheDocument();
       expect(scope.getByText(/^Counted up to/)).toBeInTheDocument();
       expect(scope.queryByText(ai.none)).toBeNull();
+      // Within the quota: no extra-answers line.
+      expect(scope.queryByText(/extra answers? so far this month/)).toBeNull();
+    });
+
+    it("above the quota: extra answers and the overage so far (docs/18 R4)", async () => {
+      serve({
+        ...base,
+        ai_bundle: {
+          ...bundle,
+          answers_used: 1250,
+          extra_answers: 250,
+          overage_so_far_inr: "375.00",
+        },
+      });
+      renderWithIntl(<BillingScreen />);
+      const card = (await screen.findByRole("heading", { name: ai.title })).closest("section");
+      expect(
+        within(card as HTMLElement).getByText(
+          "250 extra answers so far this month: ₹375.00 plus GST, billed on next month's invoice.",
+        ),
+      ).toBeInTheDocument();
     });
 
     it("before the bundle counts: no meter, says when counting starts", async () => {

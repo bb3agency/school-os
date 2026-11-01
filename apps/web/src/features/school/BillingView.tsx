@@ -101,6 +101,15 @@ function AiAnswersCard({ bundle }: { bundle: SchoolAiBundle | null }) {
                 ? t("countedTo", { date: formatDate(bundle.answers_counted_to) ?? "" })
                 : t("notCountedYet")}
             </p>
+            {bundle.extra_answers ? (
+              <p className="num text-sm font-semibold text-ink">
+                {t("extraSoFar", {
+                  count: bundle.extra_answers,
+                  extra: formatCount(bundle.extra_answers, locale) ?? "",
+                  amount: formatInr(bundle.overage_so_far_inr, locale) ?? "",
+                })}
+              </p>
+            ) : null}
           </div>
         ) : (
           <p className="text-sm text-ink-muted">

@@ -79,3 +79,20 @@ Until now the AI budget (FR-KB-011) was the school's own setting `ai_monthly_bud
   must be checked against `kb.llm_calls` once real usage exists (docs/16 §19 Q20).
 
 Related: FR-KB-011, NFR-CST-001, FR-PLT-013; docs/06 §12, docs/16 §5.7, §11, §19 Q18-Q20.
+
+## Amendments (2026-11-01)
+
+Implementation facts (docs/18 R4); the decision is unchanged.
+
+- **Public pricing page.** The Consequences follow-up on `/pricing` is done: the page shows the
+  catalogue's starting prices before GST (plans with their one-time fee, the three bundles with
+  their quota, ₹1.50 an extra answer, GST at 18 %). The numbers live in
+  `apps/web/src/features/marketing/catalogue.ts`; `billing.yaml` → `public_pricing` is a display
+  copy that never prices an invoice. `tests/platform/test_catalogue.py` pins `public_pricing` to
+  the latest published catalogue rows and `features/marketing/catalogue.test.ts` pins the page to
+  `public_pricing`, so a new catalogue migration fails both until the page matches.
+- **Answer meter.** `SchoolAiBundle` (the school's `GET /api/v1/tenant/billing`) also carries
+  `extra_answers` and `overage_so_far_inr` (this month so far, from `usage_daily`, at the
+  bundle's rate; billing in arrears is unchanged). Operators read the same numbers per school at
+  `GET /api/v1/platform/tenants/{tenant_id}/ai-answers` (`platform.usage.read`; platform tables
+  only, no new tenant access).

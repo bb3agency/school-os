@@ -37,6 +37,7 @@ import { MonoTime, SchoolStatusPill, TierTag } from "./pills";
 import { TicketTable } from "./SupportScreens";
 import { SCHOOL_TABS, type SchoolTab } from "./school-tabs";
 import { ReasonField, SubscriptionActions } from "./SubscriptionActions";
+import { AiAnswersMeter } from "./AiAnswersMeter";
 import { PlanUsageMeters } from "./PlanUsageMeters";
 import { UsageTable } from "./UsageTable";
 
@@ -613,8 +614,17 @@ function UsageTab({ schoolId, planId }: { schoolId: string; planId: string | nul
       }),
     ),
   );
+  // This month's AI answers against the bundle (docs/18 R4, ADR-0038).
+  const aiAnswers = useApiQuery([...PK.usage, schoolId, "ai-answers"], () =>
+    unwrap(
+      api.GET("/api/v1/platform/tenants/{tenant_id}/ai-answers", {
+        params: { path: { tenant_id: schoolId } },
+      }),
+    ),
+  );
   return (
     <div className="space-y-6">
+      <AiAnswersMeter answers={aiAnswers} />
       <PlanUsageMeters usage={usage} planId={planId} />
       <UsageTable usage={usage} caption={t("title")} />
     </div>

@@ -93,6 +93,8 @@ export type PaymentInput = Schemas["PaymentIn"];
 export type PaymentMethod = PaymentInput["method"];
 export type Job = Schemas["JobOut"];
 export type UsageDaily = Schemas["UsageDailyOut"];
+/** GET /platform/tenants/{id}/ai-answers: this month's AI answers against the bundle. */
+export type TenantAiAnswers = Schemas["TenantAiAnswersOut"];
 export type FeatureFlag = Schemas["FlagOut"];
 export type Deployment = Schemas["DeploymentOut"];
 export type DeploymentPatch = Schemas["DeploymentPatch"];

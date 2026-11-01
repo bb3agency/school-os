@@ -97,6 +97,7 @@ from app.platform.schemas import (
     Reasoned,
     SubscriptionOut,
     SuspendSubscriptionIn,
+    TenantAiAnswersOut,
     TenantDetailOut,
     TenantSummaryOut,
     TicketCreateOperator,
@@ -474,6 +475,20 @@ def tenant_usage(
     end: Annotated[dt.date | None, Query(alias="to")] = None,
 ) -> list[UsageDailyOut]:
     return usage.usage_for(tenant_id, *_range(start, end))
+
+
+@router.get("/tenants/{tenant_id}/ai-answers", response_model=TenantAiAnswersOut)
+def tenant_ai_answers(
+    *,
+    tenant_id: uuid.UUID,
+    ctx: Annotated[Ctx, Depends(require_platform("platform.usage.read"))],
+) -> TenantAiAnswersOut:
+    """This calendar month's billable AI answers against the school's bundle: included answers,
+    answers so far (whole IST days collected), extra answers and their ex-GST overage at the
+    bundle's price per extra answer, billed on the next invoice (ADR-0038 §3). The same numbers
+    the school sees on its Plan and billing page. ``bundle`` is ``null`` without a bundle;
+    404 for an unknown school. Counts and catalogue prices only."""
+    return billing.tenant_ai_answers(tenant_id)
 
 
 @router.get("/usage", response_model=list[UsageDailyOut])

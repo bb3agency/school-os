@@ -32629,7 +32629,7 @@
         "type": "object"
       },
       "SchoolAiBundle": {
-        "description": "The school's own AI answer bundle on its \"Plan and billing\" page (FR-PLT-030, ADR-0038).\n\nPrices are ex-GST INR from the catalogue row. ``month_start`` is the current calendar month\n(IST). ``answers_used`` is the month's billable answers counted so far (whole IST days up to\n``answers_counted_to``, collected the next morning), or ``null`` while the month does not\ncount against the bundle (``counts_from`` is later). No tokens, no cost estimate.",
+        "description": "The school's own AI answer bundle on its \"Plan and billing\" page (FR-PLT-030, ADR-0038).\n\nPrices are ex-GST INR from the catalogue row. ``month_start`` is the current calendar month\n(IST). ``answers_used`` is the month's billable answers counted so far (whole IST days up to\n``answers_counted_to``, collected the next morning), or ``null`` while the month does not\ncount against the bundle (``counts_from`` is later). ``extra_answers`` is the month's answers\nabove ``included_answers`` so far and ``overage_so_far_inr`` their ex-GST amount at\n``overage_rate_inr`` (billed in arrears on the next invoice, ADR-0038 \u00a73); both ``null``\nwith ``answers_used``. No tokens, no cost estimate.",
         "properties": {
           "answers_counted_to": {
             "anyOf": [
@@ -32663,6 +32663,17 @@
             "title": "Counts From",
             "type": "string"
           },
+          "extra_answers": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extra Answers"
+          },
           "included_answers": {
             "title": "Included Answers",
             "type": "integer"
@@ -32680,6 +32691,18 @@
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Overage Rate Inr",
             "type": "string"
+          },
+          "overage_so_far_inr": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overage So Far Inr"
           },
           "price_inr": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
@@ -36418,6 +36441,32 @@
           "version"
         ],
         "title": "TemplateOut",
+        "type": "object"
+      },
+      "TenantAiAnswersOut": {
+        "description": "A school's AI answers this month against its bundle, for operators (docs/18 R4, FR-PLT-020;\nADR-0038). Platform data only (``platform.subscriptions``, ``ai_bundles``, ``usage_daily``):\ncounts and catalogue prices, never a question, an answer or a person. ``bundle`` is ``null``\nwhen the school's live subscription has no AI answer bundle.",
+        "properties": {
+          "bundle": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SchoolAiBundle"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tenant_id": {
+            "format": "uuid",
+            "title": "Tenant Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "bundle"
+        ],
+        "title": "TenantAiAnswersOut",
         "type": "object"
       },
       "TenantBillingOut": {
@@ -69787,6 +69836,74 @@
           }
         },
         "summary": "Activate Tenant",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{tenant_id}/ai-answers": {
+      "get": {
+        "description": "This calendar month's billable AI answers against the school's bundle: included answers,\nanswers so far (whole IST days collected), extra answers and their ex-GST overage at the\nbundle's price per extra answer, billed on the next invoice (ADR-0038 \u00a73). The same numbers\nthe school sees on its Plan and billing page. ``bundle`` is ``null`` without a bundle;\n404 for an unknown school. Counts and catalogue prices only.",
+        "operationId": "tenant_ai_answers_api_v1_platform_tenants__tenant_id__ai_answers_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantAiAnswersOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tenant Ai Answers",
         "tags": [
           "platform"
         ]

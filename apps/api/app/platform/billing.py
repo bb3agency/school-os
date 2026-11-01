@@ -69,6 +69,7 @@ from app.platform.schemas import (
     PlanPatch,
     SchoolAiBundle,
     SubscriptionOut,
+    TenantAiAnswersOut,
 )
 from app.tenancy import service as tenancy
 
@@ -1185,8 +1186,13 @@ def school_ai_bundle(
             return None
         used: int | None = None
         counted_to: dt.date | None = None
+        extra: int | None = None
+        overage: Decimal | None = None
         if row["ai_bundle_from"] <= month:
             used, counted_to = repo.ai_answers_to_date(s, tenant_id, month, next_month(month))
+            extra, overage = ai_overage(
+                used, row["included_answers"], Decimal(row["overage_rate_inr"])
+            )
     return SchoolAiBundle(
         code=row["code"],
         name=row["name"],
@@ -1197,7 +1203,23 @@ def school_ai_bundle(
         month_start=month,
         answers_used=used,
         answers_counted_to=counted_to,
+        extra_answers=extra,
+        overage_so_far_inr=overage,
     )
+
+
+def tenant_ai_answers(tenant_id: uuid.UUID, *, today: dt.date | None = None) -> TenantAiAnswersOut:
+    """Operators: a school's AI answers this month against its bundle (docs/18 R4, FR-PLT-020).
+
+    The same numbers the school sees on its "Plan and billing" page (:func:`school_ai_bundle`),
+    for the school's live subscription; ``bundle`` is ``None`` without one. 404 for a school
+    the control plane does not know. Platform tables only (ADR-0020)."""
+    with platform_session() as s:
+        if repo.get_by(s, m.deployments, m.deployments.c.tenant_id == tenant_id) is None:
+            raise NotFound("School not found")
+        sub = repo.live_subscription(s, tenant_id)
+    bundle = None if sub is None else school_ai_bundle(tenant_id, sub["id"], today=today)
+    return TenantAiAnswersOut(tenant_id=tenant_id, bundle=bundle)
 
 
 def _totals(s: Session, invoice: Mapping[Any, Any]) -> dict[str, Any]:

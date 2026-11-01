@@ -22,7 +22,7 @@ from app.platform import repository as repo
 from app.platform.billing import next_month
 from app.platform.common import today_ist
 
-from .conftest import Api, Operator, provision_payload
+from .conftest import Api, MakeOperator, Operator, provision_payload
 
 pytestmark = pytest.mark.db
 
@@ -154,7 +154,24 @@ def test_FR_PLT_030_school_sees_its_ai_bundle_and_this_months_answers(
         "month_start": month.isoformat(),
         "answers_used": 40,
         "answers_counted_to": month.isoformat(),
+        "extra_answers": 0,
+        "overage_so_far_inr": "0.00",
     }
+
+
+def test_FR_PLT_020_school_sees_extra_answers_and_overage_so_far(
+    api: Api, owner: Operator, make_plan: Callable[..., uuid.UUID], admin_engine: Engine
+) -> None:
+    # docs/18 R4 "usage meters live": answers above the quota so far this month and their
+    # ex-GST amount (billed in arrears on the next invoice, ADR-0038 §3).
+    tid, sub, subject = _live_school(api, owner, make_plan(), admin_engine)
+    bundle = _set_bundle(api, owner, sub, "ai-standard")
+    month = today_ist().replace(day=1)
+    _counts_from(sub, month)
+    _answers(tid, month, int(bundle["included_answers"]) + 250)
+    got = _get(api, subject).json()["ai_bundle"]
+    assert got["extra_answers"] == 250
+    assert Decimal(got["overage_so_far_inr"]) == 250 * Decimal(bundle["overage_rate_inr"])
 
 
 def test_FR_PLT_030_bundle_not_yet_counting_shows_no_answer_count(
@@ -168,6 +185,8 @@ def test_FR_PLT_030_bundle_not_yet_counting_shows_no_answer_count(
     assert got["counts_from"] == next_month(today_ist()).isoformat()
     assert got["answers_used"] is None
     assert got["answers_counted_to"] is None
+    assert got["extra_answers"] is None
+    assert got["overage_so_far_inr"] is None
 
 
 def test_FR_PLT_030_no_bundle_is_null_and_other_schools_bundle_is_never_shown(
@@ -197,3 +216,53 @@ def test_FR_PLT_030_ai_bundle_needs_tenant_billing_read(
     denied = _get(api, staff)
     assert denied.status_code == 403, denied.text
     assert "ai-lite" not in denied.text
+
+
+# --- the operator's view of the same meter (docs/18 R4; FR-PLT-020) ---------------------------
+
+
+def _operator_get(api: Api, op: Operator, tenant_id: uuid.UUID) -> Any:
+    return api.call("GET", f"/tenants/{tenant_id}/ai-answers", op)
+
+
+def test_FR_PLT_020_operator_sees_a_schools_answers_against_its_bundle(
+    api: Api,
+    owner: Operator,
+    make_operator: MakeOperator,
+    make_plan: Callable[..., uuid.UUID],
+    admin_engine: Engine,
+) -> None:
+    tid, sub, _subject = _live_school(api, owner, make_plan(), admin_engine)
+    bundle = _set_bundle(api, owner, sub, "ai-lite")
+    month = today_ist().replace(day=1)
+    _counts_from(sub, month)
+    _answers(tid, month, int(bundle["included_answers"]) + 10)
+    # Every operator role holds platform.usage.read (docs/16 §6): the viewer is the least one.
+    viewer = make_operator("platform_viewer")
+    res = _operator_get(api, viewer, tid)
+    assert res.status_code == 200, res.text
+    got = res.json()
+    assert got["tenant_id"] == str(tid)
+    assert got["bundle"]["code"] == "ai-lite"
+    assert got["bundle"]["included_answers"] == bundle["included_answers"]
+    assert got["bundle"]["answers_used"] == int(bundle["included_answers"]) + 10
+    assert got["bundle"]["extra_answers"] == 10
+    assert Decimal(got["bundle"]["overage_so_far_inr"]) == 10 * Decimal(bundle["overage_rate_inr"])
+    # Counts only: never a token count or anything from the school's records.
+    assert "token" not in res.text
+
+
+def test_FR_PLT_020_operator_ai_answers_no_bundle_unknown_school_and_school_token(
+    api: Api, owner: Operator, make_plan: Callable[..., uuid.UUID], admin_engine: Engine
+) -> None:
+    tid, _sub, subject = _live_school(api, owner, make_plan(), admin_engine)
+    res = _operator_get(api, owner, tid)
+    assert res.status_code == 200, res.text
+    assert res.json() == {"tenant_id": str(tid), "bundle": None}
+    assert _operator_get(api, owner, uuid.uuid4()).status_code == 404
+    # A school's own staff token never reaches a control-plane route.
+    staff = api.client.get(
+        f"/api/v1/platform/tenants/{tid}/ai-answers",
+        headers=api.headers(None, tenant_subject=subject),
+    )
+    assert staff.status_code in (401, 403), staff.text

@@ -33,6 +33,21 @@ billing:
 # 'answered' row and counts (docs/16 §19 Q15). Schools never see tokens.
 ai_answers:
   billable_statuses: [answered]
+# Public pricing page (/pricing; ADR-0038, docs/18 R4): the published starting prices it shows,
+# in INR before GST. A display copy of the catalogue for the marketing site only, NEVER used to
+# price anything: invoices read platform.plans and platform.ai_bundles (frozen, versioned rows).
+# tests/platform/test_catalogue.py pins these values to the latest published catalogue rows and
+# apps/web/src/features/marketing/catalogue.test.ts pins the page to them, so a new catalogue
+# migration fails both until the page says the same.
+public_pricing:
+  gst_rate: "18.00"
+  plans:
+    shared: {monthly_inr: "4999.00", one_time_fee_inr: "15000.00"}
+    dedicated: {monthly_inr: "9900.00", one_time_fee_inr: "49000.00"}
+  ai_bundles:
+    ai-lite: {name: Lite, included_answers: 300, monthly_inr: "699.00", extra_answer_inr: "1.50"}
+    ai-standard: {name: Standard, included_answers: 1000, monthly_inr: "1499.00", extra_answer_inr: "1.50"}
+    ai-high: {name: High, included_answers: 3000, monthly_inr: "3499.00", extra_answer_inr: "1.50"}
 # Invoice PDFs (docs/16 §5.8; app/platform/invoice_pdf.py renders, invoice_files.py stores).
 # Template v0 is PENDING CA REVIEW (docs/16 §19 Q2, Q3, Q11): bump template_version whenever the
 # layout or wording changes; each stored PDF records the version it used. English only (a tax
