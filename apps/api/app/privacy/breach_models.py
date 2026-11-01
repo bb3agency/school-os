@@ -42,6 +42,9 @@ class BreachRecord(Base):
     approx_guardians: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     approx_staff: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     processor_facts: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    # 0069_incident_reopen_notice (D49): the last SchoolOS reopen this school stored.
+    platform_reopen_seq: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    platform_reopened_at: Mapped[dt.datetime | None]
     status: Mapped[str] = mapped_column(Text, server_default=text("'open'"))
     board_notice_done_at: Mapped[dt.datetime | None]
     board_notice_method: Mapped[str | None] = mapped_column(Text)

@@ -273,12 +273,13 @@ def test_FR_DPDP_030_spaced_aadhaar_in_summary_is_refused() -> None:
 
 
 def _closed(api: Api, op: Any) -> str:
+    """An incident closed in one PATCH that also records the CERT-In report (D49 close gate)."""
     iid: str = _open(api, op)["id"]
     res = api.call(
         "PATCH",
         f"/incidents/{iid}",
         op,
-        json={"status": "closed"},
+        json={"status": "closed", "cert_in_reported_at": dt.datetime.now(dt.UTC).isoformat()},
         headers=api.if_match(f"/incidents/{iid}", op),
     )
     assert res.status_code == 200, res.text
@@ -437,6 +438,167 @@ def test_D48_the_database_keeps_the_reopen_request_whole() -> None:
         )
 
 
+# --- close gate and reopen propagation (D49; FR-DPDP-030, FR-DPDP-031, FR-DPDP-032) -------------
+
+
+def _patch(api: Api, op: Any, iid: str, body: dict[str, Any]) -> Any:
+    return api.call(
+        "PATCH", f"/incidents/{iid}", op, json=body, headers=api.if_match(f"/incidents/{iid}", op)
+    )
+
+
+def _confirmed_with_school(
+    api: Api, first: Any, second: Any, **extra: Any
+) -> tuple[str, uuid.UUID]:
+    iid: str = _open(api, first, **extra)["id"]
+    school = _school()
+    payload = {"tenant_id": str(school), "categories": ["contact"], "approx_people": 12}
+    assert api.call("POST", f"/incidents/{iid}/schools", first, json=payload).status_code == 200
+    assert api.call("POST", f"/incidents/{iid}/confirm", first).status_code == 200
+    assert api.call("POST", f"/incidents/{iid}/confirm", second).status_code == 200
+    return iid, school
+
+
+def test_D49_FR_DPDP_030_close_refused_while_cert_in_is_not_reported(
+    api: Api, make_operator: MakeOperator
+) -> None:
+    op = make_operator("platform_owner")
+    iid = _open(api, op)["id"]
+    shown = api.call("GET", f"/incidents/{iid}", op).json()
+    assert shown["close_blocked_by"] == ["incident_cert_in_unreported"]
+    listed = {i["id"]: i for i in api.call("GET", "/incidents", op).json()["data"]}
+    assert listed[iid]["close_blocked_by"] == ["incident_cert_in_unreported"]
+    refused = _patch(api, op, iid, {"status": "closed"})
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["code"] == "incident_cert_in_unreported"
+    assert "CERT-In" in refused.json()["detail"], "the error says what to do"
+    assert api.call("GET", f"/incidents/{iid}", op).json() == shown, "nothing changed"
+    assert _events("incident.updated", iid) == []
+    # Recording the report in the same request satisfies the gate.
+    reported = dt.datetime.now(dt.UTC).isoformat()
+    done = _patch(api, op, iid, {"status": "closed", "cert_in_reported_at": reported})
+    assert done.status_code == 200, done.text
+    assert done.json()["status"] == "closed"
+    assert done.json()["close_blocked_by"] == []
+
+
+def test_D49_FR_DPDP_030_not_reportable_incident_closes_without_cert_in(
+    api: Api, make_operator: MakeOperator
+) -> None:
+    op = make_operator("platform_owner")
+    iid = _open(api, op, cert_in_required=False)["id"]
+    assert api.call("GET", f"/incidents/{iid}", op).json()["close_blocked_by"] == []
+    assert _patch(api, op, iid, {"status": "closed"}).status_code == 200
+    # Marking it not reportable in the closing request also lets it close.
+    other = _open(api, op)["id"]
+    res = _patch(api, op, other, {"status": "closed", "cert_in_required": False})
+    assert res.status_code == 200, res.text
+
+
+def test_D49_FR_DPDP_031_close_refused_while_a_school_is_not_notified(
+    api: Api, make_operator: MakeOperator
+) -> None:
+    first, second = make_operator("platform_owner"), make_operator("platform_engineer")
+    iid, school = _confirmed_with_school(api, first, second, cert_in_required=False)
+    assert api.call("GET", f"/incidents/{iid}", first).json()["close_blocked_by"] == [
+        "incident_school_not_notified"
+    ]
+    refused = _patch(api, first, iid, {"status": "closed"})
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["code"] == "incident_school_not_notified"
+    assert "notified" in refused.json()["detail"]
+    # Both blockers: CERT-In is reported first.
+    iid2, _ = _confirmed_with_school(api, first, second)
+    assert api.call("GET", f"/incidents/{iid2}", first).json()["close_blocked_by"] == [
+        "incident_cert_in_unreported",
+        "incident_school_not_notified",
+    ]
+    both = _patch(api, first, iid2, {"status": "closed"})
+    assert (both.status_code, both.json()["code"]) == (409, "incident_cert_in_unreported")
+    # The school's pull notifies it; then the incident closes.
+    assert incidents.mark_notice_pulled(school, uuid.UUID(iid))
+    assert api.call("GET", f"/incidents/{iid}", first).json()["close_blocked_by"] == []
+    assert _patch(api, first, iid, {"status": "closed"}).status_code == 200
+
+
+def test_D49_FR_DPDP_031_phone_notice_in_the_closing_request_satisfies_the_gate(
+    api: Api, make_operator: MakeOperator
+) -> None:
+    first, second = make_operator("platform_owner"), make_operator("platform_engineer")
+    iid, school = _confirmed_with_school(api, first, second, cert_in_required=False)
+    res = _patch(api, first, iid, {"status": "closed", "notified_tenant_ids": [str(school)]})
+    assert res.status_code == 200, res.text
+    assert res.json()["status"] == "closed"
+    assert res.json()["schools_notified"] == 1
+
+
+def test_D49_unconfirmed_school_list_does_not_block_closing(
+    api: Api, make_operator: MakeOperator
+) -> None:
+    """A list two operators never confirmed was never sent to a school (e.g. a false alarm)."""
+    op = make_operator("platform_owner")
+    iid = _open(api, op, cert_in_required=False)["id"]
+    payload = {"tenant_id": str(_school()), "categories": ["contact"], "approx_people": 3}
+    assert api.call("POST", f"/incidents/{iid}/schools", op, json=payload).status_code == 200
+    assert api.call("POST", f"/incidents/{iid}/confirm", op).status_code == 200
+    assert api.call("GET", f"/incidents/{iid}", op).json()["close_blocked_by"] == []
+    assert _patch(api, op, iid, {"status": "closed"}).status_code == 200
+
+
+def test_D49_FR_DPDP_032_a_reopen_is_offered_to_each_school_once(
+    api: Api, make_operator: MakeOperator
+) -> None:
+    first, second = make_operator("platform_owner"), make_operator("platform_engineer")
+    iid, school = _confirmed_with_school(api, first, second, cert_in_required=False)
+    incident_id = uuid.UUID(iid)
+    (notice,) = incidents.notices_for_school(school)
+    assert (notice.reopen_seq, notice.reopened_at) == (0, None)
+    assert incidents.mark_notice_pulled(school, incident_id)
+    assert incidents.notices_for_school(school) == []
+    assert incidents.mark_reopen_pulled(school, incident_id, 1) is False, "never reopened"
+    assert _patch(api, first, iid, {"status": "closed"}).status_code == 200
+    reason = {"reason": "Another kind of record found exposed after closure"}
+    assert api.call("POST", f"/incidents/{iid}/reopen", first, json=reason).status_code == 200
+    reopened = api.call("POST", f"/incidents/{iid}/reopen:confirm", second)
+    assert reopened.status_code == 200, reopened.text
+    body = reopened.json()
+    assert body["reopen_count"] == 1
+    assert body["last_reopened_at"] is not None
+    assert body["schools"][0]["reopen_pulled"] == 0
+    (event,) = _events("incident.reopened", iid)
+    assert event["summary"]["reopen"] == 1
+    (again,) = incidents.notices_for_school(school)
+    assert again.incident_id == incident_id
+    assert again.reopen_seq == 1
+    assert again.reopened_at is not None
+    assert again.categories == ["contact"]
+    # Other schools never see it.
+    assert incidents.mark_reopen_pulled(_school(), incident_id, 1) is False
+    assert incidents.mark_reopen_pulled(school, incident_id, 2) is False, "not reached yet"
+    assert incidents.mark_reopen_pulled(school, incident_id, 1) is True
+    assert incidents.mark_reopen_pulled(school, incident_id, 1) is False, "idempotent"
+    assert incidents.notices_for_school(school) == []
+    detail = api.call("GET", f"/incidents/{iid}", first).json()
+    assert detail["schools"][0]["reopen_pulled"] == 1
+    assert detail["schools"][0]["reopen_pulled_at"] is not None
+    (pulled,) = _events("incident.school_reopen_pulled", iid)
+    assert pulled["summary"] == {"source": "school_pull", "reopen": 1}
+    assert pulled["subject_tenant_id"] == school
+    assert pulled["actor_id"] is None
+
+
+def test_D49_the_database_keeps_reopen_counts_whole() -> None:
+    with pytest.raises(Exception, match="incidents_reopened"), platform_session() as s:
+        s.execute(
+            text(
+                "INSERT INTO platform.incidents (id, opened_at, severity, summary, "
+                "lead_operator_id, created_by, reopen_count) SELECT :i, now(), 'P2', "
+                "'Attendance records exposed briefly', id, id, 1 FROM platform.operators LIMIT 1"
+            ),
+            {"i": uuid.uuid4()},
+        )
+
+
 # --- no personal data in logs (SEC-008, invariant 5; NFR-SEC-008) --------------------------------
 
 
@@ -484,7 +646,7 @@ def test_SEC_008_incident_texts_and_the_school_pull_never_reach_logs(
         "PATCH",
         f"/incidents/{iid}",
         first,
-        json={"status": "closed"},
+        json={"status": "closed", "cert_in_reported_at": dt.datetime.now(dt.UTC).isoformat()},
         headers=api.if_match(f"/incidents/{iid}", first),
     )
     assert closing.status_code == 200, closing.text

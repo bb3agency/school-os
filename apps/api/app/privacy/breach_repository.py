@@ -65,6 +65,16 @@ def get(session: Session, breach_id: uuid.UUID, *, lock: bool = False) -> Breach
     return session.scalars(stmt).one_or_none()
 
 
+def get_by_incident(
+    session: Session, incident_id: uuid.UUID, *, lock: bool = False
+) -> BreachRecord | None:
+    """This school's breach for a SchoolOS incident (at most one: unique per incident)."""
+    stmt = select(BreachRecord).where(BreachRecord.platform_incident_id == incident_id)
+    if lock:
+        stmt = stmt.with_for_update()
+    return session.scalars(stmt).one_or_none()
+
+
 def insert(session: Session, **values: Any) -> BreachRecord:
     row = BreachRecord(tenant_id=current_tenant_id(session), **values)
     session.add(row)

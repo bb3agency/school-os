@@ -24,6 +24,18 @@ A ``closed`` incident is locked (D48): PATCH, adding a school and confirming ans
 SEC-029 checks as the incident's own confirmation; the request can be withdrawn. The confirmation
 sets the status back to ``open``. Audit ``incident.reopen_requested``, ``incident.reopened`` and
 ``incident.reopen_withdrawn`` (never the reason text).
+
+Closing is gated (D49 part 1): PATCH ``status: closed`` answers 409
+``incident_cert_in_unreported`` while CERT-In is required and its report time is not recorded,
+and 409 ``incident_school_not_notified`` while a school of a confirmed incident has not been
+notified (pulled, or recorded by hand). The same request may record what is missing.
+``close_blocked_by`` on every incident lists the codes a close would meet now.
+
+A confirmed reopen counts up ``reopen_count`` (D49 part 3). Each affected school whose
+``reopen_pulled`` is behind it gets the notice again on its next pull (``reopen_seq``); the
+school side records the reopen on its breach (``app.privacy.breach_sync``) and reports it with
+:func:`mark_reopen_pulled` (audit ``incident.school_reopen_pulled``). A dedicated host has no
+pull: the operator tells it by phone or e-mail.
 """
 
 from __future__ import annotations
@@ -41,7 +53,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 
 from app.core.db import platform_session
 from app.core.errors import Conflict, NotFound, PreconditionFailed, ValidationFailed
@@ -62,12 +74,15 @@ from app.platform.common import (
 
 MANAGE: Final = "platform.incidents.manage"
 CERT_IN_HOURS: Final = 6
+CLOSE_CERT_IN: Final = "incident_cert_in_unreported"
+CLOSE_SCHOOLS: Final = "incident_school_not_notified"
 SCHOOL_NOTICE_HOURS: Final = 24
 _DIGIT_RUN: Final = re.compile(r"\d{6,}")
 _EMAIL: Final = re.compile(r"@")
 
 Severity = Literal["P1", "P2", "P3", "P4"]
 IncidentStatus = Literal["open", "contained", "resolved", "closed"]
+CloseBlocker = Literal["incident_cert_in_unreported", "incident_school_not_notified"]
 Category = Literal[
     "identity",
     "contact",
@@ -181,6 +196,10 @@ class IncidentSchoolOut(_Out):
     notice_due_at: dt.datetime | None = Field(
         description="Confirmation + 24 h while the school has not been notified."
     )
+    reopen_pulled: int = Field(
+        description="The incident's reopen count this school last stored (D49)."
+    )
+    reopen_pulled_at: dt.datetime | None
 
 
 class IncidentOut(_Out):
@@ -211,6 +230,14 @@ class IncidentOut(_Out):
     reopen_confirm_by: dt.datetime | None = Field(
         default=None, description="When the reopen request expires without a confirmation."
     )
+    reopen_count: int = Field(
+        description="How many times two operators reopened this incident (D49)."
+    )
+    last_reopened_at: dt.datetime | None
+    close_blocked_by: list[CloseBlocker] = Field(
+        description="Why closing would be refused now (D49): CERT-In not reported, or a school "
+        "of the confirmed incident not notified. Empty when it can be closed.",
+    )
     schools_count: int
     schools_notified: int
     created_at: dt.datetime | None
@@ -235,6 +262,10 @@ class SchoolIncidentNotice(BaseModel):
     approx_people: int
     window_from: dt.datetime | None
     window_to: dt.datetime | None
+    reopen_seq: int = Field(
+        default=0, description="The incident's reopen count; 0 when it was never reopened (D49)."
+    )
+    reopened_at: dt.datetime | None = None
 
 
 # --- shaping ----------------------------------------------------------------------------------
@@ -263,7 +294,53 @@ def _out(row: Any, counts: tuple[int, int]) -> dict[str, Any]:
     data["confirm_by"] = two_person.expires_at(data["first_confirmed_at"]) if waiting else None
     data["reopen_confirm_by"] = two_person.expires_at(data.get("reopen_requested_at"))
     data["schools_count"], data["schools_notified"] = counts
+    data["close_blocked_by"] = _close_blockers(
+        cert_in_required=data["cert_in_required"],
+        cert_in_reported_at=data["cert_in_reported_at"],
+        confirmed_at=data["confirmed_at"],
+        unnotified=counts[0] - counts[1],
+    )
     return data
+
+
+def _close_blockers(
+    *,
+    cert_in_required: bool,
+    cert_in_reported_at: dt.datetime | None,
+    confirmed_at: dt.datetime | None,
+    unnotified: int,
+) -> list[str]:
+    """D49 part 1: what a close would meet. Schools count only once two operators confirmed
+    them (an unconfirmed list was never sent to anyone)."""
+    out = []
+    if cert_in_required and cert_in_reported_at is None:
+        out.append(CLOSE_CERT_IN)
+    if confirmed_at is not None and unnotified > 0:
+        out.append(CLOSE_SCHOOLS)
+    return out
+
+
+def _check_close(s: Any, incident_id: uuid.UUID, row: Any, values: dict[str, Any]) -> None:
+    """Refuse closing while CERT-In or a school is still owed a notice (D49 part 1)."""
+    counts = _school_counts(s, [incident_id]).get(incident_id, (0, 0))
+    blockers = _close_blockers(
+        cert_in_required=values.get("cert_in_required", row["cert_in_required"]),
+        cert_in_reported_at=values.get("cert_in_reported_at", row["cert_in_reported_at"]),
+        confirmed_at=row["confirmed_at"],
+        unnotified=counts[0] - counts[1],
+    )
+    if CLOSE_CERT_IN in blockers:
+        raise Conflict(
+            "CERT-In has not been told yet. Record when SchoolOS reported the incident to "
+            "CERT-In, or mark it as not reportable, before closing.",
+            code=CLOSE_CERT_IN,
+        )
+    if CLOSE_SCHOOLS in blockers:
+        raise Conflict(
+            "An affected school has not been notified yet. Wait for the school's register to "
+            "pull the notice, or record the schools told by phone or e-mail, before closing.",
+            code=CLOSE_SCHOOLS,
+        )
 
 
 def _schools(s: Any, incident_id: uuid.UUID, confirmed_at: dt.datetime | None) -> list[Any]:
@@ -383,6 +460,35 @@ def create_incident(actor: Actor, data: IncidentIn) -> IncidentDetailOut:
         return _detail(s, row)
 
 
+def _record_notified(s: Any, incident_id: uuid.UUID, row: Any, tenant_ids: list[uuid.UUID]) -> int:
+    """Schools told by phone or e-mail (dedicated hosts): how many were newly notified."""
+    if not tenant_ids:
+        return 0
+    if row["confirmed_at"] is None:
+        raise Conflict(
+            "Two operators must confirm the affected schools before any school is told.",
+            code="not_confirmed",
+        )
+    t = m.incident_schools
+    notified = 0
+    for tenant_id in dict.fromkeys(tenant_ids):
+        school = repo.get_by(s, t, t.c.incident_id == incident_id, t.c.tenant_id == tenant_id)
+        if school is None:
+            raise ValidationFailed(
+                [
+                    {
+                        "field": "notified_tenant_ids",
+                        "code": "not_found",
+                        "message_key": "errors.not_found",
+                    }
+                ]
+            )
+        if school["school_notified_at"] is None:
+            repo.update_row(s, t, school["id"], {"school_notified_at": now()}, bump_version=False)
+            notified += 1
+    return notified
+
+
 def update_incident(
     actor: Actor, incident_id: uuid.UUID, data: IncidentPatch, *, expected_version: int
 ) -> IncidentDetailOut:
@@ -407,33 +513,9 @@ def update_incident(
                     "Mark the incident as reportable to CERT-In first.", code="cert_in_not_required"
                 )
             values["cert_in_reported_at"] = data.cert_in_reported_at
-        notified = 0
-        if data.notified_tenant_ids:
-            if row["confirmed_at"] is None:
-                raise Conflict(
-                    "Two operators must confirm the affected schools before any school is told.",
-                    code="not_confirmed",
-                )
-            t = m.incident_schools
-            for tenant_id in dict.fromkeys(data.notified_tenant_ids):
-                school = repo.get_by(
-                    s, t, t.c.incident_id == incident_id, t.c.tenant_id == tenant_id
-                )
-                if school is None:
-                    raise ValidationFailed(
-                        [
-                            {
-                                "field": "notified_tenant_ids",
-                                "code": "not_found",
-                                "message_key": "errors.not_found",
-                            }
-                        ]
-                    )
-                if school["school_notified_at"] is None:
-                    repo.update_row(
-                        s, t, school["id"], {"school_notified_at": now()}, bump_version=False
-                    )
-                    notified += 1
+        notified = _record_notified(s, incident_id, row, data.notified_tenant_ids)
+        if values.get("status") == "closed":
+            _check_close(s, incident_id, row, values)
         if values or notified:
             values["updated_at"] = now()
             row = repo.update_row(s, m.incidents, incident_id, values)
@@ -624,8 +706,19 @@ def confirm_reopen(actor: Actor, incident_id: uuid.UUID) -> IncidentDetailOut:
             permission=MANAGE,
             requested_at=row["reopen_requested_at"],
         )
+        at = now()
+        reopen_count = int(row["reopen_count"]) + 1
         row = repo.update_row(
-            s, m.incidents, incident_id, {"status": "open", "updated_at": now()} | _NO_REQUEST
+            s,
+            m.incidents,
+            incident_id,
+            {
+                "status": "open",
+                "reopen_count": reopen_count,
+                "last_reopened_at": at,
+                "updated_at": at,
+            }
+            | _NO_REQUEST,
         )
         audit_platform(
             s,
@@ -633,7 +726,7 @@ def confirm_reopen(actor: Actor, incident_id: uuid.UUID) -> IncidentDetailOut:
             "incident.reopened",
             "incident",
             incident_id,
-            {"requested_by": str(requested_by), "status": "open"},
+            {"requested_by": str(requested_by), "status": "open", "reopen": reopen_count},
         )
         return _detail(s, row)
 
@@ -660,7 +753,8 @@ def withdraw_reopen(actor: Actor, incident_id: uuid.UUID) -> IncidentDetailOut:
 
 
 def notices_for_school(tenant_id: uuid.UUID) -> list[SchoolIncidentNotice]:
-    """Confirmed notices this school's worker has not stored yet (codes and counts only)."""
+    """Confirmed notices this school's worker has not stored yet (codes and counts only): new
+    ones, and ones reopened since the school last stored them (``reopen_seq``; D49)."""
     i, t = m.incidents, m.incident_schools
     stmt = (
         select(
@@ -673,9 +767,15 @@ def notices_for_school(tenant_id: uuid.UUID) -> list[SchoolIncidentNotice]:
             t.c.approx_people,
             t.c.window_from,
             t.c.window_to,
+            i.c.reopen_count.label("reopen_seq"),
+            i.c.last_reopened_at.label("reopened_at"),
         )
         .join(i, i.c.id == t.c.incident_id)
-        .where(t.c.tenant_id == tenant_id, t.c.pulled_at.is_(None), i.c.confirmed_at.is_not(None))
+        .where(
+            t.c.tenant_id == tenant_id,
+            i.c.confirmed_at.is_not(None),
+            or_(t.c.pulled_at.is_(None), t.c.reopen_pulled < i.c.reopen_count),
+        )
         .order_by(i.c.confirmed_at, i.c.id)
         .limit(50)
     )
@@ -711,6 +811,43 @@ def mark_notice_pulled(tenant_id: uuid.UUID, incident_id: uuid.UUID) -> bool:
         return True
 
 
+def mark_reopen_pulled(tenant_id: uuid.UUID, incident_id: uuid.UUID, reopen_seq: int) -> bool:
+    """The school recorded reopen ``reopen_seq`` of the incident on its breach (D49 part 3).
+    Idempotent; False when nothing changed, the incident is not this school's or the count is
+    not one the incident reached. Audit ``incident.school_reopen_pulled`` (ids and the count)."""
+    t = m.incident_schools
+    with platform_session() as s, db_errors():
+        incident = repo.get(s, m.incidents, incident_id)
+        row = repo.get_by(
+            s, t, t.c.incident_id == incident_id, t.c.tenant_id == tenant_id, for_update=True
+        )
+        if (
+            incident is None
+            or row is None
+            or reopen_seq < 1
+            or reopen_seq > incident["reopen_count"]
+            or row["reopen_pulled"] >= reopen_seq
+        ):
+            return False
+        repo.update_row(
+            s,
+            t,
+            row["id"],
+            {"reopen_pulled": reopen_seq, "reopen_pulled_at": now()},
+            bump_version=False,
+        )
+        audit_platform(
+            s,
+            Actor(None),
+            "incident.school_reopen_pulled",
+            "incident",
+            incident_id,
+            {"source": "school_pull", "reopen": reopen_seq},
+            tenant_id=tenant_id,
+        )
+        return True
+
+
 __all__ = [
     "IncidentDetailOut",
     "IncidentIn",
@@ -727,6 +864,7 @@ __all__ = [
     "get_incident",
     "list_incidents",
     "mark_notice_pulled",
+    "mark_reopen_pulled",
     "notices_for_school",
     "request_reopen",
     "update_incident",

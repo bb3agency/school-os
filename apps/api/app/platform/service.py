@@ -19,7 +19,8 @@ Break-glass (school side, ``app.breakglass``; US-103, FR-OPS-004):
 ``breakglass_request_for_school`` and ``record_breakglass_outcome`` (see ``platform.breakglass``).
 
 Breach notices (school side, ``app.privacy.breach_sync``; ADR-0050, FR-DPDP-032):
-``incident_notices_for_school`` and ``record_incident_notice_pulled`` (see
+``incident_notices_for_school``, ``record_incident_notice_pulled`` and
+``record_incident_reopen_pulled`` (D49; see
 ``platform.incidents``; codes and counts only).
 
 Feature flags for tenant code: ``is_flag_enabled(key, tenant_id, session=tenant_session)``.
@@ -67,6 +68,7 @@ __all__ = [
     "record_breakglass_outcome",
     "record_breakglass_session_started",
     "record_incident_notice_pulled",
+    "record_incident_reopen_pulled",
     "reply_from_tenant",
     "school_ai_bundle",
 ]
@@ -201,3 +203,11 @@ def incident_notices_for_school(tenant_id: uuid.UUID) -> list[SchoolIncidentNoti
 def record_incident_notice_pulled(tenant_id: uuid.UUID, incident_id: uuid.UUID) -> bool:
     """The school stored the notice in its breach register (idempotent; platform audit)."""
     return incidents.mark_notice_pulled(tenant_id, incident_id)
+
+
+def record_incident_reopen_pulled(
+    tenant_id: uuid.UUID, incident_id: uuid.UUID, reopen_seq: int
+) -> bool:
+    """The school recorded a reopen of the incident on its breach (D49; idempotent; platform
+    audit, ids and the reopen count only)."""
+    return incidents.mark_reopen_pulled(tenant_id, incident_id, reopen_seq)

@@ -220,3 +220,186 @@ def test_FR_DPDP_032_a_control_plane_outage_only_delays_the_pull(
     totals = breach_tasks.sweep_all()
     assert totals["failed"] >= 1
     assert totals["tenants"] >= 2
+
+
+# --- SchoolOS reopens (D49 part 3; FR-DPDP-032) -------------------------------------------------
+
+
+def _reopen(incident: uuid.UUID) -> None:
+    """Two operators reopened the incident (as the control plane writes it on reopen:confirm)."""
+    with platform_session() as s:
+        s.execute(
+            text(
+                "UPDATE platform.incidents SET status = 'open', reopen_count = reopen_count + 1, "
+                "last_reopened_at = now() WHERE id = :i"
+            ),
+            {"i": incident},
+        )
+
+
+def _close_breach(admin: Engine, breach_id: Any) -> None:
+    with admin.begin() as c:
+        c.execute(
+            text(
+                "UPDATE ops.breach_records SET status = 'closed', closed_at = now(), "
+                "close_reason = 'Closed after the detailed report' WHERE id = :b"
+            ),
+            {"b": breach_id},
+        )
+
+
+def _reopen_pulled(incident: uuid.UUID) -> Any:
+    with platform_session() as s:
+        return s.execute(
+            text(
+                "SELECT reopen_pulled, reopen_pulled_at FROM platform.incident_schools "
+                "WHERE incident_id = :i"
+            ),
+            {"i": incident},
+        ).one()
+
+
+def _reopen_events(admin: Engine, tenant_id: uuid.UUID, breach_id: Any) -> list[dict[str, Any]]:
+    return [
+        e
+        for e in W.audit_events(admin, tenant_id, "privacy.breach.incident_reopened")
+        if e["resource_id"] == breach_id
+    ]
+
+
+def _platform_reopen_events(incident: uuid.UUID) -> list[Any]:
+    with platform_session() as s:
+        return list(
+            s.execute(
+                text(
+                    "SELECT summary FROM platform.audit_events WHERE resource_id = :r "
+                    "AND action = 'incident.school_reopen_pulled' ORDER BY seq"
+                ),
+                {"r": incident},
+            ).scalars()
+        )
+
+
+def test_D49_FR_DPDP_032_reopen_reopens_a_closed_school_breach_once(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    incident = _confirmed_incident(world.a.tenant_id)
+    assert breach_sync.sync_school(world.a.tenant_id) >= 1
+    (row,) = _breaches_for(admin_engine, incident)
+    _close_breach(admin_engine, row["id"])
+    _reopen(incident)
+    assert breach_sync.sync_school(world.a.tenant_id) == 1
+    (after,) = _breaches_for(admin_engine, incident)
+    assert after["status"] == "open", "a closed breach is reopened for review"
+    assert after["closed_at"] is None
+    assert after["platform_reopen_seq"] == 1
+    assert after["platform_reopened_at"] is not None
+    assert after["version"] == row["version"] + 1, "an old ETag no longer matches"
+    assert after["categories"] == row["categories"], "nothing but the reopen changes"
+    assert after["description_ciphertext"] == row["description_ciphertext"]
+    assert breach_sync.sync_school(world.a.tenant_id) == 0, "repeated pulls add nothing"
+    assert len(_breaches_for(admin_engine, incident)) == 1
+    assert _reopen_pulled(incident).reopen_pulled == 1
+    (event,) = _reopen_events(admin_engine, world.a.tenant_id, row["id"])
+    assert event["resource_id"] == row["id"]
+    assert event["summary"] == {
+        "platform_incident_id": str(incident),
+        "reopen": 1,
+        "status_before": "closed",
+        "status": "open",
+    }
+    assert event["actor_id"] is None
+    # The owner and principal are told once more; the register shows the reopen.
+    assert (
+        _notifications(admin_engine, world.a.tenant_id, "privacy.breach.notice_received", row["id"])
+        == 4
+    )
+    detail = api.call(world.person("principal"), "GET", f"/api/v1/privacy/breaches/{row['id']}")
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["status"] == "open"
+    assert detail.json()["platform_reopens"] == 1
+    assert detail.json()["platform_reopened_at"] is not None
+    assert detail.json()["next_duty"] is not None, "open duties show again"
+    # A second reopen is a new event.
+    _reopen(incident)
+    assert breach_sync.sync_school(world.a.tenant_id) == 1
+    (again,) = _breaches_for(admin_engine, incident)
+    assert again["platform_reopen_seq"] == 2
+    assert again["status"] == "open"
+    events = _reopen_events(admin_engine, world.a.tenant_id, row["id"])
+    assert [e["summary"]["reopen"] for e in events] == [1, 2]
+    assert events[1]["summary"]["status_before"] == "open"
+    platform_events = _platform_reopen_events(incident)
+    assert [e["reopen"] for e in platform_events] == [1, 2]
+    blob = str([e["summary"] for e in events]) + str(platform_events)
+    assert "misconfigured" not in blob, "never the summary text"
+
+
+def test_D49_FR_DPDP_032_reopen_of_an_open_breach_keeps_its_status(
+    world: Any, admin_engine: Engine
+) -> None:
+    incident = _confirmed_incident(world.a.tenant_id)
+    breach_sync.sync_school(world.a.tenant_id)
+    with admin_engine.begin() as c:
+        c.execute(
+            text(
+                "UPDATE ops.breach_records SET status = 'contained' WHERE platform_incident_id = :i"
+            ),
+            {"i": incident},
+        )
+    _reopen(incident)
+    assert breach_sync.sync_school(world.a.tenant_id) == 1
+    (row,) = _breaches_for(admin_engine, incident)
+    assert (row["status"], row["platform_reopen_seq"]) == ("contained", 1)
+
+
+def test_D49_FR_DPDP_032_reopen_before_the_first_pull_arrives_with_the_notice(
+    world: Any, admin_engine: Engine
+) -> None:
+    incident = _confirmed_incident(world.a.tenant_id)
+    _reopen(incident)
+    assert breach_sync.sync_school(world.a.tenant_id) == 2, "the notice and its reopen"
+    (row,) = _breaches_for(admin_engine, incident)
+    assert (row["status"], row["platform_reopen_seq"]) == ("open", 1)
+    assert breach_sync.sync_school(world.a.tenant_id) == 0
+    assert _reopen_pulled(incident).reopen_pulled == 1
+
+
+def test_D49_FR_DPDP_032_a_reopen_report_failure_is_retried_by_the_next_sweep(
+    world: Any, admin_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    incident = _confirmed_incident(world.a.tenant_id)
+    breach_sync.sync_school(world.a.tenant_id)
+    (row,) = _breaches_for(admin_engine, incident)
+    _close_breach(admin_engine, row["id"])
+    _reopen(incident)
+    real = control_plane.record_incident_reopen_pulled
+
+    def down(*_: Any) -> bool:
+        from app.core.errors import ServiceUnavailable
+
+        raise ServiceUnavailable()
+
+    monkeypatch.setattr(control_plane, "record_incident_reopen_pulled", down)
+    assert breach_sync.sync_school(world.a.tenant_id) == 1
+    assert _reopen_pulled(incident).reopen_pulled == 0, "not reported yet"
+    monkeypatch.setattr(control_plane, "record_incident_reopen_pulled", real)
+    assert breach_sync.sync_school(world.a.tenant_id) == 0, "stored once"
+    assert _reopen_pulled(incident).reopen_pulled == 1
+    events = _reopen_events(admin_engine, world.a.tenant_id, row["id"])
+    assert len(events) == 1
+
+
+def test_D49_the_database_keeps_reopens_on_processor_notices(
+    world: Any, admin_engine: Engine
+) -> None:
+    with pytest.raises(Exception, match="breach_records_reopen"), admin_engine.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO ops.breach_records (id, tenant_id, origin, noticed_at, categories, "
+                "recorded_by, platform_reopen_seq, platform_reopened_at) SELECT :i, :t, 'school', "
+                "now(), ARRAY['contact'], user_id, 1, now() FROM core.memberships "
+                "WHERE tenant_id = :t LIMIT 1"
+            ),
+            {"i": uuid.uuid4(), "t": world.a.tenant_id},
+        )

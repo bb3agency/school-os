@@ -3631,6 +3631,24 @@
             ],
             "title": "Platform Incident Id"
           },
+          "platform_reopened_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When SchoolOS last reopened it.",
+            "title": "Platform Reopened At"
+          },
+          "platform_reopens": {
+            "description": "How many times SchoolOS reopened the incident behind this notice (D49).",
+            "title": "Platform Reopens",
+            "type": "integer"
+          },
           "processor_facts": {
             "anyOf": [
               {
@@ -3679,6 +3697,8 @@
           "duties",
           "next_duty",
           "processor_facts",
+          "platform_reopens",
+          "platform_reopened_at",
           "closed_at",
           "created_at",
           "version",
@@ -3776,6 +3796,24 @@
             ],
             "title": "Platform Incident Id"
           },
+          "platform_reopened_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When SchoolOS last reopened it.",
+            "title": "Platform Reopened At"
+          },
+          "platform_reopens": {
+            "description": "How many times SchoolOS reopened the incident behind this notice (D49).",
+            "title": "Platform Reopens",
+            "type": "integer"
+          },
           "processor_facts": {
             "anyOf": [
               {
@@ -3813,6 +3851,8 @@
           "duties",
           "next_duty",
           "processor_facts",
+          "platform_reopens",
+          "platform_reopened_at",
           "closed_at",
           "created_at",
           "version"
@@ -15115,6 +15155,18 @@
             "title": "Cert In Required",
             "type": "boolean"
           },
+          "close_blocked_by": {
+            "description": "Why closing would be refused now (D49): CERT-In not reported, or a school of the confirmed incident not notified. Empty when it can be closed.",
+            "items": {
+              "enum": [
+                "incident_cert_in_unreported",
+                "incident_school_not_notified"
+              ],
+              "type": "string"
+            },
+            "title": "Close Blocked By",
+            "type": "array"
+          },
           "confirm_by": {
             "anyOf": [
               {
@@ -15186,6 +15238,18 @@
             "title": "Id",
             "type": "string"
           },
+          "last_reopened_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Reopened At"
+          },
           "lead_operator_id": {
             "format": "uuid",
             "title": "Lead Operator Id",
@@ -15208,6 +15272,11 @@
             ],
             "description": "When the reopen request expires without a confirmation.",
             "title": "Reopen Confirm By"
+          },
+          "reopen_count": {
+            "description": "How many times two operators reopened this incident (D49).",
+            "title": "Reopen Count",
+            "type": "integer"
           },
           "reopen_reason": {
             "anyOf": [
@@ -15317,6 +15386,9 @@
           "second_confirmed_by",
           "confirmed_at",
           "confirm_by",
+          "reopen_count",
+          "last_reopened_at",
+          "close_blocked_by",
           "schools_count",
           "schools_notified",
           "created_at",
@@ -15410,6 +15482,18 @@
             "title": "Cert In Required",
             "type": "boolean"
           },
+          "close_blocked_by": {
+            "description": "Why closing would be refused now (D49): CERT-In not reported, or a school of the confirmed incident not notified. Empty when it can be closed.",
+            "items": {
+              "enum": [
+                "incident_cert_in_unreported",
+                "incident_school_not_notified"
+              ],
+              "type": "string"
+            },
+            "title": "Close Blocked By",
+            "type": "array"
+          },
           "confirm_by": {
             "anyOf": [
               {
@@ -15481,6 +15565,18 @@
             "title": "Id",
             "type": "string"
           },
+          "last_reopened_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Reopened At"
+          },
           "lead_operator_id": {
             "format": "uuid",
             "title": "Lead Operator Id",
@@ -15503,6 +15599,11 @@
             ],
             "description": "When the reopen request expires without a confirmation.",
             "title": "Reopen Confirm By"
+          },
+          "reopen_count": {
+            "description": "How many times two operators reopened this incident (D49).",
+            "title": "Reopen Count",
+            "type": "integer"
           },
           "reopen_reason": {
             "anyOf": [
@@ -15605,6 +15706,9 @@
           "second_confirmed_by",
           "confirmed_at",
           "confirm_by",
+          "reopen_count",
+          "last_reopened_at",
+          "close_blocked_by",
           "schools_count",
           "schools_notified",
           "created_at",
@@ -15846,6 +15950,23 @@
             ],
             "title": "Pulled At"
           },
+          "reopen_pulled": {
+            "description": "The incident's reopen count this school last stored (D49).",
+            "title": "Reopen Pulled",
+            "type": "integer"
+          },
+          "reopen_pulled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reopen Pulled At"
+          },
           "school_name": {
             "anyOf": [
               {
@@ -15921,7 +16042,9 @@
           "window_to",
           "school_notified_at",
           "pulled_at",
-          "notice_due_at"
+          "notice_due_at",
+          "reopen_pulled",
+          "reopen_pulled_at"
         ],
         "title": "IncidentSchoolOut",
         "type": "object"
