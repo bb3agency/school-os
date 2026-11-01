@@ -1978,6 +1978,7 @@
       "before_current_decision": "This date is before the decision already recorded. Check the date on the form.",
       "invalid_number": "Enter a whole number.",
       "before_noticed": "This can't be before the school noticed the breach.",
+      "only_when_closing": "Give a reason only when closing the breach.",
       "pulled_automatically": "Notices from SchoolOS arrive by themselves.",
       "aadhaar_full_number_rejected": "This looks like a full Aadhaar number. Remove it.",
       "timezone_required": "Choose a date and time.",
@@ -10953,6 +10954,10 @@
       "request_closed": {
         "title": "This request is closed",
         "body": "Closed requests cannot be changed. Log a new request if they ask again."
+      },
+      "request_decided": {
+        "title": "This request was already decided",
+        "body": "The report was released or the erasure was done, so it can't be changed or rebuilt. Close the request, or log a new one if they ask again."
       },
       "no_subject": {
         "title": "The person is no longer on record",

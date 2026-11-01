@@ -1978,6 +1978,7 @@
       "before_current_decision": "ఈ తేదీ ఇప్పటికే నమోదైన నిర్ణయం కంటే ముందుది. ఫారంలోని తేదీని తనిఖీ చేయండి.",
       "invalid_number": "పూర్ణ సంఖ్యను నమోదు చేయండి.",
       "before_noticed": "పాఠశాల ఉల్లంఘనను గమనించిన సమయం కంటే ముందు ఉండకూడదు.",
+      "only_when_closing": "Give a reason only when closing the breach.",
       "pulled_automatically": "SchoolOS నుండి నోటీసులు వాటంతట అవే వస్తాయి.",
       "aadhaar_full_number_rejected": "ఇది పూర్తి ఆధార్ నంబర్‌లా ఉంది. దాన్ని తీసివేయండి.",
       "timezone_required": "తేదీ మరియు సమయం ఎంచుకోండి.",
@@ -10953,6 +10954,10 @@
       "request_closed": {
         "title": "ఈ అభ్యర్థన మూసివేయబడింది",
         "body": "మూసివేసిన అభ్యర్థనలను మార్చలేరు. వారు మళ్లీ అడిగితే కొత్త అభ్యర్థనను నమోదు చేయండి."
+      },
+      "request_decided": {
+        "title": "This request was already decided",
+        "body": "The report was released or the erasure was done, so it can't be changed or rebuilt. Close the request, or log a new one if they ask again."
       },
       "no_subject": {
         "title": "ఆ వ్యక్తి ఇకపై రికార్డులో లేరు",
