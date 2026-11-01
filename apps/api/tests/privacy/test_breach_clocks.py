@@ -309,10 +309,17 @@ def test_D49_FR_DPDP_032_reopen_reopens_a_closed_school_breach_once(
         "status": "open",
     }
     assert event["actor_id"] is None
-    # The owner and principal are told once more; the register shows the reopen.
+    # The owner and principal are told once more, with the reopen message (not a second
+    # "new incident" notice); the register shows the reopen.
     assert (
         _notifications(admin_engine, world.a.tenant_id, "privacy.breach.notice_received", row["id"])
-        == 4
+        == 2
+    )
+    assert (
+        _notifications(
+            admin_engine, world.a.tenant_id, "privacy.breach.incident_reopened", row["id"]
+        )
+        == 2
     )
     detail = api.call(world.person("principal"), "GET", f"/api/v1/privacy/breaches/{row['id']}")
     assert detail.status_code == 200, detail.text

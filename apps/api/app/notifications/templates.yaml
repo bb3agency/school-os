@@ -452,6 +452,15 @@ templates:
     te:
       title: "అత్యవసరం: SchoolOS ఒక భద్రతా సంఘటనను తెలియజేసింది"
       body: మీ పాఠశాల రికార్డులపై ప్రభావం చూపే భద్రతా సంఘటనను SchoolOS నిర్ధారించింది. ప్రభావితమైన సమాచార రకాలు, బోర్డు మరియు కుటుంబాలకు తెలియజేయాల్సిన గడువులతో ఇది మీ ఉల్లంఘన రిజిస్టర్‌లో ఉంది. వెంటనే తెరవండి.
+  privacy.breach.incident_reopened:
+    params: [breach_id]
+    resource_type: breach_record
+    en:
+      title: "SchoolOS reopened a security incident"
+      body: SchoolOS reopened an incident it had closed. The breach in your register is open again for review. Check whether anything changes for the Board or families, then close it again.
+    te:
+      title: "SchoolOS ఒక భద్రతా సంఘటనను మళ్లీ తెరిచింది"
+      body: SchoolOS మూసివేసిన ఒక సంఘటనను మళ్లీ తెరిచింది. మీ రిజిస్టర్‌లోని ఉల్లంఘన సమీక్ష కోసం మళ్లీ తెరవబడింది. బోర్డు లేదా కుటుంబాల విషయంలో ఏమైనా మారుతుందో చూసి, మళ్లీ మూసివేయండి.
   privacy.breach.reminder:
     params: [breach_id, hours]
     resource_type: breach_record

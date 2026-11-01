@@ -696,7 +696,7 @@ def record_processor_reopen(
         session,
         tenant_id=tenant_id,
         recipients=OWNERS,
-        template_key="privacy.breach.notice_received",
+        template_key="privacy.breach.incident_reopened",
         params={"breach_id": row.id},
         resource_id=row.id,
         dedupe_key=f"privacy.breach.incident_reopened:{row.id}:{reopen_seq}",
