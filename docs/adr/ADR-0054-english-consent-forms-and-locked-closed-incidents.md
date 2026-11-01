@@ -19,7 +19,7 @@ Two behaviours of the R3 privacy pack, found in the 2026-10-27 bug sweep, were n
 1. **Consent forms (D47).** While `SOS_TELUGU_ENABLED` is off, consent forms and their PDFs MUST be English, whatever the school's parent language or the `language` asked for. When the switch is on, the asked language is used, else the school's parent language. The language is read only through `app.core.languages` (CLAUDE.md §1).
 2. **Closed incidents (D48).** Once a SchoolOS incident is `closed`:
    - it MUST NOT be changed: `PATCH`, adding schools and confirming answer 409 `incident_closed`;
-   - it MAY be reopened only by a recorded two-person action: one operator with `platform.incidents.manage` requests it with a reason (the summary rule applies: categories and counts only, no long numbers, e-mail addresses or Aadhaar numbers), a **different** eligible operator confirms it within the two-person window, and the requester may withdraw it before then;
+   - it MAY be reopened only by a recorded two-person action: one operator with `platform.incidents.manage` requests it with a reason (the summary rule applies: categories and counts only, no long numbers, e-mail addresses or Aadhaar numbers), a **different** eligible operator confirms it within the two-person window (`two_person_request_ttl_hours`, `app/platform/roles.yaml`); any operator with `platform.incidents.manage` may withdraw a pending or expired request, which leaves the incident closed;
    - each step is written to the platform audit chain (`incident.reopen_requested`, `incident.reopened`, `incident.reopen_withdrawn`), without the reason text;
    - the database enforces that a pending reopen exists only on a closed incident and that its reason follows the summary rule (`0068_incident_reopen`).
 
