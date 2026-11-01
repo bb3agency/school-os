@@ -47,6 +47,7 @@ import { FlagSwitch } from "./FlagSwitch";
 import { HeartbeatPill } from "./HeartbeatPill";
 import { Figure, Mono, MonoTime, TierTag } from "./pills";
 import { ShowMore } from "./ShowMore";
+import { AiQuotaAlerts } from "./AiQuotaAlerts";
 import { UsageTable } from "./UsageTable";
 
 /* ------------------------------------------------------------------ usage */
@@ -76,6 +77,10 @@ export function UsageScreen({ filters = {} }: { filters?: UsageFilters }) {
   const usage = useApiQuery([...PK.usage, "list", query], () =>
     unwrap(api.GET("/api/v1/platform/usage", { params: { query } })),
   );
+  // ADR-0038 follow-up (docs/16 §19 Q16): schools at 80 % or 100 % of their included answers.
+  const quotaAlerts = useApiQuery([...PK.usage, "ai-quota-alerts"], () =>
+    unwrap(api.GET("/api/v1/platform/usage/ai-quota-alerts")),
+  );
   return (
     <div className="space-y-6">
       <PageHeader
@@ -83,6 +88,7 @@ export function UsageScreen({ filters = {} }: { filters?: UsageFilters }) {
         description={t("description")}
         breadcrumb={[{ label: tn("dashboard"), href: "/platform" }, { label: t("title") }]}
       />
+      <AiQuotaAlerts alerts={quotaAlerts} schoolName={nameOf} />
       <UsageTable
         toolbar={
           <FilterCard

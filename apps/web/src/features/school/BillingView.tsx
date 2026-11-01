@@ -47,7 +47,8 @@ function isMetric(value: string): value is Metric {
 /**
  * The school's AI answer bundle (ADR-0038, docs/16 §5.18): name, included answers, this
  * month's answers against them, and the ex-GST prices. Facts from the API only: no cost
- * estimate, no tokens.
+ * estimate, no tokens. A quota alert (80 % or all of the included answers used this month,
+ * recorded by the control plane; ADR-0038 follow-up, docs/16 §19 Q16) shows above the meter.
  */
 function AiAnswersCard({ bundle }: { bundle: SchoolAiBundle | null }) {
   const t = useTranslations("school.billing.ai");
@@ -85,6 +86,18 @@ function AiAnswersCard({ bundle }: { bundle: SchoolAiBundle | null }) {
             </dd>
           </div>
         </dl>
+        {bundle.quota_alert === 100 ? (
+          <Alert
+            tone="warning"
+            title={t("quotaUsedUp", { amount: formatInr(bundle.overage_rate_inr, locale) ?? "" })}
+          >
+            {t("quotaUsedUpBody", { amount: formatInr(bundle.overage_rate_inr, locale) ?? "" })}
+          </Alert>
+        ) : bundle.quota_alert === 80 ? (
+          <Alert tone="info" title={t("quotaNear")}>
+            {t("quotaNearBody", { included })}
+          </Alert>
+        ) : null}
         {bundle.answers_used !== null ? (
           <div className="space-y-2">
             <UsageMeter

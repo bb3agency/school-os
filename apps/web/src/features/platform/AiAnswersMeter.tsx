@@ -2,6 +2,7 @@
 
 import type { TenantAiAnswers } from "@schoolos/api-client";
 import { useLocale, useTranslations } from "next-intl";
+import { Alert } from "@/components/ui/Alert";
 import { Card } from "@/components/ui/Card";
 import { UsageMeter } from "@/components/ui/UsageMeter";
 import { formatCount, formatDate, formatInr } from "@/lib/format";
@@ -12,7 +13,9 @@ import type { Loadable } from "@/lib/loadable";
  * ADR-0038): answers so far, the included quota, extra answers and their ex-GST overage, billed
  * on the next invoice. The same numbers the school sees on its Plan and billing page; counts
  * and catalogue prices only, straight from the API (no estimate, no tokens). Hidden while the
- * request is loading or failed: the usage table below carries its own states.
+ * request is loading or failed: the usage table below carries its own states. A quota alert
+ * (80 % or all of the included answers used this month; ADR-0038 follow-up, docs/16 §19 Q16)
+ * shows above the meter.
  */
 export function AiAnswersMeter({ answers }: { answers: Loadable<TenantAiAnswers> }) {
   const t = useTranslations("platform.usage.ai");
@@ -37,6 +40,18 @@ export function AiAnswersMeter({ answers }: { answers: Loadable<TenantAiAnswers>
     >
       <div className="space-y-4">
         <p className="font-semibold text-ink">{t("bundleName", { name: bundle.name })}</p>
+        {bundle.quota_alert ? (
+          <Alert
+            tone={bundle.quota_alert === 100 ? "warning" : "info"}
+            title={
+              bundle.quota_alert === 100
+                ? t("quotaUsedUp", { amount: formatInr(bundle.overage_rate_inr, locale) ?? "" })
+                : t("quotaNear")
+            }
+          >
+            {t("quotaNote")}
+          </Alert>
+        ) : null}
         {counting ? (
           <>
             <UsageMeter

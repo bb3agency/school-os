@@ -685,7 +685,11 @@
         "notCountedYet": "No answers counted yet this month. Each day is added the next morning.",
         "countsFrom": "Answers count against this bundle from {date}.",
         "overageNote": "Answers above the included number are billed on the next month's invoice. To change the bundle, contact SchoolOS support.",
-        "extraSoFar": "{count, plural, one {{extra} extra answer} other {{extra} extra answers}} so far this month: {amount} plus GST, billed on next month's invoice."
+        "extraSoFar": "{count, plural, one {{extra} extra answer} other {{extra} extra answers}} so far this month: {amount} plus GST, billed on next month's invoice.",
+        "quotaNear": "80% of this month's answers used",
+        "quotaNearBody": "Your school has used 80% of the {included} answers in its bundle this month. Ask keeps answering; answers above the included number are billed on next month's invoice.",
+        "quotaUsedUp": "All included answers used; extra answers are {amount} each",
+        "quotaUsedUpBody": "Ask keeps answering. Each extra answer costs {amount} plus GST and is billed on next month's invoice. To change the bundle, contact SchoolOS support."
       },
       "invoicesNote": "Your last 24 invoices, newest first. For an older invoice, contact SchoolOS support."
     },
@@ -1459,7 +1463,18 @@
         "overage": "Overage so far (before GST)",
         "countedTo": "Counted up to {date}. Extra answers are billed on the next invoice at {rate} each.",
         "notCountedYet": "No day of this month has been collected yet.",
-        "countsFrom": "Answers count against this bundle from {date}."
+        "countsFrom": "Answers count against this bundle from {date}.",
+        "quotaNear": "80% of this month's included answers used",
+        "quotaUsedUp": "All included answers used; extra answers are billed at {amount} each",
+        "quotaNote": "The school's owner and principal are told in the app. Alert only: nothing is switched off."
+      },
+      "quota": {
+        "title": "AI answer quota alerts this month",
+        "description": "Schools that used 80% or all of their bundle's included answers since {month}. Counts only.",
+        "none": "No school has used 80% of its included answers this month.",
+        "near": "80% used",
+        "usedUp": "All used",
+        "usedOf": "{used} of {included}"
       }
     },
     "flags": {

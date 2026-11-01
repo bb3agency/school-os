@@ -39,6 +39,31 @@ describe("AiAnswersMeter", () => {
     expect(document.body.textContent).not.toMatch(/token/i);
   });
 
+  it("shows the month's quota alert (ADR-0038 follow-up, docs/16 §19 Q16)", () => {
+    const { unmount } = renderWithIntl(
+      <AiAnswersMeter
+        answers={ready<TenantAiAnswers>({ tenant_id: T, bundle: { ...bundle, quota_alert: 100 } })}
+      />,
+    );
+    expect(
+      screen.getByText("All included answers used; extra answers are billed at ₹1.50 each"),
+    ).toBeInTheDocument();
+    expect(screen.getByText(um.quotaNote)).toBeInTheDocument();
+    unmount();
+    const near = renderWithIntl(
+      <AiAnswersMeter
+        answers={ready<TenantAiAnswers>({
+          tenant_id: T,
+          bundle: { ...bundle, answers_used: 800, extra_answers: 0, quota_alert: 80 },
+        })}
+      />,
+    );
+    expect(screen.getByText(um.quotaNear)).toBeInTheDocument();
+    near.unmount();
+    renderWithIntl(<AiAnswersMeter answers={ready<TenantAiAnswers>({ tenant_id: T, bundle })} />);
+    expect(screen.queryByText(um.quotaNote)).toBeNull();
+  });
+
   it("before the bundle counts: no meter, says when counting starts", () => {
     renderWithIntl(
       <AiAnswersMeter
