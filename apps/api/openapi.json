@@ -15196,6 +15196,55 @@
             "title": "Opened At",
             "type": "string"
           },
+          "reopen_confirm_by": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the reopen request expires without a confirmation.",
+            "title": "Reopen Confirm By"
+          },
+          "reopen_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reopen Reason"
+          },
+          "reopen_requested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reopen Requested At"
+          },
+          "reopen_requested_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The operator asking to reopen this closed incident (D48).",
+            "title": "Reopen Requested By"
+          },
           "schools": {
             "items": {
               "$ref": "#/components/schemas/IncidentSchoolOut"
@@ -15442,6 +15491,55 @@
             "title": "Opened At",
             "type": "string"
           },
+          "reopen_confirm_by": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the reopen request expires without a confirmation.",
+            "title": "Reopen Confirm By"
+          },
+          "reopen_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reopen Reason"
+          },
+          "reopen_requested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reopen Requested At"
+          },
+          "reopen_requested_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The operator asking to reopen this closed incident (D48).",
+            "title": "Reopen Requested By"
+          },
           "schools_count": {
             "title": "Schools Count",
             "type": "integer"
@@ -15612,6 +15710,23 @@
           }
         },
         "title": "IncidentPatch",
+        "type": "object"
+      },
+      "IncidentReopenIn": {
+        "additionalProperties": false,
+        "description": "Ask to reopen a closed incident (D48). ``reason``: why, in categories and counts only (no\nnames, numbers, e-mail addresses or record text).",
+        "properties": {
+          "reason": {
+            "maxLength": 500,
+            "minLength": 10,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "IncidentReopenIn",
         "type": "object"
       },
       "IncidentSchoolIn": {
@@ -65599,6 +65714,220 @@
           }
         },
         "summary": "Confirm Incident",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/incidents/{incident_id}/reopen": {
+      "post": {
+        "description": "Ask to reopen a closed incident (D48). A closed incident is locked (PATCH answers\n``409 incident_closed``); it opens again only when a different operator confirms. The reason\nholds categories and counts only (422 otherwise). ``409 incident_not_closed`` or\n``reopen_requested``.",
+        "operationId": "request_incident_reopen_api_v1_platform_incidents__incident_id__reopen_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentReopenIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Request Incident Reopen",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/incidents/{incident_id}/reopen:confirm": {
+      "post": {
+        "description": "A second, different operator confirms the reopen (SEC-029); the status goes back to\n``open``. ``409 no_reopen_request``, ``same_operator``, ``request_expired``,\n``requester_not_authorised`` or ``approver_not_eligible``.",
+        "operationId": "confirm_incident_reopen_api_v1_platform_incidents__incident_id__reopen_confirm_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Confirm Incident Reopen",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/incidents/{incident_id}/reopen:withdraw": {
+      "post": {
+        "description": "Withdraw a waiting (or expired) reopen request; the incident stays closed.\n``409 no_reopen_request``.",
+        "operationId": "withdraw_incident_reopen_api_v1_platform_incidents__incident_id__reopen_withdraw_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Withdraw Incident Reopen",
         "tags": [
           "platform"
         ]

@@ -484,6 +484,9 @@ IDEMPOTENCY_EXEMPT = {
     "draft on purpose (the AI draft may be redone); nothing is sent",
     ("POST", "/api/v1/platform/incidents/{incident_id}/schools"): "an upsert keyed by the "
     "school; repeating it changes nothing",
+    # R3-2F (D48): the first step of a two-operator reopen on an existing incident.
+    ("POST", "/api/v1/platform/incidents/{incident_id}/reopen"): "a state transition: a repeat "
+    "answers 409 reopen_requested",
     ("POST", "/api/v1/edge/tally/enrol"): "machine route; the one-time code is consumed",
     ("POST", "/api/v1/edge/tally/syncs"): "machine route; sync ids are unique per device",
     ("POST", "/api/v1/sections/{section_id}/attendance"): "an upsert keyed by student and day",

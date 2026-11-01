@@ -17,6 +17,13 @@ schools see the notice: each school's worker pulls it through :mod:`app.platform
 notified; clock confirmation + 24 h). A dedicated host has no pull: the operator records the
 phone or e-mail notice with ``notified_tenant_ids``. The control plane never writes tenant
 tables (ADR-0020). Every change is audited in the platform chain in the same transaction.
+
+A ``closed`` incident is locked (D48): PATCH, adding a school and confirming answer 409
+``incident_closed``. Reopening is a two-person action: one operator requests it with a reason
+(the summary's rule: categories and counts only), a different operator confirms it with the same
+SEC-029 checks as the incident's own confirmation; the request can be withdrawn. The confirmation
+sets the status back to ``open``. Audit ``incident.reopen_requested``, ``incident.reopened`` and
+``incident.reopen_withdrawn`` (never the reason text).
 """
 
 from __future__ import annotations
@@ -132,6 +139,18 @@ class IncidentPatch(_In):
         return None if value is None else check_summary(value)
 
 
+class IncidentReopenIn(_In):
+    """Ask to reopen a closed incident (D48). ``reason``: why, in categories and counts only (no
+    names, numbers, e-mail addresses or record text)."""
+
+    reason: str = Field(min_length=10, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def _clean(cls, value: str) -> str:
+        return check_summary(value)
+
+
 class IncidentSchoolIn(_In):
     tenant_id: uuid.UUID
     categories: list[Category] = Field(min_length=1, max_length=10)
@@ -184,6 +203,14 @@ class IncidentOut(_Out):
     confirm_by: dt.datetime | None = Field(
         description="When the first confirmation expires without a second one."
     )
+    reopen_requested_by: uuid.UUID | None = Field(
+        default=None, description="The operator asking to reopen this closed incident (D48)."
+    )
+    reopen_requested_at: dt.datetime | None = None
+    reopen_reason: str | None = None
+    reopen_confirm_by: dt.datetime | None = Field(
+        default=None, description="When the reopen request expires without a confirmation."
+    )
     schools_count: int
     schools_notified: int
     created_at: dt.datetime | None
@@ -234,6 +261,7 @@ def _out(row: Any, counts: tuple[int, int]) -> dict[str, Any]:
     )
     waiting = data["confirmed_by"] is not None and data["confirmed_at"] is None
     data["confirm_by"] = two_person.expires_at(data["first_confirmed_at"]) if waiting else None
+    data["reopen_confirm_by"] = two_person.expires_at(data.get("reopen_requested_at"))
     data["schools_count"], data["schools_notified"] = counts
     return data
 
@@ -270,6 +298,16 @@ def _locked(s: Any, incident_id: uuid.UUID) -> Any:
     if row is None:
         raise NotFound("Incident not found")
     return row
+
+
+def _not_closed(row: Any) -> None:
+    """D48: a closed incident is locked; it changes only through a two-operator reopen."""
+    if row["status"] == "closed":
+        raise Conflict(
+            "This incident is closed and can no longer be changed. Ask to reopen it; a second "
+            "operator must confirm.",
+            code="incident_closed",
+        )
 
 
 def _operator_ok(s: Any, operator_id: uuid.UUID) -> None:
@@ -354,6 +392,7 @@ def update_incident(
         row = _locked(s, incident_id)
         if row["version"] != expected_version:
             raise PreconditionFailed("Someone else changed this incident. Reload it.")
+        _not_closed(row)
         values: dict[str, Any] = {}
         for field in ("severity", "status", "summary", "cert_in_required", "lead_operator_id"):
             value = getattr(data, field)
@@ -420,6 +459,7 @@ def add_school(actor: Actor, incident_id: uuid.UUID, data: IncidentSchoolIn) -> 
     confirmation so both operators confirm the new list. Audit ``incident.school_added``."""
     with platform_session() as s, db_errors():
         row = _locked(s, incident_id)
+        _not_closed(row)
         if row["confirmed_at"] is not None:
             raise Conflict(
                 "Two operators already confirmed the affected schools. Open a follow-up "
@@ -472,6 +512,7 @@ def confirm(actor: Actor, incident_id: uuid.UUID) -> IncidentDetailOut:
     two-person checks of :mod:`app.platform.two_person`. Audit ``incident.confirmed``."""
     with platform_session() as s, db_errors():
         row = _locked(s, incident_id)
+        _not_closed(row)
         if row["confirmed_at"] is not None:
             raise Conflict("The affected schools are already confirmed.", code="incident_confirmed")
         t = m.incident_schools
@@ -509,6 +550,108 @@ def confirm(actor: Actor, incident_id: uuid.UUID) -> IncidentDetailOut:
             "incident",
             incident_id,
             {"confirmation": step, "schools": int(count)},
+        )
+        return _detail(s, row)
+
+
+# --- reopening a closed incident (D48) ---------------------------------------------------------
+
+_NO_REQUEST: Final[dict[str, Any]] = {
+    "reopen_requested_by": None,
+    "reopen_requested_at": None,
+    "reopen_reason": None,
+}
+
+
+def request_reopen(
+    actor: Actor, incident_id: uuid.UUID, data: IncidentReopenIn
+) -> IncidentDetailOut:
+    """First step of a reopen (D48): records who asked, when and why. The incident stays
+    ``closed`` until a different operator confirms. 409 ``incident_not_closed`` or
+    ``reopen_requested`` (one request at a time; withdraw it first). Audit
+    ``incident.reopen_requested`` (never the reason text)."""
+    with platform_session() as s, db_errors():
+        row = _locked(s, incident_id)
+        if row["status"] != "closed":
+            raise Conflict("Only a closed incident can be reopened.", code="incident_not_closed")
+        if row["reopen_requested_by"] is not None:
+            raise Conflict(
+                "A reopen request is already waiting. Confirm or withdraw it.",
+                code="reopen_requested",
+            )
+        row = repo.update_row(
+            s,
+            m.incidents,
+            incident_id,
+            {
+                "reopen_requested_by": must(actor.operator_id),
+                "reopen_requested_at": now(),
+                "reopen_reason": data.reason,
+                "updated_at": now(),
+            },
+        )
+        audit_platform(
+            s,
+            actor,
+            "incident.reopen_requested",
+            "incident",
+            incident_id,
+            {"reason_length": len(data.reason)},
+        )
+        return _detail(s, row)
+
+
+def _pending(row: Any) -> uuid.UUID:
+    requested_by: uuid.UUID | None = row["reopen_requested_by"]
+    if row["status"] != "closed" or requested_by is None:
+        raise Conflict("There is no reopen request waiting.", code="no_reopen_request")
+    return requested_by
+
+
+def confirm_reopen(actor: Actor, incident_id: uuid.UUID) -> IncidentDetailOut:
+    """Second step (D48): a different operator holding ``platform.incidents.manage`` confirms;
+    the status goes back to ``open``. 409 ``no_reopen_request``, ``same_operator`` and the
+    two-person checks of :mod:`app.platform.two_person`. Audit ``incident.reopened``."""
+    with platform_session() as s, db_errors():
+        row = _locked(s, incident_id)
+        requested_by = _pending(row)
+        if requested_by == actor.operator_id:
+            raise Conflict("A different operator must confirm the reopen.", code="same_operator")
+        two_person.check_second_step(
+            s,
+            first_operator_id=requested_by,
+            approver_id=actor.operator_id,
+            permission=MANAGE,
+            requested_at=row["reopen_requested_at"],
+        )
+        row = repo.update_row(
+            s, m.incidents, incident_id, {"status": "open", "updated_at": now()} | _NO_REQUEST
+        )
+        audit_platform(
+            s,
+            actor,
+            "incident.reopened",
+            "incident",
+            incident_id,
+            {"requested_by": str(requested_by), "status": "open"},
+        )
+        return _detail(s, row)
+
+
+def withdraw_reopen(actor: Actor, incident_id: uuid.UUID) -> IncidentDetailOut:
+    """Withdraw a waiting reopen request (also an expired one); the incident stays closed.
+    409 ``no_reopen_request``. Audit ``incident.reopen_withdrawn``."""
+    with platform_session() as s, db_errors():
+        row = _locked(s, incident_id)
+        requested_by = _pending(row)
+        row = repo.update_row(s, m.incidents, incident_id, {"updated_at": now()} | _NO_REQUEST)
+        audit_platform(
+            s,
+            actor,
+            "incident.reopen_withdrawn",
+            "incident",
+            incident_id,
+            {"requested_by": str(requested_by)},
         )
         return _detail(s, row)
 
@@ -573,15 +716,19 @@ __all__ = [
     "IncidentIn",
     "IncidentOut",
     "IncidentPatch",
+    "IncidentReopenIn",
     "IncidentSchoolIn",
     "SchoolIncidentNotice",
     "add_school",
     "check_summary",
     "confirm",
+    "confirm_reopen",
     "create_incident",
     "get_incident",
     "list_incidents",
     "mark_notice_pulled",
     "notices_for_school",
+    "request_reopen",
     "update_incident",
+    "withdraw_reopen",
 ]

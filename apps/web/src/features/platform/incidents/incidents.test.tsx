@@ -4,7 +4,13 @@ import type * as Navigation from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
 import { messages, renderWithIntl } from "@/test/render";
-import { confirmationOf, incidentSummary, type Incident, type IncidentDetail } from "./data";
+import {
+  confirmationOf,
+  incidentSummary,
+  reopenOf,
+  type Incident,
+  type IncidentDetail,
+} from "./data";
 import { IncidentDetailScreen } from "./IncidentDetailScreen";
 import { IncidentsScreen } from "./IncidentsScreen";
 
@@ -203,5 +209,97 @@ describe("two-person confirmation (SEC-029)", () => {
     const call = stub.callsTo(`PATCH /bff/api/v1/platform/incidents/${INC}`)[0];
     expect(call?.headers.get("if-match")).toBe('"5"');
     expect(JSON.parse(call?.body ?? "{}")).toHaveProperty("cert_in_reported_at");
+  });
+});
+
+describe("a closed incident is locked; reopening takes two operators (D48)", () => {
+  const closed = (extra: Partial<IncidentDetail> = {}) =>
+    detail({ status: "closed", confirmed_at: "2026-10-21T05:00:00Z", ...extra });
+  const waiting = (by: string) =>
+    closed({
+      reopen_requested_by: by,
+      reopen_requested_at: "2026-10-21T05:30:00Z",
+      reopen_confirm_by: "2026-10-24T05:30:00Z",
+      reopen_reason: "A second school reported the same exposure",
+    });
+
+  it("knows who asked to reopen", () => {
+    expect(reopenOf(waiting(OP), OP)).toMatchObject({ state: "waiting", mine: true });
+    expect(reopenOf(waiting(OP), OTHER)).toMatchObject({ state: "waiting", mine: false });
+    expect(reopenOf(closed(), OP)).toEqual({ state: "none" });
+    expect(reopenOf(incident({ reopen_requested_by: OP }), OP)).toEqual({ state: "none" });
+  });
+
+  it("shows a closed incident read-only, with only the reopen request", async () => {
+    setPermissions(["platform.incidents.read", "platform.incidents.manage"]);
+    stub.routes[`GET /bff/api/v1/platform/incidents/${INC}`] = () => Response.json(closed());
+    stub.routes[`POST /bff/api/v1/platform/incidents/${INC}/reopen`] = () =>
+      Response.json(waiting(OP));
+    const user = userEvent.setup();
+    renderWithIntl(<IncidentDetailScreen incidentId={INC} />);
+    expect(await screen.findByText(im.closedLocked)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: im.changeStatus })).toBeNull();
+    expect(screen.queryByRole("button", { name: im.recordReport })).toBeNull();
+    expect(screen.queryByRole("button", { name: im.recordNotified })).toBeNull();
+    expect(screen.queryByRole("button", { name: im.confirmReopen })).toBeNull();
+    await user.click(screen.getByRole("button", { name: im.requestReopen }));
+    const dialog = screen.getByRole("dialog", { name: im.requestReopenTitle });
+    const reason = within(dialog).getByLabelText(im.reopenReasonLabel);
+    await user.type(reason, "Parent 9876543210 called again");
+    await user.click(within(dialog).getByRole("button", { name: im.requestReopen }));
+    expect(
+      await within(dialog).findByText(messages.en.validation.summaryPersonalData),
+    ).toBeInTheDocument();
+    expect(stub.callsTo(`POST /bff/api/v1/platform/incidents/${INC}/reopen`)).toEqual([]);
+    await user.clear(reason);
+    await user.type(reason, "A second school reported the same exposure");
+    await user.click(within(dialog).getByRole("button", { name: im.requestReopen }));
+    await waitFor(() =>
+      expect(stub.callsTo(`POST /bff/api/v1/platform/incidents/${INC}/reopen`)).toHaveLength(1),
+    );
+    const call = stub.callsTo(`POST /bff/api/v1/platform/incidents/${INC}/reopen`)[0];
+    expect(JSON.parse(call?.body ?? "{}")).toEqual({
+      reason: "A second school reported the same exposure",
+    });
+  });
+
+  it("the operator who asked sees no confirm button but can withdraw", async () => {
+    setPermissions(["platform.incidents.read", "platform.incidents.manage"]);
+    stub.routes[`GET /bff/api/v1/platform/incidents/${INC}`] = () => Response.json(waiting(OP));
+    renderWithIntl(<IncidentDetailScreen incidentId={INC} />);
+    expect(await screen.findByText(im.youRequestedReopen)).toBeInTheDocument();
+    expect(screen.getByText(/A second school reported the same exposure/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: im.confirmReopen })).toBeNull();
+    expect(screen.queryByRole("button", { name: im.requestReopen })).toBeNull();
+    expect(screen.getByRole("button", { name: im.withdrawReopen })).toBeInTheDocument();
+  });
+
+  it("a different operator confirms; a refusal is explained", async () => {
+    setPermissions(["platform.incidents.read", "platform.incidents.manage"]);
+    stub.routes[`GET /bff/api/v1/platform/incidents/${INC}`] = () => Response.json(waiting(OTHER));
+    stub.routes[`POST /bff/api/v1/platform/incidents/${INC}/reopen:confirm`] = () =>
+      problem(409, "approver_not_eligible");
+    const user = userEvent.setup();
+    renderWithIntl(<IncidentDetailScreen incidentId={INC} />);
+    await user.click(await screen.findByRole("button", { name: im.confirmReopen }));
+    const dialog = screen.getByRole("dialog", { name: im.confirmReopenTitle });
+    await user.click(within(dialog).getByRole("button", { name: im.confirmReopen }));
+    await waitFor(() =>
+      expect(
+        stub.callsTo(`POST /bff/api/v1/platform/incidents/${INC}/reopen:confirm`),
+      ).toHaveLength(1),
+    );
+    expect(
+      await within(dialog).findByText(messages.en.errors.api.approver_not_eligible.title),
+    ).toBeInTheDocument();
+  });
+
+  it("a reader sees the closed state and no reopen actions", async () => {
+    setPermissions(["platform.incidents.read"]);
+    stub.routes[`GET /bff/api/v1/platform/incidents/${INC}`] = () => Response.json(waiting(OTHER));
+    renderWithIntl(<IncidentDetailScreen incidentId={INC} />);
+    expect(await screen.findByText(im.closedLocked)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: im.confirmReopen })).toBeNull();
+    expect(screen.queryByRole("button", { name: im.withdrawReopen })).toBeNull();
   });
 });
