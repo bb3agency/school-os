@@ -8,6 +8,10 @@ incident), and after that transaction commits tells the control plane, which rec
 school was notified. A notice stored but not reported is reported by the next sweep; a
 control-plane outage only delays the pull. The control plane never writes tenant tables
 (ADR-0020). This is the only file of ``app.privacy`` that imports the control plane.
+
+A reopened incident comes back with its reopen count (D49 part 3): the school records it on its
+breach (``breach_service.record_processor_reopen``: once per reopen; a closed breach opens again
+for review) and then reports it (``record_incident_reopen_pulled``). Repeated pulls add nothing.
 """
 
 from __future__ import annotations
@@ -26,11 +30,17 @@ from app.privacy import breach_service
 log = get_logger(__name__)
 
 
-def _report_pulled(tenant_id: uuid.UUID, incident_ids: Sequence[uuid.UUID]) -> int:
+def _report_pulled(
+    tenant_id: uuid.UUID, notices: Sequence[control_plane.SchoolIncidentNotice]
+) -> int:
     done = 0
-    for incident_id in incident_ids:
+    for n in notices:
         try:
-            if control_plane.record_incident_notice_pulled(tenant_id, incident_id):
+            if control_plane.record_incident_notice_pulled(tenant_id, n.incident_id):
+                done += 1
+            if n.reopen_seq > 0 and control_plane.record_incident_reopen_pulled(
+                tenant_id, n.incident_id, n.reopen_seq
+            ):
                 done += 1
         except (SQLAlchemyError, DomainError) as exc:  # the next sweep retries
             log.warning("privacy.breach_report_failed", error_type=type(exc).__name__)
@@ -39,7 +49,7 @@ def _report_pulled(tenant_id: uuid.UUID, incident_ids: Sequence[uuid.UUID]) -> i
 
 def sync_school(tenant_id: uuid.UUID) -> int:
     """Pull this school's confirmed SchoolOS notices into its register (shared platform only).
-    Returns how many were new."""
+    Returns how many were new (new notices and newly recorded reopens)."""
     if not breach_service.control_plane_here():
         return 0
     notices = control_plane.incident_notices_for_school(tenant_id)
@@ -63,7 +73,19 @@ def sync_school(tenant_id: uuid.UUID) -> int:
             )
             if created is not None:
                 received += 1
-    _report_pulled(tenant_id, [n.incident_id for n in notices])
+            if (
+                n.reopen_seq > 0
+                and n.reopened_at is not None
+                and breach_service.record_processor_reopen(
+                    session,
+                    tenant_id,
+                    incident_id=n.incident_id,
+                    reopen_seq=n.reopen_seq,
+                    reopened_at=n.reopened_at,
+                )
+            ):
+                received += 1
+    _report_pulled(tenant_id, notices)
     if received:
         log.info("privacy.breach.notices_received", count=received)
     return received

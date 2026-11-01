@@ -581,6 +581,9 @@ incidents = Table(
     Column("reopen_requested_by", Uuid),
     Column("reopen_requested_at", DateTime(timezone=True)),
     Column("reopen_reason", Text),
+    # 0069_incident_reopen_notice (D49): confirmed reopens, pulled by each school.
+    Column("reopen_count", Integer, nullable=False),
+    Column("last_reopened_at", DateTime(timezone=True)),
     Column("created_at", DateTime(timezone=True)),
     Column("updated_at", DateTime(timezone=True)),
     Column("version", Integer),
@@ -598,5 +601,8 @@ incident_schools = Table(
     Column("window_to", DateTime(timezone=True)),
     Column("school_notified_at", DateTime(timezone=True)),
     Column("pulled_at", DateTime(timezone=True)),
+    # 0069_incident_reopen_notice (D49): the reopen count this school last stored.
+    Column("reopen_pulled", Integer, nullable=False),
+    Column("reopen_pulled_at", DateTime(timezone=True)),
     Column("created_at", DateTime(timezone=True)),
 )

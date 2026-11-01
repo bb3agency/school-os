@@ -8,6 +8,10 @@
   control-plane outage only delays it), or recorded by hand on a dedicated host. Only
   ``breach_sync`` imports the control plane. The owner and principal get an urgent in-app
   notification.
+- **SchoolOS reopens (D49 part 3).** When two operators reopen a closed incident, the next pull
+  records it on the school's breach for that incident (:func:`record_processor_reopen`: the
+  reopen count and time, once per reopen) and a closed breach goes back to ``open`` for review;
+  the school closes it again as usual. Nothing else changes (categories and counts as before).
 - **Texts are C3 (invariant 5).** The description and containment steps are encrypted with the
   school's DEK (AAD ``ops.breach_records|<column>|<id>``; re-encrypted on key rotation) and never
   logged or audited; audit summaries carry ids, origins, codes, counts and field names only.
@@ -243,6 +247,8 @@ def _base(row: BreachRecord, at: dt.datetime) -> dict[str, Any]:
         "duties": duties,
         "next_duty": _next_duty(row, duties, at),
         "processor_facts": _facts(row),
+        "platform_reopens": row.platform_reopen_seq,
+        "platform_reopened_at": row.platform_reopened_at,
         "closed_at": row.closed_at,
         "created_at": row.created_at,
         "version": row.version,
@@ -649,6 +655,55 @@ def store_processor_notice(
     return created
 
 
+def record_processor_reopen(
+    session: Session,
+    tenant_id: uuid.UUID,
+    *,
+    incident_id: uuid.UUID,
+    reopen_seq: int,
+    reopened_at: dt.datetime,
+) -> bool:
+    """SchoolOS reopened the incident behind this school's notice (D49 part 3): record reopen
+    ``reopen_seq`` on the breach once, and reopen a closed breach for review (``open``; the
+    school closes it again). False when the school holds no notice for the incident or already
+    stored this reopen. Audit ``privacy.breach.incident_reopened`` (actor ``platform``; ids,
+    the count and the status change) and an urgent notification to the owner and principal."""
+    row = repo.get_by_incident(session, incident_id, lock=True)
+    if row is None or reopen_seq < 1 or row.platform_reopen_seq >= reopen_seq:
+        return False
+    status_before = row.status
+    values: dict[str, Any] = {
+        "platform_reopen_seq": reopen_seq,
+        "platform_reopened_at": reopened_at,
+    }
+    if row.status == "closed":
+        values |= {"status": "open", "closed_at": None}
+    row = repo.update_record(session, row.id, **values)
+    audit.record(
+        session,
+        action="privacy.breach.incident_reopened",
+        resource_type=RESOURCE,
+        resource_id=row.id,
+        summary={
+            "platform_incident_id": incident_id,
+            "reopen": reopen_seq,
+            "status_before": status_before,
+            "status": row.status,
+        },
+        actor_type="platform",
+    )
+    notifications.notify(
+        session,
+        tenant_id=tenant_id,
+        recipients=OWNERS,
+        template_key="privacy.breach.notice_received",
+        params={"breach_id": row.id},
+        resource_id=row.id,
+        dedupe_key=f"privacy.breach.incident_reopened:{row.id}:{reopen_seq}",
+    )
+    return True
+
+
 # --- reminders (FR-DPDP-035) --------------------------------------------------------------------
 
 
@@ -753,6 +808,7 @@ __all__ = [
     "get_breach",
     "list_breaches",
     "purge_tenant_data",
+    "record_processor_reopen",
     "reencrypt_batch",
     "send_reminders",
     "set_affected",

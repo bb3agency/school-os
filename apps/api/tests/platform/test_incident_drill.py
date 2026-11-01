@@ -10,9 +10,10 @@ different operators confirm (C) → the shared school's worker pulls the notice 
 from C: Board notice C + 24 h, detailed report C + 72 h) → the dedicated school is told by phone
 and recorded → CERT-In reported inside 6 h → reminders at C + 24 h and C + 60 h, once each →
 the school records the Board notice, people notified and the detailed report, then closes its
-breach → SchoolOS closes the incident → PATCH, schools and confirm refused 409
-``incident_closed`` → reopen asked by one operator, confirmed by another → audit on both chains,
-codes and counts only.
+breach → SchoolOS closes the incident (refused 409 while CERT-In is unreported or a school is
+not notified; D49) → PATCH, schools and confirm refused 409 ``incident_closed`` → reopen asked
+by one operator, confirmed by another → the school's next pull reopens its closed breach for
+review, once (D49) → the school closes it again → audit on both chains, codes and counts only.
 
 The clock: every ``now()`` the flow reads (the incident service, the two-person rules, the
 breach register's DB clock) is pinned to ``clock.at``, which the drill moves forward. The
@@ -280,6 +281,16 @@ def test_SEC_024_incident_drill_cert_in_6h_school_clocks_and_locked_close(  # no
     assert _at(row_a["school_notified_at"]) == confirmed_at + 1 * M
     assert row_a["notice_due_at"] is None
     assert detail["schools_notified"] == 1
+    # Step 5b (D49 close gate): closing now is refused; the console already shows why.
+    assert detail["close_blocked_by"] == [
+        "incident_cert_in_unreported",
+        "incident_school_not_notified",
+    ]
+    early_close = _patch(api, lead, iid, {"status": "closed"})
+    assert (early_close.status_code, early_close.json()["code"]) == (
+        409,
+        "incident_cert_in_unreported",
+    )
 
     # Step 6 (T0 + 2 h): the dedicated school is phoned; the operator records it and contains.
     clock.set(t0 + 2 * H)
@@ -287,6 +298,7 @@ def test_SEC_024_incident_drill_cert_in_6h_school_clocks_and_locked_close(  # no
     assert phoned.status_code == 200, phoned.text
     assert phoned.json()["schools_notified"] == 2
     assert all(s["notice_due_at"] is None for s in phoned.json()["schools"])
+    assert phoned.json()["close_blocked_by"] == ["incident_cert_in_unreported"]
 
     # Step 7 (C + 2 h): the school sees the notice in its register with its own clocks.
     clock.set(confirmed_at + 2 * H)
@@ -313,6 +325,7 @@ def test_SEC_024_incident_drill_cert_in_6h_school_clocks_and_locked_close(  # no
     assert cert.status_code == 200, cert.text
     assert _at(cert.json()["cert_in_reported_at"]) == reported_at <= t0 + 6 * H
     assert cert.json()["cert_in_due_at"] is None
+    assert cert.json()["close_blocked_by"] == [], "nothing blocks a close any more"
 
     # Step 9 (C + 20 h): the school notifies the Board and the families and records both.
     clock.set(confirmed_at + 20 * H)
@@ -386,10 +399,30 @@ def test_SEC_024_incident_drill_cert_in_6h_school_clocks_and_locked_close(  # no
     assert _at(asked.json()["reopen_confirm_by"]) == asked_at + two_person.request_ttl()
     self_confirm = api.call("POST", f"/incidents/{iid}/reopen:confirm", lead)
     assert (self_confirm.status_code, self_confirm.json()["code"]) == (409, "same_operator")
-    clock.set(t0 + 4 * 24 * H + 2 * H)
+    reopened_at = clock.set(t0 + 4 * 24 * H + 2 * H)
     reopened = api.call("POST", f"/incidents/{iid}/reopen:confirm", second)
     assert reopened.status_code == 200, reopened.text
     assert reopened.json()["status"] == "open"
+    assert reopened.json()["reopen_count"] == 1
+    # Step 13b (D49): school A's next pull brings the reopen; its closed breach opens for review.
+    clock.set(reopened_at + 1 * M)
+    assert breach_sync.sync_school(school_a) == 1
+    assert breach_sync.sync_school(school_a) == 0, "repeated pulls add nothing"
+    review = _school(api, subject_a, "GET", f"/breaches/{bid}").json()
+    assert review["status"] == "open"
+    assert review["closed_at"] is None
+    assert review["platform_reopens"] == 1
+    assert _at(review["platform_reopened_at"]) == reopened_at
+    assert review["categories"] == ["attendance", "contact"], "codes and counts as before"
+    row_a = {
+        s["tenant_id"]: s for s in api.call("GET", f"/incidents/{iid}", lead).json()["schools"]
+    }
+    assert row_a[str(school_a)]["reopen_pulled"] == 1
+    assert row_a[str(school_b)]["reopen_pulled"] == 0, "the dedicated host is told by phone"
+    # The school reviews it and closes it again as usual (its duties are already recorded).
+    reclosed = _school_patch(api, subject_a, bid, {"status": "closed"})
+    assert reclosed.status_code == 200, reclosed.text
+    assert breach_sync.sync_school(school_a) == 0, "a re-closed breach stays closed"
     # After a reopen the confirmed list stays frozen: another school needs a follow-up incident.
     late = api.call(
         "POST",
@@ -411,6 +444,7 @@ def test_SEC_024_incident_drill_cert_in_6h_school_clocks_and_locked_close(  # no
         ("incident.school_notified", 1),
         ("incident.reopen_requested", 1),
         ("incident.reopened", 1),
+        ("incident.school_reopen_pulled", 1),
     ):
         assert actions.count(action) == count, (action, actions)
     assert actions.count("incident.updated") >= 5
@@ -419,6 +453,11 @@ def test_SEC_024_incident_drill_cert_in_6h_school_clocks_and_locked_close(  # no
     assert by_action["incident.reopened"]["actor_id"] == second.id
     assert by_action["incident.school_notified"]["subject_tenant_id"] == school_a
     assert by_action["incident.school_notified"]["summary"] == {"source": "school_pull"}
+    assert by_action["incident.school_reopen_pulled"]["subject_tenant_id"] == school_a
+    assert by_action["incident.school_reopen_pulled"]["summary"] == {
+        "source": "school_pull",
+        "reopen": 1,
+    }
     confirmers = [e["actor_id"] for e in events if e["action"] == "incident.confirmed"]
     assert confirmers == [lead.id, second.id]
     _no_personal_data([e["summary"] for e in events])
@@ -428,7 +467,14 @@ def test_SEC_024_incident_drill_cert_in_6h_school_clocks_and_locked_close(  # no
     assert school_actions[0] == "privacy.breach.notice_received"
     assert school_events[0]["actor_type"] == "platform"
     assert school_events[0]["summary"]["platform_incident_id"] == iid
-    assert school_actions.count("privacy.breach.updated") == 3
+    # Two duty updates and the close, then the reopen (actor platform) and the second close.
+    assert school_actions.count("privacy.breach.updated") == 4
+    (reopen_event,) = [
+        e for e in school_events if e["action"] == "privacy.breach.incident_reopened"
+    ]
+    assert reopen_event["actor_type"] == "platform"
+    assert reopen_event["summary"]["status_before"] == "closed"
+    assert school_actions.index("privacy.breach.incident_reopened") < len(school_actions) - 1
     done = [d for e in school_events for d in e["summary"].get("duties_done", [])]
     assert sorted(done) == ["board_notice", "board_report", "people_notified"]
     _no_personal_data([e["summary"] for e in school_events])

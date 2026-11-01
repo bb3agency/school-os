@@ -11477,6 +11477,16 @@ export interface components {
             origin: "school" | "processor_notice";
             /** Platform Incident Id */
             platform_incident_id: string | null;
+            /**
+             * Platform Reopened At
+             * @description When SchoolOS last reopened it.
+             */
+            platform_reopened_at: string | null;
+            /**
+             * Platform Reopens
+             * @description How many times SchoolOS reopened the incident behind this notice (D49).
+             */
+            platform_reopens: number;
             processor_facts: components["schemas"]["ProcessorFactsOut"] | null;
             /** Recorded By Name */
             recorded_by_name: string | null;
@@ -11525,6 +11535,16 @@ export interface components {
             origin: "school" | "processor_notice";
             /** Platform Incident Id */
             platform_incident_id: string | null;
+            /**
+             * Platform Reopened At
+             * @description When SchoolOS last reopened it.
+             */
+            platform_reopened_at: string | null;
+            /**
+             * Platform Reopens
+             * @description How many times SchoolOS reopened the incident behind this notice (D49).
+             */
+            platform_reopens: number;
             processor_facts: components["schemas"]["ProcessorFactsOut"] | null;
             /**
              * Status
@@ -15633,6 +15653,11 @@ export interface components {
             /** Cert In Required */
             cert_in_required: boolean;
             /**
+             * Close Blocked By
+             * @description Why closing would be refused now (D49): CERT-In not reported, or a school of the confirmed incident not notified. Empty when it can be closed.
+             */
+            close_blocked_by: ("incident_cert_in_unreported" | "incident_school_not_notified")[];
+            /**
              * Confirm By
              * @description When the first confirmation expires without a second one.
              */
@@ -15655,6 +15680,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Last Reopened At */
+            last_reopened_at: string | null;
             /**
              * Lead Operator Id
              * Format: uuid
@@ -15670,6 +15697,11 @@ export interface components {
              * @description When the reopen request expires without a confirmation.
              */
             reopen_confirm_by?: string | null;
+            /**
+             * Reopen Count
+             * @description How many times two operators reopened this incident (D49).
+             */
+            reopen_count: number;
             /** Reopen Reason */
             reopen_reason?: string | null;
             /** Reopen Requested At */
@@ -15744,6 +15776,11 @@ export interface components {
             /** Cert In Required */
             cert_in_required: boolean;
             /**
+             * Close Blocked By
+             * @description Why closing would be refused now (D49): CERT-In not reported, or a school of the confirmed incident not notified. Empty when it can be closed.
+             */
+            close_blocked_by: ("incident_cert_in_unreported" | "incident_school_not_notified")[];
+            /**
              * Confirm By
              * @description When the first confirmation expires without a second one.
              */
@@ -15766,6 +15803,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Last Reopened At */
+            last_reopened_at: string | null;
             /**
              * Lead Operator Id
              * Format: uuid
@@ -15781,6 +15820,11 @@ export interface components {
              * @description When the reopen request expires without a confirmation.
              */
             reopen_confirm_by?: string | null;
+            /**
+             * Reopen Count
+             * @description How many times two operators reopened this incident (D49).
+             */
+            reopen_count: number;
             /** Reopen Reason */
             reopen_reason?: string | null;
             /** Reopen Requested At */
@@ -15871,6 +15915,13 @@ export interface components {
             notice_due_at: string | null;
             /** Pulled At */
             pulled_at: string | null;
+            /**
+             * Reopen Pulled
+             * @description The incident's reopen count this school last stored (D49).
+             */
+            reopen_pulled: number;
+            /** Reopen Pulled At */
+            reopen_pulled_at: string | null;
             /** School Name */
             school_name: string | null;
             /** School Notified At */

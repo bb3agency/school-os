@@ -179,6 +179,10 @@ class BreachOut(_Out):
     duties: list[DutyOut]
     next_duty: NextDutyOut | None
     processor_facts: ProcessorFactsOut | None
+    platform_reopens: int = Field(
+        description="How many times SchoolOS reopened the incident behind this notice (D49)."
+    )
+    platform_reopened_at: dt.datetime | None = Field(description="When SchoolOS last reopened it.")
     closed_at: dt.datetime | None
     created_at: dt.datetime
     version: int
