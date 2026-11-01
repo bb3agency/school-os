@@ -209,4 +209,16 @@ eval-live: ## Live model evaluation against Vertex AI (synthetic data only; docs
 	$(UV) run python -m sos_evals generate --check
 	$(UV) run python apps/api/tests/knowledge/eval_bridge.py run --adapter app-live --suite $(EVAL_SUITE) --fail-on-soft $(EVAL_ARGS)
 
+# Offline preflight for eval-live (no network, no model call): provider and model per role, India
+# region, service identity (variable names only, never values), SOS_LLM_ZDR_CONFIRMED, datasets
+# with the English-first sets, hard gates and budget limits. Exit 1 lists what is missing.
+eval-live-preflight: ## Offline check of everything make eval-live needs (docs/06 §13.7; ADR-0033)
+	$(UV) run python apps/api/tests/knowledge/eval_preflight.py $(ARGS)
+
+# Read-only report of schools and rows made by seed-synthetic (docs/12 §3; invariant 11). Uses
+# SOS_DATABASE_URL (or ARGS="--database-url ..."); exit 1 in staging/prod when synthetic data is
+# present ("purge before real data"); ARGS="--json" or "--fail-if-found".
+synthetic-check: ## Read-only: synthetic schools and rows left by seed-synthetic (exit 1 in staging/prod)
+	$(UV) run python -m app.devtools.synthetic_check $(ARGS)
+
 check: lint typecheck test security ## Everything CI runs
