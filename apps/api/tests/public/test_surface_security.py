@@ -427,3 +427,203 @@ def test_D31_a_suspended_school_makes_no_payment_link_and_counts_no_view(
     finally:
         P.set_tenant_status(admin_engine, fee_school.tenant_id, "active")
         _reset_budgets()
+
+
+# --- CBSE disclosure page (R3-2F; ADR-0051; FR-DISC-006..010; SEC-050; NFR-SEC-008) ------------
+
+DISC = _load("sos_test_disclosure_support", TESTS / "disclosure" / "support.py")
+DISCLOSURE_PAGE = "GET /api/v1/public/disclosure/{key}"
+DISCLOSURE_DOCUMENT = "GET /api/v1/public/disclosure/{key}/documents/{n}"
+
+# The public page's field allowlist (FR-DISC-009): a new field fails here first, so adding one
+# is a reviewed decision (docs/09, ADR-0051), never a side effect of a model change.
+DISCLOSURE_FIELDS = {
+    "PublicDisclosureOut": ["format_version", "published_at", "school_name", "sections", "title"],
+    "PublicSectionOut": ["items", "key", "title"],
+    "PublicItemOut": ["documents", "key", "label", "link", "table", "value"],
+    "TableOut": ["columns", "rows"],
+    "PublicDocumentOut": ["n", "title"],
+    "PublicDocumentLinkOut": ["expires_at", "url"],
+}
+
+
+def _model_fields(model: Any, seen: dict[str, list[str]]) -> dict[str, list[str]]:
+    """Every field name of ``model`` and of the models it nests (lists and optionals too)."""
+    from pydantic import BaseModel
+
+    if model.__name__ in seen:
+        return seen
+    seen[model.__name__] = sorted(model.model_fields)
+    for info in model.model_fields.values():
+        stack: list[Any] = [info.annotation]
+        while stack:
+            current = stack.pop()
+            if isinstance(current, type) and issubclass(current, BaseModel):
+                _model_fields(current, seen)
+            stack.extend(getattr(current, "__args__", ()))
+    return seen
+
+
+def test_FR_DISC_009_the_public_disclosure_fields_are_a_pinned_allowlist() -> None:
+    from app.disclosure.schemas import PublicDisclosureOut, PublicDocumentLinkOut
+
+    seen: dict[str, list[str]] = {}
+    _model_fields(PublicDisclosureOut, seen)
+    _model_fields(PublicDocumentLinkOut, seen)
+    assert seen == DISCLOSURE_FIELDS
+    for model in (PublicDisclosureOut, PublicDocumentLinkOut):
+        assert model.model_config.get("extra") != "allow"
+
+
+@pytest.fixture
+def disclosure_school(admin_engine: Engine) -> Any:
+    """A fresh CBSE school (one live disclosure link per school)."""
+    DISC.D.memory_store()
+    return DISC.cbse_school(admin_engine)
+
+
+def _publish_disclosure(api: Any, school: Any, **draft: Any) -> tuple[dict[str, Any], str]:
+    owner = school.people["owner"]
+    saved = DISC.save_draft(api, owner, **draft)
+    assert saved.status_code == 200, saved.text
+    published = DISC.publish(api, owner)
+    assert published.status_code == 201, published.text
+    body: dict[str, Any] = published.json()
+    return body, DISC.link_key(api, owner)
+
+
+def _disclosure_404(public_client: TestClient, route: str, key: str) -> dict[str, Any]:
+    _reset_budgets()
+    res = _call(public_client, route, key)
+    assert res.status_code == 404, res.text
+    assert res.headers["content-type"].startswith("application/problem+json")
+    _assert_safe_headers(res)
+    assert key not in res.text
+    body: dict[str, Any] = P.comparable(res)
+    assert body.pop("instance") == route.split(" ", 1)[1]
+    return body
+
+
+def test_FR_DISC_009_a_live_disclosure_page_is_noindex_uncached_and_cookieless(
+    api: Any, disclosure_school: Any, public_client: TestClient
+) -> None:
+    _, key = _publish_disclosure(api, disclosure_school)
+    _reset_budgets()
+    res = _call(public_client, DISCLOSURE_PAGE, key)
+    assert res.status_code == 200, res.text
+    _assert_safe_headers(res)
+    assert res.headers["x-robots-tag"].startswith("noindex")
+    assert "nofollow" in res.headers["x-robots-tag"]
+    assert key not in res.text
+    assert str(disclosure_school.tenant_id) not in res.text
+    seen = {name: set(fields) for name, fields in DISCLOSURE_FIELDS.items()}
+    body = res.json()
+    assert set(body) == seen["PublicDisclosureOut"]
+    for section in body["sections"]:
+        assert set(section) == seen["PublicSectionOut"]
+        for item in section["items"]:
+            assert set(item) == seen["PublicItemOut"]
+            if item["table"] is not None:
+                assert set(item["table"]) == seen["TableOut"]
+
+
+def test_FR_DISC_007_a_withdrawn_or_suspended_disclosure_is_the_one_404(
+    api: Any, disclosure_school: Any, public_client: TestClient, admin_engine: Engine
+) -> None:
+    snapshot, key = _publish_disclosure(api, disclosure_school)
+    _reset_budgets()
+    reference = P.comparable(P.current(public_client, tokens.new_parent_token()))
+    reference.pop("instance")
+    unknown = {
+        route: _disclosure_404(public_client, route, tokens.new_disclosure_key())
+        for route in (DISCLOSURE_PAGE, DISCLOSURE_DOCUMENT)
+    }
+    # Suspended school: the same 404 on both routes, nothing counted.
+    P.set_tenant_status(admin_engine, disclosure_school.tenant_id, "suspended")
+    try:
+        for route in (DISCLOSURE_PAGE, DISCLOSURE_DOCUMENT):
+            assert _disclosure_404(public_client, route, key) == unknown[route] == reference
+    finally:
+        P.set_tenant_status(admin_engine, disclosure_school.tenant_id, "active")
+    withdrawn = api.call(
+        disclosure_school.people["principal"],
+        "POST",
+        f"{DISC.BASE}/snapshots/{snapshot['id']}/withdraw",
+        json={"reason": "Fire certificate expired; renewing it"},
+    )
+    assert withdrawn.status_code == 200, withdrawn.text
+    for route in (DISCLOSURE_PAGE, DISCLOSURE_DOCUMENT):
+        assert _disclosure_404(public_client, route, key) == unknown[route] == reference
+    _reset_budgets()
+
+
+@pytest.mark.parametrize(
+    ("appeared", "passed", "shown"),
+    [
+        (9, 9, ["fewer than 10", "fewer than 10", ""]),
+        (10, 9, ["10", "fewer than 10", ""]),
+        (10, 10, ["10", "10", "100.0%"]),
+    ],
+)
+def test_NFR_PRV_006_the_public_page_suppresses_counts_below_ten(  # noqa: PLR0917 (fixtures)
+    api: Any,
+    disclosure_school: Any,
+    public_client: TestClient,
+    appeared: int,
+    passed: int,
+    shown: list[str],
+) -> None:
+    inputs = {
+        **DISC.REQUIRED,
+        "board_results": [
+            {"year": "2025-26", "class_level": "X", "appeared": appeared, "passed": passed}
+        ],
+    }
+    _, key = _publish_disclosure(api, disclosure_school, inputs=inputs)
+    _reset_budgets()
+    res = _call(public_client, DISCLOSURE_PAGE, key)
+    assert res.status_code == 200, res.text
+    items = {i["key"]: i for s in res.json()["sections"] for i in s["items"]}
+    assert items["board_results"]["table"]["rows"] == [["2025-26", "Class X", *shown]]
+
+
+def test_SEC_008_disclosure_drafts_and_the_public_page_never_reach_logs(
+    api: Any,
+    disclosure_school: Any,
+    public_client: TestClient,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Draft inputs (a name typed into a free-text item, the school's contact e-mail and phone),
+    refused Aadhaar and phone numbers, the published page and the link key never appear in a log
+    line (SEC-008, invariant 5)."""
+    owner = disclosure_school.people["owner"]
+    marker = "Kothapalli Synthetica, M.Sc., B.Ed."
+    capsys.readouterr()
+    caplog.clear()
+    refused = DISC.save_draft(
+        api,
+        disclosure_school.people["office_admin"],
+        inputs={"affiliation_no": "2345 6789 0123", "special_educator": "Call 9876543210"},
+    )
+    assert refused.status_code == 422, refused.text
+    _, key = _publish_disclosure(
+        api, disclosure_school, inputs={**DISC.REQUIRED, "principal_qualification": marker}
+    )
+    api.call(owner, "GET", f"{DISC.BASE}/draft")
+    _reset_budgets()
+    page = _call(public_client, DISCLOSURE_PAGE, key)
+    assert page.status_code == 200, page.text
+    assert "Kothapalli" in page.text
+    out, err = capsys.readouterr()
+    logs = out + err + caplog.text
+    for secret in (
+        "Kothapalli",
+        "2345 6789 0123",
+        "9876543210",
+        DISC.REQUIRED["school_email"],
+        DISC.REQUIRED["contact_phone"],
+        key,
+    ):
+        assert secret not in logs, secret
+    _reset_budgets()
