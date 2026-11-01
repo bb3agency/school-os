@@ -46,6 +46,21 @@ def test_FR_DPDP_008_every_contributor_resolves_and_owns_its_classes() -> None:
             assert contributor.eraser is not None, contributor.module
 
 
+def test_FR_DPDP_013_every_erasable_class_has_an_eraser() -> None:
+    """A class marked ``allowed`` is offered as erasable on the plan; it must be listed under its
+    owner's contributor ``classes`` and the owner must have ``eraser: true``, or the erasure
+    would report success with nothing erased (R3-2F)."""
+    registry = cfg.subjects_registry().contributors
+    gaps = []
+    for key, cls in cfg.record_classes().classes.items():
+        if cls.erasure != "allowed":
+            continue
+        entry = registry.get(cls.owner)
+        if entry is None or not entry.eraser or key not in entry.classes:
+            gaps.append(f"{key} (owner {cls.owner})")
+    assert gaps == [], f"erasable classes without an eraser: {gaps}"
+
+
 def _section_13() -> dict[str, str]:
     """docs/05 §13 first cell -> Default cell."""
     lines = (DOCS / "05-data-model.md").read_text("utf-8").split("\n")
