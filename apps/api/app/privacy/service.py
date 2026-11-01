@@ -1403,6 +1403,11 @@ def _plan(
             continue
         code = ERASURE_OUTCOME[cls.erasure]
         found = dry.get(key)
+        if code == "erasable" and found is None:
+            # The owner's eraser holds nothing of this class for this kind of subject (opt-ins
+            # are a guardian's, not a student's): not offered, so an erasure can never report
+            # success for a class nobody erased (R3-2F).
+            continue
         reason = cls.basis
         if code == "retention_running":
             reason = f"Kept until its retention ends ({cls.retention.replace('**', '')}). {reason}"
