@@ -23,7 +23,7 @@ from app.core.db import platform_session
 from app.core.errors import Conflict
 from app.platform import billing, usage
 from app.platform import repository as repo
-from app.platform.common import add_months, today_ist
+from app.platform.common import add_months, config, today_ist
 
 from .conftest import Api, MakeOperator, Operator, billing_account_payload, provision_payload
 
@@ -114,6 +114,49 @@ def test_FR_PLT_010_catalogue_matches_the_owner_prices(platform_engine: Engine) 
         row = bundles[code]
         assert (row["name"], row["included_answers"], row["price_inr"]) == (name, answers, price)
         assert row["overage_rate_inr"] == rate
+
+
+def test_FR_PLT_010_public_pricing_copy_matches_the_published_catalogue(
+    platform_engine: Engine,
+) -> None:
+    """billing.yaml ``public_pricing`` (what /pricing shows; docs/18 R4) is the latest published
+    catalogue row of each seeded plan and bundle, with the plans' GST rate. The web test
+    ``features/marketing/catalogue.test.ts`` pins the page to the same block."""
+    public = config()["public_pricing"]
+    with platform_session() as s:
+        plans = {
+            r["code"]: r
+            for r in s.execute(
+                text(
+                    "SELECT DISTINCT ON (code) * FROM platform.plans "
+                    "WHERE created_by IS NULL AND status = 'published' "
+                    "ORDER BY code, version DESC"
+                )
+            ).mappings()
+        }
+        bundles = {
+            r["code"]: r
+            for r in s.execute(
+                text(
+                    "SELECT DISTINCT ON (code) * FROM platform.ai_bundles "
+                    "WHERE status = 'published' ORDER BY code, version DESC"
+                )
+            ).mappings()
+        }
+    assert set(public["plans"]) == set(plans)
+    for code, shown in public["plans"].items():
+        row = plans[code]
+        assert D(shown["monthly_inr"]) == row["base_price_inr"], code
+        assert D(shown["one_time_fee_inr"]) == row["one_time_fee_inr"], code
+        assert D(public["gst_rate"]) == row["gst_rate"], code
+    assert set(public["ai_bundles"]) == set(bundles)
+    for code, shown in public["ai_bundles"].items():
+        row = bundles[code]
+        assert shown["name"] == row["name"], code
+        assert shown["included_answers"] == row["included_answers"], code
+        assert D(shown["monthly_inr"]) == row["price_inr"], code
+        assert D(shown["extra_answer_inr"]) == row["overage_rate_inr"], code
+    assert D(public["gst_rate"]) == D(config()["billing"]["default_gst_rate"])
 
 
 def test_FR_PLT_010_bundles_are_frozen(platform_engine: Engine) -> None:

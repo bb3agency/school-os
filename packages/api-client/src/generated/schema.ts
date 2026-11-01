@@ -7240,6 +7240,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/tenants/{tenant_id}/ai-answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tenant Ai Answers
+         * @description This calendar month's billable AI answers against the school's bundle: included answers,
+         *     answers so far (whole IST days collected), extra answers and their ex-GST overage at the
+         *     bundle's price per extra answer, billed on the next invoice (ADR-0038 §3). The same numbers
+         *     the school sees on its Plan and billing page. ``bundle`` is ``null`` without a bundle;
+         *     404 for an unknown school. Counts and catalogue prices only.
+         */
+        get: operations["tenant_ai_answers_api_v1_platform_tenants__tenant_id__ai_answers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/tenants/{tenant_id}/billing-account": {
         parameters: {
             query?: never;
@@ -21843,7 +21867,10 @@ export interface components {
          *     Prices are ex-GST INR from the catalogue row. ``month_start`` is the current calendar month
          *     (IST). ``answers_used`` is the month's billable answers counted so far (whole IST days up to
          *     ``answers_counted_to``, collected the next morning), or ``null`` while the month does not
-         *     count against the bundle (``counts_from`` is later). No tokens, no cost estimate.
+         *     count against the bundle (``counts_from`` is later). ``extra_answers`` is the month's answers
+         *     above ``included_answers`` so far and ``overage_so_far_inr`` their ex-GST amount at
+         *     ``overage_rate_inr`` (billed in arrears on the next invoice, ADR-0038 §3); both ``null``
+         *     with ``answers_used``. No tokens, no cost estimate.
          */
         SchoolAiBundle: {
             /** Answers Counted To */
@@ -21857,6 +21884,8 @@ export interface components {
              * Format: date
              */
             counts_from: string;
+            /** Extra Answers */
+            extra_answers?: number | null;
             /** Included Answers */
             included_answers: number;
             /**
@@ -21868,6 +21897,8 @@ export interface components {
             name: string;
             /** Overage Rate Inr */
             overage_rate_inr: string;
+            /** Overage So Far Inr */
+            overage_so_far_inr?: string | null;
             /** Price Inr */
             price_inr: string;
         };
@@ -23318,6 +23349,21 @@ export interface components {
             source: string;
             /** Version */
             version: number;
+        };
+        /**
+         * TenantAiAnswersOut
+         * @description A school's AI answers this month against its bundle, for operators (docs/18 R4, FR-PLT-020;
+         *     ADR-0038). Platform data only (``platform.subscriptions``, ``ai_bundles``, ``usage_daily``):
+         *     counts and catalogue prices, never a question, an answer or a person. ``bundle`` is ``null``
+         *     when the school's live subscription has no AI answer bundle.
+         */
+        TenantAiAnswersOut: {
+            bundle: components["schemas"]["SchoolAiBundle"] | null;
+            /**
+             * Tenant Id
+             * Format: uuid
+             */
+            tenant_id: string;
         };
         /**
          * TenantBillingOut
@@ -42133,6 +42179,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TenantDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    tenant_ai_answers_api_v1_platform_tenants__tenant_id__ai_answers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantAiAnswersOut"];
                 };
             };
             /** @description Validation Error */

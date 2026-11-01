@@ -279,7 +279,10 @@ class SchoolAiBundle(Out):
     Prices are ex-GST INR from the catalogue row. ``month_start`` is the current calendar month
     (IST). ``answers_used`` is the month's billable answers counted so far (whole IST days up to
     ``answers_counted_to``, collected the next morning), or ``null`` while the month does not
-    count against the bundle (``counts_from`` is later). No tokens, no cost estimate."""
+    count against the bundle (``counts_from`` is later). ``extra_answers`` is the month's answers
+    above ``included_answers`` so far and ``overage_so_far_inr`` their ex-GST amount at
+    ``overage_rate_inr`` (billed in arrears on the next invoice, ADR-0038 §3); both ``null``
+    with ``answers_used``. No tokens, no cost estimate."""
 
     code: str
     name: str
@@ -290,6 +293,18 @@ class SchoolAiBundle(Out):
     month_start: dt.date
     answers_used: int | None
     answers_counted_to: dt.date | None
+    extra_answers: int | None = None
+    overage_so_far_inr: Decimal | None = None
+
+
+class TenantAiAnswersOut(Out):
+    """A school's AI answers this month against its bundle, for operators (docs/18 R4, FR-PLT-020;
+    ADR-0038). Platform data only (``platform.subscriptions``, ``ai_bundles``, ``usage_daily``):
+    counts and catalogue prices, never a question, an answer or a person. ``bundle`` is ``null``
+    when the school's live subscription has no AI answer bundle."""
+
+    tenant_id: uuid.UUID
+    bundle: SchoolAiBundle | None
 
 
 # --- billing accounts -------------------------------------------------------------------------
