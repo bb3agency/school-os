@@ -15934,7 +15934,7 @@
         "properties": {
           "note": {
             "maxLength": 200,
-            "minLength": 5,
+            "minLength": 10,
             "title": "Note",
             "type": "string"
           },

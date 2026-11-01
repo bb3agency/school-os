@@ -15,6 +15,7 @@ export type Incident = Schemas["IncidentOut"];
 export type IncidentDetail = Schemas["IncidentDetailOut"];
 export type IncidentSchool = Schemas["IncidentSchoolOut"];
 export type IncidentPatch = Schemas["IncidentPatch"];
+export type IncidentClock = Schemas["IncidentClockOut"];
 export type Severity = Incident["severity"];
 export type IncidentStatus = Incident["status"];
 
@@ -38,25 +39,31 @@ export const INCIDENT_KEYS = {
   all: ["operator", "incidents"] as const,
   list: ["operator", "incidents", "list"] as const,
   detail: (id: string) => ["operator", "incidents", "detail", id] as const,
+  clocks: ["operator", "incidents", "clocks"] as const,
 };
 
 /** A run of 6 or more digits (phone, Aadhaar, account numbers) or an e-mail address. */
 const PERSONAL = /\d{6,}|@/;
+
+/** Categories and counts only: 10 to `max` characters, no long numbers or e-mail addresses. */
+function categoriesAndCounts(max: number) {
+  return z
+    .string()
+    .trim()
+    .min(1, { error: "required" })
+    .min(10, { error: "descriptionTooShort" })
+    .max(max, { error: "tooLong" })
+    .refine((value) => !PERSONAL.test(value.split(/\s+/).join(" ")), {
+      error: "summaryPersonalData",
+    });
+}
 
 /**
  * The summary holds categories and counts only (FR-DPDP-030): no names, phone or Aadhaar
  * numbers, or e-mail addresses. The API refuses a run of 6+ digits and "@" (422); the form says
  * so before sending. 10 to 500 characters.
  */
-export const incidentSummary = z
-  .string()
-  .trim()
-  .min(1, { error: "required" })
-  .min(10, { error: "descriptionTooShort" })
-  .max(500, { error: "tooLong" })
-  .refine((value) => !PERSONAL.test(value.split(/\s+/).join(" ")), {
-    error: "summaryPersonalData",
-  });
+export const incidentSummary = categoriesAndCounts(500);
 
 const pastDateTime = z
   .string()
@@ -180,3 +187,30 @@ export function reopenOf(
     reason: incident.reopen_reason ?? null,
   };
 }
+
+/**
+ * An alerting clock from the API (D49 part 2) in the console's words: overdue by whole hours (at
+ * least 1), or due within the hour / in whole hours. The API decides the stage with the same
+ * rules as the beat alerts; this only words `minutes_left`.
+ */
+export function clockFromMinutes(clock: Pick<IncidentClock, "stage" | "minutes_left">): Clock {
+  if (clock.stage === "overdue") {
+    return { state: "overdue", hours: Math.max(1, Math.floor(-clock.minutes_left / 60)) };
+  }
+  const hours = Math.floor(Math.max(0, clock.minutes_left) / 60);
+  return hours === 0 ? { state: "dueSoon" } : { state: "due", hours };
+}
+
+/**
+ * A dedicated-host school has no pull: after a reopen, an operator records that it was told by
+ * phone or e-mail (D49). Pending while its stored reopen count is behind the incident's.
+ */
+export function reopenTellPending(
+  school: Pick<IncidentSchool, "mode" | "reopen_pulled">,
+  incident: Pick<Incident, "reopen_count">,
+): boolean {
+  return school.mode === "dedicated" && school.reopen_pulled < incident.reopen_count;
+}
+
+/** How a dedicated school was told of the reopen: the summary's rule, 10 to 200 characters. */
+export const reopenToldSchema = z.object({ note: categoriesAndCounts(200) });

@@ -11,11 +11,12 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
 import { Link, useRouter } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
-import { unwrap, useBffClient } from "@/lib/bff/query";
+import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { formatCount, formatDateTime } from "@/lib/format";
 import { istLocalInput } from "@/features/breaches/schema";
-import { LIST_PAGE_SIZE, useCan, usePagedList } from "../data";
+import { LIST_PAGE_SIZE, useCan, useOperatorMe, usePagedList } from "../data";
 import { ShowMore } from "../ShowMore";
+import { IncidentClockAlerts } from "./IncidentClockAlerts";
 import {
   INCIDENTS_MANAGE,
   INCIDENTS_READ,
@@ -93,7 +94,7 @@ export function CertInClock({
  * school data. Each shows the CERT-In clock (6 hours from when SchoolOS noticed it), how many
  * affected schools have been told, and its status. Opening one needs
  * `platform.incidents.manage` and a fresh MFA sign-in; the summary holds categories and counts
- * only.
+ * only. A banner above the list shows the clocks that are due soon or overdue (D49 part 2).
  */
 export function IncidentsScreen() {
   const t = useTranslations("platform.incidents");
@@ -102,8 +103,15 @@ export function IncidentsScreen() {
   const locale = useLocale() as Locale;
   const api = useBffClient("operator");
   const can = useCan();
+  const me = useOperatorMe();
   const router = useRouter();
   const [now] = useState(() => istLocalInput());
+  const clocks = useApiQuery(
+    INCIDENT_KEYS.clocks,
+    () => unwrap(api.GET("/api/v1/platform/incidents/clocks")),
+    // Only once the role is known: an operator without it never asks.
+    { enabled: Boolean(me?.permissions.includes(INCIDENTS_READ)) },
+  );
   const list = usePagedList(INCIDENT_KEYS.list, (cursor) =>
     unwrap(
       api.GET("/api/v1/platform/incidents", {
@@ -244,6 +252,7 @@ export function IncidentsScreen() {
           ) : undefined
         }
       />
+      {clocks.status === "ready" ? <IncidentClockAlerts clocks={clocks.data} /> : null}
       <DataTableV2
         id="platform.incidents"
         stacked

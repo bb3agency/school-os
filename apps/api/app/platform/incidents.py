@@ -174,7 +174,7 @@ class IncidentReopenToldIn(_In):
 
     tenant_id: uuid.UUID
     reopen_seq: int = Field(ge=1, description="The incident's reopen count the school was told of.")
-    note: str = Field(min_length=5, max_length=200)
+    note: str = Field(min_length=10, max_length=200)
 
     @field_validator("note")
     @classmethod

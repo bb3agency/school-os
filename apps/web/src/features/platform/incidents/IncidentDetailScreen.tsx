@@ -30,6 +30,8 @@ import {
   confirmationOf,
   reopenOf,
   reopenSchema,
+  reopenTellPending,
+  reopenToldSchema,
   reportedSchema,
   type IncidentDetail,
   type IncidentSchool,
@@ -42,7 +44,8 @@ import {
  * (dedicated hosts have no pull), and the status. Categories and counts only. A closed incident
  * is read-only (D48): reopening it is asked for by one operator and confirmed by another.
  * Closing is refused while CERT-In or a school is still owed a notice (D49); the status dialog
- * says so before submit. A reopen reaches each shared-tier school on its next pull (D49).
+ * says so before submit. A reopen reaches each shared-tier school on its next pull (D49); for a
+ * dedicated-host school the operator records that it was told by phone or e-mail.
  */
 export function IncidentDetailScreen({ incidentId }: { incidentId: string }) {
   const t = useTranslations("platform.incidents");
@@ -366,6 +369,8 @@ function ReopenCard({ incident, manage }: { incident: IncidentDetail; manage: bo
 
 function Schools({ incident, manage }: { incident: IncidentDetail; manage: boolean }) {
   const t = useTranslations("platform.incidents");
+  // Recording a phone-told reopen stays possible after the incident is closed again (D49).
+  const canManage = useCan()(INCIDENTS_MANAGE);
   const tcat = useTranslations("breaches.categories");
   const locale = useLocale() as Locale;
   const clockText = useClockText();
@@ -458,6 +463,9 @@ function Schools({ incident, manage }: { incident: IncidentDetail; manage: boole
                 ? t("reopenPulledAt", { when: formatDateTime(row.reopen_pulled_at) ?? "" })
                 : t("reopenNotPulled")}
             </span>
+          ) : null}
+          {canManage && reopenTellPending(row, incident) ? (
+            <ReopenToldDialog incident={incident} school={row} />
           ) : null}
         </span>
       ),
@@ -660,6 +668,60 @@ function NotifiedDialog({
             </label>
           ))}
         </fieldset>
+      )}
+    </ActionDialog>
+  );
+}
+
+/**
+ * A dedicated-host school has no pull: after a reopen the operator tells it by phone or e-mail
+ * and records that here (D49), which counts as the school's pull. Step-up; the note follows the
+ * summary rule.
+ */
+function ReopenToldDialog({
+  incident,
+  school,
+}: {
+  incident: IncidentDetail;
+  school: IncidentSchool;
+}) {
+  const t = useTranslations("platform.incidents");
+  const api = useBffClient("operator");
+  const name = school.school_name ?? school.tenant_code ?? school.tenant_id;
+  return (
+    <ActionDialog
+      triggerLabel={t("reopenTold")}
+      triggerVariant="secondary"
+      title={t("reopenToldTitle", { school: name })}
+      description={t("reopenToldBody", { count: incident.reopen_count })}
+      confirmLabel={t("reopenTold")}
+      consequence={t("reopenToldConsequence")}
+      stepUp
+      schema={reopenToldSchema}
+      invalidate={[INCIDENT_KEYS.all]}
+      errorNamespace="platform.incidents"
+      submit={(data) =>
+        unwrap(
+          api.POST("/api/v1/platform/incidents/{incident_id}/reopen:told", {
+            params: { path: { incident_id: incident.id } },
+            body: {
+              tenant_id: school.tenant_id,
+              reopen_seq: incident.reopen_count,
+              note: data.note,
+            },
+          }),
+        )
+      }
+    >
+      {(errors) => (
+        <TextAreaField
+          name="note"
+          label={t("reopenToldNote")}
+          hint={t("reopenToldNoteHint")}
+          error={errors.note}
+          maxLength={200}
+          rows={3}
+        />
       )}
     </ActionDialog>
   );
