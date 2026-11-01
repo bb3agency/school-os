@@ -523,6 +523,8 @@ Each wave: its stories' ACs pass as automated tests; `make check`-equivalent gre
 | D44 | How sensitive is RTE status? | C3: `rte.read` only (never class teachers), never on certificates, messages, parent pages or Ask; the RTE fee concession is only requested, never auto-approved | ADR-0052 decisions 4-5 |
 | D45 | How do portal reminders work? | A versioned calendar with approximate, unverified windows; the school confirms dates and owners; reminders 30/14/7/1 days before closing become staff tasks and in-app notifications with readiness counts; never parent messages | ADR-0053 |
 | D46 | Schemas, settings, migrations | No new schema (tables in `ops`, `sis`, `platform`), no new `SOS_*` setting, migrations from `0064` | docs/05 §16, docs/10 §11.3 |
+| D47 | Consent forms when a school's parent language is Telugu but `SOS_TELUGU_ENABLED` is off (2026-11-01) | English: consent forms and their PDFs follow ADR-0036 and are printed in English while the switch is off; `parent_language` (ADR-0044) applies only when the switch is on. Fixed in R3-2F | ADR-0036; ADR-0044; ADR-0049 |
+| D48 | May a closed SchoolOS incident be edited or reopened? (2026-11-01) | No direct edits once `closed`: fields are locked (409); reopening is a recorded action that needs a second operator's confirmation (two-person rule, like the incident's own confirmation) and is written to the platform audit. Built in R3-2F | ADR-0050; docs/16 |
 
 **For the owner (no gate on the build):** whether to reopen D10 for the RTE register (D43), and when to commission the one-time professional review of `docs/legal/` (D30).
 
