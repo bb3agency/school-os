@@ -32,6 +32,7 @@ from app.insights.tasks import beat_schedule as insights_beat_schedule
 from app.knowledge.service import check_provider_agreements
 from app.knowledge.tasks import beat_schedule as knowledge_beat_schedule
 from app.messaging.tasks import beat_schedule as messaging_beat_schedule
+from app.notifications.quota_sync import beat_schedule as ai_quota_beat_schedule
 from app.notifications.tasks import beat_schedule as notifications_beat_schedule
 from app.ops.tasks import beat_schedule as ops_beat_schedule
 from app.platform.tasks import beat_schedule as platform_beat_schedule
@@ -79,6 +80,8 @@ TASK_MODULES: list[str] = [
     "app.audit.tasks",
     "app.ops.tasks",
     "app.notifications.tasks",
+    # ADR-0038 follow-up (docs/16 §19 Q16): AI answer quota alerts pulled to owner and principal.
+    "app.notifications.quota_sync",
     "app.breakglass.tasks",
     "app.platform.tasks",
     "app.documents.tasks",
@@ -170,6 +173,8 @@ def create_celery() -> Celery:
             "offboarding.certify": {"queue": "pdf"},
             # D49, FR-DPDP-031 (R3-2G): incident clock alerts to operators, every 5 minutes.
             "platform.incident_clock_alerts": {"queue": "maintenance"},
+            # ADR-0038 follow-up (docs/16 §19 Q16): the hourly AI answer quota alert pull.
+            "notifications.ai_quota_sweep": {"queue": "maintenance"},
             # FR-CERT-010: certificate PDFs render on the Chromium workers.
             "certificates.render": {"queue": "pdf"},
             # FR-FEE-011: receipt PDFs on the Chromium workers; FR-FEE-009 late fees nightly.
@@ -238,6 +243,8 @@ def create_celery() -> Celery:
             **ops_beat_schedule(),
             # FR-NOT-001: purge read notifications after 90 days (both modes).
             **notifications_beat_schedule(),
+            # ADR-0038 follow-up: AI answer quota alerts to owner and principal (hourly, shared).
+            **ai_quota_beat_schedule(),
             # FR-OPS-004: break-glass pull, expiry and outcome reporting (every minute).
             **breakglass_beat_schedule(),
             # FR-DPDP-032, FR-DPDP-035: breach notice pull and 24 h / 60 h reminders (every minute).

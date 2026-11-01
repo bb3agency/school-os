@@ -753,6 +753,8 @@ def end_subscription_for_closure(
 
 
 CLOSED_SCHOOL_STATUSES: Final = ("offboarding", "deleted")
+# usage_threshold_events.metric of the AI answer quota alerts (usage.check_ai_quota).
+AI_QUOTA_METRIC: Final = "ai_answers"
 
 
 def in_protected_window(boards: Sequence[str], day: dt.date) -> str | None:
@@ -1188,11 +1190,20 @@ def school_ai_bundle(
         counted_to: dt.date | None = None
         extra: int | None = None
         overage: Decimal | None = None
+        alert: int | None = None
         if row["ai_bundle_from"] <= month:
             used, counted_to = repo.ai_answers_to_date(s, tenant_id, month, next_month(month))
             extra, overage = ai_overage(
                 used, row["included_answers"], Decimal(row["overage_rate_inr"])
             )
+            t = m.usage_threshold_events
+            alert = s.execute(
+                select(func.max(t.c.threshold)).where(
+                    t.c.tenant_id == tenant_id,
+                    t.c.metric == AI_QUOTA_METRIC,
+                    t.c.period_start == month,
+                )
+            ).scalar_one()
     return SchoolAiBundle(
         code=row["code"],
         name=row["name"],
@@ -1205,6 +1216,7 @@ def school_ai_bundle(
         answers_counted_to=counted_to,
         extra_answers=extra,
         overage_so_far_inr=overage,
+        quota_alert=alert,
     )
 
 

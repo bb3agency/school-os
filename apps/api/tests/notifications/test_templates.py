@@ -231,7 +231,8 @@ def _sent_template_keys() -> dict[str, tuple[str, set[str] | None]]:
     ``extraction._notify(session, batch, <CONSTANT>, {...})``). Keyed ``path:line:key``."""
     found: dict[str, tuple[str, set[str] | None]] = {}
     for path in sorted(APP_DIR.rglob("*.py")):
-        if path.parent.name == "notifications":
+        # The notifications package renders and stores; only its bridge quota_sync produces.
+        if path.parent.name == "notifications" and path.name != "quota_sync.py":
             continue
         tree = ast.parse(path.read_text("utf-8"))
         constants = _module_constants(tree)

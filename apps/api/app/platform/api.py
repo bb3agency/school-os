@@ -50,6 +50,7 @@ from app.platform.permissions import ANY_OPERATOR
 from app.platform.schemas import (
     AiBundleIn,
     AiBundleOut,
+    AiQuotaAlertOut,
     AnnouncementIn,
     AnnouncementOut,
     AuditVerifyOut,
@@ -489,6 +490,19 @@ def tenant_ai_answers(
     the school sees on its Plan and billing page. ``bundle`` is ``null`` without a bundle;
     404 for an unknown school. Counts and catalogue prices only."""
     return billing.tenant_ai_answers(tenant_id)
+
+
+@router.get("/usage/ai-quota-alerts", response_model=list[AiQuotaAlertOut])
+def ai_quota_alerts(
+    *,
+    ctx: Annotated[Ctx, Depends(require_platform("platform.usage.read"))],
+    month: dt.date | None = None,
+) -> list[AiQuotaAlertOut]:
+    """Schools that used 80 % or 100 % of their AI answer bundle's included answers in a
+    calendar month (default: this month, IST), one row per school with its highest alert
+    (ADR-0038 follow-up, docs/16 §19 Q16). Recorded once per school, month and threshold by the
+    usage collector. Alert only: nothing is switched off. Counts only."""
+    return usage.ai_quota_alerts(month)
 
 
 @router.get("/usage", response_model=list[UsageDailyOut])

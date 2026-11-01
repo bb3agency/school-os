@@ -209,7 +209,18 @@ source_modules =
     app.dq
     app.students
     app.documents
-    app.notifications
+    # Every notifications module except quota_sync: the sanctioned bridge that pulls the control
+    # plane's AI answer quota alerts through app.platform.service (ADR-0038 follow-up, docs/16
+    # §19 Q16), like app.privacy.breach_sync.
+    app.notifications.api
+    app.notifications.email
+    app.notifications.models
+    app.notifications.repository
+    app.notifications.schemas
+    app.notifications.service
+    app.notifications.subjects
+    app.notifications.tasks
+    app.notifications.templates
     app.imports
     app.changes
     app.extraction

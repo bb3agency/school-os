@@ -7,12 +7,10 @@ the owning module's public service (``app.fees.service``, ``app.messaging.servic
 ``tenant_session`` as a synthetic member holding the permission, so RLS, validation,
 maker-checker and audit apply as in production:
 
-- **Fees on.** The school setting ``fees_enabled`` through ``tenancy.update_tenant_settings``.
-  The platform flag ``fees.enabled`` has no public service function for a school the seeder
-  created (``platform.flags.set_override`` needs a fleet ``deployments`` row that shared-tier
-  seeding does not make), so :func:`_ensure_flag` writes the per-school override in a
-  ``platform_session`` and records ``flag.override_set`` on the platform chain, the way
-  :class:`app.devtools.seeder.AdminOwnerBootstrap` stands in for the owner invite.
+- **Fees on.** The school setting ``fees_enabled`` through ``tenancy.update_tenant_settings``,
+  and the per-school override of the platform flag ``fees.enabled`` through
+  ``platform.service.set_school_flag_override`` (works without a fleet ``deployments`` row,
+  which shared-tier seeding does not make; audited ``flag.override_set`` on the platform chain).
 - **Fees** (first accountant): heads ``TUI`` (tuition) and ``EXM`` (exam); one active plan for
   Class X of the current year with two instalments (15 June 2026, 15 January 2027); the plan
   applied to every Class X student (accounts and charges); four cash receipts on the first
@@ -45,13 +43,10 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Final
 
-from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.audit import service as audit
 from app.authz.context import UserContext
-from app.core.db import platform_session, tenant_session
-from app.core.ids import new_id
+from app.core.db import tenant_session
 from app.devtools.plan import TenantPlan
 from app.fees import service as fees
 from app.fees.schemas import (
@@ -69,6 +64,7 @@ from app.fees.schemas import (
 )
 from app.messaging import service as messaging
 from app.messaging.schemas import MessagingSettingsIn, OptinIn
+from app.platform import service as control_plane
 from app.students import service as students
 from app.tenancy import service as tenancy
 from app.tenancy.schemas import TenantSettingsPatch
@@ -128,35 +124,10 @@ def _session(tenant_id: uuid.UUID, actor: Actor) -> AbstractContextManager[Sessi
 
 def _ensure_flag(tenant_id: uuid.UUID, created: Counter[str]) -> None:
     """The per-school ``fees.enabled`` override (see the module docstring)."""
-    with platform_session() as pdb:
-        row = pdb.execute(
-            text(
-                "SELECT id, enabled FROM platform.feature_flags WHERE key = :k AND tenant_id = :t"
-            ),
-            {"k": FEES_FLAG, "t": tenant_id},
-        ).one_or_none()
-        if row is not None and row.enabled:
-            return
-        flag_id = row.id if row is not None else new_id()
-        pdb.execute(
-            text(
-                "INSERT INTO platform.feature_flags (id, key, tenant_id, enabled) "
-                "VALUES (:i, :k, :t, true) ON CONFLICT (key, tenant_id) "
-                "DO UPDATE SET enabled = true, updated_at = now()"
-            ),
-            {"i": flag_id, "k": FEES_FLAG, "t": tenant_id},
-        )
-        audit.record_platform(
-            pdb,
-            action="flag.override_set",
-            resource_type="feature_flag",
-            resource_id=flag_id,
-            summary={"key": FEES_FLAG, "after": {"enabled": True}, "source": AUDIT_SOURCE},
-            actor_type="system",
-            subject_tenant_id=tenant_id,
-            request_id="seed-synthetic",
-        )
-    created["fee_flags"] += 1
+    if control_plane.set_school_flag_override(
+        FEES_FLAG, tenant_id, True, source=AUDIT_SOURCE, request_id="seed-synthetic"
+    ):
+        created["fee_flags"] += 1
 
 
 def _ensure_setting(tenant_id: uuid.UUID, actor: Actor, created: Counter[str]) -> None:

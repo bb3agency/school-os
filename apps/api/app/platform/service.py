@@ -24,6 +24,13 @@ Breach notices (school side, ``app.privacy.breach_sync``; ADR-0050, FR-DPDP-032)
 ``platform.incidents``; codes and counts only).
 
 Feature flags for tenant code: ``is_flag_enabled(key, tenant_id, session=tenant_session)``.
+One school's override for other modules and dev tooling: ``set_school_flag_override`` and
+``clear_school_flag_override`` (system actor, platform audit chain; any school the database
+knows, shared-tier schools without a deployments row included).
+
+AI answer quota alerts (ADR-0038 follow-up, docs/16 §19 Q16): ``ai_quota_alert_for_school``
+(the highest 80 % / 100 % crossing of this month's included answers; counts only), pulled by the
+school side (``app.notifications.quota_sync``) into in-app notifications.
 
 Provisioning helpers for dev tooling: ``invite_school_owner(platform_session, ...)``.
 """
@@ -36,10 +43,20 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.platform import announcements, billing, breakglass, flags, incidents, repository, support
+from app.platform import (
+    announcements,
+    billing,
+    breakglass,
+    flags,
+    incidents,
+    repository,
+    support,
+    usage,
+)
 from app.platform.breakglass import SchoolBreakGlassRequest
 from app.platform.incidents import SchoolIncidentNotice
 from app.platform.schemas import (
+    AiQuotaAlertOut,
     AnnouncementBrief,
     SchoolAiBundle,
     SchoolTicketMessageIn,
@@ -48,6 +65,7 @@ from app.platform.schemas import (
 )
 
 __all__ = [
+    "AiQuotaAlertOut",
     "AnnouncementBrief",
     "SchoolAiBundle",
     "SchoolBreakGlassRequest",
@@ -56,8 +74,10 @@ __all__ = [
     "TicketCreateSchool",
     "TicketOut",
     "active_announcements",
+    "ai_quota_alert_for_school",
     "breakglass_request_for_school",
     "breakglass_requests_for_school",
+    "clear_school_flag_override",
     "current_subscription",
     "get_tenant_ticket",
     "incident_notices_for_school",
@@ -71,6 +91,7 @@ __all__ = [
     "record_incident_reopen_pulled",
     "reply_from_tenant",
     "school_ai_bundle",
+    "set_school_flag_override",
 ]
 
 
@@ -98,6 +119,36 @@ def active_announcements(tenant_id: uuid.UUID, tier: str) -> list[AnnouncementBr
 
 def is_flag_enabled(key: str, tenant_id: uuid.UUID, *, session: Session | None = None) -> bool:
     return flags.is_enabled(key, tenant_id, session=session)
+
+
+def set_school_flag_override(
+    key: str,
+    tenant_id: uuid.UUID,
+    enabled: bool,
+    *,
+    source: str,
+    request_id: str | None = None,
+) -> bool:
+    """Turn feature flag ``key`` on or off for one school (system actor; audited
+    ``flag.override_set`` on the platform chain with ``source``). Returns whether it changed.
+    ``ValidationFailed`` (``invalid_flag_key``) for a malformed key, ``NotFound`` for a school
+    the database does not know. Works for shared-tier schools without a deployments row."""
+    return flags.set_school_override(key, tenant_id, enabled, source=source, request_id=request_id)
+
+
+def clear_school_flag_override(
+    key: str, tenant_id: uuid.UUID, *, source: str, request_id: str | None = None
+) -> bool:
+    """Remove one school's override of ``key`` (audited ``flag.override_removed``). Returns
+    whether there was one."""
+    return flags.clear_school_override(key, tenant_id, source=source, request_id=request_id)
+
+
+def ai_quota_alert_for_school(tenant_id: uuid.UUID) -> AiQuotaAlertOut | None:
+    """This month's AI answer quota alert of this school (pulled by the school side): the
+    highest threshold (80 or 100 % of the bundle's included answers) the usage collector has
+    recorded for the current calendar month (IST), or ``None``. Counts only."""
+    return usage.ai_quota_alert(tenant_id)
 
 
 def open_ticket_from_tenant(

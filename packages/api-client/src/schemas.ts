@@ -95,6 +95,8 @@ export type Job = Schemas["JobOut"];
 export type UsageDaily = Schemas["UsageDailyOut"];
 /** GET /platform/tenants/{id}/ai-answers: this month's AI answers against the bundle. */
 export type TenantAiAnswers = Schemas["TenantAiAnswersOut"];
+/** GET /platform/usage/ai-quota-alerts: schools at 80 % or 100 % of their included answers. */
+export type AiQuotaAlert = Schemas["AiQuotaAlertOut"];
 export type FeatureFlag = Schemas["FlagOut"];
 export type Deployment = Schemas["DeploymentOut"];
 export type DeploymentPatch = Schemas["DeploymentPatch"];

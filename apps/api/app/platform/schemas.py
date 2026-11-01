@@ -295,6 +295,23 @@ class SchoolAiBundle(Out):
     answers_counted_to: dt.date | None
     extra_answers: int | None = None
     overage_so_far_inr: Decimal | None = None
+    # The highest quota alert (80 or 100 % of ``included_answers``) recorded for this month by
+    # the usage collector, or ``null`` (ADR-0038 follow-up, docs/16 §19 Q16). Alert only.
+    quota_alert: Literal[80, 100] | None = None
+
+
+class AiQuotaAlertOut(Out):
+    """A school crossed 80 % or 100 % of its AI answer bundle's included answers in a calendar
+    month (ADR-0038 follow-up, docs/16 §19 Q16). Counts only: the answers counted when the
+    crossing was recorded and the bundle's included answers; never a question or a person.
+    Recorded once per school, month and threshold by the usage collector."""
+
+    tenant_id: uuid.UUID
+    threshold: Literal[80, 100]
+    month_start: dt.date
+    answers_used: int
+    included_answers: int
+    crossed_at: dt.datetime
 
 
 class TenantAiAnswersOut(Out):
