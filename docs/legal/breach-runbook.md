@@ -5,6 +5,7 @@
 | template_version | 0.1 (2026-10-21) |
 | Decision | [ADR-0050](../adr/ADR-0050-breach-handling-processor-incidents-and-school-breach-register.md) |
 | Based on | docs/08 §3 (Rule 7, PRV-008), §6 (CERT-In, PRV-017..019), §9 clause 5; docs/11 §7 (incident response), R5, R7 |
+| Rehearsal | Quarterly, with the timed tabletop script [docs/security/incident-drill.md](../security/incident-drill.md) (incl. the CERT-In 6-hour flow) |
 | Placeholders | `{{school_short_name}}`, `{{school_legal_name}}`, `{{privacy_contact_name}}`, `{{privacy_contact_phone}}`, `{{privacy_contact_email}}`, `{{noticed_at}}`, `{{incident_window}}`, `{{what_happened}}`, `{{data_categories}}`, `{{approx_people}}`, `{{likely_consequences}}`, `{{what_we_did}}`, `{{what_you_can_do}}`, `{{reference}}`, `{{schoolos_contact_email}}` |
 
 > **Not legal advice.** Time limits are only those docs/08 records. Points marked **(to confirm)** are not settled there.
