@@ -1,5 +1,6 @@
 """Dashboard KPIs (docs/16 §5.1). Each tile appears only when the operator holds its read
-permission; every value is an aggregate over platform tables (no school records)."""
+permission; every value is an aggregate over platform tables (no school records). Holders of
+``platform.incidents.read`` also get the incident clocks due soon or overdue (D49 part 2)."""
 
 from __future__ import annotations
 
@@ -10,6 +11,7 @@ from typing import Any
 from sqlalchemy import case, func, select
 
 from app.core.db import platform_session
+from app.platform import incident_alerts
 from app.platform import models as m
 from app.platform.common import now, today_ist
 from app.platform.schemas import DashboardOut
@@ -128,4 +130,7 @@ def build(permissions: frozenset[str]) -> DashboardOut:
                     select(func.count()).where(open_, m.support_tickets.c.resolution_due_at < now())
                 ).scalar_one()
             )
+    if "platform.incidents.read" in permissions:
+        # D49 part 2: the in-console clock alert tile (same rules as the beat alerts).
+        out["incident_clocks"] = incident_alerts.open_clocks()
     return DashboardOut.model_validate(out)

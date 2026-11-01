@@ -6554,6 +6554,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/incidents/{incident_id}/reopen:told": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record Incident Reopen Told
+         * @description Record that a dedicated-host school was told of reopen ``reopen_seq`` by phone or e-mail
+         *     (it has no pull; D49). The note follows the summary rule (422 otherwise). ``409
+         *     school_pulls`` (shared tier), ``reopen_not_pending`` or ``reopen_changed``.
+         */
+        post: operations["record_incident_reopen_told_api_v1_platform_incidents__incident_id__reopen_told_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/incidents/{incident_id}/reopen:withdraw": {
         parameters: {
             query?: never;
@@ -6590,6 +6612,28 @@ export interface paths {
          *     a first confirmation; ``409 incident_confirmed`` after the second.
          */
         post: operations["add_incident_school_api_v1_platform_incidents__incident_id__schools_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/incidents/clocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Incident Clocks
+         * @description Open incident clocks due soon (``incident_alerts.due_soon_minutes``) or overdue, most
+         *     urgent first: the CERT-In clock (T0 + 6 h) and each school-notice clock (confirmation +
+         *     24 h), with the school's tenant code. The same rules as the beat alerts (D49 part 2).
+         */
+        get: operations["list_incident_clocks_api_v1_platform_incidents_clocks_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -13405,6 +13449,11 @@ export interface components {
             fleet_versions?: {
                 [key: string]: number;
             } | null;
+            /**
+             * Incident Clocks
+             * @description Open incident clocks due soon or overdue, most urgent first; only for holders of platform.incidents.read (D49 part 2).
+             */
+            incident_clocks?: components["schemas"]["IncidentClockOut"][] | null;
             /** Mrr Inr */
             mrr_inr?: string | null;
             /** Oldest Overdue Due Date */
@@ -15665,6 +15714,51 @@ export interface components {
              */
             status: "uploaded" | "parsing" | "parsed" | "validating" | "validated" | "committing" | "committed" | "reverting" | "reverted" | "failed";
         };
+        /**
+         * IncidentClockOut
+         * @description An open incident clock that is due soon or overdue (D49 part 2; FR-DPDP-031): the same
+         *     rules as the beat alerts (:mod:`app.platform.incident_alerts`). Ids, codes and times only:
+         *     never the summary, a school name or a count.
+         */
+        IncidentClockOut: {
+            /**
+             * Clock
+             * @enum {string}
+             */
+            clock: "cert_in" | "school_notice";
+            /**
+             * Due At
+             * Format: date-time
+             */
+            due_at: string;
+            /**
+             * Incident Id
+             * Format: uuid
+             */
+            incident_id: string;
+            /**
+             * Minutes Left
+             * @description Whole minutes to the deadline; negative when overdue.
+             */
+            minutes_left: number;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "P1" | "P2" | "P3" | "P4";
+            /**
+             * Stage
+             * @enum {string}
+             */
+            stage: "due_soon" | "overdue";
+            /** Tenant Code */
+            tenant_code?: string | null;
+            /**
+             * Tenant Id
+             * @description The school of a school-notice clock; null for CERT-In.
+             */
+            tenant_id?: string | null;
+        };
         /** IncidentDetailOut */
         IncidentDetailOut: {
             /**
@@ -15907,6 +16001,26 @@ export interface components {
         IncidentReopenIn: {
             /** Reason */
             reason: string;
+        };
+        /**
+         * IncidentReopenToldIn
+         * @description A dedicated-host school was told of reopen ``reopen_seq`` by phone or e-mail (it has no
+         *     pull; D49). ``note``: how it was told, in the summary's rule (no names, long numbers,
+         *     e-mail addresses or Aadhaar numbers).
+         */
+        IncidentReopenToldIn: {
+            /** Note */
+            note: string;
+            /**
+             * Reopen Seq
+             * @description The incident's reopen count the school was told of.
+             */
+            reopen_seq: number;
+            /**
+             * Tenant Id
+             * Format: uuid
+             */
+            tenant_id: string;
         };
         /** IncidentSchoolIn */
         IncidentSchoolIn: {
@@ -40082,6 +40196,54 @@ export interface operations {
             };
         };
     };
+    record_incident_reopen_told_api_v1_platform_incidents__incident_id__reopen_told_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IncidentReopenToldIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncidentDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     withdraw_incident_reopen_api_v1_platform_incidents__incident_id__reopen_withdraw_post: {
         parameters: {
             query?: never;
@@ -40157,6 +40319,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_incident_clocks_api_v1_platform_incidents_clocks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncidentClockOut"][];
                 };
             };
             /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */

@@ -455,6 +455,9 @@ ACTION_SEGMENTS = {
 
 # Creating POSTs that do not take Idempotency-Key, with the reason.
 IDEMPOTENCY_EXEMPT = {
+    # F1 (D49): a dedicated school told of a reopen by phone.
+    ("POST", "/api/v1/platform/incidents/{incident_id}/reopen:told"): "a state transition: a "
+    "repeat answers 409 reopen_not_pending",
     ("POST", "/api/v1/disclosure/link/rotate"): "a state change (step-up, audited): a repeat "
     "only issues another link and revokes the previous one",
     ("POST", "/api/v1/fleet/heartbeat"): "machine route; nonce and timestamp make it replay-safe",

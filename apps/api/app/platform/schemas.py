@@ -1156,6 +1156,23 @@ class BreakGlassOut(Out):
 # --- dashboard / audit ------------------------------------------------------------------------
 
 
+class IncidentClockOut(Out):
+    """An open incident clock that is due soon or overdue (D49 part 2; FR-DPDP-031): the same
+    rules as the beat alerts (:mod:`app.platform.incident_alerts`). Ids, codes and times only:
+    never the summary, a school name or a count."""
+
+    incident_id: uuid.UUID
+    severity: Literal["P1", "P2", "P3", "P4"]
+    clock: Literal["cert_in", "school_notice"]
+    stage: Literal["due_soon", "overdue"]
+    due_at: dt.datetime
+    minutes_left: int = Field(description="Whole minutes to the deadline; negative when overdue.")
+    tenant_id: uuid.UUID | None = Field(
+        default=None, description="The school of a school-notice clock; null for CERT-In."
+    )
+    tenant_code: str | None = None
+
+
 class DashboardOut(Out):
     mrr_inr: Decimal | None = None
     arr_inr: Decimal | None = None
@@ -1172,6 +1189,11 @@ class DashboardOut(Out):
     ai_spend_top: list[dict[str, Any]] | None = None
     open_tickets_by_priority: dict[str, int] | None = None
     tickets_sla_breached: int | None = None
+    incident_clocks: list[IncidentClockOut] | None = Field(
+        default=None,
+        description="Open incident clocks due soon or overdue, most urgent first; only for "
+        "holders of platform.incidents.read (D49 part 2).",
+    )
 
 
 class PlatformAuditEventOut(Out):

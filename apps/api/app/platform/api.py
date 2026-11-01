@@ -35,6 +35,7 @@ from app.platform import (
     dashboard,
     flags,
     fleet,
+    incident_alerts,
     incidents,
     invoice_files,
     offboarding,
@@ -72,6 +73,7 @@ from app.platform.schemas import (
     FleetVersionOut,
     HeartbeatKeyOut,
     HeartbeatOut,
+    IncidentClockOut,
     InvoiceCreate,
     InvoiceOut,
     InvoicePatch,
@@ -1371,6 +1373,14 @@ def list_incidents(
     return Page[incidents.IncidentOut](data=items, next_cursor=nxt)
 
 
+@router.get("/incidents/clocks", response_model=list[IncidentClockOut])
+def list_incident_clocks(*, ctx: Annotated[Ctx, IncidentsRead]) -> list[IncidentClockOut]:
+    """Open incident clocks due soon (``incident_alerts.due_soon_minutes``) or overdue, most
+    urgent first: the CERT-In clock (T0 + 6 h) and each school-notice clock (confirmation +
+    24 h), with the school's tenant code. The same rules as the beat alerts (D49 part 2)."""
+    return incident_alerts.open_clocks()
+
+
 @router.post("/incidents", response_model=incidents.IncidentDetailOut, status_code=201)
 def create_incident(
     *,
@@ -1485,6 +1495,19 @@ def withdraw_incident_reopen(
     """Withdraw a waiting (or expired) reopen request; the incident stays closed.
     ``409 no_reopen_request``."""
     return incidents.withdraw_reopen(_actor(ctx), incident_id)
+
+
+@router.post("/incidents/{incident_id}/reopen:told", response_model=incidents.IncidentDetailOut)
+def record_incident_reopen_told(
+    *,
+    incident_id: uuid.UUID,
+    data: incidents.IncidentReopenToldIn,
+    ctx: Annotated[Ctx, IncidentsManage],
+) -> incidents.IncidentDetailOut:
+    """Record that a dedicated-host school was told of reopen ``reopen_seq`` by phone or e-mail
+    (it has no pull; D49). The note follows the summary rule (422 otherwise). ``409
+    school_pulls`` (shared tier), ``reopen_not_pending`` or ``reopen_changed``."""
+    return incidents.record_reopen_told(_actor(ctx), incident_id, data)
 
 
 # --- operators --------------------------------------------------------------------------------

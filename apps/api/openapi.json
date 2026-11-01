@@ -8777,6 +8777,21 @@
             ],
             "title": "Fleet Versions"
           },
+          "incident_clocks": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/IncidentClockOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Open incident clocks due soon or overdue, most urgent first; only for holders of platform.incidents.read (D49 part 2).",
+            "title": "Incident Clocks"
+          },
           "mrr_inr": {
             "anyOf": [
               {
@@ -15124,6 +15139,86 @@
         "title": "ImportSummary",
         "type": "object"
       },
+      "IncidentClockOut": {
+        "description": "An open incident clock that is due soon or overdue (D49 part 2; FR-DPDP-031): the same\nrules as the beat alerts (:mod:`app.platform.incident_alerts`). Ids, codes and times only:\nnever the summary, a school name or a count.",
+        "properties": {
+          "clock": {
+            "enum": [
+              "cert_in",
+              "school_notice"
+            ],
+            "title": "Clock",
+            "type": "string"
+          },
+          "due_at": {
+            "format": "date-time",
+            "title": "Due At",
+            "type": "string"
+          },
+          "incident_id": {
+            "format": "uuid",
+            "title": "Incident Id",
+            "type": "string"
+          },
+          "minutes_left": {
+            "description": "Whole minutes to the deadline; negative when overdue.",
+            "title": "Minutes Left",
+            "type": "integer"
+          },
+          "severity": {
+            "enum": [
+              "P1",
+              "P2",
+              "P3",
+              "P4"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "stage": {
+            "enum": [
+              "due_soon",
+              "overdue"
+            ],
+            "title": "Stage",
+            "type": "string"
+          },
+          "tenant_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Code"
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The school of a school-notice clock; null for CERT-In.",
+            "title": "Tenant Id"
+          }
+        },
+        "required": [
+          "incident_id",
+          "severity",
+          "clock",
+          "stage",
+          "due_at",
+          "minutes_left"
+        ],
+        "title": "IncidentClockOut",
+        "type": "object"
+      },
       "IncidentDetailOut": {
         "properties": {
           "cert_in_due_at": {
@@ -15831,6 +15926,36 @@
           "reason"
         ],
         "title": "IncidentReopenIn",
+        "type": "object"
+      },
+      "IncidentReopenToldIn": {
+        "additionalProperties": false,
+        "description": "A dedicated-host school was told of reopen ``reopen_seq`` by phone or e-mail (it has no\npull; D49). ``note``: how it was told, in the summary's rule (no names, long numbers,\ne-mail addresses or Aadhaar numbers).",
+        "properties": {
+          "note": {
+            "maxLength": 200,
+            "minLength": 5,
+            "title": "Note",
+            "type": "string"
+          },
+          "reopen_seq": {
+            "description": "The incident's reopen count the school was told of.",
+            "minimum": 1.0,
+            "title": "Reopen Seq",
+            "type": "integer"
+          },
+          "tenant_id": {
+            "format": "uuid",
+            "title": "Tenant Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "reopen_seq",
+          "note"
+        ],
+        "title": "IncidentReopenToldIn",
         "type": "object"
       },
       "IncidentSchoolIn": {
@@ -65663,6 +65788,56 @@
         ]
       }
     },
+    "/api/v1/platform/incidents/clocks": {
+      "get": {
+        "description": "Open incident clocks due soon (``incident_alerts.due_soon_minutes``) or overdue, most\nurgent first: the CERT-In clock (T0 + 6 h) and each school-notice clock (confirmation +\n24 h), with the school's tenant code. The same rules as the beat alerts (D49 part 2).",
+        "operationId": "list_incident_clocks_api_v1_platform_incidents_clocks_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/IncidentClockOut"
+                  },
+                  "title": "Response List Incident Clocks Api V1 Platform Incidents Clocks Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List Incident Clocks",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
     "/api/v1/platform/incidents/{incident_id}": {
       "get": {
         "description": "One incident with its affected schools and their school-notice clocks (confirmation +\n24 h). ``ETag`` for ``If-Match`` on PATCH.",
@@ -66032,6 +66207,84 @@
           }
         },
         "summary": "Confirm Incident Reopen",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/incidents/{incident_id}/reopen:told": {
+      "post": {
+        "description": "Record that a dedicated-host school was told of reopen ``reopen_seq`` by phone or e-mail\n(it has no pull; D49). The note follows the summary rule (422 otherwise). ``409\nschool_pulls`` (shared tier), ``reopen_not_pending`` or ``reopen_changed``.",
+        "operationId": "record_incident_reopen_told_api_v1_platform_incidents__incident_id__reopen_told_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentReopenToldIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Record Incident Reopen Told",
         "tags": [
           "platform"
         ]
