@@ -1,10 +1,17 @@
 // @vitest-environment node
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { routeSurface } from "@/lib/public-surface";
 import { loadAuthConfig } from "@/server/config";
 import { testEnv } from "@/test/server-env";
 import type { PublicRuntime } from "./client";
-import { disclosureDocumentRedirect, loadDisclosure } from "./disclosure";
+import { DISCLOSURE_DOCUMENT_MAX, disclosureDocumentRedirect, loadDisclosure } from "./disclosure";
+
+/** The committed OpenAPI document (apps/api/openapi.json): the API's own bounds. */
+type OpenApiParameter = { name: string; schema?: Record<string, unknown> };
+const openapi = JSON.parse(
+  readFileSync(new URL("../../../../api/openapi.json", import.meta.url), "utf8"),
+) as { paths: Record<string, { get: { parameters: OpenApiParameter[] } }> };
 
 /**
  * The CBSE disclosure page through the BFF (R3-1C; ADR-0051; FR-DISC-009, FR-DISC-010;
@@ -121,5 +128,21 @@ describe("document redirect (FR-DISC-009)", () => {
     const bad = await disclosureDocumentRedirect(runtime(), request, KEY, "0");
     expect(bad.status).toBe(303);
     expect(calls).toHaveLength(0);
+  });
+
+  it("accepts the API's document numbers only (1 to 200)", async () => {
+    const route = openapi.paths["/api/v1/public/disclosure/{key}/documents/{n}"];
+    const n = route?.get.parameters.find((p) => p.name === "n");
+    expect(n?.schema).toMatchObject({ minimum: 1, maximum: DISCLOSURE_DOCUMENT_MAX });
+    answer = () => json({ url: "https://files.example/doc.pdf?sig=x", expires_at: "x" });
+    calls = [];
+    const last = await disclosureDocumentRedirect(runtime(), request, KEY, "200");
+    expect(last.headers.get("location")).toBe("https://files.example/doc.pdf?sig=x");
+    expect(calls).toHaveLength(1);
+    for (const outside of ["201", "999", "1000", "01"]) {
+      const res = await disclosureDocumentRedirect(runtime(), request, KEY, outside);
+      expect(res.headers.get("location"), outside).toBe(`https://${PARENT}/d/${KEY}`);
+    }
+    expect(calls).toHaveLength(1);
   });
 });

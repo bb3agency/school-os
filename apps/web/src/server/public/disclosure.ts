@@ -13,6 +13,20 @@ import { callPublicApi, type PublicRuntime } from "./client";
  */
 
 export type PublicDisclosure = components["schemas"]["PublicDisclosureOut"];
+type PublicDocumentLink = components["schemas"]["PublicDocumentLinkOut"];
+
+/**
+ * Document numbers the API accepts: `Path(ge=1, le=200)` on
+ * `GET /api/v1/public/disclosure/{key}/documents/{n}` (apps/api/openapi.json; a test pins it).
+ * Anything else goes back to the page without calling the API.
+ */
+export const DISCLOSURE_DOCUMENT_MAX = 200;
+
+function documentNumber(n: string): number | null {
+  if (!/^[1-9]\d{0,2}$/.test(n)) return null;
+  const value = Number(n);
+  return value <= DISCLOSURE_DOCUMENT_MAX ? value : null;
+}
 
 /** A disclosure link key: 16 random bytes, base64url without padding (22 characters). */
 export const DISCLOSURE_KEY = /^[A-Za-z0-9_-]{22}$/;
@@ -73,12 +87,13 @@ export async function disclosureDocumentRedirect(
       status: 303,
       headers: { Location: location.toString(), "Cache-Control": "private, no-store" },
     });
-  if (!DISCLOSURE_KEY.test(key) || !/^[1-9]\d{0,2}$/.test(n)) return see(back);
+  const number = documentNumber(n);
+  if (!DISCLOSURE_KEY.test(key) || number === null) return see(back);
   let upstream: Response;
   try {
     upstream = await callPublicApi(runtime, {
       method: "GET",
-      path: `/api/v1/public/disclosure/${key}/documents/${n}`,
+      path: `/api/v1/public/disclosure/${key}/documents/${number}`,
       incomingHeaders: request.headers,
     });
   } catch {
@@ -89,8 +104,8 @@ export async function disclosureDocumentRedirect(
     await upstream.body?.cancel();
     return see(back);
   }
-  const body = (await upstream.json().catch(() => null)) as { url?: unknown } | null;
-  const url = body?.url;
+  const body = (await upstream.json().catch(() => null)) as Partial<PublicDocumentLink> | null;
+  const url: unknown = body?.url;
   return isFileUrl(url) ? see(url) : see(back);
 }
 
