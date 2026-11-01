@@ -278,7 +278,9 @@ def test_FR_MSG_016_transient_error_retries_with_backoff_and_new_link(
     assert row["next_attempt_at"] > dt.datetime.now(dt.UTC) + dt.timedelta(minutes=4)
     STATE.failing.clear()
     sends.send_due(school.tenant_id, now=S.at(12) + dt.timedelta(minutes=10))
-    sends.send_due(school.tenant_id, now=dt.datetime.now(dt.UTC) + dt.timedelta(minutes=6))
+    # The retry is due 5 minutes after the real clock; noon tomorrow is after it and inside the
+    # sending hours whenever the suite runs (at 21:00-07:00 IST "now + 6 min" is in quiet hours).
+    sends.send_due(school.tenant_id, now=S.at(12, days=1))
     row = S.message_rows(admin_engine, guardian_id=guardian)[0]
     assert row["status"] == "sent"
     assert row["attempts"] == 2
@@ -471,7 +473,9 @@ def test_US_2206_receipt_message_from_the_outbox_event(
     out = sends.queue_receipt_message(school.tenant_id, receipt.id)
     assert out["queued"] == 1
     assert sends.queue_receipt_message(school.tenant_id, receipt.id)["queued"] == 0  # idempotent
-    sends.send_due(school.tenant_id, now=S.at(12))
+    # Queued on the real clock: after the 20:00 IST receipt cut-off it waits for the morning,
+    # so send at noon tomorrow, which is due whenever the suite runs.
+    sends.send_due(school.tenant_id, now=S.at(12, days=1))
     sent = _sent_to(mobile)
     assert len(sent) == 1
     assert sent[0]["values"][3] == receipt.receipt_number
