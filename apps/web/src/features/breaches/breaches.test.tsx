@@ -62,6 +62,8 @@ function breach(extra: Partial<Breach> = {}): Breach {
     duties: duties(),
     next_duty: { key: "board_notice", due_at: "2026-10-21T00:00:00Z", hours_left: -6 },
     processor_facts: null,
+    platform_reopens: 0,
+    platform_reopened_at: null,
     platform_incident_id: null,
     closed_at: null,
     created_at: "2026-10-20T00:10:00Z",
@@ -232,5 +234,32 @@ describe("US-2702 breach detail", () => {
     expect(await screen.findByText(/left on a bus/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: bm.detail.markDone })).toBeNull();
     expect(screen.queryByRole("button", { name: bm.drafts.makeNotice })).toBeNull();
+  });
+
+  it("D49: a breach SchoolOS reopened says so and can be closed again", async () => {
+    setMe([READ, MANAGE]);
+    stub.routes[`GET /bff/api/v1/privacy/breaches/${B1}`] = () =>
+      Response.json(
+        detail({
+          origin: "processor_notice",
+          platform_incident_id: "0192f3a4-0000-7000-8000-00000000e001",
+          platform_reopens: 2,
+          platform_reopened_at: "2026-10-21T04:00:00Z",
+        }),
+      );
+    renderWithIntl(<BreachDetailScreen breachId={B1} />);
+    expect(await screen.findByText(bm.detail.reopenedTitle)).toBeInTheDocument();
+    expect(
+      screen.getByText(/reopened this incident on 21\/10\/2026.*2 times in all/),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: bm.detail.close })).toBeInTheDocument();
+  });
+
+  it("D49: no reopen note on a breach SchoolOS never reopened", async () => {
+    setMe([READ]);
+    stub.routes[`GET /bff/api/v1/privacy/breaches/${B1}`] = () => Response.json(detail());
+    renderWithIntl(<BreachDetailScreen breachId={B1} />);
+    expect(await screen.findByText(/left on a bus/)).toBeInTheDocument();
+    expect(screen.queryByText(bm.detail.reopenedTitle)).toBeNull();
   });
 });

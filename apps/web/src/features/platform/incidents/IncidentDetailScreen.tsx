@@ -41,6 +41,8 @@ import {
  * told (a second, different operator confirms), recording schools told by phone or e-mail
  * (dedicated hosts have no pull), and the status. Categories and counts only. A closed incident
  * is read-only (D48): reopening it is asked for by one operator and confirmed by another.
+ * Closing is refused while CERT-In or a school is still owed a notice (D49); the status dialog
+ * says so before submit. A reopen reaches each shared-tier school on its next pull (D49).
  */
 export function IncidentDetailScreen({ incidentId }: { incidentId: string }) {
   const t = useTranslations("platform.incidents");
@@ -102,6 +104,7 @@ export function IncidentDetailScreen({ incidentId }: { incidentId: string }) {
 function StatusDialog({ incident }: { incident: IncidentDetail }) {
   const t = useTranslations("platform.incidents");
   const api = useBffClient("operator");
+  const blockers = incident.close_blocked_by;
   return (
     <ActionDialog
       triggerLabel={t("changeStatus")}
@@ -124,13 +127,24 @@ function StatusDialog({ incident }: { incident: IncidentDetail }) {
       }
     >
       {(errors) => (
-        <SelectField
-          name="status"
-          label={t("colStatus")}
-          error={errors.status}
-          defaultValue={incident.status}
-          options={INCIDENT_STATUSES.map((value) => ({ value, label: t(`status.${value}`) }))}
-        />
+        <>
+          {blockers.length > 0 ? (
+            <Alert tone="warning" title={t("closeBlockedTitle")}>
+              <ul className="list-disc space-y-1 ps-5">
+                {blockers.map((code) => (
+                  <li key={code}>{t(`closeBlocked.${code}`)}</li>
+                ))}
+              </ul>
+            </Alert>
+          ) : null}
+          <SelectField
+            name="status"
+            label={t("colStatus")}
+            error={errors.status}
+            defaultValue={incident.status}
+            options={INCIDENT_STATUSES.map((value) => ({ value, label: t(`status.${value}`) }))}
+          />
+        </>
       )}
     </ActionDialog>
   );
@@ -434,8 +448,17 @@ function Schools({ incident, manage }: { incident: IncidentDetail; manage: boole
       key: "pulled",
       header: t("colPulled"),
       cell: (row) => (
-        <span className="num text-sm">
-          <Value>{row.pulled_at ? formatDateTime(row.pulled_at) : null}</Value>
+        <span className="flex flex-col gap-0.5">
+          <span className="num text-sm">
+            <Value>{row.pulled_at ? formatDateTime(row.pulled_at) : null}</Value>
+          </span>
+          {incident.reopen_count > 0 ? (
+            <span className="num text-xs text-ink-muted">
+              {row.reopen_pulled >= incident.reopen_count
+                ? t("reopenPulledAt", { when: formatDateTime(row.reopen_pulled_at) ?? "" })
+                : t("reopenNotPulled")}
+            </span>
+          ) : null}
         </span>
       ),
     },

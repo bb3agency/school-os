@@ -302,6 +302,8 @@ function breachOut(fields: {
     close_reason: null,
     platform_incident_id: null,
     processor_facts: null,
+    platform_reopens: 0,
+    platform_reopened_at: null,
     recorded_by_name: MEMBERS[DPO_PRINCIPAL]!.name,
     affected: { students: 0, guardians: 0, staff: 0 },
     duties,
@@ -1072,6 +1074,9 @@ const INCIDENT: Schemas["IncidentDetailOut"] = {
   cert_in_reported_at: "2026-10-30T08:00:00Z",
   schools_count: 1,
   schools_notified: 1,
+  reopen_count: 0,
+  last_reopened_at: null,
+  close_blocked_by: [],
   schools: [
     {
       tenant_id: T1,
@@ -1085,6 +1090,8 @@ const INCIDENT: Schemas["IncidentDetailOut"] = {
       school_notified_at: "2026-10-30T06:00:00Z",
       notice_due_at: "2026-10-31T04:30:00Z",
       pulled_at: "2026-10-30T06:05:00Z",
+      reopen_pulled: 0,
+      reopen_pulled_at: null,
     },
   ],
   version: 4,

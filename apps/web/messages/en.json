@@ -1897,6 +1897,13 @@
       "withdrawReopen": "Withdraw the request",
       "withdrawReopenTitle": "Withdraw the reopen request",
       "withdrawReopenConsequence": "The incident stays closed. Anyone can ask again later.",
+      "closeBlockedTitle": "This incident cannot be closed yet",
+      "closeBlocked": {
+        "incident_cert_in_unreported": "CERT-In has not been told. Record when SchoolOS reported the incident to CERT-In first.",
+        "incident_school_not_notified": "An affected school has not been notified. Wait for its register to pull the notice, or record the schools told by phone or e-mail."
+      },
+      "reopenPulledAt": "Reopen received {when}",
+      "reopenNotPulled": "Reopen not received yet",
       "errors": {
         "no_schools": {
           "title": "No schools to confirm",
@@ -1929,6 +1936,14 @@
         "no_reopen_request": {
           "title": "No reopen request is waiting",
           "body": "The request was confirmed or withdrawn. Reload the page to see the current status."
+        },
+        "incident_cert_in_unreported": {
+          "title": "CERT-In has not been told yet",
+          "body": "Record when SchoolOS reported the incident to CERT-In, or mark it as not reportable, then close it."
+        },
+        "incident_school_not_notified": {
+          "title": "A school has not been notified yet",
+          "body": "Wait for the school's register to pull the notice, or record the schools told by phone or e-mail, then close it."
         }
       }
     }
@@ -10281,7 +10296,9 @@
       "closeConsequence": "A closed breach can't be changed. It stays in the register.",
       "closeReason": "Why it is closed",
       "closeReasonOptional": "Note (optional)",
-      "closeReasonHint": "10 to 500 characters. No names or Aadhaar numbers."
+      "closeReasonHint": "10 to 500 characters. No names or Aadhaar numbers.",
+      "reopenedTitle": "SchoolOS reopened the incident",
+      "reopenedBody": "SchoolOS reopened this incident on {when} ({count, plural, one {once} other {# times}} in all). Review the breach, record anything new, then close it again."
     },
     "drafts": {
       "title": "Drafts",

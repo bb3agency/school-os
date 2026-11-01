@@ -57,6 +57,9 @@ function incident(extra: Partial<Incident> = {}): Incident {
     confirm_by: null,
     schools_count: 2,
     schools_notified: 1,
+    reopen_count: 0,
+    last_reopened_at: null,
+    close_blocked_by: ["incident_cert_in_unreported"],
     version: 5,
     ...extra,
   };
@@ -78,6 +81,8 @@ function detail(extra: Partial<IncidentDetail> = {}): IncidentDetail {
         school_notified_at: null,
         pulled_at: null,
         notice_due_at: null,
+        reopen_pulled: 0,
+        reopen_pulled_at: null,
       },
     ],
     ...extra,
@@ -301,5 +306,69 @@ describe("a closed incident is locked; reopening takes two operators (D48)", () 
     expect(await screen.findByText(im.closedLocked)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: im.confirmReopen })).toBeNull();
     expect(screen.queryByRole("button", { name: im.withdrawReopen })).toBeNull();
+  });
+});
+
+describe("close gate and reopen propagation (D49)", () => {
+  it("the status dialog says why closing would be refused before anything is sent", async () => {
+    setPermissions(["platform.incidents.read", "platform.incidents.manage"]);
+    stub.routes[`GET /bff/api/v1/platform/incidents/${INC}`] = () =>
+      Response.json(
+        detail({
+          close_blocked_by: ["incident_cert_in_unreported", "incident_school_not_notified"],
+        }),
+      );
+    const user = userEvent.setup();
+    renderWithIntl(<IncidentDetailScreen incidentId={INC} />);
+    await user.click(await screen.findByRole("button", { name: im.changeStatus }));
+    const dialog = screen.getByRole("dialog", { name: im.changeStatusTitle });
+    expect(within(dialog).getByText(im.closeBlockedTitle)).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(im.closeBlocked.incident_cert_in_unreported),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(im.closeBlocked.incident_school_not_notified),
+    ).toBeInTheDocument();
+    expect(stub.callsTo(`PATCH /bff/api/v1/platform/incidents/${INC}`)).toEqual([]);
+  });
+
+  it("nothing is shown when the incident can be closed; a refusal is still explained", async () => {
+    setPermissions(["platform.incidents.read", "platform.incidents.manage"]);
+    stub.routes[`GET /bff/api/v1/platform/incidents/${INC}`] = () =>
+      Response.json(detail({ close_blocked_by: [] }));
+    stub.routes[`PATCH /bff/api/v1/platform/incidents/${INC}`] = () =>
+      problem(409, "incident_school_not_notified");
+    const user = userEvent.setup();
+    renderWithIntl(<IncidentDetailScreen incidentId={INC} />);
+    await user.click(await screen.findByRole("button", { name: im.changeStatus }));
+    const dialog = screen.getByRole("dialog", { name: im.changeStatusTitle });
+    expect(within(dialog).queryByText(im.closeBlockedTitle)).toBeNull();
+    await user.selectOptions(within(dialog).getByLabelText(im.colStatus), "closed");
+    await user.click(within(dialog).getByRole("button", { name: im.changeStatus }));
+    await waitFor(() =>
+      expect(stub.callsTo(`PATCH /bff/api/v1/platform/incidents/${INC}`)).toHaveLength(1),
+    );
+    expect(
+      await within(dialog).findByText(im.errors.incident_school_not_notified.title),
+    ).toBeInTheDocument();
+  });
+
+  it("shows whether each school has received the reopen", async () => {
+    setPermissions(["platform.incidents.read"]);
+    const base = detail();
+    const first = base.schools[0]!;
+    stub.routes[`GET /bff/api/v1/platform/incidents/${INC}`] = () =>
+      Response.json({
+        ...base,
+        reopen_count: 1,
+        last_reopened_at: "2026-10-21T05:00:00Z",
+        schools: [
+          { ...first, reopen_pulled: 1, reopen_pulled_at: "2026-10-21T05:01:00Z" },
+          { ...first, tenant_id: OTHER, tenant_code: "other-school" },
+        ],
+      });
+    renderWithIntl(<IncidentDetailScreen incidentId={INC} />);
+    expect(await screen.findByText(/Reopen received 21\/10\/2026/)).toBeInTheDocument();
+    expect(screen.getByText(im.reopenNotPulled)).toBeInTheDocument();
   });
 });

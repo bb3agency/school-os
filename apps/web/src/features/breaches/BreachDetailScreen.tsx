@@ -117,6 +117,15 @@ export function BreachDetailScreen({ breachId }: { breachId: string }) {
           {data.close_reason ? td("closedReason", { reason: data.close_reason }) : td("closedBody")}
         </Alert>
       ) : null}
+      {data.platform_reopens > 0 ? (
+        // D49: SchoolOS reopened its incident; a closed breach came back open for review.
+        <Alert tone={closed ? "info" : "warning"} title={td("reopenedTitle")}>
+          {td("reopenedBody", {
+            when: formatDateTime(data.platform_reopened_at) ?? "",
+            count: data.platform_reopens,
+          })}
+        </Alert>
+      ) : null}
       {data.processor_facts ? (
         <div data-print={hideInPrint}>
           <ProcessorFacts breach={data} />
