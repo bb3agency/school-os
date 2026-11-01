@@ -363,18 +363,15 @@ function PublishDialog({ draft, live }: { draft: DisclosureDraft; live: boolean 
       confirmLabel={t("confirm")}
       stepUp
       consequence={t("consequence")}
-      schema={z.object({
-        confirm_no_student_data: z
-          .string()
-          .optional()
-          .refine((v) => v === "on", { error: "required" }),
-      })}
+      // A literal, not .optional().refine(): zod 4 skips refinements when the value is missing, so
+      // an unticked box (absent from the form data) would pass.
+      schema={z.object({ confirm_no_student_data: z.literal("on", { error: "required" }) })}
       invalidate={[DISCLOSURE_KEYS.all]}
-      submit={(_input, idempotencyKey) =>
+      submit={(input, idempotencyKey) =>
         unwrap(
           api.POST("/api/v1/disclosure/publish", {
             headers: { "Idempotency-Key": idempotencyKey },
-            body: { confirm_no_student_data: true },
+            body: { confirm_no_student_data: input.confirm_no_student_data === "on" },
           }),
         )
       }
@@ -749,7 +746,9 @@ function DraftEditor({
   };
 
   return (
-    <form noValidate onSubmit={(e) => void onSubmit(e)} className="space-y-5">
+    // The publish dialog has its own form, so it sits outside the editor's form: a nested form
+    // makes the browser submit the outer one as a plain GET instead of publishing.
+    <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-ink-muted">
           {draft.updated_at
@@ -761,47 +760,49 @@ function DraftEditor({
         </p>
         {canPublish ? <PublishDialog draft={draft} live={live} /> : null}
       </div>
-      <ErrorSummary errors={summary} attempt={attempt} />
-      {format.sections.map((section) => (
-        <Card key={section.key} title={section.title}>
-          <ul className="divide-y divide-border">
-            {section.items.map((item) => (
-              <li key={item.key} id={`item-${item.key}`} className="py-4 scroll-mt-24">
-                {itemBody(item)}
-              </li>
-            ))}
-          </ul>
-        </Card>
-      ))}
-      {stale ? (
-        <Alert tone="warning" title={t("staleTitle")}>
-          {t("staleBody")}
-        </Alert>
-      ) : (
-        <ApiErrorAlert error={summary.length ? undefined : error} />
-      )}
-      {saved ? (
-        <Alert tone="success" live>
-          {t("saved")}
-        </Alert>
-      ) : null}
-      <SaveBar dirty={dirty} placement="page">
-        <Button
-          variant="secondary"
-          disabled={!dirty || pending}
-          onClick={() => {
-            setState(initial);
-            setDirty(false);
-            setError(undefined);
-          }}
-        >
-          {ts("discard")}
-        </Button>
-        <Button type="submit" disabled={pending} aria-disabled={pending || undefined}>
-          {pending ? tc("working") : t("save")}
-        </Button>
-      </SaveBar>
-    </form>
+      <form noValidate onSubmit={(e) => void onSubmit(e)} className="space-y-5">
+        <ErrorSummary errors={summary} attempt={attempt} />
+        {format.sections.map((section) => (
+          <Card key={section.key} title={section.title}>
+            <ul className="divide-y divide-border">
+              {section.items.map((item) => (
+                <li key={item.key} id={`item-${item.key}`} className="py-4 scroll-mt-24">
+                  {itemBody(item)}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        ))}
+        {stale ? (
+          <Alert tone="warning" title={t("staleTitle")}>
+            {t("staleBody")}
+          </Alert>
+        ) : (
+          <ApiErrorAlert error={summary.length ? undefined : error} />
+        )}
+        {saved ? (
+          <Alert tone="success" live>
+            {t("saved")}
+          </Alert>
+        ) : null}
+        <SaveBar dirty={dirty} placement="page">
+          <Button
+            variant="secondary"
+            disabled={!dirty || pending}
+            onClick={() => {
+              setState(initial);
+              setDirty(false);
+              setError(undefined);
+            }}
+          >
+            {ts("discard")}
+          </Button>
+          <Button type="submit" disabled={pending} aria-disabled={pending || undefined}>
+            {pending ? tc("working") : t("save")}
+          </Button>
+        </SaveBar>
+      </form>
+    </div>
   );
 }
 

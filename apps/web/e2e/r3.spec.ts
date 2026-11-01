@@ -256,11 +256,8 @@ test.describe.serial("R3 journeys (stand-in IdP)", () => {
   test("disclosure: publish the CBSE disclosure and see its public link (FR-DISC-008)", async ({
     page,
   }) => {
-    // Known app bug (found by this journey, 2026-11-01): the Publish dialog's <form> is rendered
-    // inside the draft editor's <form> (DisclosureScreen.tsx, DraftEditor → PublishDialog), and
-    // its submit does a native GET to /settings/disclosure?confirm_no_student_data=on instead of
-    // POST /disclosure/publish (by keyboard and by mouse). Remove this line once it is fixed.
-    test.fail(true, "nested <form>: the Publish dialog reloads the page instead of publishing");
+    // Regression: the Publish dialog's form once sat inside the draft editor's form, so publishing
+    // did a native GET of /settings/disclosure instead of POST /disclosure/publish (2026-11-01).
     await signInByKeyboard(page, "/settings/disclosure", DPO_PRINCIPAL);
     await expect(
       page.getByRole("heading", { level: 1, name: "CBSE disclosure (Appendix IX)" }),
