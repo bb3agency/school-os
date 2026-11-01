@@ -4,14 +4,17 @@ FR-DPDP-013, PRV-031, PRV-032; ADR-0048 decisions 6 and 8).
 The rows are keyed by the user (account) id; the subject is a staff member
 (``core.memberships.id``), mapped through ``identity.service.user_id_for_membership``.
 
-Report: how many questions the member asked, their conversations (with the titles, decrypted
-with this module's own helper: titles are the member's own words about their own chats) and
-memory items, and the memory switch. The questions, answers and memory texts are not
-repeated: answers quote school records the requester may not be entitled to, and the question
-texts are counted, not printed (the member can read them in Ask while they are kept).
+Report: how many questions the member asked and their conversations (with the titles, decrypted
+with this module's own helper: titles are the member's own words about their own chats) under
+``ask_history``; their memory items and the memory switch under ``ask_memory`` (kept until the
+person deletes them or leaves, not 180 days; docs/05 §13). The questions, answers and memory
+texts are not repeated: answers quote school records the requester may not be entitled to,
+and the question texts are counted, not printed (the member can read them in Ask while they
+are kept).
 
-Erasure: every question (the encrypted query log, so the answer cache that reuses them goes
-too), conversation (title and summary), memory item and memory setting of the member in this
+Erasure, per class asked for: ``ask_history`` deletes every question (the encrypted query log,
+so the answer cache that reuses them goes too) and conversation (title and summary);
+``ask_memory`` deletes every memory item and the memory setting. Both of the member in this
 school, in the caller's transaction, audited ``kb.ask_history.erased`` with counts only. The
 metering ledger ``kb.llm_calls`` keeps its rows (ids, counts and costs only).
 """
@@ -32,6 +35,7 @@ from app.knowledge import repository as repo
 from app.knowledge.sealed import title_of
 
 CLASS_KEY = "ask_history"
+MEMORY_CLASS_KEY = "ask_memory"
 ERASED_EVENT = "kb.ask_history.erased"
 
 
@@ -50,24 +54,24 @@ def subject_report(session: Session, subject: Subject) -> list[ReportSection]:
     counts = repo.ask_history_counts(session, user_id)
     if counts.total == 0:
         return []
-    switch = repo.memory_enabled(session, user_id)
-    summary = ReportSection(
-        class_key=CLASS_KEY,
-        title='Questions to "Ask the school"',
-        columns=("Detail", "Value"),
-        rows=(
-            ("Questions asked (kept for 180 days)", fmt_count(counts.queries)),
-            ("Conversations", fmt_count(counts.conversations)),
-            (
-                "Conversations removed from the history (questions kept until deleted)",
-                fmt_count(counts.removed_conversations),
-            ),
-            ("Memory items", fmt_count(counts.memories)),
-            ("Memory switched on", fmt_bool(switch is not False)),
-        ),
-        note="Question and answer texts are not repeated here; they are shown in Ask.",
-    )
-    sections = [summary]
+    sections: list[ReportSection] = []
+    if counts.queries or counts.conversations or counts.removed_conversations:
+        sections.append(
+            ReportSection(
+                class_key=CLASS_KEY,
+                title='Questions to "Ask the school"',
+                columns=("Detail", "Value"),
+                rows=(
+                    ("Questions asked (kept for 180 days)", fmt_count(counts.queries)),
+                    ("Conversations", fmt_count(counts.conversations)),
+                    (
+                        "Conversations removed from the history (questions kept until deleted)",
+                        fmt_count(counts.removed_conversations),
+                    ),
+                ),
+                note="Question and answer texts are not repeated here; they are shown in Ask.",
+            )
+        )
     if counts.conversations:
         rows = [
             (fmt_text(title_of(session, c)), fmt_date(c.created_at), fmt_date(c.updated_at))
@@ -83,6 +87,20 @@ def subject_report(session: Session, subject: Subject) -> list[ReportSection]:
                 note=note,
             )
         )
+    if counts.memories or counts.memory_settings:
+        switch = repo.memory_enabled(session, user_id)
+        sections.append(
+            ReportSection(
+                class_key=MEMORY_CLASS_KEY,
+                title='What "Ask the school" remembers',
+                columns=("Detail", "Value"),
+                rows=(
+                    ("Memory items (kept until deleted)", fmt_count(counts.memories)),
+                    ("Memory switched on", fmt_bool(switch is not False)),
+                ),
+                note="Memory texts are not repeated here; they are shown in Ask.",
+            )
+        )
     return sections
 
 
@@ -94,30 +112,51 @@ def _request_id() -> str | None:
 def erase_for_subject(
     session: Session, subject: Subject, class_keys: Collection[str], *, dry_run: bool
 ) -> list[ErasureOutcome]:
-    """Delete the member's questions, conversations, memory items and memory setting (a dry run
-    only counts them). ``count`` is the number of rows."""
-    if CLASS_KEY not in class_keys:
+    """Delete the member's questions and conversations (``ask_history``) and/or memory items and
+    memory setting (``ask_memory``); a dry run only counts them. ``count`` is the number of
+    rows."""
+    history = CLASS_KEY in class_keys
+    memory = MEMORY_CLASS_KEY in class_keys
+    if not (history or memory):
         return []
     user_id = _user_of(session, subject)
     if user_id is None:
         return []
+    before = repo.ask_history_counts(session, user_id)
+    history_rows = before.queries + before.conversations + before.removed_conversations
+    memory_rows = before.memories + before.memory_settings
+    outcomes: list[ErasureOutcome] = []
     if dry_run:
-        return [ErasureOutcome(CLASS_KEY, repo.ask_history_counts(session, user_id).total)]
-    erased = repo.delete_ask_history_of(session, user_id)
+        if history:
+            outcomes.append(ErasureOutcome(CLASS_KEY, history_rows))
+        if memory:
+            outcomes.append(ErasureOutcome(MEMORY_CLASS_KEY, memory_rows))
+        return outcomes
+    queries = conversations = memories = memory_settings = 0
+    if memory:
+        # Memory first: its links to questions and conversations would be set NULL anyway.
+        memories = repo.delete_memory_data_of(session, [user_id])
+        memory_settings = before.memory_settings
+        outcomes.append(ErasureOutcome(MEMORY_CLASS_KEY, memories + memory_settings))
+    if history:
+        erased = repo.delete_questions_of(session, user_id)
+        queries = erased.queries
+        conversations = erased.conversations + erased.removed_conversations
+        outcomes.append(ErasureOutcome(CLASS_KEY, queries + conversations))
     audit.record(
         session,
         action=ERASED_EVENT,
         resource_type="membership",
         resource_id=subject.id,
         summary={
-            "queries": erased.queries,
-            "conversations": erased.conversations + erased.removed_conversations,
-            "memories": erased.memories,
-            "memory_settings": erased.memory_settings,
+            "queries": queries,
+            "conversations": conversations,
+            "memories": memories,
+            "memory_settings": memory_settings,
         },
         request_id=_request_id(),
     )
-    return [ErasureOutcome(CLASS_KEY, erased.total)]
+    return outcomes
 
 
 __all__ = ["ERASED_EVENT", "erase_for_subject", "subject_report"]

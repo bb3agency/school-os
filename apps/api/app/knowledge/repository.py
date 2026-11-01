@@ -1289,15 +1289,11 @@ def conversations_of(session: Session, user_id: uuid.UUID, limit: int) -> list[C
     )
 
 
-def delete_ask_history_of(session: Session, user_id: uuid.UUID) -> AskHistoryCounts:
-    """Delete every question, conversation, memory item and memory setting of ``user_id`` in
-    this school (erasure on request). Memory items first (their links to questions and
-    conversations would be set NULL anyway), then questions (other questions that pointed at
-    them as revision, supersession or answer-cache source keep only a NULL), then
-    conversations."""
+def delete_questions_of(session: Session, user_id: uuid.UUID) -> AskHistoryCounts:
+    """Delete every question and conversation of ``user_id`` in this school, keeping the
+    memory items (whose links to them are set NULL) and the memory switch."""
     before = ask_history_counts(session, user_id)
     tenant = current_tenant_id(session)
-    memories = delete_memory_data_of(session, [user_id])
     queries = _rowcount(
         session.execute(delete(Query).where(Query.tenant_id == tenant, Query.user_id == user_id))
     )
@@ -1310,6 +1306,6 @@ def delete_ask_history_of(session: Session, user_id: uuid.UUID) -> AskHistoryCou
         queries=queries,
         conversations=before.conversations,
         removed_conversations=before.removed_conversations,
-        memories=memories,
-        memory_settings=before.memory_settings,
+        memories=0,
+        memory_settings=0,
     )

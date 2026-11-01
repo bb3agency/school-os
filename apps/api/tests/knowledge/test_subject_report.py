@@ -26,7 +26,7 @@ pytestmark = pytest.mark.db
 
 SUBJECTS_YAML = Path(__file__).resolve().parents[2] / "app" / "privacy" / "subjects.yaml"
 NOW = dt.datetime(2026, 10, 1, 6, 0, tzinfo=dt.UTC)
-CLASSES = {"ask_history"}
+CLASSES = {"ask_history", "ask_memory"}
 
 
 def _load(name: str, path: Path) -> ModuleType:
@@ -154,14 +154,20 @@ def test_FR_DPDP_009_member_report_has_counts_and_own_titles(
 ) -> None:
     subject, _ = people
     sections = _report(school, Subject("member", subject.membership_id))
-    assert [s.title for s in sections] == ['Questions to "Ask the school"', "Conversations"]
+    assert [s.title for s in sections] == [
+        'Questions to "Ask the school"',
+        "Conversations",
+        'What "Ask the school" remembers',
+    ]
+    assert [s.class_key for s in sections] == ["ask_history", "ask_history", "ask_memory"]
     assert {s.class_key for s in sections} <= _classes()
     summary = {r[0]: r[1] for r in sections[0].rows}
     assert summary["Questions asked (kept for 180 days)"] == "3"
     assert summary["Conversations"] == "1"
     assert summary["Conversations removed from the history (questions kept until deleted)"] == "1"
-    assert summary["Memory items"] == "1"
-    assert summary["Memory switched on"] == "No"
+    memory = {r[0]: r[1] for r in sections[2].rows}
+    assert memory["Memory items (kept until deleted)"] == "1"
+    assert memory["Memory switched on"] == "No"
     assert [r[0] for r in sections[1].rows] == ["Fee dates mine"]
 
 
@@ -200,7 +206,7 @@ def test_FR_DPDP_013_dry_run_counts_and_changes_nothing(
     subject, _ = people
     before = _rows(admin_engine, subject.user_id)
     outcome = _erase(school, Subject("member", subject.membership_id), dry_run=True)
-    assert outcome == [ErasureOutcome("ask_history", 3 + 2 + 1 + 1)]
+    assert outcome == [ErasureOutcome("ask_history", 3 + 2), ErasureOutcome("ask_memory", 1 + 1)]
     assert _rows(admin_engine, subject.user_id) == before
 
 
@@ -210,7 +216,7 @@ def test_FR_DPDP_013_erasure_deletes_only_the_members_history(
     subject, other = people
     other_before = _rows(admin_engine, other.user_id)
     outcome = _erase(school, Subject("member", subject.membership_id), dry_run=False)
-    assert outcome == [ErasureOutcome("ask_history", 7)]
+    assert outcome == [ErasureOutcome("ask_memory", 2), ErasureOutcome("ask_history", 5)]
     assert _rows(admin_engine, subject.user_id) == {
         "queries": 0,
         "conversations": 0,
@@ -228,3 +234,26 @@ def test_FR_DPDP_013_erasure_deletes_only_the_members_history(
             {"t": school, "a": "kb.ask_history.erased", "m": subject.membership_id},
         ).scalar_one()
     assert summary == {"queries": 3, "conversations": 2, "memories": 1, "memory_settings": 1}
+
+
+def test_FR_DPDP_013_history_and_memory_are_erased_separately(
+    school: uuid.UUID, admin_engine: Engine
+) -> None:
+    """``ask_memory`` is its own record class (kept until deleted, not 180 days; docs/05 §13):
+    erasing the questions keeps the memory, and erasing the memory keeps the questions."""
+    subject = W.add_member(admin_engine, school, ["office_staff"])
+    _history(school, subject.user_id, "split")
+    member = Subject("member", subject.membership_id)
+    with tenant_session(school) as s:
+        assert service.erase_for_subject(s, member, {"ask_history"}, dry_run=False) == [
+            ErasureOutcome("ask_history", 5)
+        ]
+    rows = _rows(admin_engine, subject.user_id)
+    assert (rows["queries"], rows["conversations"]) == (0, 0)
+    assert (rows["user_memories"], rows["user_memory_settings"]) == (1, 1)
+    assert [s.class_key for s in _report(school, member)] == ["ask_memory"]
+    with tenant_session(school) as s:
+        assert service.erase_for_subject(s, member, {"ask_memory"}, dry_run=False) == [
+            ErasureOutcome("ask_memory", 2)
+        ]
+    assert _report(school, member) == []

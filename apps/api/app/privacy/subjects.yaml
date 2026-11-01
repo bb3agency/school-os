@@ -52,7 +52,7 @@ contributors:
     eraser: true
   knowledge:
     subjects: [member]
-    classes: [ask_history]
+    classes: [ask_history, ask_memory]
     eraser: true
   changes:
     subjects: [student, guardian]

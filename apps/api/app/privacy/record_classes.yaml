@@ -101,13 +101,24 @@ classes:
   ask_history:
     label: Questions to "Ask the school" and their answers
     owner: knowledge
-    tables: [kb.queries, kb.conversations, kb.user_memories, kb.user_memory_settings]
+    tables: [kb.queries, kb.conversations]
     classification: C3
     docs_row: (encrypted Q/A)
     retention: 180 days
-    basis: The record of AI use; staff can delete their conversations and memory.
+    basis: The record of AI use; staff can delete their conversations.
     erasure: allowed
     source: Typed by staff members
+
+  ask_memory:
+    label: What "Ask the school" remembers for a staff member
+    owner: knowledge
+    tables: [kb.user_memories, kb.user_memory_settings]
+    classification: C3
+    docs_row: "`kb.user_memories`, `kb.user_memory_settings` (ADR-0034)"
+    retention: "Confirmed items: until the person deletes them, forgets everything, or leaves the school. Suggestions: 24 hours unless confirmed"
+    basis: Kept so that Ask can use what the person chose to have remembered; they can delete it.
+    erasure: allowed
+    source: Typed or confirmed by staff members
 
   ai_metering:
     label: AI usage counts
