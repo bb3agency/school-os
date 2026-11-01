@@ -14,7 +14,8 @@ Other modules call only these functions (R3-1A's ``app.privacy.service`` re-expo
   return to ``pending`` (409 ``consent_already_decided``), ``If-Match`` on the number of decisions
   read; notes refuse Aadhaar-like numbers and are never logged or audited.
 - **Forms (FR-DPDP-023).** A4 forms per student or section with "I agree" and "I do not agree"
-  side by side for every active purpose, in the school's parent language; also a PDF through
+  side by side for every active purpose, in English while ``SOS_TELUGU_ENABLED`` is off (D47),
+  otherwise in the asked or the school's parent language; also a PDF through
   ``app.exports`` (kind ``consent_forms``).
 - **State for other modules (FR-DPDP-024).** :func:`consent_state` returns ``given`` only when
   the latest decision is ``given`` and the purpose is still active; anything else is
@@ -42,6 +43,7 @@ from sqlalchemy.orm import Session
 from app.apaar import service as apaar
 from app.audit import service as audit
 from app.authz.context import UserContext
+from app.core import languages
 from app.core import purge as purging
 from app.core.errors import Conflict, NotFound, PreconditionFailed, ValidationFailed
 from app.core.ids import new_id
@@ -738,6 +740,11 @@ def summary(
 
 
 def _form_language(session: Session, language: FormLanguage | None) -> FormLanguage:
+    """English while Telugu is switched off (ADR-0036, lead decision D47), whatever was asked
+    or the school's parent language says; with the switch on, the asked language, else the
+    school's parent language (ADR-0044)."""
+    if not languages.telugu_enabled():
+        return "en"
     if language is not None:
         return language
     return "te" if tenancy.parent_language(session) == "te" else "en"
@@ -897,6 +904,7 @@ def forms_document(
     in the given order and limited to the students the caller still reaches. Never an Aadhaar
     number (invariant 4). Returns the page and the number of forms."""
     cfg = settings()
+    language = "te" if language == "te" and languages.telugu_enabled() else "en"  # D47
     reach = set(_reached_students(session, ctx, None))
     ids = [i for i in student_ids if i in reach][: cfg.max_forms_per_print]
     page = templates.render_forms(
