@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| template_version | 0.1 (2026-10-21) |
+| template_version | 0.2 (2026-11-01) |
 | Placeholders | `{{school_legal_name}}`, `{{school_address}}`, `{{schoolos_legal_name}}`, `{{schoolos_address}}`, `{{effective_date}}`, `{{tier}}` (shared or dedicated), `{{school_signatory}}`, `{{schoolos_signatory}}`, `{{privacy_contact_name}}`, `{{privacy_contact_email}}`, `{{schoolos_contact_email}}`, `{{governing_law_place}}`, `{{objection_days}}`, `{{subprocessor_table}}`, `{{retention_table}}` |
 | Based on | docs/08 §1 (roles, sub-processors), §3 (obligations), §6 (CERT-In), §7 (retention, offboarding), §9 (key clauses), §14-§15 |
 
@@ -40,7 +40,7 @@
 
 ## 6. Personal data breaches
 
-6.1 SchoolOS notifies the School **without undue delay after confirming a breach affecting the School's data, with a target of 24 hours** (docs/08 §3 PRV-008, §9 clause 5), and gives the facts the School needs for its own notices to affected people and to the Data Protection Board (nature, extent, timing, likely consequences, mitigation, what affected people can do, contact).
+6.1 SchoolOS notifies the School **without undue delay after confirming a breach affecting the School's data, with a target of 24 hours** (docs/08 §3 PRV-008, §9 clause 5); on the shared tier the notice appears in the School's breach register in SchoolOS, and SchoolOS also contacts the School directly, and gives the facts the School needs for its own notices to affected people and to the Data Protection Board (nature, extent, timing, likely consequences, mitigation, what affected people can do, contact).
 
 6.2 SchoolOS reports cyber incidents it is required to report to CERT-In within six hours of noticing them (docs/08 §6 PRV-017).
 
@@ -48,7 +48,7 @@
 
 ## 7. Assistance
 
-7.1 SchoolOS provides tools for the School to answer data principals' requests for access, correction, erasure, grievance and nomination, aiming for the School to answer within 7 days (NFR-PRV-004; ADR-0048), and assists with the School's data protection impact assessment (docs/08 §10; `docs/legal/dpia-template.md`).
+7.1 SchoolOS provides tools for the School to answer data principals' requests for access, correction, erasure, grievance, nomination and withdrawal of consent, aiming for the School to answer within 7 days (NFR-PRV-004; ADR-0048); access reports are released by a second School staff member and handed over by the School, and SchoolOS sends them to no one. It also keeps the School's consent records and breach register (ADR-0049, ADR-0050), and assists with the School's data protection impact assessment (docs/08 §10; `docs/legal/dpia-template.md`).
 
 ## 8. Data location and transfers
 

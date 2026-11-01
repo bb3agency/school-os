@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| template_version | 0.1 (2026-10-21) |
+| template_version | 0.2 (2026-11-01) |
 | Placeholders | `{{school_legal_name}}`, `{{assessor_name}}`, `{{assessment_date}}`, `{{features_in_use}}`, `{{next_review_date}}` |
 | Based on | docs/08 §10 (DPIA outline and M5 inputs), §4, §5, §8, §15.3; docs/07 (controls); `app/privacy/record_classes.yaml` (ADR-0048) |
 
@@ -34,7 +34,7 @@ For each purpose: why it is needed, the lawful basis the school chose (legal obl
 
 ## 4. Controls (what SchoolOS does; school to confirm)
 
-Tenant isolation and role and class-based access; step-up sign-in for exports and approvals; no full Aadhaar numbers; Aadhaar masking in every text pipeline; maker-checker for identity changes with evidence; restricted fields encrypted with the school's key; audit of every change and export; no personal data in logs; AI answers cite sources and see only what the asking user may see; insights visible only to the class teacher and principal, rules not AI; parent links expire and can be revoked; backups in India; breach process with clocks (docs/07, docs/08, ADR-0050).
+Tenant isolation and role and class-based access; step-up sign-in for exports and approvals; no full Aadhaar numbers; Aadhaar masking in every text pipeline; maker-checker for identity changes with evidence; restricted fields encrypted with the school's key; audit of every change and export; no personal data in logs; AI answers cite sources and see only what the asking user may see; insights visible only to the class teacher and principal, rules not AI; parent links expire and can be revoked; access reports released only by a second staff member with step-up sign-in and downloadable for 24 hours; erasure refused for official records and accounts, with the reason given; consent decisions kept with the form version the parent signed; backups in India; breach process with clocks (docs/07, docs/08, ADR-0048, ADR-0049, ADR-0050).
 
 ## 5. Controls the school must run
 

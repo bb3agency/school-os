@@ -28,18 +28,21 @@ All times in IST in the product; logs in UTC with synchronised clocks (PRV-019).
 2. **Contain** (docs/11 R5/R7): revoke sessions or keys, switch off the feature flag, block at the WAF, pause workers, isolate the school if needed. Preserve evidence (docs/11 §7.3).
 3. **CERT-In clock**: decide within the first hour whether the incident is reportable; if so, report within 6 hours of T0 using the prepared format and record `cert_in_reported_at`.
 4. **Assess impact** per school: data categories, approximate number of people, time window. Two operators confirm the list of affected schools.
-5. **Notify each school** (target 24 hours from confirmation): the school's register receives the notice automatically on the shared tier; also phone the owner or principal. Dedicated hosts: phone and e-mail plus a critical announcement; the school records it by hand. Use template A.
+5. **Notify each school** (target 24 hours from confirmation): on the shared tier the school's breach register pulls the notice automatically once the second operator has confirmed the list (within about a minute; the school's owner and principal get an urgent in-app notification), and the console records when each school received it; also phone the owner or principal. Dedicated hosts: phone and e-mail plus a critical announcement; the school records it by hand. Use template A.
 6. **Support the school** with facts for its own notices; answer its questions within the day.
 7. **Eradicate, recover, report**: fix, restore, rotate, verify the audit chain; a remediation report to each affected school; postmortem within 5 working days.
+8. **Close**: once an incident is `closed` its fields are locked (the console refuses edits with 409). Reopening it is a recorded action that needs a second operator's confirmation and is written to the platform audit (lead decision D48, 2026-11-01; being implemented in R3-2F).
 
 ## 3. School steps (fiduciary)
 
-1. Record the breach in SchoolOS (Settings → Privacy → Breach register): when it was noticed, what happened, what kinds of data, roughly how many children, parents and staff.
+1. Record the breach in SchoolOS (Privacy → Breach register): when it was noticed, what happened, what kinds of data, roughly how many children, parents and staff. A SchoolOS notice arrives there by itself on the shared tier; on a dedicated host record it by hand.
 2. Contain it (take the lost device's account offline, revoke parent links, ask SchoolOS for help).
 3. Notify the Data Protection Board without delay (template C outline) and record when.
 4. Notify affected parents and staff without delay (template B), by the channel you normally use; record when and how.
 5. Send the detailed report to the Board within 72 hours of noticing and record when.
 6. Keep the record; review what to change.
+
+SchoolOS shows each duty's clock and reminds the owner and principal 24 and 60 hours after noticing while the detailed report is not recorded. It drafts the parents' notice (template B) as a notice for approval and fills the Board outline (template C); it never sends a breach notice by itself.
 
 ## 4. Templates
 
