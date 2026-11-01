@@ -36,13 +36,13 @@ def test_SEC_002_runtime_roles_cannot_create_objects_in_any_schema(admin_engine:
     with admin_engine.connect() as conn:
         for role in RUNTIME_ROLES:
             for schema in schemas:
-                can_create = conn.execute(
+                can_create: bool = conn.execute(
                     text("SELECT has_schema_privilege(:r, :s, 'CREATE')"),
                     {"r": role, "s": schema},
                 ).scalar_one()
                 if can_create:
                     problems.append(f"{role} has CREATE on schema {schema}")
-            can_create_db = conn.execute(
+            can_create_db: bool = conn.execute(
                 text("SELECT has_database_privilege(:r, current_database(), 'CREATE')"),
                 {"r": role},
             ).scalar_one()
