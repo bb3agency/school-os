@@ -1,12 +1,12 @@
-# Penetration-test scope: R2 public surface and its neighbours
+# Penetration-test scope: R2 public surface (and the R3 disclosure page) and its neighbours
 
 | Field | Value |
 |---|---|
-| Status | Scope agreed in docs (2026-10-21, wave R2-3I); test not yet scheduled |
-| Requirement | NFR-SEC-007 (R2 public surface tested before the first school uses it); NFR-SEC-006 and SEC-025 (independent test before paid go-live, then yearly) |
-| Controls under test | SEC-003..006, SEC-008, SEC-010, SEC-015, SEC-021, SEC-022, SEC-026..030, SEC-034..040 (docs/07 §16) |
-| Threats | T28-T35 (docs/07 §4); trust boundaries TB1-TB12 (docs/07 §3) |
-| Related | docs/07 §11.2, docs/09 §2.7 (rate limits), ADR-0042, ADR-0043, ADR-0045, ADR-0046, ADR-0047, docs/18 §8 D29 and D31 |
+| Status | Scope agreed in docs (2026-10-21, wave R2-3I); R3 disclosure route added 2026-11-01 (wave R3-2F, NFR-SEC-008); test not yet scheduled |
+| Requirement | NFR-SEC-007 (R2 public surface tested before the first school uses it); NFR-SEC-008 (the R3 disclosure route tested before the first CBSE school publishes); NFR-SEC-006 and SEC-025 (independent test before paid go-live, then yearly) |
+| Controls under test | SEC-003..006, SEC-008, SEC-010, SEC-015, SEC-021, SEC-022, SEC-026..030, SEC-034..040, SEC-050 (docs/07 §16) |
+| Threats | T28-T35, T37 (docs/07 §4); trust boundaries TB1-TB12 (docs/07 §3) |
+| Related | docs/07 §11.2, docs/07 §11.3, docs/09 §2.7 (rate limits), ADR-0042, ADR-0043, ADR-0045, ADR-0046, ADR-0047, ADR-0051, docs/18 §8 D29 and D31 |
 
 This document tells an external tester what to test, what not to touch, and how to work. It is
 written for the R2 release: parent link pages, certificate verification and provider webhooks are
@@ -50,6 +50,8 @@ test fails on any other unguarded route):
 | `GET /api/v1/public/links/current/payment` | `require_public_handle` (`parent_dues`) |
 | `POST /api/v1/public/links/current/optin` | `require_public_handle` (`parent_optin`) |
 | `GET /api/v1/public/certificates/{code}` | `require_public_handle` (`cert_verify`) |
+| `GET /api/v1/public/disclosure/{key}` | `require_public_handle` (`school_disclosure`; R3-1C, NFR-SEC-008) |
+| `GET /api/v1/public/disclosure/{key}/documents/{n}` | `require_public_handle` (`school_disclosure`; R3-1C, NFR-SEC-008) |
 | `GET /api/v1/webhooks/meta` | `require_meta_verify_token` |
 | `POST /api/v1/webhooks/meta` | `require_webhook_signature("meta")` |
 | `POST /api/v1/webhooks/razorpay/{route}` | `require_webhook_signature("razorpay")` |
@@ -59,6 +61,8 @@ Web pages of the `(public)` route group (`apps/web/src/app/(public)/`):
 - On `PUBLIC_BASE_URL`: `/p/{token}` (exchange, 303 to `/p/view`), `/p/view`, `/p/document`,
   `/p/pay`, `/p/optin`, `/p/paid`, `/p/expired`, `/p/fonts/telugu/{file}`.
 - On `VERIFY_BASE_URL`: `/v`, `/v/check`, `/v/{code}`.
+- On `PUBLIC_BASE_URL` (R3-1C): `/d/{key}` (the CBSE Appendix IX disclosure page) and
+  `/d/{key}/documents/{n}` (redirect to a presigned link of at most 5 minutes).
 - Host routing itself: staff paths on the public and verification hosts, and public paths on the
   staff host, must answer 404.
 
@@ -122,6 +126,7 @@ Web pages of the `(public)` route group (`apps/web/src/app/(public)/`):
 | Public: data minimisation and BOLA | Read another child, guardian or school through a valid link; swap targets; reuse a link after the guardian is unlinked or the phone changes | Only the link's own target, per kind allowlist (FR-PUB-009); unlinked guardian, phone change, opt-out and revocation give the uniform 404 (FR-PUB-007) |
 | Public: token leakage | Find the token in later URLs, `Referer`, browser history after the redirect, caches, link previews, logs or traces | Token only in the first URL, exchanged for the cookie and a 303; `no-referrer`, `private, no-store`, `noindex`; previews get a generic page; log lines and exported spans masked by `core.redaction.redact_log` (SEC-008, T35) |
 | Public: CSP and cross-site | XSS in notice text, school name or receipt fields; framing; CSRF on `/p/pay` and `/p/optin`; open redirect through the pay flow | Strict CSP with no third-party scripts, `frame-ancestors 'none'`; forms refused without the bound CSRF token and a matching Origin; redirects only to Razorpay's https hosts (SEC-010, SEC-036) |
+| Public: disclosure page (R3) | Find student data on `/d/{key}` or in its documents and HTML/PDF files; read a draft, a withdrawn or a superseded snapshot; guess keys (128-bit) or find out which schools publish; reuse a document link; inject HTML, scripts or non-https links through the school's inputs | Frozen snapshot only, field allowlist, no student items, counts below 10 shown as "fewer than 10"; the uniform 404 for unknown, malformed, revoked, other-kind, withdrawn, unpublished and suspended-school keys; `noindex`; presigned links of at most 5 minutes; inputs rendered escaped, https links only (SEC-050, T37, NFR-PRV-006) |
 | Webhooks: forgery | Unsigned, wrongly signed, truncated or tampered bodies; another school's secret or WABA; header case and encoding tricks | 401 without detail; nothing stored; a forged "paid" event alone never creates a receipt because the worker re-fetches the payment from Razorpay (T28, SEC-034) |
 | Webhooks: replay and order | Replay a valid event; send events out of order; replay after a secret rotation; oversized bodies | Duplicates acknowledged without effect; statuses never move backwards; the previous secret works only for 7 days; 413 above the limit (T29) |
 | BFF | Call the API without the BFF; send a user token to `/public/*`; reach `/api/v1/webhooks/*` through the BFF; steal or fix session cookies; CSRF on staff writes | API refuses missing service token and user tokens on public routes (401); BFF refuses public and webhook paths; `__Host-` cookies, HttpOnly, Secure; CSRF enforced (SEC-004) |
