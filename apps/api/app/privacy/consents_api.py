@@ -171,7 +171,10 @@ def print_forms(
     language: Annotated[
         FormLanguage | None,
         Query(
-            description="Language of the printed form; the school's parent language if left out."
+            description=(
+                "Language of the printed form; the school's parent language if left out. "
+                "English while Telugu is switched off (D47)."
+            )
         ),
     ] = None,
 ) -> HTMLResponse:

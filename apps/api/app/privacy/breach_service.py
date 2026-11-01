@@ -371,7 +371,8 @@ def update_breach(  # noqa: PLR0912 - one branch per field
 ) -> BreachDetailOut:
     """Change facts or status, or record a duty as done (FR-DPDP-034; ``privacy.breach.manage``,
     step-up; ``If-Match``). A closed breach is final (409 ``breach_closed``); closing needs all
-    three duties recorded or a ``close_reason`` (409 ``duties_open``). Audit
+    three duties recorded or a ``close_reason`` (409 ``duties_open``); a ``close_reason`` only
+    comes with ``status: closed`` (422 ``only_when_closing``). Audit
     ``privacy.breach.updated`` (field names, status, duties done; never texts)."""
     row = _get(session, breach_id, lock=True)
     if row.version != expected_version:
@@ -417,6 +418,10 @@ def update_breach(  # noqa: PLR0912 - one branch per field
                 )
             values["closed_at"] = repo.now(session)
     if data.close_reason is not None:
+        if data.status != "closed":
+            # A reason is given only when closing (FR-DPDP-034); on an open breach it would be
+            # stored and shown although nothing was closed.
+            raise ValidationFailed([_error("close_reason", "only_when_closing")])
         values["close_reason"] = data.close_reason
     if not values:
         return _detail(session, row)

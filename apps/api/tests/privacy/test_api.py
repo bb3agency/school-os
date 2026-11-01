@@ -468,7 +468,7 @@ def test_FR_DPDP_003_notice_issues_are_recorded_and_flagged(
     admin = school.people["office_admin"]
     body = {
         "template_key": "notice_parents",
-        "template_version": "0.1",
+        "template_version": "0.2",
         "audience": "parents",
         "issued_on": _today().isoformat(),
         "channel": "paper",
@@ -476,9 +476,9 @@ def test_FR_DPDP_003_notice_issues_are_recorded_and_flagged(
     res = api.call(admin, "POST", "/api/v1/privacy/notices", json=body)
     assert res.status_code == 201, res.text
     listed = api.call(admin, "GET", "/api/v1/privacy/notices").json()
-    assert listed[0]["template_version"] == "0.1"
+    assert listed[0]["template_version"] == "0.2"
     tpl = {t["key"]: t for t in api.call(admin, "GET", "/api/v1/privacy/templates").json()}
-    assert tpl["notice_parents"]["last_issued_version"] == "0.1"
+    assert tpl["notice_parents"]["last_issued_version"] == "0.2"
     assert tpl["notice_parents"]["newer_version_available"] is False
     future = api.call(
         admin,

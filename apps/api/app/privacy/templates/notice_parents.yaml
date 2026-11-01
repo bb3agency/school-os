@@ -1,8 +1,8 @@
 # App copy of docs/legal/privacy-notice-parents-template.md (R3-1A; FR-DPDP-001, ADR-0048 decision 1).
-# Same text and version as the docs file (tests/privacy/test_templates.py compares
+# Same text and version as the docs file (tests/privacy/test_registries.py compares
 # them). Not legal advice (D30). Change the docs file first, then this copy.
 key: notice_parents
-template_version: '0.1'
+template_version: '0.2'
 audience: parents
 source: docs/legal/privacy-notice-parents-template.md
 placeholders:
@@ -46,7 +46,7 @@ body_markdown: |
 
   ### How long we keep it
 
-  Admission registers and certificates are permanent school records. Fee records are kept 8 years. Other information is kept only as long as it is needed; working files are deleted within days or weeks. Ask us for the full list.
+  Admission registers, certificates, attendance registers and marks are permanent school records. Your consent decisions (APAAR and optional purposes) are kept while your child is on roll, then as long as the admission record. Fee records are kept 8 years. Other information is kept only as long as it is needed; working files are deleted within days or weeks. Ask us for the full list.
 
   ### Your rights
 

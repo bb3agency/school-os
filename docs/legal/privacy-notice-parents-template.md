@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| template_version | 0.1 (2026-10-21) |
+| template_version | 0.2 (2026-11-01) |
 | template_key | `notice_parents` |
 | Placeholders | `{{school_legal_name}}`, `{{school_short_name}}`, `{{school_address}}`, `{{privacy_contact_name}}`, `{{privacy_contact_phone}}`, `{{privacy_contact_email}}`, `{{effective_date}}`, `{{template_version}}`, `{{optional_sections}}` |
 | Based on | docs/08 §3 (notice: standalone, clear, itemised data and purposes, how to withdraw and complain), §4 (children's data), §5 (Aadhaar), §8 (AI), §15.3 (fees, WhatsApp, parent links, certificate verification) |
@@ -41,7 +41,7 @@ We use **SchoolOS**, a school records service, under a data processing agreement
 
 ### How long we keep it
 
-Admission registers and certificates are permanent school records. Fee records are kept 8 years. Other information is kept only as long as it is needed; working files are deleted within days or weeks. Ask us for the full list.
+Admission registers, certificates, attendance registers and marks are permanent school records. Your consent decisions (APAAR and optional purposes) are kept while your child is on roll, then as long as the admission record. Fee records are kept 8 years. Other information is kept only as long as it is needed; working files are deleted within days or weeks. Ask us for the full list.
 
 ### Your rights
 

@@ -7484,7 +7484,8 @@ export interface paths {
          * Update Breach
          * @description Change facts or status, or record a duty as done with when and how (permission
          *     ``privacy.breach.manage``, step-up, ``If-Match``). Errors: ``breach_closed``,
-         *     ``duties_open`` (409), stale ``If-Match`` (412).
+         *     ``duties_open`` (409), ``only_when_closing`` (422: a ``close_reason`` without
+         *     ``status: closed``), stale ``If-Match`` (412).
          */
         patch: operations["update_breach_api_v1_privacy_breaches__breach_id__patch"];
         trace?: never;
@@ -7845,7 +7846,9 @@ export interface paths {
         /**
          * Build Report
          * @description Build the access report in the background from every module (FR-DPDP-009; permission
-         *     ``privacy.request.manage``). It must then be released by someone else.
+         *     ``privacy.request.manage``). It must then be released by someone else. 409
+         *     ``request_closed``; 409 ``request_decided`` once a report of the request was released (the
+         *     released report stands; log a new access request for a fresh one); 409 ``no_subject``.
          */
         post: operations["build_report_api_v1_privacy_requests__request_id__report_post"];
         delete?: never;
@@ -7864,8 +7867,10 @@ export interface paths {
         /**
          * Report Download
          * @description A link (5 minutes) to the released report, within 24 hours of release (permission
-         *     ``privacy.request.manage`` or ``privacy.request.decide``, step-up). Audited
-         *     ``privacy.report.downloaded``; SchoolOS sends the report nowhere.
+         *     ``privacy.request.manage`` or ``privacy.request.decide``, step-up). 409 ``request_closed``
+         *     (withdrawn, or closed without a released report), ``report_not_released``,
+         *     ``export_expired``. Audited ``privacy.report.downloaded``; SchoolOS sends the report
+         *     nowhere.
          */
         get: operations["report_download_api_v1_privacy_requests__request_id__report_download_url_get"];
         put?: never;
@@ -27793,7 +27798,7 @@ export interface operations {
     print_forms_api_v1_consents_forms_get: {
         parameters: {
             query?: {
-                /** @description Language of the printed form; the school's parent language if left out. */
+                /** @description Language of the printed form; the school's parent language if left out. English while Telugu is switched off (D47). */
                 language?: ("en" | "te") | null;
                 /** @description Sections only: students with a purpose not answered yet. */
                 only_unanswered?: boolean;

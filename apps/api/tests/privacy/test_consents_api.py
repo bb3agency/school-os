@@ -13,6 +13,7 @@ from sqlalchemy import Engine, text
 from app.core.db import tenant_session
 from app.core.redaction import verhoeff_check_digit
 from app.privacy import consents_service
+from app.tenancy import service as tenancy_service
 
 pytestmark = pytest.mark.db
 P = sys.modules["sos_test_consent_support"]
@@ -361,11 +362,6 @@ def test_FR_DPDP_023_forms_offer_refusal_and_never_an_aadhaar_number(
     assert "do not depend on your answers" in html
     assert "Synthetica Form Child" in html
     assert page.headers["Content-Security-Policy"].startswith("default-src 'none'")
-    te = api.call(
-        staff, "GET", "/api/v1/consents/forms", params={"student_id": str(sid), "language": "te"}
-    )
-    assert te.status_code == 200
-    assert "నేను అంగీకరించడం లేదు" in te.text
     section = api.call(
         staff,
         "GET",
@@ -382,6 +378,44 @@ def test_FR_DPDP_023_forms_offer_refusal_and_never_an_aadhaar_number(
     )
     assert both.status_code == 422
     assert _events(admin_engine, world.a.tenant_id, "consent.form.printed")
+
+
+TELUGU_REFUSAL = "నేను అంగీకరించడం లేదు"
+
+
+def test_D47_forms_are_english_while_telugu_is_off(
+    world: Any, api: Any, admin_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D47 (ADR-0036): neither ``language=te`` nor a Telugu parent language prints Telugu
+    while ``SOS_TELUGU_ENABLED`` is off; the audit records ``en``."""
+    P.shared_purpose(api, world.a, admin_engine)
+    sid = P.student(world.a)
+    staff = world.person("office_staff")
+    monkeypatch.setattr(tenancy_service, "parent_language", lambda _s: "te")
+    for params in ({"student_id": str(sid)}, {"student_id": str(sid), "language": "te"}):
+        page = api.call(staff, "GET", "/api/v1/consents/forms", params=params)
+        assert page.status_code == 200, page.text
+        assert TELUGU_REFUSAL not in page.text
+        assert "I do not agree" in page.text
+    printed = _events(admin_engine, world.a.tenant_id, "consent.form.printed")
+    assert printed[-1]["summary"]["language"] == "en"
+
+
+def test_D47_forms_follow_the_parent_language_when_telugu_is_on(
+    world: Any, api: Any, admin_engine: Engine, monkeypatch: pytest.MonkeyPatch, telugu_on: None
+) -> None:
+    P.shared_purpose(api, world.a, admin_engine)
+    sid = P.student(world.a)
+    staff = world.person("office_staff")
+    asked = api.call(
+        staff, "GET", "/api/v1/consents/forms", params={"student_id": str(sid), "language": "te"}
+    )
+    assert asked.status_code == 200
+    assert TELUGU_REFUSAL in asked.text
+    monkeypatch.setattr(tenancy_service, "parent_language", lambda _s: "te")
+    school = api.call(staff, "GET", "/api/v1/consents/forms", params={"student_id": str(sid)})
+    assert school.status_code == 200
+    assert TELUGU_REFUSAL in school.text
 
 
 def test_FR_DPDP_023_forms_pdf_is_an_export_with_step_up(

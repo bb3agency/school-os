@@ -93,7 +93,9 @@ classes:
     docs_row: Search index of documents
     retention: As the source document (deleted with it)
     basis: Derived from the school's documents so that staff can search them; follows the document.
-    erasure: allowed
+    # Not erased on its own (R3-2F): no module erases it for a person; the index goes with its
+    # source document (documents erasure chain, docs/08 §7).
+    erasure: allowed_after_retention
     source: Made by SchoolOS from the school's documents
 
   ask_history:

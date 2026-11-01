@@ -45835,7 +45835,7 @@
             }
           },
           {
-            "description": "Language of the printed form; the school's parent language if left out.",
+            "description": "Language of the printed form; the school's parent language if left out. English while Telugu is switched off (D47).",
             "in": "query",
             "name": "language",
             "required": false,
@@ -45852,7 +45852,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Language of the printed form; the school's parent language if left out.",
+              "description": "Language of the printed form; the school's parent language if left out. English while Telugu is switched off (D47).",
               "title": "Language"
             }
           }
@@ -70694,7 +70694,7 @@
         ]
       },
       "patch": {
-        "description": "Change facts or status, or record a duty as done with when and how (permission\n``privacy.breach.manage``, step-up, ``If-Match``). Errors: ``breach_closed``,\n``duties_open`` (409), stale ``If-Match`` (412).",
+        "description": "Change facts or status, or record a duty as done with when and how (permission\n``privacy.breach.manage``, step-up, ``If-Match``). Errors: ``breach_closed``,\n``duties_open`` (409), ``only_when_closing`` (422: a ``close_reason`` without\n``status: closed``), stale ``If-Match`` (412).",
         "operationId": "update_breach_api_v1_privacy_breaches__breach_id__patch",
         "parameters": [
           {
@@ -72104,7 +72104,7 @@
     },
     "/api/v1/privacy/requests/{request_id}/report": {
       "post": {
-        "description": "Build the access report in the background from every module (FR-DPDP-009; permission\n``privacy.request.manage``). It must then be released by someone else.",
+        "description": "Build the access report in the background from every module (FR-DPDP-009; permission\n``privacy.request.manage``). It must then be released by someone else. 409\n``request_closed``; 409 ``request_decided`` once a report of the request was released (the\nreleased report stands; log a new access request for a fresh one); 409 ``no_subject``.",
         "operationId": "build_report_api_v1_privacy_requests__request_id__report_post",
         "parameters": [
           {
@@ -72172,7 +72172,7 @@
     },
     "/api/v1/privacy/requests/{request_id}/report/download-url": {
       "get": {
-        "description": "A link (5 minutes) to the released report, within 24 hours of release (permission\n``privacy.request.manage`` or ``privacy.request.decide``, step-up). Audited\n``privacy.report.downloaded``; SchoolOS sends the report nowhere.",
+        "description": "A link (5 minutes) to the released report, within 24 hours of release (permission\n``privacy.request.manage`` or ``privacy.request.decide``, step-up). 409 ``request_closed``\n(withdrawn, or closed without a released report), ``report_not_released``,\n``export_expired``. Audited ``privacy.report.downloaded``; SchoolOS sends the report\nnowhere.",
         "operationId": "report_download_api_v1_privacy_requests__request_id__report_download_url_get",
         "parameters": [
           {
