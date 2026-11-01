@@ -134,3 +134,24 @@ tenant relation in SQL. `TENANCY_ALLOWED` in `apps/api/tests/platform/test_bound
 has no value column, so it would need a migration, and dedicated hosts' flags are written by the
 deploy pipeline, docs/16 §19 Q5); extending the definer `core.current_subscription()` to the
 bundle (a wider definer read, ADR-0013).
+
+## Amendments (2026-11-02)
+
+Implementation facts only; the decision stands.
+
+**B4 · AI answer quota alerts reach schools by a school-side pull (ADR-0038 amendment
+2026-11-02).** `app.notifications.quota_sync` is a sanctioned pull bridge, like
+`app.privacy.breach_sync` and `app.breakglass`: on the shared deployment only, the hourly beat
+task `notifications.ai_quota_sweep` lists school IDs with `tenancy.list_tenant_ids`, calls
+`app.platform.service.ai_quota_alert_for_school(tenant_id)` (a threshold and two counts, read as
+`sos_platform` from `platform.usage_threshold_events`) and writes the in-app notification for the
+school's owner and principal in the school's own `tenant_session`. The control plane never writes
+school tables. It is the only `app.notifications` module that imports `app.platform`; the
+import-linter contract `tenant-side-without-control-plane` lists every other one.
+
+**B5 · Public per-school flag override.** `app/platform/flags.py` checks that a school exists
+through `tenancy.list_tenant_ids` (a shared-tier school may have no `platform.deployments` row)
+before `set_school_flag_override` / `clear_school_flag_override` write `platform.feature_flags`.
+`list_tenant_ids` was already in `TENANCY_ALLOWED` (`apps/api/tests/platform/test_boundaries.py`);
+no new tenant access, `tenant_session` or tenant relation in SQL.
+

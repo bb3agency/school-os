@@ -70,7 +70,7 @@ apps/api/app/
   public/        public handles and core.resolve_public_handle (ADR-0047), parent links (ADR-0046),
                  guards for unauthenticated routes (require_public_handle, require_webhook_signature,
                  require_meta_verify_token; pinned in public/public_routes.yaml)
-  notifications/ in-app notifications, bilingual templates
+  notifications/ in-app notifications, bilingual templates; quota_sync pulls AI answer quota alerts from the control plane
   privacy/       DPDP pack (ADR-0048..0050): requests and grievances, access reports, lawful erasure, notices,
                  record classes, subject-report registry subjects.yaml (contributors: each module's
                  service.subject_report); consents for optional purposes (consents_*); the breach register

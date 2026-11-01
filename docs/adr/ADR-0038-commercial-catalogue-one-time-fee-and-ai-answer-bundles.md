@@ -96,3 +96,22 @@ Implementation facts (docs/18 R4); the decision is unchanged.
   bundle's rate; billing in arrears is unchanged). Operators read the same numbers per school at
   `GET /api/v1/platform/tenants/{tenant_id}/ai-answers` (`platform.usage.read`; platform tables
   only, no new tenant access).
+
+## Amendments (2026-11-02)
+
+Implementation facts (docs/16 §19 Q16, F2); the decision is unchanged.
+
+- **Quota alerts at 80 % and 100 %, alert only.** The usage collector records the first time a
+  school's billable answers in a calendar month reach each of `ai_answers.quota_alert_thresholds`
+  (`[80, 100]`, `billing.yaml`) of its bundle's included answers, once per school, month and
+  threshold (`platform.usage_threshold_events`, metric `ai_answers`), and audits
+  `usage.ai_quota_threshold_crossed`. Nothing is switched off at 100 %: Ask keeps answering and
+  extra answers are billed in arrears as in §3. Operators see the alerts at
+  `GET /api/v1/platform/usage/ai-quota-alerts` (`platform.usage.read`); `SchoolAiBundle` carries
+  `quota_alert` (80, 100 or `null`) for the school's billing card and the operator meter; the
+  school's owner and principal get an in-app notification (`billing.ai_answers_quota`) from the
+  hourly school-side pull `notifications.ai_quota_sweep` (`app/notifications/quota_sync.py`,
+  shared tier only; ADR-0020 amendment 2026-11-02). No e-mail is sent. Still open (docs/16 §19
+  Q16): annual plans, anything beyond an alert at 100 %, e-mail to the billing contact, and a
+  crossing on the last day of a month, which is recorded under that month on the 1st and is not
+  pulled by the school.
