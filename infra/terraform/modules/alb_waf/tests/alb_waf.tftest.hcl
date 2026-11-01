@@ -114,7 +114,7 @@ run "waf_rules" {
       one(one(one(r.action).block).custom_response).response_code == 429
       && one(one(one(one(r.action).block).custom_response).response_header).name == "Retry-After"
       if startswith(r.name, "rate-limit-")
-    ]) && length([for r in aws_wafv2_web_acl.this.rule : r if startswith(r.name, "rate-limit-")]) == 6
+    ]) && length([for r in aws_wafv2_web_acl.this.rule : r if startswith(r.name, "rate-limit-")]) == 7
     error_message = "Every WAF rate rule answers 429 with Retry-After (RFC 6585, RFC 9110)."
   }
 
