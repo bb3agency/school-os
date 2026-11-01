@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | **Accepted (lead, 2026-10-21; owner may revisit)** (docs/18 §8 D40) |
+| Status | **Accepted (lead, 2026-10-21; owner may revisit)** (docs/18 §8 D40); **Amended by [ADR-0054](ADR-0054-english-consent-forms-and-locked-closed-incidents.md)** |
 | Date | 2026-10-21 |
 | Deciders | Lead engineer (for the product owner, who may revisit) |
 | Amends / supersedes | none. Reuses the pattern of ADR-0039 (append-only decisions with the signed form as evidence); does not change ADR-0039 or ADR-0043 |

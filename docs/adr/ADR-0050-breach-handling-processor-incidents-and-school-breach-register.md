@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | **Accepted (lead, 2026-10-21; owner may revisit)** (docs/18 §8 D41) |
+| Status | **Accepted (lead, 2026-10-21; owner may revisit)** (docs/18 §8 D41); **Amended by [ADR-0054](ADR-0054-english-consent-forms-and-locked-closed-incidents.md)** |
 | Date | 2026-10-21 |
 | Deciders | Lead engineer (for the product owner, who may revisit) |
 | Amends / supersedes | none. Uses the pull pattern of break-glass (docs/07 §6.4, ADR-0020) and the control-plane boundaries of ADR-0013/ADR-0020 unchanged |
