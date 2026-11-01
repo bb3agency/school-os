@@ -87,6 +87,19 @@ locals {
       pattern   = "{ $.event = \"auth_rate_limited\" }"
       metric    = "BffAuthRateLimited"
     }
+    # SchoolOS incident clocks (D49 part 2, FR-DPDP-031, SEC-052; app/platform/incident_alerts.py):
+    # one line per incident, clock (CERT-In T0 + 6 h, school notice confirmation + 24 h) and stage,
+    # written once by the 5-minute beat job in the shared worker. Ids and clock names only.
+    incident_clock_due_soon = {
+      log_group = var.worker_log_group_name
+      pattern   = "{ $.event = \"platform.incident.clock_due_soon\" }"
+      metric    = "IncidentClockDueSoon"
+    }
+    incident_clock_overdue = {
+      log_group = var.worker_log_group_name
+      pattern   = "{ $.event = \"platform.incident.clock_overdue\" }"
+      metric    = "IncidentClockOverdue"
+    }
   }
 
   # key => alarm name suffix, description, period, threshold.
@@ -148,6 +161,18 @@ locals {
     operator_denied = {
       name        = "operator-denied"
       description = "SECURITY: an operator-pool sign-in that is not an active operator reached the control plane (FR-PLT-028)."
+      period      = 300
+      threshold   = 1
+    }
+    incident_clock_due_soon = {
+      name        = "incident-clock-due-soon"
+      description = "SECURITY (deadline): a SchoolOS incident's CERT-In clock (T0 + 6 h) or a school-notice clock (confirmation + 24 h) has 2 hours or less left (D49, FR-DPDP-031, SEC-052). Open the incident in the operator console; the log line names the incident id and clock."
+      period      = 300
+      threshold   = 1
+    }
+    incident_clock_overdue = {
+      name        = "incident-clock-overdue"
+      description = "P1 SECURITY: a SchoolOS incident's CERT-In clock (T0 + 6 h) or a school-notice clock (confirmation + 24 h) is overdue (D49, FR-DPDP-031, SEC-052). Report to CERT-In or notify the school now; the log line names the incident id, clock and school id."
       period      = 300
       threshold   = 1
     }

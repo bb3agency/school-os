@@ -74,6 +74,12 @@ def test_SEC_007_audit_chain_alarms_match_the_worker_log_lines(lines: io.StringI
         ("signin_failed", ROOT / "apps" / "web" / "src" / "server" / "auth" / "handlers.ts"),
         ("step_up_failed", ROOT / "apps" / "web" / "src" / "server" / "auth" / "handlers.ts"),
         ("auth_rate_limited", ROOT / "apps" / "web" / "src" / "server" / "auth" / "handlers.ts"),
+        # D49 part 2 (FR-DPDP-031, SEC-052): incident clock alerts from the control plane.
+        (
+            "platform.incident.clock_due_soon",
+            API / "app" / "platform" / "incident_alerts.py",
+        ),
+        ("platform.incident.clock_overdue", API / "app" / "platform" / "incident_alerts.py"),
     ],
 )
 def test_docs07_s15_every_filtered_event_is_written_by_its_service(
@@ -98,6 +104,9 @@ def test_docs07_s15_every_filter_event_is_pinned_here() -> None:
         "signin_failed",
         "step_up_failed",
         "auth_rate_limited",
+        # D49 part 2: incident clocks due soon or overdue (app/platform/incident_alerts.py).
+        "platform.incident.clock_due_soon",
+        "platform.incident.clock_overdue",
     }
     assert _filter_events() == pinned
 

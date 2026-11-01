@@ -20,6 +20,7 @@ from app.platform import (
     billing,
     fleet,
     heartbeat_client,
+    incident_alerts,
     invoice_files,
     offboarding,
     support,
@@ -115,6 +116,18 @@ def certify_offboarding() -> dict[str, int]:
     return {"issued": result.advanced, "failed": result.failed, "skipped": result.skipped}
 
 
+@shared_task(name="platform.incident_clock_alerts", acks_late=True, ignore_result=True)
+def incident_clock_alerts() -> dict[str, int]:
+    """Every 5 minutes on ``maintenance`` (shared only): alert operators once per incident, clock
+    and stage when a CERT-In or school-notice clock is due soon or overdue (D49, FR-DPDP-031,
+    SEC-052; :mod:`app.platform.incident_alerts`). Ids and counts only."""
+    sent = incident_alerts.check_clocks()
+    return {
+        "due_soon": sum(1 for a in sent if a.stage == "due_soon"),
+        "overdue": sum(1 for a in sent if a.stage == "overdue"),
+    }
+
+
 # Both deployment modes: the dedicated host's own provisioning queues school-chain copies too.
 _BOTH_MODES: dict[str, dict[str, Any]] = {
     "platform-deliver-tenant-audit": {
@@ -159,6 +172,11 @@ def beat_schedule(settings: Settings | None = None) -> dict[str, dict[str, Any]]
             "task": "offboarding.certify",
             "schedule": 300.0,
             "options": {"queue": "pdf"},
+        },
+        "platform-incident-clock-alerts": {
+            "task": "platform.incident_clock_alerts",
+            "schedule": 300.0,
+            "options": {"queue": "maintenance"},
         },
         "support-purge-closed": {
             "task": "support.purge_closed",

@@ -168,6 +168,8 @@ def create_celery() -> Celery:
             # FR-PLT-005 (ADR-0029): the deletion job on "maintenance", certificates on "pdf".
             "offboarding.process": {"queue": "maintenance"},
             "offboarding.certify": {"queue": "pdf"},
+            # D49, FR-DPDP-031 (R3-2G): incident clock alerts to operators, every 5 minutes.
+            "platform.incident_clock_alerts": {"queue": "maintenance"},
             # FR-CERT-010: certificate PDFs render on the Chromium workers.
             "certificates.render": {"queue": "pdf"},
             # FR-FEE-011: receipt PDFs on the Chromium workers; FR-FEE-009 late fees nightly.
