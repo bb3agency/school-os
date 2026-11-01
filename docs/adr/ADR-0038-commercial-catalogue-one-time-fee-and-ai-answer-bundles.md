@@ -84,11 +84,13 @@ Related: FR-KB-011, NFR-CST-001, FR-PLT-013; docs/06 §12, docs/16 §5.7, §11, 
 
 Implementation facts (docs/18 R4); the decision is unchanged.
 
-- **Public pricing page (not changed).** `/pricing` stays a packaging explainer without prices, as the
-  owner decided on 2026-10-01 (docs/17 §5.6). A version that shows the catalogue's prices, pinned to
-  `billing.yaml` → `public_pricing`, is kept on branch `wip/r4-pricing-page` until the owner decides.
-  `public_pricing` is a display copy that never prices an invoice; `tests/platform/test_catalogue.py`
-  pins it to the latest published catalogue rows.
+- **Public pricing page.** The Consequences follow-up on `/pricing` is done: the page shows the
+  catalogue's starting prices before GST (plans with their one-time fee, the three bundles with
+  their quota, ₹1.50 an extra answer, GST at 18 %). The numbers live in
+  `apps/web/src/features/marketing/catalogue.ts`; `billing.yaml` → `public_pricing` is a display
+  copy that never prices an invoice. `tests/platform/test_catalogue.py` pins `public_pricing` to
+  the latest published catalogue rows and `features/marketing/catalogue.test.ts` pins the page to
+  `public_pricing`, so a new catalogue migration fails both until the page matches.
 - **Answer meter.** `SchoolAiBundle` (the school's `GET /api/v1/tenant/billing`) also carries
   `extra_answers` and `overage_so_far_inr` (this month so far, from `usage_daily`, at the
   bundle's rate; billing in arrears is unchanged). Operators read the same numbers per school at

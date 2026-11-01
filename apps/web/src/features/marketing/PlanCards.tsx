@@ -2,6 +2,7 @@ import { useTranslations } from "next-intl";
 import { buttonClasses } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
+import { PLAN_PRICES, rupees } from "./catalogue";
 import { mailtoHref } from "./links";
 import { WhatsAppLink } from "./WhatsAppLink";
 
@@ -9,9 +10,10 @@ export const PLANS = ["shared", "dedicated"] as const;
 const POINTS = ["one", "two", "three", "four"] as const;
 
 /**
- * The two plans (docs/16, ADR-0015): Shared on a white card, Dedicated on the dark card.
- * Never a price: the price is agreed with each school (owner decision). `compact` for the
- * home page teaser; the pricing page adds who it is for and the "Talk to us" link.
+ * The two plans (docs/16, ADR-0015, ADR-0038): Shared on a white card, Dedicated on the dark
+ * card. `compact` for the home page teaser (no price); the pricing page adds who it is for, the
+ * published starting price before GST with the one-time implementation and data verification
+ * fee (from `catalogue.ts`), and the "Talk to us" link.
  */
 export function PlanCards({
   headingLevel = 2,
@@ -95,9 +97,24 @@ export function PlanCards({
                   dark ? "border-white/10" : "border-border",
                 )}
               >
-                <p className={cn("font-semibold", dark ? "text-white" : "text-ink")}>
-                  {t("pricing.priceNote")}
-                </p>
+                <div>
+                  <p className={cn("eyebrow", dark ? "mk-night-muted" : "text-ink-subtle")}>
+                    {t("pricing.price.label")}
+                  </p>
+                  <p
+                    className={cn(
+                      "num mt-1 text-2xl font-semibold",
+                      dark ? "text-white" : "text-ink",
+                    )}
+                  >
+                    {t("pricing.price.monthly", { amount: rupees(PLAN_PRICES[plan].monthlyInr) })}
+                  </p>
+                  <p className={cn("mt-1 text-sm", dark ? "mk-night-muted" : "text-ink-muted")}>
+                    {t("pricing.price.oneTime", {
+                      amount: rupees(PLAN_PRICES[plan].oneTimeFeeInr),
+                    })}
+                  </p>
+                </div>
                 {contactEmail || whatsappNumber ? (
                   <div className="flex flex-wrap gap-2">
                     {contactEmail ? (

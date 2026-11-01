@@ -235,7 +235,7 @@ describe("marketing pages render with structure and calls to action (FR-IAM-001)
     }
   });
 
-  it("pricing: two plans and a comparison table, never a price", () => {
+  it("pricing: two plans with ADR-0038's starting prices before GST, and a comparison table", () => {
     render("pricing");
     expect(
       screen.getByRole("heading", { level: 2, name: m.pricing.shared.name }),
@@ -243,6 +243,14 @@ describe("marketing pages render with structure and calls to action (FR-IAM-001)
     expect(
       screen.getByRole("heading", { level: 2, name: m.pricing.dedicated.name }),
     ).toBeInTheDocument();
+    // The numbers come from catalogue.ts (pinned to billing.yaml by catalogue.test.ts).
+    const shared = screen.getByRole("article", { name: m.pricing.shared.name });
+    expect(shared).toHaveTextContent("₹4,999 a month");
+    expect(shared).toHaveTextContent("plus ₹15,000 once, for implementation and data verification");
+    expect(shared).toHaveTextContent(m.pricing.price.label);
+    const dedicated = screen.getByRole("article", { name: m.pricing.dedicated.name });
+    expect(dedicated).toHaveTextContent("₹9,900 a month");
+    expect(dedicated).toHaveTextContent("plus ₹49,000 once");
     const table = screen.getByRole("table", { name: m.pricing.compare.caption });
     expect(within(table).getAllByRole("row")).toHaveLength(7);
     expect(within(table).getByText(m.pricing.compare.domainDedicated)).toBeInTheDocument();
@@ -252,9 +260,10 @@ describe("marketing pages render with structure and calls to action (FR-IAM-001)
     render("pricing");
     const region = (name: string) => screen.getByRole("region", { name });
 
-    // What the fee is based on: size, campuses, Shared vs Dedicated, AI bundle.
+    // What a school pays for: the plan, the one-time fee, the AI bundle and GST.
     const basis = region(m.pricing.basis.title);
-    for (const factor of ["size", "campuses", "tier", "ai"] as const) {
+    expect(basis).toHaveTextContent("GST at 18% is added to every price on this page");
+    for (const factor of ["tier", "oneTime", "ai", "gst"] as const) {
       expect(
         within(basis).getByRole("heading", { level: 3, name: m.pricing.basis[factor].title }),
       ).toBeInTheDocument();
@@ -272,22 +281,42 @@ describe("marketing pages render with structure and calls to action (FR-IAM-001)
       name: m.pricing.implementation.coversLabel,
     });
     expect(within(covers).getAllByRole("listitem")).toHaveLength(7);
+    expect(implementation).toHaveTextContent("₹15,000 on Shared and ₹49,000 on Dedicated");
     for (const item of Object.values(m.pricing.implementation.items)) {
       expect(within(covers).getByText(item)).toBeInTheDocument();
     }
 
-    // AI as monthly question bundles, in words.
+    // AI answer bundles: quota and monthly price each, and the price of an extra answer.
     const ai = region(m.pricing.ai.title);
     for (const bundle of ["lite", "standard", "high", "extra"] as const) {
       expect(
         within(ai).getByRole("heading", { level: 3, name: m.pricing.ai[bundle].name }),
       ).toBeInTheDocument();
     }
+    const card = (name: string) =>
+      within(ai).getByRole("heading", { level: 3, name }).closest("li") as HTMLElement;
+    expect(card("Lite")).toHaveTextContent("₹699 a month");
+    expect(card("Lite")).toHaveTextContent("300 answers a month");
+    expect(card("Standard")).toHaveTextContent("₹1,499 a month");
+    expect(card("Standard")).toHaveTextContent("1,000 answers a month");
+    expect(card("High")).toHaveTextContent("₹3,499 a month");
+    expect(card("High")).toHaveTextContent("3,000 answers a month");
+    expect(card(m.pricing.ai.extra.name)).toHaveTextContent("cost ₹1.50 each");
 
-    // Billing cycle and GST shown separately.
+    // Billing cycle, GST shown separately and what SchoolOS never charges for.
     const billing = region(m.pricing.billing.title);
     expect(within(billing).getByText(m.pricing.billing.cycle)).toBeInTheDocument();
-    expect(within(billing).getByText(m.pricing.billing.gst)).toBeInTheDocument();
+    expect(
+      within(billing).getByText(
+        "GST at 18% (CGST and SGST, or IGST) is added on every tax invoice, never hidden inside a price.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(billing).getByText(m.pricing.billing.extras)).toBeInTheDocument();
+
+    // docs/18 R4: the quote always states migration, training and GST.
+    expect(m.pricing.next.steps.quote.body).toMatch(/migrating/);
+    expect(m.pricing.next.steps.quote.body).toMatch(/training/);
+    expect(m.pricing.next.steps.quote.body).toMatch(/GST/);
 
     // What happens after you contact us: numbered steps in order.
     const next = region(m.pricing.next.title);
@@ -546,9 +575,12 @@ describe("WhatsApp call to action (SOS_PUBLIC_WHATSAPP_NUMBER, docs/17 §5.6)", 
 });
 
 describe("honest claims (docs/01, 07, 08, 14, 16)", () => {
-  it("the marketing copy has no prices, ratings, testimonials, customer counts or certifications", () => {
+  it("the marketing copy has no typed-in prices, ratings, testimonials, customer counts or certifications", () => {
+    // Prices appear only on /pricing, from catalogue.ts (pinned to billing.yaml by
+    // catalogue.test.ts); never typed into the messages, so they cannot drift.
     const text = JSON.stringify(messages.en.marketing);
     expect(text).not.toMatch(/₹|\bRs\.?\s|\bINR\b|\$\d|\bper (month|year)\b|\/(mo|month|yr)\b|%/i);
+    expect(text).not.toMatch(/\b\d[\d,]*(\.\d+)? (a month|answers|once)\b/i);
     expect(text).not.toMatch(/★|\brating|testimonial|trusted by|customers? (love|say)|\bloved\b/i);
     expect(text).not.toMatch(/\b\d[\d,]*\+? (schools|students|users|teachers|customers)\b/i);
     expect(text).not.toMatch(/\bISO ?27001|SOC ?2|certified|HIPAA|GDPR compliant/i);
