@@ -41,7 +41,7 @@ export function AiQuotaAlerts({
               key={row.tenant_id}
               className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2"
             >
-              <span className="min-w-0 break-words font-medium text-ink">
+              <span className="min-w-0 break-words font-semibold text-ink">
                 {schoolName(row.tenant_id)}
               </span>
               <span className="flex flex-wrap items-center gap-3 text-sm text-ink-muted">
