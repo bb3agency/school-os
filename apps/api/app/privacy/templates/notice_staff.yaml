@@ -1,5 +1,5 @@
 # App copy of docs/legal/privacy-notice-staff-template.md (R3-1A; FR-DPDP-001, ADR-0048 decision 1).
-# Same text and version as the docs file (tests/privacy/test_templates.py compares
+# Same text and version as the docs file (tests/privacy/test_registries.py compares
 # them). Not legal advice (D30). Change the docs file first, then this copy.
 key: notice_staff
 template_version: '0.1'

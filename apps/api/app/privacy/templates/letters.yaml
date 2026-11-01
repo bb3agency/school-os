@@ -1,5 +1,5 @@
 # App copy of docs/legal/data-principal-response-templates.md (R3-1A; FR-DPDP-001).
-# Same text and version as the docs file (tests/privacy/test_templates.py compares them).
+# Same text and version as the docs file (tests/privacy/test_registries.py compares them).
 # Not legal advice (D30).
 template_version: '0.1'
 source: docs/legal/data-principal-response-templates.md
