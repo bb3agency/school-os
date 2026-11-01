@@ -59,6 +59,8 @@ export function UsageTable({
     },
     { key: "docs", header: t("colDocuments"), numeric: true, cell: (row) => n(row.documents) },
     { key: "queries", header: t("colAiQueries"), numeric: true, cell: (row) => n(row.ai_queries) },
+    // Billable answers (ADR-0038 §4): what a bundle's quota and overage count.
+    { key: "answers", header: t("colAiAnswers"), numeric: true, cell: (row) => n(row.ai_answers) },
     {
       key: "tokens",
       header: t("colAiTokens"),
