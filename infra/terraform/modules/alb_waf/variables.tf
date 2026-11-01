@@ -170,6 +170,28 @@ variable "waf_verify_path_prefix" {
   }
 }
 
+variable "waf_disclosure_rate_limit_per_5min" {
+  description = "Per-IP limit for the CBSE disclosure pages (waf_disclosure_path_prefix) in one evaluation window (SEC-036, NFR-SEC-008)."
+  type        = number
+  default     = 300
+
+  validation {
+    condition     = var.waf_disclosure_rate_limit_per_5min >= 10 && var.waf_disclosure_rate_limit_per_5min <= var.waf_rate_limit_per_5min
+    error_message = "waf_disclosure_rate_limit_per_5min must be at least 10 (WAF minimum) and at most waf_rate_limit_per_5min."
+  }
+}
+
+variable "waf_disclosure_path_prefix" {
+  description = "URI prefix of the public CBSE disclosure pages (/d/{key}, ADR-0051), served on the parent origin."
+  type        = string
+  default     = "/d/"
+
+  validation {
+    condition     = startswith(var.waf_disclosure_path_prefix, "/") && endswith(var.waf_disclosure_path_prefix, "/") && lower(var.waf_disclosure_path_prefix) == var.waf_disclosure_path_prefix
+    error_message = "waf_disclosure_path_prefix must start and end with / and be lower case (the rule lowercases the path)."
+  }
+}
+
 variable "waf_webhook_rate_limit_per_5min" {
   description = "Per-IP limit for provider webhooks (waf_webhook_path_prefix) in one evaluation window (SEC-036). Razorpay and Meta deliver every school's events from shared addresses, so keep it high; both providers retry after a 429."
   type        = number

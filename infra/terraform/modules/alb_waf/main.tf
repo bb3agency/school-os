@@ -250,6 +250,8 @@ locals {
     { name = "rate-limit-public-link", priority = 6, limit = var.waf_public_link_rate_limit_per_5min, prefix = var.waf_public_link_path_prefix },
     { name = "rate-limit-verify", priority = 7, limit = var.waf_verify_rate_limit_per_5min, prefix = var.waf_verify_path_prefix },
     { name = "rate-limit-webhook", priority = 8, limit = var.waf_webhook_rate_limit_per_5min, prefix = var.waf_webhook_path_prefix },
+    # CBSE disclosure pages (/d/{key}, ADR-0051; NFR-SEC-008), on the parent origin like /p/.
+    { name = "rate-limit-disclosure", priority = 9, limit = var.waf_disclosure_rate_limit_per_5min, prefix = var.waf_disclosure_path_prefix },
   ]
 }
 
@@ -461,7 +463,8 @@ resource "aws_wafv2_web_acl" "this" {
     }
   }
 
-  # Parent link pages (/p/), certificate verification pages (/v/, on the verify host) and provider
+  # Parent link pages (/p/), certificate verification pages (/v/, on the verify host), disclosure
+  # pages (/d/) and provider
   # webhooks (/api/v1/webhooks/): per-IP rate rules answering 429 like the ones above (SEC-036).
   dynamic "rule" {
     for_each = local.path_rate_rules

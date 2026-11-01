@@ -151,13 +151,14 @@ run "public_surface_rate_rules" {
         limit    = one(one(r.statement).rate_based_statement).limit
         key      = one(one(r.statement).rate_based_statement).aggregate_key_type
       }
-      if contains(["rate-limit-public-link", "rate-limit-verify", "rate-limit-webhook"], r.name)
+      if contains(["rate-limit-public-link", "rate-limit-verify", "rate-limit-webhook", "rate-limit-disclosure"], r.name)
       } == {
       "rate-limit-public-link" = { prefix = "/p/", position = "STARTS_WITH", limit = 300, key = "IP" }
       "rate-limit-verify"      = { prefix = "/v/", position = "STARTS_WITH", limit = 300, key = "IP" }
       "rate-limit-webhook"     = { prefix = "/api/v1/webhooks/", position = "STARTS_WITH", limit = 2000, key = "IP" }
+      "rate-limit-disclosure"  = { prefix = "/d/", position = "STARTS_WITH", limit = 300, key = "IP" }
     }
-    error_message = "Parent links (/p/), certificate verification (/v/) and webhooks (/api/v1/webhooks/) each have a per-IP rate rule (SEC-036)."
+    error_message = "Parent links (/p/), certificate verification (/v/), webhooks (/api/v1/webhooks/) and disclosure pages (/d/) each have a per-IP rate rule (SEC-036, NFR-SEC-008)."
   }
 
   assert {
