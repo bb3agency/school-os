@@ -821,6 +821,9 @@ function apiAnswer(method: string, path: string, subject: string): [number, unkn
   if (path === "/api/v1/insights/summary") return [200, INSIGHT_SUMMARY];
   if (path === "/api/v1/insights/settings") return [200, INSIGHT_SETTINGS];
   if (path === "/api/v1/exams") return [200, EXAMS];
+  // A plain list in the API (not a page): the paged fallback below made the school settings
+  // screen's certificate format card fail (`.find` on an object).
+  if (path === "/api/v1/certificates/formats") return [200, []];
   if (path.startsWith("/api/v1/")) return [200, page([])];
   return [404, { type: "about:blank", title: "Not found", status: 404, code: "not_found" }];
 }
