@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.5 · 2026-09-27 |
+| Version | 0.7 · 2026-11-02 |
 | Cloud | AWS ap-south-1 (Mumbai) primary · ap-south-2 (Hyderabad) backups/DR |
 | Tooling | Terraform · Docker · GitHub Actions · OpenTelemetry |
 | Related | 04-Architecture §11, §16–17, 07-Security §13–14, 11-Operations, 16-Platform admin panel §12–13, ADR-0014, ADR-0015, ADR-0018 |
