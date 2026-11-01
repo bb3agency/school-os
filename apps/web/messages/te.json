@@ -6158,9 +6158,10 @@
       "title": "Pricing",
       "eyebrow": "Pricing",
       "headline": "How SchoolOS is priced",
-      "intro": "Published starting prices, before GST. Your written quote shows the subscription, the one-time implementation and data verification fee and the AI answer bundle, each on its own line, with GST added.",
+      "intro": "There is no price list. We agree the fee with each school in writing before it starts. This page explains what the fee is based on, what every school gets and what happens after you get in touch.",
       "forLabel": "Who it is for",
       "includedLabel": "What is included",
+      "priceNote": "Quoted in writing for your school",
       "shared": {
         "name": "Shared",
         "summary": "Your school runs as a separate, isolated school on the managed SchoolOS platform in AWS Mumbai.",
@@ -6204,8 +6205,8 @@
       "faq": {
         "title": "Pricing questions",
         "price": {
-          "q": "Are these the final prices?",
-          "a": "They are the published starting prices, before GST. Your written quote states every fee on its own line: the subscription, the one-time fee for migration, verification and training, the AI bundle and GST."
+          "q": "Why are there no prices on this page?",
+          "a": "Schools differ in size, campuses and how they will use SchoolOS, so we quote each school in writing before it starts. Talk to us and we will explain every part of it plainly."
         },
         "switch": {
           "q": "What does a school need to get started?",
@@ -6220,30 +6221,30 @@
           "a": "In India on both: AWS Mumbai, with encrypted backups in Hyderabad."
         },
         "ai": {
-          "q": "What happens if we use more answers than our bundle?",
-          "a": "Ask the school keeps answering, and answers above the bundle are billed at {amount} each on the next month's invoice. You can move to a bigger bundle from the next invoice. A monthly safety limit well above the bundle switches Ask the school to search with sources if it is ever reached. Everything else keeps working."
+          "q": "What happens if we use up our questions?",
+          "a": "Everything else keeps working. You can add extra answers for the rest of the month or move to a bigger bundle from the next month."
         }
       },
       "plansLabel": "The two ways to run SchoolOS",
       "basis": {
         "eyebrow": "Your fee",
-        "title": "What you pay for",
-        "intro": "Four parts, each shown on its own line in your quote and on your tax invoices.",
+        "title": "What the fee is based on",
+        "intro": "Four things decide the recurring fee. We ask about them in the first conversation and show each one in your quote.",
+        "size": {
+          "title": "School size",
+          "body": "How many students the school has on its rolls."
+        },
+        "campuses": {
+          "title": "Campuses",
+          "body": "How many campuses or branches run on SchoolOS."
+        },
         "tier": {
           "title": "Shared or Dedicated",
-          "body": "The monthly subscription: {shared} a month for Shared, {dedicated} a month for Dedicated."
-        },
-        "oneTime": {
-          "title": "Implementation and data verification",
-          "body": "Once, on the first invoice: migrating, checking and setting up your records, and training your office."
+          "body": "A school on the shared platform, or its own managed, isolated environment."
         },
         "ai": {
-          "title": "AI answer bundle",
-          "body": "Optional and monthly: how many answers your staff can get from the school's records."
-        },
-        "gst": {
-          "title": "GST",
-          "body": "GST at {rate} is added to every price on this page and shown separately on each tax invoice."
+          "title": "AI question bundle",
+          "body": "How many questions your staff can ask the school's records each month."
         }
       },
       "everyone": {
@@ -6261,7 +6262,7 @@
       "implementation": {
         "eyebrow": "One-time fee",
         "title": "Implementation and data verification",
-        "intro": "{shared} on Shared and {dedicated} on Dedicated, before GST, invoiced once with the first invoice. It is how we get your records right before you rely on them.",
+        "intro": "A one-time fee, quoted with the subscription, for getting your records right before you rely on them.",
         "coversLabel": "What it covers",
         "items": {
           "audit": "A data audit and cleaning of your student records",
@@ -6275,10 +6276,8 @@
       },
       "ai": {
         "eyebrow": "Ask the school",
-        "title": "AI answers as monthly bundles",
-        "intro": "Answers from your own records and documents, with sources, come in a monthly bundle with a set number of answers. A bundle is optional, needs monthly billing and can be changed from the next invoice.",
-        "bundle": "{answers} answers a month",
-        "bundlePrice": "{amount} a month",
+        "title": "AI answers as monthly question bundles",
+        "intro": "Answers from your own records and documents, with sources, come in a monthly bundle of questions. You choose the bundle that fits how your staff work, and can change it later.",
         "lite": {
           "name": "Lite",
           "body": "For an office that asks now and then, such as before a board submission."
@@ -6293,17 +6292,16 @@
         },
         "extra": {
           "name": "Extra answers",
-          "body": "Answers above your bundle cost {amount} each, billed on the next month's invoice."
+          "body": "If a busy month uses up the bundle, you can add extra answers for the rest of that month."
         },
-        "note": "Only AI answers with sources count. A reply that finds nothing in your records, a refusal and a search-only reply are free."
+        "note": "Your quote says how questions are counted, so there are no surprises at the end of the month."
       },
       "billing": {
         "title": "Billing and GST",
-        "cycle": "The subscription and any AI answer bundle are billed monthly, in advance.",
-        "oneTime": "The implementation and data verification fee is billed once, on the first invoice.",
-        "gst": "GST at {rate} (CGST and SGST, or IGST) is added on every tax invoice, never hidden inside a price.",
-        "invoices": "Each tax invoice from SchoolOS lists the service period and every fee on its own line.",
-        "extras": "WhatsApp messages are paid by the school directly to Meta, and online fee payments go to the school's own Razorpay account. SchoolOS charges nothing for either."
+        "cycle": "The subscription is billed monthly or annually, in advance, as agreed in your quote.",
+        "oneTime": "The implementation and data verification fee is invoiced once.",
+        "gst": "GST is shown separately on every tax invoice, never hidden inside the fee.",
+        "invoices": "Each tax invoice from SchoolOS lists the service period and every fee on its own line."
       },
       "next": {
         "title": "What happens after you contact us",
@@ -6318,18 +6316,13 @@
           },
           "quote": {
             "title": "You get a written quote",
-            "body": "The subscription, the one-time fee for migrating and verifying your records and training your office, and the AI bundle, each on its own line, with GST added."
+            "body": "The recurring fee, the one-time implementation fee and the AI bundle, each shown on its own, with GST shown separately."
           },
           "start": {
             "title": "We set up and verify",
             "body": "Once you agree, we set up your school, verify your records with your office and invite the school's owner to sign in."
           }
         }
-      },
-      "price": {
-        "label": "Price before GST",
-        "monthly": "{amount} a month",
-        "oneTime": "plus {amount} once, for implementation and data verification"
       }
     },
     "about": {

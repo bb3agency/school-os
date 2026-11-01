@@ -5,14 +5,6 @@ import { Faq } from "./HomeView";
 import { MarketingShell } from "./MarketingShell";
 import { PlanCards } from "./PlanCards";
 import { Reveal } from "./Reveal";
-import {
-  AI_BUNDLE_PRICES,
-  EXTRA_ANSWER_INR,
-  GST_RATE_PERCENT,
-  PLAN_PRICES,
-  count,
-  rupees,
-} from "./catalogue";
 import type { MarketingSettings } from "./settings";
 import { CheckList, Container, CtaGroup, PageHero, Section, SectionIntro } from "./ui";
 
@@ -31,10 +23,10 @@ const BASIS: {
   key: Exclude<keyof Pricing["basis"], "eyebrow" | "title" | "intro">;
   icon: IconName;
 }[] = [
+  { key: "size", icon: "users" },
+  { key: "campuses", icon: "building" },
   { key: "tier", icon: "layers" },
-  { key: "oneTime", icon: "checkCircle" },
   { key: "ai", icon: "sparkles" },
-  { key: "gst", icon: "info" },
 ];
 const EVERYONE = ["features", "security", "india", "managed", "export", "support"] as const;
 const IMPLEMENTATION = [
@@ -46,32 +38,20 @@ const IMPLEMENTATION = [
   "reconciliation",
   "domain",
 ] as const;
-const BUNDLES = ["lite", "standard", "high"] as const;
-const BILLING = ["cycle", "oneTime", "gst", "invoices", "extras"] as const;
+const BUNDLES = ["lite", "standard", "high", "extra"] as const;
+const BILLING = ["cycle", "oneTime", "gst", "invoices"] as const;
 const NEXT = ["reply", "demo", "quote", "start"] as const;
 const FAQ = ["price", "features", "ai", "switch", "data"] as const;
 
 /**
- * /pricing (docs/17 §5.6, docs/18 R4): the published starting prices of ADR-0038, before GST,
- * and what they cover: the two plans with their monthly price and one-time implementation and
- * data verification fee, what a school pays for, what every school gets, the AI answer bundles
- * with their quota and the price of an extra answer (never "unlimited" or tokens), billing and
- * GST, what SchoolOS never charges for, and what happens after a school gets in touch. Every
- * number comes from `catalogue.ts` (pinned to billing.yaml); messages hold no numbers.
+ * /pricing (docs/17 §5.6): a packaging explainer that never shows a number (owner decision).
+ * It says what the fee is based on, what every school gets, the one-time implementation and
+ * data verification fee, AI as monthly question bundles (in words, never "unlimited" or
+ * tokens), billing and GST, and what happens after a school gets in touch. Claims follow
+ * docs/16 (plans, billing, GST invoices), docs/07 and docs/08 (isolation, export).
  */
 export function PricingView({ settings }: { settings: MarketingSettings }) {
   const t = useTranslations("marketing");
-  const gst = `${GST_RATE_PERCENT}%`;
-  const extra = rupees(EXTRA_ANSWER_INR);
-  const basisValues = {
-    tier: {
-      shared: rupees(PLAN_PRICES.shared.monthlyInr),
-      dedicated: rupees(PLAN_PRICES.dedicated.monthlyInr),
-    },
-    oneTime: {},
-    ai: {},
-    gst: { rate: gst },
-  } as const;
   const cell = (value: Cell) =>
     value === "yes" ? (
       <span className="inline-flex items-center gap-2 text-ink">
@@ -122,9 +102,7 @@ export function PricingView({ settings }: { settings: MarketingSettings }) {
                   <Icon name={icon} className="size-5" />
                 </span>
                 <h3 className="mt-4 font-semibold text-ink">{t(`pricing.basis.${key}.title`)}</h3>
-                <p className="mt-1.5 text-ink-muted">
-                  {t(`pricing.basis.${key}.body`, basisValues[key])}
-                </p>
+                <p className="mt-1.5 text-ink-muted">{t(`pricing.basis.${key}.body`)}</p>
               </li>
             ))}
           </Reveal>
@@ -199,10 +177,7 @@ export function PricingView({ settings }: { settings: MarketingSettings }) {
             id="implementation-title"
             eyebrow={t("pricing.implementation.eyebrow")}
             title={t("pricing.implementation.title")}
-            intro={t("pricing.implementation.intro", {
-              shared: rupees(PLAN_PRICES.shared.oneTimeFeeInr),
-              dedicated: rupees(PLAN_PRICES.dedicated.oneTimeFeeInr),
-            })}
+            intro={t("pricing.implementation.intro")}
           />
           <div className="rounded-2xl border border-border bg-surface p-6 shadow-card md:p-8">
             <p id="implementation-covers" className="eyebrow text-ink-subtle">
@@ -230,27 +205,19 @@ export function PricingView({ settings }: { settings: MarketingSettings }) {
             intro={t("pricing.ai.intro")}
           />
           <Reveal as="ul" stagger className="grid gap-4 sm:grid-cols-2 md:gap-5 lg:grid-cols-4">
-            {BUNDLES.map((bundle) => {
-              const price = AI_BUNDLE_PRICES[bundle];
-              return (
-                <li key={bundle} className="rounded-2xl border border-border bg-surface p-6">
-                  <h3 className="font-semibold text-ink">{t(`pricing.ai.${bundle}.name`)}</h3>
-                  <p className="num mt-3 text-2xl font-semibold text-ink">
-                    {t("pricing.ai.bundlePrice", { amount: rupees(price.monthlyInr) })}
-                  </p>
-                  <p className="num mt-1 text-sm font-semibold text-ink">
-                    {t("pricing.ai.bundle", { answers: count(price.includedAnswers) })}
-                  </p>
-                  <p className="mt-3 text-ink-muted">{t(`pricing.ai.${bundle}.body`)}</p>
-                </li>
-              );
-            })}
-            <li className="rounded-2xl border border-dashed border-border-soft bg-surface-muted p-6">
-              <h3 className="font-semibold text-ink">{t("pricing.ai.extra.name")}</h3>
-              <p className="mt-1.5 text-ink-muted">
-                {t("pricing.ai.extra.body", { amount: extra })}
-              </p>
-            </li>
+            {BUNDLES.map((bundle) => (
+              <li
+                key={bundle}
+                className={
+                  bundle === "extra"
+                    ? "rounded-2xl border border-dashed border-border-soft bg-surface-muted p-6"
+                    : "rounded-2xl border border-border bg-surface p-6"
+                }
+              >
+                <h3 className="font-semibold text-ink">{t(`pricing.ai.${bundle}.name`)}</h3>
+                <p className="mt-1.5 text-ink-muted">{t(`pricing.ai.${bundle}.body`)}</p>
+              </li>
+            ))}
           </Reveal>
           <p className="mt-6 flex gap-3 text-sm text-ink-muted">
             <Icon name="info" className="mt-0.5 size-4 shrink-0 text-ink" />
@@ -263,13 +230,7 @@ export function PricingView({ settings }: { settings: MarketingSettings }) {
       <Section id="billing" labelledBy="billing-title">
         <Container className="grid gap-10 lg:grid-cols-2 lg:gap-20">
           <SectionIntro id="billing-title" title={t("pricing.billing.title")} />
-          <CheckList
-            items={BILLING.map((item) =>
-              item === "gst"
-                ? t("pricing.billing.gst", { rate: gst })
-                : t(`pricing.billing.${item}`),
-            )}
-          />
+          <CheckList items={BILLING.map((item) => t(`pricing.billing.${item}`))} />
         </Container>
       </Section>
 
@@ -309,10 +270,7 @@ export function PricingView({ settings }: { settings: MarketingSettings }) {
           <Faq
             items={FAQ.map((item) => ({
               q: t(`pricing.faq.${item}.q`),
-              a:
-                item === "ai"
-                  ? t("pricing.faq.ai.a", { amount: extra })
-                  : t(`pricing.faq.${item}.a`),
+              a: t(`pricing.faq.${item}.a`),
             }))}
           />
         </Container>
