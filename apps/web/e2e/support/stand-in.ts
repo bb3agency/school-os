@@ -11,8 +11,9 @@ import type { components } from "@schoolos/api-client";
 import { createFakeIdp, type FakeIdp } from "../../src/test/fake-idp";
 import { askAnswer, askEvents, resetAsk } from "./ask-api";
 import { FILES_PREFIX, journeyAnswer, resetJourney } from "./journey-api";
-import { r1Answer, resetR1 } from "./r1-api";
+import { OFFICE, r1Answer, resetR1 } from "./r1-api";
 import { lastReceiptRequest, r2Answer, resetR2 } from "./r2-api";
+import { isR3SchoolSubject, r3Answer, r3Decorate, resetR3, setR3Clock } from "./r3-api";
 import { resetSheets, sheetAnswer } from "./sheet-api";
 
 export const IDP_PORT = Number(process.env.E2E_IDP_PORT ?? 8089);
@@ -836,6 +837,12 @@ async function startApi(): Promise<Server> {
       resetR2();
       resetAsk();
       resetSheets();
+      resetR3();
+      return send(response, 204, "");
+    }
+    if (url.pathname === "/__e2e/r3/clock" && method === "POST") {
+      const { now } = JSON.parse(raw || "{}") as { now?: string | null };
+      setR3Clock(now ?? null);
       return send(response, 204, "");
     }
     if (url.pathname === "/__e2e/r2/receipt-request" && method === "GET") {
@@ -889,18 +896,24 @@ async function startApi(): Promise<Server> {
     }
     const subject = subjectOf(request);
     const publicToken = request.headers["x-sos-public-token"];
-    const [status, answer] =
-      askAnswer(method, url.pathname, body) ??
-      r2Answer(
-        method,
-        url,
-        subject,
-        body,
-        typeof publicToken === "string" ? publicToken : undefined,
-      ) ??
-      r1Answer(method, url, subject, body) ??
-      journeyAnswer(method, url, subject, body) ??
-      apiAnswer(method, url.pathname, subject);
+    const [status, answer] = r3Decorate(
+      method,
+      url.pathname,
+      subject,
+      r3Answer(method, url, subject, body) ??
+        askAnswer(method, url.pathname, body) ??
+        r2Answer(
+          method,
+          url,
+          subject,
+          body,
+          typeof publicToken === "string" ? publicToken : undefined,
+        ) ??
+        // The R3 subjects share the R1 office admin's canned school (readiness, students).
+        r1Answer(method, url, isR3SchoolSubject(subject) ? OFFICE : subject, body) ??
+        journeyAnswer(method, url, subject, body) ??
+        apiAnswer(method, url.pathname, subject),
+    );
     if (status === 204) {
       response.writeHead(204, { "cache-control": "no-store" });
       return void response.end();
