@@ -35,7 +35,8 @@ A confirmed reopen counts up ``reopen_count`` (D49 part 3). Each affected school
 ``reopen_pulled`` is behind it gets the notice again on its next pull (``reopen_seq``); the
 school side records the reopen on its breach (``app.privacy.breach_sync``) and reports it with
 :func:`mark_reopen_pulled` (audit ``incident.school_reopen_pulled``). A dedicated host has no
-pull: the operator tells it by phone or e-mail.
+pull: the operator tells it by phone or e-mail and records that with :func:`record_reopen_told`
+(audit ``incident.school_reopen_told``), which counts as the school's pull.
 """
 
 from __future__ import annotations
@@ -161,6 +162,21 @@ class IncidentReopenIn(_In):
     reason: str = Field(min_length=10, max_length=500)
 
     @field_validator("reason")
+    @classmethod
+    def _clean(cls, value: str) -> str:
+        return check_summary(value)
+
+
+class IncidentReopenToldIn(_In):
+    """A dedicated-host school was told of reopen ``reopen_seq`` by phone or e-mail (it has no
+    pull; D49). ``note``: how it was told, in the summary's rule (no names, long numbers,
+    e-mail addresses or Aadhaar numbers)."""
+
+    tenant_id: uuid.UUID
+    reopen_seq: int = Field(ge=1, description="The incident's reopen count the school was told of.")
+    note: str = Field(min_length=10, max_length=200)
+
+    @field_validator("note")
     @classmethod
     def _clean(cls, value: str) -> str:
         return check_summary(value)
@@ -749,6 +765,60 @@ def withdraw_reopen(actor: Actor, incident_id: uuid.UUID) -> IncidentDetailOut:
         return _detail(s, row)
 
 
+def record_reopen_told(
+    actor: Actor, incident_id: uuid.UUID, data: IncidentReopenToldIn
+) -> IncidentDetailOut:
+    """A dedicated-host school was told of a reopen by phone or e-mail (D49 open item): records
+    ``reopen_pulled = reopen_count`` and ``reopen_pulled_at`` for that school, as a pull would.
+    Refused for a shared-tier school (409 ``school_pulls``; its register pulls the reopen), when
+    the school has nothing pending (409 ``reopen_not_pending``) and when the incident's reopen
+    count is no longer ``reopen_seq`` (409 ``reopen_changed``; reload). Audit
+    ``incident.school_reopen_told`` (the reopen count and the note, which follows the summary
+    rule)."""
+    t, d = m.incident_schools, m.deployments
+    with platform_session() as s, db_errors():
+        row = _locked(s, incident_id)
+        school = repo.get_by(
+            s, t, t.c.incident_id == incident_id, t.c.tenant_id == data.tenant_id, for_update=True
+        )
+        if school is None:
+            raise NotFound("School not found")
+        deployment = repo.get_by(s, d, d.c.tenant_id == data.tenant_id)
+        if deployment is None or deployment["mode"] != "dedicated":
+            raise Conflict(
+                "This school's register pulls the reopened incident by itself. Only a school on "
+                "a dedicated host is recorded as told by hand.",
+                code="school_pulls",
+            )
+        reopen_count = int(row["reopen_count"])
+        if int(school["reopen_pulled"]) >= reopen_count:
+            raise Conflict(
+                "This school has no reopen waiting to be told.", code="reopen_not_pending"
+            )
+        if reopen_count != data.reopen_seq:
+            raise Conflict(
+                "The incident's reopen count changed. Reload the incident and record it again.",
+                code="reopen_changed",
+            )
+        repo.update_row(
+            s,
+            t,
+            school["id"],
+            {"reopen_pulled": reopen_count, "reopen_pulled_at": now()},
+            bump_version=False,
+        )
+        audit_platform(
+            s,
+            actor,
+            "incident.school_reopen_told",
+            "incident",
+            incident_id,
+            {"source": "operator", "reopen": reopen_count, "note": data.note},
+            tenant_id=data.tenant_id,
+        )
+        return _detail(s, row)
+
+
 # --- the school-side pull (through app.platform.service) ---------------------------------------
 
 
@@ -854,6 +924,7 @@ __all__ = [
     "IncidentOut",
     "IncidentPatch",
     "IncidentReopenIn",
+    "IncidentReopenToldIn",
     "IncidentSchoolIn",
     "SchoolIncidentNotice",
     "add_school",
@@ -866,6 +937,7 @@ __all__ = [
     "mark_notice_pulled",
     "mark_reopen_pulled",
     "notices_for_school",
+    "record_reopen_told",
     "request_reopen",
     "update_incident",
     "withdraw_reopen",

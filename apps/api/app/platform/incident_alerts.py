@@ -26,6 +26,9 @@ The incident rows are locked ``FOR UPDATE SKIP LOCKED`` while a run checks and r
 two overlapping runs cannot alert twice (a row an operator is editing is retried 5 minutes
 later). An overdue clock whose due-soon alert was never sent (for example an incident recorded
 late) alerts as overdue only. Reads platform tables only (ADR-0020).
+
+:func:`open_clocks` reads the same clocks for the console (the operator dashboard tile and the
+banner on the incidents list), without locking or alerting.
 """
 
 from __future__ import annotations
@@ -42,6 +45,7 @@ from app.core.logging import get_logger
 from app.platform import models as m
 from app.platform.common import SYSTEM, audit_platform, config, now
 from app.platform.incidents import CERT_IN_HOURS, SCHOOL_NOTICE_HOURS
+from app.platform.schemas import IncidentClockOut
 
 log = get_logger(__name__)
 
@@ -115,29 +119,31 @@ def _sent(
 
 
 def _candidates(
-    s: Any, at: dt.datetime, window: dt.timedelta
+    s: Any, at: dt.datetime, window: dt.timedelta, *, lock: bool = True
 ) -> list[tuple[uuid.UUID, Clock, dt.datetime, uuid.UUID | None]]:
+    """Clocks due soon or overdue at ``at``. ``lock`` takes the incident rows ``FOR UPDATE SKIP
+    LOCKED`` (the beat run); the console read does not lock."""
     i, t = m.incidents, m.incident_schools
-    incidents = list(
-        s.execute(
-            select(
-                i.c.id,
-                i.c.opened_at,
-                i.c.cert_in_required,
-                i.c.cert_in_reported_at,
-                i.c.confirmed_at,
-            )
-            .where(
-                i.c.status != "closed",
-                or_(
-                    and_(i.c.cert_in_required.is_(True), i.c.cert_in_reported_at.is_(None)),
-                    i.c.confirmed_at.is_not(None),
-                ),
-            )
-            .order_by(i.c.id)
-            .with_for_update(skip_locked=True)
-        ).mappings()
+    stmt = (
+        select(
+            i.c.id,
+            i.c.opened_at,
+            i.c.cert_in_required,
+            i.c.cert_in_reported_at,
+            i.c.confirmed_at,
+        )
+        .where(
+            i.c.status != "closed",
+            or_(
+                and_(i.c.cert_in_required.is_(True), i.c.cert_in_reported_at.is_(None)),
+                i.c.confirmed_at.is_not(None),
+            ),
+        )
+        .order_by(i.c.id)
     )
+    if lock:
+        stmt = stmt.with_for_update(skip_locked=True)
+    incidents = list(s.execute(stmt).mappings())
     out: list[tuple[uuid.UUID, Clock, dt.datetime, uuid.UUID | None]] = []
     confirmed: dict[uuid.UUID, dt.datetime] = {}
     for row in incidents:
@@ -199,6 +205,52 @@ def check_clocks(at: dt.datetime | None = None) -> list[ClockAlert]:
     return sent
 
 
+def open_clocks(at: dt.datetime | None = None) -> list[IncidentClockOut]:
+    """Every clock that is due soon or overdue now, for the console (D49 part 2: the dashboard
+    tile and the incidents banner of holders of ``platform.incidents.read``). The same rules as
+    :func:`check_clocks`, read without locking or alerting; most urgent first. Ids, the school's
+    tenant code, clock names and times only."""
+    at = at or now()
+    window = due_soon_window()
+    with platform_session() as s:
+        candidates = _candidates(s, at, window, lock=False)
+        if not candidates:
+            return []
+        ids = sorted({c[0] for c in candidates})
+        severity: dict[uuid.UUID, str] = dict(
+            s.execute(
+                select(m.incidents.c.id, m.incidents.c.severity).where(m.incidents.c.id.in_(ids))
+            ).all()
+        )
+        tenants = sorted({c[3] for c in candidates if c[3] is not None})
+        codes: dict[uuid.UUID, str] = (
+            dict(
+                s.execute(
+                    select(m.deployments.c.tenant_id, m.deployments.c.tenant_code).where(
+                        m.deployments.c.tenant_id.in_(tenants)
+                    )
+                ).all()
+            )
+            if tenants
+            else {}
+        )
+    out = [
+        IncidentClockOut(
+            incident_id=incident_id,
+            severity=severity[incident_id],
+            clock=clock,
+            stage=stage,
+            due_at=due_at,
+            minutes_left=_minutes_left(due_at, at),
+            tenant_id=tenant_id,
+            tenant_code=codes.get(tenant_id) if tenant_id else None,
+        )
+        for incident_id, clock, due_at, tenant_id in candidates
+        if (stage := stage_at(due_at, at, window)) is not None
+    ]
+    return sorted(out, key=lambda c: (c.due_at, str(c.incident_id), c.clock, str(c.tenant_id)))
+
+
 def _log(alert: ClockAlert) -> None:
     fields: dict[str, Any] = {
         "incident_id": str(alert.incident_id),
@@ -222,5 +274,6 @@ __all__ = [
     "ClockAlert",
     "check_clocks",
     "due_soon_window",
+    "open_clocks",
     "stage_at",
 ]

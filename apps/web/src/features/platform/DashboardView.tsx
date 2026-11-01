@@ -10,6 +10,7 @@ import { ProgressRing } from "@/components/ui/ProgressRing";
 import { KpiCard } from "@/components/ui/StatCard";
 import { Link } from "@/i18n/navigation";
 import { formatCount, formatDate, formatInr } from "@/lib/format";
+import { IncidentClockAlerts } from "./incidents/IncidentClockAlerts";
 
 type Counts = Record<string, number> | null | undefined;
 
@@ -38,7 +39,8 @@ interface AttentionItem {
  * C14 dashboard (docs/16 §5.1). The API leaves a tile null when the operator lacks its read
  * permission; such tiles are not shown. Counts only, never student data. The "needs
  * attention" list is built from the same numbers (nothing is estimated) and links to the
- * filtered list that explains each one.
+ * filtered list that explains each one. Holders of `platform.incidents.read` also see the
+ * incident clocks that are due soon or overdue (D49 part 2) above the tiles.
  */
 export function DashboardView({
   kpis,
@@ -239,6 +241,7 @@ export function DashboardView({
     <div className="space-y-6">
       <PageHeader title={t("title")} description={t("description")} />
       {notice}
+      {kpis?.incident_clocks ? <IncidentClockAlerts clocks={kpis.incident_clocks} /> : null}
       <section aria-label={t("kpisLabel")}>
         {cards.length === 0 ? (
           <Alert tone="info">{t("noTiles")}</Alert>

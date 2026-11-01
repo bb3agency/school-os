@@ -1919,6 +1919,20 @@
       },
       "reopenPulledAt": "Reopen received {when}",
       "reopenNotPulled": "Reopen not received yet",
+      "clockAlerts": {
+        "label": "Incident clocks",
+        "title": "{count, plural, one {# incident clock is due soon or overdue} other {# incident clocks are due soon or overdue}}",
+        "certIn": "CERT-In report",
+        "schoolNotice": "School notice: {school}",
+        "due": "due {when} ({left})",
+        "open": "Open incident"
+      },
+      "reopenTold": "Record that the school was told",
+      "reopenToldTitle": "Record that {school} was told",
+      "reopenToldBody": "This school is on a dedicated host, so its register does not pull the reopened incident. Tell the school by phone or e-mail about reopen {count}, then record it here.",
+      "reopenToldConsequence": "The school is then shown as having received the reopen. This is recorded in the platform audit log.",
+      "reopenToldNote": "How the school was told",
+      "reopenToldNoteHint": "For example, who you spoke to by role and how. No names, phone numbers or e-mail addresses.",
       "errors": {
         "no_schools": {
           "title": "No schools to confirm",
@@ -1959,6 +1973,18 @@
         "incident_school_not_notified": {
           "title": "A school has not been notified yet",
           "body": "Wait for the school's register to pull the notice, or record the schools told by phone or e-mail, then close it."
+        },
+        "school_pulls": {
+          "title": "This school pulls the reopen by itself",
+          "body": "Only a school on a dedicated host is recorded as told by hand. A shared-tier school's register pulls the reopened incident."
+        },
+        "reopen_not_pending": {
+          "title": "Nothing to record",
+          "body": "This school already has the latest reopen. Reload the page to see the current state."
+        },
+        "reopen_changed": {
+          "title": "The incident changed",
+          "body": "The incident was reopened again. Reload the page and record it again."
         }
       }
     }
