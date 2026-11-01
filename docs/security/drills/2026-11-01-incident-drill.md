@@ -59,6 +59,14 @@ No step failed, so no product code was changed. These are gaps in the process or
 4. **The school's clocks start at SchoolOS's confirmation (C), not when SchoolOS noticed (T0) nor when the school pulled the notice.** In the drill C was T0 + 1 h. This matches ADR-0050 as built; whether the school's Board clock should start at C or at the pull is **(to confirm)** with the legal review of docs/08 §3.
 5. **People to play the roles do not exist yet.** No CERT-In point of contact is designated and the platform has one founder `platform_owner`; the two-operator confirmation needs a second eligible operator whose role is at least 7 days old and not granted by the first (docs/16 §5.19). With one person, steps 4-5, 13 and 15 cannot be done in a real incident.
 
+**Follow-up (2026-11-01, wave R3-2G; lead decision D49, docs/14).** Gaps 1-3 are **closed** (migration `0069_incident_reopen_notice`):
+
+- Gap 1: `PATCH` with `status: closed` is refused with 409 `incident_cert_in_unreported` while CERT-In is required and not reported, and 409 `incident_school_not_notified` while a school of the confirmed list is not notified; `close_blocked_by` shows why in the console.
+- Gap 2: the beat task `platform.incident_clock_alerts` (every 5 minutes, shared tier) logs `platform.incident.clock_due_soon` (≤ 120 min left) and `platform.incident.clock_overdue` once per incident, clock, school and stage, with CloudWatch alarms on both (docs/11 R13) and audit `incident.clock_alert`. Still open: an alert tile in the console.
+- Gap 3: a confirmed reopen is pulled by each shared-tier school (`reopen_count` / `reopen_pulled`); the school's breach records it and a closed breach opens again for review (audit `privacy.breach.incident_reopened`, `incident.school_reopen_pulled`). Still open: recording that a dedicated-host school was told of a reopen by phone.
+
+The automated drill (`test_incident_drill.py`) now has two more steps: **5b** an early close is refused with 409 `incident_cert_in_unreported` (and `close_blocked_by` lists both codes before the dedicated school is phoned); **13b** after the two-operator reopen, school A's next pull reopens its closed breach once (`platform_reopens` = 1; a repeated pull adds nothing; school B's `reopen_pulled` stays 0), and the school closes it again. Gap 4 (school T0) stays **(to confirm)** with counsel; gap 5 is owner action 2. These steps were not part of the run recorded above.
+
 ## 4. Actions for the owner
 
 | # | Action | Why | Due |
@@ -66,4 +74,4 @@ No step failed, so no product code was changed. These are gaps in the process or
 | 1 | **Designate the CERT-In point of contact** and register them with CERT-In; write the name into the script's role table and runbook template D | PRV-017; docs/14 §3 pilot gate | Before the pilot |
 | 2 | **Name two platform owners** (or an owner and an engineer) with `platform.incidents.manage`, roles granted at least 7 days before go-live and not by each other | Two-operator confirmation and reopen (ADR-0050, D48) | Before the pilot |
 | 3 | **Hold the tabletop with real people** using `docs/security/incident-drill.md`, then quarterly (docs/11 §10); write a report in this folder each time | docs/14 §3: "Incident runbook rehearsed" is not met by the automated run alone | Before the pilot, then quarterly |
-| 4 | Decide on gaps 1-4 (close gate, clock alerts, reopen follow-up, school T0) | Process risk found by this drill | Next planning |
+| 4 | Decide on gaps 1-4 (close gate, clock alerts, reopen follow-up, school T0) | Process risk found by this drill | Done for gaps 1-3 (lead decision D49, built R3-2G 2026-11-01); gap 4 (to confirm) with counsel |

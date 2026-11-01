@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.1 (2026-11-01) |
+| Version | 0.2 (2026-11-01): R3-2G as built (D49): the close gate (step 13b), clock alerts (§2) and the reopen reaching the school's breach (step 15b). 0.1 (2026-11-01) |
 | Purpose | Rehearse a suspected personal-data breach from T0 to closure, including the CERT-In 6-hour report, the two-operator confirmation, each school's breach register and the locked close (docs/14 §3 pilot gate; SEC-024) |
 | How often | Quarterly (docs/11 §10), and before the first pilot school goes live |
-| Based on | [Breach runbook](../legal/breach-runbook.md), docs/11 §7 and R5/R7, docs/08 §3 (Rule 7, PRV-008) and §6 (PRV-017..019), ADR-0050, ADR-0054 (D48), docs/16 §5.15a |
+| Based on | [Breach runbook](../legal/breach-runbook.md), docs/11 §7 and R5/R7, docs/08 §3 (Rule 7, PRV-008) and §6 (PRV-017..019), ADR-0050, ADR-0054 (D48), D49 (docs/14; built R3-2G), docs/16 §5.15a, docs/11 R13 |
 | Automated half | `apps/api/tests/platform/test_incident_drill.py` (the same timeline on a pinned clock; run it before the tabletop) |
 | Reports | `docs/security/drills/<date>-incident-drill*.md`, one per drill |
 
@@ -34,6 +34,8 @@
 | Reminders to owner and principal | The school's T0 | 24 h and 60 h, while the detailed report is not recorded | In-app notification | FR-DPDP-035 |
 | Two-person window | First confirmation or reopen request | 72 h (`two_person_request_ttl_hours`) | `confirm_by`, `reopen_confirm_by` | docs/16 §5.19 |
 
+**Alerts on the SchoolOS clocks (D49, built R3-2G).** The CERT-In clock and each unnotified school's notice clock alert the on-call once when 120 minutes or less are left (`platform.incident.clock_due_soon`, alarm `<prefix>-incident-clock-due-soon`) and once when overdue (`platform.incident.clock_overdue`, alarm `<prefix>-incident-clock-overdue`, P1); each alert is in the platform audit as `incident.clock_alert` (docs/11 R13). Shared deployment only. There is no alert tile in the console yet.
+
 All times in the product are IST; logs are UTC with synchronised clocks (PRV-019). Whether a school must also report its own incidents to CERT-In is **(to confirm)**.
 
 ## 3. Scenario (inject at T0)
@@ -60,9 +62,11 @@ Operator screens are in the operator console at `/{locale}/platform/incidents` a
 | 10 | School T0 + ≤ 24 h | School DPO / principal | Notify the Board (initial) and affected families (the parent notice goes through normal notice approval); record both | `PATCH /api/v1/privacy/breaches/{id}` with `board_notice`, `people_notified` | Board acknowledgement; approved notice | Both duties recorded with time and method; not overdue |
 | 11 | School T0 + 24 h, + 60 h | System | Reminders to owner and principal while the detailed report is not recorded | In-app notifications | Notification times | One reminder at 24 h, one at 60 h, never twice |
 | 12 | School T0 + ≤ 72 h | School DPO / principal | Send the detailed report to the Board; record it; close the school's breach | `PATCH .../{id}` with `board_report`, then `status: closed` | Report and acknowledgement | Recorded within 72 h; no reminder after it |
-| 13 | After recovery | Incident lead | Eradicate and recover (docs/11 §7.2 step 5), remediation report to each school, postmortem within 5 working days; status `resolved`, then `closed` | `PATCH .../{id}` | Postmortem (`docs/templates/incident-postmortem.md`) | Closed only after CERT-In is reported (or not required) and every school is notified (a human check: the product does not block it) |
+| 13 | After recovery | Incident lead | Eradicate and recover (docs/11 §7.2 step 5), remediation report to each school, postmortem within 5 working days; status `resolved`, then `closed` | `PATCH .../{id}` | Postmortem (`docs/templates/incident-postmortem.md`) | Closed only after CERT-In is reported (or not required) and every school is notified (enforced since R3-2G, step 13b) |
+| 13b | Before step 8 (any time CERT-In is still unreported) | Incident lead | Try to close the incident early | Incident page shows why it cannot close (`close_blocked_by`); `PATCH .../{id}` with `status: closed` | The 409 response | Refused 409 `incident_cert_in_unreported` (and `incident_school_not_notified` while a confirmed school is not notified); once the facts are recorded (they may be sent in the same PATCH as the close) the close passes (D49) |
 | 14 | After close | Incident lead | Try to edit the closed incident, add a school, confirm | Same routes | The 409 responses | All refused 409 `incident_closed` (D48) |
 | 15 | After close | Incident lead, then second operator | Reopen: one asks with a reason (categories and counts only), a different operator confirms within 72 h. Try confirming your own request (must fail); a waiting request can be withdrawn | Reopen card; `POST .../{id}/reopen`, `POST .../{id}/reopen:confirm`, `POST .../{id}/reopen:withdraw` | Audit `incident.reopen_requested`, `incident.reopened` | Own confirmation refused 409 `same_operator`; status back to `open` only after the second operator; the list of schools stays frozen (409 `incident_confirmed`): a newly affected school needs a follow-up incident |
+| 15b | Reopen + ~1 min, then later | School A's worker, then School DPO / principal | Shared tier: the next pull brings the reopen; the school's closed breach opens again for review. The school reviews it and closes it again | School: Breach page (reopen note); operator incident page shows the school's `reopen_pulled`; `PATCH /api/v1/privacy/breaches/{id}` with `status: closed` | Breach status before and after; audit `privacy.breach.incident_reopened` (school) and `incident.school_reopen_pulled` (platform) | A's breach is `open` with `platform_reopens` = 1 and `closed_at` cleared; a second pull adds nothing; owner and principal got the `privacy.breach.incident_reopened` notification; after the school closes it again a further pull leaves it closed. Dedicated host B: told by phone (no record of that in the product yet) |
 | 16 | End | Facilitator | Check the audit trails: platform audit log filtered on the incident; the school's audit for its breach; verify the chains | Platform audit log (`platform.audit.read`), school audit | CSV export of both | Every step present, by the right person; no names, numbers, e-mail addresses or summary text in any audit summary |
 
 ## 5. Overall pass criteria
@@ -71,7 +75,7 @@ Operator screens are in the operator console at `/{locale}/platform/incidents` a
 - Two different eligible operators confirmed the list; every school notified within 24 hours of confirmation (shared: pulled automatically; dedicated: recorded by hand).
 - The school recorded the Board notice within 24 hours (SchoolOS default, **to confirm**), families without delay, and the detailed report within 72 hours of its T0.
 - Reminders fired once each at 24 h and 60 h.
-- The closed incident refused every change; reopening took two operators.
+- Closing was refused while CERT-In or a school was still owed a notice (D49); the closed incident refused every change; reopening took two operators and reached school A's breach register.
 - Both audit chains hold every step with codes and counts only.
 
 ## 6. After the drill
