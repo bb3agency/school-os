@@ -1877,6 +1877,26 @@
       "recordNotifiedTitle": "Record schools told by phone or e-mail",
       "recordNotifiedBody": "For dedicated hosts and any school told outside SchoolOS.",
       "recordNotifiedConsequence": "The time is recorded as now and stops each school's notice clock.",
+      "reopenTitle": "Closed incident",
+      "closedLocked": "A closed incident can no longer be changed. To change it again, one operator asks to reopen it and a different operator confirms.",
+      "requestReopen": "Ask to reopen",
+      "requestReopenTitle": "Ask to reopen this incident",
+      "requestReopenBody": "Say why the incident must be reopened. A different operator must confirm before anything can be changed.",
+      "requestReopenConsequence": "The incident stays closed until a second operator confirms.",
+      "reopenReasonLabel": "Reason",
+      "reopenReasonHint": "Categories and counts only: no names, phone or Aadhaar numbers, or e-mail addresses. 10 to 500 characters.",
+      "reopenTwoPersonNote": "Two people are needed: the operator who asks cannot confirm.",
+      "reopenWaitingBy": "Reopen asked; waiting for a second operator, by {when}",
+      "reopenWaiting": "Reopen asked; waiting for a second operator",
+      "reopenReasonShown": "Reason: {reason}",
+      "youRequestedReopen": "You asked to reopen it. A different operator must confirm.",
+      "confirmReopen": "Confirm reopen",
+      "confirmReopenTitle": "Confirm reopening this incident",
+      "confirmReopenBody": "Another operator asked to reopen this closed incident. Check the reason before you confirm.",
+      "confirmReopenConsequence": "The incident becomes open again and can be changed. Both steps are in the platform audit log.",
+      "withdrawReopen": "Withdraw the request",
+      "withdrawReopenTitle": "Withdraw the reopen request",
+      "withdrawReopenConsequence": "The incident stays closed. Anyone can ask again later.",
       "errors": {
         "no_schools": {
           "title": "No schools to confirm",
@@ -1893,6 +1913,22 @@
         "cert_in_not_required": {
           "title": "CERT-In is not required for this incident",
           "body": "Tick that it must be reported before recording the report."
+        },
+        "incident_closed": {
+          "title": "This incident is closed",
+          "body": "A closed incident can no longer be changed. Ask to reopen it; a second operator must confirm."
+        },
+        "incident_not_closed": {
+          "title": "This incident is not closed",
+          "body": "Only a closed incident can be reopened. Reload the page to see its current status."
+        },
+        "reopen_requested": {
+          "title": "A reopen request is already waiting",
+          "body": "Confirm it with a different operator, or withdraw it first."
+        },
+        "no_reopen_request": {
+          "title": "No reopen request is waiting",
+          "body": "The request was confirmed or withdrawn. Reload the page to see the current status."
         }
       }
     }

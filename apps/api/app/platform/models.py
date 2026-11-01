@@ -577,6 +577,10 @@ incidents = Table(
     Column("first_confirmed_at", DateTime(timezone=True)),
     Column("second_confirmed_by", Uuid),
     Column("confirmed_at", DateTime(timezone=True)),
+    # 0068_incident_reopen (D48): a pending two-operator reopen request of a closed incident.
+    Column("reopen_requested_by", Uuid),
+    Column("reopen_requested_at", DateTime(timezone=True)),
+    Column("reopen_reason", Text),
     Column("created_at", DateTime(timezone=True)),
     Column("updated_at", DateTime(timezone=True)),
     Column("version", Integer),

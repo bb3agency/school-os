@@ -267,3 +267,254 @@ def test_FR_DPDP_030_spaced_aadhaar_in_summary_is_refused() -> None:
     spaced = f"{number[:4]} {number[4:8]} {number[8:]}"
     with pytest.raises(ValueError, match="long numbers"):
         incidents.check_summary(f"Card {spaced} of one child was exposed")
+
+
+# --- D48: a closed incident is locked; reopening takes two operators (ADR-0050; docs/16) -----
+
+
+def _closed(api: Api, op: Any) -> str:
+    iid: str = _open(api, op)["id"]
+    res = api.call(
+        "PATCH",
+        f"/incidents/{iid}",
+        op,
+        json={"status": "closed"},
+        headers=api.if_match(f"/incidents/{iid}", op),
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["status"] == "closed"
+    return iid
+
+
+@pytest.mark.parametrize(
+    "patch",
+    [
+        {"status": "open"},
+        {"severity": "P4"},
+        {"summary": "Attendance records of one school exposed for a few minutes"},
+        {"cert_in_required": False},
+        {"status": "closed"},
+    ],
+)
+def test_D48_closed_incident_refuses_every_patch(
+    api: Api, make_operator: MakeOperator, patch: dict[str, Any]
+) -> None:
+    op = make_operator("platform_owner")
+    iid = _closed(api, op)
+    before = api.call("GET", f"/incidents/{iid}", op).json()
+    res = api.call(
+        "PATCH", f"/incidents/{iid}", op, json=patch, headers=api.if_match(f"/incidents/{iid}", op)
+    )
+    assert res.status_code == 409, res.text
+    assert res.json()["code"] == "incident_closed"
+    after = api.call("GET", f"/incidents/{iid}", op).json()
+    assert after == before
+
+
+def test_D48_closed_incident_refuses_schools_and_confirmations(
+    api: Api, make_operator: MakeOperator
+) -> None:
+    op = make_operator("platform_owner")
+    iid = _closed(api, op)
+    payload = {"tenant_id": str(_school()), "categories": ["identity"], "approx_people": 2}
+    added = api.call("POST", f"/incidents/{iid}/schools", op, json=payload)
+    assert added.status_code == 409
+    assert added.json()["code"] == "incident_closed"
+    confirmed = api.call("POST", f"/incidents/{iid}/confirm", op)
+    assert confirmed.status_code == 409
+    assert confirmed.json()["code"] == "incident_closed"
+
+
+def test_D48_reopen_needs_a_second_operator_and_is_audited(
+    api: Api, make_operator: MakeOperator
+) -> None:
+    first, second = make_operator("platform_owner"), make_operator("platform_engineer")
+    iid = _closed(api, first)
+    reason = {"reason": "A second school reported the same exposure after closure"}
+    requested = api.call("POST", f"/incidents/{iid}/reopen", first, json=reason)
+    assert requested.status_code == 200, requested.text
+    body = requested.json()
+    assert body["status"] == "closed", "a request alone does not reopen"
+    assert body["reopen_requested_by"] == str(first.id)
+    assert body["reopen_reason"] == reason["reason"]
+    assert body["reopen_confirm_by"] is not None
+    again = api.call("POST", f"/incidents/{iid}/reopen", second, json=reason)
+    assert again.status_code == 409
+    assert again.json()["code"] == "reopen_requested"
+    same = api.call("POST", f"/incidents/{iid}/reopen:confirm", first)
+    assert same.status_code == 409
+    assert same.json()["code"] == "same_operator"
+    done = api.call("POST", f"/incidents/{iid}/reopen:confirm", second)
+    assert done.status_code == 200, done.text
+    out = done.json()
+    assert out["status"] == "open"
+    assert out["reopen_requested_by"] is None
+    assert out["reopen_reason"] is None
+    edited = api.call(
+        "PATCH",
+        f"/incidents/{iid}",
+        first,
+        json={"severity": "P2"},
+        headers=api.if_match(f"/incidents/{iid}", first),
+    )
+    assert edited.status_code == 200, edited.text
+    (req,) = _events("incident.reopen_requested", iid)
+    (reopened,) = _events("incident.reopened", iid)
+    assert req["actor_id"] == first.id
+    assert reopened["actor_id"] == second.id
+    assert reopened["summary"]["requested_by"] == str(first.id)
+    assert "second school" not in str(req["summary"]), "the reason text is not audited"
+
+
+def test_D48_reopen_only_for_closed_and_reason_is_checked(
+    api: Api, make_operator: MakeOperator
+) -> None:
+    op = make_operator("platform_owner")
+    open_iid = _open(api, op)["id"]
+    reason = {"reason": "Closed by mistake before the CERT-In report"}
+    res = api.call("POST", f"/incidents/{open_iid}/reopen", op, json=reason)
+    assert res.status_code == 409
+    assert res.json()["code"] == "incident_not_closed"
+    iid = _closed(api, op)
+    for bad in (
+        "Parent 9876543210 called again",
+        "Mail from ravi.kumar@example.test",
+        "short",
+    ):
+        refused = api.call("POST", f"/incidents/{iid}/reopen", op, json={"reason": bad})
+        assert refused.status_code == 422, bad
+    nothing = api.call("POST", f"/incidents/{iid}/reopen:confirm", op)
+    assert nothing.status_code == 409
+    assert nothing.json()["code"] == "no_reopen_request"
+
+
+def test_D48_reopen_request_can_be_withdrawn(api: Api, make_operator: MakeOperator) -> None:
+    first, second = make_operator("platform_owner"), make_operator("platform_owner")
+    iid = _closed(api, first)
+    reason = {"reason": "Need to add the CERT-In report time recorded late"}
+    assert api.call("POST", f"/incidents/{iid}/reopen", first, json=reason).status_code == 200
+    gone = api.call("POST", f"/incidents/{iid}/reopen:withdraw", first)
+    assert gone.status_code == 200, gone.text
+    assert gone.json()["reopen_requested_by"] is None
+    assert gone.json()["status"] == "closed"
+    late = api.call("POST", f"/incidents/{iid}/reopen:confirm", second)
+    assert late.status_code == 409
+    assert late.json()["code"] == "no_reopen_request"
+    assert len(_events("incident.reopen_withdrawn", iid)) == 1
+
+
+def test_D48_young_role_cannot_confirm_a_reopen(api: Api, make_operator: MakeOperator) -> None:
+    first = make_operator("platform_owner")
+    young = make_operator("platform_engineer", role_age_days=1)
+    iid = _closed(api, first)
+    reason = {"reason": "Another affected school found after closure"}
+    api.call("POST", f"/incidents/{iid}/reopen", first, json=reason)
+    res = api.call("POST", f"/incidents/{iid}/reopen:confirm", young)
+    assert res.status_code == 409
+    assert res.json()["code"] == "approver_not_eligible"
+
+
+def test_D48_reopen_routes_need_manage(api: Api, make_operator: MakeOperator) -> None:
+    owner, viewer = make_operator("platform_owner"), make_operator("platform_viewer")
+    iid = _closed(api, owner)
+    reason = {"reason": "Another affected school found after closure"}
+    assert api.call("POST", f"/incidents/{iid}/reopen", viewer, json=reason).status_code == 403
+    stale = api.call("POST", f"/incidents/{iid}/reopen", owner, json=reason, fresh=False)
+    assert stale.status_code == 428
+    for verb in ("confirm", "withdraw"):
+        assert api.call("POST", f"/incidents/{iid}/reopen:{verb}", viewer).status_code == 403
+
+
+def test_D48_the_database_keeps_the_reopen_request_whole() -> None:
+    with pytest.raises(Exception, match="incidents_reopen"), platform_session() as s:
+        s.execute(
+            text(
+                "INSERT INTO platform.incidents (id, opened_at, severity, summary, "
+                "lead_operator_id, created_by, reopen_requested_by) SELECT :i, now(), 'P2', "
+                "'Attendance records exposed briefly', id, id, id FROM platform.operators LIMIT 1"
+            ),
+            {"i": uuid.uuid4()},
+        )
+
+
+# --- no personal data in logs (SEC-008, invariant 5; NFR-SEC-008) --------------------------------
+
+
+def _spaced_aadhaar() -> str:
+    number = next(
+        f"{n:012d}" for n in range(234123412340, 234123412350) if contains_full_aadhaar(f"{n:012d}")
+    )
+    return f"{number[:4]} {number[4:8]} {number[8:]}"
+
+
+def test_SEC_008_incident_texts_and_the_school_pull_never_reach_logs(
+    api: Api,
+    make_operator: MakeOperator,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A name typed into a summary or reopen reason (the validator cannot catch names) and a
+    refused number, e-mail or spaced Aadhaar never appear in a log line, and neither does the
+    payload a school pulls."""
+    first, second = make_operator("platform_owner"), make_operator("platform_engineer")
+    name = "Kothapalli Synthetica"
+    aadhaar = _spaced_aadhaar()
+    capsys.readouterr()
+    caplog.clear()
+    iid = _open(api, first, summary=f"Contact list of {name} and 40 parents exposed")["id"]
+    school = _school()
+    payload = {"tenant_id": str(school), "categories": ["contact"], "approx_people": 41}
+    api.call("POST", f"/incidents/{iid}/schools", first, json=payload)
+    api.call("POST", f"/incidents/{iid}/confirm", first)
+    assert api.call("POST", f"/incidents/{iid}/confirm", second).status_code == 200
+    for refused in (
+        f"Card {aadhaar} of one child was exposed",
+        "Phone 9876543210 of one parent was exposed",
+        "Mail synthetica.parent@example.test was exposed",
+    ):
+        bad = api.call("POST", "/incidents", first, json=_body(summary=refused))
+        assert bad.status_code == 422
+        assert aadhaar not in bad.text
+        assert "9876543210" not in bad.text
+        assert "synthetica.parent@example.test" not in bad.text
+    (notice,) = incidents.notices_for_school(school)
+    assert name in notice.summary
+    assert incidents.mark_notice_pulled(school, uuid.UUID(iid))
+    closing = api.call(
+        "PATCH",
+        f"/incidents/{iid}",
+        first,
+        json={"status": "closed"},
+        headers=api.if_match(f"/incidents/{iid}", first),
+    )
+    assert closing.status_code == 200, closing.text
+    reason = {"reason": f"{name} reported a second exposure after closure"}
+    assert api.call("POST", f"/incidents/{iid}/reopen", first, json=reason).status_code == 200
+    refused_reason = {"reason": f"Card {aadhaar} found after closure"}
+    assert api.call(
+        "POST", f"/incidents/{iid}/reopen", second, json=refused_reason
+    ).status_code in (
+        409,
+        422,
+    )
+    assert api.call("POST", f"/incidents/{iid}/reopen:confirm", second).status_code == 200
+    api.call("GET", f"/incidents/{iid}", first)
+    api.call("GET", "/incidents", first)
+    out, err = capsys.readouterr()
+    logs = out + err + caplog.text
+    for secret in ("Kothapalli", aadhaar, aadhaar.replace(" ", ""), "9876543210", "@example.test"):
+        assert secret not in logs, secret
+    summaries = " ".join(
+        str(e["summary"])
+        for action in (
+            "incident.opened",
+            "incident.updated",
+            "incident.confirmed",
+            "incident.school_added",
+            "incident.school_notified",
+            "incident.reopen_requested",
+            "incident.reopened",
+        )
+        for e in _events(action, iid)
+    )
+    assert "Kothapalli" not in summaries

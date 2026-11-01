@@ -145,7 +145,7 @@ def test_database() -> Iterator[TestDatabase]:
         yield db
         return
 
-    from testcontainers.postgres import PostgresContainer
+    from testcontainers.community.postgres import PostgresContainer
 
     container = PostgresContainer(
         PG_IMAGE, username="postgres", password="test-admin-pw", dbname=DB_NAME, driver="psycopg"

@@ -7,7 +7,7 @@ import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { Pill } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
-import { TextField } from "@/components/ui/Input";
+import { TextAreaField, TextField } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
@@ -28,6 +28,8 @@ import {
   addSchoolSchema,
   clockFor,
   confirmationOf,
+  reopenOf,
+  reopenSchema,
   reportedSchema,
   type IncidentDetail,
   type IncidentSchool,
@@ -37,7 +39,8 @@ import {
  * One incident (docs/16, ADR-0050; FR-DPDP-030, FR-DPDP-031, SEC-029): the CERT-In clock, the
  * affected schools with their notice clocks, the two-person confirmation before any school is
  * told (a second, different operator confirms), recording schools told by phone or e-mail
- * (dedicated hosts have no pull), and the status. Categories and counts only.
+ * (dedicated hosts have no pull), and the status. Categories and counts only. A closed incident
+ * is read-only (D48): reopening it is asked for by one operator and confirmed by another.
  */
 export function IncidentDetailScreen({ incidentId }: { incidentId: string }) {
   const t = useTranslations("platform.incidents");
@@ -69,7 +72,8 @@ export function IncidentDetailScreen({ incidentId }: { incidentId: string }) {
     );
   }
   const data = incident.data;
-  const manage = can(INCIDENTS_MANAGE) && data.status !== "closed";
+  const closed = data.status === "closed";
+  const manage = can(INCIDENTS_MANAGE) && !closed;
 
   return (
     <div className="space-y-6">
@@ -80,6 +84,7 @@ export function IncidentDetailScreen({ incidentId }: { incidentId: string }) {
         description={data.summary}
         actions={manage ? <StatusDialog incident={data} /> : undefined}
       />
+      {closed ? <ReopenCard incident={data} manage={can(INCIDENTS_MANAGE)} /> : null}
       <Card title={t("certInTitle")} description={t("certInDescription")}>
         <div className="flex flex-wrap items-center gap-3">
           <CertInClock incident={data} />
@@ -230,6 +235,115 @@ function ConfirmationCard({ incident, manage }: { incident: IncidentDetail; mana
               )
             }
           />
+        ) : null}
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * A closed incident is locked (D48). Reopening follows the two-person rule (SEC-029): one
+ * operator asks with a reason (categories and counts only), a different operator confirms; the
+ * person who asked sees no confirm button and may withdraw the request.
+ */
+function ReopenCard({ incident, manage }: { incident: IncidentDetail; manage: boolean }) {
+  const t = useTranslations("platform.incidents");
+  const api = useBffClient("operator");
+  const me = useOperatorMe();
+  const state = reopenOf(incident, me?.operator_id);
+  const path = { params: { path: { incident_id: incident.id } } };
+  return (
+    <Card title={t("reopenTitle")} description={t("closedLocked")}>
+      <div className="space-y-3 text-sm">
+        {state.state === "waiting" ? (
+          <>
+            <Pill variant="review">
+              <span className="num">
+                {state.by
+                  ? t("reopenWaitingBy", { when: formatDateTime(state.by) ?? "" })
+                  : t("reopenWaiting")}
+              </span>
+            </Pill>
+            {state.reason ? (
+              <p className="break-words">{t("reopenReasonShown", { reason: state.reason })}</p>
+            ) : null}
+            {state.mine ? <p className="text-ink-muted">{t("youRequestedReopen")}</p> : null}
+          </>
+        ) : null}
+        {manage ? (
+          <div className="flex flex-wrap gap-2">
+            {state.state === "none" ? (
+              <ActionDialog
+                triggerLabel={t("requestReopen")}
+                triggerVariant="secondary"
+                triggerSize="sm"
+                title={t("requestReopenTitle")}
+                description={t("requestReopenBody")}
+                note={t("reopenTwoPersonNote")}
+                confirmLabel={t("requestReopen")}
+                consequence={t("requestReopenConsequence")}
+                stepUp
+                schema={reopenSchema}
+                invalidate={[INCIDENT_KEYS.all]}
+                errorNamespace="platform.incidents"
+                submit={(data) =>
+                  unwrap(
+                    api.POST("/api/v1/platform/incidents/{incident_id}/reopen", {
+                      ...path,
+                      body: { reason: data.reason },
+                    }),
+                  )
+                }
+              >
+                {(errors) => (
+                  <TextAreaField
+                    name="reason"
+                    label={t("reopenReasonLabel")}
+                    hint={t("reopenReasonHint")}
+                    error={errors.reason}
+                    maxLength={500}
+                    rows={3}
+                  />
+                )}
+              </ActionDialog>
+            ) : null}
+            {state.state === "waiting" && !state.mine ? (
+              <ActionDialog
+                triggerLabel={t("confirmReopen")}
+                triggerVariant="primary"
+                triggerSize="sm"
+                title={t("confirmReopenTitle")}
+                description={t("confirmReopenBody")}
+                note={t("reopenTwoPersonNote")}
+                confirmLabel={t("confirmReopen")}
+                consequence={t("confirmReopenConsequence")}
+                stepUp
+                schema={z.object({})}
+                invalidate={[INCIDENT_KEYS.all]}
+                errorNamespace="platform.incidents"
+                submit={() =>
+                  unwrap(api.POST("/api/v1/platform/incidents/{incident_id}/reopen:confirm", path))
+                }
+              />
+            ) : null}
+            {state.state === "waiting" ? (
+              <ActionDialog
+                triggerLabel={t("withdrawReopen")}
+                triggerVariant="ghost"
+                triggerSize="sm"
+                title={t("withdrawReopenTitle")}
+                confirmLabel={t("withdrawReopen")}
+                consequence={t("withdrawReopenConsequence")}
+                stepUp
+                schema={z.object({})}
+                invalidate={[INCIDENT_KEYS.all]}
+                errorNamespace="platform.incidents"
+                submit={() =>
+                  unwrap(api.POST("/api/v1/platform/incidents/{incident_id}/reopen:withdraw", path))
+                }
+              />
+            ) : null}
+          </div>
         ) : null}
       </div>
     </Card>

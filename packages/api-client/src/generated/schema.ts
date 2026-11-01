@@ -6509,6 +6509,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/incidents/{incident_id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Incident Reopen
+         * @description Ask to reopen a closed incident (D48). A closed incident is locked (PATCH answers
+         *     ``409 incident_closed``); it opens again only when a different operator confirms. The reason
+         *     holds categories and counts only (422 otherwise). ``409 incident_not_closed`` or
+         *     ``reopen_requested``.
+         */
+        post: operations["request_incident_reopen_api_v1_platform_incidents__incident_id__reopen_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/incidents/{incident_id}/reopen:confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Incident Reopen
+         * @description A second, different operator confirms the reopen (SEC-029); the status goes back to
+         *     ``open``. ``409 no_reopen_request``, ``same_operator``, ``request_expired``,
+         *     ``requester_not_authorised`` or ``approver_not_eligible``.
+         */
+        post: operations["confirm_incident_reopen_api_v1_platform_incidents__incident_id__reopen_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/incidents/{incident_id}/reopen:withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw Incident Reopen
+         * @description Withdraw a waiting (or expired) reopen request; the incident stays closed.
+         *     ``409 no_reopen_request``.
+         */
+        post: operations["withdraw_incident_reopen_api_v1_platform_incidents__incident_id__reopen_withdraw_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/incidents/{incident_id}/schools": {
         parameters: {
             query?: never;
@@ -15599,6 +15665,20 @@ export interface components {
              * Format: date-time
              */
             opened_at: string;
+            /**
+             * Reopen Confirm By
+             * @description When the reopen request expires without a confirmation.
+             */
+            reopen_confirm_by?: string | null;
+            /** Reopen Reason */
+            reopen_reason?: string | null;
+            /** Reopen Requested At */
+            reopen_requested_at?: string | null;
+            /**
+             * Reopen Requested By
+             * @description The operator asking to reopen this closed incident (D48).
+             */
+            reopen_requested_by?: string | null;
             /** Schools */
             schools: components["schemas"]["IncidentSchoolOut"][];
             /** Schools Count */
@@ -15696,6 +15776,20 @@ export interface components {
              * Format: date-time
              */
             opened_at: string;
+            /**
+             * Reopen Confirm By
+             * @description When the reopen request expires without a confirmation.
+             */
+            reopen_confirm_by?: string | null;
+            /** Reopen Reason */
+            reopen_reason?: string | null;
+            /** Reopen Requested At */
+            reopen_requested_at?: string | null;
+            /**
+             * Reopen Requested By
+             * @description The operator asking to reopen this closed incident (D48).
+             */
+            reopen_requested_by?: string | null;
             /** Schools Count */
             schools_count: number;
             /** Schools Notified */
@@ -15736,6 +15830,15 @@ export interface components {
             status?: ("open" | "contained" | "resolved" | "closed") | null;
             /** Summary */
             summary?: string | null;
+        };
+        /**
+         * IncidentReopenIn
+         * @description Ask to reopen a closed incident (D48). ``reason``: why, in categories and counts only (no
+         *     names, numbers, e-mail addresses or record text).
+         */
+        IncidentReopenIn: {
+            /** Reason */
+            reason: string;
         };
         /** IncidentSchoolIn */
         IncidentSchoolIn: {
@@ -39747,6 +39850,142 @@ export interface operations {
         };
     };
     confirm_incident_api_v1_platform_incidents__incident_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncidentDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    request_incident_reopen_api_v1_platform_incidents__incident_id__reopen_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IncidentReopenIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncidentDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    confirm_incident_reopen_api_v1_platform_incidents__incident_id__reopen_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncidentDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    withdraw_incident_reopen_api_v1_platform_incidents__incident_id__reopen_withdraw_post: {
         parameters: {
             query?: never;
             header?: never;

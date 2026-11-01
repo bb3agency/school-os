@@ -1439,6 +1439,39 @@ def confirm_incident(
     return incidents.confirm(_actor(ctx), incident_id)
 
 
+@router.post("/incidents/{incident_id}/reopen", response_model=incidents.IncidentDetailOut)
+def request_incident_reopen(
+    *,
+    incident_id: uuid.UUID,
+    data: incidents.IncidentReopenIn,
+    ctx: Annotated[Ctx, IncidentsManage],
+) -> incidents.IncidentDetailOut:
+    """Ask to reopen a closed incident (D48). A closed incident is locked (PATCH answers
+    ``409 incident_closed``); it opens again only when a different operator confirms. The reason
+    holds categories and counts only (422 otherwise). ``409 incident_not_closed`` or
+    ``reopen_requested``."""
+    return incidents.request_reopen(_actor(ctx), incident_id, data)
+
+
+@router.post("/incidents/{incident_id}/reopen:confirm", response_model=incidents.IncidentDetailOut)
+def confirm_incident_reopen(
+    *, incident_id: uuid.UUID, ctx: Annotated[Ctx, IncidentsManage]
+) -> incidents.IncidentDetailOut:
+    """A second, different operator confirms the reopen (SEC-029); the status goes back to
+    ``open``. ``409 no_reopen_request``, ``same_operator``, ``request_expired``,
+    ``requester_not_authorised`` or ``approver_not_eligible``."""
+    return incidents.confirm_reopen(_actor(ctx), incident_id)
+
+
+@router.post("/incidents/{incident_id}/reopen:withdraw", response_model=incidents.IncidentDetailOut)
+def withdraw_incident_reopen(
+    *, incident_id: uuid.UUID, ctx: Annotated[Ctx, IncidentsManage]
+) -> incidents.IncidentDetailOut:
+    """Withdraw a waiting (or expired) reopen request; the incident stays closed.
+    ``409 no_reopen_request``."""
+    return incidents.withdraw_reopen(_actor(ctx), incident_id)
+
+
 # --- operators --------------------------------------------------------------------------------
 
 OpManage = Depends(require_platform("platform.operators.manage"))

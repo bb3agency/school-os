@@ -153,3 +153,30 @@ export function confirmationOf(
   }
   return { state: "none" };
 }
+
+/** Why a closed incident should be reopened (D48): the summary's rule, categories and counts. */
+export const reopenSchema = z.object({ reason: incidentSummary });
+
+/**
+ * Where a reopen of a closed incident stands (D48): a closed incident is locked; one operator
+ * asks to reopen it and a different operator confirms (two-person rule, until
+ * `reopen_confirm_by`).
+ */
+export type Reopen =
+  { state: "none" } | { state: "waiting"; mine: boolean; by: string | null; reason: string | null };
+
+export function reopenOf(
+  incident: Pick<
+    Incident,
+    "status" | "reopen_requested_by" | "reopen_confirm_by" | "reopen_reason"
+  >,
+  operatorId: string | null | undefined,
+): Reopen {
+  if (incident.status !== "closed" || !incident.reopen_requested_by) return { state: "none" };
+  return {
+    state: "waiting",
+    mine: Boolean(operatorId) && incident.reopen_requested_by === operatorId,
+    by: incident.reopen_confirm_by ?? null,
+    reason: incident.reopen_reason ?? null,
+  };
+}
