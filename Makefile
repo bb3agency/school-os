@@ -32,6 +32,8 @@ ARGS ?=
 # (e.g. "--tenants 3 --students 800 --no-documents"; see python -m app.devtools.seed_synthetic -h).
 PROFILE   ?= full
 SEED_ARGS ?=
+# restore-drill: e.g. DRILL_ARGS="--tenants 3 --students 800 --report-dir /tmp/drills" (see -h).
+DRILL_ARGS ?=
 # test-order: ORDER_SEED (random by default; the run prints it) and ORDER_BUCKET (module, global).
 ORDER_SEED   ?=
 ORDER_BUCKET ?= module
@@ -40,7 +42,7 @@ E2E_ARGS ?=
 # e2e-audit: report and screenshot directory, relative to apps/web.
 AUDIT_OUT ?= audit-out
 
-.PHONY: help install dev dev-host dev-stop down logs migrate db-bootstrap seed-synthetic sync-system-roles test test-api test-web test-security eval-live \
+.PHONY: help install dev dev-host dev-stop down logs migrate db-bootstrap seed-synthetic restore-drill sync-system-roles test test-api test-web test-security eval-live \
         migration-check e2e e2e-audit lint format typecheck security eval check db-shell openapi tf-validate
 
 help: ## List targets
@@ -86,6 +88,9 @@ db-shell: ## psql into the local database as the admin
 
 seed-synthetic: .env ## Synthetic schools, staff, students, documents (NEVER real data; PROFILE=none|small|full)
 	$(UV) run python scripts/dev.py --seed-only -- --profile $(PROFILE) $(SEED_ARGS)
+
+restore-drill: ## Local backup/restore drill on synthetic data in throwaway containers (SEC-024; DRILL_ARGS)
+	SOS_ENV=$${SOS_ENV:-local} SOS_LOG_LEVEL=$${SOS_LOG_LEVEL:-WARNING} $(UV) run python -m app.devtools.restore_drill $(DRILL_ARGS)
 
 sync-system-roles: ## Sync every school's system roles with roles.yaml (dry run; ARGS="--apply [--prune] [--tenant <id>]")
 	$(UV) run python -m app.identity.sync_system_roles $(ARGS)
