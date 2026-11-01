@@ -49,7 +49,7 @@ from app.core.db import context_free_session, platform_session, tenant_session
 from app.core.errors import Conflict
 from app.core.ids import new_id
 from app.core.logging import get_logger
-from app.devtools import student_seeder
+from app.devtools import finance_seeder, student_seeder
 from app.devtools.plan import DatasetPlan, StaffSpec, TenantPlan
 from app.devtools.register_pages import RegisterPage
 from app.devtools.students import SchoolStudents
@@ -91,6 +91,9 @@ class StudentOptions:
     """Rendered register pages to store as ``register_scan`` documents."""
     documents: bool = True
     uploader: student_seeder.Uploader = student_seeder.http_uploader
+    fees_messaging: bool = True
+    """Fee ledger and messaging rows (:mod:`app.devtools.finance_seeder`; ``--no-fees-messaging``
+    skips them)."""
 
 
 # --- first owner -----------------------------------------------------------------------------
@@ -507,6 +510,31 @@ def _seed_students(plan: TenantPlan, summary: TenantSummary, options: StudentOpt
         summary.counts["students"] = len(student_seeder.existing_admission_numbers(session, ctx))
         if options.documents:
             summary.counts["documents"] = student_seeder.count_documents(session, ctx)
+    if options.fees_messaging:
+        _seed_fees_messaging(plan, summary)
+
+
+def _actor(plan: TenantPlan, role: str) -> finance_seeder.Actor:
+    spec = next(s for s in plan.staff if s.role == role and s.ordinal == 1)
+    with tenant_session(plan.tenant_id) as session:
+        member = _members_by_email(session).get(spec.email)
+    if member is None or member.status != "active":
+        raise SeedError(f"tenant {plan.tenant_id}: the synthetic {role} is not active")
+    return finance_seeder.Actor(member.id, _member_context(plan.tenant_id, member))
+
+
+def _seed_fees_messaging(plan: TenantPlan, summary: TenantSummary) -> None:
+    """Fee heads, plan, accounts, receipts (one cancelled, one part refunded) and, when messaging
+    is available, its settings, opt-outs and a skipped receipt message per receipt."""
+    actors = finance_seeder.Actors(
+        accountant=_actor(plan, "accountant"), principal=_actor(plan, "principal")
+    )
+    try:
+        created = finance_seeder.seed_fees_and_messaging(plan, actors)
+    except finance_seeder.FinanceSeedError as exc:
+        raise SeedError(str(exc)) from exc
+    summary.created.update(created)
+    summary.counts.update(finance_seeder.counts(plan.tenant_id))
 
 
 def seed_tenant(

@@ -13,7 +13,11 @@ removed when the drill ends, nothing else on the machine is touched):
    as the admin, ``alembic upgrade head`` as ``sos_migrator`` and the audit partition step,
    exactly like ``make migrate``;
 2. seeds synthetic schools through the module services (:mod:`app.devtools.seeder`: tenants,
-   staff, students, guardians, enrolments, per-source values) and runs the data-quality checks
+   staff, students, guardians, enrolments, per-source values, and the ``fin``/``msg`` rows of
+   :mod:`app.devtools.finance_seeder`: fee heads, plan, accounts, charges, receipts with one
+   cancellation and one refund, messaging settings, opt-outs and skipped receipt messages; the
+   drill turns messaging on for its own process only, no WhatsApp connection is made) and runs
+   the data-quality checks
    for each school, then verifies every audit hash chain and records per-table row counts;
 3. takes the backup the way ``deploy/dedicated/scripts/backup.sh`` does:
    ``pg_dump -U postgres -d schoolos -Fc -Z 6`` inside the database container, then
@@ -359,6 +363,7 @@ def _seed(
     from app.devtools.plan import build_plan  # noqa: PLC0415
     from app.devtools.students import build_students  # noqa: PLC0415
     from app.dq import service as dq  # noqa: PLC0415
+    from app.messaging import runtime as messaging_runtime  # noqa: PLC0415
     from app.students import crypto  # noqa: PLC0415
 
     wrapper = LocalDevKeyWrapper(settings)
@@ -372,9 +377,19 @@ def _seed(
         pages=lambda t, school: [],
         documents=False,  # files live in S3, not in the database dump (docs/10 §15.3)
     )
-    summary = seeder.seed(
-        plan, wrapper=wrapper, owner_bootstrap=seeder.PlatformOwnerBootstrap(), students=options
-    )
+    # msg.* rows need messaging available (shared tier + SOS_MESSAGING_ENABLED): on for this
+    # process while seeding the throwaway database, restored afterwards.
+    previous = messaging_runtime.current_patch()
+    messaging_runtime.patch_for_tests({**(previous or {}), "messaging_enabled": True})
+    try:
+        summary = seeder.seed(
+            plan,
+            wrapper=wrapper,
+            owner_bootstrap=seeder.PlatformOwnerBootstrap(),
+            students=options,
+        )
+    finally:
+        messaging_runtime.patch_for_tests(previous)
     for t in plan.tenants:
         spec = next(s for s in t.staff if s.role == seeder.STUDENT_SEEDER_ROLE and s.ordinal == 1)
         with tenant_session(t.tenant_id) as session:
