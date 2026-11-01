@@ -813,6 +813,8 @@ Stories of the 2026-27 plan, release R3 (docs/18 §3 R3, planned Apr-Jun 2027, b
 **US-2801** · As a SchoolOS operator, I want to record an incident with its CERT-In and school-notice clocks so that we meet 6 hours and 24 hours. [FR-DPDP-030, FR-DPDP-031]
 - AC1: The incident holds categories and counts only (a summary with names, numbers or e-mail addresses is refused); two operators confirm the affected schools before any school is notified.
 - AC2: Once an incident is closed its details cannot be edited; reopening it needs a second operator to confirm and is recorded in the platform audit (lead decision D48, 2026-11-01; ADR-0054; built in R3-2F).
+- AC3: An incident cannot be closed while CERT-In is required and not reported, or while a confirmed affected school has not been told; the console says which (lead decision D49, 2026-11-01; built in R3-2G).
+- AC4: When an incident is reopened, each affected school's breach register shows it on the next pull and a closed school breach opens again for review; operators are alerted by the alarm e-mail list 2 hours before and after the CERT-In and school-notice deadlines (D49; built in R3-2G; an in-console alert is still open).
 
 **US-2802** · As the principal, I want SchoolOS's notice to appear in our breach register at once, marked urgent. [FR-DPDP-032]
 - AC1: Within a minute of confirmation the owner and principal get an urgent in-app notification and the register shows the notice with its facts.
