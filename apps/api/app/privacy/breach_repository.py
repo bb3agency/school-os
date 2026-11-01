@@ -36,11 +36,26 @@ def now(session: Session) -> dt.datetime:
     return value
 
 
+# The newest closed breaches the register lists; open breaches are always listed in full (an
+# old open breach must never drop off the register behind newer closed ones).
+CLOSED_LIMIT = 500
+
+
 def list_records(session: Session, *, include_closed: bool = True) -> list[BreachRecord]:
-    stmt = select(BreachRecord).order_by(BreachRecord.noticed_at.desc(), BreachRecord.id.desc())
-    if not include_closed:
-        stmt = stmt.where(BreachRecord.status != "closed")
-    return list(session.scalars(stmt.limit(500)))
+    """Every open breach, then (with ``include_closed``) the ``CLOSED_LIMIT`` newest closed
+    ones; each part newest first."""
+    order = (BreachRecord.noticed_at.desc(), BreachRecord.id.desc())
+    still_open = select(BreachRecord).where(BreachRecord.status != "closed").order_by(*order)
+    rows = list(session.scalars(still_open))
+    if include_closed:
+        closed = (
+            select(BreachRecord)
+            .where(BreachRecord.status == "closed")
+            .order_by(*order)
+            .limit(CLOSED_LIMIT)
+        )
+        rows.extend(session.scalars(closed))
+    return rows
 
 
 def get(session: Session, breach_id: uuid.UUID, *, lock: bool = False) -> BreachRecord | None:

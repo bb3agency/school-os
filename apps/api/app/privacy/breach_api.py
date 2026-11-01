@@ -77,7 +77,8 @@ def update_breach(
 ) -> BreachDetailOut:
     """Change facts or status, or record a duty as done with when and how (permission
     ``privacy.breach.manage``, step-up, ``If-Match``). Errors: ``breach_closed``,
-    ``duties_open`` (409), stale ``If-Match`` (412)."""
+    ``duties_open`` (409), ``only_when_closing`` (422: a ``close_reason`` without
+    ``status: closed``), stale ``If-Match`` (412)."""
     out = service.update_breach(db, ctx, breach_id, body, expected_version=version)
     response.headers["ETag"] = etag(out.version)
     return out

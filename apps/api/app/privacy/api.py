@@ -209,7 +209,9 @@ def letter(ctx: Reader, db: TenantDB, request_id: uuid.UUID, letter: LetterParam
 )
 def build_report(ctx: Manager, db: TenantDB, request_id: uuid.UUID) -> PrivacyRequestOut:
     """Build the access report in the background from every module (FR-DPDP-009; permission
-    ``privacy.request.manage``). It must then be released by someone else."""
+    ``privacy.request.manage``). It must then be released by someone else. 409
+    ``request_closed``; 409 ``request_decided`` once a report of the request was released (the
+    released report stands; log a new access request for a fresh one); 409 ``no_subject``."""
     return service.build_report(db, ctx, request_id)
 
 
@@ -224,8 +226,10 @@ def release_report(ctx: Decider, db: TenantDB, request_id: uuid.UUID) -> Privacy
 @router.get("/privacy/requests/{request_id}/report/download-url", response_model=PrivacyDownloadOut)
 def report_download(ctx: Worker, db: TenantDB, request_id: uuid.UUID) -> PrivacyDownloadOut:
     """A link (5 minutes) to the released report, within 24 hours of release (permission
-    ``privacy.request.manage`` or ``privacy.request.decide``, step-up). Audited
-    ``privacy.report.downloaded``; SchoolOS sends the report nowhere."""
+    ``privacy.request.manage`` or ``privacy.request.decide``, step-up). 409 ``request_closed``
+    (withdrawn, or closed without a released report), ``report_not_released``,
+    ``export_expired``. Audited ``privacy.report.downloaded``; SchoolOS sends the report
+    nowhere."""
     return service.report_download(db, ctx, request_id)
 
 

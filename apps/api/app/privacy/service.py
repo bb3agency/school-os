@@ -1000,7 +1000,8 @@ def add_link(
     if repo.add_link(session, row.id, data.kind, data.target_id, created_by=ctx.user_id):
         _event(session, ctx, row, "change_request_linked", {"change_request_id": data.target_id})
         if row.status == "received":
-            row = repo.update_request(session, row, {"status": "in_progress"})
+            with _db_errors():
+                row = repo.update_request(session, row, {"status": "in_progress"})
         _audit(
             session,
             "privacy.request.linked",
@@ -1062,7 +1063,8 @@ def withdraw_consent(
         {"consent_id": consent_id, "purpose_id": data.purpose_id},
     )
     if row.status == "received":
-        row = repo.update_request(session, row, {"status": "in_progress"})
+        with _db_errors():
+            row = repo.update_request(session, row, {"status": "in_progress"})
     _audit(
         session,
         "privacy.request.linked",
@@ -1260,11 +1262,18 @@ def _report_document(
 
 def build_report(session: Session, ctx: UserContext, request_id: uuid.UUID) -> PrivacyRequestOut:
     """Queue the access report (FR-DPDP-009; ``privacy.request.manage``). Any earlier report of
-    the request is replaced (it must be released again)."""
+    the request is replaced (it must be released again). A request whose report was released
+    is decided (FR-DPDP-010) and keeps its released report: 409 ``request_decided`` (log a new
+    access request for a fresh report)."""
     row = _load(session, ctx, request_id, lock=True)
     _open(row)
     if row.kind != "access":
         raise _invalid("kind", "not_an_access_request")
+    if row.status == "decided" or row.report_released_at is not None:
+        raise Conflict(
+            "This report was already released. Log a new access request for a fresh report.",
+            code="request_decided",
+        )
     if _subject(row) is None:
         raise Conflict(
             "The person this request is about is no longer on record.", code="no_subject"
@@ -1284,7 +1293,8 @@ def build_report(session: Session, ctx: UserContext, request_id: uuid.UUID) -> P
     }
     if row.status == "received":
         values["status"] = "in_progress"
-    row = repo.update_request(session, row, values)
+    with _db_errors():
+        row = repo.update_request(session, row, values)
     repo.add_link(session, row.id, "export", state.id, created_by=ctx.user_id)
     _event(session, ctx, row, "report_built", {"export_id": state.id})
     _audit(session, "privacy.report.requested", row.id, {"export_id": state.id})
@@ -1339,11 +1349,16 @@ def report_download(
     if not (ctx.has(MANAGE) or ctx.has(DECIDE)):
         raise Forbidden()
     _require_step_up(ctx)
+    if row.status == "withdrawn" or (row.status in FINAL and row.report_released_at is None):
+        # A withdrawn request, or one closed without a release, has no report to hand over.
+        raise Conflict("This request is closed.", code="request_closed")
     if row.report_export_id is None or row.report_released_at is None:
         raise Conflict("The report has not been released yet.", code="report_not_released")
     if repo.now(session) > row.report_released_at + REPORT_KEEP:
         raise Conflict(
-            "The report was released more than 24 hours ago. Build it again.", code="export_expired"
+            "The report was released more than 24 hours ago. Log a new access request for a "
+            "fresh report.",
+            code="export_expired",
         )
     out = exports.module_document_download_url(
         session,
