@@ -20,7 +20,7 @@
     "format:check": "prettier --check apps/web packages/api-client"
   },
   "devDependencies": {
-    "prettier": "3.9.9"
+    "prettier": "3.9.10"
   },
   "overrides": {
     "eslint": "10.11.0",
