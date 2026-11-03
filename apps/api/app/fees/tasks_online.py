@@ -12,9 +12,9 @@ Outbox consumers (``app.ops``, relayed every 5 s):
 Beat: ``fees.sweep_payment_events`` every minute (events whose wake-up was lost and retries that
 are due), ``fees.payments_hourly`` (expired links, refunds still in progress),
 ``fees.reconcile_online`` daily at 06:00 IST (FR-PAY-010) and ``fees.payments_daily`` at 03:10
-IST (OAuth token refresh and expiry alerts, inbox retention). Each school runs in its own
-``tenant_session``; one failing school does not stop the others; schools without a connection
-are skipped cheaply.
+IST (OAuth token refresh and expiry alerts; inbox retention, suspended and offboarding schools
+included). Each school runs in its own ``tenant_session``; one failing school does not stop the
+others; schools without a connection are skipped cheaply.
 """
 
 from __future__ import annotations
@@ -26,10 +26,12 @@ from typing import Any, Final
 from celery import Task, shared_task
 from celery.schedules import crontab
 
+from app.core.db import context_free_session
 from app.core.logging import get_logger
 from app.fees import links, online, refund_hooks
 from app.fees.providers import ProviderError
 from app.ops.service import TenantTask
+from app.tenancy import service as tenancy
 
 log = get_logger(__name__)
 
@@ -40,9 +42,22 @@ RECONCILE_TASK: Final = "fees.reconcile_online"
 DAILY_TASK: Final = "fees.payments_daily"
 
 
-def _each_school(action: str, run: Callable[[uuid.UUID], object]) -> dict[str, int]:
+# Retention keeps running while a school is suspended or offboarding (docs/04 §6, docs/16 §5.5).
+PURGE_TENANT_STATUSES: Final = ("active", "suspended", "offboarding")
+
+
+def _purge_tenant_ids() -> list[uuid.UUID]:
+    with context_free_session() as session:
+        return tenancy.list_tenant_ids(session, PURGE_TENANT_STATUSES)
+
+
+def _each_school(
+    action: str,
+    run: Callable[[uuid.UUID], object],
+    tenant_ids: Callable[[], list[uuid.UUID]] | None = None,
+) -> dict[str, int]:
     totals = {"schools": 0, "failed": 0}
-    for tenant_id in online.connected_tenant_ids():
+    for tenant_id in (tenant_ids or online.connected_tenant_ids)():
         try:
             run(tenant_id)
             totals["schools"] += 1
@@ -129,14 +144,17 @@ def reconcile_online() -> dict[str, int]:
     return _each_school("reconcile", online.reconcile)
 
 
-def _daily(tenant_id: uuid.UUID) -> None:
-    online.refresh_tokens(tenant_id)
-    online.purge_events(tenant_id)
-
-
 @shared_task(name=DAILY_TASK, queue="maintenance", acks_late=True, ignore_result=True)
 def payments_daily() -> dict[str, int]:
-    return _each_school("daily", _daily)
+    """Token refresh for connected active schools; inbox retention for every school that keeps
+    data (a failed refresh no longer holds back the purge)."""
+    tokens = _each_school("daily", online.refresh_tokens)
+    purge = _each_school("purge", online.purge_events, _purge_tenant_ids)
+    return {
+        "schools": tokens["schools"],
+        "purged_schools": purge["schools"],
+        "failed": tokens["failed"] + purge["failed"],
+    }
 
 
 def beat_schedule() -> dict[str, dict[str, Any]]:

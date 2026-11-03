@@ -16,6 +16,7 @@ from celery import Celery
 from sqlalchemy import Engine, text
 
 from app.authz.kv import InMemoryKV, kv_store, set_kv_store
+from app.ops import repository as ops_repo
 from app.ops import service
 from app.ops.service import TenantTask
 
@@ -61,22 +62,23 @@ def test_FR_OPS_004_a_delivery_after_a_lost_worker_is_deferred_not_dropped(
         )
         monkeypatch.setattr(service, "DEDUPE_BY_EVENT", frozenset({"tests.e_probe"}))
         tid = _tenant(admin_engine)
-        kwargs = {"tenant_id": str(tid), "event_id": str(uuid.uuid4()), "payload": {}}
+        event_id = str(uuid.uuid4())
+        kwargs: dict[str, Any] = {"tenant_id": str(tid), "event_id": event_id, "payload": {}}
 
         # The first run claimed the event, then its worker died: the lease stays "running".
-        assert service.claim_event("tests.e_probe", kwargs["event_id"])
+        assert service.claim_event("tests.e_probe", event_id)
         assert task(**kwargs) is None
         assert ran == []
         assert resent == [{"kwargs": kwargs, "countdown": service.HOLD_COUNTDOWN_SECONDS}]
 
         # The lease ends (TTL): the deferred delivery runs the event, once.
-        kv_store().delete(service._event_key("tests.e_probe", kwargs["event_id"]))
+        kv_store().delete(service._event_key("tests.e_probe", event_id))
         assert task(**kwargs) == "done"
-        assert ran == [kwargs["event_id"]]
+        assert ran == [event_id]
 
         # A delivery of a finished event is skipped, not deferred.
         assert task(**kwargs) is None
-        assert ran == [kwargs["event_id"]]
+        assert ran == [event_id]
         assert len(resent) == 1
     finally:
         set_kv_store(None)
@@ -86,16 +88,16 @@ def test_FR_OPS_004_idempotency_purge_survives_a_failing_school(
     admin_engine: Engine, engines: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     first, second = _tenant(admin_engine), _tenant(admin_engine)
-    monkeypatch.setattr(service.tenancy, "list_tenant_ids", lambda s, statuses: [first, second])
+    monkeypatch.setattr("app.tenancy.service.list_tenant_ids", lambda s, statuses: [first, second])
     seen: list[uuid.UUID] = []
 
     def purge(session: Any) -> int:
-        tid = service.repo.current_tenant(session)
+        tid = ops_repo.current_tenant(session)
         seen.append(tid)
         if tid == first:
             raise RuntimeError("boom")
         return 2
 
-    monkeypatch.setattr(service.repo, "idem_purge_expired", purge)
+    monkeypatch.setattr(ops_repo, "idem_purge_expired", purge)
     assert service.purge_idempotency_keys() == 2
     assert seen == [first, second]

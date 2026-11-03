@@ -55,7 +55,7 @@ def test_FR_OPS_004_change_request_expiry_survives_a_failing_school(
 
     seen: list[uuid.UUID] = []
     _fan_out(monkeypatch, tasks)
-    monkeypatch.setattr(tasks.service, "expire_due", _flaky(seen, 1))
+    monkeypatch.setattr("app.changes.service.expire_due", _flaky(seen, 1))
     assert tasks.expire_all() == {"tenants": 2, "expired": 1, "failed": 1}
     assert seen == [A, B]
 
@@ -67,7 +67,7 @@ def test_FR_TASK_007_task_reminders_survive_a_failing_school(
 
     seen: list[uuid.UUID] = []
     _fan_out(monkeypatch, tasks)
-    monkeypatch.setattr(tasks.service, "send_reminders", _flaky(seen, 3))
+    monkeypatch.setattr("app.circulars.service.send_reminders", _flaky(seen, 3))
     assert tasks.remind_all() == {"tenants": 2, "sent": 3, "failed": 1}
     assert seen == [A, B]
 
@@ -79,7 +79,7 @@ def test_FR_RDY_006_portal_reminders_survive_a_failing_school(
 
     seen: list[uuid.UUID] = []
     _fan_out(monkeypatch, tasks)
-    monkeypatch.setattr(tasks.portal_tasks, "send_reminders", _flaky(seen, 2))
+    monkeypatch.setattr("app.dq.portal_tasks.send_reminders", _flaky(seen, 2))
     assert tasks.remind_all() == {"tenants": 2, "sent": 2, "failed": 1}
     assert seen == [A, B]
 
@@ -89,8 +89,8 @@ def test_FR_FEE_009_late_fees_survive_a_failing_school(monkeypatch: pytest.Monke
 
     seen: list[uuid.UUID] = []
     _fan_out(monkeypatch, tasks)
-    monkeypatch.setattr(tasks.service, "enabled", lambda *_: True)
-    monkeypatch.setattr(tasks.service, "post_late_fees", _flaky(seen, {"posted": 4}))
+    monkeypatch.setattr("app.fees.service.enabled", lambda *_: True)
+    monkeypatch.setattr("app.fees.service.post_late_fees", _flaky(seen, {"posted": 4}))
     assert tasks.post_all() == {"tenants": 2, "posted": 4, "failed": 1}
     assert seen == [A, B]
 
@@ -128,7 +128,7 @@ def test_FR_DPDP_006_privacy_due_reminders_survive_a_failing_school(
 
     seen: list[uuid.UUID] = []
     _fan_out(monkeypatch, tasks)
-    monkeypatch.setattr(tasks.service, "notify_due", _flaky(seen, 1))
+    monkeypatch.setattr("app.privacy.service.notify_due", _flaky(seen, 1))
     assert tasks.notify_all() == {"tenants": 2, "notified": 1, "failed": 1}
     assert seen == [A, B]
 
@@ -138,7 +138,7 @@ def test_FR_PUB_006_handle_purge_survives_a_failing_school(monkeypatch: pytest.M
 
     seen: list[uuid.UUID] = []
     _fan_out(monkeypatch, tasks)
-    monkeypatch.setattr(tasks.service, "purge_expired_handles", _flaky(seen, 6))
+    monkeypatch.setattr("app.public.service.purge_expired_handles", _flaky(seen, 6))
     assert tasks.purge_all() == {"tenants": 2, "deleted": 6, "failed": 1}
     assert seen == [A, B]
 
@@ -150,9 +150,9 @@ def test_FR_TALLY_009_silence_check_survives_a_failing_school(
 
     seen: list[uuid.UUID] = []
     _fan_out(monkeypatch, tasks)
-    monkeypatch.setattr(tasks.service, "connector_enabled", lambda *_: True)
-    monkeypatch.setattr(tasks.service, "notify_silent_devices", _flaky(seen, 1))
-    monkeypatch.setattr(tasks.service, "purge_old_syncs", lambda *_: 2)
+    monkeypatch.setattr("app.tally.service.connector_enabled", lambda *_: True)
+    monkeypatch.setattr("app.tally.service.notify_silent_devices", _flaky(seen, 1))
+    monkeypatch.setattr("app.tally.service.purge_old_syncs", lambda *_: 2)
     assert tasks.check_all() == {"tenants": 2, "notified": 1, "purged": 2, "failed": 1}
     assert seen == [A, B]
 
@@ -192,7 +192,7 @@ def test_FR_PAY_010_online_payment_loops_survive_a_failing_school(
     from app.fees import tasks_online
 
     seen: list[uuid.UUID] = []
-    monkeypatch.setattr(tasks_online.online, "connected_tenant_ids", lambda: [A, B])
+    monkeypatch.setattr("app.fees.online.connected_tenant_ids", lambda: [A, B])
     assert tasks_online._each_school("inbox", _flaky(seen, None)) == {"schools": 1, "failed": 1}
     assert seen == [A, B]
 
@@ -210,8 +210,8 @@ def test_US_103_AC2_a_failed_pull_still_ends_due_grants(monkeypatch: pytest.Monk
         swept.append(tenant_id)
         return {"expired": 1, "stale_requests": 0, "reported": 0}
 
-    monkeypatch.setattr(tasks.service, "sync_school", pull)
-    monkeypatch.setattr(tasks.service, "sweep_school", sweep)
+    monkeypatch.setattr("app.breakglass.service.sync_school", pull)
+    monkeypatch.setattr("app.breakglass.service.sweep_school", sweep)
     assert tasks.sweep_all() == {"tenants": 2, "received": 0, "expired": 2, "failed": 2}
     assert swept == [A, B]
 
@@ -231,7 +231,90 @@ def test_FR_DPDP_032_a_failed_pull_still_sends_breach_reminders(
         reminded.append(tenant_id)
         return 1
 
-    monkeypatch.setattr(breach_tasks.breach_sync, "sync_school", pull)
-    monkeypatch.setattr(breach_tasks.service, "send_reminders", remind)
+    monkeypatch.setattr("app.privacy.breach_sync.sync_school", pull)
+    monkeypatch.setattr("app.privacy.breach_service.send_reminders", remind)
     assert breach_tasks.sweep_all() == {"tenants": 2, "received": 0, "reminders": 2, "failed": 2}
     assert reminded == [A, B]
+
+
+def test_FR_EW_017_retention_purge_runs_for_suspended_schools(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """docs/04 §6 and docs/16 §5.5: retention purges keep running while a school is suspended;
+    the early-warning rules and reminders stay with active schools."""
+    from app.insights import tasks
+    from app.tenancy import service as tenancy
+
+    asked: list[tuple[str, ...]] = []
+
+    def ids(_: Any, statuses: tuple[str, ...]) -> list[uuid.UUID]:
+        asked.append(tuple(statuses))
+        return []
+
+    monkeypatch.setattr(tenancy, "list_tenant_ids", ids)
+    monkeypatch.setattr(tasks, "context_free_session", _session)
+    tasks.purge_expired()
+    tasks.send_flag_reminders()
+    tasks.evaluate_all()
+    assert asked == [("active", "suspended", "offboarding"), ("active",), ("active",)]
+
+
+def test_FR_MSG_023_message_retention_runs_for_suspended_schools(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.messaging import service as messaging
+    from app.messaging import tasks
+    from app.messaging.sends import service as sends
+    from app.tenancy import service as tenancy
+
+    asked: list[tuple[str, ...]] = []
+    purged: list[uuid.UUID] = []
+
+    def ids(_: Any, statuses: tuple[str, ...]) -> list[uuid.UUID]:
+        asked.append(tuple(statuses))
+        return [A, B]
+
+    def purge(tenant_id: uuid.UUID) -> dict[str, int]:
+        purged.append(tenant_id)
+        return {}
+
+    monkeypatch.setattr(tenancy, "list_tenant_ids", ids)
+    monkeypatch.setattr(tasks, "context_free_session", _session)
+    monkeypatch.setattr(messaging, "available", lambda: True)
+    monkeypatch.setattr(messaging, "live_tenant_ids", lambda: [])
+    monkeypatch.setattr(messaging, "purge_expired", purge)
+    monkeypatch.setattr(sends, "purge_expired", lambda _t: {})
+    assert tasks.purge_expired() == {"schools": 2, "failed": 0}
+    assert asked == [("active", "suspended", "offboarding")]
+    assert purged == [A, B]
+
+
+def test_FR_PAY_012_inbox_retention_runs_for_suspended_schools_and_after_a_failed_refresh(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.fees import tasks_online
+    from app.tenancy import service as tenancy
+
+    asked: list[tuple[str, ...]] = []
+    purged: list[uuid.UUID] = []
+
+    def ids(_: Any, statuses: tuple[str, ...]) -> list[uuid.UUID]:
+        asked.append(tuple(statuses))
+        return [A, B]
+
+    def refresh(tenant_id: uuid.UUID) -> str:
+        raise RuntimeError("provider down")
+
+    def purge(tenant_id: uuid.UUID) -> int:
+        purged.append(tenant_id)
+        return 0
+
+    monkeypatch.setattr(tenancy, "list_tenant_ids", ids)
+    monkeypatch.setattr(tasks_online, "context_free_session", _session)
+    monkeypatch.setattr("app.fees.online.connected_tenant_ids", lambda: [A])
+    monkeypatch.setattr("app.fees.online.refresh_tokens", refresh)
+    monkeypatch.setattr("app.fees.online.purge_events", purge)
+    out = tasks_online.payments_daily()
+    assert out == {"schools": 0, "purged_schools": 2, "failed": 1}
+    assert asked == [("active", "suspended", "offboarding")]
+    assert purged == [A, B]

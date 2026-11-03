@@ -476,6 +476,43 @@ def test_FR_FEE_026_morning_notification_and_narration_erasure(
     assert (line.narration, line.narration_erased) == (None, True)
 
 
+def test_FR_FEE_026_narrations_are_erased_while_the_school_is_suspended(
+    school: Any, admin_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Retention keeps running for a suspended school (docs/04 §6, docs/16 §5.5; PRV-024):
+    payer names in narrations are not kept past 90 days because the school was suspended.
+    No notification is sent to a suspended school."""
+    from app.fees import upi_tasks
+    from app.tenancy import service as tenancy
+
+    out, _ = _import(school, admin_engine, [U.Credit(_today(), _amount(), upi=False)])
+    real = tenancy.list_tenant_ids
+    monkeypatch.setattr(
+        tenancy,
+        "list_tenant_ids",
+        lambda s, statuses=("active",): [t for t in real(s, statuses) if t == school.tenant_id],
+    )
+    now = _common.now
+    monkeypatch.setattr(_common, "now", lambda s: now(s) + dt.timedelta(days=91))
+    with admin_engine.begin() as c:
+        c.execute(
+            text("UPDATE core.tenants SET status = 'suspended' WHERE id = :t"),
+            {"t": school.tenant_id},
+        )
+    try:
+        totals = upi_tasks.morning_all()
+    finally:
+        with admin_engine.begin() as c:
+            c.execute(
+                text("UPDATE core.tenants SET status = 'active' WHERE id = :t"),
+                {"t": school.tenant_id},
+            )
+    assert (totals["tenants"], totals["failed"], totals["notified"]) == (1, 0, 0)
+    assert totals["erased"] >= 1
+    (line,) = _lines(school, out.id)
+    assert (line.narration, line.narration_erased) == (None, True)
+
+
 def test_FR_FEE_016_concurrent_confirmations_confirm_once(
     school: Any, admin_engine: Engine
 ) -> None:

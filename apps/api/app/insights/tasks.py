@@ -38,6 +38,8 @@ EVALUATE_ALL_TASK: Final = "insights.evaluate_all"
 REMINDER_TASK: Final = "insights.send_flag_reminders"
 PURGE_TASK: Final = "insights.purge_expired"
 TENANT_STATUSES: Final = ("active",)
+# Retention keeps running while a school is suspended or offboarding (docs/04 §6, docs/16 §5.5).
+PURGE_TENANT_STATUSES: Final = ("active", "suspended", "offboarding")
 
 
 def _ids(values: object) -> list[uuid.UUID]:
@@ -68,11 +70,16 @@ def evaluate_students(
         raise self.retry(exc=exc, countdown=min(30 * 2**self.request.retries, 600)) from exc
 
 
-def for_each_school(label: str, job: Callable[[Session], int | dict[str, int]]) -> dict[str, int]:
-    """Run ``job`` in each active school's own ``tenant_session`` (statuses: active only; a
-    suspended school's staff cannot act on flags, so nothing is raised or reminded there)."""
+def for_each_school(
+    label: str,
+    job: Callable[[Session], int | dict[str, int]],
+    statuses: tuple[str, ...] = TENANT_STATUSES,
+) -> dict[str, int]:
+    """Run ``job`` in each school's own ``tenant_session`` (statuses: active only by default; a
+    suspended school's staff cannot act on flags, so nothing is raised or reminded there; the
+    retention purge passes :data:`PURGE_TENANT_STATUSES`)."""
     with context_free_session() as session:
-        tenant_ids = tenancy.list_tenant_ids(session, TENANT_STATUSES)
+        tenant_ids = tenancy.list_tenant_ids(session, statuses)
     totals = {"tenants": len(tenant_ids), "done": 0, "failed": 0}
     for tenant_id in tenant_ids:
         try:
@@ -103,7 +110,7 @@ def send_flag_reminders() -> dict[str, int]:
 
 @shared_task(name=PURGE_TASK, queue="maintenance", acks_late=True, ignore_result=True)
 def purge_expired() -> dict[str, int]:
-    return for_each_school("retention", service.purge_expired)
+    return for_each_school("retention", service.purge_expired, PURGE_TENANT_STATUSES)
 
 
 def beat_schedule() -> dict[str, dict[str, Any]]:
