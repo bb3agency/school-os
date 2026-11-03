@@ -461,10 +461,21 @@ def confirm(
         owner_membership_id=data.owner_membership_id,
     )
     if row is None:
-        row = repo.insert_calendar_row(
-            session,
-            {"id": new_id(), "academic_year_id": year.id, "event_key": event_key, **values},
-        )
+        try:
+            with session.begin_nested():
+                row = repo.insert_calendar_row(
+                    session,
+                    {"id": new_id(), "academic_year_id": year.id, "event_key": event_key, **values},
+                )
+        except IntegrityError as exc:
+            constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
+            if constraint != "portal_calendar_dates_once":
+                raise
+            # Another first confirmation of this event committed meanwhile.
+            raise PreconditionFailed(
+                "Someone else changed this in the meantime. Reload it and try again.",
+                code="version_mismatch",
+            ) from None
         created = True
     else:
         row = repo.update_calendar_row(session, row["id"], values)
