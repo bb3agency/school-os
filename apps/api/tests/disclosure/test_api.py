@@ -136,6 +136,40 @@ def test_FR_DISC_004_draft_needs_if_match_and_refuses_stale_versions(api: Any, s
     assert stale.status_code == 412
 
 
+def test_FR_DISC_004_racing_first_draft_saves_refuse_the_second_with_412(
+    school: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two first saves (``If-Match: 0``) find no draft to lock; the second insert hit
+    ``disclosure_drafts_one_per_school`` and was a 500. It is a 412 (reload)."""
+    from app.core.errors import PreconditionFailed
+    from app.disclosure import repository as disclosure_repo
+    from app.disclosure.schemas import DisclosureDraftIn
+
+    who = school.people["office_admin"]
+    real = disclosure_repo.get_draft
+
+    def racing(session: Any, *, lock: bool = False) -> Any:
+        row = real(session, lock=lock)
+        if lock and row is None:  # the other office PC saves first, between our read and write
+            monkeypatch.setattr(disclosure_repo, "get_draft", real)
+            with tenant_session(school.tenant_id, who.user_id) as other:
+                service.put_draft(
+                    other,
+                    who,
+                    DisclosureDraftIn(inputs={"affiliation_no": "1130001"}, documents={}),
+                    expected_version=0,
+                )
+        return row
+
+    monkeypatch.setattr(disclosure_repo, "get_draft", racing)
+    with pytest.raises(PreconditionFailed), tenant_session(school.tenant_id, who.user_id) as db:
+        service.put_draft(db, who, DisclosureDraftIn(inputs={}, documents={}), expected_version=0)
+    with tenant_session(school.tenant_id, who.user_id) as db:
+        kept = disclosure_repo.get_draft(db)
+        assert kept is not None
+        assert (kept.version, kept.inputs.get("affiliation_no")) == (1, "1130001")
+
+
 def test_FR_DISC_004_inputs_refuse_aadhaar_and_phone_numbers(api: Any, school: Any) -> None:
     res = S.save_draft(
         api,
