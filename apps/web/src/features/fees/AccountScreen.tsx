@@ -54,33 +54,74 @@ const reason = z
   .max(REASON_MAX, { error: "tooLong" });
 const lineRef = z.string().min(1, { error: "required" });
 
-function concessionSchema() {
-  return z.object({
-    concession_type: z.enum(["sibling", "staff_ward", "merit", "hardship", "rte", "other"]),
-    basis: z.enum(["amount", "percent"]),
-    value: z
-      .string()
-      .trim()
-      .refine((v) => (toPaise(v) ?? 0) > 0, { error: "invalidAmount" }),
-    target: lineRef,
-    reason,
-  });
+/** A concession request; a percent above 100 is refused like the API (422 above_100_percent). */
+export function concessionSchema() {
+  return z
+    .object({
+      concession_type: z.enum(["sibling", "staff_ward", "merit", "hardship", "rte", "other"]),
+      basis: z.enum(["amount", "percent"]),
+      value: z
+        .string()
+        .trim()
+        .refine((v) => (toPaise(v) ?? 0) > 0, { error: "invalidAmount" }),
+      target: lineRef,
+      reason,
+    })
+    .superRefine((data, context) => {
+      if (data.basis === "percent" && (toPaise(data.value) ?? 0) > 100 * 100) {
+        context.addIssue({ code: "custom", path: ["value"], message: "invalidPercent" });
+      }
+    });
 }
-const adjustmentSchema = z.object({
-  target: lineRef,
-  amount: z
-    .string()
-    .trim()
-    .refine((v) => (toPaise(v) ?? 0) !== 0, { error: "invalidAmount" }),
-  reason_code: z.enum([
-    "late_fee_waiver",
-    "plan_change",
-    "concession_reversal",
-    "correction",
-    "other",
-  ]),
-  reason,
-});
+
+/**
+ * An adjustment request, checked like the API (FR-FEE-009): the late-fee line takes only a
+ * late-fee waiver, a waiver reduces (negative amount) and is at most the late fee left
+ * (late fee plus waivers already approved on that line; 422 above_late_fee).
+ */
+export function adjustmentSchema(lines: readonly DueLine[]) {
+  return z
+    .object({
+      target: lineRef,
+      amount: z
+        .string()
+        .trim()
+        .refine((v) => (toPaise(v) ?? 0) !== 0, { error: "invalidAmount" }),
+      reason_code: z.enum([
+        "late_fee_waiver",
+        "plan_change",
+        "concession_reversal",
+        "correction",
+        "other",
+      ]),
+      reason,
+    })
+    .superRefine((data, context) => {
+      const target = parseTarget(data.target);
+      const waiver = data.reason_code === "late_fee_waiver";
+      if (target.head_id === null && !waiver) {
+        context.addIssue({ code: "custom", path: ["reason_code"], message: "lateFeeWaiverOnly" });
+        return;
+      }
+      if (!waiver) return;
+      if (target.head_id !== null) {
+        context.addIssue({ code: "custom", path: ["target"], message: "waiverOnLateFee" });
+        return;
+      }
+      const amount = toPaise(data.amount) ?? 0;
+      if (amount >= 0) {
+        context.addIssue({ code: "custom", path: ["amount"], message: "waiverReducesLateFee" });
+        return;
+      }
+      const line = lines.find(
+        (l) => l.head_id === null && l.instalment_no === target.instalment_no,
+      );
+      const left = line ? (toPaise(line.late_fee) ?? 0) + (toPaise(line.adjustment) ?? 0) : 0;
+      if (-amount > left) {
+        context.addIssue({ code: "custom", path: ["amount"], message: "aboveLateFee" });
+      }
+    });
+}
 
 function parseTarget(value: string): { instalment_no: number; head_id: string | null } {
   const [no, head] = value.split(":");
@@ -338,7 +379,7 @@ function AdjustmentDialog({ account, control }: { account: Account; control: Dia
       description={t("adjustmentBody")}
       confirmLabel={t("requestAdjustment")}
       consequence={t("needsApproval")}
-      schema={adjustmentSchema}
+      schema={adjustmentSchema(account.lines)}
       invalidate={[KEYS.all]}
       errorNamespace="fees"
       submit={(input, key) => {
@@ -371,6 +412,7 @@ function AdjustmentDialog({ account, control }: { account: Account; control: Dia
           <SelectField
             name="reason_code"
             label={t("reasonCode")}
+            error={errors.reason_code}
             options={(
               [
                 "correction",
