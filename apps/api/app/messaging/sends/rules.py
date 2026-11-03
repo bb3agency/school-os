@@ -42,7 +42,7 @@ def closes_at(
     return quiet_start
 
 
-def next_open(
+def next_open(  # noqa: PLR0911 - one return per window case
     now: dt.datetime,
     *,
     purpose: str,

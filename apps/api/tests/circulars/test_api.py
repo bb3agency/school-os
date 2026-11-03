@@ -876,7 +876,7 @@ def test_FR_NOTICE_005_hidden_telugu_text_does_not_block_approval(
     )
     assert approved.status_code == 200, approved.text
     with admin_engine.connect() as c:
-        body_te = c.execute(
+        body_te: str = c.execute(
             text("SELECT body_te FROM ops.parent_notices WHERE id = :i"), {"i": blank["id"]}
         ).scalar_one()
     assert body_te == english["body_en"]
