@@ -67,6 +67,8 @@ export const KNOWN_API_CODES = [
   // Audit 2026-10-05/06 hardening: replay after an access change; hidden direction characters.
   "idempotency_access_changed",
   "invalid_characters",
+  // A parent shared with a student outside the editor's classes (SEC-015; 403).
+  "guardian_shared_out_of_scope",
 ] as const;
 export type KnownApiCode = (typeof KNOWN_API_CODES)[number];
 

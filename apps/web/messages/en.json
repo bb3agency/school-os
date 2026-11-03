@@ -2096,7 +2096,26 @@
       "unknown_profile": "Choose a readiness check from the list.",
       "response_required": "Write the answer before closing a complaint.",
       "audience_mismatch": "This notice is for a different audience. Choose the matching notice.",
-      "unknown_version": "This version does not exist. Use the version printed on the notice."
+      "unknown_version": "This version does not exist. Use the version printed on the notice.",
+      "above_100_percent": "Enter a percentage from 0 to 100.",
+      "above_late_fee": "This is more than the late fee left on the instalment.",
+      "waiver_reduces_late_fee": "A late-fee waiver is a negative amount on the late-fee line.",
+      "zero": "Enter an amount other than zero.",
+      "above_due": "This is more than is due on that line.",
+      "allocations_do_not_add_up": "The amounts must add up to the receipt amount.",
+      "invalid_utr": "Enter the 12-digit UPI reference (UTR).",
+      "invalid_cheque_number": "Enter the 6-digit cheque number.",
+      "invalid_reference": "Enter the bank reference: 12 to 22 letters or digits.",
+      "not_for_mode": "A UTR goes only with a UPI payment. Clear it or choose UPI.",
+      "original_method_only": "Refund the same way the fee was paid.",
+      "original_method_online_only": "An online payment is refunded online only.",
+      "in_future": "The date cannot be after today.",
+      "too_old": "The date is too far back. Choose a later date.",
+      "invalid_range": "The start date must be on or before the end date.",
+      "leaving_date_before_enrolment": "The leaving date is before the student joined this class. Check the date.",
+      "nomination_adults_only": "A nomination is made by a parent or a staff member.",
+      "staff_sign_in_staff_only": "Staff sign-in checks only a staff member.",
+      "guardian_phone_guardians_only": "The phone on record checks only a parent or student."
     },
     "api": {
       "generic": {
@@ -2314,6 +2333,10 @@
       "approver_not_eligible": {
         "title": "Ask another operator to approve",
         "body": "You cannot be the second person on this request: your role is less than 7 days old, or one of you gave the other their role."
+      },
+      "guardian_shared_out_of_scope": {
+        "title": "Parent linked to another class",
+        "body": "This parent is also linked to a student outside your classes. Ask the office to change their details."
       }
     },
     "stepUp": {
@@ -2435,7 +2458,11 @@
     "purposeKey": "Use lowercase letters, digits and _, starting with a letter, 3 to 41 characters.",
     "notInFuture": "This can't be in the future.",
     "chooseCategories": "Tick at least one kind of data.",
-    "summaryPersonalData": "Write kinds of data and counts only: no phone, Aadhaar or other long numbers, and no e-mail addresses."
+    "summaryPersonalData": "Write kinds of data and counts only: no phone, Aadhaar or other long numbers, and no e-mail addresses.",
+    "aboveLateFee": "The waiver is more than the late fee left on this instalment. Lower it.",
+    "waiverReducesLateFee": "A late-fee waiver reduces the fee: enter it with a minus sign, like -100.",
+    "waiverOnLateFee": "Choose the late-fee line of the instalment for a late-fee waiver.",
+    "lateFeeWaiverOnly": "The late-fee line takes only a late-fee waiver. Choose that reason or another line."
   },
   "support": {
     "piiWarningTitle": "Do not include student personal data",
@@ -3227,6 +3254,10 @@
       "import_not_committed": {
         "title": "Only an added import can be undone",
         "body": "Reload the page to see this import's status."
+      },
+      "import_exists": {
+        "title": "Already being imported",
+        "body": "This file is already being imported. Open that import from the imports list."
       }
     },
     "steps": {
@@ -3625,6 +3656,10 @@
       "blocker_needs_waive": {
         "title": "Only the office admin or principal can resolve this",
         "body": "This problem stops certificates and submissions. Ask someone who may accept problems, or request a correction of the record."
+      },
+      "out_of_scope": {
+        "title": "Student outside your classes",
+        "body": "This finding is about a student outside your classes. Ask someone who looks after that class."
       }
     },
     "detail": {
@@ -4448,6 +4483,14 @@
       "sensitive_not_allowed": {
         "title": "Restricted details are not allowed for you",
         "body": "Only staff allowed to see restricted details (such as category) can include or download them. Leave them out, or ask your school's office admin."
+      },
+      "student_read_required": {
+        "title": "You cannot see student records",
+        "body": "You can no longer see student records, so you cannot download this export."
+      },
+      "students_out_of_scope": {
+        "title": "Students outside your reach",
+        "body": "Some students in this export are no longer in your classes. Make a new export."
       }
     },
     "pdfJob": {
@@ -7213,6 +7256,10 @@
       "version_mismatch": {
         "title": "Changed meanwhile",
         "body": "Someone else changed this. The page shows the latest; try again."
+      },
+      "reading_not_done": {
+        "title": "Not read yet",
+        "body": "This circular has not been read yet. Wait until reading finishes, then try again."
       }
     }
   },
@@ -9540,6 +9587,38 @@
       "upi_not_set": {
         "title": "UPI not set",
         "body": "The school's UPI ID is not set yet. The accountant adds it in Settings > UPI QR."
+      },
+      "above_late_fee": {
+        "title": "Waiver above the late fee",
+        "body": "The late fee left on this instalment is less than this waiver. Reject it and ask for a smaller one."
+      },
+      "refund_first": {
+        "title": "Refund this receipt instead",
+        "body": "An online receipt is cancelled only as a duplicate entry. Refund it instead."
+      },
+      "voucher_not_ready": {
+        "title": "No voucher yet",
+        "body": "The refund voucher is written when the refund is approved."
+      },
+      "plan_not_draft": {
+        "title": "Plan not a draft",
+        "body": "Only a draft plan can be activated. Reload the page to see its state."
+      },
+      "plan_already_active": {
+        "title": "Another plan is active",
+        "body": "Another plan is already active for this class, year and category. Make a new version of that plan instead."
+      },
+      "plan_not_active": {
+        "title": "Plan not active",
+        "body": "Activate the plan first. Only an active plan can be applied or copied to a new version."
+      },
+      "too_many_heads": {
+        "title": "Too many fee heads",
+        "body": "This school has the most fee heads allowed. Archive one you no longer use."
+      },
+      "too_many_students": {
+        "title": "Class too large",
+        "body": "This class is too large to apply at once. Apply the plan one section at a time."
       }
     },
     "upi": {
@@ -10207,6 +10286,10 @@
       "no_purposes": {
         "title": "No purposes in use",
         "body": "Switch on at least one purpose under Consent purposes before printing forms."
+      },
+      "purpose_answered": {
+        "title": "Families have answered",
+        "body": "Families have answered this version. Save the change as a new version."
       }
     }
   },
@@ -10801,7 +10884,11 @@
       "invalidDate": "Enter a real date as {format}, for example {example}.",
       "dateInFuture": "The date cannot be after today.",
       "noAadhaar": "Remove the Aadhaar number. SchoolOS never stores one.",
-      "nomineeRequired": "Enter the nominee's name."
+      "nomineeRequired": "Enter the nominee's name.",
+      "dateTooOld": "The date is more than a year ago. Check it.",
+      "nominationAdultsOnly": "A nomination is made by a parent or a staff member. Choose a parent or staff member.",
+      "staffSignInStaffOnly": "Staff sign-in checks only a staff member. Choose another way.",
+      "guardianPhoneGuardiansOnly": "The phone on record checks only a parent or student. Choose another way."
     },
     "detail": {
       "title": "Privacy request",
@@ -11078,6 +11165,18 @@
       "no_subject": {
         "title": "The person is no longer on record",
         "body": "The person this request is about is no longer in SchoolOS. Close the request with an answer."
+      },
+      "report_already_released": {
+        "title": "Report already released",
+        "body": "This report was already released. Reload the page to see it."
+      },
+      "erasure_already_decided": {
+        "title": "Erasure already decided",
+        "body": "Someone already decided this erasure. Reload the page to see the decision."
+      },
+      "not_a_consent_withdrawal": {
+        "title": "Not a consent withdrawal",
+        "body": "Only a consent withdrawal request about a student records a withdrawal."
       }
     }
   }
