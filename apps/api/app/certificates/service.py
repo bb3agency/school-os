@@ -102,6 +102,7 @@ from app.core.logging import get_context, get_logger
 from app.core.pdf import PdfRenderer, get_renderer
 from app.core.records import RecordTable
 from app.core.redaction import contains_full_aadhaar
+from app.core.textnorm import nfc
 from app.documents import service as documents
 from app.dq import service as dq
 from app.fees import service as fees
@@ -323,12 +324,12 @@ def _error(field: str, code: str, message_key: str | None = None) -> dict[str, s
 
 
 def _clean_reason(field: str, value: str | None, *, required: bool) -> str | None:
-    """Reasons and notes: trimmed, 10..1000 characters, never a full Aadhaar number."""
+    """Reasons and notes: NFC, trimmed, 10..1000 characters, never a full Aadhaar number."""
     if value is None or not value.strip():
         if required:
             raise ValidationFailed([_error(field, "missing")])
         return None
-    text = value.strip()
+    text = nfc(value).strip()
     if contains_full_aadhaar(text):
         raise ValidationFailed(
             [_error(field, AADHAAR_CODE, "errors.aadhaar_last4_only")], detail=AADHAAR_DETAIL
@@ -980,7 +981,8 @@ def _clean_number(inp: InputSpec, value: str) -> tuple[str | None, str | None]:
 
 
 def _clean_input(inp: InputSpec, value: str, today: dt.date) -> tuple[str | None, str | None]:
-    """One input: (clean value, None) or (None, error code)."""
+    """One input (NFC-normalised): (clean value, None) or (None, error code)."""
+    value = nfc(value)
     if contains_full_aadhaar(value):
         return None, AADHAAR_CODE
     if inp.kind == "choice":
@@ -1495,7 +1497,7 @@ def _verification_out(
 
 
 def _clean_verification_reason(value: str | None) -> str:
-    text = (value or "").strip()
+    text = nfc(value or "").strip()
     if not text:
         raise ValidationFailed([_error("reason", "missing")])
     if contains_full_aadhaar(text):

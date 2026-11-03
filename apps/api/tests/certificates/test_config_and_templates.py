@@ -346,3 +346,25 @@ def test_FR_REG_004_register_page_headings_and_cancelled_rows() -> None:
         )
     )
     assert "No certificates" in empty
+
+
+def test_FR_CERT_016_service_cleaning_nfc_normalises_free_text() -> None:
+    """CLAUDE.md §9: the service's own cleaning NFC-normalises free text (defence in depth for
+    callers that skip the schema, e.g. stored inputs re-checked at approval)."""
+    import unicodedata
+
+    from app.certificates import service
+    from app.certificates.config import InputSpec
+
+    decomposed = "Café తై"  # e + combining acute; Telugu e + ai length mark
+    composed = unicodedata.normalize("NFC", decomposed)
+    assert composed != decomposed
+    spec = InputSpec(kind="text", required=False, max_length=len(composed))
+    assert service._clean_input(spec, decomposed, dt.date(2026, 9, 29)) == (composed, None)
+    choice = InputSpec(kind="choice", required=True, choices=("café",))
+    assert service._clean_input(choice, "café", dt.date(2026, 9, 29)) == ("café", None)
+    reason = f"Original lost: {decomposed} office"
+    assert service._clean_reason("reason", reason, required=True) == unicodedata.normalize(
+        "NFC", reason
+    )
+    assert service._clean_verification_reason(reason) == unicodedata.normalize("NFC", reason)
