@@ -176,6 +176,10 @@ def _root(raw: bytes) -> ET.Element:
     errors = [e.text for e in root.iter("LINEERROR") if e.text]
     if errors:
         raise TallyXmlError("Tally reported an error for the request")
+    # An export always answers with an ENVELOPE; a bare RESPONSE ("Unknown Request, cannot be
+    # processed") is a refusal, never an empty list (that would send an empty snapshot).
+    if root.tag != "ENVELOPE":
+        raise TallyXmlError("Tally's answer is not an export envelope")
     return root
 
 

@@ -5,7 +5,8 @@ library (ADR-0032 §1, §3).
   (a signed request is never replayed to another address), timeouts, bounded response size.
 - :class:`SchoolOSClient`: the agent routes of ``/api/v1/edge/tally``. Every request after
   enrolment is signed (:mod:`.signing`); answers map to typed errors the sync loop understands
-  (401 credential refused, 404 connector switched off, 409 ``agent_outdated``, 429 rate limited,
+  (401 credential refused, or ``clock_skew`` when the server's ``Date`` shows this PC's clock is
+  off, 404 connector switched off, 409 ``agent_outdated``, 429 rate limited,
   5xx or network: try again later).
 - :class:`TallyClient`: POSTs export envelopes to Tally's XML server on 127.0.0.1 and checks each
   one is an export first.
@@ -13,6 +14,7 @@ library (ADR-0032 §1, §3).
 
 from __future__ import annotations
 
+import email.utils
 import json
 import ssl
 import time
@@ -52,11 +54,18 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 class UrllibTransport:
-    def __init__(self, *, timeout_s: float = TIMEOUT_S) -> None:
+    """``direct=True`` (Tally on this PC): never through a proxy, whatever the environment or
+    the Windows proxy setting says, so ledger names and balances never leave the PC in clear."""
+
+    def __init__(self, *, timeout_s: float = TIMEOUT_S, direct: bool = False) -> None:
         context = ssl.create_default_context()
-        self._opener = urllib.request.build_opener(
-            _NoRedirect(), urllib.request.HTTPSHandler(context=context)
-        )
+        handlers: list[urllib.request.BaseHandler] = [
+            _NoRedirect(),
+            urllib.request.HTTPSHandler(context=context),
+        ]
+        if direct:
+            handlers.append(urllib.request.ProxyHandler({}))
+        self._opener = urllib.request.build_opener(*handlers)
         self._timeout = timeout_s
 
     def request(
@@ -93,6 +102,28 @@ class CredentialRefused(AgentError):
     """401: the device was revoked, the key is wrong, or the clock is off by over 5 minutes."""
 
     code = "credential_refused"
+
+
+class ClockSkew(CredentialRefused):
+    """401 while this PC's clock and the server's ``Date`` differ by more than the signing
+    window: set the PC's date and time (the key is probably fine)."""
+
+    code = "clock_skew"
+
+
+SKEW_LIMIT_S: Final = 300.0
+"""The server's ``signing.skew_seconds`` (app/tally/config.yaml)."""
+
+
+def _clock_off(res: HttpResponse, now: float) -> bool:
+    raw = res.headers.get("Date") or res.headers.get("date")
+    if not raw:
+        return False
+    try:
+        server = email.utils.parsedate_to_datetime(raw).timestamp()
+    except (TypeError, ValueError, IndexError):
+        return False
+    return abs(server - now) > SKEW_LIMIT_S
 
 
 class ConnectorOff(AgentError):
@@ -132,10 +163,12 @@ def _problem_code(body: bytes) -> str:
     return str(data.get("code", "unknown"))[:64]
 
 
-def _raise_for(res: HttpResponse) -> None:
+def _raise_for(res: HttpResponse, now: float | None = None) -> None:
     if 200 <= res.status < 300:
         return
     if res.status == 401:
+        if _clock_off(res, now if now is not None else time.time()):
+            raise ClockSkew("clock_skew")
         raise CredentialRefused("credential_refused")
     if res.status == 404:
         raise ConnectorOff("connector_off")
@@ -203,7 +236,7 @@ class SchoolOSClient:
             "X-SOS-Agent-Version": __version__,
         }
         res = self._transport.request("POST", self._url("/enrol"), headers, body)
-        _raise_for(res)
+        _raise_for(res, now)
         return _json(res)
 
     def signed(
@@ -227,7 +260,7 @@ class SchoolOSClient:
         if payload is not None:
             headers["Content-Type"] = "application/json"
         res = self._transport.request(method, self._url(route), headers, body or None)
-        _raise_for(res)
+        _raise_for(res, self._clock() if self._clock is not None else None)
         return _json(res)
 
     def get_config(self) -> dict[str, Any]:
@@ -276,6 +309,7 @@ class TallyUnavailable(AgentError):
 __all__ = [
     "API_PREFIX",
     "AgentError",
+    "ClockSkew",
     "ConnectorOff",
     "CredentialRefused",
     "HttpResponse",

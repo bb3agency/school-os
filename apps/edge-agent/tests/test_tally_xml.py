@@ -132,3 +132,17 @@ def test_FR_TALLY_003_tally_errors_and_bad_xml_are_reported() -> None:
         tx.parse_groups(fixture("line_error.xml"))
     with pytest.raises(tx.TallyXmlError, match="well-formed"):
         tx.parse_groups(b"<ENVELOPE><BODY>")
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        b"<RESPONSE>Unknown Request, cannot be processed</RESPONSE>",
+        b"<RESPONSE><LEDGER NAME='Synthetic P'/></RESPONSE>",
+    ],
+)
+def test_FR_TALLY_003_an_answer_that_is_not_an_export_envelope_is_an_error(raw: bytes) -> None:
+    # Tally answers a request it cannot process with a bare RESPONSE. Read as "no ledgers", the
+    # agent would send an empty snapshot and SchoolOS would mark every ledger not present.
+    with pytest.raises(tx.TallyXmlError, match="not an export"):
+        tx.parse_ledgers(raw)

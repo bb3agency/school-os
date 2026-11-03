@@ -108,7 +108,7 @@ class Runtime:
         self.state_dir = state_dir
         self.config_path = state_dir / CONFIG_NAME
         self.transport = transport or UrllibTransport()
-        self.tally_transport = tally_transport or self.transport
+        self.tally_transport = tally_transport or UrllibTransport(direct=True)
         self.allow_insecure = allow_insecure
         self._store = store
 

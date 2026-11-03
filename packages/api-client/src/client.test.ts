@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { createApiClient, type FetchLike } from "./index";
+import { createApiClient, type FetchLike, type Problem } from "./index";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -57,6 +57,27 @@ describe("createApiClient", () => {
 
     expect(data).toBeUndefined();
     expect(error).toMatchObject({ code: "not_found" });
+  });
+
+  it("parses application/problem+json 429s with retry_after (docs/09 §2.7)", async () => {
+    const body: Problem = {
+      type: "https://errors.schoolos.in/rate_limited",
+      title: "Too many requests",
+      status: 429,
+      code: "rate_limited",
+      request_id: null,
+      retry_after: 17,
+    };
+    const fetchImpl: FetchLike = async () =>
+      new Response(JSON.stringify(body), {
+        status: 429,
+        headers: { "Content-Type": "application/problem+json", "Retry-After": "17" },
+      });
+    const client = createApiClient("http://api.internal:8000", fetchImpl);
+
+    const { error } = await client.GET("/api/v1/platform/dashboard");
+
+    expect((error as unknown as Problem).retry_after).toBe(17);
   });
 
   it("sends typed bodies and headers for control-plane writes", async () => {

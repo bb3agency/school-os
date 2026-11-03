@@ -4,8 +4,11 @@
 from __future__ import annotations
 
 import datetime as dt
+import email.utils
+import http.server
 import io
 import logging
+import socket
 import threading
 import uuid
 from contextlib import redirect_stdout
@@ -17,8 +20,9 @@ import pytest
 from sos_edge_agent import cli, client, sync
 from sos_edge_agent.config import AgentConfig, load, save
 from sos_edge_agent.credentials import InsecureFileStore
+from sos_edge_agent.tally_xml import companies_request
 
-from .conftest import DEVICE, NEW_SECRET, SECRET, TENANT, FakeServer, FakeTally
+from .conftest import DEVICE, NEW_SECRET, SECRET, TENANT, FakeServer, FakeTally, fixture
 
 SERVER = "https://school.synthetic.test"
 TODAY = dt.date(2026, 9, 28)
@@ -237,3 +241,81 @@ def test_ADR_0032_the_cli_refuses_unsafe_configuration(tmp_path: Path) -> None:
     text = (tmp_path / "agent.toml").read_text().replace("127.0.0.1", "192.168.1.20")
     (tmp_path / "agent.toml").write_text(text)
     assert cli.main(["check-tally"], runtime=rt) == cli.EXIT_FAILED
+
+
+def test_FR_TALLY_005_a_restarted_agent_applies_figures_back_to_an_earlier_snapshot(
+    server: FakeServer, tally: FakeTally, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A, B, then the service restarts (PC reboot) and Tally is back at A the same day. The
+    # restarted agent has no memory of B; A must still be a new batch, not a repeat of the first
+    # A (answered "repeat", SchoolOS would keep showing B).
+    def party(balance: str) -> dict[str, Any]:
+        return {"guid": "g-1", "name": "Synthetic P", "group": "Sundry Debtors",
+                "closing_balance": balance}  # fmt: skip
+
+    snapshots = iter([[party("100.00")], [party("0.00")], [party("100.00")]])
+    monkeypatch.setattr(sync, "collect", lambda *args: next(snapshots))
+    first = _agent(server, tally)
+    assert [first.sync_once().repeat for _ in range(2)] == [False, False]
+    restarted = _agent(server, tally)
+    assert restarted.sync_once().repeat is False
+    assert len(server.syncs) == 3
+
+
+@pytest.mark.parametrize(("offset_s", "code"), [(0, "credential_refused"), (900, "clock_skew")])
+def test_FR_TALLY_002_a_401_from_a_pc_clock_off_says_clock_skew(offset_s: int, code: str) -> None:
+    # The server answers a timestamp outside ±300 s with the same 401 as a revoked device; the
+    # office PC's clock (a flat CMOS battery is common) must be named in the log, not "refused".
+    now = 1_790_000_000.0
+    date = email.utils.formatdate(now + offset_s, usegmt=True)
+
+    class _Refusing:
+        def request(
+            self, method: str, url: str, headers: Any, body: bytes | None
+        ) -> client.HttpResponse:
+            return client.HttpResponse(401, {"Date": date}, b"{}")
+
+    config = AgentConfig(
+        server_url=SERVER, tenant_id=TENANT, device_id=DEVICE, key_id="tdk-abcdefghijklmnopqrst"
+    )
+    api = client.SchoolOSClient(config, lambda: SECRET, _Refusing(), clock=lambda: now)
+    with pytest.raises(client.CredentialRefused) as caught:
+        api.get_config()
+    assert caught.value.code == code
+
+
+class _LocalTally(http.server.BaseHTTPRequestHandler):
+    def do_POST(self) -> None:
+        self.rfile.read(int(self.headers.get("Content-Length", "0")))
+        body = fixture("companies.xml")
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args: Any) -> None:
+        return None
+
+
+def test_FR_TALLY_003_tally_is_never_read_through_a_proxy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Ledger names and balances go only to Tally on this PC: an office proxy (HTTP_PROXY or the
+    # Windows setting) must never receive them, even when 127.0.0.1 is not in its bypass list.
+    with socket.socket() as probe:  # a port nothing listens on plays the proxy
+        probe.bind(("127.0.0.1", 0))
+        dead = probe.getsockname()[1]
+    for name in ("no_proxy", "NO_PROXY"):
+        monkeypatch.delenv(name, raising=False)
+    for name in ("http_proxy", "HTTP_PROXY"):
+        monkeypatch.setenv(name, f"http://127.0.0.1:{dead}")
+    httpd = http.server.HTTPServer(("127.0.0.1", 0), _LocalTally)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        rt = cli.Runtime(tmp_path, store=InsecureFileStore(tmp_path))
+        url = f"http://127.0.0.1:{httpd.server_address[1]}"
+        answer = client.TallyClient(url, rt.tally_transport).export(companies_request())
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+    assert b"Synthetic Model School 2026-27" in answer

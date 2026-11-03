@@ -12,7 +12,9 @@
 4. ``POST /syncs`` with a ``batch_id`` derived from the snapshot's content and date: a retry of
    the same snapshot is recognised by the server and never applied twice; a newer snapshot has a
    new id, also when its figures go back to an earlier snapshot's (the id then also names the
-   last batch the server accepted, so A, B, A is three batches, not a repeat of A).
+   last batch the server accepted, so A, B, A is three batches, not a repeat of A; the first
+   snapshot of each run names a random run id instead, so a restart between B and A cannot
+   turn A into a repeat either).
 
 :meth:`Agent.run` repeats that every ``sync_interval_minutes``; a failure waits with exponential
 backoff and jitter (1 minute doubling to 30 minutes), a 429 waits for ``Retry-After``, and a
@@ -142,6 +144,10 @@ class Agent:
         self.rotate_after_days = 90
         # The last snapshot the server accepted (content digest, batch id), in memory only.
         self._accepted: tuple[str, uuid.UUID] | None = None
+        # Stands in for the last accepted batch until this run has one: after a restart the
+        # agent does not know what the server last accepted, so the first snapshot of a run
+        # must never collide with a batch of an earlier run (A, B, restart, A is applied).
+        self._run_id = uuid.uuid4()
 
     # --- one sync -------------------------------------------------------------------------------
 
@@ -187,7 +193,9 @@ class Agent:
         if self._accepted is not None and self._accepted[0] == digest:
             batch = self._accepted[1]  # unchanged since the server accepted it: a repeat
         else:
-            batch = batch_id(device, snapshot, self._accepted[1] if self._accepted else None)
+            batch = batch_id(
+                device, snapshot, self._accepted[1] if self._accepted else self._run_id
+            )
         result = self.server.post_sync({"batch_id": str(batch), **snapshot})
         self._accepted = (digest, batch)
         report = SyncReport(
