@@ -324,6 +324,7 @@ def emergency_confirm(actor: Actor, request_id: uuid.UUID) -> BreakGlassOut:
 def withdraw(actor: Actor, request_id: uuid.UUID) -> BreakGlassOut:
     """Withdraw a request that is still waiting (status ``requested``: the school has not
     decided, or an emergency request lacks its second confirmation). Audit 2026-10-05 A-13.
+    Only the requesting operator may withdraw; 404 for anyone else.
 
     The request ends as ``revoked`` (the status set has no separate "withdrawn"); the school
     stops seeing it, and a school approval of it answers 409 ``request_withdrawn``. 409
@@ -331,7 +332,9 @@ def withdraw(actor: Actor, request_id: uuid.UUID) -> BreakGlassOut:
     """
     with platform_session() as s, db_errors():
         row = repo.get(s, m.breakglass_requests, request_id, for_update=True)
-        if row is None:
+        # Only the operator who asked may withdraw it; anyone else gets the same 404 as for an
+        # unknown id (docs/16 §5.19 gives no other role a cancel power).
+        if row is None or row["requested_by"] != actor.operator_id:
             raise NotFound("Request not found")
         if row["status"] != "requested":
             raise Conflict("Only a waiting request can be withdrawn.", code="invalid_state")

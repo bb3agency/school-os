@@ -10,6 +10,7 @@ also the dedupe key. Time is frozen by passing ``at``. Synthetic data only.
 from __future__ import annotations
 
 import datetime as dt
+import json
 import uuid
 from typing import Any
 
@@ -116,18 +117,19 @@ def _audited(incident_id: uuid.UUID) -> list[dict[str, Any]]:
         ]
 
 
-def _logged(caplog: pytest.LogCaptureFixture, incident_id: uuid.UUID) -> list[dict[str, Any]]:
-    """The structured event dicts the JSON pipeline writes for this incident."""
+def _logged(out: str, incident_id: uuid.UUID) -> list[dict[str, Any]]:
+    """The rendered JSON lines (stdout, after the field allowlist) for this incident."""
+    lines = [json.loads(line) for line in out.splitlines() if line.startswith("{")]
     return [
-        dict(r.msg)
-        for r in caplog.records
-        if isinstance(r.msg, dict) and r.msg.get("incident_id") == str(incident_id)
+        r
+        for r in lines
+        if r.get("resource_type") == "incident" and r.get("resource_id") == str(incident_id)
     ]
 
 
 @pytest.mark.db
 def test_D49_FR_DPDP_031_cert_in_clock_alerts_once_per_stage(
-    api: Api, make_operator: MakeOperator, caplog: pytest.LogCaptureFixture
+    api: Api, make_operator: MakeOperator, capsys: pytest.CaptureFixture[str]
 ) -> None:
     iid, opened = _open(api, make_operator("platform_owner"))
     due = opened + 6 * HOUR
@@ -148,12 +150,13 @@ def test_D49_FR_DPDP_031_cert_in_clock_alerts_once_per_stage(
     assert audited[1]["summary"]["minutes_left"] == -1
     assert {e["actor_type"] for e in audited} == {"system"}
 
-    logged = _logged(caplog, iid)
-    assert [(r["event"], r["clock"], r["minutes_left"]) for r in logged] == [
-        ("platform.incident.clock_due_soon", "cert_in", 120),
-        ("platform.incident.clock_overdue", "cert_in", -1),
+    logged = _logged(capsys.readouterr().out, iid)
+    assert [(r["event"], r["action"], r["count"], r["outcome"]) for r in logged] == [
+        ("platform.incident.clock_due_soon", "cert_in", 120, "due_soon"),
+        ("platform.incident.clock_overdue", "cert_in", -1, "overdue"),
     ]
     assert [r["level"] for r in logged] == ["WARN", "ERROR"]
+    assert all("dropped_fields" not in r for r in logged)
 
 
 @pytest.mark.db
@@ -236,14 +239,16 @@ def test_SEC_008_D49_alerts_carry_ids_and_clock_names_only(
     due = _confirmed_at(iid) + 24 * HOUR
     sent = _mine(check_clocks(due + MINUTE), iid)
     assert len(sent) == 2
-    logged = _logged(caplog, iid)
+    out, err = capsys.readouterr()
+    logged = _logged(out, iid)
     assert {r["event"] for r in logged} == {"platform.incident.clock_overdue"}
     allowed = {"event", "level", "logger", "ts", "service", "version", "env", "trace_id"}
-    allowed |= {"span_id", "incident_id", "clock", "minutes_left", "alert", "tenant_id"}
+    allowed |= {"span_id", "request_id", "resource_type", "resource_id", "action", "count"}
+    allowed |= {"outcome", "tenant_id"}
     for record in logged:
         assert set(record) <= allowed, set(record) - allowed
-    assert str(waiting) in {r["tenant_id"] for r in logged}
-    out, err = capsys.readouterr()
+        assert (record["action"], record["outcome"]) == ("school_notice", "overdue")
+    assert str(waiting) in {r.get("tenant_id") for r in logged}
     everything = out + err + caplog.text + str(logged)
     for secret in (SCHOOL_NAME, SUMMARY, "Contact records", "approx_people"):
         assert secret not in everything, secret

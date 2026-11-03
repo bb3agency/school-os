@@ -20,6 +20,7 @@ from sqlalchemy import Engine, text
 from app.core.db import platform_session
 from app.core.errors import Conflict
 from app.platform import billing
+from app.platform import models as platform_models
 from app.platform import repository as repo
 from app.platform.common import add_months, config, today_ist
 from app.platform.schemas import InvoiceLineIn, PaymentIn
@@ -654,6 +655,46 @@ def _pay_and_reactivate(api: Api, billing_admin: Operator, sub: str, inv: str) -
     assert back.status == "active"
 
 
+def test_FR_PLT_014_suspend_never_overwrites_a_concurrent_security_hold(
+    api: Api,
+    owner: Operator,
+    make_operator: MakeOperator,
+    make_plan: Callable[..., uuid.UUID],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A security hold placed after the suspension first read the school (here: between that
+    read and its transaction) keeps its own reason; the billing suspension decides on the
+    deployment row it locks, as reactivation does (R-18)."""
+    engineer, billing_admin = make_operator("platform_engineer"), make_operator("billing_admin")
+    sub, tid, _ = _billing_suspended_school(api, owner, make_plan())
+    reason = "Security incident reported by the school"
+    original = repo.get_by
+    fired = False
+
+    def hold_after_read(session: Any, table: Any, *conds: Any, **kw: Any) -> Any:
+        nonlocal fired
+        row = original(session, table, *conds, **kw)
+        if not fired and table is platform_models.deployments:
+            fired = True
+            res = api.call("POST", f"/tenants/{tid}/suspend", engineer, json={"reason": reason})
+            assert res.status_code == 200, res.text
+        return row
+
+    monkeypatch.setattr(repo, "get_by", hold_after_read)
+    _suspend_for_billing(billing_admin, sub)
+    assert fired
+    with platform_session() as s:
+        stored = s.execute(
+            text(
+                "SELECT tenant_status, tenant_status_reason, security_hold "
+                "FROM platform.deployments WHERE tenant_id = :t"
+            ),
+            {"t": uuid.UUID(tid)},
+        ).one()
+    assert tuple(stored) == ("suspended", reason, True)
+    assert billing.get_subscription(uuid.UUID(sub)).status == "suspended"
+
+
 def test_R_18_security_hold_on_a_billing_suspended_school_is_independent(
     api: Api,
     owner: Operator,
@@ -915,6 +956,45 @@ def test_AA_16_a_security_suspension_is_immediate_inside_an_exam_window(
     assert (event.summary["from"], event.summary["to"]) == ("active", "suspended")
 
 
+def test_FR_PLT_013_editing_a_next_period_draft_keeps_the_pending_plan_tax(
+    api: Api, owner: Operator, billing_admin: Operator, make_plan: Callable[..., uuid.UUID]
+) -> None:
+    """A draft for the period after a scheduled plan change is priced with the pending plan;
+    editing its lines must keep that plan's GST rate, not the current plan's."""
+    sub = uuid.UUID(_school(api, owner, make_plan())["subscription_id"])
+    cheaper_tax = make_plan(gst_rate="5")
+    res = api.call(
+        "POST",
+        f"/subscriptions/{sub}/change-plan",
+        billing_admin,
+        json={"plan_id": str(cheaper_tax)},
+    )
+    assert res.status_code == 200, res.text
+    nxt = billing.get_subscription(sub).current_period_end
+    draft = billing.create_manual_draft(billing_admin.actor, sub, nxt)
+
+    def rates(invoice_id: uuid.UUID) -> set[Decimal]:
+        with platform_session() as s:
+            return set(
+                s.execute(
+                    text("SELECT gst_rate FROM platform.invoice_lines WHERE invoice_id = :i"),
+                    {"i": invoice_id},
+                ).scalars()
+            )
+
+    assert rates(draft.id) == {Decimal("5")}
+    line = InvoiceLineIn(kind="subscription", description="Synthetic", unit_price_inr=D("4000"))
+    billing.update_draft(
+        billing_admin.actor,
+        draft.id,
+        lines=[line],
+        notes=None,
+        notes_set=False,
+        expected_version=None,
+    )
+    assert rates(draft.id) == {Decimal("5")}
+
+
 def test_FR_PLT_012_plan_change_applies_next_period_and_cancel_at_period_end(
     api: Api, owner: Operator, billing_admin: Operator, make_plan: Callable[..., uuid.UUID]
 ) -> None:
@@ -966,6 +1046,40 @@ def test_L_11_roll_catch_up_drafts_every_skipped_period(
     assert {first, add_months(today, -1), today} <= set(starts)
     billing.roll_periods(today=today)
     assert [d["period_start"] for d in _drafts(sub)] == starts
+
+
+def test_FR_PLT_015_periods_roll_from_the_billing_anchor_day(
+    api: Api, owner: Operator, make_plan: Callable[..., uuid.UUID]
+) -> None:
+    """A subscription billed on the 31st keeps the 31st: each period ends on the anchor day
+    clamped to the month (31 Jan -> 28 Feb -> 31 Mar -> 30 Apr), not on the 28th for good."""
+    sub = _school(api, owner, make_plan())["subscription_id"]
+    with platform_session() as s:
+        anchor: int | None = s.execute(
+            text("SELECT billing_anchor_day FROM platform.subscriptions WHERE id = :i"),
+            {"i": sub},
+        ).scalar_one()
+        assert anchor == today_ist().day  # a new subscription records its billing day
+        s.execute(
+            text(
+                "UPDATE platform.subscriptions SET billing_anchor_day = 31, "
+                "current_period_start = :a, current_period_end = :b WHERE id = :i"
+            ),
+            {"a": dt.date(2026, 12, 31), "b": dt.date(2027, 1, 31), "i": sub},
+        )
+    ends = []
+    for day in (dt.date(2027, 1, 31), dt.date(2027, 2, 28), dt.date(2027, 3, 31)):
+        billing.roll_periods(today=day)
+        rolled = billing.get_subscription(uuid.UUID(sub))
+        assert rolled.current_period_start == day
+        ends.append(rolled.current_period_end)
+    assert ends == [dt.date(2027, 2, 28), dt.date(2027, 3, 31), dt.date(2027, 4, 30)]
+    periods = [(d["period_start"], d["period_end"]) for d in _drafts(sub)]
+    assert [
+        (dt.date(2027, 1, 31), dt.date(2027, 2, 28)),
+        (dt.date(2027, 2, 28), dt.date(2027, 3, 31)),
+        (dt.date(2027, 3, 31), dt.date(2027, 4, 30)),
+    ] == periods[-3:]
 
 
 def test_FR_PLT_011_trial_activate_and_extend(

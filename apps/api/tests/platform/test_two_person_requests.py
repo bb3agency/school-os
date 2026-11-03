@@ -204,9 +204,15 @@ def test_A_13_emergency_confirmations_expire_recheck_and_can_be_withdrawn(
     )
     late = api.call("POST", f"/break-glass-requests/{rid}/emergency-confirm", second)
     assert (late.status_code, late.json()["code"]) == (409, "request_expired")
-    # Withdraw: any operator who may request break-glass; it ends revoked and cannot be redone.
+    # Withdraw: only the operator who asked (another requester gets 404, as for a random id);
+    # it ends revoked and cannot be redone.
     viewer = make_operator("platform_viewer")
     assert api.call("POST", f"/break-glass-requests/{rid}/withdraw", viewer).status_code == 403
+    other = make_operator("support_agent")
+    stranger = api.call("POST", f"/break-glass-requests/{rid}/withdraw", other)
+    assert stranger.status_code == 404, stranger.text
+    unknown = api.call("POST", f"/break-glass-requests/{uuid.uuid4()}/withdraw", agent)
+    assert unknown.status_code == 404
     gone = api.call("POST", f"/break-glass-requests/{rid}/withdraw", agent)
     assert gone.status_code == 200, gone.text
     assert (gone.json()["status"], gone.json()["confirm_by"]) == ("revoked", None)

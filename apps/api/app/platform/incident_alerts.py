@@ -252,11 +252,14 @@ def open_clocks(at: dt.datetime | None = None) -> list[IncidentClockOut]:
 
 
 def _log(alert: ClockAlert) -> None:
+    # Only allowlisted fields reach the rendered JSON line (core.logging.ALLOWED_FIELDS); other
+    # keys are dropped there, which left only the event name.
     fields: dict[str, Any] = {
-        "incident_id": str(alert.incident_id),
-        "clock": alert.clock,
-        "minutes_left": alert.minutes_left,
-        "alert": f"incident_clock_{alert.stage}",
+        "resource_type": "incident",
+        "resource_id": str(alert.incident_id),
+        "action": alert.clock,
+        "count": alert.minutes_left,
+        "outcome": alert.stage,
     }
     if alert.tenant_id is not None:
         fields["tenant_id"] = str(alert.tenant_id)
