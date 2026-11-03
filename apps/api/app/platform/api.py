@@ -1368,7 +1368,8 @@ def withdraw_breakglass(
     ctx: Annotated[Ctx, Depends(require_platform("platform.breakglass.request"))],
 ) -> BreakGlassOut:
     """Withdraw a request that is still waiting (audit 2026-10-05 A-13). It ends as
-    ``revoked``; ``409 invalid_state`` once approved, denied or ended."""
+    ``revoked``; ``409 invalid_state`` once approved, denied or ended. Only the operator who
+    made the request may withdraw it; ``404`` for anyone else."""
     return breakglass.withdraw(_actor(ctx), request_id)
 
 
