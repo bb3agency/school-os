@@ -67,6 +67,8 @@ export const KNOWN_API_CODES = [
   // Audit 2026-10-05/06 hardening: replay after an access change; hidden direction characters.
   "idempotency_access_changed",
   "invalid_characters",
+  // AI answer bundles need a monthly plan (ADR-0038; docs/16 §5.7).
+  "ai_bundle_needs_monthly_plan",
 ] as const;
 export type KnownApiCode = (typeof KNOWN_API_CODES)[number];
 
