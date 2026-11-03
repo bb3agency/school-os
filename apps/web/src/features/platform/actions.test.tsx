@@ -895,7 +895,9 @@ describe("fleet, flags, audit, operators, announcements, break-glass, support", 
     Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() });
     const user = userEvent.setup();
     renderWithIntl(
-      <PlatformAuditScreen filters={{ action: "tenant.provisioned", from: "2026-09-01" }} />,
+      <PlatformAuditScreen
+        filters={{ action: "tenant.provisioned", from: "2026-09-01", to: "2026-09-30" }}
+      />,
     );
     await user.click(screen.getByRole("button", { name: pm.audit.verify }));
     expect(await screen.findByText(pm.audit.verifyFailed)).toBeInTheDocument();
@@ -910,6 +912,9 @@ describe("fleet, flags, audit, operators, announcements, break-glass, support", 
     const csv = stub.calls.find((c) => c.headers.get("accept") === "text/csv");
     expect(csv?.url.searchParams.get("action")).toBe("tenant.provisioned");
     expect(csv?.url.searchParams.get("from")).toBe("2026-09-01T00:00:00+05:30");
+    // FR-PLT-029: the API's range is [from, to), so the "to" day ends at the next IST midnight
+    // (23:59:59 dropped events in the day's last second).
+    expect(csv?.url.searchParams.get("to")).toBe("2026-10-01T00:00:00+05:30");
   });
 
   it("operators: invite needs at least one role and sends an Idempotency-Key", async () => {
