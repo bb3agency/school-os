@@ -55,3 +55,14 @@ def test_SEC_024_restore_drill_keeps_db_passwords_off_the_command_line() -> None
     run = block[block.index("sos_compose run --rm --no-deps") :]
     assert "PASSWORD" not in run
     assert not re.search(r"-e \"?SOS_[A-Z_]*URL=", run)
+
+
+BACKUP = (REPO_ROOT / "deploy" / "dedicated" / "scripts" / "backup.sh").read_text("utf-8")
+
+
+def test_SEC_024_backup_failures_after_the_trap_record_the_failure() -> None:
+    """Once ``trap on_error ERR`` is set, a failed check must go through the trap (backup.json
+    status failed, BackupSuccess 0): ``die`` exits without it, so a full disk left no trace."""
+    after_trap = BACKUP[BACKUP.index("trap on_error ERR") :]
+    assert "die " not in after_trap
+    assert re.search(r"avail_kb > db_kb / 2\)\) \|\| \{[^}]*\bfalse\b", after_trap)
