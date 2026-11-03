@@ -1405,9 +1405,10 @@ def update_draft(
             raise PreconditionFailed()
         fields = []
         if lines is not None:
-            sub = repo.get(s, m.subscriptions, row["subscription_id"])
+            sub = repo.get(s, m.subscriptions, row["subscription_id"], for_update=True)
             plan = repo.get(s, m.plans, sub["plan_id"]) if sub else None
             plan = must(plan)
+            _check_overage_months(s, row, lines)
             repo.replace_invoice_lines(s, invoice_id, _line_rows(lines, plan))
             fields.append("lines")
         values: dict[str, Any] = _totals(s, row)
@@ -1425,6 +1426,29 @@ def update_draft(
             tenant_id=row["tenant_id"],
         )
         return _invoice_out(s, row)
+
+
+def _check_overage_months(
+    s: Session, invoice: Mapping[Any, Any], lines: Sequence[InvoiceLineIn]
+) -> None:
+    """A draft edit bills each AI overage month at most once per subscription (ADR-0038 §3):
+    not twice on this draft, and not one another live invoice already bills (409
+    ``usage_month_billed``). Under the subscription row lock."""
+    months = [ln.usage_month for ln in lines if ln.kind == "usage_overage"]
+    if len(months) != len(set(months)) or any(
+        repo.subscription_has_line(
+            s,
+            invoice["subscription_id"],
+            kind="usage_overage",
+            usage_month=month,
+            exclude_invoice_id=invoice["id"],
+        )
+        for month in months
+    ):
+        raise Conflict(
+            "Another invoice already bills the AI answers of this month.",
+            code="usage_month_billed",
+        )
 
 
 def discard_draft(actor: Actor, invoice_id: uuid.UUID) -> None:
@@ -1698,9 +1722,14 @@ def generate_invoices(month: str, actor: Actor = SYSTEM) -> JobOut:
         try:
             with platform_session() as s, db_errors():
                 locked = repo.get(s, m.subscriptions, sub["id"], for_update=True)
-                if locked is not None and create_draft(
-                    s, SYSTEM, locked, locked["current_period_end"]
-                ):
+                # Re-check under the lock: the listing ran in another transaction, and a
+                # subscription cancelled, suspended or rolled since is not drafted here.
+                if (
+                    locked is not None
+                    and locked["status"] in ("active", "past_due")
+                    and not locked["cancel_at_period_end"]
+                    and first <= locked["current_period_end"] < after
+                ) and create_draft(s, SYSTEM, locked, locked["current_period_end"]):
                     generated += 1
         except Exception:  # one bad subscription must not stop the run
             failed += 1

@@ -20,6 +20,7 @@ from sqlalchemy import Engine, text
 from app.core.db import platform_session
 from app.core.errors import Conflict
 from app.platform import billing
+from app.platform import repository as repo
 from app.platform.common import add_months, config, today_ist
 from app.platform.schemas import InvoiceLineIn, PaymentIn
 
@@ -513,6 +514,39 @@ def test_FR_PLT_015_monthly_generation_is_idempotent(
     again = billing.generate_invoices(month)
     assert again.id == job.id
     assert len(_drafts(sub)) == 2
+
+
+def test_FR_PLT_015_monthly_generation_rechecks_a_subscription_cancelled_meanwhile(
+    api: Api,
+    owner: Operator,
+    billing_admin: Operator,
+    make_plan: Callable[..., uuid.UUID],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The run lists the due subscriptions, then drafts each under its row lock. A
+    subscription cancelled at period end in between must not get a draft for a period after
+    it ends (docs/16 §10.2: cancelled subscriptions are skipped)."""
+    sub = _school(api, owner, make_plan())["subscription_id"]
+    end = dt.date(2081, 5, 15)
+    with platform_session() as s:
+        s.execute(
+            text(
+                "UPDATE platform.subscriptions SET current_period_start = :a, "
+                "current_period_end = :b WHERE id = :i"
+            ),
+            {"a": add_months(end, -1), "b": end, "i": sub},
+        )
+    listed = repo.subscriptions_due_for_invoice
+
+    def list_then_cancel(session: Any, first: dt.date, after: dt.date) -> list[Any]:
+        rows = [r for r in listed(session, first, after) if str(r["id"]) == sub]
+        assert rows  # the listing still sees the live subscription
+        billing.cancel_subscription(billing_admin.actor, uuid.UUID(sub), "School is leaving")
+        return rows
+
+    monkeypatch.setattr(repo, "subscriptions_due_for_invoice", list_then_cancel)
+    billing.generate_invoices(end.strftime("%Y-%m"))
+    assert end not in [d["period_start"] for d in _drafts(sub)]
 
 
 # --- lifecycle --------------------------------------------------------------------------------

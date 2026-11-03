@@ -397,11 +397,10 @@ def _status_for(payload: HeartbeatIn, at: dt.datetime) -> str:  # noqa: PLR0911
     if backup is not None:
         if backup.status == "failing":
             return "degraded"
-        if (
-            backup.last_base_backup_at is not None
-            and at - backup.last_base_backup_at
-            > dt.timedelta(hours=int(rules["backup_max_age_hours"]))
-        ):
+        # The newest backup counts: a pg_dump-only host (no WAL-G) has no base backup time.
+        # A backup block without any backup time means no backup is known (NFR-FLT-001).
+        times = [t for t in (backup.last_base_backup_at, backup.last_pg_dump_at) if t]
+        if not times or at - max(times) > dt.timedelta(hours=int(rules["backup_max_age_hours"])):
             return "degraded"
         if backup.wal_archive_lag_s is not None and backup.wal_archive_lag_s > int(
             rules["wal_lag_max_seconds"]

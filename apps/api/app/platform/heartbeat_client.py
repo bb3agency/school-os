@@ -11,9 +11,11 @@ from __future__ import annotations
 import base64
 import datetime as dt
 import json
+import os
 import time
 import uuid
 from collections.abc import Callable, Mapping
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -21,7 +23,7 @@ import httpx
 from app.core.config import Settings, get_settings
 from app.core.health import get_checks
 from app.core.logging import get_logger
-from app.platform import announcements, usage
+from app.platform import announcements, invoice_storage, usage
 from app.platform.common import today_ist
 from app.platform.fleet import (
     HEADER_DEPLOYMENT,
@@ -45,23 +47,81 @@ def decode_key(value: str) -> bytes:
     return base64.urlsafe_b64decode(padded)
 
 
+# The host state mount (deploy/dedicated/compose.yaml): backup.sh writes backup.json there.
+STATE_DIR_ENV = "SOS_HOST_STATE_DIR"
+BACKUP_STATUS = {"ok": "ok", "failed": "failing"}
+
+
+def check_s3(settings: Settings | None = None) -> bool:
+    """The host's files bucket answers a HEAD (FR-PLT-025): reachable and permitted."""
+    settings = settings or get_settings()
+    try:
+        client = invoice_storage.s3_client(settings, settings.s3_endpoint_url)
+        client.head_bucket(Bucket=settings.s3_bucket_files)
+        return True
+    except Exception:
+        return False
+
+
+def host_checks() -> dict[str, Callable[[], bool]]:
+    return {**get_checks(), "s3": check_s3}
+
+
+def _timestamp(value: Any) -> str | None:
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = dt.datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return parsed.isoformat() if parsed.tzinfo is not None else None
+
+
+def backup_state(state_dir: Path | None) -> dict[str, Any]:
+    """``backup.json`` of ``backup.sh`` mapped to ``HbBackup`` (NFR-FLT-001). A missing or
+    unreadable file is reported as ``status: unknown`` with no backup time, never omitted, so
+    the control plane does not take silence for a good backup."""
+    if state_dir is None:
+        log.warning("fleet.heartbeat.backup_state_missing", error_code="no_state_dir")
+        return {"status": "unknown"}
+    try:
+        raw = json.loads((state_dir / "backup.json").read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            raise ValueError("backup.json is not an object")
+    except (OSError, ValueError) as exc:
+        log.warning("fleet.heartbeat.backup_state_missing", error_code=type(exc).__name__)
+        return {"status": "unknown"}
+    out: dict[str, Any] = {"status": BACKUP_STATUS.get(str(raw.get("status")), "unknown")}
+    for field in ("last_pg_dump_at", "last_base_backup_at"):
+        value = _timestamp(raw.get(field))
+        if value is not None:
+            out[field] = value
+    return out
+
+
+def _state_dir() -> Path | None:
+    value = os.environ.get(STATE_DIR_ENV)
+    return Path(value) if value else None
+
+
 def build_payload(
     settings: Settings,
     *,
     checks: Mapping[str, Callable[[], bool]] | None = None,
     usage_counts: Mapping[str, Any] | None = None,
     at: dt.datetime | None = None,
+    state_dir: Path | None = None,
 ) -> HeartbeatIn:
     if not (settings.deployment_id and settings.dedicated_tenant_id):
         raise HeartbeatNotConfigured("SOS_DEPLOYMENT_ID and SOS_DEDICATED_TENANT_ID are required")
-    results = {name: ("ok" if fn() else "down") for name, fn in (checks or get_checks()).items()}
+    results = {name: ("ok" if fn() else "down") for name, fn in (checks or host_checks()).items()}
     health = {
         "api": "ok",
         "worker": "ok",
         "beat": "ok",
         "db": results.get("database", "unknown"),
         "valkey": results.get("redis", "unknown"),
-        "s3": "unknown",
+        "s3": results.get("s3", "unknown"),
     }
     body: dict[str, Any] = {
         "schema_version": 1,
@@ -71,6 +131,7 @@ def build_payload(
         "nonce": str(uuid.uuid4()),
         "app_version": settings.version,
         "health": health,
+        "backup": backup_state(state_dir if state_dir is not None else _state_dir()),
     }
     if usage_counts is not None:
         body["usage"] = {

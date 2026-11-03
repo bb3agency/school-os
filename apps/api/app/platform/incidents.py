@@ -855,14 +855,21 @@ def notices_for_school(tenant_id: uuid.UUID) -> list[SchoolIncidentNotice]:
 
 def mark_notice_pulled(tenant_id: uuid.UUID, incident_id: uuid.UUID) -> bool:
     """The school stored the notice: record when (and, if not yet, that the school was notified
-    then). Idempotent; False when nothing changed or the incident is not this school's. Audit
+    then). Idempotent; False when nothing changed, the incident is not this school's or its
+    list is not confirmed by two operators yet (no school sees it before). Audit
     ``incident.school_notified`` in the platform chain (ids only)."""
     t = m.incident_schools
     with platform_session() as s, db_errors():
+        incident = repo.get(s, m.incidents, incident_id)
         row = repo.get_by(
             s, t, t.c.incident_id == incident_id, t.c.tenant_id == tenant_id, for_update=True
         )
-        if row is None or row["pulled_at"] is not None:
+        if (
+            incident is None
+            or incident["confirmed_at"] is None
+            or row is None
+            or row["pulled_at"] is not None
+        ):
             return False
         at = now()
         values: dict[str, Any] = {"pulled_at": at}

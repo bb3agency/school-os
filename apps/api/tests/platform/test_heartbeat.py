@@ -7,6 +7,7 @@ import json
 import time
 import uuid
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -533,3 +534,103 @@ def test_H_03_heartbeat_key_is_bound_to_its_deployment_row(
     body, headers = _signed(dep, _payload(dep))
     res = api.client.post(URL, content=body, headers=headers)
     assert res.status_code == 200, res.text
+
+
+# --- the host reports its real S3 and backup state (FR-PLT-025, NFR-FLT-001) ------------------
+
+
+def _host(dep: dict[str, Any]) -> Settings:
+    return Settings(
+        deployment_mode=DeploymentMode.DEDICATED,
+        version="2026.10.3",
+        control_plane_url="https://admin.example.test",
+        deployment_id=dep["deployment_id"],
+        dedicated_tenant_id=dep["tenant_id"],
+        heartbeat_key_id=dep["heartbeat_key_id"],
+        heartbeat_key=SecretStr(dep["heartbeat_key"]),
+    )
+
+
+ALL_OK: dict[str, Callable[[], bool]] = {
+    "database": lambda: True,
+    "redis": lambda: True,
+    "s3": lambda: True,
+}
+
+
+def _backup_json(state: Path, **values: Any) -> None:
+    (state / "backup.json").write_text(json.dumps(values), encoding="utf-8")
+
+
+def _stamp(hours_ago: int) -> str:
+    return (dt.datetime.now(dt.UTC) - dt.timedelta(hours=hours_ago)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _send(api: Api, dep: dict[str, Any], payload: HeartbeatIn) -> str:
+    headers, body = heartbeat_client.signed_request(_host(dep), payload)
+    res = api.client.post(URL, content=body, headers=headers)
+    assert res.status_code == 200, res.text
+    return fleet.get_deployment(uuid.UUID(dep["deployment_id"])).status
+
+
+def test_FR_PLT_025_a_fully_healthy_host_is_healthy(
+    api: Api, dep: dict[str, Any], tmp_path: Path
+) -> None:
+    """docs/16 §12.5: all health values ok and a fresh backup -> healthy. The client used to
+    send ``s3: unknown`` always, so no dedicated host could ever be healthy."""
+    recent = _stamp(2)
+    _backup_json(tmp_path, status="ok", last_pg_dump_at=recent, walg_enabled=False)
+    payload = heartbeat_client.build_payload(_host(dep), checks=ALL_OK, state_dir=tmp_path)
+    assert payload.health.s3 == "ok"
+    assert payload.backup is not None
+    assert (payload.backup.status, payload.backup.last_pg_dump_at) == (
+        "ok",
+        dt.datetime.fromisoformat(recent),
+    )
+    assert _send(api, dep, payload) == "healthy"
+
+
+def test_FR_PLT_025_s3_check_failure_is_reported_down(dep: dict[str, Any], tmp_path: Path) -> None:
+    checks = {**ALL_OK, "s3": lambda: False}
+    payload = heartbeat_client.build_payload(_host(dep), checks=checks, state_dir=tmp_path)
+    assert payload.health.s3 == "down"
+
+
+def test_NFR_FLT_001_a_failed_backup_marks_the_host_degraded(
+    api: Api, dep: dict[str, Any], tmp_path: Path
+) -> None:
+    recent = _stamp(2)
+    _backup_json(tmp_path, status="failed", last_pg_dump_at=recent, attempted_at=recent)
+    payload = heartbeat_client.build_payload(_host(dep), checks=ALL_OK, state_dir=tmp_path)
+    assert payload.backup is not None
+    assert payload.backup.status == "failing"
+    assert _send(api, dep, payload) == "degraded"
+
+
+def test_NFR_FLT_001_a_missing_or_unreadable_backup_state_is_reported(
+    api: Api, dep: dict[str, Any], tmp_path: Path
+) -> None:
+    payload = heartbeat_client.build_payload(_host(dep), checks=ALL_OK, state_dir=tmp_path)
+    assert payload.backup is not None
+    assert (payload.backup.status, payload.backup.last_pg_dump_at) == ("unknown", None)
+    assert _send(api, dep, payload) == "degraded"  # no backup known is not healthy
+    (tmp_path / "backup.json").write_text("{not json", encoding="utf-8")
+    broken = heartbeat_client.build_payload(_host(dep), checks=ALL_OK, state_dir=tmp_path)
+    assert broken.backup is not None
+    assert broken.backup.status == "unknown"
+
+
+def test_NFR_FLT_001_backup_age_uses_the_newest_backup(dep: dict[str, Any]) -> None:
+    """A pg_dump-only host (no WAL-G) is judged on its pg_dump; with both, the newest counts."""
+    now = dt.datetime.now(dt.UTC)
+    old, fresh = _stamp(30), _stamp(1)
+
+    def status(**backup: Any) -> str:
+        payload = HeartbeatIn.model_validate(_payload(dep, backup={"status": "ok", **backup}))
+        return fleet._status_for(payload, now)
+
+    assert status(last_pg_dump_at=old) == "degraded"
+    assert status(last_pg_dump_at=fresh) == "healthy"
+    assert status(last_base_backup_at=old, last_pg_dump_at=fresh) == "healthy"
+    assert status(last_base_backup_at=fresh, last_pg_dump_at=old) == "healthy"
+    assert status(last_base_backup_at=old, last_pg_dump_at=old) == "degraded"

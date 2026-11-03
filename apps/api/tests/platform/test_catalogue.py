@@ -486,6 +486,51 @@ def test_FR_PLT_017_overage_invoice_inter_state_is_igst(
     assert inv.total_inr == D("6741.34")
 
 
+def test_FR_PLT_015_a_draft_edit_cannot_bill_an_overage_month_twice(
+    api: Api, billing_admin: Operator, owner: Operator, make_plan: Callable[..., uuid.UUID]
+) -> None:
+    """ADR-0038 §3: a month is billed at most once per subscription. An overage line without
+    its ``usage_month`` would escape that guard, and a draft edit must not bill a month another
+    live invoice already bills (or the same month twice)."""
+    school = _school(api, owner, make_plan(base_price_inr="4999.00"))
+    sub, tenant = uuid.UUID(school["subscription_id"]), uuid.UUID(school["tenant_id"])
+    billing.set_ai_bundle(billing_admin.actor, sub, _bundle_id("ai-lite"))
+    month = dt.date(2075, 6, 1)
+    _bundle_from(sub, month)
+    _answers(tenant, month, [310])
+    billed = billing.create_manual_draft(billing_admin.actor, sub, dt.date(2075, 7, 1))
+    assert billed.lines[-1].usage_month == month
+    later = billing.create_manual_draft(billing_admin.actor, sub, dt.date(2075, 8, 1))
+    path = f"/invoices/{later.id}"
+
+    def patch(lines: list[dict[str, Any]]) -> Any:
+        return api.call(
+            "PATCH",
+            path,
+            billing_admin,
+            json={"lines": lines},
+            headers=api.if_match(path, billing_admin),
+        )
+
+    base = {"kind": "subscription", "description": "SchoolOS", "unit_price_inr": "4999.00"}
+    over = {
+        "kind": "usage_overage",
+        "description": "AI answers above the Lite bundle, June 2075",
+        "quantity": "10",
+        "unit_price_inr": "1.50",
+    }
+    assert patch([base, over]).status_code == 422  # no usage_month
+    again = patch([base, {**over, "usage_month": month.isoformat()}])
+    assert (again.status_code, again.json()["code"]) == (409, "usage_month_billed")
+    july = dt.date(2075, 7, 1).isoformat()
+    twice = patch([base, {**over, "usage_month": july}, {**over, "usage_month": july}])
+    assert (twice.status_code, twice.json()["code"]) == (409, "usage_month_billed")
+    once = patch([base, {**over, "usage_month": july}])
+    assert once.status_code == 200, once.text
+    # Re-saving the draft's own overage line is not a second charge.
+    assert patch([base, {**over, "usage_month": july}]).status_code == 200
+
+
 def test_FR_PLT_013_bundle_rules_and_removal(
     api: Api, billing_admin: Operator, owner: Operator, make_plan: Callable[..., uuid.UUID]
 ) -> None:
