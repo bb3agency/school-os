@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import importlib.util
 import io
+import subprocess
 import sys
 import uuid
 from pathlib import Path
@@ -189,3 +190,23 @@ def test_SEC_012_invalid_arguments_exit_2() -> None:
     assert run_cli("--reencrypt", "--retire")[0] == cli.EXIT_INVALID
     assert run_cli("--retire", "--new-hmac-key")[0] == cli.EXIT_INVALID
     assert run_cli("--batch-size", "0")[0] == cli.EXIT_INVALID
+
+
+def test_SEC_012_the_command_registers_every_modules_reencryption() -> None:
+    """The command is its own process: it loads every module that re-encrypts its own
+    ciphertext, so ``--reencrypt --apply`` moves every census column, not only ``sis``."""
+    import app.main  # noqa: F401  (the API process: every module registered)
+    from app.students import rotation
+
+    code = (
+        "from app.tenancy import rotate_keys as r; r.load_reencryptors(); "
+        "from app.students import rotation; print(','.join(sorted(rotation.reencryptor_names())))"
+    )
+    done = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        check=True,
+        cwd=Path(__file__).resolve().parents[2],
+    )
+    assert done.stdout.strip().split(",") == sorted(rotation.reencryptor_names())

@@ -18,7 +18,7 @@ from sqlalchemy.exc import DBAPIError
 
 from app.core.db import tenant_session
 from app.core.errors import Conflict, Forbidden, NotFound, PreconditionFailed, ValidationFailed
-from app.fees import _common
+from app.fees import _common, upi_tasks
 from app.fees import service as fees
 from app.fees.schemas import CancellationRequest, DecisionIn
 from app.fees.upi_schemas import (
@@ -479,10 +479,9 @@ def test_FR_FEE_026_morning_notification_and_narration_erasure(
 def test_FR_FEE_026_narrations_are_erased_while_the_school_is_suspended(
     school: Any, admin_engine: Engine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Retention keeps running for a suspended school (docs/04 §6, docs/16 §5.5; PRV-024):
-    payer names in narrations are not kept past 90 days because the school was suspended.
-    No notification is sent to a suspended school."""
-    from app.fees import upi_tasks
+    """Retention keeps running for a suspended school (docs/04 §6, docs/16 §5.5; PRV-024), also
+    with fees switched off: payer names in narrations are not kept past 90 days. No
+    notification is sent to a suspended school."""
     from app.tenancy import service as tenancy
 
     out, _ = _import(school, admin_engine, [U.Credit(_today(), _amount(), upi=False)])
@@ -494,6 +493,7 @@ def test_FR_FEE_026_narrations_are_erased_while_the_school_is_suspended(
     )
     now = _common.now
     monkeypatch.setattr(_common, "now", lambda s: now(s) + dt.timedelta(days=91))
+    monkeypatch.setattr(fees, "enabled", lambda s, t: False)
     with admin_engine.begin() as c:
         c.execute(
             text("UPDATE core.tenants SET status = 'suspended' WHERE id = :t"),

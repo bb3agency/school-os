@@ -2740,12 +2740,22 @@ def tenant_export_download_url(
 
 
 def delete_tenant_export(
-    session: Session, export_id: uuid.UUID, object_key: str, *, store: ObjectStore | None = None
+    session: Session,
+    export_id: uuid.UUID,
+    object_key: str | None,
+    *,
+    store: ObjectStore | None = None,
 ) -> None:
     """Delete the full export archive of the current school (retention: 24 hours after it was
     ready, or an abandoned build). An automatic deletion: the archive is discarded, so the
-    bucket rule ``discarded-1d`` expires the noncurrent copy after a day (docs/08 §7)."""
-    key = _tenant_export_key_checked(session, export_id, object_key)
+    bucket rule ``discarded-1d`` expires the noncurrent copy after a day (docs/08 §7).
+    ``object_key`` ``None`` (a failed export whose upload may still have completed): the
+    archive's fixed key; nothing there is fine."""
+    key = (
+        tenant_export_key(repo.current_tenant_id(session), export_id)
+        if object_key is None
+        else _tenant_export_key_checked(session, export_id, object_key)
+    )
     (store or get_object_store()).discard(key)
 
 

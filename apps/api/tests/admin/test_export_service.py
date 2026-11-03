@@ -738,6 +738,33 @@ def test_FR_ADM_001_transient_errors_abort_the_upload_and_retry(
     assert AD.run(school, out.id) == "ready"  # the retry starts again from nothing
 
 
+def test_FR_ADM_001_an_archive_stored_before_the_export_failed_is_purged(
+    school: Any, admin_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The upload completed but recording ``ready`` failed until the worker gave up: the row is
+    ``failed`` without an object key, yet the whole school's archive is in the bucket. The purge
+    deletes it at its fixed key (docs/05 §7.3) instead of leaving it to the bucket backstop."""
+    AD.settle(admin_engine, school)
+    out = AD.request(school)
+
+    def lost(*_: Any, **__: Any) -> str:
+        raise RuntimeError("synthetic database outage")
+
+    monkeypatch.setattr(admin, "_complete", lost)
+    with pytest.raises(RuntimeError):
+        AD.run(school, out.id)
+    monkeypatch.undo()
+    key = f"t/{school.tenant_id}/tenant-export/{out.id}.zip"
+    store = D.memory_store()
+    assert key in store.objects
+    assert admin.abandon(school.tenant_id, out.id) is True
+    assert AD.row(admin_engine, out.id)["object_key"] is None
+    admin.purge_expired(school.tenant_id, now=dt.datetime.now(dt.UTC) + dt.timedelta(hours=25))
+    assert key not in store.objects
+    assert key in store.discarded
+    assert AD.row(admin_engine, out.id)["files_deleted_at"] is not None
+
+
 def test_FR_ADM_001_staff_table_leaves_out_break_glass_support_memberships(
     school: Any, admin_engine: Engine
 ) -> None:

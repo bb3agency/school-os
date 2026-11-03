@@ -866,10 +866,11 @@ def purge_expired(
         at = now or repo.now(session)
         failed_before = at - dt.timedelta(hours=cfg.failed_cleanup_hours)
         for row in repo.due_for_purge(session, now=at, failed_before=failed_before):
-            deleted = False
-            if row.object_key is not None:
-                documents.delete_tenant_export(session, row.id, row.object_key, store=store)
-                deleted = True
+            deleted = row.object_key is not None
+            # A failed export has no object key, but its upload may have completed before the
+            # failure (recording "ready" kept failing until the worker gave up): the archive
+            # is discarded at its fixed key all the same (nothing there is fine).
+            documents.delete_tenant_export(session, row.id, row.object_key, store=store)
             repo.update_export(
                 session,
                 row.id,

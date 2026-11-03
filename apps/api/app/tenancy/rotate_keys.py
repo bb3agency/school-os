@@ -36,6 +36,7 @@ allowed) · 4 failed.
 from __future__ import annotations
 
 import argparse
+import importlib
 import sys
 import uuid
 from collections.abc import Sequence
@@ -101,6 +102,27 @@ def _parser() -> argparse.ArgumentParser:
         help=f"rows per re-encryption transaction (1..{rotation.MAX_BATCH_SIZE})",
     )
     return p
+
+
+# Modules whose service registers the re-encryption of its own ciphertext at import
+# (rotation.register_reencryptor). This command is its own process: without them ``--reencrypt``
+# would move only the ``sis`` columns, report the rest as remaining and never finish.
+REENCRYPTOR_MODULES: Final = (
+    "app.fees.online",
+    "app.fees.statements",
+    "app.imports.service",
+    "app.insights.service",
+    "app.knowledge.service",
+    "app.messaging.service",
+    "app.privacy.breach_service",
+    "app.privacy.service",
+)
+
+
+def load_reencryptors() -> None:
+    """Import every module that registers a re-encryptor (idempotent)."""
+    for name in REENCRYPTOR_MODULES:
+        importlib.import_module(name)
 
 
 def preflight(*, engine: Engine | None = None) -> None:
@@ -282,6 +304,7 @@ def main(
         err.write(f"invalid: {problem}\n")
         return EXIT_INVALID
     settings = settings or get_settings()
+    load_reencryptors()
     try:
         preflight(engine=engine)
         tenant_id = target(settings, args.tenant, engine=engine)

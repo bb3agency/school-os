@@ -589,6 +589,38 @@ def test_FR_EW_017_old_notes_and_long_closed_flags_are_purged(
     assert remaining == {kept_open.id}
 
 
+def test_FR_EW_017_retention_also_runs_for_a_suspended_school(
+    school: Any, admin_engine: Engine
+) -> None:
+    """A suspended school's C3 notes are still deleted when their year is over (retention is
+    data minimisation, not a service to the school; docs/05 §13)."""
+    from app.insights import tasks as insights_tasks
+
+    old = S.note(school, "x1", "Synthetic: old note while suspended.", who=S.principal_ctx(school))
+    with admin_engine.begin() as c:
+        c.execute(
+            text("UPDATE sis.behaviour_notes SET noted_on = noted_on - 400 WHERE id = :i"),
+            {"i": old.id},
+        )
+        c.execute(
+            text("UPDATE core.tenants SET status = 'suspended' WHERE id = :t"),
+            {"t": school.tenant_id},
+        )
+    try:
+        insights_tasks.purge_expired()
+    finally:
+        with admin_engine.begin() as c:
+            c.execute(
+                text("UPDATE core.tenants SET status = 'active' WHERE id = :t"),
+                {"t": school.tenant_id},
+            )
+    with admin_engine.connect() as c:
+        left: int = c.execute(
+            text("SELECT count(*) FROM sis.behaviour_notes WHERE id = :i"), {"i": old.id}
+        ).scalar_one()
+    assert left == 0
+
+
 def test_FR_EW_018_full_export_masks_restricted_text_unless_included(school: Any) -> None:
     S.note(school, "a1", "Synthetic export note.")
     with tenant_session(school.tenant_id) as db:
