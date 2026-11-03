@@ -6164,7 +6164,8 @@ export interface paths {
         };
         /**
          * List Audit Events
-         * @description Filters: actor, action, tenant_id, from, to. ``Accept: text/csv`` returns CSV.
+         * @description Filters: actor, action, tenant_id, from, to (``[from, to)``; times need an explicit offset
+         *     such as ``Z`` or ``+05:30``, 422 without one). ``Accept: text/csv`` returns CSV.
          */
         get: operations["list_audit_events_api_v1_platform_audit_events_get"];
         put?: never;

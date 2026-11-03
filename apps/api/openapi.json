@@ -64324,7 +64324,7 @@
     },
     "/api/v1/platform/audit/events": {
       "get": {
-        "description": "Filters: actor, action, tenant_id, from, to. ``Accept: text/csv`` returns CSV.",
+        "description": "Filters: actor, action, tenant_id, from, to (``[from, to)``; times need an explicit offset\nsuch as ``Z`` or ``+05:30``, 422 without one). ``Accept: text/csv`` returns CSV.",
         "operationId": "list_audit_events_api_v1_platform_audit_events_get",
         "parameters": [
           {
