@@ -168,7 +168,7 @@ class MemoryInvoiceStore:
         return url, _utcnow() + dt.timedelta(seconds=expires_s)
 
 
-def _client(settings: Settings, endpoint: str | None) -> S3Client:
+def s3_client(settings: Settings, endpoint: str | None) -> S3Client:
     # Same addressing rules as app.documents.storage (virtual-hosted in AWS, path style locally).
     config = Config(
         signature_version="s3v4",
@@ -184,12 +184,12 @@ def _client(settings: Settings, endpoint: str | None) -> S3Client:
 
 
 def build_s3_store(settings: Settings) -> S3InvoiceStore:
-    client = _client(settings, settings.s3_endpoint_url)
+    client = s3_client(settings, settings.s3_endpoint_url)
     presign_endpoint = settings.s3_presign_endpoint_url or settings.s3_endpoint_url
     presign = (
         client
         if presign_endpoint == settings.s3_endpoint_url
-        else _client(settings, presign_endpoint)
+        else s3_client(settings, presign_endpoint)
     )
     return S3InvoiceStore(
         client,
