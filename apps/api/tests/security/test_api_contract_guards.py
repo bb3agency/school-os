@@ -195,6 +195,19 @@ def test_API4_every_string_and_array_in_a_request_body_is_bounded(app: FastAPI) 
     assert sorted(problems) == []
 
 
+def test_API4_every_string_and_list_in_a_query_is_bounded(app: FastAPI) -> None:
+    """The same rule for query parameters: a cursor, a filter or a repeated (list) parameter has
+    a ``max_length``, a bounded pattern or a closed Literal/Enum type (audit 2026-11 H)."""
+    problems: set[str] = set()
+    for method, path, route in api_routes(app):
+        for d in _all_dependants(route.dependant):
+            for p in d.query_params:
+                info = p.field_info
+                where = f"{method} {path} ?{p.alias or p.name}"
+                problems.update(_unbounded(info.annotation, list(info.metadata), where))
+    assert sorted(problems) == []
+
+
 def test_bounded_pattern_helper() -> None:
     assert bounded_pattern(r"^[a-z][a-z0-9_]{1,63}$")
     assert bounded_pattern(r"^\+?[0-9]{10,13}$")

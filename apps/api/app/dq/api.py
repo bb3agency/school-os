@@ -104,9 +104,9 @@ def list_findings(
     *,
     ctx: Reader,
     db: TenantDB,
-    severity: Annotated[list[SeverityName] | None, Query()] = None,
-    rule_id: Annotated[list[RuleId] | None, Query()] = None,
-    status: Annotated[list[FindingStatus] | None, Query()] = None,
+    severity: Annotated[list[SeverityName] | None, Query(max_length=20)] = None,
+    rule_id: Annotated[list[RuleId] | None, Query(max_length=20)] = None,
+    status: Annotated[list[FindingStatus] | None, Query(max_length=20)] = None,
     section_id: uuid.UUID | None = None,
     student_id: uuid.UUID | None = None,
     profile_key: Annotated[str | None, Query(pattern=PROFILE_PATTERN)] = None,
@@ -277,7 +277,7 @@ def readiness_students(
     db: TenantDB,
     profile_key: ProfileKey,
     section_id: uuid.UUID,
-    status: Annotated[list[ReadinessStatus] | None, Query()] = None,
+    status: Annotated[list[ReadinessStatus] | None, Query(max_length=20)] = None,
 ) -> list[ReadinessStudentOut]:
     """The students of one section with their readiness and who must act, worst first (no
     values; permission ``dq.readiness.read``). A section outside your scope: 404."""

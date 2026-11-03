@@ -115,6 +115,10 @@ fleet_router = APIRouter(prefix="/api/v1/fleet", tags=["fleet"])
 
 Ctx = OperatorContext
 Limit = Annotated[int, Query(ge=1, le=200)]
+# Query strings are bounded like body strings (docs/09 §2; API4): an opaque cursor and a short
+# filter value (status, tier, plan code, priority).
+Cursor = Annotated[str | None, Query(max_length=512)]
+Filter = Annotated[str | None, Query(max_length=64)]
 IdemKey = Annotated[str | None, Header(alias="Idempotency-Key")]
 IfMatch = Annotated[str | None, Header(alias="If-Match")]
 
@@ -247,14 +251,14 @@ def get_dashboard(*, ctx: Annotated[Ctx, Depends(require_platform(ANY_OPERATOR))
 def list_tenants(
     *,
     ctx: Annotated[Ctx, Depends(require_platform("platform.tenants.read"))],
-    status: str | None = None,
-    tier: str | None = None,
-    plan: str | None = None,
+    status: Filter = None,
+    tier: Filter = None,
+    plan: Filter = None,
     q: Annotated[str | None, Query(max_length=100)] = None,
     trial_ending: bool = False,
     past_due: bool = False,
     limit: Limit = 50,
-    cursor: str | None = None,
+    cursor: Cursor = None,
 ) -> Page[TenantSummaryOut]:
     items, nxt = tenants.list_tenants(
         status=status,
@@ -562,7 +566,7 @@ PlanRead = Depends(
 
 
 @router.get("/plans", response_model=Page[PlanOut])
-def list_plans(*, ctx: Annotated[Ctx, PlanRead], status: str | None = None) -> Page[PlanOut]:
+def list_plans(*, ctx: Annotated[Ctx, PlanRead], status: Filter = None) -> Page[PlanOut]:
     return Page[PlanOut](data=billing.list_plans(status))
 
 
@@ -652,9 +656,9 @@ SubManage = Depends(require_platform("platform.subscriptions.manage"))
 def list_subscriptions(
     *,
     ctx: Annotated[Ctx, Depends(require_platform("platform.subscriptions.read"))],
-    status: str | None = None,
+    status: Filter = None,
     limit: Limit = 50,
-    cursor: str | None = None,
+    cursor: Cursor = None,
 ) -> Page[SubscriptionOut]:
     items, nxt = billing.list_subscriptions(status, limit, cursor)
     return Page[SubscriptionOut](data=items, next_cursor=nxt)
@@ -804,11 +808,11 @@ InvManage = Depends(require_platform("platform.invoices.manage"))
 def list_invoices(
     *,
     ctx: Annotated[Ctx, InvRead],
-    status: str | None = None,
+    status: Filter = None,
     financial_year: Annotated[str | None, Query(pattern=r"^[0-9]{4}-[0-9]{2}$")] = None,
     tenant_id: uuid.UUID | None = None,
     limit: Limit = 50,
-    cursor: str | None = None,
+    cursor: Cursor = None,
 ) -> Page[InvoiceOut]:
     items, nxt = billing.list_invoices(
         status=status, fy=financial_year, tenant_id=tenant_id, limit=limit, cursor=cursor
@@ -1033,10 +1037,10 @@ FleetManage = Depends(require_platform("platform.fleet.manage"))
 def list_deployments(
     *,
     ctx: Annotated[Ctx, FleetRead],
-    status: str | None = None,
+    status: Filter = None,
     tenant_id: uuid.UUID | None = None,
     limit: Limit = 50,
-    cursor: str | None = None,
+    cursor: Cursor = None,
 ) -> Page[DeploymentOut]:
     """Deployments, newest first, cursor-paged (R-14); ``tenant_id`` for one school's."""
     items, nxt = fleet.list_deployments(status, tenant_id=tenant_id, limit=limit, cursor=cursor)
@@ -1101,7 +1105,7 @@ def list_announcements(
     *,
     ctx: Annotated[Ctx, Depends(require_platform(ANY_OPERATOR))],
     limit: Limit = 50,
-    cursor: str | None = None,
+    cursor: Cursor = None,
 ) -> Page[AnnouncementOut]:
     """Announcements, newest first, cursor-paged (R-14)."""
     items, nxt = announcements.list_announcements(limit=limit, cursor=cursor)
@@ -1191,12 +1195,12 @@ SupManage = Depends(require_platform("platform.support.manage"))
 def list_tickets(
     *,
     ctx: Annotated[Ctx, SupRead],
-    status: str | None = None,
-    priority: str | None = None,
+    status: Filter = None,
+    priority: Filter = None,
     tenant_id: uuid.UUID | None = None,
     assigned_to: uuid.UUID | None = None,
     limit: Limit = 50,
-    cursor: str | None = None,
+    cursor: Cursor = None,
 ) -> Page[TicketOut]:
     items, nxt = support.list_tickets(
         status=status,
@@ -1305,7 +1309,7 @@ def list_breakglass(
     ctx: Annotated[Ctx, Depends(require_platform(ANY_OPERATOR))],
     tenant_id: uuid.UUID | None = None,
     limit: Limit = 50,
-    cursor: str | None = None,
+    cursor: Cursor = None,
 ) -> Page[BreakGlassOut]:
     """Break-glass requests, newest first, cursor-paged (R-14)."""
     items, nxt = breakglass.list_requests(tenant_id, limit=limit, cursor=cursor)
@@ -1379,7 +1383,7 @@ def list_incidents(
     *,
     ctx: Annotated[Ctx, IncidentsRead],
     limit: Limit = 50,
-    cursor: str | None = None,
+    cursor: Cursor = None,
 ) -> Page[incidents.IncidentOut]:
     """SchoolOS incident records, newest first, with the CERT-In clock (T0 + 6 h) and how many
     affected schools were notified."""
@@ -1534,7 +1538,7 @@ def list_operators(
     *,
     ctx: Annotated[Ctx, Depends(require_platform("platform.operators.manage", step_up=False))],
     limit: Limit = 50,
-    cursor: str | None = None,
+    cursor: Cursor = None,
 ) -> Page[OperatorOut]:
     items, nxt = operators.list_operators(limit, cursor)
     return Page[OperatorOut](data=items, next_cursor=nxt)
