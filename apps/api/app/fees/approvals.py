@@ -28,7 +28,7 @@ from app.fees import _common as c
 from app.fees import ledger, receipts, refund_hooks, templates
 from app.fees import repository as repo
 from app.fees.models import Adjustment, Concession, Receipt, ReceiptCancellation, Refund
-from app.fees.money import ZERO, group_indian, in_words, percent_of, spread, total
+from app.fees.money import HUNDRED, ZERO, group_indian, in_words, percent_of, spread, total
 from app.fees.schemas import (
     AdjustmentCreate,
     AdjustmentOut,
@@ -175,6 +175,8 @@ def request_concession(
     c.require_on(session, ctx)
     c.require_school_wide(ctx, c.CONCESSION_REQUEST)
     reason = c.clean_reason("reason", data.reason)
+    if data.basis == "percent" and data.value > HUNDRED:
+        raise ValidationFailed([c.error("value", "above_100_percent")])
     account = _account_for(session, account_id)
     dues = ledger.dues_for(session, account, c.today(session))
     seen: set[tuple[int, uuid.UUID]] = set()
@@ -417,9 +419,7 @@ def request_adjustment(
     if data.reason_code == "late_fee_waiver":
         if data.head_id is not None or data.amount >= 0:
             raise ValidationFailed([c.error("amount", "waiver_reduces_late_fee")])
-        dues = ledger.dues_for(session, account, c.today(session))
-        found = dues.line(data.instalment_no, None)
-        if found is None or found[0].late_fee < -data.amount:
+        if _late_fee_left(session, account, data.instalment_no) < -data.amount:
             raise ValidationFailed([c.error("amount", "above_late_fee")])
     elif data.head_id is None or repo.get_head(session, data.head_id) is None:
         raise ValidationFailed([c.error("head_id", "invalid")])
@@ -453,6 +453,13 @@ def request_adjustment(
     return _adjustment_out(row, _names(session, [row]))
 
 
+def _late_fee_left(session: Session, account: Any, instalment_no: int) -> Decimal:
+    """The late fee of an instalment not waived yet: posted late fees plus the waivers already
+    approved (adjustments on the late-fee line are waivers only, FR-FEE-007/009)."""
+    found = ledger.dues_for(session, account, c.today(session)).line(instalment_no, None)
+    return found[0].late_fee + found[0].adjustment if found else ZERO
+
+
 def _load_adjustment(session: Session, row_id: uuid.UUID) -> Adjustment:
     row = repo.get_adjustment(session, row_id, lock=True)
     if row is None:
@@ -476,6 +483,15 @@ def approve_adjustment(
     note = c.clean_reason("note", data.note, required=False)
     account = _account_for(session, row.account_id)
     today = c.today(session)
+    if (
+        row.reason_code == "late_fee_waiver"
+        and _late_fee_left(session, account, row.instalment_no) < -row.amount
+    ):
+        raise Conflict(
+            "The late fee left on this instalment is less than this waiver. Reject it and ask "
+            "for a smaller one.",
+            code="above_late_fee",
+        )
     with c.db_errors():
         row = repo.update_adjustment(
             session, row.id, _decision_values(ctx, session, "approved", note)

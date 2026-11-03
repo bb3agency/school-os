@@ -744,6 +744,73 @@ def test_FR_FEE_009_flat_late_fee_posted_once(school: Any) -> None:
     assert late.late_fee == D("100.00")
 
 
+def _waiver(school: Any, account_id: uuid.UUID, amount: str) -> Any:
+    return F.call(
+        school,
+        "accountant",
+        fees.request_adjustment,
+        account_id,
+        AdjustmentCreate(
+            instalment_no=1,
+            head_id=None,
+            amount=D(amount),
+            reason_code="late_fee_waiver",
+            reason="Parent was in hospital that month",
+        ),
+    )
+
+
+def _approve_waiver(school: Any, row_id: uuid.UUID) -> Any:
+    return F.call(
+        school,
+        "accountant",
+        fees.approve_adjustment,
+        row_id,
+        DecisionIn(),
+        expected_version=None,
+        person=school.people["accountant2"],
+    )
+
+
+def test_FR_FEE_007_FR_FEE_009_waivers_never_exceed_the_late_fee(school: Any) -> None:
+    _, account_id = _late_plan(
+        school,
+        LateFeeRule(kind="flat_per_instalment", amount=D("100.00"), grace_days=5),
+        "waiver_rule",
+    )
+    _post(school)
+    first = _waiver(school, account_id, "-60.00")
+    second = _waiver(school, account_id, "-60.00")  # both fit the late fee while pending
+    assert _approve_waiver(school, first.id).status == "approved"
+    with pytest.raises(Conflict) as err:
+        _approve_waiver(school, second.id)
+    assert err.value.code == "above_late_fee"
+    with pytest.raises(ValidationFailed):
+        _waiver(school, account_id, "-50.00")  # only 40.00 is left to waive
+    assert _approve_waiver(school, _waiver(school, account_id, "-40.00").id).status == "approved"
+    late = _line(_account(school, account_id), 1, None)
+    assert late.late_fee + late.adjustment == D("0.00")
+
+
+def test_FR_FEE_008_percent_concession_above_100_is_refused(school: Any) -> None:
+    setup = F.ensure_setup(school)
+    with pytest.raises(ValidationFailed) as err:
+        F.call(
+            school,
+            "office_admin",
+            fees.request_concession,
+            F.account(school),
+            ConcessionCreate(
+                concession_type="hardship",
+                basis="percent",
+                value=D("150"),
+                targets=[ConcessionTarget(instalment_no=1, head_id=setup.tui)],
+                reason="Family lost their income this year",
+            ),
+        )
+    assert err.value.errors[0]["code"] == "above_100_percent"
+
+
 def test_FR_FEE_009_per_day_late_fee_capped_never_compounding(school: Any) -> None:
     _, account_id = _late_plan(
         school,
