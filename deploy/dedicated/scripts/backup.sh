@@ -69,7 +69,11 @@ trap on_error ERR
 
 avail_kb="$(df --output=avail -k "$work" | tail -1)"
 db_kb="$(du -sk "$SOS_DATA_DIR/pg" | cut -f1)"
-((avail_kb > db_kb / 2)) || die "not enough free space in $work for a dump"
+# Not `die`: exit skips the ERR trap, and this failure must be recorded like any other.
+((avail_kb > db_kb / 2)) || {
+  log ERR "not enough free space in $work for a dump"
+  false
+}
 
 info "dumping database to $file"
 sos_compose exec -T db pg_dump -U postgres -d schoolos -Fc -Z 6 >"$file"

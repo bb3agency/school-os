@@ -127,10 +127,12 @@ set -a
 # shellcheck source=/dev/null
 . "$SOS_SECRETS_ENV"
 set +a
+# The URLs hold role passwords: they reach the container by name (`-e NAME`, value from this
+# environment), never as `-e NAME=value`, which any host process could read in /proc/*/cmdline.
+export SOS_DATABASE_URL="postgresql+psycopg://sos_app:${SOS_APP_DB_PASSWORD}@db:5432/$db"
+export SOS_PLATFORM_DATABASE_URL="postgresql+psycopg://sos_platform:${SOS_PLATFORM_DB_PASSWORD}@db:5432/$db"
 audit_result=ok
-if ! sos_compose run --rm --no-deps \
-  -e "SOS_DATABASE_URL=postgresql+psycopg://sos_app:${SOS_APP_DB_PASSWORD}@db:5432/$db" \
-  -e "SOS_PLATFORM_DATABASE_URL=postgresql+psycopg://sos_platform:${SOS_PLATFORM_DB_PASSWORD}@db:5432/$db" \
+if ! sos_compose run --rm --no-deps -e SOS_DATABASE_URL -e SOS_PLATFORM_DATABASE_URL \
   api python -m app.audit.verify_all; then
   audit_result=failed
   warn "audit chain verification FAILED on the restored copy"

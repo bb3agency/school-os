@@ -29,9 +29,40 @@ def test_SEC_024_restore_summary_covers_every_application_schema() -> None:
         assert set(re.findall(r"'(\w+)'", found)) == schemas
 
 
+def _drill_urls() -> str:
+    """The restore drill's URL exports through its verify_all container run."""
+    start = RESTORE.index("export SOS_DATABASE_URL=")
+    return RESTORE[start : RESTORE.index("python -m app.audit.verify_all")]
+
+
 def test_SEC_024_restore_drill_verifies_both_chains_on_the_copy() -> None:
-    block = RESTORE[RESTORE.index("sos_compose run --rm --no-deps") :]
-    block = block[: block.index("python -m app.audit.verify_all")]
-    assert '-e "SOS_DATABASE_URL=postgresql+psycopg://sos_app:' in block
-    assert '-e "SOS_PLATFORM_DATABASE_URL=postgresql+psycopg://sos_platform:' in block
-    assert block.count('@db:5432/$db"') == 2
+    block = _drill_urls()
+    app_url = "postgresql+psycopg://sos_app:${SOS_APP_DB_PASSWORD}@db:5432/$db"
+    platform_url = "postgresql+psycopg://sos_platform:${SOS_PLATFORM_DB_PASSWORD}@db:5432/$db"
+    assert f'export SOS_DATABASE_URL="{app_url}"' in block
+    assert f'export SOS_PLATFORM_DATABASE_URL="{platform_url}"' in block
+    run = block[block.index("sos_compose run --rm --no-deps") :]
+    assert re.search(r"-e SOS_DATABASE_URL\s", run)
+    assert re.search(r"-e SOS_PLATFORM_DATABASE_URL\s", run)
+
+
+def test_SEC_024_restore_drill_keeps_db_passwords_off_the_command_line() -> None:
+    """The drill's container run takes the database URLs by name from its environment
+    (``-e NAME``): ``-e NAME=value`` puts the role passwords on the docker command line, which any
+    host process can read in /proc/*/cmdline while it runs (db-bootstrap uses getenv for the same
+    reason; test_dedicated_hardening.py)."""
+    block = _drill_urls()
+    run = block[block.index("sos_compose run --rm --no-deps") :]
+    assert "PASSWORD" not in run
+    assert not re.search(r"-e \"?SOS_[A-Z_]*URL=", run)
+
+
+BACKUP = (REPO_ROOT / "deploy" / "dedicated" / "scripts" / "backup.sh").read_text("utf-8")
+
+
+def test_SEC_024_backup_failures_after_the_trap_record_the_failure() -> None:
+    """Once ``trap on_error ERR`` is set, a failed check must go through the trap (backup.json
+    status failed, BackupSuccess 0): ``die`` exits without it, so a full disk left no trace."""
+    after_trap = BACKUP[BACKUP.index("trap on_error ERR") :]
+    assert "die " not in after_trap
+    assert re.search(r"avail_kb > db_kb / 2\)\) \|\| \{[^}]*\bfalse\b", after_trap)
