@@ -52,11 +52,18 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 class UrllibTransport:
-    def __init__(self, *, timeout_s: float = TIMEOUT_S) -> None:
+    """``direct=True`` (Tally on this PC): never through a proxy, whatever the environment or
+    the Windows proxy setting says, so ledger names and balances never leave the PC in clear."""
+
+    def __init__(self, *, timeout_s: float = TIMEOUT_S, direct: bool = False) -> None:
         context = ssl.create_default_context()
-        self._opener = urllib.request.build_opener(
-            _NoRedirect(), urllib.request.HTTPSHandler(context=context)
-        )
+        handlers: list[urllib.request.BaseHandler] = [
+            _NoRedirect(),
+            urllib.request.HTTPSHandler(context=context),
+        ]
+        if direct:
+            handlers.append(urllib.request.ProxyHandler({}))
+        self._opener = urllib.request.build_opener(*handlers)
         self._timeout = timeout_s
 
     def request(
