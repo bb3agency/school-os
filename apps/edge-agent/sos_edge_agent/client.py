@@ -6,8 +6,9 @@ library (ADR-0032 §1, §3).
 - :class:`SchoolOSClient`: the agent routes of ``/api/v1/edge/tally``. Every request after
   enrolment is signed (:mod:`.signing`); answers map to typed errors the sync loop understands
   (401 credential refused, or ``clock_skew`` when the server's ``Date`` shows this PC's clock is
-  off, 404 connector switched off, 409 ``agent_outdated``, 429 rate limited,
-  5xx or network: try again later).
+  off, 404 connector switched off, 409 ``agent_outdated``, 413 ``snapshot_too_large``, 429 rate
+  limited, 5xx or network: try again later). Bodies are compact UTF-8 JSON and are checked
+  against the server's 1 MiB limit before they are sent.
 - :class:`TallyClient`: POSTs export envelopes to Tally's XML server on 127.0.0.1 and checks each
   one is an export first.
 """
@@ -16,6 +17,7 @@ from __future__ import annotations
 
 import email.utils
 import json
+import logging
 import ssl
 import time
 import urllib.error
@@ -32,7 +34,11 @@ from sos_edge_agent.tally_xml import assert_export_only
 
 API_PREFIX: Final = "/api/v1/edge/tally"
 MAX_RESPONSE_BYTES: Final = 8 * 1024 * 1024
+MAX_REQUEST_BYTES: Final = 1024 * 1024
+"""The server's ``MAX_BODY_BYTES`` (app/tally/agent_auth.py): a larger body is refused."""
 TIMEOUT_S: Final = 30.0
+
+log = logging.getLogger("sos_edge_agent")
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,6 +148,13 @@ class RateLimited(AgentError):
         self.retry_after_s = retry_after_s
 
 
+class PayloadTooLarge(AgentError):
+    """The body is over the server's limit (checked before sending, or a 413): sending the same
+    snapshot again cannot succeed, so the run fails and the loop waits like a refusal."""
+
+    code = "snapshot_too_large"
+
+
 class Refused(AgentError):
     """422/409 other than the above: the server refused this snapshot (code from the problem)."""
 
@@ -178,7 +191,9 @@ def _raise_for(res: HttpResponse, now: float | None = None) -> None:
     code = _problem_code(res.body)
     if res.status == 409 and code == "agent_outdated":
         raise Outdated("agent_outdated")
-    if res.status in (409, 413, 422):
+    if res.status == 413:
+        raise PayloadTooLarge("snapshot_too_large")
+    if res.status in (409, 422):
         raise Refused(code)
     raise TransientError(f"http_{res.status}")
 
@@ -245,7 +260,16 @@ class SchoolOSClient:
         cfg = self._config
         if cfg.device_id is None or cfg.key_id is None:
             raise CredentialRefused("not_enrolled")
-        body = b"" if payload is None else json.dumps(payload, separators=(",", ":")).encode()
+        body = (
+            b""
+            if payload is None
+            else json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        )
+        if len(body) > MAX_REQUEST_BYTES:
+            # Counts only: the body holds ledger names.
+            extra = {"code": PayloadTooLarge.code, "count": len(body)}
+            log.warning("tally.request.too_large", extra=extra)
+            raise PayloadTooLarge(PayloadTooLarge.code)
         headers = signed_headers(
             secret=self._secret(),
             tenant_id=cfg.tenant_id,
@@ -314,6 +338,7 @@ __all__ = [
     "CredentialRefused",
     "HttpResponse",
     "Outdated",
+    "PayloadTooLarge",
     "RateLimited",
     "Refused",
     "SchoolOSClient",

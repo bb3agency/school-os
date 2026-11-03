@@ -5,7 +5,8 @@
 1. ``GET /config``: the company and the ledger groups the accountant selected; stop if this
    agent is older than ``min_agent_version``.
 2. Tally: the open companies, then the groups of the chosen company -> ``PUT /catalog`` (names
-   only), so the accountant can choose groups in SchoolOS.
+   only, at most the server's 500, the first by name), so the accountant can choose groups in
+   SchoolOS. Names are compared with SchoolOS's after NFC; Tally is asked with its own spelling.
 3. If groups are selected: for each selected group, the ledgers under it (sub-groups included)
    with their closing balance today. A ledger is reported under the selected group it was read
    from (its own parent when that is also selected), once.
@@ -34,8 +35,9 @@ import json
 import logging
 import random
 import threading
+import unicodedata
 import uuid
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -45,6 +47,7 @@ from sos_edge_agent.client import (
     ConnectorOff,
     CredentialRefused,
     Outdated,
+    PayloadTooLarge,
     RateLimited,
     SchoolOSClient,
     TallyClient,
@@ -66,6 +69,15 @@ BATCH_NAMESPACE: Final = uuid.UUID("0192f0c1-7a51-7c4e-9d0e-5c0a6b0e7f21")
 BACKOFF_MIN_S: Final = 60.0
 BACKOFF_MAX_S: Final = 30 * 60.0
 REFUSED_WAIT_S: Final = 60 * 60.0
+MAX_CATALOG_GROUPS: Final = 500
+"""The server's ``sync.max_groups`` (app/tally/config.yaml): more is refused with 422."""
+MAX_NAME_CHARS: Final = 200
+"""The server's ``TallyName`` length (app/tally/schemas.py)."""
+
+
+def nfc(value: str) -> str:
+    """SchoolOS stores Tally names NFC-normalised; Tally keeps them as typed."""
+    return unicodedata.normalize("NFC", value)
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,16 +114,25 @@ def batch_id(
 
 
 def collect(
-    tally: TallyClient, company: str, groups: Sequence[str], today: dt.date
+    tally: TallyClient,
+    company: str,
+    groups: Sequence[str],
+    today: dt.date,
+    tally_names: Mapping[str, str] | None = None,
 ) -> list[dict[str, Any]]:
-    """Parties under the selected groups, each once, reported under a selected group."""
-    selected = set(groups)
+    """Parties under the selected groups, each once, reported under a selected group.
+
+    ``groups`` are SchoolOS's (NFC) names; ``tally_names`` maps each to Tally's own spelling,
+    which is what Tally is asked with. Names are compared after NFC."""
+    selected = {nfc(g) for g in groups}
     seen: dict[str, dict[str, Any]] = {}
     for group in groups:
-        for ledger in parse_ledgers(tally.export(ledgers_request(company, group, today))):
+        asked = (tally_names or {}).get(group, group)
+        for ledger in parse_ledgers(tally.export(ledgers_request(company, asked, today))):
             key = ledger.guid or f"name:{ledger.name}"
             if key not in seen:
-                reported = ledger.parent if ledger.parent in selected else group
+                parent = nfc(ledger.parent)
+                reported = parent if parent in selected else group
                 seen[key] = _party(ledger, reported)
     return list(seen.values())
 
@@ -155,8 +176,10 @@ class Agent:
         companies = parse_companies(self.tally.export(companies_request()))
         if not companies:
             raise AgentError("no_company_open")
-        if wanted is not None and wanted in companies:
-            return wanted
+        if wanted is not None:  # Tally's own spelling of the company SchoolOS names (NFC)
+            for company in companies:
+                if nfc(company) == nfc(wanted):
+                    return company
         return companies[0]
 
     def sync_once(self) -> SyncReport:
@@ -167,21 +190,34 @@ class Agent:
             raise Outdated("agent_outdated")
         company = self._company(config.get("company"))
         groups = parse_groups(self.tally.export(groups_request(company)))
+        catalog = sorted(groups, key=lambda g: g.name)[:MAX_CATALOG_GROUPS]
+        if len(groups) > MAX_CATALOG_GROUPS:
+            # Counts only; the first groups by name are sent so the choice is stable.
+            extra = {"code": "too_many_groups", "count": len(groups)}
+            log.warning("tally.catalog.truncated", extra=extra)
         self.server.put_catalog(
             {
                 "company": company,
                 "tally_product": "TallyPrime",
-                "groups": [{"name": g.name[:200], "parent": g.parent} for g in groups][:2000],
+                "groups": [
+                    {
+                        "name": g.name[:MAX_NAME_CHARS],
+                        "parent": g.parent[:MAX_NAME_CHARS] if g.parent else None,
+                    }
+                    for g in catalog
+                ],
             }
         )
         selected = [str(g) for g in config.get("groups") or []]
-        if not selected or config.get("company") != company:
+        wanted = config.get("company")
+        if not selected or wanted is None or nfc(str(wanted)) != nfc(company):
             log.info("tally.sync.skipped", extra={"code": "no_groups_selected"})
             return SyncReport(outcome="no_groups_selected", groups=len(groups))
         today = self._today()
-        parties = collect(self.tally, company, selected, today)
+        tally_names = {nfc(g.name): g.name for g in groups}
+        parties = collect(self.tally, company, selected, today, tally_names)
         snapshot = {
-            "company": company,
+            "company": nfc(company),
             "as_of": today.isoformat(),
             "groups": selected,
             "parties": parties,
@@ -237,7 +273,7 @@ class Agent:
             return self.interval_s
         if isinstance(error, RateLimited) and error.retry_after_s:
             return max(error.retry_after_s, 30.0)
-        if isinstance(error, CredentialRefused | ConnectorOff | Outdated):
+        if isinstance(error, CredentialRefused | ConnectorOff | Outdated | PayloadTooLarge):
             return REFUSED_WAIT_S
         base = min(BACKOFF_MAX_S, BACKOFF_MIN_S * float(2 ** max(0, failures - 1)))
         jitter: float = 0.5 + random.random() / 2  # noqa: S311 - jitter, not security

@@ -10,6 +10,7 @@ import io
 import logging
 import socket
 import threading
+import unicodedata
 import uuid
 from contextlib import redirect_stdout
 from pathlib import Path
@@ -319,3 +320,210 @@ def test_FR_TALLY_003_tally_is_never_read_through_a_proxy(
         httpd.shutdown()
         httpd.server_close()
     assert b"Synthetic Model School 2026-27" in answer
+
+
+# --- audit 2026-11-03: catalog cap, body size, crash-safe keys, NFC names ------------------------
+
+_API_TALLY = Path(__file__).resolve().parents[2] / "api" / "app" / "tally"
+
+
+def _envelope(rows: str) -> bytes:
+    return (
+        f"<ENVELOPE><BODY><DATA><COLLECTION>{rows}</COLLECTION></DATA></BODY></ENVELOPE>".encode()
+    )
+
+
+class _ManyGroupsTally(FakeTally):
+    """Tally with more groups than SchoolOS accepts, each under a very long parent name."""
+
+    def __init__(self, count: int) -> None:
+        super().__init__()
+        parent = "P" * 300
+        self.groups_xml = _envelope(
+            "".join(
+                f'<GROUP NAME="Group {n:04d}"><PARENT>{parent}</PARENT></GROUP>'
+                for n in reversed(range(count))  # Tally's order is not sorted
+            )
+        )
+
+    def request(
+        self, method: str, url: str, headers: Any, body: bytes | None
+    ) -> client.HttpResponse:
+        if body is not None and b"<TYPE>Group</TYPE>" in body:
+            self.bodies.append(body)
+            return client.HttpResponse(200, {}, self.groups_xml)
+        return super().request(method, url, headers, body)
+
+
+def test_FR_TALLY_004_the_catalog_keeps_to_the_servers_group_cap(
+    server: FakeServer, caplog: pytest.LogCaptureFixture
+) -> None:
+    # 2,000 groups were sent while the server takes 500 (422 too_many, and then no sync ever ran).
+    tally = _ManyGroupsTally(620)
+    with caplog.at_level(logging.INFO, logger="sos_edge_agent"):
+        report = _agent(server, tally).sync_once()
+    catalog = _sent(server, "/catalog")[0]
+    names = [g["name"] for g in catalog["groups"]]
+    assert len(names) == sync.MAX_CATALOG_GROUPS == 500
+    assert names == [f"Group {n:04d}" for n in range(500)]  # the first 500, sorted
+    assert all(len(g["parent"]) == 200 for g in catalog["groups"])
+    assert report.outcome == "synced"
+    warned = [r for r in caplog.records if getattr(r, "code", None) == "too_many_groups"]
+    assert len(warned) == 1
+    assert getattr(warned[0], "count", None) == 620
+    assert "Group 0" not in caplog.text
+
+
+def test_FR_TALLY_004_agent_limits_match_the_server_rules() -> None:
+    # The agent cannot ask the server for these numbers, so they are pinned to the server's files.
+    if not _API_TALLY.is_dir():
+        pytest.skip("the API sources are not next to the agent")
+    rules = (_API_TALLY / "config.yaml").read_text(encoding="utf-8")
+    auth = (_API_TALLY / "agent_auth.py").read_text(encoding="utf-8")
+    assert f"  max_groups: {sync.MAX_CATALOG_GROUPS}\n" in rules
+    assert f"  skew_seconds: {int(client.SKEW_LIMIT_S)} " in rules
+    assert "MAX_BODY_BYTES: Final = 1024 * 1024\n" in auth
+    assert client.MAX_REQUEST_BYTES == 1024 * 1024
+
+
+def test_FR_TALLY_005_bodies_are_compact_utf8_not_ascii_escapes() -> None:
+    # Escaped, a Telugu letter costs 6 bytes ("\\u0c2a"); raw UTF-8 costs 3.
+    calls: list[bytes] = []
+
+    class _Recording(FakeServer):
+        def request(
+            self, method: str, url: str, headers: Any, body: bytes | None
+        ) -> client.HttpResponse:
+            calls.append(body or b"")
+            return super().request(method, url, headers, body)
+
+    config = AgentConfig(
+        server_url=SERVER, tenant_id=TENANT, device_id=DEVICE, key_id="tdk-abcdefghijklmnopqrst"
+    )
+    api = client.SchoolOSClient(config, lambda: SECRET, _Recording())
+    api.put_catalog({"company": "పాఠశాల", "groups": [{"name": "ఫీజులు", "parent": None}]})
+    assert "పాఠశాల".encode() in calls[0]
+    assert b"\\u" not in calls[0]
+    assert b", " not in calls[0]
+    assert b": " not in calls[0]
+
+
+def test_FR_TALLY_005_a_snapshot_over_the_server_limit_fails_the_run_without_sending(
+    server: FakeServer,
+    tally: FakeTally,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # Over 1 MiB the server refuses the body; retried every cycle, the agent never synced again.
+    big = [
+        {
+            "guid": None,
+            "name": f"Synthetic {n:05d} " + "క" * 60,
+            "group": "Sundry Debtors",
+            "closing_balance": "1.00",
+        }
+        for n in range(5000)
+    ]
+    monkeypatch.setattr(sync, "collect", lambda *args: big)
+    agent = _agent(server, tally)
+    with (
+        caplog.at_level(logging.INFO, logger="sos_edge_agent"),
+        pytest.raises(client.PayloadTooLarge) as caught,
+    ):
+        agent.sync_once()
+    assert caught.value.code == "snapshot_too_large"
+    assert not _sent(server, "/syncs")  # never sent
+    assert agent.next_wait(1, caught.value) == sync.REFUSED_WAIT_S
+    logged = [r for r in caplog.records if getattr(r, "code", None) == "snapshot_too_large"]
+    assert logged
+    assert int(getattr(logged[0], "count", 0)) > client.MAX_REQUEST_BYTES
+    assert "Synthetic" not in caplog.text
+    # The server's own 413 is the same refusal, not an endless retry.
+    with pytest.raises(client.PayloadTooLarge):
+        client._raise_for(client.HttpResponse(413, {}, b"{}"))
+
+
+def _runtime(tmp_path: Path, server: FakeServer, tally: FakeTally) -> cli.Runtime:
+    return cli.Runtime(
+        tmp_path, transport=server, tally_transport=tally, store=InsecureFileStore(tmp_path)
+    )
+
+
+_ENROL = ["enrol", "--server", SERVER, "--school", str(TENANT), "--code", "ABCD-EFGH-JKLM"]
+
+
+def _crash(*args: Any) -> None:
+    raise OSError("power cut")
+
+
+def test_FR_TALLY_002_a_crash_between_the_key_and_config_writes_does_not_lock_the_pc_out(
+    tmp_path: Path, server: FakeServer, tally: FakeTally, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert cli.main(_ENROL, runtime=_runtime(tmp_path, server, tally)) == cli.EXIT_OK
+    monkeypatch.setattr(cli, "save", _crash)
+    with pytest.raises(OSError, match="power cut"):
+        cli.main(["rotate-key"], runtime=_runtime(tmp_path, server, tally))
+    monkeypatch.setattr(cli, "save", save)
+    assert load(tmp_path / "agent.toml").key_id == "tdk-abcdefghijklmnopqrst"  # stale config
+    del server.keys["tdk-abcdefghijklmnopqrst"]  # the new key's first use retires the old one
+    assert cli.main(["sync-once"], runtime=_runtime(tmp_path, server, tally)) == cli.EXIT_OK
+    assert load(tmp_path / "agent.toml").key_id == "tdk-zyxwvutsrqponmlkjihg"  # repaired
+
+
+def test_FR_TALLY_001_a_crash_during_re_enrolment_does_not_lock_the_pc_out(
+    tmp_path: Path, server: FakeServer, tally: FakeTally, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # An enrolled PC is enrolled again (new device); the config write fails after the key write.
+    old_device = uuid.UUID("01920000-0000-7000-8000-00000000d0ff")
+    old = AgentConfig(
+        server_url=SERVER, tenant_id=TENANT, device_id=old_device, key_id="tdk-oldoldoldoldoldoldol"
+    )
+    save(old, tmp_path / "agent.toml")
+    InsecureFileStore(tmp_path).save(NEW_SECRET)
+    monkeypatch.setattr(cli, "save", _crash)
+    with pytest.raises(OSError, match="power cut"):
+        cli.main(_ENROL, runtime=_runtime(tmp_path, server, tally))
+    monkeypatch.setattr(cli, "save", save)
+    assert cli.main(["sync-once"], runtime=_runtime(tmp_path, server, tally)) == cli.EXIT_OK
+    repaired = load(tmp_path / "agent.toml")
+    assert (repaired.device_id, repaired.key_id) == (DEVICE, "tdk-abcdefghijklmnopqrst")
+
+
+_DECOMPOSED = "పై"  # Telugu "pai" typed as two vowel marks
+_COMPOSED = "పై"  # the same text after NFC (how SchoolOS stores it)
+
+
+class _TeluguTally(FakeTally):
+    """Tally keeps names as typed (not NFC)."""
+
+    def request(
+        self, method: str, url: str, headers: Any, body: bytes | None
+    ) -> client.HttpResponse:
+        assert body is not None
+        self.bodies.append(body)
+        if b"<TYPE>Company</TYPE>" in body:
+            rows = f'<COMPANY NAME="School {_DECOMPOSED}"/>'
+        elif b"<TYPE>Group</TYPE>" in body:
+            rows = f'<GROUP NAME="Fees {_DECOMPOSED}"><PARENT>Sundry Debtors</PARENT></GROUP>'
+        else:
+            rows = (
+                f'<LEDGER NAME="Synthetic Party"><GUID>g-1</GUID><PARENT>Fees {_DECOMPOSED}'
+                "</PARENT><CLOSINGBALANCE>-100.00</CLOSINGBALANCE></LEDGER>"
+            )
+        return client.HttpResponse(200, {}, _envelope(rows))
+
+
+def test_FR_TALLY_004_tally_names_match_the_servers_nfc_names() -> None:
+    assert unicodedata.normalize("NFC", _DECOMPOSED) == _COMPOSED
+    server = FakeServer(groups=[f"Fees {_COMPOSED}"], company=f"School {_COMPOSED}")
+    tally = _TeluguTally()
+    report = _agent(server, tally).sync_once()
+    assert (report.outcome, report.parties) == ("synced", 1)
+    snapshot = _sent(server, "/syncs")[0]
+    assert snapshot["company"] == f"School {_COMPOSED}"
+    assert snapshot["parties"][0]["group"] == f"Fees {_COMPOSED}"
+    # Tally is asked with its own spelling, the one it knows.
+    asked = [b for b in tally.bodies if b"<TYPE>Ledger</TYPE>" in b]
+    assert len(asked) == 1
+    assert f"Fees {_DECOMPOSED}".encode() in asked[0]
+    assert f"School {_DECOMPOSED}".encode() in asked[0]

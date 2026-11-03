@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import datetime as dt
 import os
 import stat
@@ -111,3 +112,19 @@ def test_ADR_0032_dpapi_is_windows_only(tmp_path: Path) -> None:
         pytest.skip("covered by the DPAPI test on Windows")
     with pytest.raises(cred.CredentialError, match="Windows"):
         cred.DpapiStore(tmp_path, TENANT)
+
+
+def test_FR_TALLY_002_the_key_store_keeps_the_key_id_with_the_secret(tmp_path: Path) -> None:
+    store = cred.InsecureFileStore(tmp_path)
+    device = uuid.uuid4()
+    store.save(bytes(range(32)), device_id=device, key_id="tdk-abcdefghijklmnopqrst")
+    stored = store.load_key()
+    assert stored == cred.StoredKey(device, "tdk-abcdefghijklmnopqrst", bytes(range(32)))
+    assert store.load() == bytes(range(32))
+    assert not list(tmp_path.glob("*.tmp"))
+
+
+def test_FR_TALLY_002_a_key_file_of_the_old_layout_still_loads(tmp_path: Path) -> None:
+    (tmp_path / cred.KEY_FILE).write_bytes(base64.b64encode(bytes(range(32))))
+    stored = cred.InsecureFileStore(tmp_path).load_key()
+    assert stored == cred.StoredKey(None, None, bytes(range(32)))
