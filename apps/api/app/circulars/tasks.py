@@ -26,11 +26,9 @@ from typing import Any, Final
 
 from celery import Task, shared_task
 from celery.schedules import crontab
-from sqlalchemy.exc import SQLAlchemyError
 
 from app.circulars import service
 from app.core.db import context_free_session, tenant_session
-from app.core.errors import DomainError
 from app.core.logging import get_logger
 from app.ops.service import TenantTask
 from app.tenancy import service as tenancy
@@ -122,7 +120,7 @@ def remind_all() -> dict[str, int]:
         try:
             with tenant_session(tenant_id) as session:
                 totals["sent"] += service.send_reminders(session)
-        except (SQLAlchemyError, DomainError) as exc:
+        except Exception as exc:
             totals["failed"] += 1
             log.warning(
                 "circulars.reminders_failed", tenant_id=tenant_id, error_type=type(exc).__name__

@@ -11,11 +11,9 @@ from typing import Any
 
 from celery import shared_task
 from celery.schedules import crontab
-from sqlalchemy.exc import SQLAlchemyError
 
 from app.changes import service
 from app.core.db import context_free_session, tenant_session
-from app.core.errors import DomainError
 from app.core.logging import get_logger
 from app.tenancy import service as tenancy
 
@@ -31,7 +29,7 @@ def expire_all() -> dict[str, int]:
         try:
             with tenant_session(tenant_id) as session:
                 totals["expired"] += service.expire_due(session)
-        except (SQLAlchemyError, DomainError) as exc:
+        except Exception as exc:
             totals["failed"] += 1
             log.warning("changes.expire_failed", tenant_id=tenant_id, error_type=type(exc).__name__)
     log.info("changes.expired", count=totals["expired"])

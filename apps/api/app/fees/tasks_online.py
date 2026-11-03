@@ -25,9 +25,7 @@ from typing import Any, Final
 
 from celery import Task, shared_task
 from celery.schedules import crontab
-from sqlalchemy.exc import SQLAlchemyError
 
-from app.core.errors import DomainError
 from app.core.logging import get_logger
 from app.fees import links, online, refund_hooks
 from app.fees.providers import ProviderError
@@ -48,7 +46,7 @@ def _each_school(action: str, run: Callable[[uuid.UUID], object]) -> dict[str, i
         try:
             run(tenant_id)
             totals["schools"] += 1
-        except (SQLAlchemyError, DomainError, ProviderError) as exc:
+        except Exception as exc:
             totals["failed"] += 1
             log.warning(
                 "payments.school_task_failed",

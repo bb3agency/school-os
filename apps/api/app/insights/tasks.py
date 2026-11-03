@@ -26,7 +26,6 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.db import context_free_session, tenant_session
-from app.core.errors import DomainError
 from app.core.logging import get_logger
 from app.insights import service
 from app.ops.service import TenantTask
@@ -80,7 +79,7 @@ def for_each_school(label: str, job: Callable[[Session], int | dict[str, int]]) 
             with tenant_session(tenant_id) as session:
                 result = job(session)
             totals["done"] += result if isinstance(result, int) else sum(result.values())
-        except (SQLAlchemyError, DomainError) as exc:
+        except Exception as exc:
             totals["failed"] += 1
             log.warning(
                 "insights.job_failed",

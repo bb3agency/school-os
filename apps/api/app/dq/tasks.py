@@ -25,10 +25,8 @@ from typing import Any, Final
 
 from celery import shared_task
 from celery.schedules import crontab
-from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.db import context_free_session, tenant_session
-from app.core.errors import DomainError
 from app.core.logging import get_logger
 from app.dq import portal_tasks, service
 from app.ops.service import TenantTask
@@ -89,7 +87,7 @@ def remind_all(*, today: dt.date | None = None) -> dict[str, int]:
         try:
             with tenant_session(tenant_id) as session:
                 totals["sent"] += portal_tasks.send_reminders(session, today=today)
-        except (SQLAlchemyError, DomainError) as exc:
+        except Exception as exc:
             totals["failed"] += 1
             log.warning(
                 "dq.calendar.reminders_failed", tenant_id=tenant_id, error_type=type(exc).__name__

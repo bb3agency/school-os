@@ -22,12 +22,10 @@ import uuid
 from typing import Any, Final
 
 from celery import shared_task
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import DeploymentMode, Settings, get_settings
 from app.core.db import context_free_session, tenant_session
-from app.core.errors import DomainError
 from app.core.logging import get_logger
 from app.identity import service as identity
 from app.notifications import service as notifications
@@ -102,7 +100,7 @@ def sweep_all() -> dict[str, int]:
     for tenant_id in tenant_ids:
         try:
             totals["sent"] += sync_school(tenant_id)
-        except (SQLAlchemyError, DomainError) as exc:  # this school only; the next sweep retries
+        except Exception as exc:  # this school only; the next sweep retries
             totals["failed"] += 1
             log.warning(
                 "notifications.ai_quota_sweep_failed",

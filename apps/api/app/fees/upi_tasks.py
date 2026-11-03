@@ -16,10 +16,8 @@ from typing import Any, Final
 
 from celery import shared_task
 from celery.schedules import crontab
-from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.db import context_free_session, tenant_session
-from app.core.errors import DomainError
 from app.core.logging import get_logger
 from app.fees import service
 from app.fees.upi_config import load_upi_config
@@ -67,7 +65,7 @@ def morning_all() -> dict[str, int]:
     for tenant_id in tenant_ids:
         try:
             out = morning_for_school(tenant_id)
-        except (SQLAlchemyError, DomainError) as exc:
+        except Exception as exc:
             totals["failed"] += 1
             log.warning(
                 "fees.upi_morning_failed", tenant_id=tenant_id, error_type=type(exc).__name__

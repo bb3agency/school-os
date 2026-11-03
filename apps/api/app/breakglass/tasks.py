@@ -11,11 +11,9 @@ from __future__ import annotations
 from typing import Any
 
 from celery import shared_task
-from sqlalchemy.exc import SQLAlchemyError
 
 from app.breakglass import service
 from app.core.db import context_free_session
-from app.core.errors import DomainError
 from app.core.logging import get_logger
 from app.tenancy import service as tenancy
 
@@ -28,17 +26,26 @@ def sweep_all() -> dict[str, int]:
         tenant_ids = tenancy.list_tenant_ids(session, TENANT_STATUSES)
     totals = {"tenants": len(tenant_ids), "received": 0, "expired": 0, "failed": 0}
     for tenant_id in tenant_ids:
+        # Pulling from the control plane and ending grants are independent: a failed pull must
+        # not keep a grant whose window has passed from being ended (and its approvers told).
+        failed = False
         try:
             synced = service.sync_school(tenant_id)
-            swept = service.sweep_school(tenant_id)
-        except (SQLAlchemyError, DomainError) as exc:
-            totals["failed"] += 1
+            totals["received"] += synced.received + synced.emergency
+        except Exception as exc:  # this school only; the next sweep retries
+            failed = True
             log.warning(
                 "breakglass.sweep_failed", tenant_id=tenant_id, error_type=type(exc).__name__
             )
-            continue
-        totals["received"] += synced.received + synced.emergency
-        totals["expired"] += swept["expired"] + swept["stale_requests"]
+        try:
+            swept = service.sweep_school(tenant_id)
+            totals["expired"] += swept["expired"] + swept["stale_requests"]
+        except Exception as exc:  # this school only; the next sweep retries
+            failed = True
+            log.warning(
+                "breakglass.sweep_failed", tenant_id=tenant_id, error_type=type(exc).__name__
+            )
+        totals["failed"] += int(failed)
     return totals
 
 

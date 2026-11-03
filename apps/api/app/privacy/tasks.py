@@ -13,10 +13,8 @@ from typing import Any, Final
 
 from celery import shared_task
 from celery.schedules import crontab
-from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.db import context_free_session, tenant_session
-from app.core.errors import DomainError
 from app.core.logging import get_logger
 from app.privacy import service
 from app.tenancy import service as tenancy
@@ -33,7 +31,7 @@ def notify_all() -> dict[str, int]:
         try:
             with tenant_session(tenant_id) as session:
                 totals["notified"] += service.notify_due(session)
-        except (SQLAlchemyError, DomainError) as exc:
+        except Exception as exc:
             totals["failed"] += 1
             log.warning(
                 "privacy.notify_due.failed", tenant_id=tenant_id, error_code=type(exc).__name__
