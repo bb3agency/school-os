@@ -196,6 +196,12 @@ def all_student_ids(session: Session) -> list[uuid.UUID]:
     return list(session.scalars(select(Student.id).order_by(Student.id)))
 
 
+def admission_numbers(session: Session) -> dict[uuid.UUID, str]:
+    """Student id -> admission number (the unique ``students_adm_no`` projection)."""
+    stmt = select(Student.id, Student.admission_no).where(Student.admission_no.is_not(None))
+    return {sid: adm for sid, adm in session.execute(stmt) if adm}
+
+
 def active_enrollments_of(session: Session, student_ids: Collection[uuid.UUID]) -> list[Enrollment]:
     """Active enrolments of ``student_ids`` in any academic year (one query)."""
     if not student_ids:

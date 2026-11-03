@@ -2023,6 +2023,14 @@ def structure_in_use(session: Session) -> StructureInUse:
     )
 
 
+def admission_numbers_outside_reach(session: Session, ctx: UserContext) -> list[str]:
+    """Admission numbers of the school's students that ``ctx`` may not read
+    (``student.read_basic`` scope). For imports only: a row with one of them must not be taken
+    for a new student (admission numbers are unique per school). Numbers only, never ids."""
+    reach = set(list_students_in_scope(session, ctx))
+    return [adm for sid, adm in repo.admission_numbers(session).items() if sid not in reach]
+
+
 def student_ids_for_import_batch(session: Session, batch_id: uuid.UUID) -> list[uuid.UUID]:
     """Students with a value recorded by import batch ``batch_id`` (dq runs for a batch).
     Callers intersect the result with :func:`list_students_in_scope`."""

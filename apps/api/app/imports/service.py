@@ -480,6 +480,7 @@ def _validation_context(
         )
     targets = set(batch.mapping.values())
     national_ids = _national_ids(session, sheet, batch.mapping)
+    wanted = _sheet_admission_keys(sheet, batch.mapping)
     return ValidationContext(
         source=batch.source,
         specs=specs,
@@ -492,7 +493,7 @@ def _validation_context(
         existing=_existing_students(
             session,
             ctx,
-            _sheet_admission_keys(sheet, batch.mapping),
+            wanted,
             specs,
             structure,
             need_sections=bool({"class", "section", "class_section"} & targets)
@@ -502,6 +503,11 @@ def _validation_context(
         today=_today(),
         national_ids=national_ids,
         visible_holders=_visible_holders(session, ctx, national_ids),
+        unreachable_admission_keys=frozenset(
+            key
+            for adm in (students.admission_numbers_outside_reach(session, ctx) if wanted else ())
+            if (key := admission_key(adm)) in wanted
+        ),
     )
 
 
