@@ -14,7 +14,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Header, Query, Request, Response
 from fastapi.responses import PlainTextResponse
-from pydantic import BaseModel
+from pydantic import AwareDatetime, BaseModel
 
 from app.authz.kv import kv_store
 from app.core.crypto import KeyWrapper
@@ -1593,12 +1593,13 @@ def list_audit_events(
     actor: uuid.UUID | None = None,
     action: Annotated[str | None, Query(max_length=100)] = None,
     tenant_id: uuid.UUID | None = None,
-    start: Annotated[dt.datetime | None, Query(alias="from")] = None,
-    end: Annotated[dt.datetime | None, Query(alias="to")] = None,
+    start: Annotated[AwareDatetime | None, Query(alias="from")] = None,
+    end: Annotated[AwareDatetime | None, Query(alias="to")] = None,
     limit: Limit = 50,
     cursor: Annotated[int | None, Query(ge=1)] = None,
 ) -> Any:
-    """Filters: actor, action, tenant_id, from, to. ``Accept: text/csv`` returns CSV."""
+    """Filters: actor, action, tenant_id, from, to (``[from, to)``; times need an explicit offset
+    such as ``Z`` or ``+05:30``, 422 without one). ``Accept: text/csv`` returns CSV."""
     items, nxt = audit_view.list_events(
         actor_id=actor,
         action=action,

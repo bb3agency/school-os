@@ -335,3 +335,16 @@ def test_FR_PLT_029_platform_audit_viewer_filters_csv_and_verify(
     assert job.json()["status"] == "succeeded"
     other = make_operator("support_agent")
     assert api.call("GET", f"/jobs/{verify.json()['job_id']}", other).status_code == 404
+
+
+def test_FR_PLT_029_platform_audit_time_filters_need_an_offset(
+    api: Api, make_operator: MakeOperator
+) -> None:
+    """A time without an offset was read in the database session's zone without saying so (an
+    operator's IST midnight became 05:30 IST); like the school viewer (FR-AUD-005) it is 422."""
+    viewer = make_operator("platform_viewer")
+    for params in ("from=2026-11-01T00:00:00", "to=2026-11-02T00:00:00", "from=2026-11-01"):
+        res = api.call("GET", f"/audit/events?{params}", viewer)
+        assert res.status_code == 422, (params, res.text)
+    ok = api.call("GET", "/audit/events?from=2026-11-01T00:00:00%2B05:30", viewer)
+    assert ok.status_code == 200
