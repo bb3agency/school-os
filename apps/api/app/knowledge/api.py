@@ -392,7 +392,13 @@ def create_memory(ctx: Asker, db: TenantDB, body: MemoryIn, idem: IdempotencyDep
     cannot run; 409 ``memory_off`` or ``memory_full``; 429 ``ai_rate_limited`` (the item check
     counts against your per-minute question limit). Accepts ``Idempotency-Key``: a retry with
     the same key replays the first answer without running the check again."""
-    return idem.run(db, body, lambda: service.get_service().create_memory(db, ctx, body))
+    return idem.run(
+        db,
+        body,
+        lambda: service.get_service().create_memory(db, ctx, body),
+        # The item text is decrypted only for this answer: Valkey keeps the id (H-01).
+        refetch=lambda memory_id: service.get_service().get_memory(db, ctx, memory_id),
+    )
 
 
 @router.delete("/knowledge/memories", status_code=204)

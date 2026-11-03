@@ -322,6 +322,13 @@ def create_payment_intent(
     return intent.id
 
 
+def public_handle_ids_in_use(session: Session) -> set[uuid.UUID]:
+    """Public handle ids (ids only) that the current school's payment intents still reference, so
+    the expired-handle purge leaves them (FR-PUB-006): intents are append-only and their
+    ``public_handle_id`` has no ON DELETE action (0059). No permission check: a system job."""
+    return orepo.handle_ids_with_intents(session)
+
+
 def payment_link(session: Session, intent_id: uuid.UUID) -> PaymentLinkInfo | None:
     """The hosted payment page of an intent (short URL, expiry, status, amount) for the parent
     page's redirect (R2-3H); ``None`` for an unknown intent. No permission check."""
@@ -569,6 +576,7 @@ __all__ = [
     "parent_upi_qr",
     "payment_link",
     "payments_connected",
+    "public_handle_ids_in_use",
     "purge_tenant_data",
     "receipt_for_message",
     "receipt_message_event",

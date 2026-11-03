@@ -11,6 +11,7 @@ suggested or used. Real database and pipeline, offline fake model, fresh synthet
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import importlib.util
 import sys
 import uuid
@@ -23,6 +24,7 @@ import pytest
 from sqlalchemy import Engine, text
 from structlog.testing import capture_logs
 
+from app.authz.kv import kv_store
 from app.core.db import tenant_session
 from app.knowledge import composition, memory, service
 from app.knowledge.config.conversations import load_conversations_config
@@ -187,6 +189,28 @@ def test_R_05_a_retried_memory_item_is_saved_once(
     assert one.json()["id"] == two.json()["id"]
     assert two.headers.get("Idempotent-Replayed") == "true"
     assert len(_items(api, who)) == 1
+
+
+def test_ADR_0034_memory_replay_keeps_no_item_text_in_valkey(
+    world: Any, api: Any, admin_engine: Engine, fake: Any
+) -> None:
+    """Data-protection H-01 for memory items (ADR-0034, SEC-008): the Idempotency-Key record in
+    Valkey holds the id only, not the decrypted item text; the replay re-reads the item."""
+    who = _person(admin_engine, world)
+    key = f"mem-{uuid.uuid4().hex}"
+    note = "Keep answers short"
+    path = "/api/v1/knowledge/memories"
+    one = api.call(who, "POST", path, json={"text": note}, headers={"Idempotency-Key": key})
+    assert one.status_code == 201, one.text
+    scope = hashlib.sha256(f"POST {path} {key}".encode()).hexdigest()
+    raw = kv_store().get(f"sos:idem:{world.a.tenant_id}:{who.user_id}:{scope}")
+    assert raw is not None
+    assert one.json()["text"].encode() not in raw
+    assert b'"body"' not in raw
+    two = api.call(who, "POST", path, json={"text": note}, headers={"Idempotency-Key": key})
+    assert two.status_code == 201, two.text
+    assert two.headers.get("Idempotent-Replayed") == "true"
+    assert two.json() == one.json()
 
 
 @pytest.mark.parametrize(

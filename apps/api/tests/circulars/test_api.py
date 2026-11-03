@@ -19,8 +19,11 @@ from sqlalchemy import Engine, text
 from app.circulars import service
 from app.circulars.config import rules as circular_rules
 from app.core.db import tenant_session
-from app.core.errors import Forbidden
+from app.core.errors import Forbidden, NotFound
 from app.core.languages import contains_telugu
+from app.messaging import service as messaging
+from app.messaging.sends import service as sends
+from app.messaging.sends.schemas import BroadcastConfirmIn, BroadcastPreviewIn
 
 from .conftest import C
 
@@ -684,6 +687,46 @@ def test_A_16_a_draft_from_a_circular_you_cannot_see_is_not_shown_until_approved
     assert api.call(office, "GET", path).status_code == 200
     listed = api.call(office, "GET", "/api/v1/notices", params={"limit": 200})
     assert notice_id in {n["id"] for n in listed.json()["data"]}
+
+
+def test_A_16_broadcast_routes_answer_404_for_a_draft_you_cannot_see(
+    ai_on: Any, api: Any, admin_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A-16 for WhatsApp broadcasts (FR-MSG-012, FR-MSG-017): the broadcast list, preview and
+    confirmation of a draft drafted from a circular the caller cannot read answer 404 like an
+    unknown id (not 200 [] or 409 ``notice_not_approved``, which tell the draft exists)."""
+    monkeypatch.setattr(messaging, "ensure_available", lambda: None)
+    school = ai_on.a
+    principal = school.people["principal"]
+    document_id = C.read_circular(admin_engine, school, acl=[("role", "principal")])
+    res = api.call(
+        principal,
+        "POST",
+        "/api/v1/notices",
+        json={"source": "circular", "document_id": str(document_id)},
+    )
+    assert res.status_code == 202, res.text
+    notice_id = uuid.UUID(res.json()["id"])
+    assert C.draft_now(school, notice_id) == "draft"
+    office = C.ctx(school, "office_staff")
+    sections = [school.ids["section_9a"]]
+    with tenant_session(school.tenant_id, office.user_id) as db:
+        assert service.notice_for_sending(db, notice_id, office) is None
+        assert service.notice_for_sending(db, notice_id) is not None  # the sender's read
+        with pytest.raises(NotFound):
+            sends.list_broadcasts(db, office, notice_id=notice_id, limit=10, cursor=None)
+        with pytest.raises(NotFound):
+            sends.preview_broadcast(db, office, notice_id, BroadcastPreviewIn(section_ids=sections))
+        with pytest.raises(NotFound):
+            sends.confirm_broadcast(
+                db,
+                office,
+                notice_id,
+                BroadcastConfirmIn(preview_token="bc_" + "0" * 32, section_ids=sections),
+            )
+    drafter = C.ctx(school, "principal")
+    with tenant_session(school.tenant_id, drafter.user_id) as db:
+        assert service.notice_for_sending(db, notice_id, drafter) is not None
 
 
 def test_FR_NOTICE_002_personal_circulars_and_numbers_are_refused(

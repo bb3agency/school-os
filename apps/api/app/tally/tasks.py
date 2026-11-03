@@ -33,10 +33,10 @@ def check_all() -> dict[str, int]:
     for tenant_id in tenant_ids:
         try:
             with tenant_session(tenant_id) as session:
-                if not service.connector_enabled(session, tenant_id):
-                    continue
-                totals["notified"] += service.notify_silent_devices(session)
+                # FR-TALLY-009: retention runs whether or not the connector is switched on.
                 totals["purged"] += service.purge_old_syncs(session)
+                if service.connector_enabled(session, tenant_id):
+                    totals["notified"] += service.notify_silent_devices(session)
         except Exception as exc:
             totals["failed"] += 1
             log.warning(

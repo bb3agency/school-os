@@ -1107,6 +1107,16 @@ class SchoolKnowledgeService:
             raise NotFound("Memory item not found")
         return row
 
+    def get_memory(self, session: Session, ctx: UserContext, memory_id: uuid.UUID) -> MemoryOut:
+        """One of the caller's own live memory items (404 otherwise). Used by the idempotent
+        replay of ``POST /knowledge/memories`` so Valkey keeps the id, not the text (H-01)."""
+        if not ctx.has(ASK):
+            raise Forbidden()
+        row = repo.get_memory(session, memory_id, ctx.user_id, dt.datetime.now(dt.UTC))
+        if row is None:
+            raise NotFound("Memory item not found")
+        return self._memory_out(memory.Item(row, memory.text_of(session, row)))
+
     def update_memory(
         self,
         session: Session,

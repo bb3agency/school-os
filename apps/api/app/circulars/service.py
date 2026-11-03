@@ -1997,12 +1997,18 @@ class NoticeForSending:
     version: int
 
 
-def notice_for_sending(session: Session, notice_id: uuid.UUID) -> NoticeForSending | None:
+def notice_for_sending(
+    session: Session, notice_id: uuid.UUID, ctx: UserContext | None = None
+) -> NoticeForSending | None:
     """The notice of the current school for a broadcast, or ``None`` when there is no such notice
-    (system read: the caller holds ``message.send``; approved notices are written for parents and
-    visible to every drafter, so no circular scope applies to them)."""
+    (the caller holds ``message.send``; approved notices are written for parents and visible to
+    every drafter, so no circular scope applies to them). With ``ctx`` (a staff request) a draft
+    the caller may not see under A-16 is ``None`` too, so it answers 404 like an unknown id;
+    without ``ctx`` it is a system read (the sender)."""
     notice = repo.get_notice(session, notice_id)
     if notice is None:
+        return None
+    if ctx is not None and not _notice_visible(session, ctx, notice):
         return None
     return NoticeForSending(
         notice_id=notice.id,
