@@ -135,7 +135,11 @@ def verhoeff_check_digit(digits: str) -> str:
 # spaces), so every gap that collapses into a space must already join the groups here, or a
 # number typed as "1234<TAB>5678<TAB>9012" would pass the check and be stored as a full Aadhaar
 # number (invariant 4).
-_GAP = r"[\s\u200b-\u200d\u2060\ufeff]"
+# Invisible format characters (category Cf: soft hyphen, zero-width and bidi marks, invisible
+# operators) show nothing on screen or in print, so they count as gaps too: "2345<LRM>6789..."
+# reads as a full number.
+_INVISIBLE = r"\u00ad\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u206f\ufeff"
+_GAP = rf"[\s{_INVISIBLE}]"
 _DASH = r"[-\u2010-\u2015\u2212\ufe58\ufe63\uff0d]"
 _SEP = rf"(?:{_GAP}{{1,3}}|{_GAP}{{0,2}}{_DASH}{_GAP}{{0,2}})"
 _RUN_RE = re.compile(rf"\+?\d+(?:{_SEP}\d+)*")
@@ -462,7 +466,7 @@ def contains_full_aadhaar(text: str) -> bool:
     return _has_valid_window(nfc) or _has_valid_window(_COLLAPSE_RE.sub(" ", nfc))
 
 
-_COLLAPSE_RE = re.compile(r"[\s\u200b-\u200d\u2060\ufeff]+")
+_COLLAPSE_RE = re.compile(rf"[\s{_INVISIBLE}]+")
 
 
 def _has_valid_window(text: str) -> bool:

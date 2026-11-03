@@ -21,6 +21,7 @@ from app.core.redaction import (
     find_aadhaar,
     mask_aadhaar,
     redact,
+    redact_log,
     verhoeff_check_digit,
     verhoeff_valid,
 )
@@ -170,6 +171,37 @@ def test_PRV_015_any_gap_that_collapses_or_reads_as_a_separator_is_detected(gap:
     assert masked(VALID) in mask_aadhaar(text)
     assert masked(VALID) in redact(text)
     assert [m.verhoeff for m in find_aadhaar(text)] == [True]
+
+
+@pytest.mark.parametrize(
+    "mark",
+    [
+        "\u00ad",  # soft hyphen (word processors, PDF copy)
+        "\u200e",  # left-to-right mark (mixed Telugu/English text)
+        "\u200f",  # right-to-left mark
+        "\u202a",  # left-to-right embedding
+        "\u202c",  # pop directional formatting
+        "\u2066",  # left-to-right isolate
+        "\u2069",  # pop directional isolate
+        "\u2062",  # invisible times
+        "\u061c",  # Arabic letter mark
+        "\u180e",  # Mongolian vowel separator
+    ],
+)
+def test_PRV_015_invisible_format_characters_inside_a_number_do_not_hide_it(mark: str) -> None:
+    """SEC-013 / invariant 4: an invisible format character (category Cf) shows nothing on
+    screen or in print, so ``2345<mark>67890124`` reads as a full Aadhaar number. It must be
+    refused on input, masked in text pipelines and located, like a zero-width space."""
+    for text in (
+        f"Ref {VALID[:6]}{mark}{VALID[6:]} end",
+        f"Ref {mark.join([VALID[:4], VALID[4:8], VALID[8:]])} end",
+        f"Ref {VALID[:4]} {mark}{VALID[4:8]}{mark} {VALID[8:]} end",
+    ):
+        assert contains_full_aadhaar(text), ascii(text)
+        assert masked(VALID) in mask_aadhaar(text), ascii(text)
+        assert masked(VALID) in redact(text), ascii(text)
+        assert masked(VALID) in redact_log(text), ascii(text)
+        assert [m.verhoeff for m in find_aadhaar(text)] == [True], ascii(text)
 
 
 def test_PRV_015_telugu_and_devanagari_digits_are_masked() -> None:

@@ -429,3 +429,60 @@ def test_FR_TEN_012_me_carries_session_settings(api: Any, admin_engine: Engine) 
     chosen = api.call(staff, "POST", "/api/v1/me/active-tenant", json={"tenant_id": str(tid)})
     assert chosen.status_code == 200, chosen.text
     assert chosen.json()["settings"]["idle_timeout_minutes"] == 7
+
+
+# --- scope changes follow the role.assign reach rule (FR-IAM-012, SEC-003) ----------------------
+
+
+def test_FR_IAM_012_principal_cannot_change_scopes_of_a_member_with_more_access(
+    api: Any, admin_engine: Engine
+) -> None:
+    """Changing scopes changes the reach of every scoped grant the member holds, so it follows
+    the set_roles rule: a role.assign holder (principal) may not widen or narrow the scopes of
+    a member whose roles carry permissions the principal lacks (403 role_not_grantable). The
+    owner still may, and the principal still may for roles within their own access."""
+    school = W.School(W.provision_school())
+    owner = W.add_member(admin_engine, school.tenant_id, ["owner"])
+    principal = W.add_member(admin_engine, school.tenant_id, ["principal"])
+    W.build_structure(school, owner)
+    with admin_engine.begin() as c:
+        role_id = uuid.uuid4()
+        c.execute(
+            text(
+                "INSERT INTO core.roles (id, tenant_id, key, name_en, name_te, is_system) "
+                "VALUES (:r, :t, 'export_clerk', 'Export clerk', 'ఎగుమతి', false)"
+            ),
+            {"r": role_id, "t": school.tenant_id},
+        )
+        c.execute(
+            text(
+                "INSERT INTO core.role_permissions (tenant_id, role_id, permission_key) "
+                "VALUES (:t, :r, 'export.download_any')"
+            ),
+            {"t": school.tenant_id, "r": role_id},
+        )
+    member = W.add_member(
+        admin_engine, school.tenant_id, ["export_clerk"], scopes=[("class", school.ids["class_x"])]
+    )
+    url = f"{USERS}/{member.user_id}/scopes"
+    school_wide = {"scopes": [{"type": "school", "ref": None}]}
+    res = api.call(principal, "PUT", url, json=school_wide)
+    assert (res.status_code, res.json()["code"]) == (403, "role_not_grantable"), res.text
+    res = api.call(principal, "PUT", url, json={"scopes": []})
+    assert (res.status_code, res.json()["code"]) == (403, "role_not_grantable"), res.text
+    with admin_engine.connect() as c:
+        kept: list[str] = list(
+            c.execute(
+                text("SELECT scope_type FROM core.membership_scopes WHERE membership_id = :m"),
+                {"m": member.membership_id},
+            ).scalars()
+        )
+        assert kept == ["class"]
+    res = api.call(owner, "PUT", url, json=school_wide)
+    assert res.status_code == 200, res.text
+    assert [s["type"] for s in res.json()["scopes"]] == ["school"]
+    teacher = W.add_member(
+        admin_engine, school.tenant_id, ["class_teacher"], scopes=[("class", school.ids["class_x"])]
+    )
+    res = api.call(principal, "PUT", f"{USERS}/{teacher.user_id}/scopes", json=school_wide)
+    assert res.status_code == 200, res.text
