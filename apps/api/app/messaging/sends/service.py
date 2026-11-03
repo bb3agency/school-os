@@ -205,8 +205,9 @@ def _sections(
     return year.id, wanted
 
 
-def _notice(session: Session, notice_id: uuid.UUID) -> circulars.NoticeForSending:
-    notice = circulars.notice_for_sending(session, notice_id)
+def _notice(session: Session, ctx: UserContext, notice_id: uuid.UUID) -> circulars.NoticeForSending:
+    # A draft the caller may not see (A-16) is 404 like an unknown id.
+    notice = circulars.notice_for_sending(session, notice_id, ctx)
     if notice is None:
         raise NotFound("Notice not found")
     if not notice.approved:
@@ -297,7 +298,7 @@ def preview_broadcast(
     messaging.ensure_available()
     if len(set(data.section_ids)) > load_config().broadcasts.max_sections:
         raise ValidationFailed([_error("section_ids", "too_many")])
-    notice = _notice(session, notice_id)
+    notice = _notice(session, ctx, notice_id)
     plan = _plan(session, notice, data.section_ids, resend=data.resend)
     now = mrepo.now(session)
     expires = now + dt.timedelta(minutes=load_config().broadcasts.preview_minutes)
@@ -367,7 +368,7 @@ def confirm_broadcast(
     ``notices_off``); 422 ``resend_reason`` for "Send again". Audit
     ``messaging.broadcast.sent`` (notice, counts) and ``messaging.message.queued`` per message."""
     messaging.ensure_available()
-    notice = _notice(session, notice_id)
+    notice = _notice(session, ctx, notice_id)
     row = _preview_row(session, ctx, notice_id, data.preview_token)
     if set(data.section_ids) != set(row.section_ids):
         raise PreviewInvalid("Preview again before sending.")
@@ -493,7 +494,7 @@ def list_broadcasts(
     """Confirmed broadcasts, newest first, with live counts by status (FR-MSG-017;
     ``message.read``; a class teacher's counts cover the students of their sections only)."""
     messaging.ensure_available()
-    if notice_id is not None and circulars.notice_for_sending(session, notice_id) is None:
+    if notice_id is not None and circulars.notice_for_sending(session, notice_id, ctx) is None:
         raise NotFound("Notice not found")
     reach = _reach(session, ctx)
     after = None
