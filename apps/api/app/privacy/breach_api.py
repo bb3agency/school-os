@@ -51,7 +51,14 @@ def create_breach(ctx: Manager, db: TenantDB, body: BreachCreate, idem: Idempote
     of data and approximate numbers of children, guardians and staff (permission
     ``privacy.breach.manage``, MFA within 5 minutes). Accepts ``Idempotency-Key``. Errors:
     ``date_in_future``, ``pulled_automatically``, ``aadhaar_full_number_rejected`` (422)."""
-    return idem.run(db, body, lambda: service.create_breach(db, ctx, body), headers=_headers)
+    return idem.run(
+        db,
+        body,
+        lambda: service.create_breach(db, ctx, body),
+        headers=_headers,
+        # C3 texts (description, containment): no body kept in Valkey (H-01).
+        refetch=lambda breach_id: service.get_breach(db, breach_id),
+    )
 
 
 @router.get("/breaches/{breach_id}", response_model=BreachDetailOut)
