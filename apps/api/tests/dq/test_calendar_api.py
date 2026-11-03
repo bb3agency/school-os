@@ -223,6 +223,59 @@ def test_US_3102_AC1_confirm_dates_source_document_and_owner(
     assert audits[0]["summary"]["created"] is True
 
 
+def test_FR_RDY_004_racing_first_confirmations_refuse_the_second_with_412(
+    admin_engine: Engine, api: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two first confirmations of one event (no ``If-Match``) find no row to lock; the second
+    insert hit ``portal_calendar_dates_once`` and was a 500. It is a 412 (reload)."""
+    from app.core.errors import PreconditionFailed
+    from app.dq import repository as dq_repo
+    from app.dq.schemas import CalendarConfirmIn
+
+    s = school(admin_engine)
+    principal = s.people["principal"]
+    ctx = DS.ctx(s, "principal")
+    body = {
+        "academic_year_id": s.ids["year"],
+        "opens_on": dt.date(2027, 2, 2),
+        "source_kind": "portal",
+    }
+    real = dq_repo.calendar_row
+
+    def racing(session: Any, year_id: Any, key: str, *, lock: bool = False) -> Any:
+        row = real(session, year_id, key, lock=lock)
+        if lock and row is None:  # the other office PC confirms first, between read and write
+            monkeypatch.setattr(dq_repo, "calendar_row", real)
+            with tenant_session(s.tenant_id, principal.user_id) as other:
+                calendar_service.confirm(
+                    other,
+                    ctx,
+                    SSC_EVENT,
+                    CalendarConfirmIn(**body, closes_on=dt.date(2027, 2, 4)),
+                    expected_version=None,
+                )
+        return row
+
+    monkeypatch.setattr(dq_repo, "calendar_row", racing)
+    with pytest.raises(PreconditionFailed), tenant_session(s.tenant_id, principal.user_id) as db:
+        calendar_service.confirm(
+            db,
+            ctx,
+            SSC_EVENT,
+            CalendarConfirmIn(**body, closes_on=dt.date(2027, 2, 6)),
+            expected_version=None,
+        )
+    with admin_engine.connect() as c:
+        kept = c.execute(
+            text(
+                "SELECT closes_on, version FROM ops.portal_calendar_dates "
+                "WHERE tenant_id = :t AND event_key = :k"
+            ),
+            {"t": s.tenant_id, "k": SSC_EVENT},
+        ).one()
+    assert (kept.closes_on, kept.version) == (dt.date(2027, 2, 4), 1)
+
+
 def test_FR_RDY_004_bad_confirmations_are_refused(admin_engine: Engine, api: Any) -> None:
     s = school(admin_engine)
     principal = s.people["principal"]

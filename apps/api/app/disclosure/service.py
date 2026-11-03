@@ -31,6 +31,7 @@ import json
 import uuid
 from typing import Any, Final
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.audit import service as audit
@@ -289,15 +290,19 @@ def put_draft(
     if expected_version != current:
         raise PreconditionFailed()
     if draft is None:
-        draft = repo.insert_draft(
-            session,
-            id=new_id(),
-            format_key=fmt.key,
-            format_version=fmt.version,
-            inputs=inputs,
-            documents=chosen,
-            updated_by=ctx.user_id,
-        )
+        try:
+            with session.begin_nested():
+                draft = repo.insert_draft(
+                    session,
+                    id=new_id(),
+                    format_key=fmt.key,
+                    format_version=fmt.version,
+                    inputs=inputs,
+                    documents=chosen,
+                    updated_by=ctx.user_id,
+                )
+        except IntegrityError as exc:  # another first save committed meanwhile
+            raise PreconditionFailed() from exc
     else:
         draft = repo.update_draft(
             session,

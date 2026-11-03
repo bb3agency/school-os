@@ -531,6 +531,9 @@ def update_settings(
     if not changes:
         return get_settings(session, ctx)
     saved = repo.save_settings(session, clean, ctx.user_id, new_id=new_id())
+    # A first save has no row to lock: another first save that committed meanwhile turns our
+    # insert into an update of its row (version 2, not 1). Refuse instead of overwriting it.
+    _check_version(saved.version, version + 1)
     _audit(session, "insights.settings_updated", "insight_settings", saved.id, {"changes": changes})
     return get_settings(session, ctx)
 

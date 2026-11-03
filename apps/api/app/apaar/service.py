@@ -37,7 +37,7 @@ from contextlib import contextmanager
 from typing import Any, Final
 from zoneinfo import ZoneInfo
 
-from sqlalchemy.exc import DBAPIError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session
 
 from app.apaar import repository as repo
@@ -731,9 +731,13 @@ def update_settings(
         raise PreconditionFailed("The setting was changed by someone else. Reload it.")
     before = row.form_language if row is not None else None
     if row is None:
-        row = repo.insert_settings(
-            session, id=new_id(), form_language=data.form_language, updated_by=ctx.user_id
-        )
+        try:
+            with session.begin_nested():
+                row = repo.insert_settings(
+                    session, id=new_id(), form_language=data.form_language, updated_by=ctx.user_id
+                )
+        except IntegrityError as exc:  # another first save committed meanwhile
+            raise PreconditionFailed("The setting was changed by someone else. Reload it.") from exc
     elif row.form_language != data.form_language:
         row = repo.update_settings(
             session, row.id, form_language=data.form_language, updated_by=ctx.user_id

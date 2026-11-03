@@ -934,6 +934,10 @@ def update_messaging_settings(
     if expected_version != current:
         raise PreconditionFailed("The settings were changed by someone else. Reload and try again.")
     row = existing or _ensure_settings(session)
+    if existing is None and row.version != 1:
+        # Another first save committed meanwhile (there was no row to lock): we found its row,
+        # already changed. Refuse instead of overwriting it.
+        raise PreconditionFailed("The settings were changed by someone else. Reload and try again.")
     values = {
         "notices_enabled": data.notices_enabled,
         "absence_alerts_enabled": data.absence_alerts_enabled,

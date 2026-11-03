@@ -719,6 +719,56 @@ def test_FR_MSG_004_settings_defaults_and_update(
     assert W.audit_events(admin_engine, world.a.tenant_id, "messaging.settings.changed")
 
 
+def test_FR_MSG_004_racing_first_settings_saves_refuse_the_second_with_412(
+    world: Any, admin_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two first saves (``If-Match: W/"0"``) find no row to lock; the second one used to take
+    over the first one's row and overwrite its switches (lost update). It is a 412."""
+    from app.core.errors import PreconditionFailed
+    from app.messaging import repository as messaging_repo
+    from app.messaging.schemas import MessagingSettingsIn
+
+    school = W.School(W.provision_school())
+    school.people["owner"] = W.add_member(admin_engine, school.tenant_id, ["owner"])
+    owner = school.people["owner"]
+    ctx = M.owner_ctx(school)
+    base: dict[str, Any] = {
+        "notices_enabled": False,
+        "absence_alerts_enabled": False,
+        "fee_reminders_enabled": False,
+        "fee_receipts_enabled": False,
+        "absence_alert_time": dt.time(11, 0),
+        "quiet_start": dt.time(21, 0),
+        "quiet_end": dt.time(7, 0),
+    }
+    real = messaging_repo.get_settings
+
+    def racing(session: Any, *, lock: bool = False) -> Any:
+        row = real(session, lock=lock)
+        if lock and row is None:  # the other office PC saves first, between our read and write
+            monkeypatch.setattr(messaging_repo, "get_settings", real)
+            with tenant_session(school.tenant_id, owner.user_id) as other:
+                service.update_messaging_settings(
+                    other,
+                    ctx,
+                    MessagingSettingsIn(**{**base, "daily_cap": 200}),
+                    expected_version=0,
+                )
+        return row
+
+    monkeypatch.setattr(messaging_repo, "get_settings", racing)
+    with (
+        pytest.raises(PreconditionFailed),
+        tenant_session(school.tenant_id, owner.user_id) as db,
+    ):
+        service.update_messaging_settings(
+            db, ctx, MessagingSettingsIn(**{**base, "daily_cap": 300}), expected_version=0
+        )
+    with tenant_session(school.tenant_id, owner.user_id) as db:
+        kept = service.get_messaging_settings(db, ctx)
+    assert kept.daily_cap == 200
+
+
 def test_US_2202_section_summary_counts_and_scope(world: Any, api: Any) -> None:
     M.connect(world.a)
     _, guardian, _ = M.guardian(world.a, section_key="section_9a")

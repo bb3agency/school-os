@@ -486,6 +486,53 @@ def test_FR_EW_014_settings_stay_within_bounds(school: Any, admin_engine: Engine
     assert {r.key: r.threshold for r in back.rules}["course_low"] == 35
 
 
+def test_FR_EW_014_concurrent_first_saves_refuse_the_second_not_overwrite(
+    school: Any, admin_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two first saves (``If-Match: 0``) race: there is no row to lock, so the second one's
+    upsert used to overwrite the first one's change silently (lost update). It is a 412."""
+    principal = S.principal_ctx(school)
+    clear = text("DELETE FROM sis.insight_settings WHERE tenant_id = :t")
+    with admin_engine.begin() as c:
+        c.execute(clear, {"t": school.tenant_id})
+    from app.insights import repository as insights_repo
+
+    real = insights_repo.get_settings
+
+    def racing(session: Any, *, lock: bool = False) -> Any:
+        row = real(session, lock=lock)
+        if lock and row is None:  # the other office PC saves first, between our read and write
+            monkeypatch.setattr(insights_repo, "get_settings", real)
+            with tenant_session(school.tenant_id, principal.user_id) as other:
+                insights.update_settings(
+                    other,
+                    principal,
+                    SettingsIn.model_validate({"rules": {"course_low": {"threshold": 40}}}),
+                    0,
+                )
+        return row
+
+    monkeypatch.setattr(insights_repo, "get_settings", racing)
+    try:
+        with (
+            pytest.raises(PreconditionFailed),
+            tenant_session(school.tenant_id, principal.user_id) as db,
+        ):
+            insights.update_settings(
+                db,
+                principal,
+                SettingsIn.model_validate({"rules": {"course_low": {"threshold": 45}}}),
+                0,
+            )
+        with tenant_session(school.tenant_id, principal.user_id) as db:
+            kept = insights.get_settings(db, principal)
+        assert {r.key: r.threshold for r in kept.rules}["course_low"] == 40
+        assert kept.version == 1
+    finally:
+        with admin_engine.begin() as c:
+            c.execute(clear, {"t": school.tenant_id})
+
+
 def test_FR_EW_014_erasing_a_note_and_a_flag_keeps_only_the_reason(
     school: Any, admin_engine: Engine
 ) -> None:
