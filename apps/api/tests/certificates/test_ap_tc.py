@@ -150,6 +150,16 @@ def test_FR_CERT_016_ap_inputs_are_validated(school: Any, ap: None) -> None:
     assert err.value.errors[0]["code"] == "too_large"
 
 
+def test_FR_CERT_016_days_attended_never_exceed_working_days(school: Any, ap: None) -> None:
+    """A frozen TC must not print more days attended than working days."""
+    sid = _student(school)
+    with pytest.raises(ValidationFailed) as err:
+        C.issue(school, sid, "transfer", inputs=ap_inputs(working_days="200", days_attended="201"))
+    assert {e["field"]: e["code"] for e in err.value.errors} == {
+        "inputs.days_attended": "too_large"
+    }
+
+
 def test_FR_CERT_015_ap_tc_is_frozen_in_the_format_with_its_key_and_version(
     school: Any, ap: None, admin_engine: Engine
 ) -> None:
@@ -199,6 +209,53 @@ def test_FR_CERT_018_preview_masks_printed_restricted_values_without_read_sensit
     )
     caste = next(f for f in clerk.fields if f.key == "caste")
     assert (caste.value, caste.masked) == (None, True)
+
+
+def test_FR_CERT_018_preview_shows_restricted_values_only_within_the_read_sensitive_scope(
+    school: Any, ap: None, admin_engine: Engine
+) -> None:
+    """SEC-015: a school-wide issuer whose ``student.read_sensitive`` reaches section 9A only
+    sees caste and religion masked for a student in 10A."""
+    from app.authz.context import Scopes, UserContext
+
+    _settings(admin_engine, school.tenant_id, {"print_restricted_tc_fields": True})
+    clerk = school.people["office_staff"]
+    held = {"student.read_basic", "certificate.read", "certificate.issue"}
+    ctx = UserContext(
+        user_id=clerk.user_id,
+        tenant_id=school.tenant_id,
+        membership_id=clerk.membership_id,
+        roles=frozenset({"office_staff", "class_teacher"}),
+        permissions=frozenset({*held, "student.read_sensitive"}),
+        scopes=Scopes(school=False, section_ids=frozenset({school.ids["section_9a"]})),
+        mfa=True,
+        auth_time=None,
+        scoped_permissions=frozenset({"student.read_sensitive"}),
+    )
+    outside = C.student(
+        school,
+        section_key="section_10a",
+        extra=[
+            ValueIn(attribute_key="caste", source="admission_register", value="Synthetic Caste")
+        ],
+    )
+    out = C.call(
+        school, clerk, "office_staff", certificates.preview, outside, "transfer", as_ctx=ctx
+    )
+    caste = next(f for f in out.fields if f.key == "caste")
+    assert (caste.value, caste.masked) == (None, True)
+    inside = C.student(
+        school,
+        section_key="section_9a",
+        extra=[
+            ValueIn(attribute_key="caste", source="admission_register", value="Synthetic Caste")
+        ],
+    )
+    out = C.call(
+        school, clerk, "office_staff", certificates.preview, inside, "transfer", as_ctx=ctx
+    )
+    caste = next(f for f in out.fields if f.key == "caste")
+    assert (caste.value, caste.masked) == ("Synthetic Caste", False)
 
 
 def test_FR_CERT_017_pen_only_when_verified(school: Any, ap: None, admin_engine: Engine) -> None:
