@@ -138,7 +138,7 @@ test.describe
       "Synthetica Meena Kumari",
       "write the date as DD/MM/YYYY, for example 14/03/2012.",
     ]);
-    await expect(page.getByLabel("Show")).toHaveValue("error");
+    await expect(page.getByLabel("Show", { exact: true })).toHaveValue("error");
 
     // Commit dialog: Escape closes and returns focus; then skip the error row and add.
     const commit = page.getByRole("button", { name: "Add to student records" });
@@ -155,7 +155,7 @@ test.describe
     await expect(page.getByRole("heading", { name: "Added to student records" })).toBeVisible();
     // After adding, the list shows every row again (FR-IMP-004): the "Rows with errors" filter
     // from checking would now show nothing. The filter stays reachable by keyboard.
-    const show = page.getByLabel("Show");
+    const show = page.getByLabel("Show", { exact: true });
     await expect(show).toHaveValue("all");
     await show.focus();
     await expectFocusRing(show, "rows filter");

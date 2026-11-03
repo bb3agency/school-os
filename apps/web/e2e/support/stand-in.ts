@@ -301,7 +301,7 @@ const TENANT = {
   id: T1,
   code: "sshs",
   name: "Sri Saraswati High School",
-  boards: ["STATE_AP", "CBSE"],
+  boards: ["BSEAP", "CBSE"],
   state_code: "37",
   status: "active",
   plan_tier: "shared",

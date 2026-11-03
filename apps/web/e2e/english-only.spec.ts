@@ -121,7 +121,7 @@ test.describe("English only, signed in (stand-in IdP, ADR-0036)", () => {
     await expect(page).toHaveURL((url) => url.pathname === "/settings/structure");
     for (const [path, proof] of [
       ["/settings/structure", "Class 6"],
-      ["/settings/school", "STATE_AP, CBSE"],
+      ["/settings/school", "sshs"],
       ["/settings/users", "Synthetic Teacher"],
       ["/settings/users/new", "Invite"],
       ["/documents", "Dasara holidays circular 2026"],
