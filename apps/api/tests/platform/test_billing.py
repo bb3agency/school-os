@@ -20,6 +20,7 @@ from sqlalchemy import Engine, text
 from app.core.db import platform_session
 from app.core.errors import Conflict
 from app.platform import billing
+from app.platform import repository as repo
 from app.platform.common import add_months, config, today_ist
 from app.platform.schemas import InvoiceLineIn, PaymentIn
 
@@ -535,7 +536,7 @@ def test_FR_PLT_015_monthly_generation_rechecks_a_subscription_cancelled_meanwhi
             ),
             {"a": add_months(end, -1), "b": end, "i": sub},
         )
-    listed = billing.repo.subscriptions_due_for_invoice
+    listed = repo.subscriptions_due_for_invoice
 
     def list_then_cancel(session: Any, first: dt.date, after: dt.date) -> list[Any]:
         rows = [r for r in listed(session, first, after) if str(r["id"]) == sub]
@@ -543,7 +544,7 @@ def test_FR_PLT_015_monthly_generation_rechecks_a_subscription_cancelled_meanwhi
         billing.cancel_subscription(billing_admin.actor, uuid.UUID(sub), "School is leaving")
         return rows
 
-    monkeypatch.setattr(billing.repo, "subscriptions_due_for_invoice", list_then_cancel)
+    monkeypatch.setattr(repo, "subscriptions_due_for_invoice", list_then_cancel)
     billing.generate_invoices(end.strftime("%Y-%m"))
     assert end not in [d["period_start"] for d in _drafts(sub)]
 
