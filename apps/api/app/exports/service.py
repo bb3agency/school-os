@@ -522,7 +522,9 @@ def request_precheck(session: Session, ctx: UserContext, data: PrecheckCreate) -
             detail="Restricted details can be included only by staff allowed to see them.",
         )
     _require_step_up(ctx)
-    reach = (DQ_READ, SENSITIVE) if data.include_sensitive else (DQ_READ,)
+    # The export grant's own scope must reach each student too (defence in depth, SEC-015).
+    kind_grant = PERMISSION_OF_KIND[profile.kind]
+    reach = (kind_grant, DQ_READ, SENSITIVE) if data.include_sensitive else (kind_grant, DQ_READ)
     ids = dq.board_students(
         session, profile.key, _students_for(session, ctx, data.scope, permissions=reach)
     )
@@ -586,7 +588,9 @@ def request_student_list(session: Session, ctx: UserContext, data: StudentListCr
             code="sensitive_not_allowed",
             detail="Restricted details can be exported only by staff allowed to see them.",
         )
-    ids = _students_for(session, ctx, data.scope, permissions=(SENSITIVE,) if sensitive else ())
+    # student.export's own scope must reach each student too (defence in depth, SEC-015).
+    reach = (STUDENT_EXPORT, SENSITIVE) if sensitive else (STUDENT_EXPORT,)
+    ids = _students_for(session, ctx, data.scope, permissions=reach)
     return _create(
         session,
         ctx,

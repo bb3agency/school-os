@@ -432,6 +432,32 @@ def test_SEC_015_scoped_requester_gets_only_reachable_students(
     assert outside not in ids
 
 
+def test_SEC_015_export_permission_scope_limits_the_frozen_students(
+    school: Any, section: str, admin_engine: Engine
+) -> None:
+    """Defence in depth: student.read_basic and dq.findings.read school-wide, but the export
+    grants themselves (export.board / export.portal / student.export) reach only 9A. A
+    whole-school pre-check or student list freezes only 9A students."""
+    inside = EX.student(school, section_key="section_9a")
+    outside = EX.student(school, section_key=section)
+    base = EX.ctx(school, school.people["principal"], "principal")
+    scoped = dataclasses.replace(
+        base,
+        scoped_permissions=frozenset({"export.board", "export.portal", "student.export"}),
+        scopes=Scopes(school=False, section_ids=frozenset({school.ids["section_9a"]})),
+    )
+    out = EX.request_precheck(
+        school, school.people["principal"], "", section_keys=(), as_ctx=scoped
+    )
+    ids = EX.export_row(admin_engine, out.id)["student_ids"]
+    assert inside in ids
+    assert outside not in ids
+    listed = EX.request_list(school, school.people["principal"], "", section_keys=(), as_ctx=scoped)
+    ids = EX.export_row(admin_engine, listed.id)["student_ids"]
+    assert inside in ids
+    assert outside not in ids
+
+
 def test_SEC_015_sensitive_and_findings_reach_only_their_own_scope(
     school: Any, section: str, admin_engine: Engine
 ) -> None:
