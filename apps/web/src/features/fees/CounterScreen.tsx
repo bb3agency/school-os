@@ -402,6 +402,7 @@ function PaymentForm({
   onSaved: (receipt: Receipt) => void;
 }) {
   const t = useTranslations("fees.counter");
+  const locale = useLocale() as Locale;
   const tf = useTranslations("fees");
   const api = useBffClient("staff");
   const queryClient = useQueryClient();
@@ -674,7 +675,7 @@ function PaymentForm({
                   key={lineKey(line)}
                   name={`alloc-${lineKey(line)}`}
                   label={`${line.label} · ${line.head_name ?? t("lateFee")}`}
-                  hint={t("upTo", { amount: line.due })}
+                  hint={t("upTo", { amount: formatInr(line.due, locale) ?? line.due })}
                   inputMode="decimal"
                   className="min-w-0 [&_input]:num"
                   value={custom.get(lineKey(line)) ?? ""}

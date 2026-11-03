@@ -545,6 +545,28 @@ describe("fee problems the API returns have plain-language messages (FR-FEE-007.
   });
 });
 
+describe("own allocation at the counter (FR-FEE-010, FR-FEE-028)", () => {
+  it("says the most each line takes in rupees with Indian grouping", async () => {
+    signedIn([COLLECT]);
+    stub.routes["GET /bff/api/v1/fees/status"] = () => Response.json(STATUS);
+    stub.routes["POST /bff/api/v1/fees/accounts/search"] = () => Response.json([MATCH]);
+    const big = account();
+    big.lines = big.lines.map((l, i) => (i === 0 ? { ...l, due: "125000.00" } : l));
+    big.totals = { ...big.totals, collectable: "128100.00" };
+    stub.routes[`GET /bff/api/v1/fees/accounts/${ACCOUNT}`] = () => Response.json(big);
+    const user = userEvent.setup();
+    renderWithIntl(<CounterScreen />);
+    const search = await screen.findByRole("combobox", { name: en.counter.searchLabel });
+    await user.type(search, "F-0001");
+    await screen.findByRole("option", { name: /Synthetica Fee Student/ });
+    await user.keyboard("{Enter}");
+    await user.click(await screen.findByRole("button", { name: en.counter.changeAllocation }));
+    const upTo = (amount: string) => en.counter.upTo.replace("{amount}", amount);
+    expect(await screen.findByText(upTo("₹1,25,000.00"))).toBeInTheDocument();
+    expect(screen.queryByText(upTo("125000.00"))).not.toBeInTheDocument();
+  });
+});
+
 describe("fee plans (FR-FEE-004)", () => {
   it("makes a new version with an Idempotency-Key, so a retry does not make a second draft", async () => {
     signedIn(["fee.manage"]);
