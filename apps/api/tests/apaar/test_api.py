@@ -464,6 +464,7 @@ def test_D9_racing_first_settings_saves_refuse_the_second_with_412(
     ``apaar_consent_settings_one_per_school`` and was a 500. It is a 412 (reload)."""
     from sqlalchemy import text
 
+    from app.apaar import repository as apaar_repo
     from app.apaar import service
     from app.apaar.schemas import ApaarSettingsIn
     from app.core.db import tenant_session
@@ -474,19 +475,19 @@ def test_D9_racing_first_settings_saves_refuse_the_second_with_412(
     clear = text("DELETE FROM sis.apaar_consent_settings WHERE tenant_id = :t")
     with admin_engine.begin() as c:
         c.execute(clear, {"t": tenant_id})
-    real = service.repo.get_settings
+    real = apaar_repo.get_settings
 
     def racing(session: Any, *, lock: bool = False) -> Any:
         row = real(session, lock=lock)
         if lock and row is None:  # the other office PC saves first, between our read and write
-            monkeypatch.setattr(service.repo, "get_settings", real)
+            monkeypatch.setattr(apaar_repo, "get_settings", real)
             with tenant_session(tenant_id, principal.user_id) as other:
                 service.update_settings(
                     other, principal, ApaarSettingsIn(form_language="te"), expected_version=0
                 )
         return row
 
-    monkeypatch.setattr(service.repo, "get_settings", racing)
+    monkeypatch.setattr(apaar_repo, "get_settings", racing)
     try:
         with pytest.raises(PreconditionFailed), tenant_session(tenant_id, principal.user_id) as db:
             service.update_settings(

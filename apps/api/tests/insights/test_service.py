@@ -495,12 +495,14 @@ def test_FR_EW_014_concurrent_first_saves_refuse_the_second_not_overwrite(
     clear = text("DELETE FROM sis.insight_settings WHERE tenant_id = :t")
     with admin_engine.begin() as c:
         c.execute(clear, {"t": school.tenant_id})
-    real = insights.repo.get_settings
+    from app.insights import repository as insights_repo
+
+    real = insights_repo.get_settings
 
     def racing(session: Any, *, lock: bool = False) -> Any:
         row = real(session, lock=lock)
         if lock and row is None:  # the other office PC saves first, between our read and write
-            monkeypatch.setattr(insights.repo, "get_settings", real)
+            monkeypatch.setattr(insights_repo, "get_settings", real)
             with tenant_session(school.tenant_id, principal.user_id) as other:
                 insights.update_settings(
                     other,
@@ -510,7 +512,7 @@ def test_FR_EW_014_concurrent_first_saves_refuse_the_second_not_overwrite(
                 )
         return row
 
-    monkeypatch.setattr(insights.repo, "get_settings", racing)
+    monkeypatch.setattr(insights_repo, "get_settings", racing)
     try:
         with (
             pytest.raises(PreconditionFailed),
