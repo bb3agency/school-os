@@ -173,6 +173,23 @@ def test_FR_DPDP_015_nomination_for_a_guardian_is_encrypted_and_withdrawable(
     assert "nomination_withdrawn" in [e["event"] for e in res.json()["events"]]
 
 
+@pytest.mark.parametrize("field", ["nominee_name", "nominee_relationship"])
+def test_FR_DPDP_015_nominee_fields_refuse_a_full_aadhaar_number(
+    school: Any, api: Any, field: str
+) -> None:
+    """Invariant 4: no stored text of a nomination may hold a full Aadhaar number."""
+    from app.core.redaction import verhoeff_check_digit
+
+    base = "23412341234"
+    gid = P.guardian(school, P.student(school))
+    values = {"nominee_name": "Synthetica Nominee", "nominee_relationship": "Sister"}
+    values[field] = f"Aadhaar {base}{verhoeff_check_digit(base)}"
+    res = P.log(api, school.people["office_admin"], P.body("nomination", guardian_id=gid, **values))
+    assert res.status_code == 422, res.text
+    errors = res.json().get("errors", [])
+    assert {"field": field, "code": "aadhaar_full_number_rejected"}.items() <= errors[0].items()
+
+
 def test_FR_DPDP_005_staff_member_can_be_the_subject(school: Any, api: Any) -> None:
     teacher = school.people["teacher"]
     out = P.logged(

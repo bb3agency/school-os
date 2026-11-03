@@ -604,3 +604,41 @@ def test_FR_EW_018_full_export_masks_restricted_text_unless_included(school: Any
     for table in masked.values():
         assert "tenant_id" not in table.columns
         assert not any(c.endswith("ciphertext") for c in table.columns)
+
+
+def test_FR_EW_003_a_run_longer_than_the_history_window_keeps_its_first_day(
+    school: Any, admin_engine: Engine
+) -> None:
+    """A child absent for longer than ``evaluation.history_days`` (a long-term absentee) keeps
+    one basis per run: the run's real first day, not the first day of the sliding window. Else
+    every daily evaluation after the flag is closed raises a new flag for the same run."""
+    sid = S.SW.create(school, name="Synthetica Long Kumar", section_key=None, admission_no="SYN-L1")
+    with tenant_session(school.tenant_id, school.people["owner"].user_id) as db:
+        S.students.enrol(
+            db,
+            S.SW.admin_ctx(school),
+            sid,
+            S.EnrollmentIn(section_id=school.ids["section_10a"], roll_no="9"),
+        )
+    days = S.school_days(100)
+    last = days[-1]
+    assert (last - days[0]).days > 125  # the run starts before the 120-day history window
+    S.record(school, "section_10a", {sid: ["absent"] * len(days)}, days)
+    with tenant_session(school.tenant_id) as db:
+        insights.evaluate(db, [sid], today=last)
+    flags = [
+        f
+        for f in S.flags_of(admin_engine, school.tenant_id, sid)
+        if f["rule"] == "attendance_streak"
+    ]
+    assert [f["basis"] for f in flags] == [f"run:{days[0].isoformat()}"]
+    assert flags[0]["evidence"]["days"] == len(days)
+    principal = S.principal_ctx(school)
+    with tenant_session(school.tenant_id, principal.user_id) as db:
+        insights.close_flag(
+            db, principal, flags[0]["id"], CloseIn(reason="parent_informed"), flags[0]["version"]
+        )
+    # A week later the window has slid on; the run is the same, so nothing new is raised.
+    with tenant_session(school.tenant_id) as db:
+        raised = insights.evaluate(db, [sid], today=last + dt.timedelta(days=7))
+    assert raised == 0

@@ -669,6 +669,8 @@ def create_request(
     for field, value in (
         ("request_text", data.request_text),
         ("requester_name", data.requester_name),
+        ("nominee_name", data.nominee_name),
+        ("nominee_relationship", data.nominee_relationship),
         ("nominee_contact", data.nominee_contact),
     ):
         _no_aadhaar(field, value)
