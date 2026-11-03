@@ -32,12 +32,25 @@ def ist_midnight(now: dt.datetime) -> dt.datetime:
     return dt.datetime.combine(ist_today(now), dt.time(0), tzinfo=IST)
 
 
+def _after(t: dt.time, base: dt.time) -> int:
+    """Minutes from ``base`` to the next ``t`` on the clock (0 when equal)."""
+    return ((t.hour - base.hour) * 60 + t.minute - base.minute) % (24 * 60)
+
+
 def closes_at(
-    purpose: str, quiet_start: dt.time, early_close: dt.time, early_purposes: Collection[str]
+    purpose: str,
+    quiet_start: dt.time,
+    early_close: dt.time,
+    early_purposes: Collection[str],
+    quiet_end: dt.time,
 ) -> dt.time:
     """When the day's sending window closes for ``purpose``: the school's quiet-hours start,
-    or the earlier close for absence alerts and receipts (FR-MSG-011)."""
-    if purpose in early_purposes and early_close < quiet_start:
+    or the earlier close for absence alerts and receipts (FR-MSG-011). "Earlier" is measured
+    from the morning opening (``quiet_end``), so quiet hours that start after midnight still
+    close those at 20:00."""
+    if purpose in early_purposes and 0 < _after(early_close, quiet_end) < _after(
+        quiet_start, quiet_end
+    ):
         return early_close
     return quiet_start
 
@@ -55,20 +68,14 @@ def next_open(
     opens again (quiet hours 21:00-07:00 by default, absence alerts and receipts until 20:00)."""
     local = ist_now(now)
     t = local.time()
-    close = closes_at(purpose, quiet_start, early_close, early_purposes)
+    close = closes_at(purpose, quiet_start, early_close, early_purposes, quiet_end)
     today_open = dt.datetime.combine(local.date(), quiet_end, tzinfo=IST)
-    if close > quiet_end:  # the usual case: quiet from the evening until the morning
-        if t >= close:
-            return today_open + dt.timedelta(days=1)
-        if t < quiet_end:
-            return today_open
-        return None
     if close == quiet_end:  # no quiet hours
         return None
-    # A quiet window inside one day (for example 01:00-06:00).
-    if close <= t < quiet_end:
-        return today_open
-    return None
+    # Quiet from ``close`` until ``quiet_end``, across midnight or inside one day (01:00-06:00).
+    if _after(t, quiet_end) < _after(close, quiet_end):
+        return None
+    return today_open if t < quiet_end else today_open + dt.timedelta(days=1)
 
 
 def next_morning(now: dt.datetime, quiet_end: dt.time) -> dt.datetime:

@@ -66,6 +66,34 @@ def test_FR_MSG_011_quiet_window_inside_one_day_and_none() -> None:
     assert at(_at(23), 7, 7) is None
 
 
+@pytest.mark.parametrize(
+    ("now", "purpose", "expected"),
+    [
+        # Quiet hours that start after midnight (00:30-06:00): absence alerts and receipts still
+        # stop at 20:00 and wait for the morning; they were sent until 00:30.
+        (_at(23), "absence_alert", _at(6, days=1)),
+        (_at(20), "fee_receipt", _at(6, days=1)),
+        (_at(0, 15), "absence_alert", _at(6)),
+        (_at(19, 59), "absence_alert", None),
+        (_at(23), "school_notice", None),
+        (_at(0, 30), "school_notice", _at(6)),
+        (_at(6), "absence_alert", None),
+    ],
+)
+def test_FR_MSG_011_early_close_when_quiet_hours_start_after_midnight(
+    now: dt.datetime, purpose: str, expected: object
+) -> None:
+    got = rules.next_open(
+        now.astimezone(dt.UTC),
+        purpose=purpose,
+        quiet_start=dt.time(0, 30),
+        quiet_end=dt.time(6, 0),
+        early_close=dt.time(20, 0),
+        early_purposes=EARLY,
+    )
+    assert got == expected
+
+
 def test_FR_MSG_011_cap_and_staleness() -> None:
     assert rules.cap_reached(225, 225)
     assert not rules.cap_reached(224, 225)
