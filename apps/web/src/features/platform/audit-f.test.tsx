@@ -1,9 +1,10 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
 import { messages, renderWithIntl } from "@/test/render";
 import { SubscriptionsScreen } from "./BillingViews";
+import { HeartbeatPill } from "./HeartbeatPill";
 import { BreakGlassScreen } from "./OperationsViews";
 import { PlatformTicketScreen } from "./SupportScreens";
 
@@ -172,5 +173,22 @@ describe("operator console: idempotent creates and plain-language refusals", () 
       await within(dialog).findByText(api.ai_bundle_needs_monthly_plan?.title ?? "missing"),
     ).toBeInTheDocument();
     expect(within(dialog).queryByText(api.conflict?.title ?? "")).not.toBeInTheDocument();
+  });
+});
+
+describe("fleet heartbeat age", () => {
+  it("FR-PLT-025: the age keeps counting while the page stays open", () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+    try {
+      vi.setSystemTime(new Date("2026-11-03T10:00:00Z"));
+      renderWithIntl(<HeartbeatPill at="2026-11-03T09:55:00Z" status="healthy" />);
+      expect(screen.getByText(/5 min/)).toBeInTheDocument();
+      act(() => {
+        vi.advanceTimersByTime(30 * 60_000);
+      });
+      expect(screen.getByText(/35 min/)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

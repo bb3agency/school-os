@@ -1,7 +1,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pill, type PillVariant } from "@/components/ui/Badge";
 
 /**
@@ -21,7 +21,14 @@ export function HeartbeatPill({
 }) {
   const t = useTranslations("platform.fleet");
   const locale = useLocale();
-  const [renderedAt] = useState(() => now ?? Date.now());
+  const [renderedAt, setRenderedAt] = useState(() => now ?? Date.now());
+  // The age keeps counting while the page stays open (the fleet list is not polled), so a
+  // host that stopped reporting does not keep showing the age it had when the page loaded.
+  useEffect(() => {
+    if (now !== undefined) return undefined;
+    const timer = setInterval(() => setRenderedAt(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, [now]);
   if (!at) return <Pill variant="tag">{t("heartbeatNever")}</Pill>;
   const then = Date.parse(at);
   if (!Number.isFinite(then)) return null;
