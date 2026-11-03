@@ -789,9 +789,11 @@ export function BreakGlassScreen() {
               confirmLabel={t("request")}
               schema={breakGlassSchema}
               invalidate={[PK.breakGlass]}
-              submit={(data) =>
+              submit={(data, key) =>
                 unwrap(
                   api.POST("/api/v1/platform/break-glass-requests", {
+                    // A retry after a lost response never opens a second request.
+                    params: { header: { "Idempotency-Key": key } },
                     // DL-10: only section_id/class_id narrow a grant; the panel asks for the
                     // whole school and says so (requestBody).
                     body: { ...data, scope: {} },

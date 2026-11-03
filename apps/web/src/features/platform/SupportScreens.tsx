@@ -336,10 +336,14 @@ export function PlatformTicketScreen({ ticketId }: { ticketId: string }) {
   const reply = useApiForm({
     schema: replySchema,
     invalidate: [PK.tickets],
-    submit: (data) =>
+    // Idempotency-Key: a retry after a lost response never posts the reply twice.
+    submit: (data, idempotencyKey) =>
       unwrap(
         api.POST("/api/v1/platform/support/tickets/{ticket_id}/messages", {
-          params: { path: { ticket_id: ticketId } },
+          params: {
+            path: { ticket_id: ticketId },
+            header: { "Idempotency-Key": idempotencyKey },
+          },
           body: data,
         }),
       ),
