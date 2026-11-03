@@ -851,6 +851,37 @@ def test_R_16_telugu_text_nobody_reviewed_is_not_kept_on_approval(
     assert (row.title_te, row.body_te) == (planted["title_en"], planted["body_en"])
 
 
+def test_FR_NOTICE_005_hidden_telugu_text_does_not_block_approval(
+    ai_on: Any, api: Any, admin_engine: Engine
+) -> None:
+    """While Telugu is hidden the approver can neither see nor fix the Telugu title and body
+    (an earlier AI draft may have filled them), and approval replaces them with the English
+    text (R-16). A phone number there must not refuse the approval with errors on fields the
+    approver cannot see (``notice_personal_data`` on ``body_te``); only the English texts that
+    reach parents are checked."""
+    school = ai_on.a
+    office = school.people["office_staff"]
+    blank = api.call(office, "POST", "/api/v1/notices", json={"source": "blank"}).json()
+    path = f"/api/v1/notices/{blank['id']}"
+    english = {"title_en": "Sports day", "body_en": "Sports day is on 14/11/2026 at 9:00."}
+    assert api.call(office, "PATCH", path, json=english, headers=_if(1)).status_code == 200
+    with admin_engine.begin() as c:  # an earlier AI draft's Telugu body, never shown
+        c.execute(
+            text("UPDATE ops.parent_notices SET body_te = :b WHERE id = :i"),
+            {"b": "Call the office on 9876543210", "i": blank["id"]},
+        )
+    version = api.call(office, "GET", path).json()["version"]
+    approved = api.call(
+        school.people["principal"], "POST", f"{path}/approve", json={}, headers=_if(version)
+    )
+    assert approved.status_code == 200, approved.text
+    with admin_engine.connect() as c:
+        body_te: str = c.execute(
+            text("SELECT body_te FROM ops.parent_notices WHERE id = :i"), {"i": blank["id"]}
+        ).scalar_one()
+    assert body_te == english["body_en"]
+
+
 @pytest.mark.usefixtures("telugu_on")
 def test_ADR_0036_notice_needs_its_telugu_texts_while_telugu_is_shown(ai_on: Any, api: Any) -> None:
     school = ai_on.a

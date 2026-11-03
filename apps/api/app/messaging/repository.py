@@ -330,8 +330,15 @@ def search_messages(
     until: dt.datetime | None,
     after: tuple[dt.datetime, uuid.UUID] | None,
     limit: int,
+    visible_students: Collection[uuid.UUID] | None = None,
 ) -> list[Message]:
+    """``visible_students`` (a scoped reader's students): messages about any other student are
+    left out; messages about no student stay."""
     stmt = select(Message)
+    if visible_students is not None:
+        stmt = stmt.where(
+            or_(Message.student_id.is_(None), Message.student_id.in_(list(visible_students)))
+        )
     reach = []
     if guardian_ids is not None:
         reach.append(Message.guardian_id.in_(list(guardian_ids)))

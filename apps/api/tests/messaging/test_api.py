@@ -663,7 +663,10 @@ def test_FR_MSG_021_flagged_quality_pauses_until_a_person_resumes(
     assert resumed.status_code == 200
     assert resumed.json()["status"] == "active"
     assert W.audit_events(admin_engine, world.a.tenant_id, "messaging.paused")
-    assert W.audit_events(admin_engine, world.a.tenant_id, "messaging.resumed")
+    resumed_events = W.audit_events(admin_engine, world.a.tenant_id, "messaging.resumed")
+    assert resumed_events
+    # The audit names the pause that was lifted, not the cleared column (FR-MSG-021).
+    assert resumed_events[-1]["summary"]["previous_reason"] == "quality_flagged"
     del account_id
 
 
@@ -768,6 +771,72 @@ def test_FR_MSG_017_search_scope(world: Any, api: Any) -> None:
         ).status_code
         == 403
     )
+
+
+def test_FR_MSG_016_reply_to_an_inbound_message_is_never_left_queued(
+    world: Any, api: Any, admin_engine: Engine, fake_state: Any
+) -> None:
+    """The STOP confirmation is sent once, right after the inbox is applied; the sender never
+    retries it (it is not one of the sending purposes). A transient Meta error must end it as
+    ``failed``, not leave it ``queued`` for ever (counted as waiting, never finished)."""
+    _, waba = M.connect(world.a)
+    _, guardian, mobile = M.guardian(world.a)
+    assert M.opt_in(api, world.person("office_staff"), guardian, "notices").status_code == 201
+    STATE.failing["91" + mobile] = 130429  # throughput: transient
+    M.deliver_webhook(api, world.a, M.inbound(waba, "91" + mobile, text_body="STOP"))
+    rows = M.rows(
+        admin_engine,
+        "SELECT status, error_code FROM msg.messages WHERE tenant_id = :t "
+        "AND purpose = 'optin_stopped' AND guardian_id = :g",
+        t=world.a.tenant_id,
+        g=guardian,
+    )
+    assert rows == [{"status": "failed", "error_code": "meta:130429"}]
+
+
+def test_FR_MSG_017_scoped_reader_sees_no_message_about_a_student_outside_their_sections(
+    world: Any, api: Any
+) -> None:
+    """A class teacher reaches a guardian through a child in their section, but the guardian's
+    messages about a sibling in another section (an absence alert, a fee reminder) stay out of
+    their search (invariant 3); messages about no student (opt-in replies) stay visible."""
+    M.connect(world.a)
+    in_9a, guardian, _ = M.guardian(world.a)
+    sibling_9c, _, _ = M.guardian(world.a, section_key="section_9c")
+    with tenant_session(world.a.tenant_id) as db:
+        ids = {}
+        for key, student in (("own", in_9a), ("sibling", sibling_9c), ("none", None)):
+            queued = service.queue_message(
+                db,
+                purpose="absence_alert",
+                guardian_id=guardian,
+                student_id=student,
+                source_type="student",
+                source_id=uuid.uuid4(),
+                dedupe_key=TODAY,
+                variables={
+                    "school_name": "Synthetic Model School",
+                    "child_first_name": "Synthetica",
+                    "date": TODAY,
+                },
+            )
+            assert queued is not None
+            ids[key] = queued.message_id
+    teacher = world.person("class_teacher")
+    for body in ({"guardian_id": str(guardian)}, {"student_id": str(in_9a)}):
+        found = api.call(teacher, "POST", "/api/v1/messages/search", json=body)
+        assert found.status_code == 200, found.text
+        seen = {item["id"] for item in found.json()["items"]}
+        assert str(ids["own"]) in seen
+        assert str(ids["none"]) in seen
+        assert str(ids["sibling"]) not in seen
+    wide = api.call(
+        world.person("office_admin"),
+        "POST",
+        "/api/v1/messages/search",
+        json={"guardian_id": str(guardian)},
+    )
+    assert str(ids["sibling"]) in {item["id"] for item in wide.json()["items"]}
 
 
 def test_SEC_008_messaging_flows_log_no_phone_token_or_text(
