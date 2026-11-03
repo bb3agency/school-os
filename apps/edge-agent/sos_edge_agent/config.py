@@ -114,10 +114,21 @@ def save(config: AgentConfig, path: Path) -> None:
         lines.append(f"key_id = {_quote(config.key_id)}")
     if config.key_rotated_at is not None:
         lines.append(f"key_rotated_at = {_quote(config.key_rotated_at.isoformat())}")
+    write_atomic(path, ("\n".join(lines) + "\n").encode("utf-8"))
+
+
+def write_atomic(path: Path, data: bytes) -> None:
+    """Write ``data`` to a new owner-only file, flush it to disk, then swap it in: after a crash
+    or power cut ``path`` holds either the old or the new content, never a partial file."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(".tmp")
-    temporary.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    temporary.replace(path)
+    temporary = path.with_name(path.name + ".tmp")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_BINARY", 0)
+    descriptor = os.open(temporary, flags, 0o600)
+    with os.fdopen(descriptor, "wb") as handle:
+        handle.write(data)
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(temporary, path)
 
 
 def load(path: Path) -> AgentConfig:
@@ -153,4 +164,5 @@ __all__ = [
     "default_state_dir",
     "load",
     "save",
+    "write_atomic",
 ]

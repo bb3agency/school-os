@@ -45,7 +45,7 @@ from sos_edge_agent.config import (
     load,
     save,
 )
-from sos_edge_agent.credentials import CredentialError, CredentialStore, default_store
+from sos_edge_agent.credentials import CredentialError, CredentialStore, default_store, reconcile
 from sos_edge_agent.sync import Agent
 from sos_edge_agent.tally_xml import (
     TallyXmlError,
@@ -122,11 +122,18 @@ class Runtime:
     def agent(self) -> Agent:
         config = load(self.config_path)
         store = self.store(config.tenant_id)
+        # agent.toml is written after the key file: a crash in between left it naming the old
+        # device or key, so the ids stored with the secret win, and the file is put right.
+        repaired = reconcile(config, store.load_key())
+        if repaired != config:
+            save(repaired, self.config_path)
+            log.warning("tally.agent.config_repaired", extra={"code": "key_id_from_key_file"})
+            config = repaired
         server = SchoolOSClient(config, store.load, self.transport)
         tally = TallyClient(config.tally_url, self.tally_transport)
 
         def rotated(new: AgentConfig, secret: bytes) -> None:
-            store.save(secret)
+            store.save(secret, device_id=new.device_id, key_id=new.key_id)
             save(new, self.config_path)
 
         return Agent(server, tally, on_key_rotated=rotated)
@@ -139,12 +146,12 @@ def cmd_enrol(rt: Runtime, args: argparse.Namespace) -> int:
     store = rt.store(config.tenant_id)
     out = SchoolOSClient(config, lambda: b"", rt.transport).enrol(args.code, _platform())
     secret = base64.urlsafe_b64decode(str(out["secret"]) + "=" * (-len(str(out["secret"])) % 4))
-    store.save(secret)
     enrolled = config.replace(
         device_id=uuid.UUID(str(out["device_id"])),
         key_id=str(out["key_id"]),
         key_rotated_at=dt.datetime.now(dt.UTC),
     )
+    store.save(secret, device_id=enrolled.device_id, key_id=enrolled.key_id)
     save(enrolled, rt.config_path)
     log.info("tally.agent.enrolled", extra={"code": "enrolled"})
     sys.stdout.write(
