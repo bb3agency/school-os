@@ -2,7 +2,14 @@
 
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { AuthRedirectError } from "@/lib/bff/fetch";
-import { ApiError, asList, NotAvailableError, unwrap, useBffClient } from "@/lib/bff/query";
+import {
+  ApiError,
+  asList,
+  NotAvailableError,
+  newIdempotencyKey,
+  unwrap,
+  useBffClient,
+} from "@/lib/bff/query";
 import { ifMatch, type MemoryItem, type MemorySettings } from "./data";
 
 /**
@@ -105,7 +112,13 @@ export function useAddMemory() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (text: string): Promise<MemoryItem> =>
-      unwrap(api.POST("/api/v1/knowledge/memories", { body: { text } })),
+      unwrap(
+        api.POST("/api/v1/knowledge/memories", {
+          // A retried request is answered once (the API keeps the key); each add is a new one.
+          headers: { "Idempotency-Key": newIdempotencyKey() },
+          body: { text },
+        }),
+      ),
     onMutate: async (text) => {
       const saved = await begin(client);
       const now = new Date().toISOString();
