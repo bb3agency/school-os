@@ -20,7 +20,7 @@ import { formatCount, formatDateTime } from "@/lib/format";
 import { formList } from "@/lib/forms";
 import { translateOr } from "@/lib/i18n-dynamic";
 import { ifMatch, useCan, useOperatorMe, useSchoolDirectory } from "../data";
-import { CertInClock, IncidentStatusPill, useClockText } from "./IncidentsScreen";
+import { CertInClock, IncidentStatusPill, useClockText, useMinuteTick } from "./IncidentsScreen";
 import {
   INCIDENTS_MANAGE,
   INCIDENT_KEYS,
@@ -374,6 +374,8 @@ function Schools({ incident, manage }: { incident: IncidentDetail; manage: boole
   const tcat = useTranslations("breaches.categories");
   const locale = useLocale() as Locale;
   const clockText = useClockText();
+  // The notice clocks below are worked out from the current time.
+  useMinuteTick();
   const columns: ColumnV2<IncidentSchool>[] = [
     {
       key: "school",

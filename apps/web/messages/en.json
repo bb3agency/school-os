@@ -2314,6 +2314,10 @@
       "approver_not_eligible": {
         "title": "Ask another operator to approve",
         "body": "You cannot be the second person on this request: your role is less than 7 days old, or one of you gave the other their role."
+      },
+      "ai_bundle_needs_monthly_plan": {
+        "title": "AI answer bundles need a monthly plan",
+        "body": "This school has an AI answer bundle, and bundles are billed monthly. Choose a monthly plan, or remove the bundle first."
       }
     },
     "stepUp": {
