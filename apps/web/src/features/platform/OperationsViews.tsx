@@ -879,10 +879,16 @@ export interface PlatformAuditFilters {
   to?: string;
 }
 
-/** YYYY-MM-DD (IST day) → RFC 3339 bounds for the API. */
+/**
+ * YYYY-MM-DD (IST day) → RFC 3339 bounds for the API. The API's range is `[from, to)`, so the
+ * end of a day is the next day's IST midnight (23:59:59 left out the day's last second).
+ */
 function dayBound(value: string | undefined, end: boolean): string | undefined {
   if (!value || !ISO_DATE.test(value)) return undefined;
-  return `${value}T${end ? "23:59:59" : "00:00:00"}+05:30`;
+  const date = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return undefined;
+  if (end) date.setUTCDate(date.getUTCDate() + 1);
+  return `${date.toISOString().slice(0, 10)}T00:00:00+05:30`;
 }
 
 function summaryText(summary: Record<string, unknown>): string {

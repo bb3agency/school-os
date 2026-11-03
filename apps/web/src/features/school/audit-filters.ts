@@ -34,10 +34,22 @@ function istMidnight(iso: string | undefined): string | undefined {
   return iso ? `${iso}T00:00:00+05:30` : undefined;
 }
 
-/** The API query for the filters: blank values and dates that are not real are left out. */
+/** The day after a real YYYY-MM-DD date. */
+function nextDay(iso: string | undefined): string | undefined {
+  if (!iso) return undefined;
+  const date = new Date(`${iso}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * The API query for the filters: blank values and dates that are not real are left out. The
+ * API's time range is `[from, to)`, so "To date" is sent as the next day's midnight (India
+ * time) and the chosen day itself is included.
+ */
 export function auditQuery(filters: AuditFilters): AuditQuery {
   const from = istMidnight(toIsoDate(filters.from));
-  const to = istMidnight(toIsoDate(filters.to));
+  const to = istMidnight(nextDay(toIsoDate(filters.to)));
   return {
     ...(filters.actor?.trim() ? { actor: filters.actor.trim() } : {}),
     ...(filters.action?.trim() ? { action: filters.action.trim() } : {}),

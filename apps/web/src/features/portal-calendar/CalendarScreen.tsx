@@ -12,6 +12,7 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 import { TextField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
+import { todayInIndia } from "@/features/change-requests/dates";
 import { useCirculars } from "@/features/circulars/data";
 import { ReadyBar } from "@/features/readiness/parts";
 import type { Locale } from "@/i18n/routing";
@@ -282,7 +283,8 @@ function AddEventDialog({ yearId }: { yearId: string }) {
   const t = useTranslations("portalCalendar.add");
   const td = useTranslations("portalCalendar.dialog");
   const api = useBffClient("staff");
-  const today = new Date().toISOString().slice(0, 10);
+  // The calendar day in India (PRD §8), not the UTC date (a day early before 05:30 IST).
+  const today = todayInIndia();
   return (
     <ActionDialog
       triggerLabel={t("open")}

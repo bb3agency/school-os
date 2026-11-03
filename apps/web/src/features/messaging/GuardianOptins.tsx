@@ -7,6 +7,7 @@ import { Pill, type PillVariant } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { TextField } from "@/components/ui/Input";
 import { SelectField } from "@/components/ui/Select";
+import { todayInIndia } from "@/features/change-requests/dates";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan } from "@/lib/bff/staff-me";
 import { formatDate } from "@/lib/format";
@@ -39,10 +40,9 @@ export interface OptinGuardian {
   preferred_language?: "en" | "te" | null;
 }
 
+/** Today in India (the API's "today" for decided dates), whatever the PC's time zone is. */
 function today(): string {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  return todayInIndia();
 }
 
 function CategoryRow({ state }: { state: CategoryState }) {
