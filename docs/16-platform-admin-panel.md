@@ -976,7 +976,7 @@ Conventions from 09 §2 apply (problem+json, `Idempotency-Key` on creating POSTs
 | POST | `/platform/operators` | `platform.operators.manage` ᴿ | 201 | Invite |
 | PUT | `/platform/operators/{operator_id}/roles` | `platform.operators.manage` ᴿ | 200 | Not own roles; keep ≥ 1 owner |
 | POST | `/platform/operators/{operator_id}/deactivate` | `platform.operators.manage` ᴿ | 200 | |
-| GET | `/platform/audit/events` | `platform.audit.read` | 200 | Filters: `actor`, `action`, `tenant_id`, `from`, `to`; CSV via `Accept: text/csv` |
+| GET | `/platform/audit/events` | `platform.audit.read` | 200 | Filters: `actor`, `action`, `tenant_id`, `from`, `to` (`[from, to)`, times with an explicit offset, 422 without one); CSV via `Accept: text/csv` |
 | POST | `/platform/audit/verify` | `platform.audit.read` | 202 | Runs verification; result in the job. One per operator every 10 minutes (`platform_audit_verify`, `429 rate_limited`; audit 2026-10-06 R-19) |
 | GET | `/platform/jobs/{job_id}` | any operator | 200 | Visible to the job's creator or holders of `platform.audit.read`; otherwise 404 |
 
