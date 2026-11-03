@@ -615,7 +615,7 @@ def test_FR_EW_017_retention_also_runs_for_a_suspended_school(
                 {"t": school.tenant_id},
             )
     with admin_engine.connect() as c:
-        left = c.execute(
+        left: int = c.execute(
             text("SELECT count(*) FROM sis.behaviour_notes WHERE id = :i"), {"i": old.id}
         ).scalar_one()
     assert left == 0

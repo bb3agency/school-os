@@ -484,7 +484,7 @@ def test_FR_FEE_026_narrations_are_erased_while_suspended_or_with_fees_off(
     out, _ = _import(school, admin_engine, [U.Credit(_today(), _amount(), upi=False)])
     now = _common.now
     monkeypatch.setattr(_common, "now", lambda s: now(s) + dt.timedelta(days=91))
-    monkeypatch.setattr(upi_tasks.service, "enabled", lambda s, t: False)
+    monkeypatch.setattr(fees, "enabled", lambda s, t: False)
     with admin_engine.begin() as c:
         c.execute(
             text("UPDATE core.tenants SET status = 'suspended' WHERE id = :t"),
