@@ -49,37 +49,46 @@ const categoryPill: Record<NoteCategory, PillVariant> = {
 /** ABC indicators from stored records (FR-EW-001): numbers, never a score or a label. */
 function Indicators({ data }: { data: TimelineData }) {
   const t = useTranslations("insights.indicators");
-  const { attendance, behaviour, course } = data.indicators;
+  // AA-17: the attendance and course indicators are null without attendance.read / marks.read.
+  const { behaviour } = data.indicators;
+  const attendance = data.indicators.attendance ?? null;
+  const course = data.indicators.course ?? null;
   const change =
-    course.change === null
+    course === null || course.change === null
       ? null
       : t("change", { change: course.change > 0 ? `+${course.change}` : String(course.change) });
   return (
     <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      <StatCard
-        label={t("attendanceRate")}
-        value={attendance.rate === null ? null : `${attendance.rate}%`}
-        unavailableLabel={t("noData")}
-        hint={t("attendanceDays", { days: attendance.days, absent: attendance.absent })}
-      />
-      <StatCard
-        label={t("streak")}
-        value={String(attendance.streak)}
-        unavailableLabel={t("noData")}
-        hint={t("streakHint")}
-      />
+      {attendance && (
+        <>
+          <StatCard
+            label={t("attendanceRate")}
+            value={attendance.rate === null ? null : `${attendance.rate}%`}
+            unavailableLabel={t("noData")}
+            hint={t("attendanceDays", { days: attendance.days, absent: attendance.absent })}
+          />
+          <StatCard
+            label={t("streak")}
+            value={String(attendance.streak)}
+            unavailableLabel={t("noData")}
+            hint={t("streakHint")}
+          />
+        </>
+      )}
       <StatCard
         label={t("concerns")}
         value={String(behaviour.concerns)}
         unavailableLabel={t("noData")}
         hint={t("concernsHint", { days: behaviour.window_days })}
       />
-      <StatCard
-        label={t("course")}
-        value={course.percent === null ? null : `${course.percent}%`}
-        unavailableLabel={t("noData")}
-        {...(change ? { hint: change } : {})}
-      />
+      {course && (
+        <StatCard
+          label={t("course")}
+          value={course.percent === null ? null : `${course.percent}%`}
+          unavailableLabel={t("noData")}
+          {...(change ? { hint: change } : {})}
+        />
+      )}
     </dl>
   );
 }

@@ -226,9 +226,13 @@ class CourseIndicatorOut(_Out):
 
 
 class IndicatorsOut(_Out):
-    attendance: AttendanceIndicatorOut
+    attendance: AttendanceIndicatorOut | None = Field(
+        description="null unless the caller holds attendance.read for the student (AA-17)"
+    )
     behaviour: BehaviourIndicatorOut
-    course: CourseIndicatorOut
+    course: CourseIndicatorOut | None = Field(
+        description="null unless the caller holds marks.read for the student (AA-17)"
+    )
 
 
 class RuleSettingOut(_Out):

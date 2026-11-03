@@ -335,6 +335,7 @@ def test_FR_EW_013_timeline_lists_every_kind_newest_first(
     assert {"enrolment", "attendance_month", "exam", "note", "flag"} <= kinds
     assert "certificate" not in kinds  # class teachers do not hold certificate.read
     assert [i.on for i in out.items] == sorted((i.on for i in out.items), reverse=True)
+    assert out.indicators.course is not None
     assert out.indicators.course.percent is not None
     assert out.student.section_label == "IX-A"
     viewed = _events(admin_engine, school.tenant_id, "insights.viewed")[-1]
@@ -374,6 +375,36 @@ def test_AA_17_timeline_shows_attendance_and_exams_only_with_their_read_permissi
     assert "exam" in kinds[frozenset({"attendance.read"})]
     assert "attendance_month" in kinds[frozenset({"marks.read"})]
     assert "exam" not in kinds[frozenset({"marks.read"})]
+
+
+def test_AA_17_timeline_indicators_follow_attendance_and_marks_read(school: Any) -> None:
+    """The attendance indicator (rate, streak) and the course indicator (exam percentages) are
+    left out (null) for a caller without attendance.read / marks.read reach, like the months
+    and exams; the behaviour indicator stays (it is the insights record itself)."""
+    _timeline_with_attendance_and_marks(school)
+    ct = S.ct_ctx(school)
+    seen: dict[frozenset[str], Any] = {}
+    for dropped in (
+        frozenset({"attendance.read", "marks.read"}),
+        frozenset({"attendance.read"}),
+        frozenset({"marks.read"}),
+        frozenset(),
+    ):
+        custom = dataclasses.replace(ct, permissions=ct.permissions - dropped)
+        with tenant_session(school.tenant_id, custom.user_id) as db:
+            seen[dropped] = insights.timeline(db, custom, school.ids["a2"]).indicators
+    none = seen[frozenset({"attendance.read", "marks.read"})]
+    assert none.attendance is None
+    assert none.course is None
+    assert none.behaviour is not None
+    assert seen[frozenset({"attendance.read"})].attendance is None
+    assert seen[frozenset({"attendance.read"})].course is not None
+    assert seen[frozenset({"marks.read"})].attendance is not None
+    assert seen[frozenset({"marks.read"})].course is None
+    full = seen[frozenset()]
+    assert full.attendance is not None
+    assert full.attendance.days >= 1
+    assert full.course is not None
 
 
 def test_AA_17_timeline_needs_attendance_and_marks_read_in_scope_for_the_student(

@@ -1110,10 +1110,16 @@ def erase_note(session: Session, ctx: UserContext, note_id: uuid.UUID, data: Era
 # --- timeline (FR-EW-013) -------------------------------------------------------------------------
 
 
-def _indicators_out(ind: engine.Indicators) -> IndicatorsOut:
+def _indicators_out(
+    ind: engine.Indicators, *, attendance: bool = True, course: bool = True
+) -> IndicatorsOut:
+    """The ABC indicators; ``attendance``/``course`` False leave that indicator out (null) for a
+    caller without ``attendance.read``/``marks.read`` reach (AA-17)."""
     a, b, c = ind.attendance, ind.behaviour, ind.course
     return IndicatorsOut(
-        attendance=AttendanceIndicatorOut(
+        attendance=None
+        if not attendance
+        else AttendanceIndicatorOut(
             days=a.days,
             present=a.present,
             late=a.late,
@@ -1126,7 +1132,9 @@ def _indicators_out(ind: engine.Indicators) -> IndicatorsOut:
         behaviour=BehaviourIndicatorOut(
             concerns=b.concerns, window_days=b.window_days, concern=b.concern
         ),
-        course=CourseIndicatorOut(
+        course=None
+        if not course
+        else CourseIndicatorOut(
             exam_id=c.exam_id,
             percent=c.percent,
             previous_percent=c.previous_percent,
@@ -1198,7 +1206,8 @@ def timeline(session: Session, ctx: UserContext, student_id: uuid.UUID) -> Timel
     """Everything the school holds for the student's educational follow-up, newest first,
     with the ABC indicators (``insights.read``; 404 outside scope). Attendance months only for
     callers holding ``attendance.read`` for the student, exams only with ``marks.read`` (audit
-    2026-10-04 AA-17). Audit ``insights.viewed`` (view ``timeline``)."""
+    2026-10-04 AA-17); the attendance and course indicators follow the same rule (null
+    without). Audit ``insights.viewed`` (view ``timeline``)."""
     _ensure_student(session, ctx, student_id)
     cfg = load_config()
     today = today_ist()
@@ -1241,9 +1250,11 @@ def timeline(session: Session, ctx: UserContext, student_id: uuid.UUID) -> Timel
                 ),
             )
         )
-    if _reaches(session, ctx, student_id, ATTENDANCE_READ):
+    sees_attendance = _reaches(session, ctx, student_id, ATTENDANCE_READ)
+    sees_marks = _reaches(session, ctx, student_id, MARKS_READ)
+    if sees_attendance:
         items.extend(_attendance_months(marks, cfg.timeline.attendance_months))
-    if _reaches(session, ctx, student_id, MARKS_READ):
+    if sees_marks:
         items.extend(
             TimelineItem(
                 kind="exam",
@@ -1277,7 +1288,8 @@ def timeline(session: Session, ctx: UserContext, student_id: uuid.UUID) -> Timel
     }
     items.sort(key=lambda i: (i.on, -order[i.kind]), reverse=True)
     _viewed(session, "timeline", "student", student_id, items=len(items))
-    return TimelineOut(student=ref, indicators=_indicators_out(ind), items=items)
+    indicators = _indicators_out(ind, attendance=sees_attendance, course=sees_marks)
+    return TimelineOut(student=ref, indicators=indicators, items=items)
 
 
 # --- retention (FR-EW-017) ------------------------------------------------------------------------
