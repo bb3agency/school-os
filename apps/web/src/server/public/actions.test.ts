@@ -254,9 +254,7 @@ describe("GET /p/document and the payment status", () => {
     for (const host of ["localhost:8333", "127.0.0.1", "[::1]"]) {
       answer = () => json({ url: `http://${host}/x.pdf?sig=1`, expires_at: "x" });
       vi.stubEnv("NODE_ENV", "production");
-      expect((await documentRedirect(rt, request)).headers.get("location")).toBe(
-        "/p/view?pdf=0",
-      );
+      expect((await documentRedirect(rt, request)).headers.get("location")).toBe("/p/view?pdf=0");
       vi.stubEnv("NODE_ENV", "development");
       expect((await documentRedirect(rt, request)).headers.get("location")).toBe(
         `http://${host}/x.pdf?sig=1`,

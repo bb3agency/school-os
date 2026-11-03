@@ -107,18 +107,23 @@ export async function apiGetAsSession<T>(
 ): Promise<RscApiResult<T> | null> {
   const secure = isHttpsDeployment(process.env.APP_BASE_URL);
   const jar = await cookies();
-  let effective = kind;
-  let value = jar.get(sessionCookieName(kind, secure))?.value;
-  if (!value && kind === "staff") {
-    // No staff session: the school console may run as a support session (ADR-0023).
-    effective = "support";
-    value = jar.get(sessionCookieName("support", secure))?.value;
-  }
-  if (!value) return null;
+  const cookieOf = (k: SessionKind) => jar.get(sessionCookieName(k, secure))?.value;
+  // No cookie at all: no need to reach Valkey.
+  if (!cookieOf(kind) && !(kind === "staff" && cookieOf("support"))) return null;
   try {
     const runtime = await getAuthRuntime();
-    const current = await runtime.store.load(value, { touch: false });
-    if (!current || current.kind !== effective) return null;
+    const load = async (k: SessionKind): Promise<Session | null> => {
+      const value = cookieOf(k);
+      if (!value) return null;
+      const loaded = await runtime.store.load(value, { touch: false });
+      return loaded && loaded.kind === k ? loaded : null;
+    };
+    // No live staff session (no cookie, or it expired): the school console may run as a
+    // support session (ADR-0023), as readSchoolSession does in the BFF.
+    const current =
+      (await load(kind)) ??
+      (kind === "staff" && runtime.config.supportEnabled ? await load("support") : null);
+    if (!current) return null;
     const session = await runtime.refresher.ensureFresh(current);
     const stored = await runtime.store.tokens(session.id);
     if (!stored) return null;
