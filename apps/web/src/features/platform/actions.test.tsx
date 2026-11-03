@@ -947,6 +947,34 @@ describe("fleet, flags, audit, operators, announcements, break-glass, support", 
     });
   });
 
+  it("operators: invite, change roles and deactivate need platform.operators.manage (FR-PLT-028)", async () => {
+    stub.routes["GET /bff/api/v1/platform/me"] = () =>
+      Response.json({ ...ME, roles: ["platform_viewer"], permissions: ["platform.tenants.read"] });
+    stub.routes["GET /bff/api/v1/platform/operators"] = () =>
+      page([
+        {
+          id: "0192f3a4-0000-7000-8000-0000000000f2",
+          display_name: "Synthetic Operator",
+          email: "op@schoolos.example",
+          roles: ["support_agent"],
+          status: "active",
+          mfa_enrolled: true,
+          created_at: "2026-06-01T04:30:00Z",
+          last_login_at: null,
+        },
+      ]);
+    renderWithIntl(<OperatorsScreen />);
+    expect((await screen.findAllByText("Synthetic Operator")).length).toBeGreaterThan(0);
+    await waitFor(() =>
+      expect(stub.callsTo("GET /bff/api/v1/platform/me").length).toBeGreaterThan(0),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: pm.operators.invite })).toBeNull(),
+    );
+    expect(screen.queryByRole("button", { name: /Change roles/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Deactivate/ })).toBeNull();
+  });
+
   it("announcements: both languages required; tier audience and IST times sent as UTC", async () => {
     stub.routes["GET /bff/api/v1/platform/announcements"] = () => page([]);
     stub.routes["POST /bff/api/v1/platform/announcements"] = () =>
