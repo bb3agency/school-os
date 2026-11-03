@@ -455,3 +455,46 @@ def test_D9_parent_form_language_is_chosen_per_school(
     )
     assert back.status_code == 200
     assert W.audit_events(admin_engine, world.a.tenant_id, "apaar.settings.updated")
+
+
+def test_D9_racing_first_settings_saves_refuse_the_second_with_412(
+    world: Any, admin_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two first saves (``If-Match: 0``) find no row to lock; the second insert hit
+    ``apaar_consent_settings_one_per_school`` and was a 500. It is a 412 (reload)."""
+    from sqlalchemy import text
+
+    from app.apaar import service
+    from app.apaar.schemas import ApaarSettingsIn
+    from app.core.db import tenant_session
+    from app.core.errors import PreconditionFailed
+
+    principal = world.person("principal")
+    tenant_id = world.a.tenant_id
+    clear = text("DELETE FROM sis.apaar_consent_settings WHERE tenant_id = :t")
+    with admin_engine.begin() as c:
+        c.execute(clear, {"t": tenant_id})
+    real = service.repo.get_settings
+
+    def racing(session: Any, *, lock: bool = False) -> Any:
+        row = real(session, lock=lock)
+        if lock and row is None:  # the other office PC saves first, between our read and write
+            monkeypatch.setattr(service.repo, "get_settings", real)
+            with tenant_session(tenant_id, principal.user_id) as other:
+                service.update_settings(
+                    other, principal, ApaarSettingsIn(form_language="te"), expected_version=0
+                )
+        return row
+
+    monkeypatch.setattr(service.repo, "get_settings", racing)
+    try:
+        with pytest.raises(PreconditionFailed), tenant_session(tenant_id, principal.user_id) as db:
+            service.update_settings(
+                db, principal, ApaarSettingsIn(form_language="en"), expected_version=0
+            )
+        with tenant_session(tenant_id, principal.user_id) as db:
+            kept = service.get_settings(db)
+        assert (kept.form_language, kept.version) == ("te", 1)
+    finally:
+        with admin_engine.begin() as c:
+            c.execute(clear, {"t": tenant_id})
