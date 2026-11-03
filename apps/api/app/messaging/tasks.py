@@ -11,7 +11,8 @@ The sending wave (R2-3G, ``app.messaging.sends.tasks``) adds ``messaging.send_du
 
 Beat: ``messaging.sweep_inbox`` every minute (events whose wake-up was lost),
 ``messaging.sync_accounts`` hourly (quality, limit, currency, template statuses; pauses on a red
-or flagged rating) and ``messaging.purge_expired`` daily (retention, docs/05 §13). Each school
+or flagged rating) and ``messaging.purge_expired`` daily (retention, docs/05 §13; also for
+suspended and offboarding schools). Each school
 runs in its own ``tenant_session``; one failing school does not stop the others. Nothing runs
 while messaging is off (FR-MSG-024).
 """
@@ -19,6 +20,7 @@ while messaging is off (FR-MSG-024).
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from typing import Any
 
 from celery import Task, shared_task
@@ -36,11 +38,14 @@ from app.ops.service import TenantTask
 log = get_logger(__name__)
 
 
-def _each_school(action: str, run: Any) -> dict[str, int]:
+def _each_school(
+    action: str, run: Any, schools: Callable[[], list[uuid.UUID]] | None = None
+) -> dict[str, int]:
+    """Run ``run`` for each active school (``schools``: another list of school ids)."""
     if not service.available():
         return {"skipped": 1}
     totals = {"schools": 0, "failed": 0}
-    for tenant_id in service.live_tenant_ids():
+    for tenant_id in (schools or service.live_tenant_ids)():
         try:
             run(tenant_id)
             totals["schools"] += 1
@@ -114,7 +119,7 @@ def _purge(tenant_id: uuid.UUID) -> None:
 
 @shared_task(name="messaging.purge_expired", acks_late=True, ignore_result=True)
 def purge_expired() -> dict[str, int]:
-    return _each_school("purge", _purge)
+    return _each_school("purge", _purge, service.retention_tenant_ids)
 
 
 def beat_schedule() -> dict[str, dict[str, Any]]:
