@@ -41,7 +41,15 @@ import {
   requiredInt,
   uuid,
 } from "@/lib/validation";
-import { LIST_PAGE_SIZE, PK, ifMatch, useCan, usePagedList, useSchoolDirectory } from "./data";
+import {
+  LIST_PAGE_SIZE,
+  PK,
+  ifMatch,
+  useCan,
+  useOperatorMe,
+  usePagedList,
+  useSchoolDirectory,
+} from "./data";
 import { DeploymentActions } from "./DeploymentActions";
 import { FilterCard } from "./FilterCard";
 import { FlagSwitch } from "./FlagSwitch";
@@ -652,6 +660,8 @@ export function BreakGlassScreen() {
   const tstatus = useTranslations("status.breakGlass");
   const api = useBffClient("operator");
   const can = useCan();
+  // Only the operator who asked may withdraw (the API answers 404 to anyone else).
+  const meId = useOperatorMe()?.operator_id;
   const hintId = useId();
   const { nameOf, schools } = useSchoolDirectory();
   const requestList = usePagedList([...PK.breakGlass, "list"], (cursor) =>
@@ -709,7 +719,9 @@ export function BreakGlassScreen() {
       cell: (row) => (
         <span className="flex flex-wrap items-start gap-2">
           {breakGlassAction(row)}
-          {row.status === "requested" && can("platform.breakglass.request") ? (
+          {row.status === "requested" &&
+          row.requested_by === meId &&
+          can("platform.breakglass.request") ? (
             <ActionDialog
               triggerLabel={t("withdraw")}
               triggerSize="sm"
