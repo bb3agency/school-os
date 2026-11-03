@@ -16223,13 +16223,29 @@
       "IndicatorsOut": {
         "properties": {
           "attendance": {
-            "$ref": "#/components/schemas/AttendanceIndicatorOut"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AttendanceIndicatorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null unless the caller holds attendance.read for the student (AA-17)"
           },
           "behaviour": {
             "$ref": "#/components/schemas/BehaviourIndicatorOut"
           },
           "course": {
-            "$ref": "#/components/schemas/CourseIndicatorOut"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CourseIndicatorOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null unless the caller holds marks.read for the student (AA-17)"
           }
         },
         "required": [
@@ -64800,7 +64816,7 @@
     },
     "/api/v1/platform/break-glass-requests/{request_id}/withdraw": {
       "post": {
-        "description": "Withdraw a request that is still waiting (audit 2026-10-05 A-13). It ends as\n``revoked``; ``409 invalid_state`` once approved, denied or ended.",
+        "description": "Withdraw a request that is still waiting (audit 2026-10-05 A-13). It ends as\n``revoked``; ``409 invalid_state`` once approved, denied or ended. Only the operator who\nmade the request may withdraw it; ``404`` for anyone else.",
         "operationId": "withdraw_breakglass_api_v1_platform_break_glass_requests__request_id__withdraw_post",
         "parameters": [
           {

@@ -6253,7 +6253,8 @@ export interface paths {
         /**
          * Withdraw Breakglass
          * @description Withdraw a request that is still waiting (audit 2026-10-05 A-13). It ends as
-         *     ``revoked``; ``409 invalid_state`` once approved, denied or ended.
+         *     ``revoked``; ``409 invalid_state`` once approved, denied or ended. Only the operator who
+         *     made the request may withdraw it; ``404`` for anyone else.
          */
         post: operations["withdraw_breakglass_api_v1_platform_break_glass_requests__request_id__withdraw_post"];
         delete?: never;
@@ -16135,9 +16136,11 @@ export interface components {
         };
         /** IndicatorsOut */
         IndicatorsOut: {
-            attendance: components["schemas"]["AttendanceIndicatorOut"];
+            /** @description null unless the caller holds attendance.read for the student (AA-17) */
+            attendance: components["schemas"]["AttendanceIndicatorOut"] | null;
             behaviour: components["schemas"]["BehaviourIndicatorOut"];
-            course: components["schemas"]["CourseIndicatorOut"];
+            /** @description null unless the caller holds marks.read for the student (AA-17) */
+            course: components["schemas"]["CourseIndicatorOut"] | null;
         };
         /** InputOut */
         InputOut: {
