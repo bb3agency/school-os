@@ -36,6 +36,14 @@ import {
 export const REQUEST_TEXT_MAX = 4000;
 const NAME_MAX = 200;
 const NOT_CHECKED = "not_checked";
+/** The API refuses a received date more than this many days back (422 `too_old`). */
+const RECEIVED_MAX_AGE_DAYS = 366;
+
+/** `YYYY-MM-DD` that many calendar days before `iso` (calendar maths, no time zone). */
+function daysBefore(iso: string, days: number): string {
+  const [y, m, d] = iso.split("-").map(Number) as [number, number, number];
+  return new Date(Date.UTC(y, m - 1, d - days)).toISOString().slice(0, 10);
+}
 
 /**
  * Client checks for the "Log a request" form (FR-DPDP-005). Messages are keys under
@@ -85,6 +93,29 @@ export function buildRequestSchema(today = todayInIndia()) {
         context.addIssue({ code: "custom", path: ["received_on"], message: "invalidDate" });
       } else if (iso > today) {
         context.addIssue({ code: "custom", path: ["received_on"], message: "dateInFuture" });
+      } else if (iso < daysBefore(today, RECEIVED_MAX_AGE_DAYS)) {
+        context.addIssue({ code: "custom", path: ["received_on"], message: "dateTooOld" });
+      }
+      // The API's subject rules (privacy.service.create_request), checked before sending.
+      if (data.kind === "nomination" && data.subject_kind === "student") {
+        context.addIssue({ code: "custom", path: ["kind"], message: "nominationAdultsOnly" });
+      }
+      if (data.verification_method === "staff_sign_in" && data.subject_kind !== "member") {
+        context.addIssue({
+          code: "custom",
+          path: ["verification_method"],
+          message: "staffSignInStaffOnly",
+        });
+      }
+      if (
+        data.verification_method === "guardian_phone_on_record" &&
+        data.subject_kind === "member"
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["verification_method"],
+          message: "guardianPhoneGuardiansOnly",
+        });
       }
       // Invariant 4: no Aadhaar number is ever stored, even inside what the parent wrote.
       if (containsFullAadhaar(data.request_text)) {
@@ -414,16 +445,22 @@ function RequestForm({ onCreated }: { onCreated: (request: PrivacyRequest) => vo
         </div>
       ) : null}
 
-      <fieldset className="space-y-2">
+      <fieldset
+        className="space-y-2"
+        aria-describedby={
+          errors.verification_method ? `${id("verification_method")}-error` : undefined
+        }
+      >
         <legend className="text-sm font-semibold text-ink">{t("verification")}</legend>
         <p className="text-sm text-ink-muted">{t("verificationHint")}</p>
         <div className="grid gap-2 md:grid-cols-2">
           {[
             { value: NOT_CHECKED, label: tm("notChecked") },
             ...VERIFICATION_METHODS.map((value) => ({ value, label: tm(value) })),
-          ].map((option) => (
+          ].map((option, index) => (
             <label key={option.value} className={card}>
               <input
+                {...(index === 0 ? { id: id("verification_method") } : {})}
                 type="radio"
                 name="verification_method"
                 value={option.value}
@@ -434,6 +471,14 @@ function RequestForm({ onCreated }: { onCreated: (request: PrivacyRequest) => vo
             </label>
           ))}
         </div>
+        {errors.verification_method ? (
+          <p
+            id={`${id("verification_method")}-error`}
+            className="text-sm font-semibold text-danger"
+          >
+            {errors.verification_method}
+          </p>
+        ) : null}
       </fieldset>
 
       <ApiErrorAlert error={error} namespace="privacy" />
