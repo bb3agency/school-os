@@ -710,10 +710,10 @@ def _refuse_blocked(record: _Record) -> None:
     raise CertificateBlocked()
 
 
-def _format_preview(record: _Record, ctx: UserContext) -> list[PrintedField]:
+def _format_preview(record: _Record, *, sensitive: bool) -> list[PrintedField]:
     """A format TC's lines in print order, each with its value now or as a TC input to type
-    (US-2001 AC1). A restricted value the school prints is shown only to holders of
-    ``student.read_sensitive`` (``masked`` otherwise)."""
+    (US-2001 AC1). A restricted value the school prints is shown only when the caller's
+    ``student.read_sensitive`` reaches the student (``sensitive``; ``masked`` otherwise)."""
     fmt = record.layout.fmt
     if fmt is None:  # pragma: no cover - callers check
         return record.fields
@@ -744,7 +744,7 @@ def _format_preview(record: _Record, ctx: UserContext) -> list[PrintedField]:
             out.append(ident.model_copy(update={"key": line.key, "label_en": line.label_en}))
         elif line.fill == "restricted" and line.attribute is not None:
             value = record.restricted.get(line.attribute)
-            shown = record.print_restricted and ctx.has(STUDENT_SENSITIVE)
+            shown = record.print_restricted and sensitive
             out.append(
                 PrintedField(
                     **{**base, "value": value if shown else None},
@@ -755,7 +755,7 @@ def _format_preview(record: _Record, ctx: UserContext) -> list[PrintedField]:
     return out
 
 
-def _preview_out(record: _Record, ctx: UserContext) -> CertificatePreview:
+def _preview_out(record: _Record, *, sensitive: bool) -> CertificatePreview:
     current = record.current_enrolment or record.last_enrolment
     label = record.structure.class_labels(current.section_id)[0] if current else None
     year = record.structure.current
@@ -764,7 +764,9 @@ def _preview_out(record: _Record, ctx: UserContext) -> CertificatePreview:
         student_id=record.student_id,
         certificate_type=record.certificate_type,
         requires_approval=record.spec.requires_approval,
-        fields=_format_preview(record, ctx) if layout.fmt is not None else record.fields,
+        fields=_format_preview(record, sensitive=sensitive)
+        if layout.fmt is not None
+        else record.fields,
         class_label=label,
         academic_year_label=year.label if year is not None else None,
         blockers=record.blockers,
@@ -929,7 +931,12 @@ def preview(
     permission ``certificate.issue``; 404 outside scope). Nothing is written or audited."""
     if not _in_reach(_reach(session, ctx, [ISSUE]), student_id):
         raise NotFound("Student not found")
-    out = _preview_out(_record(session, ctx, student_id, certificate_type), ctx)
+    record = _record(session, ctx, student_id, certificate_type)
+    # SEC-015: restricted values only where the caller's read_sensitive reaches this student.
+    sensitive = record.print_restricted and _in_reach(
+        _reach(session, ctx, [STUDENT_SENSITIVE]), student_id
+    )
+    out = _preview_out(record, sensitive=sensitive)
     if certificate_type == "transfer":
         out = out.model_copy(update={"fee_note": _fee_note(session, ctx, student_id)})
     return out
@@ -1025,6 +1032,10 @@ def _clean_inputs(
             day < s for s in starts
         ):
             errors.append(_error("inputs.leaving_date", "leaving_date_before_enrolment"))
+    worked, attended = clean.get("working_days"), clean.get("days_attended")
+    if worked is not None and attended is not None and int(attended) > int(worked):
+        # FR-CERT-016: a frozen TC never prints more days attended than working days.
+        errors.append(_error("inputs.days_attended", "too_large"))
     if errors:
         raise ValidationFailed(errors)
     return clean
