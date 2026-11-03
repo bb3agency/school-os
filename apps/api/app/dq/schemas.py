@@ -4,10 +4,18 @@ from __future__ import annotations
 
 import datetime as dt
 import re
+import unicodedata
 import uuid
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    model_validator,
+)
 
 # needs_confirmation (A-01): a blocker a write without evidence removed; unresolved until a
 # dq.findings.waive holder confirms it (POST /dq/findings/{id}/resolve, step-up).
@@ -19,6 +27,16 @@ RuleId = Literal[
     "DQ-007", "DQ-008", "DQ-009", "DQ-010", "DQ-011", "DQ-012",
     "DQ-021", "DQ-022", "DQ-030", "DQ-031",
 ]  # fmt: skip
+
+
+def _clean(value: Any) -> Any:
+    """NFC and trimmed before the length checks (CLAUDE.md §9): the services store free text
+    trimmed, so a value long enough only with its spaces must be refused here (422), not by the
+    database's length CHECK (a 500, or a misleading 409)."""
+    return unicodedata.normalize("NFC", value).strip() if isinstance(value, str) else value
+
+
+Text = Annotated[str, BeforeValidator(_clean)]
 
 
 class _In(BaseModel):
@@ -133,7 +151,7 @@ class FindingOut(_Out):
 class ResolveIn(_In):
     """US-502 AC1: a note, a change request, or both."""
 
-    note: str | None = Field(default=None, min_length=1, max_length=1000)
+    note: Text | None = Field(default=None, min_length=1, max_length=1000)
     change_request_id: uuid.UUID | None = None
 
     @model_validator(mode="after")
@@ -144,7 +162,7 @@ class ResolveIn(_In):
 
 
 class WaiveIn(_In):
-    reason: str = Field(min_length=3, max_length=1000)
+    reason: Text = Field(min_length=3, max_length=1000)
 
 
 class FindingFilters(_In):
@@ -482,7 +500,7 @@ class CalendarEventIn(_In):
     its dates, the readiness profiles it concerns and an owner."""
 
     academic_year_id: uuid.UUID
-    label: str = Field(min_length=3, max_length=120)
+    label: Text = Field(min_length=3, max_length=120)
     opens_on: dt.date
     closes_on: dt.date
     profile_keys: list[Annotated[str, StringConstraints(max_length=64)]] = Field(

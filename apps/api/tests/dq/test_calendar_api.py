@@ -284,6 +284,28 @@ def test_FR_RDY_005_own_event_add_list_and_remove(admin_engine: Engine, api: Any
     assert again.status_code == 404
 
 
+def test_FR_RDY_005_own_event_label_is_trimmed_and_nfc_before_its_length_check(
+    admin_engine: Engine, api: Any
+) -> None:
+    """A label that is long enough only with its spaces was a 409 ``conflict`` ("an event with
+    this name was just added") from the database's 3-character minimum; it is a 422 now, and a
+    decomposed label is stored NFC (CLAUDE.md §9)."""
+    s = school(admin_engine)
+    office = s.people["office_admin"]
+    body = {
+        "academic_year_id": str(s.ids["year"]),
+        "opens_on": "2026-11-10",
+        "closes_on": "2026-11-12",
+        "source_kind": "phone",
+    }
+    short = api.call(office, "POST", BASE, json={**body, "label": "  ab    "})
+    assert short.status_code == 422, short.text
+    assert short.json()["code"] == "validation_error"
+    res = api.call(office, "POST", BASE, json={**body, "label": "  Café meeting  "})
+    assert res.status_code == 201, res.text
+    assert res.json()["label_en"] == "Café meeting"
+
+
 def test_FR_RDY_004_undoing_a_confirmation_brings_the_expected_dates_back(
     admin_engine: Engine, api: Any
 ) -> None:

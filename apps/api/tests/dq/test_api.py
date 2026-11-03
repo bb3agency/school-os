@@ -9,11 +9,12 @@ import uuid
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from app.core.languages import contains_telugu
 from app.core.redaction import verhoeff_check_digit
 from app.dq.rules import load_rules
-from app.dq.schemas import RuleId
+from app.dq.schemas import ResolveIn, RuleId
 
 pytestmark = pytest.mark.db
 DS = sys.modules["sos_test_dq_support"]
@@ -250,6 +251,21 @@ def test_SEC_005_waive_needs_step_up_and_a_reason(world: Any, api: Any) -> None:
     ok = api.call(who, "POST", path, json={"reason": "Accepted by board"})
     assert ok.status_code == 200
     assert (ok.json()["status"], ok.json()["waived_reason"]) == ("waived", "Accepted by board")
+
+
+def test_FR_DQ_020_blank_reason_or_note_is_a_422_not_a_server_error(world: Any, api: Any) -> None:
+    """A reason of spaces only passed the 3-character minimum, was stored trimmed (empty) and
+    broke the database's 1-character minimum (500). Free text is trimmed and NFC first."""
+    fid = DS.high_finding(world.a)
+    who = world.person("office_admin")
+    path = f"/api/v1/dq/findings/{fid}/waive"
+    blank = api.call(who, "POST", path, json={"reason": "      "})
+    assert (blank.status_code, blank.json()["code"]) == (422, "validation_error")
+    with pytest.raises(ValidationError):
+        ResolveIn(note="     ", change_request_id=uuid.uuid4())
+    ok = api.call(who, "POST", path, json={"reason": "  Café board  "})
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["waived_reason"] == "Café board"
 
 
 def test_DL_06_resolving_a_blocker_needs_the_waive_permission_and_step_up(
