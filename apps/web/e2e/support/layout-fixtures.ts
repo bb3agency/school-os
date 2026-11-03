@@ -2121,6 +2121,19 @@ const ROUTES: Array<[RegExp, Handler]> = [
     (_, q) => page(by(VERIFIED_ANSWERS, q, "status", (r) => r.status)),
   ],
   // Platform.
+  // Schools at 80 % or 100 % of their included AI answers this month (FR-PLT-020): a list.
+  [
+    re("/platform/usage/ai-quota-alerts"),
+    (): Schemas["AiQuotaAlertOut"][] =>
+      SCHOOLS.slice(0, 2).map(([tenant_id], i) => ({
+        tenant_id,
+        threshold: i === 0 ? 100 : 80,
+        month_start: date(9, 1),
+        answers_used: i === 0 ? 5_000 : 4_012,
+        included_answers: 5_000,
+        crossed_at: at(20 + i),
+      })),
+  ],
   [
     re("/platform/usage"),
     () => SCHOOLS.slice(0, 10).map(([tenant_id], i) => usageRow(tenant_id, 28 - (i % 3), i)),

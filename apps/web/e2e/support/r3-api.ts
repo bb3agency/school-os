@@ -1115,6 +1115,10 @@ function incidentAnswer(method: string, path: string): [number, unknown] | undef
     ) as Schemas["IncidentOut"];
     return [200, page([summary])];
   }
+  // FR-DPDP-031: open reporting clocks, a list. CERT-In is reported and the school told: none.
+  if (path === "/api/v1/platform/incidents/clocks" && method === "GET") {
+    return [200, [] satisfies Schemas["IncidentClockOut"][]];
+  }
   if (path === `/api/v1/platform/incidents/${R3_IDS.incident}` && method === "GET") {
     return [200, INCIDENT];
   }
