@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 import secrets
 import string
 import uuid
@@ -24,7 +25,7 @@ from hypothesis import strategies as st
 
 from app.core.config import Environment, Settings
 from app.core.logging import clear_context, get_logger, setup_logging
-from app.core.redaction import redact, redact_log
+from app.core.redaction import redact, redact_log, verhoeff_valid
 from app.core.telemetry import sanitize_attributes
 from app.public import tokens
 
@@ -56,7 +57,19 @@ PHONE_FORMS = [
     f"{MOBILE[:5]}-{MOBILE[5:]}",
     f"{MOBILE[:3]} {MOBILE[3:6]} {MOBILE[6:]}",
 ]
-UTR_NUMERIC = _digits(12)  # UPI UTR / RRN
+
+
+def _utr_numeric() -> str:
+    """12 random digits that ``redact`` leaves alone: a draw passing Verhoeff (about 1 in 10)
+    reads as an Aadhaar number and one starting ``91[6-9]`` as a mobile number, both masked by
+    ``redact`` too, which made the tests below fail now and then."""
+    while True:
+        value = _digits(12)
+        if not verhoeff_valid(value) and re.fullmatch(r"91[6-9]\d{9}", value) is None:
+            return value
+
+
+UTR_NUMERIC = _utr_numeric()  # UPI UTR / RRN
 UTR_IMPS = _digits(16)
 UTR_NEFT = "SYNB" + "R5" + _digits(16)  # bank prefix + R/N + digits (22 characters)
 RAZORPAY_IDS = [
