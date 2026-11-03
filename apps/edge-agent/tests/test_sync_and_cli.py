@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import email.utils
 import http.server
 import io
 import logging
@@ -259,6 +260,28 @@ def test_FR_TALLY_005_a_restarted_agent_applies_figures_back_to_an_earlier_snaps
     restarted = _agent(server, tally)
     assert restarted.sync_once().repeat is False
     assert len(server.syncs) == 3
+
+
+@pytest.mark.parametrize(("offset_s", "code"), [(0, "credential_refused"), (900, "clock_skew")])
+def test_FR_TALLY_002_a_401_from_a_pc_clock_off_says_clock_skew(offset_s: int, code: str) -> None:
+    # The server answers a timestamp outside ±300 s with the same 401 as a revoked device; the
+    # office PC's clock (a flat CMOS battery is common) must be named in the log, not "refused".
+    now = 1_790_000_000.0
+    date = email.utils.formatdate(now + offset_s, usegmt=True)
+
+    class _Refusing:
+        def request(
+            self, method: str, url: str, headers: Any, body: bytes | None
+        ) -> client.HttpResponse:
+            return client.HttpResponse(401, {"Date": date}, b"{}")
+
+    config = AgentConfig(
+        server_url=SERVER, tenant_id=TENANT, device_id=DEVICE, key_id="tdk-abcdefghijklmnopqrst"
+    )
+    api = client.SchoolOSClient(config, lambda: SECRET, _Refusing(), clock=lambda: now)
+    with pytest.raises(client.CredentialRefused) as caught:
+        api.get_config()
+    assert caught.value.code == code
 
 
 class _LocalTally(http.server.BaseHTTPRequestHandler):
