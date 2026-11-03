@@ -6,6 +6,7 @@ import { setNavigateForTesting } from "@/lib/bff/query";
 import { messages, renderWithIntl } from "@/test/render";
 import { DashboardScreen, SchoolsScreen } from "./platform/screens";
 import { AcademicStructureScreen } from "./academic-structure/AcademicStructureScreen";
+import { auditQuery } from "./school/audit-filters";
 import { AuditScreen, toIsoDate } from "./school/screens";
 import { UsersScreen } from "./users/UsersScreen";
 
@@ -266,6 +267,16 @@ describe("school screens wired to the BFF (US-202, US-102, FR-AUD-005)", () => {
     expect(toIsoDate("29/02/2027")).toBeUndefined();
     expect(toIsoDate("2026-06-01")).toBeUndefined();
     expect(toIsoDate(undefined)).toBeUndefined();
+  });
+
+  it("FR-AUD-005: the 'To date' day is included (the API's range is [from, to))", () => {
+    expect(auditQuery({ from: "03/11/2026", to: "03/11/2026" })).toEqual({
+      from: "2026-11-03T00:00:00+05:30",
+      to: "2026-11-04T00:00:00+05:30",
+    });
+    // Month and year ends roll over.
+    expect(auditQuery({ to: "31/12/2026" }).to).toBe("2027-01-01T00:00:00+05:30");
+    expect(auditQuery({ to: "28/02/2027" }).to).toBe("2027-03-01T00:00:00+05:30");
   });
 });
 
