@@ -1531,6 +1531,63 @@ def test_SEC_015_insights_of_students_outside_scope_are_404(
     assert len(after) == len(before) + 1
 
 
+def test_SEC_015_scoped_reads_and_closes_outside_scope_are_404_like_a_random_id(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """Audit B (invariant 3): the by-id routes a class teacher holds SCOPED that no other
+    same-school test probed. A 9A class teacher asking for a 9C student's consents, the 9C
+    month register, someone else's data-quality run or closing a 9C flag gets the 404 of a
+    random id, and nothing changes; a subject teacher of class X cannot list a 9A student's
+    enrolments."""
+    ids = SW.ensure_students(world)
+    SW.configure_keyring()
+    ct = world.person("class_teacher")
+    dq = _dq()
+    run_id = dq.call(world.a, dq.dq.run_checks).id  # requested by the office admin
+    flag = _m5().world_manual_flag(world, "s9c")
+    before = W.audit_events(admin_engine, world.a.tenant_id)
+    for method, template, hidden, params, body in (
+        ("GET", "/api/v1/students/{}/consents", ids["s9c"], None, None),
+        (
+            "GET",
+            "/api/v1/sections/{}/attendance/month",
+            world.a.ids["section_9c"],
+            {"month": "2026-09"},
+            None,
+        ),
+        ("GET", "/api/v1/dq/runs/{}", run_id, None, None),
+        ("POST", "/api/v1/insights/flags/{}/close", flag.id, None, {"reason": "improved"}),
+    ):
+        answers = [
+            api.call(
+                ct,
+                method,
+                template.format(target),
+                params=params,
+                json=body,
+                headers={"If-Match": 'W/"1"'},
+            )
+            for target in (hidden, uuid.uuid4())
+        ]
+        assert [a.status_code for a in answers] == [404, 404], (template, answers[0].text)
+        assert answers[0].json()["detail"] == answers[1].json()["detail"], template
+    assert W.audit_events(admin_engine, world.a.tenant_id) == before, "nothing changed or read"
+    # The run's own requester and an in-scope reader still reach their objects.
+    assert (
+        api.call(world.person("office_admin"), "GET", f"/api/v1/dq/runs/{run_id}").status_code
+        == 200
+    )
+    assert api.call(ct, "GET", f"/api/v1/students/{ids['s9a']}/consents").status_code == 200
+    teacher = world.person("teacher")  # subject teacher of class X
+    assert (
+        api.call(teacher, "GET", f"/api/v1/students/{ids['s10a']}/enrollments").status_code == 200
+    )
+    hidden = api.call(teacher, "GET", f"/api/v1/students/{ids['s9a']}/enrollments")
+    random = api.call(teacher, "GET", f"/api/v1/students/{uuid.uuid4()}/enrollments")
+    assert hidden.status_code == random.status_code == 404
+    assert hidden.json()["detail"] == random.json()["detail"]
+
+
 def test_SEC_001_flag_lists_never_show_other_school(world: Any, api: Any) -> None:
     b_flag = _m5().b_flag(world)
     res = api.call(
