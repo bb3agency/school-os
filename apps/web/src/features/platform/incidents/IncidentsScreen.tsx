@@ -1,7 +1,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DataTableV2, type ColumnV2 } from "@/components/console";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
@@ -45,6 +45,18 @@ export function IncidentStatusPill({ status }: { status: IncidentStatus }) {
   );
 }
 
+/**
+ * Re-render once a minute so a clock worked out from the current time ("due in 4 h") moves on
+ * while the page stays open; nothing else refreshes these pages on its own.
+ */
+export function useMinuteTick(): void {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTick((tick) => tick + 1), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+}
+
 /** "Due in 4 h" / "Overdue by 2 h" / "Due within the hour" for a clock. */
 export function useClockText(): (clock: Clock) => string {
   const t = useTranslations("platform.incidents.clock");
@@ -64,6 +76,7 @@ export function CertInClock({
 }) {
   const t = useTranslations("platform.incidents");
   const text = useClockText();
+  useMinuteTick();
   if (!incident.cert_in_required) {
     return (
       <Pill variant="tag" size="sm" icon={null}>
@@ -109,8 +122,9 @@ export function IncidentsScreen() {
   const clocks = useApiQuery(
     INCIDENT_KEYS.clocks,
     () => unwrap(api.GET("/api/v1/platform/incidents/clocks")),
-    // Only once the role is known: an operator without it never asks.
-    { enabled: Boolean(me?.permissions.includes(INCIDENTS_READ)) },
+    // Only once the role is known: an operator without it never asks. Asked again every
+    // minute: the API words each clock from the time it answered (`minutes_left`, stage).
+    { enabled: Boolean(me?.permissions.includes(INCIDENTS_READ)), refetchInterval: 60_000 },
   );
   const list = usePagedList(INCIDENT_KEYS.list, (cursor) =>
     unwrap(

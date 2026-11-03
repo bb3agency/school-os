@@ -5,6 +5,7 @@ import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@
 import { messages, renderWithIntl } from "@/test/render";
 import { SubscriptionsScreen } from "./BillingViews";
 import { HeartbeatPill } from "./HeartbeatPill";
+import { CertInClock } from "./incidents/IncidentsScreen";
 import { BreakGlassScreen } from "./OperationsViews";
 import { PlatformTicketScreen } from "./SupportScreens";
 
@@ -173,6 +174,31 @@ describe("operator console: idempotent creates and plain-language refusals", () 
       await within(dialog).findByText(api.ai_bundle_needs_monthly_plan?.title ?? "missing"),
     ).toBeInTheDocument();
     expect(within(dialog).queryByText(api.conflict?.title ?? "")).not.toBeInTheDocument();
+  });
+});
+
+describe("incident clocks", () => {
+  it("FR-DPDP-030: the CERT-In clock moves on while the page stays open", () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+    try {
+      vi.setSystemTime(new Date("2026-11-03T10:00:00Z"));
+      renderWithIntl(
+        <CertInClock
+          incident={{
+            cert_in_required: true,
+            cert_in_reported_at: null,
+            cert_in_due_at: "2026-11-03T15:30:00Z",
+          }}
+        />,
+      );
+      expect(screen.getByText(/due in 5 h/)).toBeInTheDocument();
+      act(() => {
+        vi.advanceTimersByTime(6 * 60 * 60_000);
+      });
+      expect(screen.getByText(/overdue by/)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
