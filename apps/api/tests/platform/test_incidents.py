@@ -165,6 +165,25 @@ def test_FR_DPDP_031_adding_a_school_clears_a_first_confirmation(
     assert len(again.json()["schools"]) == 2
 
 
+def test_FR_DPDP_031_a_school_cannot_mark_an_unconfirmed_notice_as_pulled(
+    api: Api, make_operator: MakeOperator
+) -> None:
+    """Schools see a notice only after two operators confirmed the list (ADR-0050). The pull
+    record must not mark a school notified for a list nobody confirmed: the notified time
+    satisfies the close gate and the school-notice clock."""
+    op = make_operator("platform_owner")
+    iid = _open(api, op)["id"]
+    school = _school()
+    payload = {"tenant_id": str(school), "categories": ["contact"], "approx_people": 3}
+    assert api.call("POST", f"/incidents/{iid}/schools", op, json=payload).status_code == 200
+    assert api.call("POST", f"/incidents/{iid}/confirm", op).status_code == 200  # first only
+    assert incidents.notices_for_school(school) == []
+    assert incidents.mark_notice_pulled(school, uuid.UUID(iid)) is False
+    (row,) = api.call("GET", f"/incidents/{iid}", op).json()["schools"]
+    assert row["school_notified_at"] is None
+    assert _events("incident.school_notified", iid) == []
+
+
 def test_FR_DPDP_031_young_role_cannot_be_the_second_operator(
     api: Api, make_operator: MakeOperator
 ) -> None:
