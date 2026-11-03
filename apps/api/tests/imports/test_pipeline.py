@@ -165,6 +165,40 @@ def test_FR_IMP_003_register_identity_is_not_overwritten_by_a_reimport(
     assert S.batch(admin_engine, same)["stats"]["updated"] == 1
 
 
+def test_SEC_015_admission_number_held_outside_the_importers_reach_is_an_error(
+    world: Any, admin_engine: Engine
+) -> None:
+    """FR-IMP-003: a scoped importer (9A, read_basic scoped too) re-importing the admission
+    number of a 10A student gets ``student_out_of_scope`` at validation, not a ``create`` row
+    that the school's unique admission number then refuses at commit."""
+    from dataclasses import replace
+
+    from app.authz.context import Scopes
+
+    existing_rows, existing = S.class_list(1)
+    existing_rows[1][5], existing_rows[1][6] = "X", "A"
+    S.imported(admin_engine, world.a, S.xlsx_bytes(existing_rows))
+    rows = [list(existing_rows[0]), list(existing_rows[1])]
+    rows[1][5], rows[1][6] = "IX", "A"
+    importer = S.ctx(world.a)
+    scoped = replace(
+        importer,
+        scopes=Scopes(section_ids=frozenset({world.a.ids["section_9a"]})),
+        scoped_permissions=frozenset(
+            {"import.run", "import.commit", "student.create", "student.read_basic"}
+        ),
+    )
+    batch_id = S.start(admin_engine, world.a, S.xlsx_bytes(rows))
+    sheet = read_sheet(S.xlsx_bytes(rows), "xlsx", import_config().limits)
+    with tenant_session(world.a.tenant_id, importer.user_id) as s:
+        batch = service._visible(s, scoped, batch_id, "import.run")
+        vctx = service._validation_context(s, scoped, batch, sheet, "import.commit")
+        result = validate_sheet(sheet, batch.mapping, vctx)
+    assert existing[0]
+    assert [e["code"] for e in result.rows[0].errors] == ["student_out_of_scope"]
+    assert result.rows[0].student_id is None
+
+
 def test_FR_IMP_003_duplicates_against_existing_and_within_file(
     world: Any, admin_engine: Engine
 ) -> None:

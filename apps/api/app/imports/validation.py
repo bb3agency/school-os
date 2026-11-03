@@ -133,6 +133,10 @@ class ValidationContext:
     # holder outside it is still a row error, but does not name that record (as
     # ``students.create_student`` does). Fails closed when not given.
     visible_holders: frozenset[str] = frozenset()
+    # Admission keys held by students of the school OUTSIDE the importer's reach (``existing``
+    # holds only those in reach): such a row is ``student_out_of_scope``, never a new student
+    # (the admission number is unique per school, so its commit would fail).
+    unreachable_admission_keys: frozenset[str] = frozenset()
 
     @property
     def creates(self) -> bool:
@@ -424,6 +428,8 @@ class _RowValidator:
         existing = ctx.existing.get(admission_key(admission)) if admission else None
         if existing is not None:
             self._update_row(existing, result)
+        elif admission is not None and admission_key(admission) in ctx.unreachable_admission_keys:
+            result.errors.append(issue("admission_no", "student_out_of_scope"))
         elif admission is not None:
             self._create_row(result)
         self._national_ids(result)

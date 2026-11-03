@@ -392,6 +392,21 @@ def test_SEC_015_scope_of_the_importer() -> None:
     assert all("admission_no:student_create_not_permitted" in c for c in _codes(cannot))
 
 
+def test_SEC_015_admission_number_of_a_student_outside_reach_is_not_a_new_student() -> None:
+    """FR-IMP-003: a row whose admission number another student of the school already holds,
+    outside the importer's reach, is an error at validation (not a ``create`` that the
+    unique admission number then refuses at commit), and names no record."""
+    sheet = _rows(["a-7", "Synthetica Seven", "", "14/03/2012", "M", "IX", "A"])
+    result = validate_sheet(
+        sheet,
+        MAPPING,
+        _ctx(allowed_sections=frozenset({"s9a"}), unreachable_admission_keys=frozenset({"a-7"})),
+    )
+    assert _codes(result) == [{"admission_no:student_out_of_scope"}]
+    assert result.rows[0].action is None
+    assert result.rows[0].student_id is None
+
+
 def test_FR_IMP_003_ambiguous_dates_are_flagged_unless_the_column_proves_the_order() -> None:
     sheet = _rows(
         ["A-1", "Synthetica One", "", "03/04/2012", "M", "IX", "A"],

@@ -165,6 +165,18 @@ def test_FR_IMP_003_date_parsing(
     assert (result.value, result.error, result.ambiguous) == (expected, error, ambiguous)
 
 
+def test_FR_IMP_003_text_month_with_comma_before_year() -> None:
+    """``14 March, 2012`` (the separator class names the comma) is a date, not invalid."""
+    assert parse_date("14 March, 2012").value == dt.date(2012, 3, 14)
+    assert parse_date("14 Mar., 2012").value == dt.date(2012, 3, 14)
+
+
+@pytest.mark.parametrize("value", ["1234²", "4098¹"])
+def test_FR_IMP_003_digit_like_text_is_invalid_not_a_crash(value: str) -> None:
+    """Superscript digits pass ``str.isdigit`` but are not numbers: a row error, never a 500."""
+    assert parse_date(value).error == "invalid_date"
+
+
 def test_FR_IMP_003_a_column_can_prove_day_first() -> None:
     column = ["03/04/2012", "25/12/2011", None, 40982]
     assert day_first_proven(column) is True
