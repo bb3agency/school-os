@@ -254,8 +254,11 @@ def online_receipts_between(session: Session, start: dt.date, end: dt.date) -> l
 
 
 def refund_by_provider_id(session: Session, provider_refund_id: str) -> Refund | None:
+    """Locked and re-read (``populate_existing``): a row already loaded in this session (the
+    refund poll) must not keep a status another worker changed before the lock was granted."""
     return session.scalars(
-        select(Refund).where(Refund.provider_refund_id == provider_refund_id).with_for_update()
+        select(Refund).where(Refund.provider_refund_id == provider_refund_id).with_for_update(),
+        execution_options={"populate_existing": True},
     ).one_or_none()
 
 
