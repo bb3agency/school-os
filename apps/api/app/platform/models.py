@@ -172,6 +172,7 @@ subscriptions = Table(
     Column("trial_ends_at", DateTime(timezone=True)),
     Column("current_period_start", Date, nullable=False),
     Column("current_period_end", Date, nullable=False),
+    Column("billing_anchor_day", SmallInteger),
     Column("price_override_inr", Numeric(14, 2)),
     Column("override_reason", Text),
     Column("past_due_since", Date),

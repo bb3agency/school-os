@@ -148,6 +148,17 @@ def _period_months(plan: Mapping[Any, Any]) -> int:
     return 12 if plan["billing_period"] == "annual" else 1
 
 
+def _period_end(start: dt.date, plan: Mapping[Any, Any], anchor: int | None) -> dt.date:
+    """The end of the period starting on ``start``: one billing period later, on the
+    subscription's anchor day clamped to that month's length (FR-PLT-015). So a subscription
+    billed on the 31st goes 31 Jan -> 28 Feb -> 31 Mar -> 30 Apr instead of staying on the 28th.
+    Without an anchor the day is only clamped (the old rule)."""
+    end = add_months(start, _period_months(plan))
+    if anchor is None:
+        return end
+    return end.replace(day=min(anchor, calendar.monthrange(end.year, end.month)[1]))
+
+
 # --- one-time fee, AI bundles and overage (pure) ----------------------------------------------
 
 ONE_TIME_FEE_TEXT = "Implementation and data verification (one-time)"
@@ -377,7 +388,7 @@ def insert_subscription(
     end = (
         today + dt.timedelta(days=max(trial_days, 1))
         if trial
-        else add_months(today, _period_months(plan))
+        else _period_end(today, plan, today.day)
     )
     return repo.insert_row(
         s,
@@ -391,6 +402,7 @@ def insert_subscription(
             "trial_ends_at": (dt.datetime.combine(end, dt.time(), dt.UTC) if trial else None),
             "current_period_start": today,
             "current_period_end": end,
+            "billing_anchor_day": today.day,
             "price_override_inr": price_override,
             "override_reason": override_reason,
         },
@@ -438,7 +450,8 @@ def activate_subscription(
             "plan_id": plan["id"],
             "pending_plan_id": None,
             "current_period_start": today,
-            "current_period_end": add_months(today, _period_months(plan)),
+            "current_period_end": _period_end(today, plan, today.day),
+            "billing_anchor_day": today.day,
         }
         if sub["ai_bundle_id"] is not None:
             # Trial answers are free: the bundle counts from the month after activation.
@@ -787,9 +800,12 @@ def suspend_subscription(
         )
     if sub0 is None or dep is None:
         raise NotFound("Subscription not found")
-    shared_active = dep["mode"] == "shared" and dep["tenant_status"] == "active"
     with platform_session() as s, db_errors():
         sub = _sub_or_404(s, sub_id)
+        # Under the deployment lock, as reactivate_subscription (R-18): a security hold or an
+        # offboarding placed meanwhile is never overwritten with reason "billing" (FR-PLT-014).
+        dep = must(repo.get(s, m.deployments, dep["id"], for_update=True))
+        shared_active = dep["mode"] == "shared" and dep["tenant_status"] == "active"
         if sub["status"] != "past_due":
             raise Conflict("Only a past-due subscription can be suspended.", code="invalid_state")
         if sub["grace_ends_on"] is None or today < sub["grace_ends_on"]:
@@ -966,17 +982,18 @@ def roll_periods(*, today: dt.date | None = None) -> int:
             else:
                 plan = repo.get(s, m.plans, sub["pending_plan_id"] or sub["plan_id"])
                 plan = must(plan)
+                anchor = sub["billing_anchor_day"]
                 start = sub["current_period_end"]
-                end = add_months(start, _period_months(plan))
-                starts = [start]
+                end = _period_end(start, plan, anchor)
+                periods = [(start, end)]
                 while end <= today:  # catch up if the job did not run for a while
-                    start, end = end, add_months(end, _period_months(plan))
-                    starts.append(start)
+                    start, end = end, _period_end(end, plan, anchor)
+                    periods.append((start, end))
                 if sub["status"] in ("active", "past_due"):
                     # Billing in advance: each period gets its draft, also the ones a stopped
                     # job skipped (create_draft is idempotent per period; audit L-11).
-                    for period_start in starts:
-                        create_draft(s, SYSTEM, sub, period_start)
+                    for period_start, period_end in periods:
+                        create_draft(s, SYSTEM, sub, period_start, period_end=period_end)
                 repo.update_row(
                     s,
                     m.subscriptions,
@@ -1251,6 +1268,13 @@ def _totals(s: Session, invoice: Mapping[Any, Any]) -> dict[str, Any]:
     }
 
 
+def _plan_for_period(s: Session, sub: Mapping[Any, Any], period_start: dt.date) -> RowMapping:
+    """The plan that bills the period starting on ``period_start``: the scheduled (pending)
+    plan for a period from the next period start on, else the current plan."""
+    use_pending = sub["pending_plan_id"] is not None and period_start >= sub["current_period_end"]
+    return must(repo.get(s, m.plans, sub["pending_plan_id"] if use_pending else sub["plan_id"]))
+
+
 def create_draft(
     s: Session,
     actor: Actor,
@@ -1270,11 +1294,17 @@ def create_draft(
     if dep is not None and dep["tenant_status"] in CLOSED_SCHOOL_STATUSES:
         return None
     account = repo.get(s, m.billing_accounts, sub["billing_account_id"])
-    use_pending = sub["pending_plan_id"] is not None and period_start >= sub["current_period_end"]
-    plan = repo.get(s, m.plans, sub["pending_plan_id"] if use_pending else sub["plan_id"])
+    plan = _plan_for_period(s, sub, period_start)
     account = must(account)
-    plan = must(plan)
-    period_end = period_end or add_months(period_start, _period_months(plan))
+    if period_end is None:
+        # The anchor day applies to the subscription's own periods; a manual draft for some
+        # other start date covers plain months from that date (FR-PLT-015).
+        anchor = sub["billing_anchor_day"]
+        own = period_start in (sub["current_period_start"], sub["current_period_end"])
+        if not own and anchor is not None:
+            month_len = calendar.monthrange(period_start.year, period_start.month)[1]
+            own = period_start.day == min(anchor, month_len)
+        period_end = _period_end(period_start, plan, anchor if own else None)
     existing = repo.get_by(
         s,
         m.invoices,
@@ -1405,9 +1435,10 @@ def update_draft(
             raise PreconditionFailed()
         fields = []
         if lines is not None:
-            sub = repo.get(s, m.subscriptions, row["subscription_id"], for_update=True)
-            plan = repo.get(s, m.plans, sub["plan_id"]) if sub else None
-            plan = must(plan)
+            sub = must(repo.get(s, m.subscriptions, row["subscription_id"], for_update=True))
+            # The plan of the invoice's own period (the pending one after a scheduled change),
+            # as create_draft priced it; not always the current plan (FR-PLT-013).
+            plan = _plan_for_period(s, sub, row["period_start"])
             _check_overage_months(s, row, lines)
             repo.replace_invoice_lines(s, invoice_id, _line_rows(lines, plan))
             fields.append("lines")
