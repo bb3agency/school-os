@@ -1722,9 +1722,14 @@ def generate_invoices(month: str, actor: Actor = SYSTEM) -> JobOut:
         try:
             with platform_session() as s, db_errors():
                 locked = repo.get(s, m.subscriptions, sub["id"], for_update=True)
-                if locked is not None and create_draft(
-                    s, SYSTEM, locked, locked["current_period_end"]
-                ):
+                # Re-check under the lock: the listing ran in another transaction, and a
+                # subscription cancelled, suspended or rolled since is not drafted here.
+                if (
+                    locked is not None
+                    and locked["status"] in ("active", "past_due")
+                    and not locked["cancel_at_period_end"]
+                    and first <= locked["current_period_end"] < after
+                ) and create_draft(s, SYSTEM, locked, locked["current_period_end"]):
                     generated += 1
         except Exception:  # one bad subscription must not stop the run
             failed += 1
