@@ -153,7 +153,8 @@ def test_FR_TALLY_009_silence_check_survives_a_failing_school(
     monkeypatch.setattr("app.tally.service.connector_enabled", lambda *_: True)
     monkeypatch.setattr("app.tally.service.notify_silent_devices", _flaky(seen, 1))
     monkeypatch.setattr("app.tally.service.purge_old_syncs", lambda *_: 2)
-    assert tasks.check_all() == {"tenants": 2, "notified": 1, "purged": 2, "failed": 1}
+    # Retention runs first, so the school whose notice fails is still purged (FR-TALLY-009).
+    assert tasks.check_all() == {"tenants": 2, "notified": 1, "purged": 4, "failed": 1}
     assert seen == [A, B]
 
 
