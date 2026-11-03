@@ -18,7 +18,7 @@ from sqlalchemy.exc import DBAPIError
 
 from app.core.db import tenant_session
 from app.core.errors import Conflict, Forbidden, NotFound, PreconditionFailed, ValidationFailed
-from app.fees import _common
+from app.fees import _common, upi_tasks
 from app.fees import service as fees
 from app.fees.schemas import CancellationRequest, DecisionIn
 from app.fees.upi_schemas import (
@@ -472,6 +472,32 @@ def test_FR_FEE_026_morning_notification_and_narration_erasure(
     now = _common.now
     monkeypatch.setattr(_common, "now", lambda s: now(s) + dt.timedelta(days=91))
     morning_for_school(school.tenant_id)
+    (line,) = _lines(school, out.id)
+    assert (line.narration, line.narration_erased) == (None, True)
+
+
+def test_FR_FEE_026_narrations_are_erased_while_suspended_or_with_fees_off(
+    school: Any, admin_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Retention (docs/05 §13: narration erased after 90 days) does not wait for the school to
+    be active or to have fees on; only the notification does."""
+    out, _ = _import(school, admin_engine, [U.Credit(_today(), _amount(), upi=False)])
+    now = _common.now
+    monkeypatch.setattr(_common, "now", lambda s: now(s) + dt.timedelta(days=91))
+    monkeypatch.setattr(upi_tasks.service, "enabled", lambda s, t: False)
+    with admin_engine.begin() as c:
+        c.execute(
+            text("UPDATE core.tenants SET status = 'suspended' WHERE id = :t"),
+            {"t": school.tenant_id},
+        )
+    try:
+        upi_tasks.morning_all()
+    finally:
+        with admin_engine.begin() as c:
+            c.execute(
+                text("UPDATE core.tenants SET status = 'active' WHERE id = :t"),
+                {"t": school.tenant_id},
+            )
     (line,) = _lines(school, out.id)
     assert (line.narration, line.narration_erased) == (None, True)
 

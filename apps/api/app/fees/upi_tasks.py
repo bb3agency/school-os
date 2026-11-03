@@ -1,10 +1,11 @@
 """Celery task for UPI reconciliation upkeep (R2-2E; FR-FEE-017, FR-FEE-026; docs/05 §13).
 
-- ``fees.upi_morning`` (beat, 07:00 IST, queue ``maintenance``): per active school with fees on,
-  erases bank statement narrations older than 90 days and, when there is anything to look at,
-  notifies the holders of ``fee.reconcile`` with the counts (UPI receipts unconfirmed past the
-  school's window; bank credits needing a person). One tenant session per school; one failing
-  school does not stop the others. Ids and counts only in logs.
+- ``fees.upi_morning`` (beat, 07:00 IST, queue ``maintenance``): per school (also suspended or
+  offboarding, and whether fees are on or not: retention is data minimisation) erases bank
+  statement narrations older than 90 days; then, for an active school with fees on and when
+  there is anything to look at, notifies the holders of ``fee.reconcile`` with the counts (UPI
+  receipts unconfirmed past the school's window; bank credits needing a person). One tenant
+  session per school; one failing school does not stop the others. Ids and counts only in logs.
 
 Register this module in ``sos_worker.celery_app.TASK_MODULES`` and merge :func:`beat_schedule`.
 """
@@ -31,20 +32,23 @@ log = get_logger(__name__)
 MORNING_TASK: Final = "fees.upi_morning"
 TEMPLATE: Final = "fee.upi_exceptions"
 TENANT_STATUSES: Final = ("active",)
+# Narration retention (docs/05 §13) runs for every school whose data is still kept.
+RETENTION_STATUSES: Final = ("active", "suspended", "offboarding")
 MAX_ERASE_BATCHES: Final = 50
 
 
-def morning_for_school(tenant_id: uuid.UUID) -> dict[str, int]:
-    """Erase old narrations and notify (see the module docstring) for one school."""
+def morning_for_school(tenant_id: uuid.UUID, *, notify: bool = True) -> dict[str, int]:
+    """Erase old narrations and notify (see the module docstring) for one school. The erasure
+    always runs; the notification only with ``notify`` and fees on."""
     erased = 0
     with tenant_session(tenant_id) as session:
-        if not service.enabled(session, tenant_id):
-            return {"erased": 0, "notified": 0}
         for _ in range(MAX_ERASE_BATCHES):
             done = service.erase_statement_narrations(session)
             erased += done
             if done == 0:
                 break
+        if not notify or not service.enabled(session, tenant_id):
+            return {"erased": erased, "notified": 0}
         unconfirmed, credits = service.upi_exception_counts(session)
         notified = 0
         if unconfirmed or credits:
@@ -62,11 +66,12 @@ def morning_for_school(tenant_id: uuid.UUID) -> dict[str, int]:
 
 def morning_all() -> dict[str, int]:
     with context_free_session() as session:
-        tenant_ids = tenancy.list_tenant_ids(session, TENANT_STATUSES)
+        tenant_ids = tenancy.list_tenant_ids(session, RETENTION_STATUSES)
+        active = set(tenancy.list_tenant_ids(session, TENANT_STATUSES))
     totals = {"tenants": len(tenant_ids), "erased": 0, "notified": 0, "failed": 0}
     for tenant_id in tenant_ids:
         try:
-            out = morning_for_school(tenant_id)
+            out = morning_for_school(tenant_id, notify=tenant_id in active)
         except (SQLAlchemyError, DomainError) as exc:
             totals["failed"] += 1
             log.warning(
