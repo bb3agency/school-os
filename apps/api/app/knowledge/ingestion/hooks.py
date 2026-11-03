@@ -2,12 +2,14 @@
 
 ``documents`` has no outbox event for "version is clean"; it offers extension hooks instead
 (``documents.service.READY_HOOKS``, called in the worker's transaction right after a version
-turns ``ready``, and ``ACL_CHANGED_HOOKS``, called in the ``set_acl`` transaction). These hooks
+turns ``ready``, ``ACL_CHANGED_HOOKS``, called in the ``set_acl`` transaction, and
+``METADATA_CHANGED_HOOKS``, called in the metadata PATCH's transaction). These hooks
 only enqueue an event in that same transaction, so a job is queued if and only if the change
 commits (docs/04 §6, FR-OPS-004):
 
 - ``kb.version.ready`` -> ``knowledge.ingest_version`` (queue ``ingest``)
-- ``kb.document.acl_changed`` -> ``knowledge.refresh_acl`` (queue ``ingest``)
+- ``kb.document.acl_changed`` -> ``knowledge.refresh_acl`` (queue ``ingest``), for an ACL change
+  and for a metadata change (the refresh rewrites the ACL copies and the facets)
 
 Nothing is enqueued while ``SOS_KB_ENABLED`` is off. Importing this module installs the hooks
 and routes (idempotent); the worker imports it through ``app.knowledge.tasks`` and the API must
@@ -46,6 +48,12 @@ def on_acl_changed(session: Session, document_id: uuid.UUID) -> None:
         ops.enqueue_event(session, ACL_EVENT, {"document_id": document_id})
 
 
+def on_metadata_changed(session: Session, document_id: uuid.UUID, fields: frozenset[str]) -> None:
+    """A PATCH changed the document's metadata: the same refresh rewrites the facets the chunks
+    copy (``doc_type``, ``issued_on``; docs/05 §6), so search filters use the new values."""
+    on_acl_changed(session, document_id)
+
+
 def install() -> None:
     ops.register_outbox_route(READY_EVENT, INGEST_TASK)
     ops.register_outbox_route(ACL_EVENT, ACL_TASK)
@@ -53,6 +61,8 @@ def install() -> None:
         documents.READY_HOOKS.append(on_version_ready)
     if on_acl_changed not in documents.ACL_CHANGED_HOOKS:
         documents.ACL_CHANGED_HOOKS.append(on_acl_changed)
+    if on_metadata_changed not in documents.METADATA_CHANGED_HOOKS:
+        documents.METADATA_CHANGED_HOOKS.append(on_metadata_changed)
 
 
 install()
@@ -65,5 +75,6 @@ __all__ = [
     "REMOVE_TASK",
     "install",
     "on_acl_changed",
+    "on_metadata_changed",
     "on_version_ready",
 ]

@@ -14,6 +14,7 @@ import io
 import sys
 import uuid
 from collections.abc import Iterator
+from datetime import date
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -280,6 +281,19 @@ def test_FR_KB_002_acl_refresh_rewrites_the_copies_on_every_chunk() -> None:
     )
     w.pipeline.refresh_acl(S.TENANT_A, DOC)
     assert {r.acl for r in rows(w)} == {ChunkAcl(sections=(S.SECTION_6A,), memberships=(member,))}
+
+
+def test_FR_KB_002_refresh_after_a_metadata_change_rewrites_the_chunk_facets() -> None:
+    """docs/05 §6: the facets (doc_type, issued_on, ...) are copies the refresh rewrites, so a
+    re-typed or re-dated document is filtered by its new values, not the ones at ingestion."""
+    w = S.world()
+    seeded(w)
+    w.pipeline.ingest(S.TENANT_A, DOC, V1.id)
+    w.source.update(S.TENANT_A, DOC, doc_type="notice", issued_on=date(2026, 9, 1))
+    w.pipeline.refresh_acl(S.TENANT_A, DOC)
+    assert {(r.filters.doc_type, r.filters.issued_on) for r in rows(w)} == {
+        ("notice", date(2026, 9, 1))
+    }
 
 
 def test_FR_KB_002_empty_acl_is_copied_as_empty_never_widened() -> None:

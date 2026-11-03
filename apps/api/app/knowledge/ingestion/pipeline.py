@@ -151,7 +151,9 @@ class DocumentIngestionPipeline:
                 count = self._store.delete_document(s, document_id)
                 outcome = MISSING if facts is None else EXCLUDED
             else:
-                count = self._store.update_acl(s, document_id, ChunkAcl.from_entries(facts.acl))
+                count = self._store.update_acl(
+                    s, document_id, ChunkAcl.from_entries(facts.acl), _filters(facts)
+                )
                 outcome = "updated"
         log.info(
             "knowledge.acl.refreshed",
