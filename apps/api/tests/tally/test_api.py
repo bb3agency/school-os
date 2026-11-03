@@ -20,7 +20,7 @@ import pytest
 from sqlalchemy import Engine, text
 
 from app.core.db import tenant_session
-from app.tally import agent_auth, service
+from app.tally import agent_auth, service, tasks
 from app.tally.config import rules as tally_rules
 
 from .conftest import T
@@ -876,6 +876,36 @@ def test_FR_TALLY_005_old_sync_records_are_deleted_unless_a_ledger_points_to_the
         )
     with tenant_session(school.tenant_id) as db:
         assert service.purge_old_syncs(db) == 1
+    assert (
+        _scalar(
+            admin_engine,
+            "SELECT count(*) FROM ops.tally_syncs WHERE tenant_id = :t",
+            t=school.tenant_id,
+        )
+        == 1
+    )
+
+
+def test_FR_TALLY_009_old_sync_records_are_deleted_while_the_flag_is_off(
+    api: Any, admin_engine: Engine
+) -> None:
+    """Retention is a duty, not connector activity: the nightly check deletes sync records past
+    retention even after the school's connector flag was switched off (no notices then)."""
+    school, agent = _ready(api, admin_engine)
+    T.snapshot(api, agent, [T.party("Synthetic Party Gone", "1.00")])
+    _new_window()
+    T.snapshot(api, agent, [T.party("Synthetic Party Gone", "2.00")])
+    T.set_flag(admin_engine, school.tenant_id, enabled=False)
+    with admin_engine.begin() as c:
+        c.execute(
+            text(
+                "UPDATE ops.tally_syncs SET received_at = now() - interval '500 days' "
+                "WHERE tenant_id = :t"
+            ),
+            {"t": school.tenant_id},
+        )
+    totals = tasks.check_all()
+    assert totals["purged"] >= 1
     assert (
         _scalar(
             admin_engine,
