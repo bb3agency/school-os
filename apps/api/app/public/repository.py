@@ -128,11 +128,20 @@ def count_view(session: Session, handle_id: uuid.UUID) -> bool:
     return row is not None and int(row[0]) == 1
 
 
-def purge_expired(session: Session, before: dt.datetime, limit: int) -> int:
-    """Delete up to ``limit`` handles of the current school that expired before ``before``."""
+def purge_expired(
+    session: Session,
+    before: dt.datetime,
+    limit: int,
+    *,
+    keep: Collection[uuid.UUID] = (),
+) -> int:
+    """Delete up to ``limit`` handles of the current school that expired before ``before``,
+    except the ``keep`` ids (handles that other rows still reference, FR-PUB-006)."""
     ids = select(PublicHandle.id).where(
         PublicHandle.expires_at.is_not(None), PublicHandle.expires_at < before
     )
+    if keep:
+        ids = ids.where(PublicHandle.id.not_in(list(keep)))
     result = session.execute(
         delete(PublicHandle).where(PublicHandle.id.in_(ids.limit(limit).scalar_subquery())),
         execution_options={"synchronize_session": False},

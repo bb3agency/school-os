@@ -383,13 +383,19 @@ def revoke_for_target(
 
 def purge_expired_handles(tenant_id: uuid.UUID) -> int:
     """Delete the school's handles that expired more than ``purge_after_days`` ago (FR-PUB-006),
-    in batches, each in its own transaction. Returns the number deleted (ids and counts only)."""
+    in batches, each in its own transaction. Returns the number deleted (ids and counts only).
+    Handles that payment intents still reference are kept: intents are append-only and their
+    ``public_handle_id`` has no ON DELETE action (0059), so deleting one would fail the batch."""
+    # fees.online imports this module, so fees.service is imported here, not at the top.
+    from app.fees import service as fees  # noqa: PLC0415
+
     cfg = rules()
     total = 0
     while True:
         with tenant_session(tenant_id) as session:
             before = repo.now(session) - dt.timedelta(days=cfg.purge_after_days)
-            deleted = repo.purge_expired(session, before, cfg.purge_batch_size)
+            keep = fees.public_handle_ids_in_use(session)
+            deleted = repo.purge_expired(session, before, cfg.purge_batch_size, keep=keep)
         total += deleted
         if deleted < cfg.purge_batch_size:
             return total

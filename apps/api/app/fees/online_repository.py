@@ -188,6 +188,18 @@ def latest_intent_of_handle(session: Session, handle_id: uuid.UUID) -> PaymentIn
     ).first()
 
 
+def handle_ids_with_intents(session: Session) -> set[uuid.UUID]:
+    """The current school's public handle ids that payment intents still reference (FR-PUB-006):
+    intents are append-only and the reference has no ON DELETE action (0059)."""
+    return set(
+        session.scalars(
+            select(PaymentIntent.public_handle_id)
+            .where(PaymentIntent.public_handle_id.is_not(None))
+            .distinct()
+        )
+    )
+
+
 def open_intents(
     session: Session, account_id: uuid.UUID, *, lock: bool = False
 ) -> list[PaymentIntent]:
