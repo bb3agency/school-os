@@ -449,6 +449,9 @@ class InvoiceLineIn(In):
             self.kind != "usage_overage" or self.usage_month.day != 1
         ):
             raise ValueError("usage_month is the first day of a month, on overage lines only")
+        # ADR-0038 §3: a month is billed once; an overage line without its month escapes that.
+        if self.kind == "usage_overage" and self.usage_month is None:
+            raise ValueError("an overage line names the month it bills (usage_month)")
         # Audit 2026-10-05 hardening: a negative price would hide a discount inside a charge
         # line. Only an ``adjustment`` line may be negative (a credit; there are no credit
         # notes); a ``discount`` is entered as a positive amount and stored as a deduction. The

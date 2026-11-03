@@ -508,14 +508,18 @@ def subscription_has_line(
     *,
     kind: str,
     usage_month: dt.date | None = None,
+    exclude_invoice_id: uuid.UUID | None = None,
 ) -> bool:
     """Does a live (not void) invoice of the subscription carry a line of ``kind`` (for that
-    ``usage_month`` when given)? Callers hold the subscription row lock."""
+    ``usage_month`` when given; other than ``exclude_invoice_id`` when given)? Callers hold the
+    subscription row lock."""
     conds: list[ColumnElement[bool]] = [
         m.invoices.c.subscription_id == subscription_id,
         m.invoices.c.status != "void",
         m.invoice_lines.c.kind == kind,
     ]
+    if exclude_invoice_id is not None:
+        conds.append(m.invoices.c.id != exclude_invoice_id)
     if usage_month is not None:
         conds.append(m.invoice_lines.c.usage_month == usage_month)
     stmt = select(
