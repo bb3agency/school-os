@@ -572,6 +572,14 @@ def evaluate(
     history = academics.attendance_history(
         session, ids, since=day - dt.timedelta(days=cfg.evaluation.history_days)
     )
+    # FR-EW-003: a run of absences that fills the whole window may have started before it; its
+    # basis is the run's real first day, so read those (rare) students' full history. Otherwise
+    # the basis slides with the window and a closed run is raised again every day.
+    long_runs = [
+        sid for sid, marks in history.items() if marks and all(m.status == "absent" for m in marks)
+    ]
+    if long_runs:
+        history.update(academics.attendance_history(session, long_runs))
     results = academics.exam_results(session, ids, academic_year_id=year.id)
     window = max(cfg.rules["behaviour_concerns"].window or 30, 1)
     concerns = repo.concern_dates(session, ids, day - dt.timedelta(days=window))
