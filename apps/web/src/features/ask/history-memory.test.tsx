@@ -392,6 +392,25 @@ describe("Manage memory", () => {
     expect(await screen.findByText("I teach Class 7 mathematics")).toBeInTheDocument();
   });
 
+  it("adding a memory sends an Idempotency-Key, a new one per add (FR-KB-012)", async () => {
+    stub.routes[`POST ${MEM}`] = () => refused("memory_others");
+    renderWithIntl(<AskMemoryPage />);
+    const user = userEvent.setup();
+    const field = await screen.findByLabelText("Add something to remember");
+    await user.type(field, "I prefer short answers");
+    await user.click(screen.getByRole("button", { name: "Remember" }));
+    await waitFor(() => expect(stub.callsTo(`POST ${MEM}`)).toHaveLength(1));
+    await screen.findByText("This can't be remembered");
+    await user.click(screen.getByRole("button", { name: "Remember" }));
+    await waitFor(() => expect(stub.callsTo(`POST ${MEM}`)).toHaveLength(2));
+    const [first, second] = stub
+      .callsTo(`POST ${MEM}`)
+      .map((call) => call.headers.get("idempotency-key"));
+    expect(first).toMatch(/^[0-9a-f-]{36}$/);
+    expect(second).toMatch(/^[0-9a-f-]{36}$/);
+    expect(second).not.toBe(first);
+  });
+
   it("explains a refused memory (422 memory_others) and keeps the text", async () => {
     stub.routes[`POST ${MEM}`] = () => refused("memory_others");
     renderWithIntl(<AskMemoryPage />);

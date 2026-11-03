@@ -24,6 +24,7 @@ import { Toggle } from "@/components/ui/Toggle";
 import { DataTableV2 } from "@/components/console/DataTableV2";
 import type { Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
+import { todayInIndia } from "@/features/change-requests/dates";
 import { breakGlassTone, deploymentTone, known } from "@/features/status";
 import { Link } from "@/i18n/navigation";
 import { createBffFetch } from "@/lib/bff/fetch";
@@ -40,7 +41,15 @@ import {
   requiredInt,
   uuid,
 } from "@/lib/validation";
-import { LIST_PAGE_SIZE, PK, ifMatch, useCan, usePagedList, useSchoolDirectory } from "./data";
+import {
+  LIST_PAGE_SIZE,
+  PK,
+  ifMatch,
+  useCan,
+  useOperatorMe,
+  usePagedList,
+  useSchoolDirectory,
+} from "./data";
 import { DeploymentActions } from "./DeploymentActions";
 import { FilterCard } from "./FilterCard";
 import { FlagSwitch } from "./FlagSwitch";
@@ -651,6 +660,8 @@ export function BreakGlassScreen() {
   const tstatus = useTranslations("status.breakGlass");
   const api = useBffClient("operator");
   const can = useCan();
+  // Only the operator who asked may withdraw (the API answers 404 to anyone else).
+  const meId = useOperatorMe()?.operator_id;
   const hintId = useId();
   const { nameOf, schools } = useSchoolDirectory();
   const requestList = usePagedList([...PK.breakGlass, "list"], (cursor) =>
@@ -708,7 +719,9 @@ export function BreakGlassScreen() {
       cell: (row) => (
         <span className="flex flex-wrap items-start gap-2">
           {breakGlassAction(row)}
-          {row.status === "requested" && can("platform.breakglass.request") ? (
+          {row.status === "requested" &&
+          row.requested_by === meId &&
+          can("platform.breakglass.request") ? (
             <ActionDialog
               triggerLabel={t("withdraw")}
               triggerSize="sm"
@@ -949,7 +962,8 @@ export function PlatformAuditScreen({ filters = {} }: { filters?: PlatformAuditF
       const url = URL.createObjectURL(await response.blob());
       const link = document.createElement("a");
       link.href = url;
-      link.download = `platform-audit-${new Date().toISOString().slice(0, 10)}.csv`;
+      // The operator's day in India, like the date filters (01:30 IST is still yesterday in UTC).
+      link.download = `platform-audit-${todayInIndia()}.csv`;
       document.body.append(link);
       link.click();
       link.remove();

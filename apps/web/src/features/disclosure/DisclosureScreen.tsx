@@ -367,6 +367,7 @@ function PublishDialog({ draft, live }: { draft: DisclosureDraft; live: boolean 
       // an unticked box (absent from the form data) would pass.
       schema={z.object({ confirm_no_student_data: z.literal("on", { error: "required" }) })}
       invalidate={[DISCLOSURE_KEYS.all]}
+      errorNamespace="disclosure"
       submit={(input, idempotencyKey) =>
         unwrap(
           api.POST("/api/v1/disclosure/publish", {
@@ -482,7 +483,7 @@ function PublishedCard({
             </Button>
           </div>
         ) : null}
-        <ApiErrorAlert error={downloadError} />
+        <ApiErrorAlert error={downloadError} namespace="disclosure" />
         {canPublish ? (
           <div className="flex flex-wrap gap-2">
             <ActionDialog
@@ -518,6 +519,7 @@ function PublishedCard({
                     .max(REASON_MAX, { error: "tooLong" }),
                 })}
                 invalidate={[DISCLOSURE_KEYS.all]}
+                errorNamespace="disclosure"
                 submit={(input) =>
                   unwrap(
                     api.POST("/api/v1/disclosure/snapshots/{snapshot_id}/withdraw", {
@@ -778,7 +780,7 @@ function DraftEditor({
             {t("staleBody")}
           </Alert>
         ) : (
-          <ApiErrorAlert error={summary.length ? undefined : error} />
+          <ApiErrorAlert error={summary.length ? undefined : error} namespace="disclosure" />
         )}
         {saved ? (
           <Alert tone="success" live>

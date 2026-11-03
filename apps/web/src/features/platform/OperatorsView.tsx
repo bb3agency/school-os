@@ -16,7 +16,7 @@ import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { formList } from "@/lib/forms";
 import { ready } from "@/lib/loadable";
 import { email, text } from "@/lib/validation";
-import { PK, useOperatorMe } from "./data";
+import { PK, useCan, useOperatorMe } from "./data";
 import { MonoTime } from "./pills";
 
 const roles = z.array(z.enum(PLATFORM_ROLES)).min(1, { error: "chooseRole" });
@@ -85,6 +85,8 @@ export function OperatorsScreen() {
   const tstatus = useTranslations("status.person");
   const api = useBffClient("operator");
   const me = useOperatorMe();
+  // UX only: the API checks platform.operators.manage on every call (FR-PLT-028).
+  const manage = useCan()("platform.operators.manage");
   const operators = useApiQuery(
     [...PK.operators, "list"],
     async () =>
@@ -151,7 +153,7 @@ export function OperatorsScreen() {
       header: tc("actions"),
       cell: (row) => {
         const self = me?.operator_id === row.id;
-        if (row.status === "deactivated") return null;
+        if (row.status === "deactivated" || !manage) return null;
         if (self) return <span className="text-sm text-ink-muted">{t("you")}</span>;
         return (
           <div className="relative flex flex-wrap gap-2">
@@ -224,52 +226,54 @@ export function OperatorsScreen() {
         description={t("description")}
         breadcrumb={[{ label: tn("dashboard"), href: "/platform" }, { label: t("title") }]}
         actions={
-          <ActionDialog
-            triggerLabel={t("invite")}
-            triggerVariant="primary"
-            title={t("inviteDialogTitle")}
-            description={t("inviteDialogBody")}
-            confirmLabel={t("inviteSend")}
-            stepUp
-            schema={inviteSchema}
-            extra={extraRoles}
-            invalidate={[PK.operators]}
-            submit={(data, key) =>
-              unwrap(
-                api.POST("/api/v1/platform/operators", {
-                  params: { header: { "Idempotency-Key": key } },
-                  body: data,
-                }),
-              )
-            }
-          >
-            {(errors) => (
-              <>
-                <TextField
-                  name="display_name"
-                  label={t("inviteName")}
-                  error={errors.display_name}
-                  autoComplete="off"
-                />
-                <TextField
-                  name="email"
-                  type="email"
-                  label={t("inviteEmail")}
-                  error={errors.email}
-                  autoComplete="off"
-                />
-                <TextField
-                  name="idp_subject"
-                  label={t("inviteSubject")}
-                  hint={t("inviteSubjectHint")}
-                  error={errors.idp_subject}
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                <RoleCheckboxes error={errors.roles} />
-              </>
-            )}
-          </ActionDialog>
+          manage ? (
+            <ActionDialog
+              triggerLabel={t("invite")}
+              triggerVariant="primary"
+              title={t("inviteDialogTitle")}
+              description={t("inviteDialogBody")}
+              confirmLabel={t("inviteSend")}
+              stepUp
+              schema={inviteSchema}
+              extra={extraRoles}
+              invalidate={[PK.operators]}
+              submit={(data, key) =>
+                unwrap(
+                  api.POST("/api/v1/platform/operators", {
+                    params: { header: { "Idempotency-Key": key } },
+                    body: data,
+                  }),
+                )
+              }
+            >
+              {(errors) => (
+                <>
+                  <TextField
+                    name="display_name"
+                    label={t("inviteName")}
+                    error={errors.display_name}
+                    autoComplete="off"
+                  />
+                  <TextField
+                    name="email"
+                    type="email"
+                    label={t("inviteEmail")}
+                    error={errors.email}
+                    autoComplete="off"
+                  />
+                  <TextField
+                    name="idp_subject"
+                    label={t("inviteSubject")}
+                    hint={t("inviteSubjectHint")}
+                    error={errors.idp_subject}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <RoleCheckboxes error={errors.roles} />
+                </>
+              )}
+            </ActionDialog>
+          ) : undefined
         }
       />
       <DataTableV2

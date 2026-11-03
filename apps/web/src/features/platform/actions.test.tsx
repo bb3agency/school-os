@@ -873,6 +873,32 @@ describe("fleet, flags, audit, operators, announcements, break-glass, support", 
     ).toBeNull();
   });
 
+  it("audit: the CSV file is named after the IST day, not the UTC one (FR-PLT-029)", async () => {
+    stub.routes["GET /bff/api/v1/platform/audit/events"] = (request) =>
+      request.headers.get("accept") === "text/csv"
+        ? new Response("seq,action\n", { headers: { "content-type": "text/csv" } })
+        : page([]);
+    Object.assign(URL, { createObjectURL: vi.fn(() => "blob:csv"), revokeObjectURL: vi.fn() });
+    const names: string[] = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      names.push(this.download);
+    });
+    // 01:30 on 2 October in India is still 1 October in UTC.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-01T20:00:00Z"));
+    try {
+      const user = userEvent.setup();
+      renderWithIntl(<PlatformAuditScreen filters={{}} />);
+      await user.click(await screen.findByRole("button", { name: pm.audit.exportCsv }));
+      await waitFor(() => expect(names).toEqual(["platform-audit-2026-10-02.csv"]));
+    } finally {
+      vi.useRealTimers();
+      click.mockRestore();
+    }
+  });
+
   it("audit: verifies the chain and downloads CSV with Accept: text/csv", async () => {
     stub.routes["GET /bff/api/v1/platform/audit/events"] = (request) =>
       request.headers.get("accept") === "text/csv"
@@ -945,6 +971,34 @@ describe("fleet, flags, audit, operators, announcements, break-glass, support", 
       idp_subject: "op-ravi",
       roles: ["support_agent"],
     });
+  });
+
+  it("operators: invite, change roles and deactivate need platform.operators.manage (FR-PLT-028)", async () => {
+    stub.routes["GET /bff/api/v1/platform/me"] = () =>
+      Response.json({ ...ME, roles: ["platform_viewer"], permissions: ["platform.tenants.read"] });
+    stub.routes["GET /bff/api/v1/platform/operators"] = () =>
+      page([
+        {
+          id: "0192f3a4-0000-7000-8000-0000000000f2",
+          display_name: "Synthetic Operator",
+          email: "op@schoolos.example",
+          roles: ["support_agent"],
+          status: "active",
+          mfa_enrolled: true,
+          created_at: "2026-06-01T04:30:00Z",
+          last_login_at: null,
+        },
+      ]);
+    renderWithIntl(<OperatorsScreen />);
+    expect((await screen.findAllByText("Synthetic Operator")).length).toBeGreaterThan(0);
+    await waitFor(() =>
+      expect(stub.callsTo("GET /bff/api/v1/platform/me").length).toBeGreaterThan(0),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: pm.operators.invite })).toBeNull(),
+    );
+    expect(screen.queryByRole("button", { name: /Change roles/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Deactivate/ })).toBeNull();
   });
 
   it("announcements: both languages required; tier audience and IST times sent as UTC", async () => {

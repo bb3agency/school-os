@@ -130,6 +130,16 @@ describe("document redirect (FR-DISC-009)", () => {
     expect(calls).toHaveLength(0);
   });
 
+  it("follows a loopback http file URL in development only (FR-DISC-009)", async () => {
+    answer = () => json({ url: "http://localhost:8333/doc.pdf?sig=x", expires_at: "x" });
+    vi.stubEnv("NODE_ENV", "production");
+    const prod = await disclosureDocumentRedirect(runtime(), request, KEY, "1");
+    expect(prod.headers.get("location")).toBe(`https://${PARENT}/d/${KEY}`);
+    vi.stubEnv("NODE_ENV", "development");
+    const dev = await disclosureDocumentRedirect(runtime(), request, KEY, "1");
+    expect(dev.headers.get("location")).toBe("http://localhost:8333/doc.pdf?sig=x");
+  });
+
   it("accepts the API's document numbers only (1 to 200)", async () => {
     const route = openapi.paths["/api/v1/public/disclosure/{key}/documents/{n}"];
     const n = route?.get.parameters.find((p) => p.name === "n");

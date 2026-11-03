@@ -1,6 +1,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
+import { useState } from "react";
 import * as z from "@/lib/zod";
 import { DataTableV2, type ColumnV2 } from "@/components/console";
 import { ActionDialog } from "@/components/ui/ActionDialog";
@@ -19,6 +20,7 @@ import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { formatCount, formatDateTime } from "@/lib/format";
 import { formList } from "@/lib/forms";
 import { translateOr } from "@/lib/i18n-dynamic";
+import { requiredInt } from "@/lib/validation";
 import { ifMatch, useCan, useOperatorMe, useSchoolDirectory } from "../data";
 import { CertInClock, IncidentStatusPill, useClockText, useMinuteTick } from "./IncidentsScreen";
 import {
@@ -104,6 +106,18 @@ export function IncidentDetailScreen({ incidentId }: { incidentId: string }) {
   );
 }
 
+/** The incident's `version` for If-Match (AA-13). */
+const openedVersion = requiredInt(1, 2_147_483_647);
+
+/**
+ * The incident's version when the dialog opened (dialog bodies mount on open): a background
+ * reload must not move it, so a change saved by someone else meanwhile answers 412.
+ */
+function OpenedVersion({ version }: { version: number }) {
+  const [opened] = useState(version);
+  return <input type="hidden" name="version" value={opened} readOnly />;
+}
+
 function StatusDialog({ incident }: { incident: IncidentDetail }) {
   const t = useTranslations("platform.incidents");
   const api = useBffClient("operator");
@@ -116,14 +130,17 @@ function StatusDialog({ incident }: { incident: IncidentDetail }) {
       confirmLabel={t("changeStatus")}
       consequence={t("changeStatusConsequence")}
       stepUp
-      schema={z.object({ status: z.enum(INCIDENT_STATUSES, { error: "chooseOption" }) })}
+      schema={z.object({
+        status: z.enum(INCIDENT_STATUSES, { error: "chooseOption" }),
+        version: openedVersion,
+      })}
       invalidate={[INCIDENT_KEYS.all]}
       errorNamespace="platform.incidents"
       submit={(data) =>
         unwrap(
           api.PATCH("/api/v1/platform/incidents/{incident_id}", {
             params: { path: { incident_id: incident.id } },
-            headers: { "If-Match": ifMatch(incident.version) },
+            headers: { "If-Match": ifMatch(data.version) },
             body: { status: data.status },
           }),
         )
@@ -131,6 +148,7 @@ function StatusDialog({ incident }: { incident: IncidentDetail }) {
     >
       {(errors) => (
         <>
+          <OpenedVersion version={incident.version} />
           {blockers.length > 0 ? (
             <Alert tone="warning" title={t("closeBlockedTitle")}>
               <ul className="list-disc space-y-1 ps-5">
@@ -167,30 +185,33 @@ function ReportedDialog({ incident }: { incident: IncidentDetail }) {
       description={t("recordReportBody")}
       confirmLabel={t("recordReport")}
       stepUp
-      schema={reportedSchema}
+      schema={reportedSchema.extend({ version: openedVersion })}
       invalidate={[INCIDENT_KEYS.all]}
       errorNamespace="platform.incidents"
       submit={(data) =>
         unwrap(
           api.PATCH("/api/v1/platform/incidents/{incident_id}", {
             params: { path: { incident_id: incident.id } },
-            headers: { "If-Match": ifMatch(incident.version) },
+            headers: { "If-Match": ifMatch(data.version) },
             body: { cert_in_reported_at: data.cert_in_reported_at },
           }),
         )
       }
     >
       {(errors) => (
-        <TextField
-          name="cert_in_reported_at"
-          type="datetime-local"
-          label={t("reportedAt")}
-          hint={tc("istHint")}
-          error={errors.cert_in_reported_at}
-          defaultValue={now}
-          max={now}
-          className="max-w-xs"
-        />
+        <>
+          <OpenedVersion version={incident.version} />
+          <TextField
+            name="cert_in_reported_at"
+            type="datetime-local"
+            label={t("reportedAt")}
+            hint={tc("istHint")}
+            error={errors.cert_in_reported_at}
+            defaultValue={now}
+            max={now}
+            className="max-w-xs"
+          />
+        </>
       )}
     </ActionDialog>
   );
@@ -592,6 +613,7 @@ function AddSchoolDialog({ incident }: { incident: IncidentDetail }) {
             name="window_from"
             type="datetime-local"
             label={t("windowFrom")}
+            hint={tc("istHint")}
             error={errors.window_from}
             className="max-w-xs"
           />
@@ -599,6 +621,7 @@ function AddSchoolDialog({ incident }: { incident: IncidentDetail }) {
             name="window_to"
             type="datetime-local"
             label={t("windowTo")}
+            hint={tc("istHint")}
             error={errors.window_to}
             className="max-w-xs"
           />
@@ -631,6 +654,7 @@ function NotifiedDialog({
           .array(z.string())
           .default([])
           .refine((values) => values.length > 0, { error: "chooseSchools" }),
+        version: openedVersion,
       })}
       extra={(form) => ({ tenant_ids: formList(form, "tenant_ids") })}
       invalidate={[INCIDENT_KEYS.all]}
@@ -639,37 +663,40 @@ function NotifiedDialog({
         unwrap(
           api.PATCH("/api/v1/platform/incidents/{incident_id}", {
             params: { path: { incident_id: incident.id } },
-            headers: { "If-Match": ifMatch(incident.version) },
+            headers: { "If-Match": ifMatch(data.version) },
             body: { notified_tenant_ids: data.tenant_ids },
           }),
         )
       }
     >
       {(errors) => (
-        <fieldset className="space-y-2">
-          <legend className="text-sm font-semibold text-ink">{t("colSchool")}</legend>
-          {errors.tenant_ids ? (
-            <p className="text-sm font-semibold text-danger">{errors.tenant_ids}</p>
-          ) : null}
-          {schools.map((school) => (
-            <label
-              key={school.tenant_id}
-              className="flex min-h-10 items-start gap-2 py-1 text-sm pointer-coarse:min-h-11"
-            >
-              <input
-                type="checkbox"
-                name="tenant_ids"
-                value={school.tenant_id}
-                aria-invalid={errors.tenant_ids ? true : undefined}
-                className="mt-0.5 size-4 shrink-0 accent-primary"
-              />
-              <span className="break-anywhere">
-                {school.school_name ?? school.tenant_id}
-                {school.tenant_code ? ` (${school.tenant_code})` : ""}
-              </span>
-            </label>
-          ))}
-        </fieldset>
+        <>
+          <OpenedVersion version={incident.version} />
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-semibold text-ink">{t("colSchool")}</legend>
+            {errors.tenant_ids ? (
+              <p className="text-sm font-semibold text-danger">{errors.tenant_ids}</p>
+            ) : null}
+            {schools.map((school) => (
+              <label
+                key={school.tenant_id}
+                className="flex min-h-10 items-start gap-2 py-1 text-sm pointer-coarse:min-h-11"
+              >
+                <input
+                  type="checkbox"
+                  name="tenant_ids"
+                  value={school.tenant_id}
+                  aria-invalid={errors.tenant_ids ? true : undefined}
+                  className="mt-0.5 size-4 shrink-0 accent-primary"
+                />
+                <span className="break-anywhere">
+                  {school.school_name ?? school.tenant_id}
+                  {school.tenant_code ? ` (${school.tenant_code})` : ""}
+                </span>
+              </label>
+            ))}
+          </fieldset>
+        </>
       )}
     </ActionDialog>
   );

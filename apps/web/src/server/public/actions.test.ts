@@ -246,6 +246,22 @@ describe("GET /p/document and the payment status", () => {
     expect((await documentRedirect(rt, noCookie)).headers.get("location")).toBe("/p/expired");
   });
 
+  it("follows a loopback http file URL in development only (FR-PUB-010)", async () => {
+    const rt = runtime();
+    const request = new Request(`${PUBLIC}/p/document`, {
+      headers: { cookie: `__Host-sos_parent=${TOKEN}` },
+    });
+    for (const host of ["localhost:8333", "127.0.0.1", "[::1]"]) {
+      answer = () => json({ url: `http://${host}/x.pdf?sig=1`, expires_at: "x" });
+      vi.stubEnv("NODE_ENV", "production");
+      expect((await documentRedirect(rt, request)).headers.get("location")).toBe("/p/view?pdf=0");
+      vi.stubEnv("NODE_ENV", "development");
+      expect((await documentRedirect(rt, request)).headers.get("location")).toBe(
+        `http://${host}/x.pdf?sig=1`,
+      );
+    }
+  });
+
   it("asks for the named intent only when it is 32 hex characters", async () => {
     const rt = runtime();
     const headers = new Headers({ cookie: `__Host-sos_parent=${TOKEN}` });

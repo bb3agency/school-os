@@ -157,7 +157,7 @@ describe("break-glass requests (A-13)", () => {
   const waiting = {
     id: BG,
     tenant_id: T,
-    requested_by: OTHER,
+    requested_by: OP,
     reason_code: "security_incident",
     reason: "Suspected account compromise reported by principal",
     scope: {},
@@ -184,6 +184,20 @@ describe("break-glass requests (A-13)", () => {
       expect(
         stub.callsTo(`POST /bff/api/v1/platform/break-glass-requests/${BG}/withdraw`),
       ).toHaveLength(1),
+    );
+  });
+
+  it("only the operator who asked can withdraw a request (FR-OPS-004)", async () => {
+    // The API answers 404 to anyone else (platform/breakglass.py withdraw).
+    stub.routes["GET /bff/api/v1/platform/break-glass-requests"] = () =>
+      page([{ ...waiting, requested_by: OTHER, emergency_confirmed_by_1: OP }]);
+    renderWithIntl(<BreakGlassScreen />);
+    expect(await screen.findByText(/^Confirm by /)).toBeVisible();
+    await waitFor(() =>
+      expect(stub.callsTo("GET /bff/api/v1/platform/me").length).toBeGreaterThan(0),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: pm.breakGlass.withdraw })).toBeNull(),
     );
   });
 

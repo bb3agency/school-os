@@ -68,13 +68,17 @@ function isDev(): boolean {
   return process.env.NODE_ENV === "development";
 }
 
-/** A presigned file URL we may send a parent to: https, or http on a loopback host (local). */
+/** A presigned file URL we may send a parent to: https, or http on a loopback host (development only, like isPayUrl). */
 function isFileUrl(value: unknown): value is string {
   if (typeof value !== "string") return false;
   try {
     const url = new URL(value);
     if (url.protocol === "https:") return true;
-    return url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+    return (
+      isDev() &&
+      url.protocol === "http:" &&
+      ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)
+    );
   } catch {
     return false;
   }

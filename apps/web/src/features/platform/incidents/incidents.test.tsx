@@ -3,8 +3,9 @@ import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
-import { messages, renderWithIntl } from "@/test/render";
+import { messages, renderWithIntl, testQueryClient } from "@/test/render";
 import {
+  INCIDENT_KEYS,
   confirmationOf,
   incidentSummary,
   reopenOf,
@@ -214,6 +215,65 @@ describe("two-person confirmation (SEC-029)", () => {
     const call = stub.callsTo(`PATCH /bff/api/v1/platform/incidents/${INC}`)[0];
     expect(call?.headers.get("if-match")).toBe('"5"');
     expect(JSON.parse(call?.body ?? "{}")).toHaveProperty("cert_in_reported_at");
+  });
+
+  it("the add-school window fields say they are IST like the other times (FR-DPDP-030)", async () => {
+    setPermissions(["platform.incidents.read", "platform.incidents.manage"]);
+    stub.routes[`GET /bff/api/v1/platform/incidents/${INC}`] = () => Response.json(detail());
+    const user = userEvent.setup();
+    renderWithIntl(<IncidentDetailScreen incidentId={INC} />);
+    await user.click(await screen.findByRole("button", { name: im.addSchool }));
+    const dialog = screen.getByRole("dialog", { name: im.addSchoolTitle });
+    for (const label of [im.windowFrom, im.windowTo]) {
+      expect(within(dialog).getByLabelText(label)).toHaveAccessibleDescription(
+        expect.stringContaining(messages.en.common.istHint),
+      );
+    }
+  });
+
+  it("the dialogs send the version read when they opened, not a background reload's (AA-13)", async () => {
+    setPermissions(["platform.incidents.read", "platform.incidents.manage"]);
+    let version = 5;
+    const confirmed = { confirmed_at: "2026-10-21T05:00:00Z" };
+    stub.routes[`GET /bff/api/v1/platform/incidents/${INC}`] = () =>
+      Response.json(detail({ ...confirmed, version }));
+    stub.routes[`PATCH /bff/api/v1/platform/incidents/${INC}`] = () => problem(412, "stale");
+    const client = testQueryClient();
+    const user = userEvent.setup();
+    const cachedVersion = () =>
+      client.getQueryData<IncidentDetail>(INCIDENT_KEYS.detail(INC))?.version;
+    renderWithIntl(<IncidentDetailScreen incidentId={INC} />, "en", client);
+    const cases: [string, string, (dialog: HTMLElement) => Promise<void>][] = [
+      [im.changeStatus, im.changeStatusTitle, async () => {}],
+      [im.recordReport, im.recordReportTitle, async () => {}],
+      [
+        im.recordNotified,
+        im.recordNotifiedTitle,
+        async (dialog) => {
+          await user.click(within(dialog).getAllByRole("checkbox")[0]!);
+        },
+      ],
+    ];
+    for (const [button, title, fill] of cases) {
+      version = 5;
+      await client.invalidateQueries();
+      await waitFor(() => expect(cachedVersion()).toBe(5));
+      await user.click(await screen.findByRole("button", { name: button }));
+      const dialog = screen.getByRole("dialog", { name: title });
+      // Someone else saves meanwhile: the page reloads underneath the open dialog.
+      version = 9;
+      await client.invalidateQueries();
+      await waitFor(() => expect(cachedVersion()).toBe(9));
+      await fill(dialog);
+      const sent = stub.callsTo(`PATCH /bff/api/v1/platform/incidents/${INC}`).length;
+      await user.click(within(dialog).getByRole("button", { name: button }));
+      await waitFor(() =>
+        expect(stub.callsTo(`PATCH /bff/api/v1/platform/incidents/${INC}`)).toHaveLength(sent + 1),
+      );
+      const call = stub.callsTo(`PATCH /bff/api/v1/platform/incidents/${INC}`)[sent];
+      expect(call?.headers.get("if-match"), button).toBe('"5"');
+      await user.keyboard("{Escape}");
+    }
   });
 });
 

@@ -2115,7 +2115,36 @@
       "leaving_date_before_enrolment": "The leaving date is before the student joined this class. Check the date.",
       "nomination_adults_only": "A nomination is made by a parent or a staff member.",
       "staff_sign_in_staff_only": "Staff sign-in checks only a staff member.",
-      "guardian_phone_guardians_only": "The phone on record checks only a parent or student."
+      "guardian_phone_guardians_only": "The phone on record checks only a parent or student.",
+      "absent_has_no_marks": "A student marked absent cannot also have marks. Remove the marks or the absent mark.",
+      "bad_max_marks": "The maximum marks must be a number above 0 (at most 1000).",
+      "date_out_of_range": "This date is outside the academic year. Choose a date inside it.",
+      "duplicate_entry": "This student appears twice for the same day or subject. Keep one entry.",
+      "exam_name_taken": "An exam with this name already exists this year. Choose another name.",
+      "exam_other_year": "This exam belongs to another academic year. Choose an exam of this year.",
+      "invalid_month": "Choose a month of the academic year.",
+      "marks_over_max": "More than the maximum marks. Enter a mark up to the maximum.",
+      "not_an_import_file": "Upload the sheet again.",
+      "not_in_section": "This student is not in this section. Reload the page and try again.",
+      "too_many_entries": "Too many entries at once. Save a smaller part.",
+      "too_many_subjects": "Too many subjects. Split them into smaller parts.",
+      "before_flag": "The date is before the flag was raised. Choose a later date.",
+      "future_date": "This date is in the future. Choose today or an earlier date.",
+      "not_enrolled": "The student is not in a section this year.",
+      "owner_not_eligible": "That person cannot act for this student. Choose someone from the list.",
+      "rule_required": "This rule cannot be switched off.",
+      "threshold_out_of_bounds": "This threshold is outside the allowed range.",
+      "unknown_rule": "This rule is not known. Reload the page and try again.",
+      "unknown_group": "This Tally group is not in the company's list. Reload the groups and choose again.",
+      "duplicate": "This appears twice. Keep it once.",
+      "masked_value": "This value is masked (XXXX). Type the value as printed.",
+      "no_values": "Fill in at least one value.",
+      "only_for_new_student": "Section and roll number are only for a new student. Leave them empty.",
+      "required": "Fill in this field.",
+      "unknown_field": "This field cannot be filled in here. Reload the page and try again.",
+      "size_mismatch": "The file changed during the upload. Choose the file again and upload it.",
+      "confirmation_required": "Tick the box to confirm before you go on.",
+      "ai_bundle": "This AI answer bundle is no longer offered. Choose another bundle."
     },
     "api": {
       "generic": {
@@ -2341,6 +2370,10 @@
       "guardian_shared_out_of_scope": {
         "title": "Parent linked to another class",
         "body": "This parent is also linked to a student outside your classes. Ask the office to change their details."
+      },
+      "invoice_number_length": {
+        "title": "The invoice number would be too long",
+        "body": "An invoice number can have at most 16 characters (GST rules). Shorten the invoice number prefix in the billing settings, then issue the invoice again."
       }
     },
     "stepUp": {
@@ -10725,6 +10758,32 @@
       "withdrawn": "Withdrawn",
       "replaced": "Replaced",
       "formerStaff": "Former staff member"
+    },
+    "errors": {
+      "confirmation_required": {
+        "title": "Confirm there is no student data",
+        "body": "Tick the box to confirm that the documents contain no student's personal data, then publish again."
+      },
+      "incomplete": {
+        "title": "Some required items are empty",
+        "body": "Fill in the required items, save the draft and publish again."
+      },
+      "files_failed": {
+        "title": "The files could not be made",
+        "body": "Try again later. If it keeps happening, contact support."
+      },
+      "files_not_ready": {
+        "title": "The files are still being made",
+        "body": "Try again in a minute."
+      },
+      "not_published": {
+        "title": "The disclosure is not published yet",
+        "body": "Publish the disclosure first."
+      },
+      "snapshot_not_live": {
+        "title": "This is not the page shown now",
+        "body": "Only the page shown now can be withdrawn. Reload the page to see it."
+      }
     }
   },
   "privacy": {

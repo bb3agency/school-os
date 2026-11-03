@@ -109,13 +109,17 @@ export async function disclosureDocumentRedirect(
   return isFileUrl(url) ? see(url) : see(back);
 }
 
-/** A presigned file URL: https, or http on a loopback host (local runs). */
+/** A presigned file URL: https, or http on a loopback host (development only). */
 function isFileUrl(value: unknown): value is string {
   if (typeof value !== "string") return false;
   try {
     const url = new URL(value);
     if (url.protocol === "https:") return true;
-    return url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+    return (
+      process.env.NODE_ENV === "development" &&
+      url.protocol === "http:" &&
+      ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)
+    );
   } catch {
     return false;
   }

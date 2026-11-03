@@ -71,6 +71,8 @@ export const KNOWN_API_CODES = [
   "ai_bundle_needs_monthly_plan",
   // A parent shared with a student outside the editor's classes (SEC-015; 403).
   "guardian_shared_out_of_scope",
+  // Issuing an invoice whose number would pass 16 characters (CGST Rule 46; 409).
+  "invoice_number_length",
 ] as const;
 export type KnownApiCode = (typeof KNOWN_API_CODES)[number];
 
