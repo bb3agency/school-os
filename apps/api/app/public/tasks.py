@@ -13,7 +13,6 @@ from typing import Any
 
 from celery import shared_task
 from celery.schedules import crontab
-from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.db import context_free_session
 from app.core.logging import get_logger
@@ -31,7 +30,7 @@ def purge_all() -> dict[str, int]:
     for tenant_id in tenant_ids:
         try:
             totals["deleted"] += service.purge_expired_handles(tenant_id)
-        except SQLAlchemyError as exc:
+        except Exception as exc:
             totals["failed"] += 1
             log.warning("public.purge_failed", tenant_id=tenant_id, error_type=type(exc).__name__)
     log.info("public.purge_done", count=totals["deleted"], outcome="ok")

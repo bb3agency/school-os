@@ -11,9 +11,9 @@ The sending wave (R2-3G, ``app.messaging.sends.tasks``) adds ``messaging.send_du
 
 Beat: ``messaging.sweep_inbox`` every minute (events whose wake-up was lost),
 ``messaging.sync_accounts`` hourly (quality, limit, currency, template statuses; pauses on a red
-or flagged rating) and ``messaging.purge_expired`` daily (retention, docs/05 §13). Each school
-runs in its own ``tenant_session``; one failing school does not stop the others. Nothing runs
-while messaging is off (FR-MSG-024).
+or flagged rating) and ``messaging.purge_expired`` daily (retention, docs/05 §13; suspended
+and offboarding schools included). Each school runs in its own ``tenant_session``; one failing
+school does not stop the others. Nothing runs while messaging is off (FR-MSG-024).
 """
 
 from __future__ import annotations
@@ -23,28 +23,36 @@ from typing import Any
 
 from celery import Task, shared_task
 from celery.schedules import crontab
-from sqlalchemy.exc import SQLAlchemyError
 
-from app.core.errors import DomainError
+from app.core.db import context_free_session
 from app.core.logging import get_logger
 from app.messaging import service
-from app.messaging.providers import ProviderError
 from app.messaging.sends import service as sends
 from app.messaging.sends import tasks as sends_tasks
 from app.ops.service import TenantTask
+from app.tenancy import service as tenancy
 
 log = get_logger(__name__)
 
 
-def _each_school(action: str, run: Any) -> dict[str, int]:
+# Retention keeps running while a school is suspended or offboarding (docs/04 §6, docs/16 §5.5).
+PURGE_TENANT_STATUSES = ("active", "suspended", "offboarding")
+
+
+def _purge_tenant_ids() -> list[uuid.UUID]:
+    with context_free_session() as session:
+        return tenancy.list_tenant_ids(session, PURGE_TENANT_STATUSES)
+
+
+def _each_school(action: str, run: Any, tenant_ids: Any = None) -> dict[str, int]:
     if not service.available():
         return {"skipped": 1}
     totals = {"schools": 0, "failed": 0}
-    for tenant_id in service.live_tenant_ids():
+    for tenant_id in (tenant_ids or service.live_tenant_ids)():
         try:
             run(tenant_id)
             totals["schools"] += 1
-        except (SQLAlchemyError, DomainError, ProviderError) as exc:
+        except Exception as exc:
             totals["failed"] += 1
             log.warning(
                 "messaging.school_task_failed",
@@ -114,7 +122,7 @@ def _purge(tenant_id: uuid.UUID) -> None:
 
 @shared_task(name="messaging.purge_expired", acks_late=True, ignore_result=True)
 def purge_expired() -> dict[str, int]:
-    return _each_school("purge", _purge)
+    return _each_school("purge", _purge, _purge_tenant_ids)
 
 
 def beat_schedule() -> dict[str, dict[str, Any]]:

@@ -17,10 +17,8 @@ from typing import Any, Final
 
 from celery import Task, shared_task
 from celery.schedules import crontab
-from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.db import context_free_session, tenant_session
-from app.core.errors import DomainError
 from app.core.logging import get_logger
 from app.fees import service
 from app.ops.service import TenantTask
@@ -75,7 +73,7 @@ def post_all() -> dict[str, int]:
                 if not service.enabled(session, tenant_id):
                     continue
                 totals["posted"] += service.post_late_fees(session)["posted"]
-        except (SQLAlchemyError, DomainError) as exc:
+        except Exception as exc:
             totals["failed"] += 1
             log.warning("fees.late_fees_failed", tenant_id=tenant_id, error_type=type(exc).__name__)
     log.info("fees.late_fees_posted", count=totals["posted"])

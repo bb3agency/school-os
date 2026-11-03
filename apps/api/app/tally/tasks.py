@@ -14,10 +14,8 @@ from typing import Any, Final
 
 from celery import shared_task
 from celery.schedules import crontab
-from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.db import context_free_session, tenant_session
-from app.core.errors import DomainError
 from app.core.logging import get_logger
 from app.tally import service
 from app.tenancy import service as tenancy
@@ -39,7 +37,7 @@ def check_all() -> dict[str, int]:
                     continue
                 totals["notified"] += service.notify_silent_devices(session)
                 totals["purged"] += service.purge_old_syncs(session)
-        except (SQLAlchemyError, DomainError) as exc:
+        except Exception as exc:
             totals["failed"] += 1
             log.warning(
                 "tally.silence_check_failed", tenant_id=tenant_id, error_type=type(exc).__name__

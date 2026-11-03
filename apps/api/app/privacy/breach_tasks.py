@@ -10,10 +10,8 @@ from __future__ import annotations
 from typing import Any
 
 from celery import shared_task
-from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.db import context_free_session
-from app.core.errors import DomainError
 from app.core.logging import get_logger
 from app.privacy import breach_service as service
 from app.privacy import breach_sync
@@ -28,14 +26,24 @@ def sweep_all() -> dict[str, int]:
         tenant_ids = tenancy.list_tenant_ids(session, TENANT_STATUSES)
     totals = {"tenants": len(tenant_ids), "received": 0, "reminders": 0, "failed": 0}
     for tenant_id in tenant_ids:
+        # The pull and the reminders are independent: a failed pull must not hold back the
+        # 24 h / 60 h reminders of breaches already in the register.
+        failed = False
         try:
             totals["received"] += breach_sync.sync_school(tenant_id)
-            totals["reminders"] += service.send_reminders(tenant_id)
-        except (SQLAlchemyError, DomainError) as exc:
-            totals["failed"] += 1
+        except Exception as exc:  # this school only; the next sweep retries
+            failed = True
             log.warning(
                 "privacy.breach_sweep_failed", tenant_id=tenant_id, error_type=type(exc).__name__
             )
+        try:
+            totals["reminders"] += service.send_reminders(tenant_id)
+        except Exception as exc:  # this school only; the next sweep retries
+            failed = True
+            log.warning(
+                "privacy.breach_sweep_failed", tenant_id=tenant_id, error_type=type(exc).__name__
+            )
+        totals["failed"] += int(failed)
     return totals
 
 

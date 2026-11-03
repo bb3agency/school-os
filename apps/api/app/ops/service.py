@@ -169,6 +169,15 @@ def claim_event(task_name: str, event_id: str) -> bool:
         return True
 
 
+def _event_running(task_name: str, event_id: str) -> bool:
+    """Whether a run of ``task_name`` for ``event_id`` holds the lease (not yet done)."""
+    try:
+        return kv_store().get(_event_key(task_name, event_id)) == _RUNNING
+    except KVUnavailable:
+        log.warning("ops.task.dedupe_unavailable", action=task_name)
+        return False
+
+
 def _settle_event(task_name: str, event_id: str, *, done: bool) -> None:
     key = _event_key(task_name, event_id)
     try:
@@ -234,6 +243,15 @@ class TenantTask(Task):  # type: ignore[type-arg]
     def _run_once(self, args: tuple[Any, ...], kwargs: dict[str, Any]) -> Any:
         event_id = str(kwargs["event_id"])
         if not claim_event(self.name, event_id):
+            if _event_running(self.name, event_id):
+                # Another delivery holds the lease: it is still running, or its worker died
+                # (``task_reject_on_worker_lost`` re-queues the message at once, a lost worker's
+                # message comes back after the visibility timeout) and the lease outlives it.
+                # Look again later instead of dropping the event: it is skipped once done, and
+                # runs once a dead run's lease has ended.
+                self.apply_async(args=args, kwargs=kwargs, countdown=HOLD_COUNTDOWN_SECONDS)
+                log.info("ops.task.deferred", action=self.name, outcome="lease_held")
+                return None
             log.info("ops.task.duplicate", action=self.name, outcome="skipped")
             return None
         try:
@@ -391,13 +409,22 @@ def complete_idempotent(
 
 
 def purge_idempotency_keys() -> int:
-    """Daily: remove expired keys, one tenant session per school (RLS stays on)."""
+    """Daily: remove expired keys, one tenant session per school (RLS stays on). A school that
+    fails is rolled back and logged (ids and error type only); the others still run, and its
+    keys are due again on the next run."""
     with context_free_session() as s:
         tenant_ids = tenancy.list_tenant_ids(s, None)
     total = 0
     for tenant_id in tenant_ids:
-        with tenant_session(tenant_id) as ts:
-            total += repo.idem_purge_expired(ts)
+        try:
+            with tenant_session(tenant_id) as ts:
+                total += repo.idem_purge_expired(ts)
+        except Exception as exc:  # database: this school only, retried next run
+            log.warning(
+                "ops.idempotency.purge_failed",
+                tenant_id=str(tenant_id),
+                error_type=type(exc).__name__,
+            )
     return total
 
 
