@@ -42,9 +42,14 @@ RECONCILE_TASK: Final = "fees.reconcile_online"
 DAILY_TASK: Final = "fees.payments_daily"
 
 
-def _each_school(action: str, run: Callable[[uuid.UUID], object]) -> dict[str, int]:
+def _each_school(
+    action: str,
+    run: Callable[[uuid.UUID], object],
+    schools: Callable[[], list[uuid.UUID]] | None = None,
+) -> dict[str, int]:
+    """Run ``run`` for each active school (``schools``: another list of school ids)."""
     totals = {"schools": 0, "failed": 0}
-    for tenant_id in online.connected_tenant_ids():
+    for tenant_id in (schools or online.connected_tenant_ids)():
         try:
             run(tenant_id)
             totals["schools"] += 1
@@ -131,14 +136,17 @@ def reconcile_online() -> dict[str, int]:
     return _each_school("reconcile", online.reconcile)
 
 
-def _daily(tenant_id: uuid.UUID) -> None:
-    online.refresh_tokens(tenant_id)
-    online.purge_events(tenant_id)
-
-
 @shared_task(name=DAILY_TASK, queue="maintenance", acks_late=True, ignore_result=True)
 def payments_daily() -> dict[str, int]:
-    return _each_school("daily", _daily)
+    """Token refreshes for active schools; the inbox retention (docs/05 §13) for every school
+    whose data is kept, on its own so that a failed refresh never skips it."""
+    refreshed = _each_school("daily", online.refresh_tokens)
+    purged = _each_school("purge", online.purge_events, online.retention_tenant_ids)
+    return {
+        "schools": refreshed["schools"],
+        "failed": refreshed["failed"] + purged["failed"],
+        "purged_schools": purged["schools"],
+    }
 
 
 def beat_schedule() -> dict[str, dict[str, Any]]:

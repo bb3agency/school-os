@@ -2194,6 +2194,16 @@ def connected_tenant_ids() -> list[uuid.UUID]:
         return tenancy.list_tenant_ids(session, ("active",))
 
 
+# Retention (docs/05 §13) is data minimisation, not a service to the school: the inbox purge also
+# runs while a school is suspended or being offboarded.
+RETENTION_STATUSES: Final = ("active", "suspended", "offboarding")
+
+
+def retention_tenant_ids() -> list[uuid.UUID]:
+    with context_free_session() as session:
+        return tenancy.list_tenant_ids(session, RETENTION_STATUSES)
+
+
 # --- reconciliation screen ------------------------------------------------------------------------
 
 
