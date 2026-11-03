@@ -48580,6 +48580,7 @@
                     ],
                     "type": "string"
                   },
+                  "maxItems": 20,
                   "type": "array"
                 },
                 {
@@ -48617,6 +48618,7 @@
                     ],
                     "type": "string"
                   },
+                  "maxItems": 20,
                   "type": "array"
                 },
                 {
@@ -48643,6 +48645,7 @@
                     ],
                     "type": "string"
                   },
+                  "maxItems": 20,
                   "type": "array"
                 },
                 {
@@ -49564,6 +49567,7 @@
                     ],
                     "type": "string"
                   },
+                  "maxItems": 20,
                   "type": "array"
                 },
                 {
@@ -63950,6 +63954,7 @@
             "schema": {
               "anyOf": [
                 {
+                  "maxLength": 512,
                   "type": "string"
                 },
                 {
@@ -64580,6 +64585,7 @@
             "schema": {
               "anyOf": [
                 {
+                  "maxLength": 512,
                   "type": "string"
                 },
                 {
@@ -64917,6 +64923,7 @@
             "schema": {
               "anyOf": [
                 {
+                  "maxLength": 64,
                   "type": "string"
                 },
                 {
@@ -64962,6 +64969,7 @@
             "schema": {
               "anyOf": [
                 {
+                  "maxLength": 512,
                   "type": "string"
                 },
                 {
@@ -65705,6 +65713,7 @@
             "schema": {
               "anyOf": [
                 {
+                  "maxLength": 512,
                   "type": "string"
                 },
                 {
@@ -66574,6 +66583,7 @@
             "schema": {
               "anyOf": [
                 {
+                  "maxLength": 64,
                   "type": "string"
                 },
                 {
@@ -66636,6 +66646,7 @@
             "schema": {
               "anyOf": [
                 {
+                  "maxLength": 512,
                   "type": "string"
                 },
                 {
@@ -67507,6 +67518,7 @@
             "schema": {
               "anyOf": [
                 {
+                  "maxLength": 512,
                   "type": "string"
                 },
                 {
@@ -67883,6 +67895,7 @@
             "schema": {
               "anyOf": [
                 {
+                  "maxLength": 64,
                   "type": "string"
                 },
                 {
@@ -68330,6 +68343,7 @@
             "schema": {
               "anyOf": [
                 {
+                  "maxLength": 64,
                   "type": "string"
                 },
                 {
@@ -68358,6 +68372,7 @@
             "schema": {
               "anyOf": [
                 {
+                  "maxLength": 512,
                   "type": "string"
                 },
                 {
@@ -69294,6 +69309,7 @@
             "schema": {
               "anyOf": [
                 {
+                  "maxLength": 64,
                   "type": "string"
                 },
                 {
@@ -69310,6 +69326,7 @@
             "schema": {
               "anyOf": [
                 {
+                  "maxLength": 64,
                   "type": "string"
                 },
                 {
@@ -69372,6 +69389,7 @@
             "schema": {
               "anyOf": [
                 {
+                  "maxLength": 512,
                   "type": "string"
                 },
                 {
@@ -69779,6 +69797,7 @@
             "schema": {
               "anyOf": [
                 {
+                  "maxLength": 64,
                   "type": "string"
                 },
                 {
@@ -69795,6 +69814,7 @@
             "schema": {
               "anyOf": [
                 {
+                  "maxLength": 64,
                   "type": "string"
                 },
                 {
@@ -69811,6 +69831,7 @@
             "schema": {
               "anyOf": [
                 {
+                  "maxLength": 64,
                   "type": "string"
                 },
                 {
@@ -69876,6 +69897,7 @@
             "schema": {
               "anyOf": [
                 {
+                  "maxLength": 512,
                   "type": "string"
                 },
                 {
