@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { installBffStub, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
 import { intlErrors, messages, renderWithIntl } from "@/test/render";
 import { me, STUDENT } from "@/test/school-fixtures";
+import { adjustmentSchema, concessionSchema } from "./AccountScreen";
 import { ApprovalsScreen } from "./ApprovalsScreen";
 import { CounterScreen } from "./CounterScreen";
 import {
@@ -23,6 +24,7 @@ import {
 } from "./data";
 import { ReceiptDetailScreen } from "./ReceiptDetailScreen";
 import { ReceiptsScreen } from "./ReceiptsScreen";
+import { SetupScreen } from "./SetupScreen";
 
 /**
  * Fee screens (R2-1B; US-2102, US-2103..US-2106, US-2110; docs/17 §5.8). Synthetic names and
@@ -453,5 +455,196 @@ describe("approvals inbox (D17: never one's own request)", () => {
         ),
       ).toHaveLength(1),
     );
+  });
+});
+
+describe("fee problems the API returns have plain-language messages (FR-FEE-007..009)", () => {
+  /** 409/422 problem codes of app/fees with no shared `errors.api.*` message. */
+  const FEE_CODES = [
+    "above_late_fee",
+    "refund_first",
+    "voucher_not_ready",
+    "plan_not_draft",
+    "plan_already_active",
+    "plan_not_active",
+    "too_many_heads",
+    "too_many_students",
+  ];
+  /** Field codes (`errors.<code>`) of app/fees validation failures. */
+  const FIELD_CODES = [
+    "above_100_percent",
+    "above_late_fee",
+    "waiver_reduces_late_fee",
+    "zero",
+    "above_due",
+    "allocations_do_not_add_up",
+    "invalid_utr",
+    "invalid_cheque_number",
+    "invalid_reference",
+    "not_for_mode",
+    "original_method_only",
+    "original_method_online_only",
+    "in_future",
+    "too_old",
+    "invalid_range",
+  ];
+
+  it("has a title and body for every fee problem code, in en and te", () => {
+    for (const locale of ["en", "te"] as const) {
+      const errors = messages[locale].fees.errors as Record<
+        string,
+        { title?: string; body?: string }
+      >;
+      for (const code of FEE_CODES) {
+        expect(typeof errors[code]?.title, `${locale}:${code}`).toBe("string");
+        expect(typeof errors[code]?.body, `${locale}:${code}`).toBe("string");
+      }
+      const fields = messages[locale].errors.field as unknown as Record<string, unknown>;
+      for (const code of FIELD_CODES) {
+        expect(typeof fields[code], `${locale}:${code}`).toBe("string");
+      }
+    }
+  });
+
+  it("explains a waiver above the late fee left when approving (409 above_late_fee)", async () => {
+    signedIn([CONCESSION_APPROVE]);
+    const id = "0192f3a4-0000-7000-8000-00000000f403";
+    stub.routes["GET /bff/api/v1/fees/approvals"] = () =>
+      Response.json([
+        {
+          kind: "adjustment",
+          id,
+          account_id: ACCOUNT,
+          student_id: STUDENT,
+          student_name: "Synthetica Fee Student",
+          class_section: "Class IX A",
+          amount: "-100.00",
+          summary_code: "late_fee_waiver",
+          reason: "Waive the late fee",
+          requested_by: MEMBER,
+          requested_by_name: "Synthetic Clerk",
+          requested_at: "2026-10-17T05:00:00Z",
+          receipt_id: null,
+          receipt_number: null,
+          mine: false,
+          can_decide: true,
+          version: 1,
+        } satisfies ApprovalItem,
+      ]);
+    stub.routes[`POST /bff/api/v1/fees/adjustments/${id}/approve`] = () =>
+      problem(409, "above_late_fee");
+    const user = userEvent.setup();
+    renderWithIntl(<ApprovalsScreen />);
+    await user.click(await screen.findByRole("button", { name: en.approvals.approve }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: en.approvals.approve }));
+    const errors = en.errors as Record<string, { title: string } | undefined>;
+    expect(
+      await within(dialog).findByText(errors.above_late_fee?.title ?? "(no message)"),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("own allocation at the counter (FR-FEE-010, FR-FEE-028)", () => {
+  it("says the most each line takes in rupees with Indian grouping", async () => {
+    signedIn([COLLECT]);
+    stub.routes["GET /bff/api/v1/fees/status"] = () => Response.json(STATUS);
+    stub.routes["POST /bff/api/v1/fees/accounts/search"] = () => Response.json([MATCH]);
+    const big = account();
+    big.lines = big.lines.map((l, i) => (i === 0 ? { ...l, due: "125000.00" } : l));
+    big.totals = { ...big.totals, collectable: "128100.00" };
+    stub.routes[`GET /bff/api/v1/fees/accounts/${ACCOUNT}`] = () => Response.json(big);
+    const user = userEvent.setup();
+    renderWithIntl(<CounterScreen />);
+    const search = await screen.findByRole("combobox", { name: en.counter.searchLabel });
+    await user.type(search, "F-0001");
+    await screen.findByRole("option", { name: /Synthetica Fee Student/ });
+    await user.keyboard("{Enter}");
+    await user.click(await screen.findByRole("button", { name: en.counter.changeAllocation }));
+    const upTo = (amount: string) => en.counter.upTo.replace("{amount}", amount);
+    expect(await screen.findByText(upTo("₹1,25,000.00"))).toBeInTheDocument();
+    expect(screen.queryByText(upTo("125000.00"))).not.toBeInTheDocument();
+  });
+});
+
+describe("fee plans (FR-FEE-004)", () => {
+  it("makes a new version with an Idempotency-Key, so a retry does not make a second draft", async () => {
+    signedIn(["fee.manage"]);
+    const PLAN = "0192f3a4-0000-7000-8000-00000000f302";
+    stub.routes["GET /bff/api/v1/fees/status"] = () => Response.json(STATUS);
+    stub.routes["GET /bff/api/v1/fees/heads"] = () => Response.json([]);
+    stub.routes["GET /bff/api/v1/academic-years"] = () =>
+      Response.json({ data: [], next_cursor: null });
+    stub.routes["GET /bff/api/v1/classes"] = () => Response.json({ data: [], next_cursor: null });
+    const plan = {
+      id: PLAN,
+      academic_year_id: "0192f3a4-0000-7000-8000-00000000f301",
+      class_id: "0192f3a4-0000-7000-8000-00000000f303",
+      category_code: null,
+      plan_version: 1,
+      status: "active",
+      name: "Class IX 2026-27",
+      late_fee_rule: {},
+      previous_plan_id: null,
+      lines: [],
+      instalments: [],
+      annual_total: "0.00",
+      accounts: 0,
+      version: 1,
+    };
+    stub.routes["GET /bff/api/v1/fees/plans"] = () => Response.json([plan]);
+    stub.routes[`POST /bff/api/v1/fees/plans/${PLAN}/new-version`] = () =>
+      Response.json({ ...plan, status: "draft", plan_version: 2 }, { status: 201 });
+    const user = userEvent.setup();
+    renderWithIntl(<SetupScreen />);
+    await user.click(await screen.findByRole("button", { name: en.setup.newVersion }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: en.setup.newVersion }));
+    await waitFor(() =>
+      expect(stub.callsTo(`POST /bff/api/v1/fees/plans/${PLAN}/new-version`)).toHaveLength(1),
+    );
+    const [call] = stub.callsTo(`POST /bff/api/v1/fees/plans/${PLAN}/new-version`);
+    expect(call?.headers.get("idempotency-key")).toBeTruthy();
+  });
+});
+
+describe("account requests check what the API checks (FR-FEE-007, FR-FEE-009)", () => {
+  type Parsed = {
+    success: boolean;
+    error?: { issues: readonly { path: readonly PropertyKey[]; message: string }[] };
+  };
+  const issues = (parsed: Parsed) =>
+    parsed.success
+      ? []
+      : (parsed.error?.issues ?? []).map((i) => `${i.path.map(String).join(".")}:${i.message}`);
+  const base = { concession_type: "merit", target: `1:${HEAD}`, reason: "Merit scholarship" };
+
+  it("refuses a percent concession above 100", () => {
+    const schema = concessionSchema();
+    expect(issues(schema.safeParse({ ...base, basis: "percent", value: "101" }))).toEqual([
+      "value:invalidPercent",
+    ]);
+    expect(issues(schema.safeParse({ ...base, basis: "percent", value: "100" }))).toEqual([]);
+    expect(issues(schema.safeParse({ ...base, basis: "amount", value: "101" }))).toEqual([]);
+  });
+
+  it("keeps a late-fee waiver on the late fee, negative and within what is left", () => {
+    const schema = adjustmentSchema(account().lines);
+    const ask = (target: string, amount: string, reason_code: string) =>
+      issues(schema.safeParse({ target, amount, reason_code, reason: "Waive the late fee" }));
+    expect(ask("1:late", "-100", "late_fee_waiver")).toEqual([]);
+    expect(ask("1:late", "-100.01", "late_fee_waiver")).toEqual(["amount:aboveLateFee"]);
+    expect(ask("1:late", "50", "late_fee_waiver")).toEqual(["amount:waiverReducesLateFee"]);
+    expect(ask(`1:${HEAD}`, "-50", "late_fee_waiver")).toEqual(["target:waiverOnLateFee"]);
+    expect(ask("1:late", "-50", "correction")).toEqual(["reason_code:lateFeeWaiverOnly"]);
+    expect(ask(`1:${HEAD}`, "-50", "correction")).toEqual([]);
+    for (const key of [
+      "aboveLateFee",
+      "waiverReducesLateFee",
+      "waiverOnLateFee",
+      "lateFeeWaiverOnly",
+    ]) {
+      expect(messages.en.validation).toHaveProperty(key);
+    }
   });
 });

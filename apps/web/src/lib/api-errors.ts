@@ -69,6 +69,8 @@ export const KNOWN_API_CODES = [
   "invalid_characters",
   // AI answer bundles need a monthly plan (ADR-0038; docs/16 §5.7).
   "ai_bundle_needs_monthly_plan",
+  // A parent shared with a student outside the editor's classes (SEC-015; 403).
+  "guardian_shared_out_of_scope",
 ] as const;
 export type KnownApiCode = (typeof KNOWN_API_CODES)[number];
 

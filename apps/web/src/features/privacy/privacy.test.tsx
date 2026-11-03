@@ -280,6 +280,42 @@ describe("US-2602 log a request", () => {
     expect(parsed.success).toBe(false);
   });
 
+  it("FR-DPDP-005 refuses before sending what the API refuses (nomination, verification, old date)", () => {
+    const base = {
+      kind: "access",
+      student_id: ID.student,
+      membership_id: ID.student,
+      requester_relationship: "father",
+      received_on: "21/10/2026",
+    };
+    const issues = (values: Record<string, string>) => {
+      const parsed = buildRequestSchema("2026-10-21").safeParse({ ...base, ...values });
+      return parsed.success
+        ? []
+        : parsed.error.issues.map((i) => `${i.path.join(".")}:${i.message}`);
+    };
+    expect(issues({ kind: "nomination", nominee_name: "N" })).toContain(
+      "kind:nominationAdultsOnly",
+    );
+    expect(issues({ verification_method: "staff_sign_in" })).toContain(
+      "verification_method:staffSignInStaffOnly",
+    );
+    expect(
+      issues({ subject_kind: "member", verification_method: "guardian_phone_on_record" }),
+    ).toContain("verification_method:guardianPhoneGuardiansOnly");
+    expect(issues({ received_on: "19/10/2025" })).toContain("received_on:dateTooOld");
+    expect(issues({ received_on: "20/10/2025" })).toEqual([]);
+    expect(issues({ subject_kind: "member", verification_method: "staff_sign_in" })).toEqual([]);
+    for (const key of [
+      "nominationAdultsOnly",
+      "staffSignInStaffOnly",
+      "guardianPhoneGuardiansOnly",
+      "dateTooOld",
+    ]) {
+      expect(pm.validation).toHaveProperty(key);
+    }
+  });
+
   it("builds the body with the chosen subject only", () => {
     const data = buildRequestSchema("2026-10-21").parse({
       kind: "access",
