@@ -268,6 +268,23 @@ describe("own events (FR-RDY-005)", () => {
     expect(call?.headers.get("If-Match")).toBe('W/"1"');
     expect(call?.url.searchParams.get("academic_year_id")).toBe(YEAR_ID);
   });
+
+  it("FR-RDY-005: a new event starts on today in India, also after midnight IST", async () => {
+    // 20:00 UTC on 3 Nov is 01:30 IST on 4 Nov: the UTC date would be a day early (PRD §8).
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-11-03T20:00:00Z") });
+    try {
+      signedIn(MANAGER);
+      stub.routes["GET /bff/api/v1/dq/calendar"] = () => Response.json(calendar([event()]));
+      renderWithIntl(<CalendarScreen />);
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole("button", { name: t.add.open }));
+      const add = within(await screen.findByRole("dialog", { name: t.add.title }));
+      expect(add.getByLabelText(t.dialog.opensOn)).toHaveValue("04/11/2026");
+      expect(add.getByLabelText(t.dialog.closesOn)).toHaveValue("04/11/2026");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("next window on readiness (US-3104, FR-RDY-009)", () => {
