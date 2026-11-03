@@ -1709,7 +1709,9 @@ def approve_notice(
     empty = sorted(k for k, v in needed.items() if not v.strip())
     if empty:
         raise ValidationFailed([_error(f, "notice_incomplete") for f in empty])
-    _refuse_personal(texts)
+    # Only the texts that reach parents: while Telugu is hidden the Telugu columns are replaced
+    # with the English text below, and the approver can neither see nor fix them.
+    _refuse_personal(needed)
     values: dict[str, Any] = {
         "status": "approved",
         "approved_by": ctx.user_id,
