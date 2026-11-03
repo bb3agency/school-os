@@ -157,7 +157,12 @@ def create_request(
     ``Idempotency-Key``). Errors (422): ``subject_required``, ``nomination_adults_only``,
     ``date_in_future``, ``aadhaar_full_number_rejected``."""
     return idem.run(
-        db, body, lambda: service.create_request(db, ctx, body), headers=_request_headers
+        db,
+        body,
+        lambda: service.create_request(db, ctx, body),
+        headers=_request_headers,
+        # C3 texts (requester name, request text, nominee): no body kept in Valkey (H-01).
+        refetch=lambda request_id: service.get_request(db, ctx, request_id),
     )
 
 
