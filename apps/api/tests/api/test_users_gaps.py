@@ -471,11 +471,13 @@ def test_FR_IAM_012_principal_cannot_change_scopes_of_a_member_with_more_access(
     res = api.call(principal, "PUT", url, json={"scopes": []})
     assert (res.status_code, res.json()["code"]) == (403, "role_not_grantable"), res.text
     with admin_engine.connect() as c:
-        kept = c.execute(
-            text("SELECT scope_type FROM core.membership_scopes WHERE membership_id = :m"),
-            {"m": member.membership_id},
-        ).scalars()
-        assert list(kept) == ["class"]
+        kept: list[str] = list(
+            c.execute(
+                text("SELECT scope_type FROM core.membership_scopes WHERE membership_id = :m"),
+                {"m": member.membership_id},
+            ).scalars()
+        )
+        assert kept == ["class"]
     res = api.call(owner, "PUT", url, json=school_wide)
     assert res.status_code == 200, res.text
     assert [s["type"] for s in res.json()["scopes"]] == ["school"]
