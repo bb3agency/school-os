@@ -873,6 +873,32 @@ describe("fleet, flags, audit, operators, announcements, break-glass, support", 
     ).toBeNull();
   });
 
+  it("audit: the CSV file is named after the IST day, not the UTC one (FR-PLT-029)", async () => {
+    stub.routes["GET /bff/api/v1/platform/audit/events"] = (request) =>
+      request.headers.get("accept") === "text/csv"
+        ? new Response("seq,action\n", { headers: { "content-type": "text/csv" } })
+        : page([]);
+    Object.assign(URL, { createObjectURL: vi.fn(() => "blob:csv"), revokeObjectURL: vi.fn() });
+    const names: string[] = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      names.push(this.download);
+    });
+    // 01:30 on 2 October in India is still 1 October in UTC.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-01T20:00:00Z"));
+    try {
+      const user = userEvent.setup();
+      renderWithIntl(<PlatformAuditScreen filters={{}} />);
+      await user.click(await screen.findByRole("button", { name: pm.audit.exportCsv }));
+      await waitFor(() => expect(names).toEqual(["platform-audit-2026-10-02.csv"]));
+    } finally {
+      vi.useRealTimers();
+      click.mockRestore();
+    }
+  });
+
   it("audit: verifies the chain and downloads CSV with Accept: text/csv", async () => {
     stub.routes["GET /bff/api/v1/platform/audit/events"] = (request) =>
       request.headers.get("accept") === "text/csv"

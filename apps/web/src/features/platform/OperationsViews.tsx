@@ -24,6 +24,7 @@ import { Toggle } from "@/components/ui/Toggle";
 import { DataTableV2 } from "@/components/console/DataTableV2";
 import type { Column } from "@/components/ui/Table";
 import { Value } from "@/components/ui/Value";
+import { todayInIndia } from "@/features/change-requests/dates";
 import { breakGlassTone, deploymentTone, known } from "@/features/status";
 import { Link } from "@/i18n/navigation";
 import { createBffFetch } from "@/lib/bff/fetch";
@@ -949,7 +950,8 @@ export function PlatformAuditScreen({ filters = {} }: { filters?: PlatformAuditF
       const url = URL.createObjectURL(await response.blob());
       const link = document.createElement("a");
       link.href = url;
-      link.download = `platform-audit-${new Date().toISOString().slice(0, 10)}.csv`;
+      // The operator's day in India, like the date filters (01:30 IST is still yesterday in UTC).
+      link.download = `platform-audit-${todayInIndia()}.csv`;
       document.body.append(link);
       link.click();
       link.remove();
