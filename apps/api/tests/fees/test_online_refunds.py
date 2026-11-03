@@ -13,8 +13,10 @@ from typing import Any
 import pytest
 from sqlalchemy import Engine
 
+from app.core.db import tenant_session
 from app.core.errors import Conflict, Forbidden, ValidationFailed
 from app.fees import online
+from app.fees import online_repository as orepo
 from app.fees import service as fees
 from app.fees.providers.fake import STATE, webhook_body
 from app.fees.schemas import DecisionIn, RefundCreate
@@ -147,6 +149,50 @@ def test_FR_PAY_011_maker_checker_then_provider_then_voucher(
         P.scalar(
             admin_engine,
             "SELECT count(DISTINCT voucher_number) FROM fin.refunds WHERE id = :i",
+            i=refund.id,
+        )
+        == 1
+    )
+
+
+def test_FR_PAY_011_poll_sees_a_refund_processed_meanwhile(
+    school: Any, api: Any, admin_engine: Engine
+) -> None:
+    """The hourly poll loads the refunds in flight first; when the webhook worker writes the
+    voucher meanwhile, the poll's locked re-read must see it (no second voucher attempt that
+    fails the whole poll)."""
+    _, payment, _ = _online_receipt(school, api)
+    refund = _request(school, _receipt_id(admin_engine, payment.id))
+    F.call(
+        school,
+        "accountant2",
+        fees.approve_refund,
+        refund.id,
+        DecisionIn(),
+        expected_version=None,
+        person=school.people["accountant2"],
+        as_ctx=F.ctx(school, school.people["accountant2"], "accountant"),
+    )
+    assert online.send_refund(school.tenant_id, refund.id) == "processing"
+    provider_id = P.scalar(
+        admin_engine, "SELECT provider_refund_id FROM fin.refunds WHERE id = :i", i=refund.id
+    )
+    STATE.settle_refund(provider_id)
+    with tenant_session(school.tenant_id) as poll:
+        in_flight = [r for r in orepo.refunds_in_flight(poll, 100) if r.id == refund.id]
+        assert [r.status for r in in_flight] == ["processing"]
+        with tenant_session(school.tenant_id) as worker:
+            live = orepo.live_connection(worker)
+            assert live is not None
+            out = online.apply_refund(worker, live, payment.id, provider_id)
+            assert out == "voucher_written"
+        live = orepo.live_connection(poll)
+        assert live is not None
+        assert online.apply_refund(poll, live, payment.id, provider_id) == "no_change"
+    assert (
+        P.scalar(
+            admin_engine,
+            "SELECT count(*) FROM fin.ledger_entries WHERE refund_id = :i",
             i=refund.id,
         )
         == 1
