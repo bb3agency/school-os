@@ -63,6 +63,14 @@ def next_open(
         if t < quiet_end:
             return today_open
         return None
+    if purpose in early_purposes:
+        # Quiet hours that start after midnight, or none: the 20:00 close still ends the day
+        # for absence alerts and receipts (FR-MSG-011); they reopen at the morning's opening.
+        morning = quiet_end if quiet_start != quiet_end else dt.time(0)
+        if t >= early_close:
+            return dt.datetime.combine(local.date() + dt.timedelta(days=1), morning, tzinfo=IST)
+        if t < morning:
+            return dt.datetime.combine(local.date(), morning, tzinfo=IST)
     if close == quiet_end:  # no quiet hours
         return None
     # A quiet window inside one day (for example 01:00-06:00).
