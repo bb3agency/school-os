@@ -613,6 +613,7 @@ function AddSchoolDialog({ incident }: { incident: IncidentDetail }) {
             name="window_from"
             type="datetime-local"
             label={t("windowFrom")}
+            hint={tc("istHint")}
             error={errors.window_from}
             className="max-w-xs"
           />
@@ -620,6 +621,7 @@ function AddSchoolDialog({ incident }: { incident: IncidentDetail }) {
             name="window_to"
             type="datetime-local"
             label={t("windowTo")}
+            hint={tc("istHint")}
             error={errors.window_to}
             className="max-w-xs"
           />

@@ -217,6 +217,20 @@ describe("two-person confirmation (SEC-029)", () => {
     expect(JSON.parse(call?.body ?? "{}")).toHaveProperty("cert_in_reported_at");
   });
 
+  it("the add-school window fields say they are IST like the other times (FR-DPDP-030)", async () => {
+    setPermissions(["platform.incidents.read", "platform.incidents.manage"]);
+    stub.routes[`GET /bff/api/v1/platform/incidents/${INC}`] = () => Response.json(detail());
+    const user = userEvent.setup();
+    renderWithIntl(<IncidentDetailScreen incidentId={INC} />);
+    await user.click(await screen.findByRole("button", { name: im.addSchool }));
+    const dialog = screen.getByRole("dialog", { name: im.addSchoolTitle });
+    for (const label of [im.windowFrom, im.windowTo]) {
+      expect(within(dialog).getByLabelText(label)).toHaveAccessibleDescription(
+        expect.stringContaining(messages.en.common.istHint),
+      );
+    }
+  });
+
   it("the dialogs send the version read when they opened, not a background reload's (AA-13)", async () => {
     setPermissions(["platform.incidents.read", "platform.incidents.manage"]);
     let version = 5;
