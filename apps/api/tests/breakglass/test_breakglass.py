@@ -382,6 +382,59 @@ def test_SEC_021_support_access_is_read_only_and_scope_limited(
     assert api.call(operator, "POST", "/api/v1/notifications/read-all").status_code == 200
 
 
+def _student_world() -> Any:
+    """tests/students/student_world.py (synthetic students through the real services)."""
+    import importlib.util
+    import sys
+    from pathlib import Path
+
+    name = "sos_test_student_world"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "students" / "student_world.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+def test_SEC_021_section_scoped_support_session_reaches_no_student_outside_it(
+    campus: Campus, api: Any, make_operator: MakeOperator
+) -> None:
+    """Audit B (invariant 3, docs/07 §6.4): an operator's support session limited to 9A reads a
+    9A student but gets the 404 of a random id for a 9C student on every student read, and
+    cannot reveal restricted values even in scope (403: no ``student.read_sensitive``, and
+    support sessions are read-only)."""
+    sw = _student_world()
+    inside = sw.create(campus.school, name="Synthetica Support Inside", section_key="section_9a")
+    outside = sw.create(campus.school, name="Synthetica Support Outside", section_key="section_9c")
+    op = make_operator("support_agent")
+    _, grant_id = _pending(campus, op, scope={"section_id": campus.id("section_9a")})
+    approve = api.call(campus.person("owner"), "POST", f"{BASE}/requests/{grant_id}/approve")
+    assert approve.status_code == 200
+    operator = Caller(op.subject)
+    assert api.call(operator, "GET", f"/api/v1/students/{inside}").status_code == 200
+    for suffix in ("", "/values", "/guardians", "/enrollments"):
+        hidden = api.call(operator, "GET", f"/api/v1/students/{outside}{suffix}")
+        random = api.call(operator, "GET", f"/api/v1/students/{uuid.uuid4()}{suffix}")
+        assert hidden.status_code == random.status_code == 404, (suffix, hidden.text)
+        assert hidden.json()["detail"] == random.json()["detail"]
+    listed = api.call(operator, "GET", "/api/v1/students", params={"limit": 200})
+    assert listed.status_code == 200
+    got = {s["id"] for s in listed.json()["data"]}
+    assert str(inside) in got
+    assert str(outside) not in got
+    reveal = api.call(
+        operator,
+        "POST",
+        f"/api/v1/students/{inside}/sensitive-reveal",
+        json={"attribute_key": "health_notes"},
+    )
+    assert reveal.status_code == 403
+
+
 def test_T17_every_support_call_is_visible_in_the_school_audit_log(
     campus: Campus, api: Any, admin_engine: Engine, make_operator: MakeOperator
 ) -> None:
