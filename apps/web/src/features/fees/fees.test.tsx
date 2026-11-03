@@ -24,6 +24,7 @@ import {
 } from "./data";
 import { ReceiptDetailScreen } from "./ReceiptDetailScreen";
 import { ReceiptsScreen } from "./ReceiptsScreen";
+import { SetupScreen } from "./SetupScreen";
 
 /**
  * Fee screens (R2-1B; US-2102, US-2103..US-2106, US-2110; docs/17 §5.8). Synthetic names and
@@ -541,6 +542,47 @@ describe("fee problems the API returns have plain-language messages (FR-FEE-007.
     expect(
       await within(dialog).findByText(errors.above_late_fee?.title ?? "(no message)"),
     ).toBeInTheDocument();
+  });
+});
+
+describe("fee plans (FR-FEE-004)", () => {
+  it("makes a new version with an Idempotency-Key, so a retry does not make a second draft", async () => {
+    signedIn(["fee.manage"]);
+    const PLAN = "0192f3a4-0000-7000-8000-00000000f302";
+    stub.routes["GET /bff/api/v1/fees/status"] = () => Response.json(STATUS);
+    stub.routes["GET /bff/api/v1/fees/heads"] = () => Response.json([]);
+    stub.routes["GET /bff/api/v1/academic-years"] = () =>
+      Response.json({ data: [], next_cursor: null });
+    stub.routes["GET /bff/api/v1/classes"] = () => Response.json({ data: [], next_cursor: null });
+    const plan = {
+      id: PLAN,
+      academic_year_id: "0192f3a4-0000-7000-8000-00000000f301",
+      class_id: "0192f3a4-0000-7000-8000-00000000f303",
+      category_code: null,
+      plan_version: 1,
+      status: "active",
+      name: "Class IX 2026-27",
+      late_fee_rule: {},
+      previous_plan_id: null,
+      lines: [],
+      instalments: [],
+      annual_total: "0.00",
+      accounts: 0,
+      version: 1,
+    };
+    stub.routes["GET /bff/api/v1/fees/plans"] = () => Response.json([plan]);
+    stub.routes[`POST /bff/api/v1/fees/plans/${PLAN}/new-version`] = () =>
+      Response.json({ ...plan, status: "draft", plan_version: 2 }, { status: 201 });
+    const user = userEvent.setup();
+    renderWithIntl(<SetupScreen />);
+    await user.click(await screen.findByRole("button", { name: en.setup.newVersion }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: en.setup.newVersion }));
+    await waitFor(() =>
+      expect(stub.callsTo(`POST /bff/api/v1/fees/plans/${PLAN}/new-version`)).toHaveLength(1),
+    );
+    const [call] = stub.callsTo(`POST /bff/api/v1/fees/plans/${PLAN}/new-version`);
+    expect(call?.headers.get("idempotency-key")).toBeTruthy();
   });
 });
 

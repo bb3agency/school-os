@@ -504,10 +504,11 @@ function PlanRow({ plan, classes }: { plan: Plan; classes: Map<string, string> }
                 schema={z.object({})}
                 invalidate={invalidate}
                 errorNamespace="fees"
-                submit={() =>
+                submit={(_input, key) =>
                   unwrap(
                     api.POST("/api/v1/fees/plans/{plan_id}/new-version", {
                       params: { path: { plan_id: plan.id } },
+                      headers: { "Idempotency-Key": key },
                     }),
                   )
                 }
