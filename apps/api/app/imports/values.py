@@ -25,7 +25,7 @@ EXCEL_EPOCH: Final = dt.date(1899, 12, 30)
 SERIAL_MIN: Final = 10_000  # 1927-05-18: smaller numbers are not dates of birth/admission
 SERIAL_MAX: Final = 73_050  # 2099-12-31
 _NUMERIC_DATE_RE: Final = re.compile(r"^(\d{1,4})[/.\-\s](\d{1,2})[/.\-\s](\d{1,4})$")
-_TEXT_MONTH_RE: Final = re.compile(r"^(\d{1,2})[\s\-/.]+([^\d\s\-/.]+)[\s\-/.,]+(\d{2,4})$")
+_TEXT_MONTH_RE: Final = re.compile(r"^(\d{1,2})[\s\-/.]+([^\d\s\-/.,]+)[\s\-/.,]+(\d{2,4})$")
 _WS_RE: Final = re.compile(r"\s+")
 _CONTROL_RE: Final = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _MONTHS: Final = {
@@ -134,7 +134,7 @@ def parse_date(  # noqa: PLR0911, PLR0912  - one early return per input shape ke
         serial = _serial(float(value))
         return DateResult(serial) if serial else DateResult(None, "invalid_date")
     text = clean_text(str(value))
-    if text.isdigit() and len(text) == 5:
+    if text.isdecimal() and len(text) == 5:  # isdigit() also passes superscripts
         serial = _serial(float(text))
         return DateResult(serial) if serial else DateResult(None, "invalid_date")
     match = _NUMERIC_DATE_RE.match(text)
