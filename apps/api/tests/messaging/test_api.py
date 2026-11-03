@@ -773,6 +773,51 @@ def test_FR_MSG_017_search_scope(world: Any, api: Any) -> None:
     )
 
 
+def test_FR_MSG_017_scoped_reader_sees_no_message_about_a_student_outside_their_sections(
+    world: Any, api: Any
+) -> None:
+    """A class teacher reaches a guardian through a child in their section, but the guardian's
+    messages about a sibling in another section (an absence alert, a fee reminder) stay out of
+    their search (invariant 3); messages about no student (opt-in replies) stay visible."""
+    M.connect(world.a)
+    in_9a, guardian, _ = M.guardian(world.a)
+    sibling_9c, _, _ = M.guardian(world.a, section_key="section_9c")
+    with tenant_session(world.a.tenant_id) as db:
+        ids = {}
+        for key, student in (("own", in_9a), ("sibling", sibling_9c), ("none", None)):
+            queued = service.queue_message(
+                db,
+                purpose="absence_alert",
+                guardian_id=guardian,
+                student_id=student,
+                source_type="student",
+                source_id=uuid.uuid4(),
+                dedupe_key=TODAY,
+                variables={
+                    "school_name": "Synthetic Model School",
+                    "child_first_name": "Synthetica",
+                    "date": TODAY,
+                },
+            )
+            assert queued is not None
+            ids[key] = queued.message_id
+    teacher = world.person("class_teacher")
+    for body in ({"guardian_id": str(guardian)}, {"student_id": str(in_9a)}):
+        found = api.call(teacher, "POST", "/api/v1/messages/search", json=body)
+        assert found.status_code == 200, found.text
+        seen = {item["id"] for item in found.json()["items"]}
+        assert str(ids["own"]) in seen
+        assert str(ids["none"]) in seen
+        assert str(ids["sibling"]) not in seen
+    wide = api.call(
+        world.person("office_admin"),
+        "POST",
+        "/api/v1/messages/search",
+        json={"guardian_id": str(guardian)},
+    )
+    assert str(ids["sibling"]) in {item["id"] for item in wide.json()["items"]}
+
+
 def test_SEC_008_messaging_flows_log_no_phone_token_or_text(
     world: Any, api: Any, admin_engine: Engine, capsys: pytest.CaptureFixture[str], fake_state: Any
 ) -> None:

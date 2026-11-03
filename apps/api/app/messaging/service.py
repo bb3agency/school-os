@@ -1712,6 +1712,13 @@ def search_messages(
         until=_start(data.until + dt.timedelta(days=1)) if data.until else None,
         after=after,
         limit=data.limit + 1,
+        # A scoped reader reaches a guardian through one child; the guardian's messages about a
+        # sibling outside their sections stay hidden (invariant 3).
+        visible_students=(
+            None
+            if school_wide
+            else students.list_students_in_scope(session, ctx, permissions=(READ,))
+        ),
     )
     more = len(rows) > data.limit
     rows = rows[: data.limit]
