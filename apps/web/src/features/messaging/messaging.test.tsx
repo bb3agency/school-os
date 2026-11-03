@@ -389,6 +389,33 @@ describe("guardian opt-ins (US-2202, US-2203)", () => {
     expect(await screen.findByText(en.errors.opted_out_by_parent.title)).toBeInTheDocument();
   });
 
+  it("FR-MSG-008: the decision date defaults to today in India whatever the PC's time zone", async () => {
+    // 12:00 UTC on 4 Nov is 17:30 IST on 4 Nov but already 01:00 on 5 Nov on a PC set to
+    // Auckland: the API refuses a future date (date_in_future), so the PC's day must not leak.
+    const zone = process.env.TZ;
+    process.env.TZ = "Pacific/Auckland";
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-11-04T12:00:00Z") });
+    try {
+      signedIn([RECORD, READ, "student.update_nonidentity"]);
+      stub.routes[`GET /bff/api/v1/guardians/${GUARDIAN}/optins`] = () => Response.json(optins());
+      renderWithIntl(
+        <GuardianOptinsCard
+          studentId={STUDENT}
+          guardians={[{ id: GUARDIAN, full_name: "Synthetic Parent", version: 1 }]}
+        />,
+      );
+      await userEvent.click(await screen.findByRole("button", { name: en.optins.record }));
+      const dialog = within(await screen.findByRole("dialog"));
+      const decided = dialog.getByLabelText(en.optins.decidedOn);
+      expect(decided).toHaveValue("2026-11-04");
+      expect(decided).toHaveAttribute("max", "2026-11-04");
+    } finally {
+      vi.useRealTimers();
+      if (zone === undefined) delete process.env.TZ;
+      else process.env.TZ = zone;
+    }
+  });
+
   it("is hidden where messaging is not offered", async () => {
     signedIn([RECORD, READ]);
     stub.routes[`GET /bff/api/v1/guardians/${GUARDIAN}/optins`] = () =>
