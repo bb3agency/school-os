@@ -663,7 +663,10 @@ def test_FR_MSG_021_flagged_quality_pauses_until_a_person_resumes(
     assert resumed.status_code == 200
     assert resumed.json()["status"] == "active"
     assert W.audit_events(admin_engine, world.a.tenant_id, "messaging.paused")
-    assert W.audit_events(admin_engine, world.a.tenant_id, "messaging.resumed")
+    resumed_events = W.audit_events(admin_engine, world.a.tenant_id, "messaging.resumed")
+    assert resumed_events
+    # The audit names the pause that was lifted, not the cleared column (FR-MSG-021).
+    assert resumed_events[-1]["summary"]["previous_reason"] == "quality_flagged"
     del account_id
 
 

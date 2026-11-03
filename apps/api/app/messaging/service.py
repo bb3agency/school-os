@@ -600,6 +600,7 @@ def resume(session: Session, ctx: UserContext) -> MessagingAccountOut:
         raise StillRestricted(
             "Meta still rates the number's quality low. Wait until it improves before resuming."
         )
+    previous_reason = account.pause_reason  # read before the refresh clears it
     repo.update_account(
         session, account.id, {**values, "status": "active", "pause_reason": None, "paused_at": None}
     )
@@ -609,7 +610,7 @@ def resume(session: Session, ctx: UserContext) -> MessagingAccountOut:
         action="messaging.resumed",
         resource_type="messaging_account",
         resource_id=account.id,
-        summary={"previous_reason": account.pause_reason},
+        summary={"previous_reason": previous_reason},
     )
     return _account_out(session, account)
 
