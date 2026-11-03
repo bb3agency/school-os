@@ -980,7 +980,11 @@ def set_scopes(
     expected_version: int | None = None,
 ) -> UserOut:
     """Replace a member's class/section scopes (``role.assign``, step-up; FR-IAM-012).
-    ``expected_version`` is the optional ``If-Match``, as for :func:`set_roles`."""
+    ``expected_version`` is the optional ``If-Match``, as for :func:`set_roles`.
+
+    Scopes set the reach of every scoped grant the member holds, so changing them follows the
+    :func:`set_roles` rule (SEC-003): the caller must hold every permission of every role the
+    member has (the owner reaches everyone); otherwise 403 ``role_not_grantable``."""
     membership = _membership_for_user(session, user_id)
     _guard_not_breakglass(session, membership)
     if membership.status == "removed":
@@ -992,6 +996,8 @@ def set_scopes(
         (s.scope_type, s.scope_ref): s for s in repo.list_membership_scopes(session, membership.id)
     }
     wanted = {(s.type, s.ref): s for s in scopes}
+    if current.keys() != wanted.keys():
+        _guard_grantable(session, ctx, repo.list_roles_for_membership(session, membership.id))
     for key, row in current.items():
         if key not in wanted:
             repo.remove_membership_scope(session, row.id)
